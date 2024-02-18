@@ -21,6 +21,8 @@
 namespace slang::codegen
 {
 class context;
+class function;
+class value;
 }    // namespace slang::codegen
 
 namespace slang::ast
@@ -37,8 +39,9 @@ public:
      * Generate IR.
      *
      * @param ctx The context to use for code generation.
+     * @returns The value of this expression or nullptr.
      */
-    virtual void generate_code(slang::codegen::context* ctx) const = 0;
+    virtual std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const = 0;
 };
 
 /** Literal type. */
@@ -106,7 +109,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** A signed expression. */
@@ -145,7 +148,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Scope expression. */
@@ -184,7 +187,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Access expression. */
@@ -223,7 +226,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Import statements. */
@@ -257,7 +260,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Variable references. */
@@ -291,7 +294,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Variable declaration. */
@@ -335,7 +338,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Struct definition. */
@@ -374,7 +377,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Anonymous struct initialization. */
@@ -413,7 +416,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Named struct initialization. */
@@ -457,7 +460,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Binary operators. */
@@ -498,11 +501,11 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Function prototype. */
-class prototype_expression : public expression
+class prototype_ast
 {
     /** The function name. */
     std::string name;
@@ -515,18 +518,18 @@ class prototype_expression : public expression
 
 public:
     /** No default constructor. */
-    prototype_expression() = delete;
+    prototype_ast() = delete;
 
     /** Default destructor. */
-    virtual ~prototype_expression() = default;
+    virtual ~prototype_ast() = default;
 
     /** Default copy and move constructors. */
-    prototype_expression(const prototype_expression&) = default;
-    prototype_expression(prototype_expression&&) = default;
+    prototype_ast(const prototype_ast&) = default;
+    prototype_ast(prototype_ast&&) = default;
 
     /** Default assignment operators. */
-    prototype_expression& operator=(const prototype_expression&) = default;
-    prototype_expression& operator=(prototype_expression&&) = default;
+    prototype_ast& operator=(const prototype_ast&) = default;
+    prototype_ast& operator=(prototype_ast&&) = default;
 
     /**
      * Construct a function prototype.
@@ -535,14 +538,14 @@ public:
      * @param args The function's arguments as a vector of pairs (type_identifier, name).
      * @param return_type The function's return type.
      */
-    prototype_expression(std::string name, std::vector<std::pair<std::string, std::string>> args, std::string return_type)
+    prototype_ast(std::string name, std::vector<std::pair<std::string, std::string>> args, std::string return_type)
     : name{std::move(name)}
     , args{std::move(args)}
     , return_type{std::move(return_type)}
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    slang::codegen::function* generate_code(slang::codegen::context* ctx) const;
 };
 
 /** AST of a code block. This can refer to any block, e.g. the whole program, or a function body. */
@@ -576,14 +579,14 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** A function definition. */
 class function_expression : public expression
 {
     /** The function prototype. */
-    std::unique_ptr<prototype_expression> prototype;
+    std::unique_ptr<prototype_ast> prototype;
 
     /** The function's body. */
     std::unique_ptr<block> body;
@@ -609,13 +612,13 @@ public:
      * @param prototype The function's prototype.
      * @param body The function's body.
      */
-    function_expression(std::unique_ptr<prototype_expression> prototype, std::unique_ptr<block> body)
+    function_expression(std::unique_ptr<prototype_ast> prototype, std::unique_ptr<block> body)
     : prototype{std::move(prototype)}
     , body{std::move(body)}
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Function calls. */
@@ -654,7 +657,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /*
@@ -692,7 +695,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** If statement. */
@@ -736,7 +739,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** While statement. */
@@ -775,7 +778,7 @@ public:
     {
     }
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Break statement. */
@@ -796,7 +799,7 @@ public:
     break_statement& operator=(const break_statement&) = default;
     break_statement& operator=(break_statement&&) = default;
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 /** Continue statement. */
@@ -817,7 +820,7 @@ public:
     continue_statement& operator=(const continue_statement&) = default;
     continue_statement& operator=(continue_statement&&) = default;
 
-    void generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
 };
 
 }    // namespace slang::ast

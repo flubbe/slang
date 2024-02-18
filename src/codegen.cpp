@@ -99,7 +99,7 @@ void context::set_insertion_point(basic_block* ip)
  * Code generation.
  */
 
-void context::generate_binary_op(binary_op op, value_type op_type)
+void context::generate_binary_op(binary_op op, value op_type)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -132,24 +132,24 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     insertion_point->add_instruction(std::make_unique<instruction>("ifeq", std::move(args)));
 }
 
-void context::generate_const(value_type vt, std::variant<int, float, std::string> v)
+void context::generate_const(value vt, std::variant<int, float, std::string> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt == value_type::i32)
+    if(vt.get_type() == "i32")
     {
         auto arg = std::make_unique<const_argument>(std::get<int>(v));
         args.emplace_back(std::move(arg));
     }
-    else if(vt == value_type::f32)
+    else if(vt.get_type() == "f32")
     {
         auto arg = std::make_unique<const_argument>(std::get<float>(v));
         args.emplace_back(std::move(arg));
     }
-    else if(vt == value_type::str)
+    else if(vt.get_type() == "str")
     {
-        auto arg = std::make_unique<const_argument>(std::get<std::string>(v));
-        args.emplace_back(std::move(arg));
+        generate_load(std::make_unique<const_argument>(std::get<std::string>(v)));
+        return;
     }
     else
     {
@@ -193,7 +193,7 @@ void context::generate_load_element(std::vector<int> indices)
     insertion_point->add_instruction(std::make_unique<instruction>("load_element", std::move(args)));
 }
 
-void context::generate_ret(std::optional<value_type> arg)
+void context::generate_ret(std::optional<value> arg)
 {
     validate_insertion_point();
     if(!arg)
@@ -226,6 +226,12 @@ void context::generate_store_element(std::vector<int> indices)
         args.emplace_back(std::make_unique<const_argument>(i));
     }
     insertion_point->add_instruction(std::make_unique<instruction>("store_element", std::move(args)));
+}
+
+bool context::ends_with_return() const
+{
+    validate_insertion_point();
+    return insertion_point->ends_with_return();
 }
 
 }    // namespace slang::codegen

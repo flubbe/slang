@@ -105,7 +105,7 @@ protected:
     std::unique_ptr<ast::import_expression> parse_import();
 
     /** Parse a function prototype. */
-    std::unique_ptr<ast::prototype_expression> parse_prototype();
+    std::unique_ptr<ast::prototype_ast> parse_prototype();
 
     /** Parse a function definition. */
     std::unique_ptr<ast::function_expression> parse_definition();

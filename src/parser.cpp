@@ -80,7 +80,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
 
 // prototype ::= 'fn' identifier '(' args ')' -> return_type
 // args ::= identifier ':' type_id | identifier ':' type_id ',' args
-std::unique_ptr<ast::prototype_expression> parser::parse_prototype()
+std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
 {
     get_next_token();    // skip "fn" token.
     if(current_token->type != token_type::identifier)
@@ -146,13 +146,13 @@ std::unique_ptr<ast::prototype_expression> parser::parse_prototype()
     std::string return_type = current_token->s;
     get_next_token();
 
-    return std::make_unique<ast::prototype_expression>(std::move(name), std::move(args), std::move(return_type));
+    return std::make_unique<ast::prototype_ast>(std::move(name), std::move(args), std::move(return_type));
 }
 
 // function ::= protoype block_expr
 std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
-    std::unique_ptr<ast::prototype_expression> proto = parse_prototype();
+    std::unique_ptr<ast::prototype_ast> proto = parse_prototype();
     if(current_token == std::nullopt)
     {
         throw syntax_error(fmt::format("Unexpected end of file."));
