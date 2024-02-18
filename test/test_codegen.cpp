@@ -80,6 +80,30 @@ TEST(codegen, insertion_points)
     EXPECT_EQ(block.get_inserting_context(), nullptr);
 }
 
+TEST(codegen, validate_basic_block)
+{
+    auto ctx = cg::context();
+    auto fn = ctx.create_function("test", "void", {});
+    EXPECT_NE(fn, nullptr);
+
+    // basic block created by function.
+    cg::basic_block* fn_block = fn->create_basic_block("entry");
+    EXPECT_NE(fn_block, nullptr);
+
+    ctx.set_insertion_point(fn_block);
+    EXPECT_EQ(ctx.get_insertion_point(), fn_block);
+
+    EXPECT_FALSE(fn_block->is_valid());
+
+    ctx.generate_ret();
+
+    EXPECT_TRUE(fn_block->is_valid());
+
+    ctx.generate_branch(std::make_unique<cg::label_argument>("some_label"));
+
+    EXPECT_FALSE(fn_block->is_valid());
+}
+
 TEST(codegen, generate_function)
 {
     {
