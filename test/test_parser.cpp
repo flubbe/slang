@@ -92,6 +92,18 @@ TEST(parser, function)
     }
     {
         const std::string test_input =
+          "fn f(s: string, i: i32, f: f32) -> i32 {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
           "fn f(s: string) -> i32 {a = b; c;}";
 
         slang::lexer lexer;

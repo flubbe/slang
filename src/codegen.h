@@ -734,6 +734,38 @@ public:
     }
 
     /**
+     * Get the variable for the given name.
+     *
+     * @param name The variable's name.
+     * @returns The variable or nullptr.
+     */
+    variable* get_variable(const std::string& name)
+    {
+        auto it = std::find_if(args.begin(), args.end(),
+                               [&name](const std::unique_ptr<variable>& v) -> bool
+                               {
+                                   return v->get_name() == name;
+                               });
+        if(it != args.end())
+        {
+            return it->get();
+        }
+
+        it = std::find_if(locals.begin(), locals.end(),
+                          [&name](const std::unique_ptr<variable>& v) -> bool
+                          {
+                              return v->get_name() == name;
+                          });
+
+        if(it != locals.end())
+        {
+            return it->get();
+        }
+
+        return nullptr;
+    }
+
+    /**
      * Add an argument.
      *
      * @param arg The argument.
@@ -774,6 +806,53 @@ public:
     {
         return locals;
     }
+
+    /** Get the outer scope. */
+    scope* get_outer()
+    {
+        return outer;
+    }
+
+    /** Get the outer scope. */
+    const scope* get_outer() const
+    {
+        return outer;
+    }
+};
+
+/**
+ * A scope guard that automatically gets called when the scope is exited.
+ */
+class scope_guard
+{
+    /** The associated context. */
+    context* ctx;
+
+    /** The scope. */
+    scope* s;
+
+public:
+    /** No default constructor. */
+    scope_guard() = delete;
+
+    /** Default copy and move constructors. */
+    scope_guard(const scope_guard&) = default;
+    scope_guard(scope_guard&&) = default;
+
+    /**
+     * Construct a scope guard.
+     *
+     * @param ctx The associated context.
+     * @param s The scope.
+     */
+    scope_guard(context* ctx, scope* s);
+
+    /** Destructor. */
+    ~scope_guard();
+
+    /** Default assignments.*/
+    scope_guard& operator=(const scope_guard&) = default;
+    scope_guard& operator=(scope_guard&&) = default;
 };
 
 /**
@@ -836,6 +915,18 @@ public:
     void create_local(std::unique_ptr<variable> v)
     {
         scope.add_local(std::move(v));
+    }
+
+    /** Get the function's scope. */
+    class scope* get_scope()
+    {
+        return &scope;
+    }
+
+    /** Get the function's scope. */
+    const class scope* get_scope() const
+    {
+        return &scope;
     }
 
     /** String representation of function. */
@@ -967,6 +1058,9 @@ class context
     /** Global scope. */
     std::unique_ptr<scope> global_scope;
 
+    /** The current scope stack. */
+    std::vector<scope*> current_scopes;
+
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
@@ -1044,6 +1138,47 @@ public:
     basic_block* get_insertion_point() const
     {
         return insertion_point;
+    }
+
+    /**
+     * Enter a new scope.
+     *
+     * @param s The new scope.
+     */
+    void enter_scope(scope* s)
+    {
+        current_scopes.push_back(s);
+    }
+
+    /**
+     * Exit a scope.
+     *
+     * @param s The scope to leave. Has to be the last entered scope.
+     */
+    void exit_scope(scope* s)
+    {
+        if(current_scopes.size() == 0)
+        {
+            throw codegen_error("No scope to leave.");
+        }
+
+        if(current_scopes.back() != s)
+        {
+            throw codegen_error("Tried exiting wrong scope.");
+        }
+
+        current_scopes.pop_back();
+    }
+
+    /** Get the current scope. */
+    scope* get_scope()
+    {
+        if(current_scopes.size() > 0)
+        {
+            return current_scopes.back();
+        }
+
+        return global_scope.get();
     }
 
     /*
@@ -1247,6 +1382,22 @@ inline void basic_block::set_inserting_context(context* ctx)
     {
         inserting_context->set_insertion_point(this);
     }
+}
+
+/*
+ * scope_guard implementation.
+ */
+
+inline scope_guard::scope_guard(context* ctx, scope* s)
+: ctx{ctx}
+, s{s}
+{
+    ctx->enter_scope(s);
+}
+
+inline scope_guard::~scope_guard()
+{
+    ctx->exit_scope(s);
 }
 
 }    // namespace slang::codegen

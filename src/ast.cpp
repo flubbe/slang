@@ -105,8 +105,29 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx) co
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context* ctx) const
 {
-    // TODO
-    throw std::runtime_error("variable_reference_expression::generate_code not implemented.");
+    auto* s = ctx->get_scope();
+    if(s == nullptr)
+    {
+        throw cg::codegen_error(fmt::format("No scope to search for '{}'.", name));
+    }
+
+    const cg::variable* var{nullptr};
+    while(s != nullptr)
+    {
+        if((var = s->get_variable(name)) != nullptr)
+        {
+            break;
+        }
+        s = s->get_outer();
+    }
+
+    if(s == nullptr)
+    {
+        throw cg::codegen_error(fmt::format("Cannot find variable '{}' in current scope.", name));
+    }
+
+    ctx->generate_load(std::make_unique<cg::variable_argument>(*var));
+    return std::make_unique<cg::value>(var->get_value());
 }
 
 /*
@@ -115,8 +136,27 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context* ctx) const
 {
-    // TODO
-    throw std::runtime_error("variable_declaration_expression::generate_code not implemented.");
+    cg::scope* s = ctx->get_scope();
+    if(s == nullptr)
+    {
+        throw cg::codegen_error("No scope available for adding locals.");
+    }
+    s->add_local(std::make_unique<cg::variable>(name, type));
+
+    if(expr)
+    {
+        auto v = expr->generate_code(ctx);
+        if(is_builtin_type(type))
+        {
+            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name, type}));
+        }
+        else
+        {
+            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name, "composite", type}));
+        }
+    }
+
+    return {};
 }
 
 /*
@@ -203,16 +243,20 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
 {
     cg::function* fn = prototype->generate_code(ctx);
     cg::basic_block* bb = fn->create_basic_block("entry");
+
+    cg::scope_guard sg{ctx, fn->get_scope()};
+
     ctx->set_insertion_point(bb);
-    body->generate_code(ctx);
+    auto v = body->generate_code(ctx);
 
     // generate return instruction if required.
     if(!ctx->ends_with_return())
     {
         ctx->generate_ret();
+        return {};
     }
 
-    return {};
+    return v;
 }
 
 /*

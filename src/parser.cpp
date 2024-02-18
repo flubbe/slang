@@ -125,6 +125,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         {
             break;
         }
+
+        get_next_token();    // skip ","
     }
 
     if(current_token->s != ")")

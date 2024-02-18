@@ -159,4 +159,66 @@ TEST(compile_ir, builtin_return_values)
     }
 }
 
+TEST(compile_ir, function_arguments_and_locals)
+{
+    {
+        const std::string test_input =
+          "fn f(i: i32, j: str, k: f32) -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f(i32 %i, str %j, f32 %k) {\n"
+                  "entry:\n"
+                  " ret\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(i: i32, j: str, k: f32) -> i32\n"
+          "{\n"
+          " let a: i32 = 1;\n"
+          " return a;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %i, str %j, f32 %k) {\n"
+                  "local i32 %a\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " store i32 %a\n"
+                  " load i32 %a\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
 }    // namespace
