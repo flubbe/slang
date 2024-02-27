@@ -205,20 +205,20 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx) co
 
 cg::function* prototype_ast::generate_code(cg::context* ctx) const
 {
-    std::vector<cg::variable> function_args;
+    std::vector<std::unique_ptr<cg::variable>> function_args;
     for(auto& a: args)
     {
         if(is_builtin_type(a.second))
         {
-            function_args.emplace_back(cg::variable(a.first, a.second));
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first, a.second));
         }
         else
         {
-            function_args.emplace_back(cg::variable(a.first, "composite", a.second));
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first, "composite", a.second));
         }
     }
 
-    return ctx->create_function(name, return_type, function_args);
+    return ctx->create_function(name, return_type, std::move(function_args));
 }
 
 /*

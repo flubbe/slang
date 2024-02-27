@@ -64,7 +64,7 @@ std::size_t context::get_string(std::string str)
     return strings.size() - 1;
 }
 
-function* context::create_function(std::string name, std::string return_type, std::vector<variable> args)
+function* context::create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
 {
     if(std::find_if(funcs.begin(), funcs.end(),
                     [&name](const std::unique_ptr<function>& fn) -> bool

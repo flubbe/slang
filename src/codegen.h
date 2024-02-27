@@ -704,6 +704,16 @@ public:
     scope& operator=(scope&&) = default;
 
     /**
+     * Create a scope and initialize it with function arguments.
+     *
+     * @param args The function's arguments.
+     */
+    scope(std::vector<std::unique_ptr<variable>> args)
+    : args{std::move(args)}
+    {
+    }
+
+    /**
      * Check if the name is already contained in this scope as an argument or a local variable.
      *
      * @returns True if the name exists.
@@ -866,9 +876,6 @@ class function
     /** The function's return type. */
     std::string return_type;
 
-    /** The function's arguments. */
-    std::vector<variable> args;
-
     /** The function variable scope. */
     scope scope;
 
@@ -884,10 +891,10 @@ public:
     /**
      * Construct a function from a name and return type.
      */
-    function(std::string name, std::string return_type, std::vector<variable> args)
+    function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
     : name{std::move(name)}
     , return_type{std::move(return_type)}
-    , args{std::move(args)}
+    , scope{std::move(args)}
     {
     }
 
@@ -933,13 +940,15 @@ public:
     std::string to_string() const
     {
         std::string buf = fmt::format("define {} @{}(", return_type, name);
+
+        const auto& args = scope.get_args();
         if(args.size() > 0)
         {
             for(std::size_t i = 0; i < args.size() - 1; ++i)
             {
-                buf += fmt::format("{}, ", args[i].to_string());
+                buf += fmt::format("{}, ", args[i]->to_string());
             }
-            buf += fmt::format("{}) ", args.back().to_string());
+            buf += fmt::format("{}) ", args.back()->to_string());
         }
         else
         {
@@ -1125,7 +1134,7 @@ public:
      * @param args The function's arguments.
      * @returns A representation of the function.
      */
-    function* create_function(std::string name, std::string return_type, std::vector<variable> args);
+    function* create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args);
 
     /**
      * Set instruction insertion point.

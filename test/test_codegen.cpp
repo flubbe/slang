@@ -114,7 +114,10 @@ TEST(codegen, generate_function)
          * {
          * }
          */
-        auto fn = ctx.create_function("f", "void", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "void", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -143,7 +146,10 @@ TEST(codegen, generate_function)
          *     return -31;
          * }
          */
-        auto fn = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "i32", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -174,7 +180,10 @@ TEST(codegen, generate_function)
          *     return a;
          * }
          */
-        auto fn = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "i32", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -209,7 +218,10 @@ TEST(codegen, operators)
          *     return a + 1;
          * }
          */
-        auto fn = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "i32", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -255,7 +267,10 @@ TEST(codegen, conditional_branch)
          *     return 0;
          * }
          */
-        auto fn = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "i32", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -321,7 +336,10 @@ TEST(codegen, locals_store)
          *     let b: i32 = a;
          * }
          */
-        auto fn = ctx.create_function("f", "void", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn = ctx.create_function("f", "void", std::move(args));
         EXPECT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -370,7 +388,10 @@ TEST(codegen, invoke)
          *     return a*b;
          * }
          */
-        auto fn_f = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args_f;
+        args_f.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn_f = ctx.create_function("f", "i32", std::move(args_f));
         EXPECT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
@@ -397,7 +418,11 @@ TEST(codegen, invoke)
 
         EXPECT_TRUE(block->is_valid());
 
-        auto fn_g = ctx.create_function("g", "i32", {{"a", "i32"}, {"b", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args_g;
+        args_g.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+        args_g.emplace_back(std::make_unique<cg::variable>("b", "i32"));
+
+        auto fn_g = ctx.create_function("g", "i32", std::move(args_g));
         EXPECT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -452,7 +477,10 @@ TEST(codegen, invoke)
          *     return a*b;
          * }
          */
-        auto fn_f = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args_f;
+        args_f.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn_f = ctx.create_function("f", "i32", std::move(args_f));
         EXPECT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
@@ -480,7 +508,11 @@ TEST(codegen, invoke)
 
         EXPECT_TRUE(block->is_valid());
 
-        auto fn_g = ctx.create_function("g", "i32", {{"a", "i32"}, {"b", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args_g;
+        args_g.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+        args_g.emplace_back(std::make_unique<cg::variable>("b", "i32"));
+
+        auto fn_g = ctx.create_function("g", "i32", std::move(args_g));
         EXPECT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -545,7 +577,10 @@ TEST(codegen, composite_data)
 
         ctx.create_type("S", {{"a", "i32"}, {"b", "i32"}});
 
-        auto fn_f = ctx.create_function("f", "i32", {{"a", "i32"}});
+        std::vector<std::unique_ptr<cg::variable>> args;
+        args.emplace_back(std::make_unique<cg::variable>("a", "i32"));
+
+        auto fn_f = ctx.create_function("f", "i32", std::move(args));
         EXPECT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
