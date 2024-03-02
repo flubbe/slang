@@ -398,7 +398,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         lexical_token bin_op = *current_token;
         get_next_token();
 
-        std::unique_ptr<ast::expression> rhs = parse_primary();
+        std::unique_ptr<ast::expression> rhs = parse_expression();
 
         int next_prec = get_token_precedence();
         if(tok_prec < next_prec)

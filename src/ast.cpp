@@ -33,8 +33,28 @@ static bool is_builtin_type(const std::string& s)
  * literal_expression.
  */
 
-std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc == memory_context::store)
+    {
+        if(type == literal_type::int_literal)
+        {
+            throw cg::codegen_error(fmt::format("Cannot store into int_literal '{}'.", std::get<int>(*value)));
+        }
+        else if(type == literal_type::fp_literal)
+        {
+            throw cg::codegen_error(fmt::format("Cannot store into fp_literal '{}'.", std::get<float>(*value)));
+        }
+        else if(type == literal_type::str_literal)
+        {
+            throw cg::codegen_error(fmt::format("Cannot store into str_literal '{}'.", std::get<std::string>(*value)));
+        }
+        else
+        {
+            throw cg::codegen_error(fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(type)));
+        }
+    }
+
     if(type == literal_type::int_literal)
     {
         ctx->generate_const({"i32"}, *value);
@@ -63,7 +83,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx) c
  * signed_expression.
  */
 
-std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("signed_expression::generate_code not implemented.");
@@ -73,7 +93,7 @@ std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx) co
  * scope_expression.
  */
 
-std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("scope_expression::generate_code not implemented.");
@@ -83,7 +103,7 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx) con
  * access_expression.
  */
 
-std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("access_expression::generate_code not implemented.");
@@ -93,7 +113,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx) co
  * import_expression.
  */
 
-std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("import_expression::generate_code not implemented.");
@@ -103,7 +123,7 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx) co
  * variable_reference_expression.
  */
 
-std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     auto* s = ctx->get_scope();
     if(s == nullptr)
@@ -126,7 +146,15 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         throw cg::codegen_error(fmt::format("Cannot find variable '{}' in current scope.", name));
     }
 
-    ctx->generate_load(std::make_unique<cg::variable_argument>(*var));
+    if(mc == memory_context::none || mc == memory_context::load)
+    {
+        ctx->generate_load(std::make_unique<cg::variable_argument>(*var));
+    }
+    else
+    {
+        ctx->generate_store(std::make_unique<cg::variable_argument>(*var));
+    }
+
     return std::make_unique<cg::value>(var->get_value());
 }
 
@@ -134,8 +162,13 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
  * variable_declaration_expression.
  */
 
-std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error("Invalid memory context for variable declaration.");
+    }
+
     cg::scope* s = ctx->get_scope();
     if(s == nullptr)
     {
@@ -163,7 +196,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
  * struct_definition_expression.
  */
 
-std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("struct_definition_expression::generate_code not implemented.");
@@ -173,7 +206,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
  * struct_anonymous_initializer_expression.
  */
 
-std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("struct_anonymous_initializer_expression::generate_code not implemented.");
@@ -183,7 +216,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
  * struct_named_initializer_expression.
  */
 
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("struct_named_initializer_expression::generate_code not implemented.");
@@ -193,18 +226,42 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
  * binary_expression.
  */
 
-std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error("binary_expression::generate_code not implemented.");
+    if(op == "=")
+    {
+        if(mc == memory_context::store)
+        {
+            throw cg::codegen_error("Invalid memory context for assignment.");
+        }
+
+        rhs->generate_code(ctx, memory_context::load);
+        auto value = lhs->generate_code(ctx, memory_context::store);
+
+        if(mc == memory_context::load)
+        {
+            value = lhs->generate_code(ctx, memory_context::load);
+        }
+
+        return value;
+    }
+    else
+    {
+        throw std::runtime_error(fmt::format("binary_expression::generate_code not implemented for '{}'.", op));
+    }
 }
 
 /*
  * prototype_ast.
  */
 
-cg::function* prototype_ast::generate_code(cg::context* ctx) const
+cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error("Invalid memory context for prototype_ast.");
+    }
+
     std::vector<std::unique_ptr<cg::variable>> function_args;
     for(auto& a: args)
     {
@@ -225,12 +282,17 @@ cg::function* prototype_ast::generate_code(cg::context* ctx) const
  * block.
  */
 
-std::unique_ptr<cg::value> block::generate_code(cg::context* ctx) const
+std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error("Invalid memory context for code block.");
+    }
+
     std::unique_ptr<cg::value> v;
     for(auto& expr: this->exprs)
     {
-        v = expr->generate_code(ctx);
+        v = expr->generate_code(ctx, memory_context::none);
     }
     return v;
 }
@@ -239,8 +301,13 @@ std::unique_ptr<cg::value> block::generate_code(cg::context* ctx) const
  * function_expression.
  */
 
-std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error("Invalid memory context for function_expression.");
+    }
+
     cg::function* fn = prototype->generate_code(ctx);
     cg::basic_block* bb = fn->create_basic_block("entry");
 
@@ -263,7 +330,7 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
  * call_expression.
  */
 
-std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("call_expression::generate_code not implemented.");
@@ -273,8 +340,13 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
  * return_statement.
  */
 
-std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error("Invalid memory context for return_statement.");
+    }
+
     auto v = expr->generate_code(ctx);
     if(!v)
     {
@@ -288,7 +360,7 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
  * if_statement.
  */
 
-std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("if_statement::generate_code not implemented.");
@@ -298,7 +370,7 @@ std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* 
  * while_statement.
  */
 
-std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("while_statement::generate_code not implemented.");
@@ -308,7 +380,7 @@ std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::contex
  * break_statement.
  */
 
-std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("break_statement::generate_code not implemented.");
@@ -318,7 +390,7 @@ std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::contex
  * continue_statement.
  */
 
-std::unique_ptr<slang::codegen::value> continue_statement::generate_code(cg::context* ctx) const
+std::unique_ptr<slang::codegen::value> continue_statement::generate_code(cg::context* ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error("continue_statement::generate_code not implemented.");

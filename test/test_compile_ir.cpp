@@ -219,6 +219,102 @@ TEST(compile_ir, function_arguments_and_locals)
                   " ret i32\n"
                   "}");
     }
+    {
+        const std::string test_input =
+          "fn f(i: i32, j: i32, k: f32) -> i32\n"
+          "{\n"
+          " let a: i32 = j;\n"
+          " return a;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+                  "local i32 %a\n"
+                  "entry:\n"
+                  " load i32 %j\n"
+                  " store i32 %a\n"
+                  " load i32 %a\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(i: i32, j: i32, k: f32) -> i32\n"
+          "{\n"
+          " i = 3;\n"
+          " return j;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+                  "entry:\n"
+                  " const i32 3\n"
+                  " store i32 %i\n"
+                  " load i32 %j\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(i: i32, j: i32, k: f32) -> i32\n"
+          "{\n"
+          " i = j = 3;\n"
+          " return j;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+                  "entry:\n"
+                  " const i32 3\n"
+                  " store i32 %j\n"
+                  " load i32 %j\n"
+                  " store i32 %i\n"
+                  " load i32 %j\n"
+                  " ret i32\n"
+                  "}");
+    }
 }
 
 }    // namespace

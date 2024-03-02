@@ -28,6 +28,16 @@ class value;
 namespace slang::ast
 {
 
+/**
+ * The memory context for an expression.
+ */
+enum class memory_context
+{
+    none,  /** Neither load nor store. */
+    load,  /** loading context. */
+    store, /** storing context. */
+};
+
 /** Base class for all expression nodes. */
 class expression
 {
@@ -41,7 +51,7 @@ public:
      * @param ctx The context to use for code generation.
      * @returns The value of this expression or nullptr.
      */
-    virtual std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const = 0;
+    virtual std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const = 0;
 };
 
 /** Literal type. */
@@ -109,7 +119,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** A signed expression. */
@@ -148,7 +158,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Scope expression. */
@@ -187,7 +197,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Access expression. */
@@ -226,7 +236,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Import statements. */
@@ -260,7 +270,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Variable references. */
@@ -294,7 +304,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Variable declaration. */
@@ -338,7 +348,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Struct definition. */
@@ -377,7 +387,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Anonymous struct initialization. */
@@ -416,7 +426,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Named struct initialization. */
@@ -460,7 +470,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Binary operators. */
@@ -501,7 +511,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Function prototype. */
@@ -545,7 +555,7 @@ public:
     {
     }
 
-    slang::codegen::function* generate_code(slang::codegen::context* ctx) const;
+    slang::codegen::function* generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const;
 };
 
 /** AST of a code block. This can refer to any block, e.g. the whole program, or a function body. */
@@ -579,7 +589,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** A function definition. */
@@ -618,7 +628,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Function calls. */
@@ -657,7 +667,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /*
@@ -695,7 +705,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** If statement. */
@@ -739,7 +749,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** While statement. */
@@ -778,7 +788,7 @@ public:
     {
     }
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Break statement. */
@@ -799,7 +809,7 @@ public:
     break_statement& operator=(const break_statement&) = default;
     break_statement& operator=(break_statement&&) = default;
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 /** Continue statement. */
@@ -820,7 +830,7 @@ public:
     continue_statement& operator=(const continue_statement&) = default;
     continue_statement& operator=(continue_statement&&) = default;
 
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx) const override;
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
 };
 
 }    // namespace slang::ast
