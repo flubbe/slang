@@ -563,8 +563,17 @@ std::string function_expression::to_string() const
 
 std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error("call_expression::generate_code not implemented.");
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error("Cannot store into call expression.");
+    }
+
+    for(auto& arg: args)
+    {
+        arg->generate_code(ctx, memory_context::load);
+    }
+    ctx->generate_invoke(std::make_unique<cg::function_argument>(callee));
+    return {};    // FIXME return the return type of the function?
 }
 
 std::string call_expression::to_string() const

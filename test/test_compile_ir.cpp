@@ -549,4 +549,69 @@ TEST(compile_ir, binary_operators)
     }
 }
 
+TEST(compile_ir, function_calls)
+{
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " invoke @g\n"
+                  " ret\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g(1, 2.3, \"Test\", h());\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  ".string @0 \"Test\"\n"
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " const f32 2.3\n"
+                  " load str @0\n"
+                  " invoke @h\n"
+                  " invoke @g\n"
+                  " ret\n"
+                  "}");
+    }
+}
+
 }    // namespace
