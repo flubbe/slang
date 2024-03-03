@@ -77,7 +77,7 @@ static bool is_hexdigit(const std::optional<char>& c)
 }
 
 /** The count of operators the lexer supports. */
-constexpr std::size_t operator_count = 33;
+constexpr std::size_t operator_count = 34;
 
 /**
  * Supported operators.
@@ -88,7 +88,7 @@ static std::array<std::string, operator_count> operators = {
   // clang-format off
   "+", "-", "*", "/", "%",             // arithmetic / prefixes
   "&&", "||", "!",                     // logical
-  "&", "|", "~",                       // bitwise
+  "&", "^", "|", "~",                  // bitwise
   "<<", ">>",                          // shifts
   "==", "!=", "<", "<=", ">", ">=",    // comparisons
   "=", "+=", "-=", "*=", "/=", "%=",   // assignments
@@ -100,12 +100,12 @@ static std::array<std::string, operator_count> operators = {
 };
 
 /** The count of different starting characters of the operators. */
-constexpr std::size_t operator_chars_count = 13;
+constexpr std::size_t operator_chars_count = 14;
 
 /** The starting characters of the operators. */
 static std::array<char, operator_chars_count> operator_chars = {
   // clang-format off
-  '+', '-', '*', '/', '%', '&', '|', '!', '~', '<', '>', '=', ':'
+  '+', '-', '*', '/', '%', '&', '^', '|', '!', '~', '<', '>', '=', ':'
   // clang-format on
 };
 

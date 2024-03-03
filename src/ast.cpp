@@ -404,15 +404,24 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
         }
 
         std::unordered_map<std::string, cg::binary_op> op_map = {
-          {"+", cg::binary_op::op_add},
-          {"-", cg::binary_op::op_sub},
           {"*", cg::binary_op::op_mul},
           {"/", cg::binary_op::op_div},
           {"%", cg::binary_op::op_mod},
-          {"&", cg::binary_op::op_and},
-          {"|", cg::binary_op::op_or},
+          {"+", cg::binary_op::op_add},
+          {"-", cg::binary_op::op_sub},
           {"<<", cg::binary_op::op_shl},
-          {">>", cg::binary_op::op_shr}};
+          {">>", cg::binary_op::op_shr},
+          {"<", cg::binary_op::op_less},
+          {"<=", cg::binary_op::op_less_equal},
+          {">", cg::binary_op::op_greater},
+          {">=", cg::binary_op::op_greater_equal},
+          {"==", cg::binary_op::op_equal},
+          {"!=", cg::binary_op::op_not_equal},
+          {"&", cg::binary_op::op_and},
+          {"^", cg::binary_op::op_xor},
+          {"|", cg::binary_op::op_or},
+          {"&&", cg::binary_op::op_logical_and},
+          {"||", cg::binary_op::op_logical_or}};
 
         auto it = op_map.find(op);
         if(it != op_map.end())

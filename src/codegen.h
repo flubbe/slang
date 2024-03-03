@@ -1034,15 +1034,24 @@ public:
  */
 enum class binary_op
 {
-    op_add, /** a + b */
-    op_sub, /** a - b */
-    op_mul, /** a * b */
-    op_div, /** a / b */
-    op_mod, /** a % b */
-    op_and, /** a & b */
-    op_or,  /** a | b*/
-    op_shl, /** a << b */
-    op_shr, /** a >> b */
+    op_mul,           /** a * b */
+    op_div,           /** a / b */
+    op_mod,           /** a % b */
+    op_add,           /** a + b */
+    op_sub,           /** a - b */
+    op_shl,           /** a << b */
+    op_shr,           /** a >> b */
+    op_less,          /** a < b */
+    op_less_equal,    /** a <= b */
+    op_greater,       /** a > b */
+    op_greater_equal, /** a >= b */
+    op_equal,         /** a == b */
+    op_not_equal,     /** a != b */
+    op_and,           /** a & b */
+    op_xor,           /** a ^ b */
+    op_or,            /** a | b*/
+    op_logical_and,   /** a && b */
+    op_logical_or,    /** a || b */
 };
 
 /**

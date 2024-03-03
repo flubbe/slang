@@ -21,8 +21,25 @@ namespace slang::codegen
 
 std::string to_string(binary_op op)
 {
-    std::array<std::string, 9> strs = {
-      "add", "sub", "mul", "div", "mod", "and", "or", "shl", "shr"};
+    std::array<std::string, 18> strs = {
+      "mul",
+      "div",
+      "mod",
+      "add",
+      "sub",
+      "shl",
+      "shr",
+      "less",
+      "less_equal",
+      "greater",
+      "greater_equal",
+      "equal",
+      "not_equal",
+      "and",
+      "xor",
+      "or",
+      "logical_and",
+      "logical_or"};
 
     std::size_t idx = static_cast<std::size_t>(op);
     if(idx < 0 || idx >= strs.size())
