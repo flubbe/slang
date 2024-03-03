@@ -29,6 +29,7 @@ add_executable(test_parser
     ../src/lexer.cpp
     ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/utils.cpp
 )
 target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main)
 
@@ -38,6 +39,7 @@ add_executable(test_codegen
     ../src/lexer.cpp
     ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/utils.cpp
 )
 target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main)
 
@@ -47,5 +49,6 @@ add_executable(test_compile_ir
     ../src/lexer.cpp
     ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/utils.cpp
 )
 target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)

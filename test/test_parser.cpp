@@ -285,16 +285,123 @@ TEST(parser, return_statement)
 
 TEST(parser, operators)
 {
-    const std::string test_input =
-      "let a: i32 = 1 + b * (c = 3 = 4) / 5 & 6;";
+    {
+        const std::string test_input =
+          "let a: i32 = 1 + 1;";
 
-    slang::lexer lexer;
-    slang::parser parser;
+        slang::lexer lexer;
+        slang::parser parser;
 
-    lexer.set_input(test_input);
-    parser.parse(lexer);
+        lexer.set_input(test_input);
+        parser.parse(lexer);
 
-    EXPECT_TRUE(lexer.eof());
+        EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        const std::string expected =
+          "Block("
+           "exprs=("
+             "VariableDeclaration("
+              "name=a, "
+              "type=i32, "
+              "expr=Binary("
+               "op=\"+\", "
+               "lhs=IntLiteral("
+                "value=1"
+               "), "
+               "rhs=IntLiteral("
+               "value=1"
+              ")"
+             ")"
+            ")"
+           ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "let a: i32 = 2 * 1 + 1;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        const std::string expected = 
+          "Block("
+           "exprs=("
+            "VariableDeclaration("
+             "name=a, "
+             "type=i32, "
+             "expr=Binary("
+              "op=\"+\", "
+              "lhs=Binary("
+               "op=\"*\", "
+               "lhs=IntLiteral("
+                "value=2"
+               "), "
+               "rhs=IntLiteral("
+                "value=1"
+               ")"
+              "), "
+              "rhs=IntLiteral("
+               "value=1"
+              ")"
+             ")"
+            ")"
+           ")"
+          ")";
+        // clang-format on
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "let a: i32 = 2 + 1 * 1;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const std::string expected = "Block(exprs=(VariableDeclaration(name=a, type=i32, expr=Binary(op=\"+\", lhs=IntLiteral(value=2), rhs=Binary(op=\"*\", lhs=IntLiteral(value=1), rhs=IntLiteral(value=1))))))";
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "let a: i32 = b = c = 1;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const std::string expected = "Block(exprs=(VariableDeclaration(name=a, type=i32, expr=Binary(op=\"=\", lhs=VariableReference(name=b), rhs=Binary(op=\"=\", lhs=VariableReference(name=c), rhs=IntLiteral(value=1))))))";
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "let a: i32 = 1 + b * (c = 3 = 4) / 5 & 6;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+    }
 }
 
 TEST(parser, hello_world)

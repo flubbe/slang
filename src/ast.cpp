@@ -10,6 +10,7 @@
 
 #include "ast.h"
 #include "codegen.h"
+#include "utils.h"
 
 /*
  * Code generation from AST.
@@ -79,6 +80,47 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, m
     return {};
 }
 
+std::string literal_expression::to_string() const
+{
+    if(type == literal_type::fp_literal)
+    {
+        if(value)
+        {
+            return fmt::format("FloatLiteral(value={})", std::get<float>(*value));
+        }
+        else
+        {
+            return "FloatLiteral(<none>)";
+        }
+    }
+    else if(type == literal_type::int_literal)
+    {
+        if(value)
+        {
+            return fmt::format("IntLiteral(value={})", std::get<int>(*value));
+        }
+        else
+        {
+            return "IntLiteral(<none>)";
+        }
+    }
+    else if(type == literal_type::str_literal)
+    {
+        if(value)
+        {
+            return fmt::format("StrLiteral(value=\"{}\")", std::get<std::string>(*value));
+        }
+        else
+        {
+            return "StrLiteral(<none>)";
+        }
+    }
+    else
+    {
+        return "UnknownLiteral";
+    }
+}
+
 /*
  * signed_expression.
  */
@@ -87,6 +129,11 @@ std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, me
 {
     // TODO
     throw std::runtime_error("signed_expression::generate_code not implemented.");
+}
+
+std::string signed_expression::to_string() const
+{
+    return fmt::format("Signed(sign={}, expr={})", sign, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -99,6 +146,11 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
     throw std::runtime_error("scope_expression::generate_code not implemented.");
 }
 
+std::string scope_expression::to_string() const
+{
+    return fmt::format("Scope(name={}, expr={})", name, expr ? expr->to_string() : std::string("<none>"));
+}
+
 /*
  * access_expression.
  */
@@ -109,6 +161,11 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, me
     throw std::runtime_error("access_expression::generate_code not implemented.");
 }
 
+std::string access_expression::to_string() const
+{
+    return fmt::format("Access(name={}, expr={})", name, expr ? expr->to_string() : std::string("<none>"));
+}
+
 /*
  * import_expression.
  */
@@ -117,6 +174,11 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, me
 {
     // TODO
     throw std::runtime_error("import_expression::generate_code not implemented.");
+}
+
+std::string import_expression::to_string() const
+{
+    return fmt::format("Import(path={})", slang::utils::join(path, "."));
 }
 
 /*
@@ -158,6 +220,11 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     return std::make_unique<cg::value>(var->get_value());
 }
 
+std::string variable_reference_expression::to_string() const
+{
+    return fmt::format("VariableReference(name={})", name);
+}
+
 /*
  * variable_declaration_expression.
  */
@@ -192,6 +259,11 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     return {};
 }
 
+std::string variable_declaration_expression::to_string() const
+{
+    return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name, type, expr ? expr->to_string() : std::string("<none>"));
+}
+
 /*
  * struct_definition_expression.
  */
@@ -200,6 +272,21 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 {
     // TODO
     throw std::runtime_error("struct_definition_expression::generate_code not implemented.");
+}
+
+std::string struct_definition_expression::to_string() const
+{
+    std::string ret = fmt::format("Struct(name={}, members=(", name);
+    for(std::size_t i = 0; i < members.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", members[i]->to_string());
+    }
+    if(members.size() > 0)
+    {
+        ret += fmt::format("{}", members.back()->to_string());
+    }
+    ret += ")";
+    return ret;
 }
 
 /*
@@ -212,6 +299,21 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
     throw std::runtime_error("struct_anonymous_initializer_expression::generate_code not implemented.");
 }
 
+std::string struct_anonymous_initializer_expression::to_string() const
+{
+    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name);
+    for(std::size_t i = 0; i < initializers.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", initializers[i]->to_string());
+    }
+    if(initializers.size() > 0)
+    {
+        ret += fmt::format("{}", initializers.back()->to_string());
+    }
+    ret += ")";
+    return ret;
+}
+
 /*
  * struct_named_initializer_expression.
  */
@@ -222,33 +324,116 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     throw std::runtime_error("struct_named_initializer_expression::generate_code not implemented.");
 }
 
+std::string struct_named_initializer_expression::to_string() const
+{
+    std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", name);
+
+    if(member_names.size() != initializers.size())
+    {
+        ret += "<name/initializer mismatch>";
+    }
+    else
+    {
+        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
+        {
+            ret += fmt::format("{}={}, ", member_names[i]->to_string(), initializers[i]->to_string());
+        }
+        if(initializers.size() > 0)
+        {
+            ret += fmt::format("{}={}", member_names.back()->to_string(), initializers.back()->to_string());
+        }
+        ret += ")";
+    }
+    return ret;
+}
+
 /*
  * binary_expression.
  */
 
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
-    if(op == "=")
+    bool is_assignment = (op == "=" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=" || op == "&=" || op == "|=" || op == "<<=" || op == ">>=");
+    bool is_compound = is_assignment && (op != "=");
+
+    std::string reduced_op = op;
+    if(is_compound)
+    {
+        reduced_op.pop_back();
+
+        // TODO Compound assignments
+        throw std::runtime_error("Compound assignments not implemented in binary_expression::generate_code.");
+    }
+
+    if(is_assignment)
     {
         if(mc == memory_context::store)
         {
             throw cg::codegen_error("Invalid memory context for assignment.");
         }
 
-        rhs->generate_code(ctx, memory_context::load);
-        auto value = lhs->generate_code(ctx, memory_context::store);
+        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
+        auto lhs_value = lhs->generate_code(ctx, memory_context::store);
+
+        if(lhs_value->get_type() != rhs_value->get_type())
+        {
+            throw cg::codegen_error(fmt::format("Types don't match in assignment. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
+        }
 
         if(mc == memory_context::load)
         {
-            value = lhs->generate_code(ctx, memory_context::load);
+            lhs_value = lhs->generate_code(ctx, memory_context::load);
         }
 
-        return value;
+        return lhs_value;
     }
-    else
+
+    if(!is_assignment)
     {
-        throw std::runtime_error(fmt::format("binary_expression::generate_code not implemented for '{}'.", op));
+        if(mc == memory_context::store)
+        {
+            throw cg::codegen_error("Invalid memory context for binary operator.");
+        }
+
+        auto lhs_value = lhs->generate_code(ctx, memory_context::load);
+        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
+
+        if(lhs_value->get_type() != rhs_value->get_type())
+        {
+            throw cg::codegen_error(fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
+        }
+
+        std::unordered_map<std::string, cg::binary_op> op_map = {
+          {"+", cg::binary_op::op_add},
+          {"-", cg::binary_op::op_sub},
+          {"*", cg::binary_op::op_mul},
+          {"/", cg::binary_op::op_div},
+          {"%", cg::binary_op::op_mod},
+          {"&", cg::binary_op::op_and},
+          {"|", cg::binary_op::op_or},
+          {"<<", cg::binary_op::op_shl},
+          {">>", cg::binary_op::op_shr}};
+
+        auto it = op_map.find(op);
+        if(it != op_map.end())
+        {
+            ctx->generate_binary_op(it->second, *lhs_value);
+            return lhs_value;
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Code generation for binary operator '{}' not implemented.", op));
+        }
     }
+
+    throw std::runtime_error(fmt::format("binary_expression::generate_code not implemented for '{}'.", op));
+}
+
+std::string binary_expression::to_string() const
+{
+    return fmt::format("Binary(op=\"{}\", lhs={}, rhs={})", op,
+                       lhs ? lhs->to_string() : std::string("<none>"),
+                       rhs ? rhs->to_string() : std::string("<none>"));
 }
 
 /*
@@ -278,6 +463,21 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     return ctx->create_function(name, return_type, std::move(function_args));
 }
 
+std::string prototype_ast::to_string() const
+{
+    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name, return_type);
+    for(std::size_t i = 0; i < args.size() - 1; ++i)
+    {
+        ret += fmt::format("(name={}, type={}), ", args[i].first, args[i].second);
+    }
+    if(args.size() > 0)
+    {
+        ret += fmt::format("(name={}, type={})", args.back().first, args.back().second);
+    }
+    ret += "))";
+    return ret;
+}
+
 /*
  * block.
  */
@@ -295,6 +495,21 @@ std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context
         v = expr->generate_code(ctx, memory_context::none);
     }
     return v;
+}
+
+std::string block::to_string() const
+{
+    std::string ret = "Block(exprs=(";
+    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
+    }
+    if(exprs.size() > 0)
+    {
+        ret += fmt::format("{}", exprs.back() ? exprs.back()->to_string() : std::string("<none>"));
+    }
+    ret += "))";
+    return ret;
 }
 
 /*
@@ -326,6 +541,13 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
     return v;
 }
 
+std::string function_expression::to_string() const
+{
+    return fmt::format("Function(prototype={}, body={})",
+                       prototype ? prototype->to_string() : std::string("<none>"),
+                       body ? body->to_string() : std::string("<none>"));
+}
+
 /*
  * call_expression.
  */
@@ -334,6 +556,21 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
 {
     // TODO
     throw std::runtime_error("call_expression::generate_code not implemented.");
+}
+
+std::string call_expression::to_string() const
+{
+    std::string ret = fmt::format("Call(callee={}, args=(", callee);
+    for(std::size_t i = 0; i < args.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
+    }
+    if(args.size() > 0)
+    {
+        ret += fmt::format("{}, ", args.back() ? args.back()->to_string() : std::string("<none>"));
+    }
+    ret += "))";
+    return ret;
 }
 
 /*
@@ -356,6 +593,18 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
     return {};
 }
 
+std::string return_statement::to_string() const
+{
+    if(expr)
+    {
+        return fmt::format("Return(expr={})", expr->to_string());
+    }
+    else
+    {
+        return "Return()";
+    }
+}
+
 /*
  * if_statement.
  */
@@ -366,6 +615,14 @@ std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* 
     throw std::runtime_error("if_statement::generate_code not implemented.");
 }
 
+std::string if_statement::to_string() const
+{
+    return fmt::format("If(condition={}, if_block={}, else_block={})",
+                       condition ? condition->to_string() : std::string("<none>"),
+                       if_block ? if_block->to_string() : std::string("<none>"),
+                       else_block ? else_block->to_string() : std::string("<none>"));
+}
+
 /*
  * while_statement.
  */
@@ -374,6 +631,13 @@ std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::contex
 {
     // TODO
     throw std::runtime_error("while_statement::generate_code not implemented.");
+}
+
+std::string while_statement::to_string() const
+{
+    return fmt::format("While(condition={}, while_block={})",
+                       condition ? condition->to_string() : std::string("<none>"),
+                       while_block ? while_block->to_string() : std::string("<none>"));
 }
 
 /*

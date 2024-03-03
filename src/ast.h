@@ -52,6 +52,9 @@ public:
      * @returns The value of this expression or nullptr.
      */
     virtual std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const = 0;
+
+    /** Get a readable string representation of the node. */
+    virtual std::string to_string() const = 0;
 };
 
 /** Literal type. */
@@ -120,6 +123,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** A signed expression. */
@@ -159,6 +164,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Scope expression. */
@@ -188,7 +195,7 @@ public:
     /**
      * Construct a scope expression.
      *
-     * @param identifier The identifier.
+     * @param name The scope's name.
      * @param expr An expression.
      */
     scope_expression(std::string name, std::unique_ptr<expression> expr)
@@ -198,6 +205,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Access expression. */
@@ -237,6 +246,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Import statements. */
@@ -271,6 +282,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Variable references. */
@@ -305,6 +318,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Variable declaration. */
@@ -349,6 +364,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Struct definition. */
@@ -388,6 +405,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Anonymous struct initialization. */
@@ -427,6 +446,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Named struct initialization. */
@@ -471,6 +492,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Binary operators. */
@@ -512,6 +535,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Function prototype. */
@@ -556,6 +581,8 @@ public:
     }
 
     slang::codegen::function* generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const;
+
+    std::string to_string() const;
 };
 
 /** AST of a code block. This can refer to any block, e.g. the whole program, or a function body. */
@@ -590,6 +617,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** A function definition. */
@@ -629,6 +658,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Function calls. */
@@ -668,6 +699,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /*
@@ -706,6 +739,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** If statement. */
@@ -750,6 +785,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** While statement. */
@@ -789,6 +826,8 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override;
 };
 
 /** Break statement. */
@@ -810,6 +849,11 @@ public:
     break_statement& operator=(break_statement&&) = default;
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override
+    {
+        return "Break()";
+    }
 };
 
 /** Continue statement. */
@@ -831,6 +875,11 @@ public:
     continue_statement& operator=(continue_statement&&) = default;
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::string to_string() const override
+    {
+        return "Continue()";
+    }
 };
 
 }    // namespace slang::ast

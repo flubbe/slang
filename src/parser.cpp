@@ -351,24 +351,24 @@ std::unique_ptr<ast::expression> parser::parse_primary()
 /** Binary operator precedences. */
 static std::unordered_map<std::string, int> bin_op_precedence = {
   // clang-format off
-  {"::", 12},
-  {".", 11}, {"->", 11},
-  {"*", 10}, {"/", 10}, {"%", 10},
-  {"+", 9}, {"-", 9},
-  {"<<", 8}, {">>", 8},
-  {"<", 7}, {"<=", 7}, {">", 7}, {">=", 7},
-  {"==", 6}, {"!=", 6},
-  {"&", 5},
-  {"^", 4},
-  {"|", 3},
-  {"&&", 2},
-  {"||", 1},
-  {"=", 0}, {"+=", 0}, {"-=", 0}, {"*=", 0}, {"/=", 0}, {"%=", 0},
-  {"<<=", 0}, {">>=", 0}, {"&=", 0}, {"^=", 0}, {"|=", 0},
+  {"::", 13},
+  {".", 12}, {"->", 12},
+  {"*", 11}, {"/", 11}, {"%", 11},
+  {"+", 10}, {"-", 10},
+  {"<<", 9}, {">>", 9},
+  {"<", 8}, {"<=", 8}, {">", 8}, {">=", 8},
+  {"==", 7}, {"!=", 7},
+  {"&", 6},
+  {"^", 5},
+  {"|", 4},
+  {"&&", 3},
+  {"||", 2},
+  {"=", 1}, {"+=", 1}, {"-=", 1}, {"*=", 1}, {"/=", 1}, {"%=", 1},
+  {"<<=", 1}, {">>=", 1}, {"&=", 1}, {"^=", 1}, {"|=", 1},
   // clang-format on
 };
 
-int parser::get_token_precedence()
+int parser::get_token_precedence() const
 {
     if(current_token == std::nullopt)
     {
@@ -379,6 +379,57 @@ int parser::get_token_precedence()
     if(it == bin_op_precedence.end())
     {
         return -1;
+    }
+
+    return it->second;
+}
+
+/** Binary operator associativities. */
+static std::unordered_map<std::string, associativity> bin_op_associativity = {
+  {"::", associativity::left_to_right},
+  {".", associativity::left_to_right},
+  {"*", associativity::left_to_right},
+  {"/", associativity::left_to_right},
+  {"%", associativity::left_to_right},
+  {"+", associativity::left_to_right},
+  {"-", associativity::left_to_right},
+  {"<<", associativity::left_to_right},
+  {">>", associativity::left_to_right},
+  {"<", associativity::left_to_right},
+  {"<=", associativity::left_to_right},
+  {">", associativity::left_to_right},
+  {">=", associativity::left_to_right},
+  {"==", associativity::left_to_right},
+  {"!=", associativity::left_to_right},
+  {"&", associativity::left_to_right},
+  {"^", associativity::left_to_right},
+  {"|", associativity::left_to_right},
+  {"&&", associativity::left_to_right},
+  {"||", associativity::left_to_right},
+  {"=", associativity::right_to_left},
+  {"+=", associativity::right_to_left},
+  {"-=", associativity::right_to_left},
+  {"*=", associativity::right_to_left},
+  {"/=", associativity::right_to_left},
+  {"%=", associativity::right_to_left},
+  {"<<=", associativity::right_to_left},
+  {">>=", associativity::right_to_left},
+  {"&=", associativity::right_to_left},
+  {"^=", associativity::right_to_left},
+  {"|=", associativity::right_to_left},
+};
+
+std::optional<associativity> parser::get_token_associativity() const
+{
+    if(current_token == std::nullopt)
+    {
+        return std::nullopt;
+    }
+
+    auto it = bin_op_associativity.find(current_token->s);
+    if(it == bin_op_associativity.end())
+    {
+        return std::nullopt;
     }
 
     return it->second;
@@ -398,12 +449,13 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         lexical_token bin_op = *current_token;
         get_next_token();
 
-        std::unique_ptr<ast::expression> rhs = parse_expression();
+        std::unique_ptr<ast::expression> rhs = parse_primary();
 
         int next_prec = get_token_precedence();
-        if(tok_prec < next_prec)
+        std::optional<associativity> assoc = get_token_associativity();
+        if(tok_prec < next_prec || (tok_prec == next_prec && assoc && *assoc == associativity::right_to_left))
         {
-            rhs = parse_bin_op_rhs(tok_prec + 1, std::move(rhs));
+            rhs = parse_bin_op_rhs(tok_prec, std::move(rhs));
         }
 
         lhs = std::make_unique<ast::binary_expression>(std::move(bin_op.s), std::move(lhs), std::move(rhs));

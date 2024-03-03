@@ -52,6 +52,13 @@ public:
     }
 };
 
+/** Operator associativity. */
+enum class associativity
+{
+    left_to_right,
+    right_to_left
+};
+
 /**
  * The parser class. Uses a lexer to turn tokens into an abstract syntax tree.
  */
@@ -96,7 +103,14 @@ protected:
      *
      * @return The precedence value for the current token. Returns -1 if the current token is not a binary operator.
      */
-    int get_token_precedence();
+    int get_token_precedence() const;
+
+    /**
+     * Get the associativity for the current token.
+     *
+     * @return The associativity for the current token, or std::nullopt.
+     */
+    std::optional<associativity> get_token_associativity() const;
 
     /** Parse a top level statement. */
     std::unique_ptr<ast::expression> parse_top_level_statement();
