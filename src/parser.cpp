@@ -51,7 +51,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
         {
             throw syntax_error(fmt::format("{}: Expected <identifier>, got '{}'.", to_string(current_token->location), current_token->s));
         }
-        import_path.emplace_back(std::move(current_token->s));
+        import_path.emplace_back(current_token->s);
 
         lexical_token last_token = *current_token;    // store token for error reporting
         get_next_token();
