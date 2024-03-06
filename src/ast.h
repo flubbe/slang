@@ -33,7 +33,7 @@ namespace slang::ast
  */
 enum class memory_context
 {
-    none,  /** Neither load nor store. */
+    none,  /** No explicit context. */
     load,  /** loading context. */
     store, /** storing context. */
 };

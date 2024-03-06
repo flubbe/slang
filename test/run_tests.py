@@ -12,6 +12,7 @@ _tests = [
     "test_parser",
     "test_codegen",
     "test_compile_ir",
+    "test_type_system",
 ]
 
 if __name__ == "__main__":
