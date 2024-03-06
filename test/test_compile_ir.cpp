@@ -612,6 +612,40 @@ TEST(compile_ir, function_calls)
                   " ret\n"
                   "}");
     }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g(1 + 2 * 3, 2.3);\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " const i32 2\n"
+                  " const i32 3\n"
+                  " mul i32\n"
+                  " add i32\n"
+                  " const f32 2.3\n"
+                  " invoke @g\n"
+                  " ret\n"
+                  "}");
+    }
 }
 
 }    // namespace
