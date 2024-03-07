@@ -47,6 +47,36 @@ std::list<std::string> split(const std::string& s, const std::string& delimiter)
 std::string join(const std::vector<std::string>& v, const std::string& separator);
 
 /**
+ * Join a vector of strings.
+ *
+ * @tparam T Type parameter of the vector.
+ * @param v The vector with elements of type T.
+ * @param transform A transformation from T to std::string.
+ * @param separator The seperator to use between the strings.
+ * @return A string made of the vector's transformed elements joined together and separated bythe given separator.
+ */
+template<typename T>
+std::string join(const std::vector<T>& v, std::function<std::string(const T&)> transform, const std::string& separator)
+{
+    if(v.size() == 0)
+    {
+        return {};
+    }
+    else if(v.size() == 1)
+    {
+        return transform(v[0]);
+    }
+
+    std::string res = transform(v[0]);
+    for(auto it = std::next(v.begin()); it != v.end(); ++it)
+    {
+        res.append(separator);
+        res.append(transform(*it));
+    }
+    return res;
+}
+
+/**
  * Insert line breaks between words after at most len characters.
  * Preserves line breaks in the original string.
  *

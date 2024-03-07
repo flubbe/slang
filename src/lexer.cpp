@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <array>
+
 #include <fmt/core.h>
 
 #include "lexer.h"

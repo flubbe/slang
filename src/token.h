@@ -12,6 +12,8 @@
 
 #include <cstddef>
 
+#include "fmt/core.h"
+
 namespace slang
 {
 
@@ -54,5 +56,16 @@ struct token_location
         return line == other.line && col == other.col;
     }
 };
+
+/**
+ * Convert a token location to a string.
+ *
+ * @param loc The token location.
+ * @return A string of the form "(line, col)".
+ */
+inline std::string to_string(const token_location& loc)
+{
+    return fmt::format("{}:{}", loc.line, loc.col);
+}
 
 }    // namespace slang

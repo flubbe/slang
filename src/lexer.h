@@ -34,17 +34,6 @@ enum class token_type
 };
 
 /**
- * Convert a token location to a string.
- *
- * @param loc The token location.
- * @return A string of the form "(line, col)".
- */
-inline std::string to_string(const token_location& loc)
-{
-    return fmt::format("{}:{}", loc.line, loc.col);
-}
-
-/**
  * An evaluated token.
  */
 struct lexical_token
