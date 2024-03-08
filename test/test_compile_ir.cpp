@@ -549,6 +549,159 @@ TEST(compile_ir, binary_operators)
     }
 }
 
+TEST(compile_ir, compound_assignments)
+{
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " i += 1;\n"
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f() {\n"
+                  "local i32 %i\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " store i32 %i\n"
+                  " load i32 %i\n"
+                  " const i32 1\n"
+                  " add i32\n"
+                  " store i32 %i\n"
+                  " load i32 %i\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " let j: i32 = 1;\n"
+          " i += j += 1;\n"
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ast->generate_code(&ctx);
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f() {\n"
+                  "local i32 %i\n"
+                  "local i32 %j\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " store i32 %i\n"
+                  " const i32 1\n"
+                  " store i32 %j\n"
+                  " load i32 %i\n"
+                  " load i32 %j\n"
+                  " const i32 1\n"
+                  " add i32\n"
+                  " store i32 %j\n"
+                  " load i32 %j\n"
+                  " add i32\n"
+                  " store i32 %i\n"
+                  " load i32 %i\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " let j: i32 = 1;\n"
+          " i += j + 2;\n"
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        EXPECT_NO_THROW(ast->generate_code(&ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f() {\n"
+                  "local i32 %i\n"
+                  "local i32 %j\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " store i32 %i\n"
+                  " const i32 1\n"
+                  " store i32 %j\n"
+                  " load i32 %i\n"
+                  " load i32 %j\n"
+                  " const i32 2\n"
+                  " add i32\n"
+                  " add i32\n"
+                  " store i32 %i\n"
+                  " load i32 %i\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " let j: i32 = 1;\n"
+          " i += j + 2 += 1;\n"
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+    }
+}
+
 TEST(compile_ir, function_calls)
 {
     {

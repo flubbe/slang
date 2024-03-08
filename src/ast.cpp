@@ -360,35 +360,9 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
     if(is_compound)
     {
         reduced_op.pop_back();
-
-        // TODO Compound assignments
-        throw std::runtime_error(fmt::format("{}: Compound assignments not implemented in binary_expression::generate_code.", slang::to_string(loc)));
     }
 
-    if(is_assignment)
-    {
-        if(mc == memory_context::store)
-        {
-            throw cg::codegen_error(fmt::format("{}: Invalid memory context for assignment.", slang::to_string(loc)));
-        }
-
-        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
-        auto lhs_value = lhs->generate_code(ctx, memory_context::store);
-
-        if(lhs_value->get_type() != rhs_value->get_type())
-        {
-            throw cg::codegen_error(fmt::format("{}: Types don't match in assignment. LHS: {}, RHS: {}.", slang::to_string(loc), lhs_value->get_type(), rhs_value->get_type()));
-        }
-
-        if(mc == memory_context::load)
-        {
-            lhs_value = lhs->generate_code(ctx, memory_context::load);
-        }
-
-        return lhs_value;
-    }
-
-    if(!is_assignment)
+    if(!is_assignment || is_compound)
     {
         if(mc == memory_context::store)
         {
@@ -423,16 +397,50 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
           {"&&", cg::binary_op::op_logical_and},
           {"||", cg::binary_op::op_logical_or}};
 
-        auto it = op_map.find(op);
+        auto it = op_map.find(reduced_op);
         if(it != op_map.end())
         {
             ctx->generate_binary_op(it->second, *lhs_value);
+
+            if(is_compound)
+            {
+                lhs_value = lhs->generate_code(ctx, memory_context::store);
+
+                if(mc == memory_context::load)
+                {
+                    lhs_value = lhs->generate_code(ctx, memory_context::load);
+                }
+            }
+
             return lhs_value;
         }
         else
         {
             throw std::runtime_error(fmt::format("{}: Code generation for binary operator '{}' not implemented.", slang::to_string(loc), op));
         }
+    }
+
+    if(is_assignment)
+    {
+        if(mc == memory_context::store)
+        {
+            throw cg::codegen_error(fmt::format("{}: Invalid memory context for assignment.", slang::to_string(loc)));
+        }
+
+        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
+        auto lhs_value = lhs->generate_code(ctx, memory_context::store);
+
+        if(lhs_value->get_type() != rhs_value->get_type())
+        {
+            throw cg::codegen_error(fmt::format("{}: Types don't match in assignment. LHS: {}, RHS: {}.", slang::to_string(loc), lhs_value->get_type(), rhs_value->get_type()));
+        }
+
+        if(mc == memory_context::load)
+        {
+            lhs_value = lhs->generate_code(ctx, memory_context::load);
+        }
+
+        return lhs_value;
     }
 
     throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op));
