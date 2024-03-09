@@ -55,7 +55,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
         }
         import_path.emplace_back(current_token->location, current_token->s);
 
-        lexical_token last_token = *current_token;    // store token for error reporting
+        token last_token = *current_token;    // store token for error reporting
         get_next_token();
 
         if(current_token == std::nullopt)
@@ -456,7 +456,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
             return lhs;
         }
 
-        lexical_token bin_op = *current_token;
+        token bin_op = *current_token;
         get_next_token();
 
         std::unique_ptr<ast::expression> rhs = parse_primary();
@@ -601,29 +601,29 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
 {
     token_location loc = current_token->location;
-    lexical_token token = *current_token;
+    token tok = *current_token;
     get_next_token();
 
-    if(token.value == std::nullopt)
+    if(tok.value == std::nullopt)
     {
-        throw parser_error(fmt::format("{}: Expected <literal>, got '{}'.", to_string(token.location), token.s));
+        throw parser_error(fmt::format("{}: Expected <literal>, got '{}'.", to_string(tok.location), tok.s));
     }
 
-    if(token.type == token_type::int_literal)
+    if(tok.type == token_type::int_literal)
     {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<int>(*token.value));
+        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<int>(*tok.value));
     }
-    else if(token.type == token_type::fp_literal)
+    else if(tok.type == token_type::fp_literal)
     {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<float>(*token.value));
+        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<float>(*tok.value));
     }
-    else if(token.type == token_type::str_literal)
+    else if(tok.type == token_type::str_literal)
     {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<std::string>(*token.value));
+        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<std::string>(*tok.value));
     }
     else
     {
-        throw parser_error(fmt::format("{}: Unknown literal type.", to_string(token.location)));
+        throw parser_error(fmt::format("{}: Unknown literal type.", to_string(tok.location)));
     }
 }
 

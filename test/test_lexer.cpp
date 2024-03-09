@@ -26,8 +26,8 @@ TEST(lexer, tokenize_whitespaces_identifiers)
     slang::lexer lexer{test_string};
     lexer.set_tab_size(4);
 
-    std::vector<slang::lexical_token> tokens;
-    std::optional<slang::lexical_token> t;
+    std::vector<slang::token> tokens;
+    std::optional<slang::token> t;
 
     while((t = lexer.next()) != std::nullopt)
     {
@@ -77,9 +77,9 @@ TEST(lexer, single_line_comment)
       "a b cde // More comment";
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -110,9 +110,9 @@ TEST(lexer, multi_line_comment)
       "that continues here */ f gh";
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -141,9 +141,9 @@ TEST(lexer, operators)
       "+++++ --- <<< <> <<=+ > !%& + - %::=";
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -192,9 +192,9 @@ TEST(lexer, int_literals)
       "1 2 123 0x12 0xab34";    // NOTE integer literals are always unsigned.
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -254,9 +254,9 @@ TEST(lexer, fp_literals)
       "1. 2.23 12.3 12e7 12e-3 1.3E5 1.2e-8";    // NOTE integer literals are always unsigned.
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -332,9 +332,9 @@ TEST(lexer, string_literals)
       "a b \"s t r i n g\" \"1.23\" \"123\" c";
 
     slang::lexer lexer{test_string};
-    std::vector<slang::lexical_token> tokens;
+    std::vector<slang::token> tokens;
 
-    std::optional<slang::lexical_token> t;
+    std::optional<slang::token> t;
     while((t = lexer.next()) != std::nullopt)
     {
         tokens.push_back(*t);
@@ -384,8 +384,8 @@ TEST(lexer, string_literals)
 TEST(lexer, fail_literals)
 {
     slang::lexer lexer;
-    std::vector<slang::lexical_token> tokens;
-    std::optional<slang::lexical_token> t;
+    std::vector<slang::token> tokens;
+    std::optional<slang::token> t;
 
     // no tokens parsed.
     EXPECT_EQ(lexer.next(), std::nullopt);
@@ -422,7 +422,7 @@ TEST(lexer, example_program)
 
         slang::lexer lexer{test_string};
 
-        std::optional<slang::lexical_token> t;
+        std::optional<slang::token> t;
         while((t = lexer.next()) != std::nullopt)
             ;
 

@@ -72,7 +72,7 @@ protected:
     std::unique_ptr<ast::block> ast;
 
     /** Token buffer. */
-    std::optional<lexical_token> current_token{std::nullopt};
+    std::optional<token> current_token{std::nullopt};
 
     /**
      * Get the next token and store it in the token buffer `current_token`.
@@ -82,7 +82,7 @@ protected:
      * @throws A `parser_error` if no lexer is available.
      *         A `syntax_error` if `throw_on_eof` is set and no token is available.
      */
-    std::optional<lexical_token> get_next_token(bool throw_on_eof = true)
+    std::optional<token> get_next_token(bool throw_on_eof = true)
     {
         if(!m_lexer)
         {

@@ -21,37 +21,6 @@ namespace slang
 {
 
 /**
- * Token type.
- */
-enum class token_type
-{
-    unknown,     /** Unknown token type. */
-    delimiter,   /** A delimiter, e.g. + - * / % ! & | ^ . :: < > ( ) { } [ ] ; */
-    identifier,  /** starts with A-Z, a-z or _ and continues with A-Z, a-z, _, 0-9 */
-    int_literal, /** integer literal */
-    fp_literal,  /** floating-point literal */
-    str_literal  /** a quoted string (including the quotes) */
-};
-
-/**
- * An evaluated token.
- */
-struct lexical_token
-{
-    /** The token. */
-    std::string s;
-
-    /** Token location. */
-    token_location location;
-
-    /** Token type. */
-    token_type type;
-
-    /** Evaluated token, for token_type::int_literal, token_type::fp_literal and token_type::string_literal. */
-    std::optional<std::variant<int, float, std::string>> value;
-};
-
-/**
  * An error during lexing.
  */
 class lexical_error : public std::runtime_error
@@ -201,7 +170,7 @@ public:
      * @return The token produced by the lexer, or std::nullopt if the end of the stream was reached.
      * @throws lexical_error on errors, including eof.
      */
-    std::optional<lexical_token> next();
+    std::optional<token> next();
 
     /**
      * Set the horizonal tab size.

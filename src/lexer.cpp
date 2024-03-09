@@ -123,30 +123,30 @@ static bool is_operator(const std::optional<char>& c)
 }
 
 /**
- * Evaluate a token, given its type. If type is not one of token_type::int_literal,
+ * Evaluate a string, given its token type. If type is not one of token_type::int_literal,
  * token_type::fp_literal or token_type::str_literal, std::nullopt is returned.
  *
- * @param token The token to evaluate.
- * @param type The token type.
+ * @param s The string to evaluate.
+ * @param type The string's token type.
  * @return Returns the evaluated token or std::nullopt.
  */
-static std::optional<std::variant<int, float, std::string>> eval(const std::string& token, token_type type)
+static std::optional<std::variant<int, float, std::string>> eval(const std::string& s, token_type type)
 {
     if(type == token_type::str_literal)
     {
-        return token.substr(1, token.length() - 2);    // remove quotes
+        return s.substr(1, s.length() - 2);    // remove quotes
     }
     else if(type == token_type::int_literal)
     {
-        if(token.substr(0, 2) == "0x")
+        if(s.substr(0, 2) == "0x")
         {
-            return std::stoi(token, nullptr, 16);
+            return std::stoi(s, nullptr, 16);
         }
-        return std::stoi(token);
+        return std::stoi(s);
     }
     else if(type == token_type::fp_literal)
     {
-        return std::stof(token);
+        return std::stof(s);
     }
 
     return std::nullopt;
@@ -156,16 +156,16 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
  * lexer implementation.
  */
 
-std::optional<lexical_token> lexer::next()
+std::optional<token> lexer::next()
 {
-    std::string token;
+    std::string current_token;
     token_type type;
     token_location loc;
 
     while(!eof())    // this loop is only here for catching comments
     {
         type = token_type::unknown;    // reset type on each iteration
-        token.clear();                 // clear token on each iteration.
+        current_token.clear();         // clear token on each iteration.
 
         while(is_whitespace(peek()))
         {
@@ -180,12 +180,12 @@ std::optional<lexical_token> lexer::next()
             return std::nullopt;
         }
 
-        token = {*c};
+        current_token = {*c};
         if(is_identifier(c, true))
         {
             while(is_identifier(peek(), false))
             {
-                token += *get();
+                current_token += *get();
             }
 
             type = token_type::identifier;
@@ -203,7 +203,7 @@ std::optional<lexical_token> lexer::next()
             }
 
             // clear token here, since the outer loop condition might not be satsified anymore.
-            token.clear();
+            current_token.clear();
             continue;
         }
         else if(*c == '/' && peek() != std::nullopt && *peek() == '*')    // multi-line comment
@@ -220,7 +220,7 @@ std::optional<lexical_token> lexer::next()
             }
 
             // clear token here, since the outer loop condition might not be satsified anymore.
-            token.clear();
+            current_token.clear();
             continue;
         }
         else if(is_operator(c))
@@ -228,12 +228,12 @@ std::optional<lexical_token> lexer::next()
             // match the longest operator.
             while((c = peek()))
             {
-                std::string temp_token = token + *c;
+                std::string temp_token = current_token + *c;
                 if(std::find(operators.begin(), operators.end(), temp_token) == operators.end())
                 {
                     break;
                 }
-                token += *get();
+                current_token += *get();
             }
 
             break;
@@ -246,10 +246,10 @@ std::optional<lexical_token> lexer::next()
         {
             if(*c == '0' && peek() && *peek() == 'x')
             {
-                token += *get();
+                current_token += *get();
                 while(peek() && (std::isdigit(*peek()) || is_hexdigit(peek())))
                 {
-                    token += *get();
+                    current_token += *get();
                 }
 
                 if(peek() && std::isalpha(*peek()))
@@ -265,7 +265,7 @@ std::optional<lexical_token> lexer::next()
             {
                 while(peek() && std::isdigit(*peek()))
                 {
-                    token += *get();
+                    current_token += *get();
                 }
 
                 type = token_type::int_literal;    // this might get adjusted below.
@@ -274,10 +274,10 @@ std::optional<lexical_token> lexer::next()
 
             if(*c == '.')
             {
-                token += *get();
+                current_token += *get();
                 while(peek() && std::isdigit(*peek()))
                 {
-                    token += *get();
+                    current_token += *get();
                 }
 
                 type = token_type::fp_literal;
@@ -286,16 +286,16 @@ std::optional<lexical_token> lexer::next()
 
             if(*c == 'e' || *c == 'E')
             {
-                token += *get();
+                current_token += *get();
 
                 if(peek() && (*peek() == '+' || *peek() == '-'))
                 {
-                    token += *get();
+                    current_token += *get();
                 }
 
                 while(peek() && std::isdigit(*peek()))
                 {
-                    token += *get();
+                    current_token += *get();
                 }
 
                 type = token_type::fp_literal;
@@ -316,7 +316,7 @@ std::optional<lexical_token> lexer::next()
         {
             while((c = get()))
             {
-                token += *c;
+                current_token += *c;
                 if(*c == '"')
                 {
                     break;
@@ -349,7 +349,7 @@ std::optional<lexical_token> lexer::next()
         }
     }
 
-    if(token.length() == 0)
+    if(current_token.length() == 0)
     {
         if(eof())
         {
@@ -358,7 +358,7 @@ std::optional<lexical_token> lexer::next()
         throw lexical_error("lext::next: No token parsed.");
     }
 
-    return slang::lexical_token{token, loc, type, eval(token, type)};
+    return slang::token{current_token, loc, type, eval(current_token, type)};
 }
 
 }    // namespace slang
