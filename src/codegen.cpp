@@ -10,10 +10,20 @@
 
 #include <fmt/core.h>
 
+#include "token.h"
 #include "codegen.h"
 
 namespace slang::codegen
 {
+
+/*
+ * Exceptions.
+ */
+
+codegen_error::codegen_error(const token_location& loc, const std::string& message)
+: std::runtime_error{fmt::format("{}: {}", to_string(loc), message)}
+{
+}
 
 /*
  * Binary operators.

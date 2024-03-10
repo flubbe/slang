@@ -17,6 +17,12 @@
 
 #include <fmt/core.h>
 
+/* Forward declarations. */
+namespace slang
+{
+struct token_location;
+}    // namespace slang
+
 namespace slang::codegen
 {
 
@@ -27,12 +33,22 @@ public:
     /**
      * Construct a codegen_error.
      *
+     * NOTE Use the other constructor if you want to include location information in the error message.
+     *
      * @param message The error message.
      */
     codegen_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
+
+    /**
+     * Construct a codegen_error.
+     *
+     * @param loc The error location in the source.
+     * @param message The error message.
+     */
+    codegen_error(const slang::token_location& loc, const std::string& message);
 };
 
 /**
@@ -68,7 +84,7 @@ protected:
 
         if(!composite_type.has_value() || composite_type->length() == 0)
         {
-            throw codegen_error(fmt::format("Empty composite type."));
+            throw codegen_error("Empty composite type.");
         }
     }
 

@@ -11,6 +11,8 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
+#include <variant>
 
 #include "fmt/core.h"
 

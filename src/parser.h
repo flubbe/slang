@@ -27,12 +27,22 @@ public:
     /**
      * Construct a parser_error.
      *
+     * NOTE Use the other constructor if you want to include token location information in the error message.
+     *
      * @param message The error message.
      */
     parser_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
+
+    /**
+     * Construct a syntax_error.
+     *
+     * @param tok The token where the error occured.
+     * @param message The error message.
+     */
+    parser_error(const token& tok, const std::string& message);
 };
 
 /**
@@ -44,12 +54,22 @@ public:
     /**
      * Construct a syntax_error.
      *
+     * NOTE Use the other constructor if you want to include token location information in the error message.
+     *
      * @param message The error message.
      */
     syntax_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
+
+    /**
+     * Construct a syntax_error.
+     *
+     * @param tok The token where the error occured.
+     * @param message The error message.
+     */
+    syntax_error(const token& tok, const std::string& message);
 };
 
 /** Operator associativity. */

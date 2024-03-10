@@ -40,19 +40,19 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, m
     {
         if(type == literal_type::int_literal)
         {
-            throw cg::codegen_error(fmt::format("{}: Cannot store into int_literal '{}'.", slang::to_string(loc), std::get<int>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into int_literal '{}'.", std::get<int>(*value)));
         }
         else if(type == literal_type::fp_literal)
         {
-            throw cg::codegen_error(fmt::format("{}: Cannot store into fp_literal '{}'.", slang::to_string(loc), std::get<float>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into fp_literal '{}'.", std::get<float>(*value)));
         }
         else if(type == literal_type::str_literal)
         {
-            throw cg::codegen_error(fmt::format("{}: Cannot store into str_literal '{}'.", slang::to_string(loc), std::get<std::string>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into str_literal '{}'.", std::get<std::string>(*value)));
         }
         else
         {
-            throw cg::codegen_error(fmt::format("{}: Cannot store into unknown literal of type id '{}'.", slang::to_string(loc), static_cast<int>(type)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(type)));
         }
     }
 
@@ -73,7 +73,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, m
     }
     else
     {
-        throw cg::codegen_error(fmt::format("{}: Unable to generate code for literal of type id '{}'.", slang::to_string(loc), static_cast<int>(type)));
+        throw cg::codegen_error(loc, fmt::format("Unable to generate code for literal of type id '{}'.", static_cast<int>(type)));
     }
 }
 
@@ -190,7 +190,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     auto* s = ctx->get_scope();
     if(s == nullptr)
     {
-        throw cg::codegen_error(fmt::format("{}: No scope to search for '{}'.", slang::to_string(loc), name.s));
+        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
     }
 
     const cg::variable* var{nullptr};
@@ -205,7 +205,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(s == nullptr)
     {
-        throw cg::codegen_error(fmt::format("{}: Cannot find variable '{}' in current scope.", slang::to_string(loc), name.s));
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
     }
 
     if(mc == memory_context::none || mc == memory_context::load)
@@ -233,13 +233,13 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(fmt::format("{}: Invalid memory context for variable declaration.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, fmt::format("Invalid memory context for variable declaration."));
     }
 
     cg::scope* s = ctx->get_scope();
     if(s == nullptr)
     {
-        throw cg::codegen_error(fmt::format("{}: No scope available for adding locals.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, fmt::format("No scope available for adding locals."));
     }
     s->add_local(std::make_unique<cg::variable>(name.s, type.s));
 
@@ -366,7 +366,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
     {
         if(mc == memory_context::store)
         {
-            throw cg::codegen_error(fmt::format("{}: Invalid memory context for binary operator.", slang::to_string(loc)));
+            throw cg::codegen_error(loc, "Invalid memory context for binary operator.");
         }
 
         auto lhs_value = lhs->generate_code(ctx, memory_context::load);
@@ -374,7 +374,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
 
         if(lhs_value->get_type() != rhs_value->get_type())
         {
-            throw cg::codegen_error(fmt::format("{}: Types don't match in binary operation. LHS: {}, RHS: {}.", slang::to_string(loc), lhs_value->get_type(), rhs_value->get_type()));
+            throw cg::codegen_error(loc, fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
         }
 
         std::unordered_map<std::string, cg::binary_op> op_map = {
@@ -424,7 +424,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
     {
         if(mc == memory_context::store)
         {
-            throw cg::codegen_error(fmt::format("{}: Invalid memory context for assignment.", slang::to_string(loc)));
+            throw cg::codegen_error(loc, "Invalid memory context for assignment.");
         }
 
         auto rhs_value = rhs->generate_code(ctx, memory_context::load);
@@ -432,7 +432,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
 
         if(lhs_value->get_type() != rhs_value->get_type())
         {
-            throw cg::codegen_error(fmt::format("{}: Types don't match in assignment. LHS: {}, RHS: {}.", slang::to_string(loc), lhs_value->get_type(), rhs_value->get_type()));
+            throw cg::codegen_error(loc, fmt::format("Types don't match in assignment. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
         }
 
         if(mc == memory_context::load)
@@ -461,7 +461,7 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(fmt::format("{}: Invalid memory context for prototype_ast.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Invalid memory context for prototype_ast.");
     }
 
     std::vector<std::unique_ptr<cg::variable>> function_args;
@@ -503,7 +503,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(fmt::format("{}: Invalid memory context for code block.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Invalid memory context for code block.");
     }
 
     std::unique_ptr<cg::value> v;
@@ -537,7 +537,7 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(fmt::format("{}: Invalid memory context for function_expression.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
     }
 
     cg::function* fn = prototype->generate_code(ctx);
@@ -573,7 +573,7 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
 {
     if(mc == memory_context::store)
     {
-        throw cg::codegen_error(fmt::format("{}: Cannot store into call expression.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Cannot store into call expression.");
     }
 
     for(auto& arg: args)
@@ -607,13 +607,13 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(fmt::format("{}: Invalid memory context for return_statement.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
     }
 
     auto v = expr->generate_code(ctx);
     if(!v)
     {
-        throw cg::codegen_error(fmt::format("{}: Expression did not yield a type.", slang::to_string(loc)));
+        throw cg::codegen_error(loc, "Expression did not yield a type.");
     }
     ctx->generate_ret(*v);
     return {};
