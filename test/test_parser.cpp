@@ -300,21 +300,21 @@ TEST(parser, operators)
         // clang-format off
         const std::string expected =
           "Block("
-           "exprs=("
-             "VariableDeclaration("
-              "name=a, "
-              "type=i32, "
-              "expr=Binary("
-               "op=\"+\", "
-               "lhs=IntLiteral("
-                "value=1"
-               "), "
-               "rhs=IntLiteral("
-               "value=1"
+            "exprs=("
+              "VariableDeclaration("
+                "name=a, "
+                "type=i32, "
+                "expr=Binary("
+                  "op=\"+\", "
+                  "lhs=IntLiteral("
+                    "value=1"
+                  "), "
+                  "rhs=IntLiteral("
+                    "value=1"
+                  ")"
+                ")"
               ")"
-             ")"
             ")"
-           ")"
           ")";
         // clang-format on
 
@@ -335,27 +335,27 @@ TEST(parser, operators)
         // clang-format off
         const std::string expected = 
           "Block("
-           "exprs=("
-            "VariableDeclaration("
-             "name=a, "
-             "type=i32, "
-             "expr=Binary("
-              "op=\"+\", "
-              "lhs=Binary("
-               "op=\"*\", "
-               "lhs=IntLiteral("
-                "value=2"
-               "), "
-               "rhs=IntLiteral("
-                "value=1"
-               ")"
-              "), "
-              "rhs=IntLiteral("
-               "value=1"
+            "exprs=("
+              "VariableDeclaration("
+                "name=a, "
+                "type=i32, "
+                "expr=Binary("
+                "op=\"+\", "
+                "lhs=Binary("
+                  "op=\"*\", "
+                  "lhs=IntLiteral("
+                    "value=2"
+                  "), "
+                  "rhs=IntLiteral("
+                    "value=1"
+                  ")"
+                "), "
+                "rhs=IntLiteral("
+                  "value=1"
+                ")"
+                ")"
               ")"
-             ")"
             ")"
-           ")"
           ")";
         // clang-format on
         EXPECT_EQ(parser.get_ast()->to_string(), expected);
@@ -372,7 +372,32 @@ TEST(parser, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const std::string expected = "Block(exprs=(VariableDeclaration(name=a, type=i32, expr=Binary(op=\"+\", lhs=IntLiteral(value=2), rhs=Binary(op=\"*\", lhs=IntLiteral(value=1), rhs=IntLiteral(value=1))))))";
+        // clang-format off
+        const std::string expected = 
+          "Block("
+            "exprs=("
+              "VariableDeclaration("
+                "name=a, "
+                "type=i32, "
+                "expr=Binary("
+                  "op=\"+\", "
+                  "lhs=IntLiteral("
+                    "value=2"
+                  "), "
+                  "rhs=Binary("
+                    "op=\"*\", "
+                    "lhs=IntLiteral("
+                      "value=1"
+                    "), "
+                    "rhs=IntLiteral("
+                      "value=1"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
         EXPECT_EQ(parser.get_ast()->to_string(), expected);
     }
     {
@@ -387,7 +412,32 @@ TEST(parser, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const std::string expected = "Block(exprs=(VariableDeclaration(name=a, type=i32, expr=Binary(op=\"=\", lhs=VariableReference(name=b), rhs=Binary(op=\"=\", lhs=VariableReference(name=c), rhs=IntLiteral(value=1))))))";
+        // clang-format off
+        const std::string expected = 
+          "Block("
+            "exprs=("
+              "VariableDeclaration("
+                "name=a, "
+                "type=i32, "
+                "expr=Binary("
+                  "op=\"=\", "
+                  "lhs=VariableReference("
+                    "name=b"
+                  "), "
+                  "rhs=Binary("
+                    "op=\"=\", "
+                    "lhs=VariableReference("
+                      "name=c"
+                    "), "
+                    "rhs=IntLiteral("
+                      "value=1"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
         EXPECT_EQ(parser.get_ast()->to_string(), expected);
     }
     {
