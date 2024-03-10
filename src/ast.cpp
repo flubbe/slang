@@ -36,76 +36,81 @@ static bool is_builtin_type(const std::string& s)
 
 std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
+    if(!tok.value)
+    {
+        throw cg::codegen_error(loc, "Empty literal.");
+    }
+
     if(mc == memory_context::store)
     {
-        if(type == literal_type::int_literal)
+        if(tok.type == token_type::int_literal)
         {
-            throw cg::codegen_error(loc, fmt::format("Cannot store into int_literal '{}'.", std::get<int>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into int_literal '{}'.", std::get<int>(*tok.value)));
         }
-        else if(type == literal_type::fp_literal)
+        else if(tok.type == token_type::fp_literal)
         {
-            throw cg::codegen_error(loc, fmt::format("Cannot store into fp_literal '{}'.", std::get<float>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into fp_literal '{}'.", std::get<float>(*tok.value)));
         }
-        else if(type == literal_type::str_literal)
+        else if(tok.type == token_type::str_literal)
         {
-            throw cg::codegen_error(loc, fmt::format("Cannot store into str_literal '{}'.", std::get<std::string>(*value)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into str_literal '{}'.", std::get<std::string>(*tok.value)));
         }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(type)));
+            throw cg::codegen_error(loc, fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(tok.type)));
         }
     }
 
-    if(type == literal_type::int_literal)
+    if(tok.type == token_type::int_literal)
     {
-        ctx->generate_const({"i32"}, *value);
+        ctx->generate_const({"i32"}, *tok.value);
         return std::make_unique<cg::value>("i32");
     }
-    else if(type == literal_type::fp_literal)
+    else if(tok.type == token_type::fp_literal)
     {
-        ctx->generate_const({"f32"}, *value);
+        ctx->generate_const({"f32"}, *tok.value);
         return std::make_unique<cg::value>("f32");
     }
-    else if(type == literal_type::str_literal)
+    else if(tok.type == token_type::str_literal)
     {
-        ctx->generate_const({"str"}, *value);
+        ctx->generate_const({"str"}, *tok.value);
         return std::make_unique<cg::value>("str");
     }
     else
     {
-        throw cg::codegen_error(loc, fmt::format("Unable to generate code for literal of type id '{}'.", static_cast<int>(type)));
+        throw cg::codegen_error(loc, fmt::format("Unable to generate code for literal of type id '{}'.", static_cast<int>(tok.type)));
     }
 }
 
 std::string literal_expression::to_string() const
 {
-    if(type == literal_type::fp_literal)
+    if(tok.type == token_type::fp_literal)
     {
-        if(value)
+        if(tok.value)
         {
-            return fmt::format("FloatLiteral(value={})", std::get<float>(*value));
+            return fmt::format("FloatLiteral(value={})", std::get<float>(*tok.value));
         }
         else
         {
             return "FloatLiteral(<none>)";
         }
     }
-    else if(type == literal_type::int_literal)
+    else if(tok.type == token_type::int_literal)
     {
-        if(value)
+        if(tok.value)
         {
-            return fmt::format("IntLiteral(value={})", std::get<int>(*value));
+            return fmt::format("IntLiteral(value={})", std::get<int>(*tok.value));
         }
         else
         {
             return "IntLiteral(<none>)";
         }
     }
-    else if(type == literal_type::str_literal)
+    else if(tok.type == token_type::str_literal)
     {
-        if(value)
+        if(tok.value)
         {
-            return fmt::format("StrLiteral(value=\"{}\")", std::get<std::string>(*value));
+            return fmt::format("StrLiteral(value=\"{}\")", std::get<std::string>(*tok.value));
         }
         else
         {
@@ -353,10 +358,12 @@ std::string struct_named_initializer_expression::to_string() const
 
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
-    bool is_assignment = (op == "=" || op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=" || op == "&=" || op == "|=" || op == "<<=" || op == ">>=");
-    bool is_compound = is_assignment && (op != "=");
+    bool is_assignment = (op.s == "=" || op.s == "+=" || op.s == "-="
+                          || op.s == "*=" || op.s == "/=" || op.s == "%="
+                          || op.s == "&=" || op.s == "|=" || op.s == "<<=" || op.s == ">>=");
+    bool is_compound = is_assignment && (op.s != "=");
 
-    std::string reduced_op = op;
+    std::string reduced_op = op.s;
     if(is_compound)
     {
         reduced_op.pop_back();
@@ -416,7 +423,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
         }
         else
         {
-            throw std::runtime_error(fmt::format("{}: Code generation for binary operator '{}' not implemented.", slang::to_string(loc), op));
+            throw std::runtime_error(fmt::format("{}: Code generation for binary operator '{}' not implemented.", slang::to_string(loc), op.s));
         }
     }
 
@@ -443,12 +450,12 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
         return lhs_value;
     }
 
-    throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op));
+    throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op.s));
 }
 
 std::string binary_expression::to_string() const
 {
-    return fmt::format("Binary(op=\"{}\", lhs={}, rhs={})", op,
+    return fmt::format("Binary(op=\"{}\", lhs={}, rhs={})", op.s,
                        lhs ? lhs->to_string() : std::string("<none>"),
                        rhs ? rhs->to_string() : std::string("<none>"));
 }

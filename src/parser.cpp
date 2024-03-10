@@ -485,7 +485,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
             rhs = parse_bin_op_rhs(tok_prec, std::move(rhs));
         }
 
-        lhs = std::make_unique<ast::binary_expression>(std::move(loc), std::move(bin_op.s), std::move(lhs), std::move(rhs));
+        lhs = std::make_unique<ast::binary_expression>(std::move(loc), std::move(bin_op), std::move(lhs), std::move(rhs));
     }
 }
 
@@ -626,22 +626,7 @@ std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
         throw syntax_error(tok, fmt::format("Expected <literal>, got '{}'.", tok.s));
     }
 
-    if(tok.type == token_type::int_literal)
-    {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<int>(*tok.value));
-    }
-    else if(tok.type == token_type::fp_literal)
-    {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<float>(*tok.value));
-    }
-    else if(tok.type == token_type::str_literal)
-    {
-        return std::make_unique<ast::literal_expression>(std::move(loc), std::get<std::string>(*tok.value));
-    }
-    else
-    {
-        throw parser_error(tok, "Unknown literal type.");
-    }
+    return std::make_unique<ast::literal_expression>(current_token->location, std::move(tok));
 }
 
 std::unique_ptr<ast::expression> parser::parse_paren_expression()

@@ -85,22 +85,11 @@ public:
     virtual std::string to_string() const = 0;
 };
 
-/** Literal type. */
-enum class literal_type
-{
-    int_literal, /** integer literal */
-    fp_literal,  /** floating-point literal */
-    str_literal  /** string literal */
-};
-
 /** String, integer or floating-point literals. */
 class literal_expression : public expression
 {
-    /** The literal type. */
-    literal_type type;
-
-    /** Evaluated token, for token_type::int_literal, token_type::fp_literal and token_type::string_literal. */
-    std::optional<std::variant<int, float, std::string>> value;
+    /** The literal token. */
+    token tok;
 
 public:
     /** No default constructor. */
@@ -118,41 +107,14 @@ public:
     literal_expression& operator=(literal_expression&&) = default;
 
     /**
-     * Construct an integer literal.
+     * Construct a literal expression.
      *
      * @param loc The location.
-     * @param i An integer.
+     * @param tok The token.
      */
-    literal_expression(token_location loc, int i)
+    literal_expression(token_location loc, token tok)
     : expression{std::move(loc)}
-    , type{literal_type::int_literal}
-    , value{i}
-    {
-    }
-
-    /**
-     * Construct a floating-point literal.
-     *
-     * @param loc The location.
-     * @param f A floating-point number.
-     */
-    literal_expression(token_location loc, float f)
-    : expression{std::move(loc)}
-    , type{literal_type::fp_literal}
-    , value{f}
-    {
-    }
-
-    /**
-     * Construct an string literal.
-     *
-     * @param loc The location.
-     * @param s A string.
-     */
-    literal_expression(token_location loc, std::string s)
-    : expression{std::move(loc)}
-    , type{literal_type::str_literal}
-    , value{std::move(s)}
+    , tok{std::move(tok)}
     {
     }
 
@@ -547,7 +509,7 @@ public:
 class binary_expression : public expression
 {
     /** The binary operator. */
-    std::string op;
+    token op;
 
     /** Left and right hand sides. */
     std::unique_ptr<expression> lhs, rhs;
@@ -575,9 +537,9 @@ public:
      * @param lhs The left-hand side.
      * @param rhs The right-hand side.
      */
-    binary_expression(token_location loc, std::string op, std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs)
+    binary_expression(token_location loc, token op, std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs)
     : expression{std::move(loc)}
-    , op{op}
+    , op{std::move(op)}
     , lhs{std::move(lhs)}
     , rhs{std::move(rhs)}
     {
