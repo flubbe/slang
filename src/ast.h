@@ -165,7 +165,7 @@ public:
 class signed_expression : public expression
 {
     /** The sign. */
-    std::pair<token_location, std::string> sign;
+    token sign;
 
     /** The expression. */
     std::unique_ptr<expression> expr;
@@ -192,7 +192,7 @@ public:
      * @param sign The sign.
      * @param expr The expression.
      */
-    signed_expression(token_location loc, std::pair<token_location, std::string> sign, std::unique_ptr<expression> expr)
+    signed_expression(token_location loc, token sign, std::unique_ptr<expression> expr)
     : expression{std::move(loc)}
     , sign{std::move(sign)}
     , expr{std::move(expr)}
@@ -208,7 +208,7 @@ public:
 class scope_expression : public expression
 {
     /** The scope name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** The remaining expression. */
     std::unique_ptr<expression> expr;
@@ -231,12 +231,11 @@ public:
     /**
      * Construct a scope expression.
      *
-     * @param loc The location
      * @param name The scope's name.
      * @param expr An expression.
      */
-    scope_expression(token_location loc, std::pair<token_location, std::string> name, std::unique_ptr<expression> expr)
-    : expression{std::move(loc)}
+    scope_expression(token name, std::unique_ptr<expression> expr)
+    : expression{name.location}
     , name{std::move(name)}
     , expr{std::move(expr)}
     {
@@ -251,7 +250,7 @@ public:
 class access_expression : public expression
 {
     /** The namespace name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
@@ -274,13 +273,12 @@ public:
     /**
      * Construct an access expression.
      *
-     * @param loc The location.
      * @param identifier The identifier.
      * @param expr An identifier expression.
      */
-    access_expression(token_location loc, std::pair<token_location, std::string> name, std::unique_ptr<expression> expr)
-    : expression{std::move(loc)}
-    , name{std::move(name)}
+    access_expression(token identifier, std::unique_ptr<expression> expr)
+    : expression{identifier.location}
+    , name{std::move(identifier)}
     , expr{std::move(expr)}
     {
     }
@@ -294,7 +292,7 @@ public:
 class import_expression : public expression
 {
     /** The import path. */
-    std::vector<std::pair<token_location, std::string>> path;
+    std::vector<token> path;
 
 public:
     /** No default constructor. */
@@ -316,8 +314,8 @@ public:
      *
      * @param in_path The import path.
      */
-    import_expression(std::vector<std::pair<token_location, std::string>> in_path)
-    : expression{in_path[0].first}
+    import_expression(std::vector<token> in_path)
+    : expression{in_path[0].location}
     , path{std::move(in_path)}
     {
     }
@@ -331,7 +329,7 @@ public:
 class variable_reference_expression : public expression
 {
     /** The variable name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
 public:
     /** No default constructor. */
@@ -351,11 +349,10 @@ public:
     /**
      * Construct a variable reference expression.
      *
-     * @param loc The location.
      * @param name The variable's name.
      */
-    variable_reference_expression(token_location loc, std::pair<token_location, std::string> name)
-    : expression{std::move(loc)}
+    variable_reference_expression(token name)
+    : expression{name.location}
     , name{std::move(name)}
     {
     }
@@ -369,10 +366,10 @@ public:
 class variable_declaration_expression : public expression
 {
     /** The variable name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** The variable's type. */
-    std::pair<token_location, std::string> type;
+    token type;
 
     /** An optional initializer expression. */
     std::unique_ptr<ast::expression> expr;
@@ -400,7 +397,7 @@ public:
      * @param type The variable's type.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, std::pair<token_location, std::string> name, std::pair<token_location, std::string> type, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(token_location loc, token name, token type, std::unique_ptr<ast::expression> expr)
     : expression{std::move(loc)}
     , name{std::move(name)}
     , type{std::move(type)}
@@ -417,7 +414,7 @@ public:
 class struct_definition_expression : public expression
 {
     /** The struct's name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** The struct's members. */
     std::vector<std::unique_ptr<variable_declaration_expression>> members;
@@ -444,7 +441,7 @@ public:
      * @param name The struct's name.
      * @param members The struct's members.
      */
-    struct_definition_expression(token_location loc, std::pair<token_location, std::string> name, std::vector<std::unique_ptr<variable_declaration_expression>> members)
+    struct_definition_expression(token_location loc, token name, std::vector<std::unique_ptr<variable_declaration_expression>> members)
     : expression{std::move(loc)}
     , name{std::move(name)}
     , members{std::move(members)}
@@ -460,7 +457,7 @@ public:
 class struct_anonymous_initializer_expression : public expression
 {
     /** The struct's name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** Anonymous initializers. */
     std::vector<std::unique_ptr<expression>> initializers;
@@ -487,8 +484,8 @@ public:
      * @param name The struct's name.
      * @param members The struct's members.
      */
-    struct_anonymous_initializer_expression(token_location loc, std::pair<token_location, std::string> name, std::vector<std::unique_ptr<expression>> initializers)
-    : expression{std::move(loc)}
+    struct_anonymous_initializer_expression(token name, std::vector<std::unique_ptr<expression>> initializers)
+    : expression{name.location}
     , name{std::move(name)}
     , initializers{std::move(initializers)}
     {
@@ -503,7 +500,7 @@ public:
 class struct_named_initializer_expression : public expression
 {
     /** The struct's name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
     /** Initialized member names. */
     std::vector<std::unique_ptr<expression>> member_names;
@@ -529,13 +526,12 @@ public:
     /**
      * Construct a named struct initialization.
      *
-     * @param loc The location.
      * @param name The struct's name.
      * @param member_names The initialized member names.
      * @param members The struct's members.
      */
-    struct_named_initializer_expression(token_location loc, std::pair<token_location, std::string> name, std::vector<std::unique_ptr<expression>> member_names, std::vector<std::unique_ptr<expression>> initializers)
-    : expression{std::move(loc)}
+    struct_named_initializer_expression(token name, std::vector<std::unique_ptr<expression>> member_names, std::vector<std::unique_ptr<expression>> initializers)
+    : expression{name.location}
     , name{std::move(name)}
     , member_names{std::move(member_names)}
     , initializers{std::move(initializers)}
@@ -599,13 +595,13 @@ class prototype_ast
     token_location loc;
 
     /** The function name. */
-    std::pair<token_location, std::string> name;
+    token name;
 
-    /** The function's arguments as tuples (location, name, type). */
-    std::vector<std::tuple<token_location, std::string, std::string>> args;
+    /** The function's arguments as tuples (name, type). */
+    std::vector<std::pair<token, token>> args;
 
     /** The function's return type. */
-    std::pair<token_location, std::string> return_type;
+    token return_type;
 
 public:
     /** No default constructor. */
@@ -630,7 +626,7 @@ public:
      * @param args The function's arguments as a vector of tuples (location, type_identifier, name).
      * @param return_type The function's return type.
      */
-    prototype_ast(token_location loc, std::pair<token_location, std::string> name, std::vector<std::tuple<token_location, std::string, std::string>> args, std::pair<token_location, std::string> return_type)
+    prototype_ast(token_location loc, token name, std::vector<std::pair<token, token>> args, token return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}
@@ -728,7 +724,7 @@ public:
 class call_expression : public expression
 {
     /** The callee's name. */
-    std::pair<token_location, std::string> callee;
+    token callee;
 
     /** The function's arguments. */
     std::vector<std::unique_ptr<expression>> args;
@@ -751,12 +747,11 @@ public:
     /**
      * Construct a function call.
      *
-     * @param loc The location.
      * @param callee The callee's name.
      * @param args The argument expressions.
      */
-    call_expression(token_location loc, std::pair<token_location, std::string> callee, std::vector<std::unique_ptr<expression>> args)
-    : expression{std::move(loc)}
+    call_expression(token callee, std::vector<std::unique_ptr<expression>> args)
+    : expression{callee.location}
     , callee{std::move(callee)}
     , args{std::move(args)}
     {

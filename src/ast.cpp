@@ -130,7 +130,7 @@ std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, me
 
 std::string signed_expression::to_string() const
 {
-    return fmt::format("Signed(sign={}, expr={})", std::get<1>(sign), expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("Signed(sign={}, expr={})", sign.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -145,7 +145,7 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
 
 std::string scope_expression::to_string() const
 {
-    return fmt::format("Scope(name={}, expr={})", std::get<1>(name), expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("Scope(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -160,7 +160,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, me
 
 std::string access_expression::to_string() const
 {
-    return fmt::format("Access(name={}, expr={})", std::get<1>(name), expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -175,8 +175,8 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, me
 
 std::string import_expression::to_string() const
 {
-    auto transform = [](const std::pair<token_location, std::string>& p) -> std::string
-    { return p.second; };
+    auto transform = [](const token& p) -> std::string
+    { return p.s; };
 
     return fmt::format("Import(path={})", slang::utils::join(path, {transform}, "."));
 }
@@ -190,13 +190,13 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     auto* s = ctx->get_scope();
     if(s == nullptr)
     {
-        throw cg::codegen_error(fmt::format("{}: No scope to search for '{}'.", slang::to_string(loc), std::get<1>(name)));
+        throw cg::codegen_error(fmt::format("{}: No scope to search for '{}'.", slang::to_string(loc), name.s));
     }
 
     const cg::variable* var{nullptr};
     while(s != nullptr)
     {
-        if((var = s->get_variable(std::get<1>(name))) != nullptr)
+        if((var = s->get_variable(name.s)) != nullptr)
         {
             break;
         }
@@ -205,7 +205,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(s == nullptr)
     {
-        throw cg::codegen_error(fmt::format("{}: Cannot find variable '{}' in current scope.", slang::to_string(loc), std::get<1>(name)));
+        throw cg::codegen_error(fmt::format("{}: Cannot find variable '{}' in current scope.", slang::to_string(loc), name.s));
     }
 
     if(mc == memory_context::none || mc == memory_context::load)
@@ -222,7 +222,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
 std::string variable_reference_expression::to_string() const
 {
-    return fmt::format("VariableReference(name={})", std::get<1>(name));
+    return fmt::format("VariableReference(name={})", name.s);
 }
 
 /*
@@ -241,18 +241,18 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     {
         throw cg::codegen_error(fmt::format("{}: No scope available for adding locals.", slang::to_string(loc)));
     }
-    s->add_local(std::make_unique<cg::variable>(std::get<1>(name), std::get<1>(type)));
+    s->add_local(std::make_unique<cg::variable>(name.s, type.s));
 
     if(expr)
     {
         auto v = expr->generate_code(ctx);
-        if(is_builtin_type(std::get<1>(type)))
+        if(is_builtin_type(type.s))
         {
-            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{std::get<1>(name), std::get<1>(type)}));
+            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, type.s}));
         }
         else
         {
-            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{std::get<1>(name), "composite", std::get<1>(type)}));
+            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, "composite", type.s}));
         }
     }
 
@@ -261,7 +261,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::string variable_declaration_expression::to_string() const
 {
-    return fmt::format("VariableDeclaration(name={}, type={}, expr={})", std::get<1>(name), std::get<1>(type), expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name.s, type.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -276,7 +276,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 std::string struct_definition_expression::to_string() const
 {
-    std::string ret = fmt::format("Struct(name={}, members=(", std::get<1>(name));
+    std::string ret = fmt::format("Struct(name={}, members=(", name.s);
     for(std::size_t i = 0; i < members.size() - 1; ++i)
     {
         ret += fmt::format("{}, ", members[i]->to_string());
@@ -301,7 +301,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
 
 std::string struct_anonymous_initializer_expression::to_string() const
 {
-    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", std::get<1>(name));
+    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
     for(std::size_t i = 0; i < initializers.size() - 1; ++i)
     {
         ret += fmt::format("{}, ", initializers[i]->to_string());
@@ -326,7 +326,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
 
 std::string struct_named_initializer_expression::to_string() const
 {
-    std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", std::get<1>(name));
+    std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", name.s);
 
     if(member_names.size() != initializers.size())
     {
@@ -467,29 +467,29 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     std::vector<std::unique_ptr<cg::variable>> function_args;
     for(auto& a: args)
     {
-        if(is_builtin_type(std::get<2>(a)))
+        if(is_builtin_type(a.second.s))
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(std::get<1>(a), std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, a.second.s));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(std::get<1>(a), "composite", std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, "composite", a.second.s));
         }
     }
 
-    return ctx->create_function(std::get<1>(name), std::get<1>(return_type), std::move(function_args));
+    return ctx->create_function(name.s, return_type.s, std::move(function_args));
 }
 
 std::string prototype_ast::to_string() const
 {
-    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", std::get<1>(name), std::get<1>(return_type));
+    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, return_type.s);
     for(std::size_t i = 0; i < args.size() - 1; ++i)
     {
-        ret += fmt::format("(name={}, type={}), ", std::get<1>(args[i]), std::get<2>(args[i]));
+        ret += fmt::format("(name={}, type={}), ", args[i].first.s, args[i].second.s);
     }
     if(args.size() > 0)
     {
-        ret += fmt::format("(name={}, type={})", std::get<1>(args.back()), std::get<2>(args.back()));
+        ret += fmt::format("(name={}, type={})", args.back().first.s, args.back().second.s);
     }
     ret += "))";
     return ret;
@@ -580,13 +580,13 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
     {
         arg->generate_code(ctx, memory_context::load);
     }
-    ctx->generate_invoke(std::make_unique<cg::function_argument>(std::get<1>(callee)));
+    ctx->generate_invoke(std::make_unique<cg::function_argument>(callee.s));
     return {};    // FIXME return the return type of the function?
 }
 
 std::string call_expression::to_string() const
 {
-    std::string ret = fmt::format("Call(callee={}, args=(", std::get<1>(callee));
+    std::string ret = fmt::format("Call(callee={}, args=(", callee.s);
     for(std::size_t i = 0; i < args.size() - 1; ++i)
     {
         ret += fmt::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
