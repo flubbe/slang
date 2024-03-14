@@ -21,6 +21,7 @@ add_executable(slang
     src/main.cpp
     src/package.cpp
     src/parser.cpp
+    src/typing.cpp
     src/utils.cpp
 )
 target_link_libraries(slang fmt::fmt)

@@ -697,6 +697,9 @@ public:
  */
 class scope
 {
+    /** The scope's name. */
+    std::string name;
+
     /** Reference to the outer scope (if any). */
     scope* outer{nullptr};
 
@@ -722,10 +725,12 @@ public:
     /**
      * Create a scope and initialize it with function arguments.
      *
+     * @param name The scope's name (usually the same as the function's name)
      * @param args The function's arguments.
      */
-    scope(std::vector<std::unique_ptr<variable>> args)
-    : args{std::move(args)}
+    scope(std::string name, std::vector<std::unique_ptr<variable>> args)
+    : name{std::move(name)}
+    , args{std::move(args)}
     {
     }
 
@@ -844,6 +849,17 @@ public:
     {
         return outer;
     }
+
+    /** Get a string representation of the scope. */
+    std::string to_string() const
+    {
+        if(outer)
+        {
+            return fmt::format("{}::{}", outer->to_string(), name);
+        }
+
+        return name;
+    }
 };
 
 /**
@@ -908,9 +924,9 @@ public:
      * Construct a function from a name and return type.
      */
     function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
-    : name{std::move(name)}
+    : name{name}
     , return_type{std::move(return_type)}
-    , scope{std::move(args)}
+    , scope{std::move(name), std::move(args)}
     {
     }
 

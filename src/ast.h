@@ -28,6 +28,11 @@ class function;
 class value;
 }    // namespace slang::codegen
 
+namespace slang::typing
+{
+class context;
+}    // namespace slang::typing
+
 namespace slang::ast
 {
 
@@ -81,6 +86,16 @@ public:
      */
     virtual std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const = 0;
 
+    /**
+     * Type checking.
+     *
+     * @throws A type_error if a type error was found.
+     *
+     * @param ctx Type system context.
+     * @returns A string representation of the expression's type or std::nullopt.
+     */
+    virtual std::optional<std::string> type_check(slang::typing::context& ctx) const = 0;
+
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
 };
@@ -119,7 +134,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -162,7 +177,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -204,7 +219,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -246,7 +261,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -283,7 +298,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -320,7 +335,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -368,7 +383,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -411,7 +426,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -454,7 +469,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -501,7 +516,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -546,7 +561,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -597,7 +612,7 @@ public:
     }
 
     slang::codegen::function* generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const;
     std::string to_string() const;
 };
 
@@ -635,7 +650,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -678,7 +693,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -720,7 +735,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -762,7 +777,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -810,7 +825,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -853,7 +868,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
 
@@ -886,6 +901,11 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override
+    {
+        return std::nullopt;
+    }
 
     std::string to_string() const override
     {
@@ -922,6 +942,11 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override
+    {
+        return std::nullopt;
+    }
 
     std::string to_string() const override
     {

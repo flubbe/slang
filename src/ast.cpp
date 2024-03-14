@@ -10,6 +10,7 @@
 
 #include "ast.h"
 #include "codegen.h"
+#include "typing.h"
 #include "utils.h"
 
 /*
@@ -17,6 +18,7 @@
  */
 
 namespace cg = slang::codegen;
+namespace ty = slang::typing;
 
 namespace slang::ast
 {
@@ -82,6 +84,31 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, m
     }
 }
 
+std::optional<std::string> literal_expression::type_check(ty::context& ctx) const
+{
+    if(!tok.value)
+    {
+        throw ty::type_error(loc, "Empty literal.");
+    }
+
+    if(tok.type == token_type::int_literal)
+    {
+        return "i32";
+    }
+    else if(tok.type == token_type::fp_literal)
+    {
+        return "f32";
+    }
+    else if(tok.type == token_type::str_literal)
+    {
+        return "str";
+    }
+    else
+    {
+        throw ty::type_error(tok.location, fmt::format("Unknown literal type with id '{}'.", static_cast<int>(tok.type)));
+    }
+}
+
 std::string literal_expression::to_string() const
 {
     if(tok.type == token_type::fp_literal)
@@ -133,6 +160,12 @@ std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, me
     throw std::runtime_error(fmt::format("{}: signed_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
+std::optional<std::string> signed_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: signed_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string signed_expression::to_string() const
 {
     return fmt::format("Signed(sign={}, expr={})", sign.s, expr ? expr->to_string() : std::string("<none>"));
@@ -146,6 +179,12 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: scope_expression::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: scope_expression::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string scope_expression::to_string() const
@@ -163,6 +202,12 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, me
     throw std::runtime_error(fmt::format("{}: access_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
+std::optional<std::string> access_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: access_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string access_expression::to_string() const
 {
     return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
@@ -176,6 +221,12 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, me
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: import_expression::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> import_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: import_expression::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string import_expression::to_string() const
@@ -225,6 +276,12 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     return std::make_unique<cg::value>(var->get_value());
 }
 
+std::optional<std::string> variable_reference_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: variable_reference_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string variable_reference_expression::to_string() const
 {
     return fmt::format("VariableReference(name={})", name.s);
@@ -264,6 +321,28 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     return {};
 }
 
+std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
+{
+    ctx.add_variable(name.s, type.s);
+
+    if(expr)
+    {
+        auto rhs = expr->type_check(ctx);
+
+        if(!rhs)
+        {
+            throw ty::type_error(name.location, fmt::format("Expression has no type."));
+        }
+
+        if(*rhs != type.s)
+        {
+            throw ty::type_error(name.location, fmt::format("Expected expression of type '{}' to match variable type '{}'.", *rhs, type.s));
+        }
+    }
+
+    return std::nullopt;
+}
+
 std::string variable_declaration_expression::to_string() const
 {
     return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name.s, type.s, expr ? expr->to_string() : std::string("<none>"));
@@ -277,6 +356,12 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_definition_expression::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: struct_definition_expression::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string struct_definition_expression::to_string() const
@@ -304,6 +389,12 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
     throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
+std::optional<std::string> struct_anonymous_initializer_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string struct_anonymous_initializer_expression::to_string() const
 {
     std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
@@ -327,6 +418,12 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_named_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> struct_named_initializer_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: struct_named_initializer_expression::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string struct_named_initializer_expression::to_string() const
@@ -453,6 +550,12 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
     throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op.s));
 }
 
+std::optional<std::string> binary_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: binary_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string binary_expression::to_string() const
 {
     return fmt::format("Binary(op=\"{}\", lhs={}, rhs={})", op.s,
@@ -487,6 +590,12 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     return ctx->create_function(name.s, return_type.s, std::move(function_args));
 }
 
+std::optional<std::string> prototype_ast::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: prototype_ast::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string prototype_ast::to_string() const
 {
     std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, return_type.s);
@@ -519,6 +628,16 @@ std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context
         v = expr->generate_code(ctx, memory_context::none);
     }
     return v;
+}
+
+std::optional<std::string> block::type_check(ty::context& ctx) const
+{
+    for(auto& expr: exprs)
+    {
+        expr->type_check(ctx);
+    }
+
+    return std::nullopt;
 }
 
 std::string block::to_string() const
@@ -565,6 +684,12 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
     return v;
 }
 
+std::optional<std::string> function_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: function_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string function_expression::to_string() const
 {
     return fmt::format("Function(prototype={}, body={})",
@@ -589,6 +714,12 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
     }
     ctx->generate_invoke(std::make_unique<cg::function_argument>(callee.s));
     return {};    // FIXME return the return type of the function?
+}
+
+std::optional<std::string> call_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: call_expression::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string call_expression::to_string() const
@@ -626,6 +757,12 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
     return {};
 }
 
+std::optional<std::string> return_statement::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: return_statement::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string return_statement::to_string() const
 {
     if(expr)
@@ -648,6 +785,12 @@ std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* 
     throw std::runtime_error(fmt::format("{}: if_statement::generate_code not implemented.", slang::to_string(loc)));
 }
 
+std::optional<std::string> if_statement::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: if_statement::type_check not implemented.", slang::to_string(loc)));
+}
+
 std::string if_statement::to_string() const
 {
     return fmt::format("If(condition={}, if_block={}, else_block={})",
@@ -664,6 +807,12 @@ std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::contex
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: while_statement::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> while_statement::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: while_statement::type_check not implemented.", slang::to_string(loc)));
 }
 
 std::string while_statement::to_string() const
