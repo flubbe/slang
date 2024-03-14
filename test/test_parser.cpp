@@ -28,7 +28,7 @@ TEST(parser, import_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -40,7 +40,7 @@ TEST(parser, import_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -86,7 +86,7 @@ TEST(parser, function)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -98,7 +98,7 @@ TEST(parser, function)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -110,7 +110,20 @@ TEST(parser, function)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void {}\n"
+          "fn g() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -197,7 +210,7 @@ TEST(parser, return_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -214,7 +227,7 @@ TEST(parser, return_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -231,7 +244,7 @@ TEST(parser, return_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -248,7 +261,7 @@ TEST(parser, return_statement)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -293,7 +306,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -328,7 +341,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -368,7 +381,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -408,7 +421,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -448,7 +461,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -468,7 +481,7 @@ TEST(parser, hello_world)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -486,7 +499,7 @@ TEST(parser, function_call)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -501,7 +514,7 @@ TEST(parser, function_call)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -537,7 +550,7 @@ TEST(parser, if_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -563,7 +576,7 @@ TEST(parser, if_else_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -589,7 +602,7 @@ TEST(parser, if_elseif_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -611,7 +624,7 @@ TEST(parser, while_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -637,7 +650,7 @@ TEST(parser, while_if_break_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -663,7 +676,7 @@ TEST(parser, while_if_continue_statement)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -685,7 +698,7 @@ TEST(parser, variable_declaration)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -703,7 +716,7 @@ TEST(parser, struct_definition)
     slang::parser parser;
 
     lexer.set_input(test_input);
-    parser.parse(lexer);
+    EXPECT_NO_THROW(parser.parse(lexer));
 
     EXPECT_TRUE(lexer.eof());
 }
@@ -723,7 +736,7 @@ TEST(parser, struct_initialization)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -767,7 +780,7 @@ TEST(parser, struct_member_access)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }
@@ -779,7 +792,7 @@ TEST(parser, struct_member_access)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        parser.parse(lexer);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
     }

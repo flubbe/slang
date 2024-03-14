@@ -723,6 +723,16 @@ public:
     scope& operator=(scope&&) = default;
 
     /**
+     * Create a scope from a name (e.g. "<global>").
+     *
+     * @param name The scope's name.
+     */
+    scope(std::string name)
+    : name{std::move(name)}
+    {
+    }
+
+    /**
      * Create a scope and initialize it with function arguments.
      *
      * @param name The scope's name (usually the same as the function's name)
@@ -806,7 +816,7 @@ public:
     {
         if(contains(arg->get_name()))
         {
-            throw codegen_error(fmt::format("Argument name '{}' already contained in scope.", arg->get_name()));
+            throw codegen_error(fmt::format("Name '{}' already contained in scope.", arg->get_name()));
         }
         args.emplace_back(std::move(arg));
     }
@@ -821,7 +831,7 @@ public:
     {
         if(contains(arg->get_name()))
         {
-            throw codegen_error(fmt::format("Argument name '{}' already contained in scope.", arg->get_name()));
+            throw codegen_error(fmt::format("Name '{}' already contained in scope.", arg->get_name()));
         }
         locals.emplace_back(std::move(arg));
     }
@@ -1106,7 +1116,7 @@ class context
     std::vector<std::string> strings;
 
     /** Global scope. */
-    std::unique_ptr<scope> global_scope;
+    std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
 
     /** The current scope stack. */
     std::vector<scope*> current_scopes;

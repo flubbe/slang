@@ -42,6 +42,74 @@ TEST(compile_ir, empty)
     EXPECT_EQ(ctx.to_string().length(), 0);
 }
 
+TEST(compile_ir, double_definition)
+{
+    {
+        const std::string test_input =
+          "let a: i32;\n"
+          "let a: f32;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " let a: i32;\n"
+          " let a: f32;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          "}\n"
+          "fn f() -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        cg::context ctx;
+        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+    }
+}
+
 TEST(compile_ir, empty_function)
 {
     const std::string test_input =
