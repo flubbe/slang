@@ -535,24 +535,47 @@ TEST(parser, function_call)
 
 TEST(parser, if_statement)
 {
-    const std::string test_input =
-      "import std;\n"
-      "\n"
-      "fn main(s: string) -> i32\n"
-      "{\n"
-      " if(1 == 2)\n"
-      " {\n"
-      "  std::print(\"Hello, World!\\n\");\n"
-      " }\n"
-      "}";
+    {
+        const std::string test_input =
+          "import std;\n"
+          "\n"
+          "fn main(s: string) -> i32\n"
+          "{\n"
+          " if(1 == 2)\n"
+          " {\n"
+          "  std::print(\"Hello, World!\\n\");\n"
+          " }\n"
+          "}";
 
-    slang::lexer lexer;
-    slang::parser parser;
+        slang::lexer lexer;
+        slang::parser parser;
 
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
-    EXPECT_TRUE(lexer.eof());
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "import std;\n"
+          "\n"
+          "fn main(s: string) -> i32\n"
+          "{\n"
+          " if(1 == 2)\n"
+          " {\n"
+          "  std::print(\"Hello, World!\\n\");\n"
+          " }\n"
+          " let a: i32 = 0;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
 }
 
 TEST(parser, if_else_statement)

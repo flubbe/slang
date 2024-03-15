@@ -150,8 +150,15 @@ protected:
     /** Parse a struct definition. */
     std::unique_ptr<ast::struct_definition_expression> parse_struct();
 
-    /** Parse any block of expressions between { and }. */
-    std::unique_ptr<ast::block> parse_block();
+    /**
+     * Parse any block of expressions between { and }.
+     *
+     * Function definitions don't skip the closing brace, since that is done
+     * by the parser loop.
+     *
+     * @param skip_closing_brace Whether to skip the block's closing brace.
+     */
+    std::unique_ptr<ast::block> parse_block(bool skip_closing_brace = true);
 
     /** Parse a primary expression. */
     std::unique_ptr<ast::expression> parse_primary();

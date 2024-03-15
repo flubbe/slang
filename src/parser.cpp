@@ -182,7 +182,7 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
         throw syntax_error("Unexpected end of file.");
     }
 
-    return std::make_unique<ast::function_expression>(std::move(loc), std::move(proto), parse_block());
+    return std::make_unique<ast::function_expression>(std::move(loc), std::move(proto), parse_block(false));
 }
 
 // variable_decl ::= 'let' identifier
@@ -290,7 +290,7 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 //             | break_statement
 //             | continue_statement
 //             | return_statement
-std::unique_ptr<ast::block> parser::parse_block()
+std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
 {
     token_location loc = current_token->location;
     if(current_token->s != "{")
@@ -345,7 +345,11 @@ std::unique_ptr<ast::block> parser::parse_block()
             throw syntax_error(*current_token, fmt::format("Expected <expression> or <statement>, got '{}'.", current_token->s));
         }
     }
-    get_next_token(false);    // skip "}". (We might hit the end of the input.)
+
+    if(skip_closing_brace)
+    {
+        get_next_token(false);    // skip "}". (We might hit the end of the input.)
+    }
 
     return std::make_unique<ast::block>(std::move(loc), std::move(stmts_exprs));
 }
@@ -754,7 +758,7 @@ void parser::parse(lexer& in_lexer)
     m_lexer = &in_lexer;
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
-    while((current_token = in_lexer.next()) != std::nullopt)
+    while((current_token = get_next_token(false)) != std::nullopt)
     {
         exprs.emplace_back(std::move(parse_top_level_statement()));
     }
