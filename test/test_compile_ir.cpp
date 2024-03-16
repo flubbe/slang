@@ -723,7 +723,7 @@ TEST(compile_ir, compound_assignments)
         EXPECT_NE(ast, nullptr);
 
         cg::context ctx;
-        EXPECT_NO_THROW(ast->generate_code(&ctx));
+        ASSERT_NO_THROW(ast->generate_code(&ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"

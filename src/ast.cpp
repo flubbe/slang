@@ -8,6 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <unordered_map>
+#include <set>
+
 #include "ast.h"
 #include "codegen.h"
 #include "typing.h"
@@ -194,13 +197,35 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context* ctx,
 
 std::optional<std::string> type_cast_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: type_cast_expression::type_check not implemented.", slang::to_string(loc)));
+    auto type = expr->type_check(ctx);
+    if(type == std::nullopt)
+    {
+        throw ty::type_error(loc, "Invalid cast from untyped expression.");
+    }
+
+    // valid type casts.
+    std::unordered_map<std::string, std::set<std::string>> valid_casts = {
+      {"i32", {"i32", "f32"}},
+      {"f32", {"i32", "f32"}}};
+
+    auto cast_from = valid_casts.find(*type);
+    if(cast_from == valid_casts.end())
+    {
+        throw ty::type_error(loc, fmt::format("Invalid cast from non-primitive type '{}'.", *type));
+    }
+
+    auto cast_to = cast_from->second.find(target_type.s);
+    if(cast_to == cast_from->second.end())
+    {
+        throw ty::type_error(loc, fmt::format("Invalid cast to non-primitive type '{}'.", target_type.s));
+    }
+
+    return target_type.s;
 }
 
 std::string type_cast_expression::to_string() const
 {
-    return fmt::format("TypeCast(expr={}, target_type={})", expr ? expr->to_string() : std::string("<none>"), target_type.s);
+    return fmt::format("TypeCast(target_type={}, expr={})", target_type.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
