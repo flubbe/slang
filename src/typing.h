@@ -44,11 +44,74 @@ public:
     type_error(const slang::token_location& loc, const std::string& message);
 };
 
+/** A function signature. */
+struct function_signature
+{
+    /** Name of the function. */
+    std::string name;
+
+    /** Argument types. */
+    std::vector<std::string> arg_types;
+
+    /** Return type. */
+    std::string ret_type;
+
+    /** Default constructors. */
+    function_signature() = default;
+    function_signature(const function_signature&) = default;
+    function_signature(function_signature&&) = default;
+
+    /** Default assignments. */
+    function_signature& operator=(const function_signature&) = default;
+    function_signature& operator=(function_signature&&) = default;
+
+    /**
+     * Construct a new function_signature.
+     *
+     * @param name The function's name.
+     * @param arg_types The function's argument types.
+     * @param ret_type The function's return type.
+     */
+    function_signature(std::string name, std::vector<std::string> arg_types, std::string ret_type)
+    : name{std::move(name)}
+    , arg_types{std::move(arg_types)}
+    , ret_type{std::move(ret_type)}
+    {
+    }
+
+    /** Return a string representation of the signature. */
+    std::string to_string() const;
+};
+
+/** A scope. */
+struct scope
+{
+    /** Variables (variables["name"] == "type"). */
+    std::unordered_map<std::string, std::string> variables;
+
+    /** Functions. */
+    std::unordered_map<std::string, function_signature> functions;
+
+    /**
+     * Check whether this scope contains a name.
+     *
+     * @param name The name to check for.
+     * @returns True if the name exists in this scope or false if not.
+     */
+    bool contains(const std::string& name) const
+    {
+        return variables.find(name) != variables.end() || functions.find(name) != functions.end();
+    }
+
+    /** Get a string representation of the scope. */
+    std::string to_string() const;
+};
+
 /** Type system context. */
 class context
 {
-    /** Variables per scope (variables["scope"]["name"] == "type"). */
-    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> variables;
+    /** Variables per scope. */
+    std::unordered_map<std::string, scope> scopes;
 
     /** The current scopes. */
     std::vector<std::string> current_scopes = {"<global>"};
@@ -67,14 +130,27 @@ public:
     context& operator=(context&&) = default;
 
     /**
-     * Add a type to the context.
+     * Add a variable's type to the context.
      *
      * @throws A type_error if the name already exists in the scope.
+     * @throws A type_error if the given type is unknown.
      *
-     * @param name The name.
+     * @param name The variable's name.
      * @param type String representation of the type.
      */
-    void add_type(std::string name, std::string type);
+    void add_variable_type(std::string name, std::string type);
+
+    /**
+     * Add a function's type to the context.
+     *
+     * @throws A type_error if the name already exists in the scope.
+     * @throws A type_error if any of the supplied types are unknown.
+     *
+     * @param name The function's name.
+     * @param arg_types The functions's argument types.
+     * @param ret_type The function's return type.
+     */
+    void add_function_type(std::string name, std::vector<std::string> arg_types, std::string ret_type);
 
     /**
      * Get the type for a name.
@@ -103,8 +179,13 @@ public:
 
     /**
      * Exit a scope.
+     *
+     * @param name The scope's name. Used for validation.
      */
     void exit_scope(const std::string& name);
+
+    /** Get a string representation of the context. */
+    std::string to_string() const;
 };
 
 }    // namespace slang::typing

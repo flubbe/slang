@@ -381,7 +381,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_type(name.s, type.s);
+    ctx.add_variable_type(name.s, type.s);
 
     if(expr)
     {
@@ -691,10 +691,29 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     return ctx->create_function(name.s, return_type.s, std::move(function_args));
 }
 
-std::optional<std::string> prototype_ast::type_check(ty::context& ctx) const
+void prototype_ast::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: prototype_ast::type_check not implemented.", slang::to_string(loc)));
+    // add function signature to current scope.
+    std::vector<std::string> arg_types;
+    std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
+                   [](const auto& arg)
+                   { return arg.second.s; });
+    ctx.add_function_type(name.s, std::move(arg_types), return_type.s);
+
+    // enter function scope. the scope is exited in the type_check for the function's body.
+    ctx.enter_named_scope(name.s);
+
+    // add the arguments to the current scope.
+    for(auto arg: args)
+    {
+        ctx.add_variable_type(arg.first.s, arg.second.s);
+    }
+}
+
+void prototype_ast::finish_type_check(ty::context& ctx) const
+{
+    // exit the function's scope.
+    ctx.exit_scope(name.s);
 }
 
 std::string prototype_ast::to_string() const
@@ -787,8 +806,11 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
 
 std::optional<std::string> function_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: function_expression::type_check not implemented.", slang::to_string(loc)));
+    prototype->type_check(ctx);
+    body->type_check(ctx);
+    prototype->finish_type_check(ctx);
+
+    return std::nullopt;
 }
 
 std::string function_expression::to_string() const

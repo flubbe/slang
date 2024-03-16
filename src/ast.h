@@ -655,7 +655,8 @@ public:
     }
 
     slang::codegen::function* generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const;
+    void type_check(slang::typing::context& ctx) const;
+    void finish_type_check(slang::typing::context& ctx) const;
     std::string to_string() const;
 };
 
