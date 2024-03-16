@@ -9,11 +9,77 @@
  */
 
 #include <unordered_map>
+#include <set>
 
 #include "parser.h"
 
 namespace slang
 {
+
+/*
+ * Keyword list.
+ */
+
+// clang-format off
+static std::set<std::string> keywords = {
+  "import", 
+  "let", 
+  "i32", "f32", "str", 
+  "void", 
+  "as", 
+  "struct", 
+  "fn", "return", 
+  "if", "else", 
+  "while", "break", "continue"
+};
+// clang-format on
+
+/**
+ * Check whether a name can be used as an identifier and throw a syntax_error
+ * if this is not the case.
+ *
+ * @param tok The token to validate.
+ */
+static void validate_identifier_name(const token& tok)
+{
+    // we probably already know this, but validate anyway.
+    if(tok.type != token_type::identifier)
+    {
+        throw syntax_error(tok, fmt::format("Expected <identifier>, got '{}'.", tok.s));
+    }
+
+    if(keywords.find(tok.s) != keywords.end())
+    {
+        throw syntax_error(tok, fmt::format("Expected <identifier>, got keyword '{}'.", tok.s));
+    }
+}
+
+/**
+ * Check whether a name can be used as a type name and throw a syntax_error
+ * if this is not the case.
+ *
+ * @param tok The token to validate.
+ */
+static void validate_type_name(const token& tok)
+{
+    // we probably already know this, but validate anyway.
+    if(tok.type != token_type::identifier)
+    {
+        throw syntax_error(tok, fmt::format("Expected <type>, got '{}'.", tok.s));
+    }
+
+    // check built-in types.
+    if(tok.s == "void" || tok.s == "i32" || tok.s == "f32" || tok.s == "str")
+    {
+        return;
+    }
+
+    // check against keyword list.
+    if(keywords.find(tok.s) != keywords.end())
+    {
+        throw syntax_error(tok, fmt::format("Expected <type>, got keyword '{}'.", tok.s));
+    }
+}
 
 /*
  * Exceptions.
@@ -108,7 +174,9 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     {
         throw syntax_error(*current_token, "Expected <identifier>.");
     }
-    token name{*current_token};
+
+    token name = *current_token;
+    validate_identifier_name(name);
 
     get_next_token();
     if(current_token->s != "(")
@@ -124,7 +192,9 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         {
             break;
         }
+
         token arg_name = *current_token;
+        validate_identifier_name(arg_name);
 
         get_next_token();
         if(current_token->s != ":")
@@ -137,7 +207,9 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         {
             throw syntax_error(*current_token, fmt::format("Expected <identifier>, got '{}'.", current_token->s));
         }
+
         token arg_type = *current_token;
+        validate_type_name(arg_type);
 
         args.emplace_back(std::make_pair(std::move(arg_name), std::move(arg_type)));
 
@@ -166,7 +238,9 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     {
         throw syntax_error(*current_token, "Expected <identifier>.");
     }
+
     token return_type = *current_token;
+    validate_type_name(return_type);
     get_next_token();
 
     return std::make_unique<ast::prototype_ast>(std::move(loc), std::move(name), std::move(args), std::move(return_type));
@@ -195,7 +269,9 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     {
         throw syntax_error(*current_token, "Expected <identifier>.");
     }
+
     token name = *current_token;
+    validate_identifier_name(name);
 
     get_next_token();
     if(current_token->s != ":")
@@ -208,7 +284,9 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     {
         throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
     }
+
     token type = *current_token;
+    validate_type_name(type);
 
     get_next_token();
     if(current_token->s == ";")
@@ -234,7 +312,9 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
     {
         throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
     }
+
     token name = *current_token;
+    validate_identifier_name(name);
 
     get_next_token();
     if(current_token->s != "{")
@@ -249,6 +329,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
         if(current_token->type == token_type::identifier)
         {
             token member_name = *current_token;
+            validate_identifier_name(member_name);
+
             get_next_token();
 
             if(current_token->s != ":")
@@ -262,6 +344,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
                 throw syntax_error(*current_token, fmt::format("Expected <identifier>, got '{}'.", current_token->s));
             }
             token member_type = *current_token;
+            validate_type_name(member_type);
+
             get_next_token();
 
             members.emplace_back(std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(member_name), std::move(member_type), nullptr));
@@ -355,26 +439,36 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
 }
 
 // primary_expr ::= identifier_expr | literal_expr | paren_expr
+//                | (identifier_expr | literal_expr | paren_expr) as type_expr
 std::unique_ptr<ast::expression> parser::parse_primary()
 {
+    std::unique_ptr<ast::expression> expr;
+
     if(current_token->type == token_type::identifier)
     {
-        return parse_identifier_expression();
+        expr = parse_identifier_expression();
     }
     else if(current_token->type == token_type::int_literal
             || current_token->type == token_type::fp_literal
             || current_token->type == token_type::str_literal)
     {
-        return parse_literal_expression();
+        expr = parse_literal_expression();
     }
     else if(current_token->s == "(")
     {
-        return parse_paren_expression();
+        expr = parse_paren_expression();
     }
     else
     {
         throw syntax_error(*current_token, fmt::format("Expected <primary-expression>, got '{}'.", current_token->s));
     }
+
+    if(current_token->s == "as")
+    {
+        expr = parse_type_cast_expression(std::move(expr));
+    }
+
+    return expr;
 }
 
 /** Binary operator precedences. */
@@ -667,6 +761,27 @@ std::unique_ptr<ast::expression> parser::parse_expression()
     }
 
     return parse_bin_op_rhs(0, std::move(lhs));
+}
+
+std::unique_ptr<ast::expression> parser::parse_type_cast_expression(std::unique_ptr<ast::expression> expr)
+{
+    token_location loc = current_token->location;
+    get_next_token();    // skip 'as'.
+
+    if(current_token->type != token_type::identifier)
+    {
+        throw syntax_error(*current_token, fmt::format("Expected <identifier>, got '{}'.", current_token->s));
+    }
+
+    // check we're casting to primitive type.
+    token type = *current_token;
+    if(type.s != "i32" && type.s != "f32")
+    {
+        throw syntax_error(type, fmt::format("Expected <primitive-type>, got '{}'.", type.s));
+    }
+    get_next_token();
+
+    return std::make_unique<ast::type_cast_expression>(std::move(loc), std::move(expr), std::move(type));
 }
 
 // ifexpr ::= '(' expression ')' block 'else' (ifexpr | block)

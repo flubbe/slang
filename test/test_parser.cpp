@@ -306,7 +306,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -341,7 +341,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -381,7 +381,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -421,7 +421,7 @@ TEST(parser, operators)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
 
@@ -706,22 +706,78 @@ TEST(parser, while_if_continue_statement)
 
 TEST(parser, variable_declaration)
 {
+    {
+        const std::string test_input =
+          "import std;\n"
+          "\n"
+          "let k : i32 = 3;\n"
+          "\n"
+          "fn main(s: string) -> i32\n"
+          "{\n"
+          " let a : f32;\n"
+          " let b : f32 = 2*a;"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "let 1: i32 = 2;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "let if: i32 = 2;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+}
+
+TEST(parser, explicit_cast)
+{
     const std::string test_input =
-      "import std;\n"
-      "\n"
-      "let k : i32 = 3;\n"
-      "\n"
-      "fn main(s: string) -> i32\n"
-      "{\n"
-      " let a : f32;\n"
-      " let b : f32 = 2*a;"
-      "}";
+      "let k: i32 = 3.0 as i32;";
 
     slang::lexer lexer;
     slang::parser parser;
 
     lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
+    ASSERT_NO_THROW(parser.parse(lexer));
+
+    // clang-format off
+    std::string expected =
+      "Block("
+        "exprs=("
+          "VariableDeclaration("
+            "name=k, "
+            "type=i32, "
+            "expr=TypeCast("
+              "expr=FloatLiteral("
+                "value=3"
+              "), "
+              "target_type=i32"
+            ")"
+          ")"
+        ")"
+      ")";
+    // clang-format on
+
+    EXPECT_EQ(parser.get_ast()->to_string(), expected);
 
     EXPECT_TRUE(lexer.eof());
 }

@@ -29,7 +29,7 @@ namespace slang::ast
  */
 static bool is_builtin_type(const std::string& s)
 {
-    return s == "void" || s == "i32" || s == "f32";
+    return s == "void" || s == "i32" || s == "f32" || s == "str";
 }
 
 /*
@@ -162,13 +162,45 @@ std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, me
 
 std::optional<std::string> signed_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: signed_expression::type_check not implemented.", slang::to_string(loc)));
+    auto expr_type = expr->type_check(ctx);
+
+    if(expr_type == std::nullopt)
+    {
+        throw ty::type_error(loc, "Unable to determine type of signed expression.");
+    }
+
+    if(*expr_type != "i32" && *expr_type != "f32")
+    {
+        throw ty::type_error(loc, fmt::format("Expected type 'i32' or 'f32' for signed expression, got '{}'.", *expr_type));
+    }
+
+    return expr_type;
 }
 
 std::string signed_expression::to_string() const
 {
     return fmt::format("Signed(sign={}, expr={})", sign.s, expr ? expr->to_string() : std::string("<none>"));
+}
+
+/*
+ * type_cast_expression.
+ */
+
+std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context* ctx, memory_context mc) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: type_cast_expression::generate_code not implemented.", slang::to_string(loc)));
+}
+
+std::optional<std::string> type_cast_expression::type_check(ty::context& ctx) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: type_cast_expression::type_check not implemented.", slang::to_string(loc)));
+}
+
+std::string type_cast_expression::to_string() const
+{
+    return fmt::format("TypeCast(expr={}, target_type={})", expr ? expr->to_string() : std::string("<none>"), target_type.s);
 }
 
 /*
@@ -183,8 +215,11 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
 
 std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: scope_expression::type_check not implemented.", slang::to_string(loc)));
+    ctx.enter_named_scope(name.s);
+    auto type = expr->type_check(ctx);
+    ctx.exit_scope(name.s);
+
+    return type;
 }
 
 std::string scope_expression::to_string() const
@@ -225,8 +260,7 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, me
 
 std::optional<std::string> import_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: import_expression::type_check not implemented.", slang::to_string(loc)));
+    return std::nullopt;
 }
 
 std::string import_expression::to_string() const
@@ -278,8 +312,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
 std::optional<std::string> variable_reference_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: variable_reference_expression::type_check not implemented.", slang::to_string(loc)));
+    return ctx.get_type(name.s);
 }
 
 std::string variable_reference_expression::to_string() const
@@ -323,7 +356,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable(name.s, type.s);
+    ctx.add_type(name.s, type.s);
 
     if(expr)
     {
@@ -336,7 +369,7 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
 
         if(*rhs != type.s)
         {
-            throw ty::type_error(name.location, fmt::format("Expected expression of type '{}' to match variable type '{}'.", *rhs, type.s));
+            throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, type.s));
         }
     }
 
@@ -360,8 +393,14 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: struct_definition_expression::type_check not implemented.", slang::to_string(loc)));
+    ctx.enter_named_scope(name.s);
+    for(auto& m: members)
+    {
+        m->type_check(ctx);
+    }
+    ctx.exit_scope(name.s);
+
+    return std::nullopt;
 }
 
 std::string struct_definition_expression::to_string() const
@@ -453,18 +492,25 @@ std::string struct_named_initializer_expression::to_string() const
  * binary_expression.
  */
 
-std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
+static std::tuple<bool, bool, std::string> classify_binary_op(const std::string& s)
 {
-    bool is_assignment = (op.s == "=" || op.s == "+=" || op.s == "-="
-                          || op.s == "*=" || op.s == "/=" || op.s == "%="
-                          || op.s == "&=" || op.s == "|=" || op.s == "<<=" || op.s == ">>=");
-    bool is_compound = is_assignment && (op.s != "=");
+    bool is_assignment = (s == "=" || s == "+=" || s == "-="
+                          || s == "*=" || s == "/=" || s == "%="
+                          || s == "&=" || s == "|=" || s == "<<=" || s == ">>=");
+    bool is_compound = is_assignment && (s != "=");
 
-    std::string reduced_op = op.s;
+    std::string reduced_op = s;
     if(is_compound)
     {
         reduced_op.pop_back();
     }
+
+    return {is_assignment, is_compound, reduced_op};
+}
+
+std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
+{
+    auto [is_assignment, is_compound, reduced_op] = classify_binary_op(op.s);
 
     if(!is_assignment || is_compound)
     {
@@ -534,6 +580,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
         auto rhs_value = rhs->generate_code(ctx, memory_context::load);
         auto lhs_value = lhs->generate_code(ctx, memory_context::store);
 
+        // TODO This is handled by the type system.
         if(lhs_value->get_type() != rhs_value->get_type())
         {
             throw cg::codegen_error(loc, fmt::format("Types don't match in assignment. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
@@ -552,8 +599,37 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
 
 std::optional<std::string> binary_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: binary_expression::type_check not implemented.", slang::to_string(loc)));
+    auto [is_assignment, is_compound, reduced_op] = classify_binary_op(op.s);
+
+    auto lhs_type = lhs->type_check(ctx);
+    auto rhs_type = rhs->type_check(ctx);
+
+    if(lhs_type == std::nullopt || rhs_type == std::nullopt)
+    {
+        throw ty::type_error(loc, fmt::format("Could not infer types for binary operator '{}'.", reduced_op));
+    }
+
+    // some operations restrict the type.
+    if(reduced_op == "%"
+       || reduced_op == "<<" || reduced_op == ">>"
+       || reduced_op == "&" || reduced_op == "^" || reduced_op == "|"
+       || reduced_op == "&&" || reduced_op == "||")
+    {
+        if(*lhs_type != "i32" || *rhs_type != "i32")
+        {
+            throw ty::type_error(loc, fmt::format("Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.", *lhs_type, reduced_op, *rhs_type, reduced_op));
+        }
+
+        // return the restricted type.
+        return {"i32"};
+    }
+
+    if(*lhs_type != *rhs_type)
+    {
+        throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", *lhs_type, reduced_op, *rhs_type));
+    }
+
+    return lhs_type;
 }
 
 std::string binary_expression::to_string() const
@@ -787,8 +863,29 @@ std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* 
 
 std::optional<std::string> if_statement::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: if_statement::type_check not implemented.", slang::to_string(loc)));
+    auto condition_type = condition->type_check(ctx);
+    if(condition_type == std::nullopt)
+    {
+        throw ty::type_error(loc, "If condition has no type.");
+    }
+
+    if(*condition_type != "i32")
+    {
+        throw ty::type_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", *condition_type));
+    }
+
+    ctx.enter_anonymous_scope();
+    if_block->type_check(ctx);
+    ctx.exit_anonymous_scope();
+
+    if(else_block)
+    {
+        ctx.enter_anonymous_scope();
+        else_block->type_check(ctx);
+        ctx.exit_anonymous_scope();
+    }
+
+    return std::nullopt;
 }
 
 std::string if_statement::to_string() const
@@ -811,8 +908,22 @@ std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::contex
 
 std::optional<std::string> while_statement::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: while_statement::type_check not implemented.", slang::to_string(loc)));
+    auto condition_type = condition->type_check(ctx);
+    if(condition_type == std::nullopt)
+    {
+        throw ty::type_error(loc, "While condition has no type.");
+    }
+
+    if(*condition_type != "i32")
+    {
+        throw ty::type_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", *condition_type));
+    }
+
+    ctx.enter_anonymous_scope();
+    while_block->type_check(ctx);
+    ctx.exit_anonymous_scope();
+
+    return std::nullopt;
 }
 
 std::string while_statement::to_string() const

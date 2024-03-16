@@ -178,6 +178,9 @@ protected:
     /** Parse expression. */
     std::unique_ptr<ast::expression> parse_expression();
 
+    /** Parse a type cast expression. */
+    std::unique_ptr<ast::expression> parse_type_cast_expression(std::unique_ptr<ast::expression> expr);
+
     /** Parse an if statement. */
     std::unique_ptr<ast::if_statement> parse_if();
 

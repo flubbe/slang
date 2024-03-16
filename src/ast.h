@@ -181,6 +181,49 @@ public:
     std::string to_string() const override;
 };
 
+/** A type cast expression. */
+class type_cast_expression : public expression
+{
+    /** The expression. */
+    std::unique_ptr<expression> expr;
+
+    /** The target type. */
+    token target_type;
+
+public:
+    /** No default constructor. */
+    type_cast_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~type_cast_expression() = default;
+
+    /** Copy and move constructors. */
+    type_cast_expression(const type_cast_expression&) = delete;
+    type_cast_expression(type_cast_expression&&) = default;
+
+    /** Assignment operators. */
+    type_cast_expression& operator=(const type_cast_expression&) = delete;
+    type_cast_expression& operator=(type_cast_expression&&) = default;
+
+    /**
+     * Construct a type cast expression.
+     *
+     * @param loc The location
+     * @param expr The expression.
+     * @param target_type The target type.
+     */
+    type_cast_expression(token_location loc, std::unique_ptr<expression> expr, token target_type)
+    : expression{std::move(loc)}
+    , expr{std::move(expr)}
+    , target_type{std::move(target_type)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
+};
+
 /** Scope expression. */
 class scope_expression : public expression
 {

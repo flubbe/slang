@@ -51,7 +51,10 @@ class context
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> variables;
 
     /** The current scopes. */
-    std::vector<std::string> current_scopes;
+    std::vector<std::string> current_scopes = {"<global>"};
+
+    /** The current anonymous scope id. */
+    std::size_t anonymous_scope_id = 0;
 
 public:
     /** Default constructor. */
@@ -64,27 +67,39 @@ public:
     context& operator=(context&&) = default;
 
     /**
-     * Add a variable to the context.
+     * Add a type to the context.
      *
-     * @throws A
+     * @throws A type_error if the name already exists in the scope.
      *
-     * @param name The variable's name.
-     * @param type String representation of the variable's type.
+     * @param name The name.
+     * @param type String representation of the type.
      */
-    void add_variable(std::string name, std::string type)
-    {
-        // TODO
-    }
+    void add_type(std::string name, std::string type);
 
     /**
-     * Enter a scope.
+     * Get the type for a name.
+     *
+     * @throws A type_error if the name is unknown.
+     *
+     * @param name The name.
+     */
+    std::string get_type(const std::string& name) const;
+
+    /**
+     * Enter a named scope.
      *
      * @param name The scope's name.
      */
-    void enter_scope(const std::string& name)
+    void enter_named_scope(const std::string& name)
     {
         current_scopes.emplace_back(name);
     }
+
+    /** Enter an anonymous scope. */
+    void enter_anonymous_scope();
+
+    /** Exit an anonymous scope. */
+    void exit_anonymous_scope();
 
     /**
      * Exit a scope.
