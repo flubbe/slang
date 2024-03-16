@@ -134,6 +134,29 @@ struct scope
         return variables.find(name) != variables.end() || functions.find(name) != functions.end();
     }
 
+    /**
+     * Find the location of a name in this scope.
+     *
+     * @param name The name to find.
+     * @returns If the name is found, returns its location, and std::nullopt otherwise.
+     */
+    std::optional<token_location> find(const std::string& name) const
+    {
+        auto var_it = variables.find(name);
+        if(var_it != variables.end())
+        {
+            return {var_it->second.name.location};
+        }
+
+        auto func_it = functions.find(name);
+        if(func_it != functions.end())
+        {
+            return {func_it->second.name.location};
+        }
+
+        return std::nullopt;
+    }
+
     /** Get a string representation of the scope. */
     std::string to_string() const;
 };

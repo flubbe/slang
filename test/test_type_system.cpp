@@ -442,6 +442,28 @@ TEST(type_system, functions)
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
     }
+    {
+        const std::string test_input =
+          "fn f(a: i32) -> void\n"
+          "{\n"
+          " let b: f32 = 2.;\n"
+          " let b: i32 = 1. as i32;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+    }
 }
 
 }    // namespace

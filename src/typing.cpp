@@ -72,9 +72,13 @@ void context::add_variable_type(token name, token type)
 
     // check for existing names.
     std::string scope_name = slang::utils::join(current_scopes, {transform}, "::");
-    if(scopes.find(scope_name) != scopes.end() && scopes[scope_name].contains(name.s))
+    if(scopes.find(scope_name) != scopes.end())
     {
-        throw type_error(name.location, fmt::format("Name '{}' already exists in scope '{}'.", name.s, scope_name));
+        auto location = scopes[scope_name].find(name.s);
+        if(location != std::nullopt)
+        {
+            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, scope_name, slang::to_string(*location)));
+        }
     }
 
     // check if the type is known.
@@ -96,9 +100,13 @@ void context::add_function_type(token name, std::vector<token> arg_types, token 
 
     // check for existing names.
     std::string scope_name = slang::utils::join(current_scopes, {transform}, "::");
-    if(scopes.find(scope_name) != scopes.end() && scopes[scope_name].contains(name.s))
+    if(scopes.find(scope_name) != scopes.end())
     {
-        throw type_error(name.location, fmt::format("Name '{}' already exists in scope '{}'.", name.s, scope_name));
+        auto location = scopes[scope_name].find(name.s);
+        if(location != std::nullopt)
+        {
+            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, scope_name, slang::to_string(*location)));
+        }
     }
 
     // check if all types are known.
