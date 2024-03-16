@@ -381,7 +381,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable_type(name, type);
+    ctx.add_variable(name, type);
 
     if(expr)
     {
@@ -418,12 +418,21 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
 {
-    ctx.enter_named_scope(name.location, name.s);
+    // first add struct, then type-check. this allows the struct to be used already.
+    // TODO use a name collection pass.
+    std::vector<std::pair<token, token>> struct_members;
+    for(auto& m: members)
+    {
+        struct_members.emplace_back(m->get_name(), m->get_type());
+    }
+    ctx.add_type(name, std::move(struct_members));
+
+    ctx.disable_name_collection();    // FIXME artifact of the missing name collection pass (see above).
     for(auto& m: members)
     {
         m->type_check(ctx);
     }
-    ctx.exit_scope(name.s);
+    ctx.enable_name_collection();    // FIXME artifact of the missing name collection pass (see above).
 
     return std::nullopt;
 }
@@ -698,7 +707,7 @@ void prototype_ast::type_check(ty::context& ctx) const
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [](const auto& arg)
                    { return arg.second; });
-    ctx.add_function_type(name, std::move(arg_types), return_type);
+    ctx.add_function(name, std::move(arg_types), return_type);
 
     // enter function scope. the scope is exited in the type_check for the function's body.
     ctx.enter_named_scope(name.location, name.s);
@@ -706,7 +715,7 @@ void prototype_ast::type_check(ty::context& ctx) const
     // add the arguments to the current scope.
     for(auto arg: args)
     {
-        ctx.add_variable_type(arg.first, arg.second);
+        ctx.add_variable(arg.first, arg.second);
     }
 }
 

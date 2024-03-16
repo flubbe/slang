@@ -114,6 +114,37 @@ struct function_signature
     std::string to_string() const;
 };
 
+/** A struct. */
+struct struct_definition
+{
+    /** The struct's name. */
+    token name;
+
+    /** The struct's members as (name, type) pairs. */
+    std::vector<std::pair<token, token>> members;
+
+    /** Default constructors. */
+    struct_definition() = default;
+    struct_definition(const struct_definition&) = default;
+    struct_definition(struct_definition&&) = default;
+
+    /** Default assignments. */
+    struct_definition& operator=(const struct_definition&) = default;
+    struct_definition& operator=(struct_definition&&) = default;
+
+    /**
+     * Construct a struct definition.
+     *
+     * @param name The struct's name.
+     * @param members The struct's members.
+     */
+    struct_definition(token name, std::vector<std::pair<token, token>> members)
+    : name{std::move(name)}
+    , members{std::move(members)}
+    {
+    }
+};
+
 /** A scope. */
 struct scope
 {
@@ -134,6 +165,9 @@ struct scope
 
     /** Functions. */
     std::unordered_map<std::string, function_signature> functions;
+
+    /** Structs. */
+    std::unordered_map<std::string, struct_definition> structs;
 
     /** Default constructors. */
     scope() = default;
@@ -159,14 +193,16 @@ struct scope
     }
 
     /**
-     * Check whether this scope contains a name.
+     * Check whether this scope contains a name or a type.
      *
      * @param name The name to check for.
      * @returns True if the name exists in this scope or false if not.
      */
     bool contains(const std::string& name) const
     {
-        return variables.find(name) != variables.end() || functions.find(name) != functions.end();
+        return variables.find(name) != variables.end()
+               || functions.find(name) != functions.end()
+               || structs.find(name) != structs.end();
     }
 
     /**
@@ -187,6 +223,12 @@ struct scope
         if(func_it != functions.end())
         {
             return {func_it->second.name};
+        }
+
+        auto struct_it = structs.find(name);
+        if(struct_it != structs.end())
+        {
+            return {struct_it->second.name};
         }
 
         return std::nullopt;
@@ -234,6 +276,9 @@ class context
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
+    /** Whether we are collecting names. */
+    bool collect = true;
+
 public:
     /** Default constructor. */
     context() = default;
@@ -245,7 +290,23 @@ public:
     context& operator=(context&&) = default;
 
     /**
-     * Add a variable's type to the context.
+     * Enable name collection (default state is 'enabled').
+     */
+    void enable_name_collection()
+    {
+        collect = true;
+    }
+
+    /**
+     * Disable name collection.
+     */
+    void disable_name_collection()
+    {
+        collect = false;
+    }
+
+    /**
+     * Add a variable to the context.
      *
      * @throws A type_error if the name already exists in the scope.
      * @throws A type_error if the given type is unknown.
@@ -253,10 +314,10 @@ public:
      * @param name The variable's name.
      * @param type String representation of the type.
      */
-    void add_variable_type(token name, token type);
+    void add_variable(token name, token type);
 
     /**
-     * Add a function's type to the context.
+     * Add a function to the context.
      *
      * @throws A type_error if the name already exists in the scope.
      * @throws A type_error if any of the supplied types are unknown.
@@ -265,7 +326,18 @@ public:
      * @param arg_types The functions's argument types.
      * @param ret_type The function's return type.
      */
-    void add_function_type(token name, std::vector<token> arg_types, token ret_type);
+    void add_function(token name, std::vector<token> arg_types, token ret_type);
+
+    /**
+     * Add a type to the context.
+     *
+     * @throws A type_error if the type already exists in the scope.
+     * @throws A type_error if any of the supplied types are unknown.
+     *
+     * @param name The name of the type.
+     * @param members The members, given as pairs (name, type).
+     */
+    void add_type(token name, std::vector<std::pair<token, token>> members);
 
     /**
      * Check if the context has a specific type.

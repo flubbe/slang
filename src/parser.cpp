@@ -362,7 +362,7 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
         get_next_token();    // skip ','.
     }
 
-    get_next_token(false);    // skip "}"
+    get_next_token();    // skip "}"
     return std::make_unique<ast::struct_definition_expression>(std::move(loc), std::move(name), std::move(members));
 }
 

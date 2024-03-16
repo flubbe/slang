@@ -61,6 +61,14 @@ std::string scope::to_string() const
     {
         repr += fmt::format("[fn] name: {}, signature: {}\n", name, sig.to_string());
     }
+    for(auto& [name, s]: structs)
+    {
+        repr += fmt::format("[s] name: {}\n    members:\n", name);
+        for(auto& [n, t]: s.members)
+        {
+            repr += fmt::format("    - name: {}, type: {}\n", n.s, t.s);
+        }
+    }
 
     // remove trailing newline
     repr.pop_back();
@@ -72,8 +80,13 @@ std::string scope::to_string() const
  * Typing context.
  */
 
-void context::add_variable_type(token name, token type)
+void context::add_variable(token name, token type)
 {
+    if(!collect)
+    {
+        return;
+    }
+
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
@@ -98,8 +111,13 @@ void context::add_variable_type(token name, token type)
     current_scope->variables[name.s] = {name, std::move(type)};
 }
 
-void context::add_function_type(token name, std::vector<token> arg_types, token ret_type)
+void context::add_function(token name, std::vector<token> arg_types, token ret_type)
 {
+    if(!collect)
+    {
+        return;
+    }
+
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
@@ -135,9 +153,55 @@ void context::add_function_type(token name, std::vector<token> arg_types, token 
     current_scope->functions[name.s] = {name, std::move(arg_types), std::move(ret_type)};
 }
 
+void context::add_type(token name, std::vector<std::pair<token, token>> members)
+{
+    if(!collect)
+    {
+        return;
+    }
+
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
+
+    // check for existing names.
+    auto tok = current_scope->find(name.s);
+    if(tok != std::nullopt)
+    {
+        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+    }
+
+    // check if all types are known.
+    for(auto& [name, type]: members)
+    {
+        if(type.s != "i32" && type.s != "f32" && type.s != "str")
+        {
+            if(!has_type(type.s))
+            {
+                throw type_error(type.location, fmt::format("Struct member has unknown type '{}'.", type.s));
+            }
+        }
+    }
+
+    current_scope->structs[name.s] = {name, std::move(members)};
+}
+
 bool context::has_type(const std::string& name) const
 {
-    // TODO
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
+
+    for(const scope* s = current_scope; s != nullptr; s = s->parent)
+    {
+        if(s->structs.find(name) != s->structs.end())
+        {
+            return true;
+        }
+    }
+
     return false;
 }
 

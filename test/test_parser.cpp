@@ -784,20 +784,55 @@ TEST(parser, explicit_cast)
 
 TEST(parser, struct_definition)
 {
-    const std::string test_input =
-      "struct S\n"
-      "{\n"
-      " a: i32,\n"
-      " b: f32\n"
-      "}";
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};";
 
-    slang::lexer lexer;
-    slang::parser parser;
+        slang::lexer lexer;
+        slang::parser parser;
 
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
 
-    EXPECT_TRUE(lexer.eof());
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          "};\n"
+          "fn f() -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
 }
 
 TEST(parser, struct_initialization)

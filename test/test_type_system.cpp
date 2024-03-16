@@ -466,4 +466,80 @@ TEST(type_system, functions)
     }
 }
 
+TEST(type_system, structs)
+{
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};\n"
+          "fn test(a: S) -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
+          "fn test(a: S) -> void\n"
+          "{\n"
+          "}\n"
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+    }
+}
+
 }    // namespace

@@ -434,6 +434,18 @@ public:
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
     std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
+
+    /** Get the variable's name. */
+    const token& get_name() const
+    {
+        return name;
+    }
+
+    /** Get the variable's type. */
+    const token& get_type() const
+    {
+        return type;
+    }
 };
 
 /** Struct definition. */
