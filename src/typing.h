@@ -44,17 +44,48 @@ public:
     type_error(const slang::token_location& loc, const std::string& message);
 };
 
+/** A variable type. */
+struct variable_type
+{
+    /** The variable's name. */
+    token name;
+
+    /** The variable's type. */
+    token type;
+
+    /** Default constructors. */
+    variable_type() = default;
+    variable_type(const variable_type&) = default;
+    variable_type(variable_type&&) = default;
+
+    /** Default assignments. */
+    variable_type& operator=(const variable_type&) = default;
+    variable_type& operator=(variable_type&&) = default;
+
+    /**
+     * Construct a new variable type.
+     *
+     * @param name The variable's name.
+     * @param type The variable's type.
+     */
+    variable_type(token name, token type)
+    : name{std::move(name)}
+    , type{std::move(type)}
+    {
+    }
+};
+
 /** A function signature. */
 struct function_signature
 {
     /** Name of the function. */
-    std::string name;
+    token name;
 
     /** Argument types. */
-    std::vector<std::string> arg_types;
+    std::vector<token> arg_types;
 
     /** Return type. */
-    std::string ret_type;
+    token ret_type;
 
     /** Default constructors. */
     function_signature() = default;
@@ -72,7 +103,7 @@ struct function_signature
      * @param arg_types The function's argument types.
      * @param ret_type The function's return type.
      */
-    function_signature(std::string name, std::vector<std::string> arg_types, std::string ret_type)
+    function_signature(token name, std::vector<token> arg_types, token ret_type)
     : name{std::move(name)}
     , arg_types{std::move(arg_types)}
     , ret_type{std::move(ret_type)}
@@ -86,8 +117,8 @@ struct function_signature
 /** A scope. */
 struct scope
 {
-    /** Variables (variables["name"] == "type"). */
-    std::unordered_map<std::string, std::string> variables;
+    /** Variables. */
+    std::unordered_map<std::string, variable_type> variables;
 
     /** Functions. */
     std::unordered_map<std::string, function_signature> functions;
@@ -114,7 +145,7 @@ class context
     std::unordered_map<std::string, scope> scopes;
 
     /** The current scopes. */
-    std::vector<std::string> current_scopes = {"<global>"};
+    std::vector<std::pair<std::optional<token_location>, std::string>> current_scopes = {{std::nullopt, "<global>"}};
 
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
@@ -138,7 +169,7 @@ public:
      * @param name The variable's name.
      * @param type String representation of the type.
      */
-    void add_variable_type(std::string name, std::string type);
+    void add_variable_type(token name, token type);
 
     /**
      * Add a function's type to the context.
@@ -150,7 +181,15 @@ public:
      * @param arg_types The functions's argument types.
      * @param ret_type The function's return type.
      */
-    void add_function_type(std::string name, std::vector<std::string> arg_types, std::string ret_type);
+    void add_function_type(token name, std::vector<token> arg_types, token ret_type);
+
+    /**
+     * Check if the context has a specific type.
+     *
+     * @param name The type's name.
+     * @returns True if the type exists within the current scope.
+     */
+    bool has_type(const std::string& name) const;
 
     /**
      * Get the type for a name.
@@ -159,20 +198,21 @@ public:
      *
      * @param name The name.
      */
-    std::string get_type(const std::string& name) const;
+    std::string get_type(const token& name) const;
 
     /**
      * Enter a named scope.
      *
+     * @param loc The scope's enter location.
      * @param name The scope's name.
      */
-    void enter_named_scope(const std::string& name)
+    void enter_named_scope(token_location loc, std::string name)
     {
-        current_scopes.emplace_back(name);
+        current_scopes.emplace_back(std::make_pair<std::optional<token_location>, std::string>(std::move(loc), std::move(name)));
     }
 
     /** Enter an anonymous scope. */
-    void enter_anonymous_scope();
+    void enter_anonymous_scope(token_location loc);
 
     /** Exit an anonymous scope. */
     void exit_anonymous_scope();

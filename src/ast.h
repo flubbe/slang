@@ -98,6 +98,12 @@ public:
 
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
+
+    /** Get the expression's location. */
+    const token_location& get_location() const
+    {
+        return loc;
+    }
 };
 
 /** String, integer or floating-point literals. */

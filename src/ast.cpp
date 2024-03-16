@@ -240,7 +240,7 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
 
 std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
 {
-    ctx.enter_named_scope(name.s);
+    ctx.enter_named_scope(name.location, name.s);
     auto type = expr->type_check(ctx);
     ctx.exit_scope(name.s);
 
@@ -337,7 +337,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
 std::optional<std::string> variable_reference_expression::type_check(ty::context& ctx) const
 {
-    return ctx.get_type(name.s);
+    return ctx.get_type(name);
 }
 
 std::string variable_reference_expression::to_string() const
@@ -381,7 +381,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable_type(name.s, type.s);
+    ctx.add_variable_type(name, type);
 
     if(expr)
     {
@@ -418,7 +418,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
 {
-    ctx.enter_named_scope(name.s);
+    ctx.enter_named_scope(name.location, name.s);
     for(auto& m: members)
     {
         m->type_check(ctx);
@@ -694,19 +694,19 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
 void prototype_ast::type_check(ty::context& ctx) const
 {
     // add function signature to current scope.
-    std::vector<std::string> arg_types;
+    std::vector<token> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [](const auto& arg)
-                   { return arg.second.s; });
-    ctx.add_function_type(name.s, std::move(arg_types), return_type.s);
+                   { return arg.second; });
+    ctx.add_function_type(name, std::move(arg_types), return_type);
 
     // enter function scope. the scope is exited in the type_check for the function's body.
-    ctx.enter_named_scope(name.s);
+    ctx.enter_named_scope(name.location, name.s);
 
     // add the arguments to the current scope.
     for(auto arg: args)
     {
-        ctx.add_variable_type(arg.first.s, arg.second.s);
+        ctx.add_variable_type(arg.first, arg.second);
     }
 }
 
@@ -921,13 +921,13 @@ std::optional<std::string> if_statement::type_check(ty::context& ctx) const
         throw ty::type_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", *condition_type));
     }
 
-    ctx.enter_anonymous_scope();
+    ctx.enter_anonymous_scope(if_block->get_location());
     if_block->type_check(ctx);
     ctx.exit_anonymous_scope();
 
     if(else_block)
     {
-        ctx.enter_anonymous_scope();
+        ctx.enter_anonymous_scope(else_block->get_location());
         else_block->type_check(ctx);
         ctx.exit_anonymous_scope();
     }
@@ -966,7 +966,7 @@ std::optional<std::string> while_statement::type_check(ty::context& ctx) const
         throw ty::type_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", *condition_type));
     }
 
-    ctx.enter_anonymous_scope();
+    ctx.enter_anonymous_scope(while_block->get_location());
     while_block->type_check(ctx);
     ctx.exit_anonymous_scope();
 
