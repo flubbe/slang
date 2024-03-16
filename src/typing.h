@@ -117,11 +117,46 @@ struct function_signature
 /** A scope. */
 struct scope
 {
+    /** Starting location of the scope. */
+    token_location loc;
+
+    /** The scope's name. */
+    std::string name;
+
+    /** Parent scope (if any). */
+    scope* parent = nullptr;
+
+    /** Child scopes. */
+    std::vector<scope> children;
+
     /** Variables. */
     std::unordered_map<std::string, variable_type> variables;
 
     /** Functions. */
     std::unordered_map<std::string, function_signature> functions;
+
+    /** Default constructors. */
+    scope() = default;
+    scope(const scope&) = default;
+    scope(scope&&) = default;
+
+    /** Default assignment. */
+    scope& operator=(const scope&) = default;
+    scope& operator=(scope&&) = default;
+
+    /**
+     * Construct a scope from location, name and parent.
+     *
+     * @param loc The location.
+     * @param name The scope's name.
+     * @param parent The parent scope, if any.
+     */
+    scope(token_location loc, std::string name, scope* parent)
+    : loc{std::move(loc)}
+    , name{std::move(name)}
+    , parent{parent}
+    {
+    }
 
     /**
      * Check whether this scope contains a name.
@@ -135,27 +170,53 @@ struct scope
     }
 
     /**
-     * Find the location of a name in this scope.
+     * Find the token of a name in this scope.
      *
      * @param name The name to find.
-     * @returns If the name is found, returns its location, and std::nullopt otherwise.
+     * @returns If the name is found, returns its token, and std::nullopt otherwise.
      */
-    std::optional<token_location> find(const std::string& name) const
+    std::optional<token> find(const std::string& name) const
     {
         auto var_it = variables.find(name);
         if(var_it != variables.end())
         {
-            return {var_it->second.name.location};
+            return {var_it->second.name};
         }
 
         auto func_it = functions.find(name);
         if(func_it != functions.end())
         {
-            return {func_it->second.name.location};
+            return {func_it->second.name};
         }
 
         return std::nullopt;
     }
+
+    /**
+     * Get the type of a name in this scope.
+     *
+     * @param name The name to find.
+     * @returns If the name is found, returns its type, and std::nullopt otherwise.
+     */
+    std::optional<std::string> get_type(const std::string& name) const
+    {
+        auto var_it = variables.find(name);
+        if(var_it != variables.end())
+        {
+            return {var_it->second.type.s};
+        }
+
+        auto func_it = functions.find(name);
+        if(func_it != functions.end())
+        {
+            return {func_it->second.to_string()};
+        }
+
+        return std::nullopt;
+    }
+
+    /** Get the qualified scope name. */
+    std::string get_qualified_name() const;
 
     /** Get a string representation of the scope. */
     std::string to_string() const;
@@ -164,11 +225,11 @@ struct scope
 /** Type system context. */
 class context
 {
-    /** Variables per scope. */
-    std::unordered_map<std::string, scope> scopes;
+    /** The global scope. */
+    scope global_scope = {{1, 1}, "<global>", nullptr};
 
-    /** The current scopes. */
-    std::vector<std::pair<std::optional<token_location>, std::string>> current_scopes = {{std::nullopt, "<global>"}};
+    /** The current scope. */
+    scope* current_scope = &global_scope;
 
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
@@ -231,7 +292,19 @@ public:
      */
     void enter_named_scope(token_location loc, std::string name)
     {
-        current_scopes.emplace_back(std::make_pair<std::optional<token_location>, std::string>(std::move(loc), std::move(name)));
+        // check if the scope already exists.
+        auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
+                               [](const scope& s) -> bool
+                               { return true; });
+        if(it != current_scope->children.end())
+        {
+            current_scope = &(*it);
+        }
+        else
+        {
+            current_scope->children.emplace_back(std::move(loc), std::move(name), current_scope);
+            current_scope = &current_scope->children.back();
+        }
     }
 
     /** Enter an anonymous scope. */

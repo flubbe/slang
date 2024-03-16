@@ -40,9 +40,19 @@ std::string function_signature::to_string() const
  * Scopes.
  */
 
+std::string scope::get_qualified_name() const
+{
+    std::string qualified_name;
+    for(const scope* s = this; s != nullptr; s = s->parent)
+    {
+        qualified_name = fmt::format("{}::{}", s->name, qualified_name);
+    }
+    return qualified_name;
+}
+
 std::string scope::to_string() const
 {
-    std::string repr;
+    std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
     for(auto& [name, type]: variables)
     {
         repr += fmt::format("[v] name: {}, type: {}\n", name, type.type.s);
@@ -53,10 +63,7 @@ std::string scope::to_string() const
     }
 
     // remove trailing newline
-    if(variables.size() > 0 || functions.size() > 0)
-    {
-        repr.pop_back();
-    }
+    repr.pop_back();
 
     return repr;
 }
@@ -67,18 +74,16 @@ std::string scope::to_string() const
 
 void context::add_variable_type(token name, token type)
 {
-    auto transform = [](const std::pair<std::optional<token_location>, std::string>& v) -> std::string
-    { return v.second; };
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
 
     // check for existing names.
-    std::string scope_name = slang::utils::join(current_scopes, {transform}, "::");
-    if(scopes.find(scope_name) != scopes.end())
+    auto tok = current_scope->find(name.s);
+    if(tok != std::nullopt)
     {
-        auto location = scopes[scope_name].find(name.s);
-        if(location != std::nullopt)
-        {
-            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, scope_name, slang::to_string(*location)));
-        }
+        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
     }
 
     // check if the type is known.
@@ -90,23 +95,21 @@ void context::add_variable_type(token name, token type)
         }
     }
 
-    scopes[scope_name].variables[name.s] = {name, std::move(type)};
+    current_scope->variables[name.s] = {name, std::move(type)};
 }
 
 void context::add_function_type(token name, std::vector<token> arg_types, token ret_type)
 {
-    auto transform = [](const std::pair<std::optional<token_location>, std::string>& v) -> std::string
-    { return v.second; };
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
 
     // check for existing names.
-    std::string scope_name = slang::utils::join(current_scopes, {transform}, "::");
-    if(scopes.find(scope_name) != scopes.end())
+    auto tok = current_scope->find(name.s);
+    if(tok != std::nullopt)
     {
-        auto location = scopes[scope_name].find(name.s);
-        if(location != std::nullopt)
-        {
-            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, scope_name, slang::to_string(*location)));
-        }
+        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
     }
 
     // check if all types are known.
@@ -129,113 +132,83 @@ void context::add_function_type(token name, std::vector<token> arg_types, token 
         }
     }
 
-    scopes[scope_name].functions[name.s] = {name, std::move(arg_types), std::move(ret_type)};
+    current_scope->functions[name.s] = {name, std::move(arg_types), std::move(ret_type)};
 }
 
 bool context::has_type(const std::string& name) const
 {
-    auto transform = [](const std::pair<std::optional<token_location>, std::string>& v) -> std::string
-    { return v.second; };
-
-    // check all scopes, from inner-most to outer-most.
-    auto scope_copy = current_scopes;
-    while(scope_copy.size() > 0)
-    {
-        std::string scope_name = slang::utils::join(scope_copy, {transform}, "::");
-
-        auto it = scopes.find(scope_name);
-        if(it != scopes.end() && it->second.contains(name))
-        {
-            return true;
-        }
-
-        scope_copy.pop_back();
-    }
-
+    // TODO
     return false;
 }
 
 std::string context::get_type(const token& name) const
 {
-    auto transform = [](const std::pair<std::optional<token_location>, std::string>& v) -> std::string
-    { return v.second; };
-
-    std::string scope_name = slang::utils::join(current_scopes, {transform}, "::");
-    auto scope_it = scopes.find(scope_name);
-    if(scope_it == scopes.end())
+    for(scope* s = current_scope; s != nullptr; s = s->parent)
     {
-        throw type_error(name.location, fmt::format("No scope named '{}'.", scope_name));
+        auto type = s->get_type(name.s);
+        if(type != std::nullopt)
+        {
+            return *type;
+        }
     }
 
-    auto var_it = scope_it->second.variables.find(name.s);
-    if(var_it != scope_it->second.variables.end())
-    {
-        return var_it->second.type.s;
-    }
-
-    auto func_it = scope_it->second.functions.find(name.s);
-    if(func_it != scope_it->second.functions.end())
-    {
-        return func_it->second.to_string();
-    }
-
-    throw type_error(name.location, fmt::format("Name '{}' not found in scope '{}'.", name.s, scope_name));
+    throw type_error(name.location, fmt::format("Name '{}' not found in current scope.", name.s));
 }
 
 void context::enter_anonymous_scope(token_location loc)
 {
-    current_scopes.emplace_back(std::make_pair<token_location, std::string>(std::move(loc), fmt::format("<anonymous@{}>", anonymous_scope_id)));
+    std::string name = fmt::format("<anonymous@{}>", anonymous_scope_id);
     ++anonymous_scope_id;
+
+    // check if the scope already exists.
+    auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
+                           [](const scope& s) -> bool
+                           { return true; });
+    if(it != current_scope->children.end())
+    {
+        // this should never happen.
+        throw type_error(loc, fmt::format("Cannot enter anonymous scope: Name '{}' already exists.", name));
+    }
+    else
+    {
+        current_scope->children.emplace_back(std::move(loc), std::move(name), current_scope);
+        current_scope = &current_scope->children.back();
+    }
 }
 
 void context::exit_anonymous_scope()
 {
-    if(current_scopes.size() <= 1)    // 1 is the global scope
+    if(current_scope->parent == nullptr)
     {
-        throw type_error("Cannot exit anonymous scope: No scope to leave.");
+        throw type_error(current_scope->loc, "Cannot exit anonymous scope: No scope to leave.");
     }
 
-    const auto& s = current_scopes.back();
-    if(s.second.substr(0, 11) != "<anonymous@" || s.second.back() != '>')
+    if(current_scope->name.substr(0, 11) != "<anonymous@" || current_scope->name.back() != '>')
     {
-        throw type_error(fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", s.second));
+        throw type_error(current_scope->loc, fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name));
     }
 
-    current_scopes.pop_back();
+    current_scope = current_scope->parent;
 }
 
 void context::exit_scope(const std::string& name)
 {
-    if(current_scopes.size() <= 1)    // 1 is the global scope
+    if(current_scope->parent == nullptr)
     {
-        throw type_error(fmt::format("Cannot exit scope '{}': No scope to leave.", name));
+        throw type_error(current_scope->loc, "Cannot exit anonymous scope: No scope to leave.");
     }
 
-    if(current_scopes.back().second != name)
+    if(current_scope->name != name)
     {
-        throw type_error(fmt::format("Cannot exit scope '{}': Expected to leave '{}'.", name, current_scopes.back().second));
+        throw type_error(current_scope->loc, fmt::format("Cannot exit scope '{}': Expected to leave '{}'.", name, current_scope->name));
     }
 
-    current_scopes.pop_back();
+    current_scope = current_scope->parent;
 }
 
 std::string context::to_string() const
 {
-    std::string repr;
-
-    for(auto& [name, scope]: scopes)
-    {
-        repr += fmt::format("scope: {}\n------\n{}\n\n", name, scope.to_string());
-    }
-
-    // remove trailing newlines
-    if(scopes.size() > 0)
-    {
-        repr.pop_back();
-        repr.pop_back();
-    }
-
-    return repr;
+    return global_scope.to_string();
 }
 
 }    // namespace slang::typing
