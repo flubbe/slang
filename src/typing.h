@@ -148,11 +148,8 @@ struct struct_definition
 /** A scope. */
 struct scope
 {
-    /** Starting location of the scope. */
-    token_location loc;
-
     /** The scope's name. */
-    std::string name;
+    token name;
 
     /** Parent scope (if any). */
     scope* parent = nullptr;
@@ -179,15 +176,25 @@ struct scope
     scope& operator=(scope&&) = default;
 
     /**
-     * Construct a scope from location, name and parent.
+     * Construct a scope from location and name.
      *
-     * @param loc The location.
+     * @param loc The scope location.
+     * @param name The scope name.
+     */
+    scope(token_location loc, std::string scope_name)
+    {
+        name.s = std::move(scope_name);
+        name.location = std::move(loc);
+    }
+
+    /**
+     * Construct a scope from name and parent.
+     *
      * @param name The scope's name.
      * @param parent The parent scope, if any.
      */
-    scope(token_location loc, std::string name, scope* parent)
-    : loc{std::move(loc)}
-    , name{std::move(name)}
+    scope(token name, scope* parent)
+    : name{std::move(name)}
     , parent{parent}
     {
     }
@@ -268,10 +275,13 @@ struct scope
 class context
 {
     /** The global scope. */
-    scope global_scope = {{1, 1}, "<global>", nullptr};
+    scope global_scope = {{1, 1}, "<global>"};
 
     /** The current scope. */
     scope* current_scope = &global_scope;
+
+    /** The current function scope. */
+    std::optional<token> function_scope;
 
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
@@ -289,17 +299,13 @@ public:
     context& operator=(const context&) = default;
     context& operator=(context&&) = default;
 
-    /**
-     * Enable name collection (default state is 'enabled').
-     */
+    /** Enable name collection (default state is 'enabled'). */
     void enable_name_collection()
     {
         collect = true;
     }
 
-    /**
-     * Disable name collection.
-     */
+    /** Disable name collection. */
     void disable_name_collection()
     {
         collect = false;
@@ -353,31 +359,37 @@ public:
      * @throws A type_error if the name is unknown.
      *
      * @param name The name.
+     * @returns The string representation of the type.
      */
     std::string get_type(const token& name) const;
 
     /**
-     * Enter a named scope.
+     * Get the signature of a function.
      *
-     * @param loc The scope's enter location.
-     * @param name The scope's name.
+     * @throws A type_error if the function is not known.
+     *
+     * @param name The name of the function.
+     * @returns A reference to the function signature.
      */
-    void enter_named_scope(token_location loc, std::string name)
-    {
-        // check if the scope already exists.
-        auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
-                               [](const scope& s) -> bool
-                               { return true; });
-        if(it != current_scope->children.end())
-        {
-            current_scope = &(*it);
-        }
-        else
-        {
-            current_scope->children.emplace_back(std::move(loc), std::move(name), current_scope);
-            current_scope = &current_scope->children.back();
-        }
-    }
+    const function_signature& get_function_signature(const token& name) const;
+
+    /**
+     * Enter a function's scope.
+     *
+     * @param name The function's name.
+     */
+    void enter_function_scope(token name);
+
+    /**
+     * Exit a function's scope.
+     *
+     * @param name The function's name. Used for validation.
+     */
+    void exit_function_scope(const token& name);
+
+    /**
+     * Exit a function's scope.
+     */
 
     /** Enter an anonymous scope. */
     void enter_anonymous_scope(token_location loc);
@@ -385,12 +397,11 @@ public:
     /** Exit an anonymous scope. */
     void exit_anonymous_scope();
 
-    /**
-     * Exit a scope.
-     *
-     * @param name The scope's name. Used for validation.
-     */
-    void exit_scope(const std::string& name);
+    /** Get the current scope's name. */
+    const token& get_scope_name() const;
+
+    /** Get the current function scope. */
+    std::optional<function_signature> get_current_function() const;
 
     /** Get a string representation of the context. */
     std::string to_string() const;

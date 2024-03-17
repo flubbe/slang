@@ -240,9 +240,9 @@ std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, mem
 
 std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
 {
-    ctx.enter_named_scope(name.location, name.s);
+    ctx.enter_function_scope(name);
     auto type = expr->type_check(ctx);
-    ctx.exit_scope(name.s);
+    ctx.exit_function_scope(name);
 
     return type;
 }
@@ -710,7 +710,7 @@ void prototype_ast::type_check(ty::context& ctx) const
     ctx.add_function(name, std::move(arg_types), return_type);
 
     // enter function scope. the scope is exited in the type_check for the function's body.
-    ctx.enter_named_scope(name.location, name.s);
+    ctx.enter_function_scope(name);
 
     // add the arguments to the current scope.
     for(auto arg: args)
@@ -722,7 +722,7 @@ void prototype_ast::type_check(ty::context& ctx) const
 void prototype_ast::finish_type_check(ty::context& ctx) const
 {
     // exit the function's scope.
-    ctx.exit_scope(name.s);
+    ctx.exit_function_scope(name);
 }
 
 std::string prototype_ast::to_string() const
@@ -850,8 +850,28 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
 
 std::optional<std::string> call_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: call_expression::type_check not implemented.", slang::to_string(loc)));
+    auto sig = ctx.get_function_signature(callee);
+
+    if(sig.arg_types.size() != args.size())
+    {
+        throw ty::type_error(callee.location, fmt::format("Wrong number of arguments in function call. Expected {}, got {}.", sig.arg_types.size(), args.size()));
+    }
+
+    for(std::size_t i = 0; i < args.size(); ++i)
+    {
+        auto arg_type = args[i]->type_check(ctx);
+        if(arg_type == std::nullopt)
+        {
+            throw ty::type_error(args[i]->get_location(), fmt::format("Cannot evaluate type of argument {}.", i + 1));
+        }
+
+        if(sig.arg_types[i].s != *arg_type)
+        {
+            throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, sig.arg_types[i].s, *arg_type));
+        }
+    }
+
+    return sig.ret_type.s;
 }
 
 std::string call_expression::to_string() const
@@ -891,8 +911,33 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
 
 std::optional<std::string> return_statement::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: return_statement::type_check not implemented.", slang::to_string(loc)));
+    auto sig = ctx.get_current_function();
+    if(sig == std::nullopt)
+    {
+        throw ty::type_error(loc, "Cannot have return statement outside a function.");
+    }
+
+    if(sig->ret_type.s == "void")
+    {
+        if(expr)
+        {
+            throw ty::type_error(loc, fmt::format("Function '{}' declared as having no return value cannot have a return expression.", sig->name.s));
+        }
+    }
+    else
+    {
+        auto ret_type = expr->type_check(ctx);
+        if(ret_type == std::nullopt)
+        {
+            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has no type, expected '{}'.", sig->name.s, sig->ret_type.s));
+        }
+        if(ret_type != sig->ret_type.s)
+        {
+            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has type '{}', expected '{}'.", sig->name.s, *ret_type, sig->ret_type.s));
+        }
+    }
+
+    return sig->ret_type.s;
 }
 
 std::string return_statement::to_string() const

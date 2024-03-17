@@ -42,10 +42,10 @@ std::string function_signature::to_string() const
 
 std::string scope::get_qualified_name() const
 {
-    std::string qualified_name;
-    for(const scope* s = this; s != nullptr; s = s->parent)
+    std::string qualified_name = name.s;
+    for(const scope* s = this->parent; s != nullptr; s = s->parent)
     {
-        qualified_name = fmt::format("{}::{}", s->name, qualified_name);
+        qualified_name = fmt::format("{}::{}", s->name.s, qualified_name);
     }
     return qualified_name;
 }
@@ -219,9 +219,74 @@ std::string context::get_type(const token& name) const
     throw type_error(name.location, fmt::format("Name '{}' not found in current scope.", name.s));
 }
 
+const function_signature& context::get_function_signature(const token& name) const
+{
+    for(scope* s = current_scope; s != nullptr; s = s->parent)
+    {
+        auto it = s->functions.find(name.s);
+        if(it != s->functions.end())
+        {
+            return it->second;
+        }
+    }
+
+    throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+}
+
+void context::enter_function_scope(token name)
+{
+    if(current_scope == nullptr)
+    {
+        throw type_error(name.location, fmt::format("Cannot enter function scope '{}': No global scope.", name.s));
+    }
+
+    if(function_scope != std::nullopt)
+    {
+        throw type_error(name.location, fmt::format("Nested function are not allowed."));
+    }
+    function_scope = name;
+
+    // check if the scope already exists.
+    auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
+                           [&name](const scope& s) -> bool
+                           { return s.name.s == name.s; });
+    if(it != current_scope->children.end())
+    {
+        current_scope = &(*it);
+    }
+    else
+    {
+        current_scope->children.emplace_back(std::move(name), current_scope);
+        current_scope = &current_scope->children.back();
+    }
+}
+
+void context::exit_function_scope(const token& name)
+{
+    if(current_scope == nullptr)
+    {
+        throw type_error(name.location, fmt::format("Cannot exit scope '{}': No scope to leave.", name.s));
+    }
+
+    if(current_scope->parent == nullptr)
+    {
+        throw type_error(name.location, fmt::format("Cannot exit scope '{}': No scope to leave.", name.s));
+    }
+
+    if(current_scope->name.s != name.s)
+    {
+        throw type_error(name.location, fmt::format("Cannot exit scope '{}': Expected to exit scope '{}'.", name.s, current_scope->name.s));
+    }
+
+    function_scope = std::nullopt;
+    current_scope = current_scope->parent;
+}
+
 void context::enter_anonymous_scope(token_location loc)
 {
-    std::string name = fmt::format("<anonymous@{}>", anonymous_scope_id);
+    token anonymous_scope;
+    anonymous_scope.location = std::move(loc);
+    anonymous_scope.s = std::move(fmt::format("<anonymous@{}>", anonymous_scope_id));
     ++anonymous_scope_id;
 
     // check if the scope already exists.
@@ -231,11 +296,11 @@ void context::enter_anonymous_scope(token_location loc)
     if(it != current_scope->children.end())
     {
         // this should never happen.
-        throw type_error(loc, fmt::format("Cannot enter anonymous scope: Name '{}' already exists.", name));
+        throw type_error(anonymous_scope.location, fmt::format("Cannot enter anonymous scope: Name '{}' already exists.", anonymous_scope.s));
     }
     else
     {
-        current_scope->children.emplace_back(std::move(loc), std::move(name), current_scope);
+        current_scope->children.emplace_back(std::move(anonymous_scope), current_scope);
         current_scope = &current_scope->children.back();
     }
 }
@@ -244,30 +309,35 @@ void context::exit_anonymous_scope()
 {
     if(current_scope->parent == nullptr)
     {
-        throw type_error(current_scope->loc, "Cannot exit anonymous scope: No scope to leave.");
+        throw type_error(current_scope->name.location, "Cannot exit anonymous scope: No scope to leave.");
     }
 
-    if(current_scope->name.substr(0, 11) != "<anonymous@" || current_scope->name.back() != '>')
+    if(current_scope->name.s.substr(0, 11) != "<anonymous@" || current_scope->name.s.back() != '>')
     {
-        throw type_error(current_scope->loc, fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name));
+        throw type_error(current_scope->name.location, fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name.s));
     }
 
     current_scope = current_scope->parent;
 }
 
-void context::exit_scope(const std::string& name)
+const token& context::get_scope_name() const
 {
-    if(current_scope->parent == nullptr)
+    if(current_scope == nullptr)
     {
-        throw type_error(current_scope->loc, "Cannot exit anonymous scope: No scope to leave.");
+        throw std::runtime_error("Typing context: No current scope.");
     }
 
-    if(current_scope->name != name)
+    return current_scope->name;
+}
+
+std::optional<function_signature> context::get_current_function() const
+{
+    if(function_scope == std::nullopt)
     {
-        throw type_error(current_scope->loc, fmt::format("Cannot exit scope '{}': Expected to leave '{}'.", name, current_scope->name));
+        return std::nullopt;
     }
 
-    current_scope = current_scope->parent;
+    return get_function_signature(*function_scope);
 }
 
 std::string context::to_string() const
