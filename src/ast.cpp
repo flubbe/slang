@@ -416,23 +416,22 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     throw std::runtime_error(fmt::format("{}: struct_definition_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
-std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
+void struct_definition_expression::collect_names(ty::context& ctx) const
 {
-    // first add struct, then type-check. this allows the struct to be used already.
-    // TODO use a name collection pass.
     std::vector<std::pair<token, token>> struct_members;
     for(auto& m: members)
     {
         struct_members.emplace_back(m->get_name(), m->get_type());
     }
     ctx.add_type(name, std::move(struct_members));
+}
 
-    ctx.disable_name_collection();    // FIXME artifact of the missing name collection pass (see above).
+std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
+{
     for(auto& m: members)
     {
         m->type_check(ctx);
     }
-    ctx.enable_name_collection();    // FIXME artifact of the missing name collection pass (see above).
 
     return std::nullopt;
 }
@@ -700,15 +699,17 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     return ctx->create_function(name.s, return_type.s, std::move(function_args));
 }
 
-void prototype_ast::type_check(ty::context& ctx) const
+void prototype_ast::collect_names(ty::context& ctx) const
 {
-    // add function signature to current scope.
     std::vector<token> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [](const auto& arg)
                    { return arg.second; });
     ctx.add_function(name, std::move(arg_types), return_type);
+}
 
+void prototype_ast::type_check(ty::context& ctx) const
+{
     // enter function scope. the scope is exited in the type_check for the function's body.
     ctx.enter_function_scope(name);
 
@@ -757,6 +758,14 @@ std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context
         v = expr->generate_code(ctx, memory_context::none);
     }
     return v;
+}
+
+void block::collect_names(ty::context& ctx) const
+{
+    for(auto& expr: exprs)
+    {
+        expr->collect_names(ctx);
+    }
 }
 
 std::optional<std::string> block::type_check(ty::context& ctx) const
@@ -811,6 +820,11 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
     }
 
     return v;
+}
+
+void function_expression::collect_names(ty::context& ctx) const
+{
+    prototype->collect_names(ctx);
 }
 
 std::optional<std::string> function_expression::type_check(ty::context& ctx) const

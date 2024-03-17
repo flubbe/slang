@@ -286,9 +286,6 @@ class context
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
-    /** Whether we are collecting names. */
-    bool collect = true;
-
 public:
     /** Default constructor. */
     context() = default;
@@ -298,18 +295,6 @@ public:
     /** Default assignments. */
     context& operator=(const context&) = default;
     context& operator=(context&&) = default;
-
-    /** Enable name collection (default state is 'enabled'). */
-    void enable_name_collection()
-    {
-        collect = true;
-    }
-
-    /** Disable name collection. */
-    void disable_name_collection()
-    {
-        collect = false;
-    }
 
     /**
      * Add a variable to the context.

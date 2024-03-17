@@ -833,6 +833,19 @@ TEST(parser, struct_definition)
 
         EXPECT_TRUE(lexer.eof());
     }
+    {
+        const std::string test_input =
+          "fn f(i: f32) -> void\n"
+          "{\n"
+          " struct S{};\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
 }
 
 TEST(parser, struct_initialization)

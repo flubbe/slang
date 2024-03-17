@@ -34,6 +34,12 @@ static std::set<std::string> keywords = {
 };
 // clang-format on
 
+/** Check whether a given string is a keyword. */
+static bool is_keyword(const std::string& s)
+{
+    return keywords.find(s) != keywords.end();
+}
+
 /**
  * Check whether a name can be used as an identifier and throw a syntax_error
  * if this is not the case.
@@ -48,7 +54,7 @@ static void validate_identifier_name(const token& tok)
         throw syntax_error(tok, fmt::format("Expected <identifier>, got '{}'.", tok.s));
     }
 
-    if(keywords.find(tok.s) != keywords.end())
+    if(is_keyword(tok.s))
     {
         throw syntax_error(tok, fmt::format("Expected <identifier>, got keyword '{}'.", tok.s));
     }
@@ -74,8 +80,8 @@ static void validate_type_name(const token& tok)
         return;
     }
 
-    // check against keyword list.
-    if(keywords.find(tok.s) != keywords.end())
+    // check for keywords.
+    if(is_keyword(tok.s))
     {
         throw syntax_error(tok, fmt::format("Expected <type>, got keyword '{}'.", tok.s));
     }
@@ -413,6 +419,10 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
         else if(current_token->s == "return")
         {
             stmts_exprs.emplace_back(parse_return());
+        }
+        else if(is_keyword(current_token->s))
+        {
+            throw syntax_error(*current_token, fmt::format("Unexpected keyword '{}'.", current_token->s));
         }
         else if(current_token->type == token_type::identifier)
         {

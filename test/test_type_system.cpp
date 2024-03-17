@@ -23,6 +23,56 @@ namespace ty = slang::typing;
 namespace
 {
 
+TEST(type_system, name_collection)
+{
+    {
+        const std::string test_input =
+          "fn f(i: f32) -> i32\n"
+          "{\n"
+          " return 1.;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        ast->collect_names(ctx);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}\n"
+          "fn g() -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        ast->collect_names(ctx);
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+}
+
 TEST(type_system, variables)
 {
     {
@@ -513,6 +563,7 @@ TEST(type_system, structs)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
     {
@@ -566,6 +617,7 @@ TEST(type_system, function_calls)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
     {
@@ -590,6 +642,7 @@ TEST(type_system, function_calls)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
     {
@@ -638,6 +691,7 @@ TEST(type_system, function_calls)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
     {
@@ -663,6 +717,7 @@ TEST(type_system, function_calls)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
 }
@@ -709,6 +764,7 @@ TEST(type_system, return_expressions)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
     {
@@ -734,6 +790,7 @@ TEST(type_system, return_expressions)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
 }

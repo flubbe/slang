@@ -82,11 +82,6 @@ std::string scope::to_string() const
 
 void context::add_variable(token name, token type)
 {
-    if(!collect)
-    {
-        return;
-    }
-
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
@@ -113,11 +108,6 @@ void context::add_variable(token name, token type)
 
 void context::add_function(token name, std::vector<token> arg_types, token ret_type)
 {
-    if(!collect)
-    {
-        return;
-    }
-
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
@@ -155,11 +145,6 @@ void context::add_function(token name, std::vector<token> arg_types, token ret_t
 
 void context::add_type(token name, std::vector<std::pair<token, token>> members)
 {
-    if(!collect)
-    {
-        return;
-    }
-
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
