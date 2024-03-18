@@ -154,38 +154,6 @@ std::string literal_expression::to_string() const
 }
 
 /*
- * signed_expression.
- */
-
-std::unique_ptr<cg::value> signed_expression::generate_code(cg::context* ctx, memory_context mc) const
-{
-    // TODO
-    throw std::runtime_error(fmt::format("{}: signed_expression::generate_code not implemented.", slang::to_string(loc)));
-}
-
-std::optional<std::string> signed_expression::type_check(ty::context& ctx) const
-{
-    auto expr_type = expr->type_check(ctx);
-
-    if(expr_type == std::nullopt)
-    {
-        throw ty::type_error(loc, "Unable to determine type of signed expression.");
-    }
-
-    if(*expr_type != "i32" && *expr_type != "f32")
-    {
-        throw ty::type_error(loc, fmt::format("Expected type 'i32' or 'f32' for signed expression, got '{}'.", *expr_type));
-    }
-
-    return expr_type;
-}
-
-std::string signed_expression::to_string() const
-{
-    return fmt::format("Signed(sign={}, expr={})", sign.s, expr ? expr->to_string() : std::string("<none>"));
-}
-
-/*
  * type_cast_expression.
  */
 

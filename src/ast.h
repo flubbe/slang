@@ -153,49 +153,6 @@ public:
     std::string to_string() const override;
 };
 
-/** A signed expression. */
-class signed_expression : public expression
-{
-    /** The sign. */
-    token sign;
-
-    /** The expression. */
-    std::unique_ptr<expression> expr;
-
-public:
-    /** No default constructor. */
-    signed_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~signed_expression() = default;
-
-    /** Copy and move constructors. */
-    signed_expression(const signed_expression&) = delete;
-    signed_expression(signed_expression&&) = default;
-
-    /** Assignment operators. */
-    signed_expression& operator=(const signed_expression&) = delete;
-    signed_expression& operator=(signed_expression&&) = default;
-
-    /**
-     * Construct a signed expression.
-     *
-     * @param loc The location
-     * @param sign The sign.
-     * @param expr The expression.
-     */
-    signed_expression(token_location loc, token sign, std::unique_ptr<expression> expr)
-    : expression{std::move(loc)}
-    , sign{std::move(sign)}
-    , expr{std::move(expr)}
-    {
-    }
-
-    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
-    std::string to_string() const override;
-};
-
 /** A type cast expression. */
 class type_cast_expression : public expression
 {
