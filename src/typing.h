@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <list>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -155,7 +156,7 @@ struct scope
     scope* parent = nullptr;
 
     /** Child scopes. */
-    std::vector<scope> children;
+    std::list<scope> children;
 
     /** Variables. */
     std::unordered_map<std::string, variable_type> variables;
@@ -286,6 +287,9 @@ class context
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
+    /** Struct/type stack, for member/type lookups. */
+    std::vector<const struct_definition*> struct_stack;
+
 public:
     /** Default constructor. */
     context() = default;
@@ -372,9 +376,8 @@ public:
      */
     void exit_function_scope(const token& name);
 
-    /**
-     * Exit a function's scope.
-     */
+    /** Get the current function scope. */
+    std::optional<function_signature> get_current_function() const;
 
     /** Enter an anonymous scope. */
     void enter_anonymous_scope(token_location loc);
@@ -385,8 +388,22 @@ public:
     /** Get the current scope's name. */
     const token& get_scope_name() const;
 
-    /** Get the current function scope. */
-    std::optional<function_signature> get_current_function() const;
+    /**
+     * Get the definition of a struct.
+     *
+     * @throws A type_error if the struct does not exist.
+     *
+     * @param loc A reference location for error reporting.
+     * @param name The struct's name.
+     * @returns A reference to the struct's definition.
+     */
+    const struct_definition* get_struct_definition(token_location loc, const std::string& name) const;
+
+    /** Push a struct lookup. */
+    void push_struct_definition(const struct_definition* s);
+
+    /** Pop a struct definition. */
+    void pop_struct_definition();
 
     /** Get a string representation of the context. */
     std::string to_string() const;

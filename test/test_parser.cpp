@@ -128,6 +128,22 @@ TEST(parser, function)
         EXPECT_TRUE(lexer.eof());
     }
     {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " let a: i32;\n"
+          " a = -23;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
         // test incomplete definition.
         const std::string test_input =
           "fn f(s: ";

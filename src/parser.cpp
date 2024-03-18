@@ -584,7 +584,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         token bin_op = *current_token;
         get_next_token();
 
-        std::unique_ptr<ast::expression> rhs = parse_primary();
+        std::unique_ptr<ast::expression> rhs = parse_unary();
 
         int next_prec = get_token_precedence();
         std::optional<associativity> assoc = get_token_associativity();
@@ -595,6 +595,23 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 
         lhs = std::make_unique<ast::binary_expression>(std::move(loc), std::move(bin_op), std::move(lhs), std::move(rhs));
     }
+}
+
+//  unary ::= primary
+//          | ('-' | '+' | '~' | '!') primary
+std::unique_ptr<ast::expression> parser::parse_unary()
+{
+    token op = *current_token;
+    token_location loc = current_token->location;
+
+    // if we're not parsing a unary operator, it must be a primary expression.
+    if(op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
+    {
+        return parse_primary();
+    }
+
+    get_next_token();
+    return std::make_unique<ast::unary_ast>(current_token->location, std::move(op), parse_unary());
 }
 
 // identifierexpr ::= identifier
@@ -751,26 +768,10 @@ std::unique_ptr<ast::expression> parser::parse_paren_expression()
     return expr;
 }
 
-// expression ::= primary binoprhs
-//              | '+' primary binoprhs
-//              | '-' primary binoprhs
+// expression ::= unary binoprhs
 std::unique_ptr<ast::expression> parser::parse_expression()
 {
-    std::unique_ptr<ast::expression> lhs;
-    if(current_token->s == "+" || current_token->s == "-")
-    {
-        token_location loc = current_token->location;
-        token sign = *current_token;
-        get_next_token();
-
-        lhs = std::make_unique<ast::signed_expression>(std::move(loc), std::move(sign), parse_primary());
-    }
-    else
-    {
-        lhs = parse_primary();
-    }
-
-    return parse_bin_op_rhs(0, std::move(lhs));
+    return parse_bin_op_rhs(0, parse_unary());
 }
 
 std::unique_ptr<ast::expression> parser::parse_type_cast_expression(std::unique_ptr<ast::expression> expr)
@@ -885,6 +886,12 @@ void parser::parse(lexer& in_lexer)
     std::vector<std::unique_ptr<ast::expression>> exprs;
     while((current_token = get_next_token(false)) != std::nullopt)
     {
+        // skip empty statements.
+        if(current_token->s == ";")
+        {
+            continue;
+        }
+
         exprs.emplace_back(std::move(parse_top_level_statement()));
     }
 

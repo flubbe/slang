@@ -163,8 +163,11 @@ protected:
     /** Parse a primary expression. */
     std::unique_ptr<ast::expression> parse_primary();
 
-    /** Parse the right-hand side of an expression. */
+    /** Parse the right-hand side of a binary operator expression. */
     std::unique_ptr<ast::expression> parse_bin_op_rhs(int prec, std::unique_ptr<ast::expression> lhs);
+
+    /** Parse a unary operator expression. */
+    std::unique_ptr<ast::expression> parse_unary();
 
     /** Parse identifier expression. */
     std::unique_ptr<ast::expression> parse_identifier_expression();

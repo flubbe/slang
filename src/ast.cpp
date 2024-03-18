@@ -204,7 +204,7 @@ std::optional<std::string> type_cast_expression::type_check(ty::context& ctx) co
     }
 
     // valid type casts.
-    std::unordered_map<std::string, std::set<std::string>> valid_casts = {
+    static const std::unordered_map<std::string, std::set<std::string>> valid_casts = {
       {"i32", {"i32", "f32"}},
       {"f32", {"i32", "f32"}}};
 
@@ -264,8 +264,12 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, me
 
 std::optional<std::string> access_expression::type_check(ty::context& ctx) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: access_expression::type_check not implemented.", slang::to_string(loc)));
+    auto type = ctx.get_type(name);
+    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, type);
+    ctx.push_struct_definition(struct_def);
+    auto expr_type = expr->type_check(ctx);
+    ctx.pop_struct_definition();
+    return expr_type;
 }
 
 std::string access_expression::to_string() const
@@ -560,7 +564,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
             throw cg::codegen_error(loc, fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
         }
 
-        std::unordered_map<std::string, cg::binary_op> op_map = {
+        static const std::unordered_map<std::string, cg::binary_op> op_map = {
           {"*", cg::binary_op::op_mul},
           {"/", cg::binary_op::op_div},
           {"%", cg::binary_op::op_mod},
@@ -670,6 +674,50 @@ std::string binary_expression::to_string() const
     return fmt::format("Binary(op=\"{}\", lhs={}, rhs={})", op.s,
                        lhs ? lhs->to_string() : std::string("<none>"),
                        rhs ? rhs->to_string() : std::string("<none>"));
+}
+
+/*
+ * unary_ast.
+ */
+
+std::unique_ptr<cg::value> unary_ast::generate_code(cg::context* ctx, memory_context mc) const
+{
+    // TODO
+    throw std::runtime_error(fmt::format("{}: unary_ast::generate_code not implemented", slang::to_string(loc)));
+}
+
+std::optional<std::string> unary_ast::type_check(slang::typing::context& ctx) const
+{
+    static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
+      {"+", {"i32", "f32"}},
+      {"-", {"i32", "f32"}},
+      {"!", {"i32"}},
+      {"~", {"i32"}}};
+
+    auto op_it = valid_operand_types.find(op.s);
+    if(op_it == valid_operand_types.end())
+    {
+        throw ty::type_error(op.location, fmt::format("Unknown unary operator '{}'.", op.s));
+    }
+
+    auto operand_type = operand->type_check(ctx);
+    if(operand_type == std::nullopt)
+    {
+        throw ty::type_error(op.location, fmt::format("Operand of unary operator '{}' has no type.", op.s));
+    }
+
+    auto type_it = std::find(op_it->second.begin(), op_it->second.end(), *operand_type);
+    if(type_it == op_it->second.end())
+    {
+        throw ty::type_error(operand->get_location(), fmt::format("Invalid operand type '{}' for unary operator '{}'.", *operand_type, op.s));
+    }
+
+    return *type_it;
+}
+
+std::string unary_ast::to_string() const
+{
+    return fmt::format("Unary(op=\"{}\", operand={})", op.s, operand ? operand->to_string() : std::string("<none>"));
 }
 
 /*

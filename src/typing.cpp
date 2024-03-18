@@ -172,12 +172,26 @@ bool context::has_type(const std::string& name) const
 
 std::string context::get_type(const token& name) const
 {
-    for(scope* s = current_scope; s != nullptr; s = s->parent)
+    // check if we're accessing a struct.
+    if(struct_stack.size() > 0)
     {
-        auto type = s->get_type(name.s);
-        if(type != std::nullopt)
+        for(auto [n, t]: struct_stack.back()->members)
         {
-            return *type;
+            if(n.s == name.s)
+            {
+                return t.s;
+            }
+        }
+    }
+    else
+    {
+        for(scope* s = current_scope; s != nullptr; s = s->parent)
+        {
+            auto type = s->get_type(name.s);
+            if(type != std::nullopt)
+            {
+                return *type;
+            }
         }
     }
 
@@ -247,6 +261,16 @@ void context::exit_function_scope(const token& name)
     current_scope = current_scope->parent;
 }
 
+std::optional<function_signature> context::get_current_function() const
+{
+    if(function_scope == std::nullopt)
+    {
+        return std::nullopt;
+    }
+
+    return get_function_signature(*function_scope);
+}
+
 void context::enter_anonymous_scope(token_location loc)
 {
     token anonymous_scope;
@@ -295,14 +319,35 @@ const token& context::get_scope_name() const
     return current_scope->name;
 }
 
-std::optional<function_signature> context::get_current_function() const
+const struct_definition* context::get_struct_definition(token_location loc, const std::string& name) const
 {
-    if(function_scope == std::nullopt)
+    for(scope* s = current_scope; s != nullptr; s = s->parent)
     {
-        return std::nullopt;
+        auto it = s->structs.find(name);
+        if(it != s->structs.end())
+        {
+            return &it->second;
+        }
     }
 
-    return get_function_signature(*function_scope);
+    throw type_error(loc, fmt::format("Unknown struct '{}'.", name));
+}
+
+/** Push a struct lookup. */
+void context::push_struct_definition(const struct_definition* s)
+{
+    struct_stack.push_back(s);
+}
+
+/** Pop a struct definition. */
+void context::pop_struct_definition()
+{
+    if(struct_stack.size() == 0)
+    {
+        throw std::runtime_error("Typing context: Struct stack is empty.");
+    }
+
+    struct_stack.pop_back();
 }
 
 std::string context::to_string() const

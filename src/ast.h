@@ -636,6 +636,49 @@ public:
     std::string to_string() const override;
 };
 
+/** Unary operators. */
+class unary_ast : public expression
+{
+    /** The operator. */
+    token op;
+
+    /** The operand. */
+    std::unique_ptr<expression> operand;
+
+public:
+    /** No default constructor. */
+    unary_ast() = delete;
+
+    /** Default destructor. */
+    virtual ~unary_ast() = default;
+
+    /** Copy and move constructors. */
+    unary_ast(const unary_ast&) = delete;
+    unary_ast(unary_ast&&) = default;
+
+    /** Assignment operators. */
+    unary_ast& operator=(const unary_ast&) = delete;
+    unary_ast& operator=(unary_ast&&) = default;
+
+    /**
+     * Construct a unary expression.
+     *
+     * @param loc The location.
+     * @param op The operator.
+     * @param operand The operand.
+     */
+    unary_ast(token_location loc, token op, std::unique_ptr<expression> operand)
+    : expression{std::move(loc)}
+    , op{std::move(op)}
+    , operand{std::move(operand)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
+};
+
 /** Function prototype. */
 class prototype_ast
 {
