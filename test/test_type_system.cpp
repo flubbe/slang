@@ -41,7 +41,7 @@ TEST(type_system, name_collection)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         ast->collect_names(ctx);
@@ -65,7 +65,7 @@ TEST(type_system, name_collection)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         ast->collect_names(ctx);
@@ -87,7 +87,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -104,7 +104,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -121,7 +121,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -138,7 +138,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -155,7 +155,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -172,7 +172,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -191,7 +191,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -210,7 +210,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -228,7 +228,7 @@ TEST(type_system, variables)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -251,7 +251,7 @@ TEST(type_system, explicit_cast)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -269,7 +269,7 @@ TEST(type_system, explicit_cast)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -287,7 +287,7 @@ TEST(type_system, explicit_cast)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -305,7 +305,7 @@ TEST(type_system, explicit_cast)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -347,7 +347,7 @@ TEST(type_system, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -365,7 +365,7 @@ TEST(type_system, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -383,7 +383,7 @@ TEST(type_system, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -401,7 +401,7 @@ TEST(type_system, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -419,7 +419,7 @@ TEST(type_system, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -541,7 +541,7 @@ TEST(type_system, functions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -562,7 +562,7 @@ TEST(type_system, functions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -583,7 +583,7 @@ TEST(type_system, functions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -604,7 +604,7 @@ TEST(type_system, functions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -626,7 +626,7 @@ TEST(type_system, functions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -652,7 +652,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->type_check(ctx));
@@ -672,7 +672,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -693,7 +693,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -719,7 +719,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -745,7 +745,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -769,7 +769,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -793,7 +793,7 @@ TEST(type_system, structs)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -822,7 +822,7 @@ TEST(type_system, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -847,7 +847,7 @@ TEST(type_system, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -872,7 +872,7 @@ TEST(type_system, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -896,7 +896,7 @@ TEST(type_system, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -922,7 +922,7 @@ TEST(type_system, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -948,7 +948,7 @@ TEST(type_system, return_expressions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
@@ -969,7 +969,7 @@ TEST(type_system, return_expressions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -995,7 +995,7 @@ TEST(type_system, return_expressions)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1023,7 +1023,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1047,7 +1047,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1073,7 +1073,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1099,7 +1099,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1125,7 +1125,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1151,7 +1151,7 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));
@@ -1177,7 +1177,59 @@ TEST(type_system, element_access)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+}
+
+TEST(type_system, examples)
+{
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 1 > 2 | 3 < 4 & 4;\n"    // same as (1 > 2) | ((3 < 4) & 4)
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " let j: i32 = 1;\n"
+          " i += j += 1;\n"
+          " return i;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
 
         ty::context ctx;
         EXPECT_NO_THROW(ast->collect_names(ctx));

@@ -34,7 +34,7 @@ TEST(compile_ir, empty)
     EXPECT_TRUE(lexer.eof());
 
     const slang::ast::block* ast = parser.get_ast();
-    EXPECT_NE(ast, nullptr);
+    ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
     ast->generate_code(&ctx);
@@ -58,7 +58,7 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
@@ -80,7 +80,7 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
@@ -103,7 +103,7 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
@@ -126,7 +126,7 @@ TEST(compile_ir, empty_function)
     EXPECT_TRUE(lexer.eof());
 
     const slang::ast::block* ast = parser.get_ast();
-    EXPECT_NE(ast, nullptr);
+    ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
     ast->generate_code(&ctx);
@@ -156,7 +156,7 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -184,7 +184,7 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -212,7 +212,7 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -244,7 +244,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -272,7 +272,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -304,7 +304,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -336,7 +336,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -367,7 +367,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -404,7 +404,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -440,7 +440,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -476,7 +476,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -512,7 +512,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -552,7 +552,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -592,7 +592,7 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -637,7 +637,7 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -675,7 +675,7 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -720,7 +720,7 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ASSERT_NO_THROW(ast->generate_code(&ctx));
@@ -763,7 +763,7 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
@@ -788,7 +788,7 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -816,7 +816,7 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
@@ -849,7 +849,7 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         const slang::ast::block* ast = parser.get_ast();
-        EXPECT_NE(ast, nullptr);
+        ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
         ast->generate_code(&ctx);
