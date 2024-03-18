@@ -718,6 +718,12 @@ void prototype_ast::type_check(ty::context& ctx) const
     {
         ctx.add_variable(arg.first, arg.second);
     }
+
+    // check the return type.
+    if(!is_builtin_type(return_type.s) && !ctx.has_type(return_type.s))
+    {
+        throw ty::type_error(return_type.location, fmt::format("Unknown return type '{}'.", return_type.s));
+    }
 }
 
 void prototype_ast::finish_type_check(ty::context& ctx) const

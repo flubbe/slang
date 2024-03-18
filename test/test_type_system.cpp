@@ -215,6 +215,25 @@ TEST(type_system, variables)
         ty::context ctx;
         EXPECT_THROW(ast->type_check(ctx), ty::type_error);
     }
+    {
+        const std::string test_input =
+          "let s: S;\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+    }
 }
 
 TEST(type_system, explicit_cast)
@@ -542,6 +561,48 @@ TEST(type_system, structs)
     }
     {
         const std::string test_input =
+          "fn test(a: S) -> void\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+    }
+    {
+        const std::string test_input =
+          "fn test() -> S\n"
+          "{\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+    }
+    {
+        const std::string test_input =
           "struct S\n"
           "{\n"
           " a: i32,\n"
@@ -589,7 +650,56 @@ TEST(type_system, structs)
         EXPECT_NE(ast, nullptr);
 
         ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};\n"
+          "let s: S;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
+          "let s: S;\n"
+          "struct S\n"
+          "{\n"
+          " a: i32,\n"
+          " b: f32\n"
+          "};";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        EXPECT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ast->type_check(ctx));
     }
 }
 

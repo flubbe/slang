@@ -120,26 +120,6 @@ void context::add_function(token name, std::vector<token> arg_types, token ret_t
         throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
     }
 
-    // check if all types are known.
-    if(ret_type.s != "i32" && ret_type.s != "f32" && ret_type.s != "str" && ret_type.s != "void")
-    {
-        if(!has_type(ret_type.s))
-        {
-            throw type_error(ret_type.location, fmt::format("Unknown return type '{}'.", ret_type.s));
-        }
-    }
-
-    for(auto& arg_type: arg_types)
-    {
-        if(arg_type.s != "i32" && arg_type.s != "f32" && arg_type.s != "str")
-        {
-            if(!has_type(arg_type.s))
-            {
-                throw type_error(arg_type.location, fmt::format("Unknown argument type '{}'.", arg_type.s));
-            }
-        }
-    }
-
     current_scope->functions[name.s] = {name, std::move(arg_types), std::move(ret_type)};
 }
 
