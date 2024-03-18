@@ -451,6 +451,25 @@ TEST(type_system, unary_operators)
     }
     {
         const std::string test_input =
+          "let a: i32 = +(1 + 2);"
+          "let b: i32 = -+1;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+    {
+        const std::string test_input =
           "let a: f32 = ~1.;";
 
         slang::lexer lexer;
