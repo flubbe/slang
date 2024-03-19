@@ -103,12 +103,12 @@ public:
     /**
      * Add a directive (during code generation).
      *
+     * @throws A type_error if the directive is not supported by the expression.
+     *
      * @param name The directive's name.
      * @param args The directive's arguments.
      */
-    virtual void add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
-    {
-    }
+    virtual void add_directive(const token& name, const std::vector<std::pair<token, token>>& args);
 
     /**
      * Type checking.

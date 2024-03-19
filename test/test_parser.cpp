@@ -966,6 +966,54 @@ TEST(parser, directives)
 
         EXPECT_TRUE(lexer.eof());
     }
+    {
+        const std::string test_input =
+          "#[test]\n"
+          "fn f() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "#[test()]\n"
+          "fn f() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "#[test(]\n"
+          "fn f() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "#[test()\n"
+          "fn f() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
 }
 
 }    // namespace

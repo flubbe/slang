@@ -36,6 +36,15 @@ static bool is_builtin_type(const std::string& s)
 }
 
 /*
+ * expression.
+ */
+
+void expression::add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+{
+    throw ty::type_error(name.location, fmt::format("Directive '{}' is not supported by the following expression.", name.s));
+}
+
+/*
  * literal_expression.
  */
 
