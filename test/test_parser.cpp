@@ -951,4 +951,21 @@ TEST(parser, struct_member_access)
     }
 }
 
+TEST(parser, directives)
+{
+    {
+        const std::string test_input =
+          "#[native(lib=\"test\")]\n"
+          "fn f() -> void {}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+    }
+}
+
 }    // namespace

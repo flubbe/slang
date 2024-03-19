@@ -123,6 +123,10 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
     {
         return parse_definition();
     }
+    else if(current_token->s == "#")
+    {
+        return parse_directive();
+    }
     else
     {
         throw syntax_error(*current_token, fmt::format("Unexpected token '{}'", current_token->s));
@@ -252,7 +256,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     return std::make_unique<ast::prototype_ast>(std::move(loc), std::move(name), std::move(args), std::move(return_type));
 }
 
-// function ::= protoype block_expr
+// function ::= prototype ';'
+//            | prototype block_expr
 std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
     token_location loc = current_token->location;
@@ -262,6 +267,11 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
         throw syntax_error("Unexpected end of file.");
     }
 
+    // check if we have a function body.
+    if(current_token->s == ";")
+    {
+        return std::make_unique<ast::function_expression>(std::move(loc), std::move(proto), nullptr);
+    }
     return std::make_unique<ast::function_expression>(std::move(loc), std::move(proto), parse_block(false));
 }
 
@@ -370,6 +380,71 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 
     get_next_token();    // skip "}"
     return std::make_unique<ast::struct_definition_expression>(std::move(loc), std::move(name), std::move(members));
+}
+
+// directive ::= '#[' directive '(' args ')' ']'
+// args ::= (arg_name '=' arg_value)
+//        | (arg_name '=' arg_value) ',' args
+std::unique_ptr<ast::directive_expression> parser::parse_directive()
+{
+    token_location loc = current_token->location;
+    get_next_token();    // skip '#'.
+
+    if(current_token->s != "[")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected '[', got '{}'.", current_token->s));
+    }
+    get_next_token();
+
+    token name = *current_token;
+    if(name.type != token_type::identifier)
+    {
+        throw syntax_error(name, fmt::format("Expected <identifier> as directive name, got '{}'.", name.s));
+    }
+    get_next_token();
+
+    // parse arguments (if any).
+    std::vector<std::pair<token, token>> args;
+    if(current_token->s == "(")
+    {
+        get_next_token();    // skip '('
+        while(current_token->s != ")")
+        {
+            token key = *current_token;
+            if(key.type != token_type::identifier)
+            {
+                throw syntax_error(key, fmt::format("Expected <identifier> as a key in directive."));
+            }
+            get_next_token();
+
+            if(current_token->s != "=")
+            {
+                throw syntax_error(*current_token, fmt::format("Expected '=', got '{}'.", current_token->s));
+            }
+            get_next_token();
+
+            token value = *current_token;
+            if(value.type != token_type::fp_literal
+               && value.type != token_type::int_literal
+               && value.type != token_type::str_literal
+               && value.type != token_type::identifier)
+            {
+                throw syntax_error(value, fmt::format("Value in directive can only be an i32-, f32- or string literal, or an identifier."));
+            }
+            get_next_token();
+
+            args.emplace_back(std::make_pair(std::move(key), std::move(value)));
+        }
+        get_next_token();    // skip ')'
+    }
+
+    if(current_token->s != "]")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+    }
+    get_next_token();    // skip ']'
+
+    return std::make_unique<ast::directive_expression>(std::move(name), std::move(args), parse_top_level_statement());
 }
 
 // block_expr ::= '{' stmts_exprs '}'

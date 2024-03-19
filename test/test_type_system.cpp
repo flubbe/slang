@@ -1235,6 +1235,70 @@ TEST(type_system, examples)
         EXPECT_NO_THROW(ast->collect_names(ctx));
         EXPECT_NO_THROW(ast->type_check(ctx));
     }
+    {
+        const std::string test_input =
+          "import std;\n"
+          "\n"
+          "fn main(s: str) -> i32\n"
+          "{\n"
+          "\tprintln(\"Hello, World!\");\n"
+          "\treturn 0;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ctx.resolve_imports());
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
+}
+
+TEST(type_system, native_binding)
+{
+    {
+        const std::string test_input =
+          "/**\n"
+          " * Print a string to stdout.\n"
+          " *\n"
+          " * @param s The string to print.\n"
+          " */\n"
+          "#[native(lib=\"slang\")]\n"
+          "fn print(s: str) -> void;\n"
+          "\n"
+          "/**\n"
+          " * Print a string to stdout and append a new-line character.\n"
+          " *\n"
+          " * @param s The string to print.\n"
+          " */\n"
+          "#[native(lib=\"slang\")]\n"
+          "fn println(s: str) -> void;\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context ctx;
+        EXPECT_NO_THROW(ast->collect_names(ctx));
+        EXPECT_NO_THROW(ctx.resolve_imports());
+        EXPECT_NO_THROW(ast->type_check(ctx));
+    }
 }
 
 }    // namespace

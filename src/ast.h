@@ -95,6 +95,21 @@ public:
     {
     }
 
+    /** Clear any applied directives. */
+    virtual void clear_directives()
+    {
+    }
+
+    /**
+     * Add a directive (during code generation).
+     *
+     * @param name The directive's name.
+     * @param args The directive's arguments.
+     */
+    virtual void add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+    {
+    }
+
     /**
      * Type checking.
      *
@@ -309,6 +324,54 @@ public:
     import_expression(std::vector<token> in_path)
     : expression{in_path[0].location}
     , path{std::move(in_path)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(slang::typing::context& ctx) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
+};
+
+/** Directives. Directives have names and contain a list of key-value pairs as arguments. */
+class directive_expression : public expression
+{
+    /** The name. */
+    token name;
+
+    /** Key-value pairs. */
+    std::vector<std::pair<token, token>> args;
+
+    /** An optional expression the directive applies to. */
+    std::unique_ptr<expression> expr;
+
+public:
+    /** No default constructor. */
+    directive_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~directive_expression() = default;
+
+    /** Default copy and move constructors. */
+    directive_expression(const directive_expression&) = delete;
+    directive_expression(directive_expression&&) = default;
+
+    /** Default assignment operators. */
+    directive_expression& operator=(const directive_expression&) = delete;
+    directive_expression& operator=(directive_expression&&) = default;
+
+    /**
+     * Construct a directive expression.
+     *
+     * @param name The name.
+     * @param args The directive's arguments as key-value pairs.
+     * @param expr The expression the directive applies to.
+     */
+    directive_expression(token name, std::vector<std::pair<token, token>> args, std::unique_ptr<expression> expr)
+    : expression{name.location}
+    , name{std::move(name)}
+    , args{std::move(args)}
+    , expr{std::move(expr)}
     {
     }
 
@@ -768,6 +831,8 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
     void collect_names(slang::typing::context& ctx) const override;
+    void clear_directives() override;
+    void add_directive(const token& name, const std::vector<std::pair<token, token>>& args) override;
     std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };

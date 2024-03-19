@@ -255,6 +255,11 @@ std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, me
     throw std::runtime_error(fmt::format("{}: import_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
+void import_expression::collect_names(ty::context& ctx) const
+{
+    ctx.add_import(path);
+}
+
 std::optional<std::string> import_expression::type_check(ty::context& ctx) const
 {
     return std::nullopt;
@@ -266,6 +271,30 @@ std::string import_expression::to_string() const
     { return p.s; };
 
     return fmt::format("Import(path={})", slang::utils::join(path, {transform}, "."));
+}
+
+/*
+ * directive_expression.
+ */
+
+std::unique_ptr<slang::codegen::value> directive_expression::generate_code(slang::codegen::context* ctx, memory_context mc) const
+{
+    expr->clear_directives();
+    expr->add_directive(name, args);
+    return expr->generate_code(ctx, mc);
+}
+
+std::optional<std::string> directive_expression::type_check(slang::typing::context& ctx) const
+{
+    return expr->type_check(ctx);
+}
+
+std::string directive_expression::to_string() const
+{
+    auto transform = [](const std::pair<token, token>& p) -> std::string
+    { return fmt::format("{}, {}", p.first.s, p.second.s); };
+
+    return fmt::format("Directive(name={}, args=({}), expr={})", name.s, slang::utils::join(args, {transform}, ","), expr->to_string());
 }
 
 /*
@@ -411,12 +440,12 @@ std::optional<std::string> struct_definition_expression::type_check(ty::context&
 std::string struct_definition_expression::to_string() const
 {
     std::string ret = fmt::format("Struct(name={}, members=(", name.s);
-    for(std::size_t i = 0; i < members.size() - 1; ++i)
-    {
-        ret += fmt::format("{}, ", members[i]->to_string());
-    }
     if(members.size() > 0)
     {
+        for(std::size_t i = 0; i < members.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", members[i]->to_string());
+        }
         ret += fmt::format("{}", members.back()->to_string());
     }
     ret += ")";
@@ -442,12 +471,12 @@ std::optional<std::string> struct_anonymous_initializer_expression::type_check(t
 std::string struct_anonymous_initializer_expression::to_string() const
 {
     std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
-    for(std::size_t i = 0; i < initializers.size() - 1; ++i)
-    {
-        ret += fmt::format("{}, ", initializers[i]->to_string());
-    }
     if(initializers.size() > 0)
     {
+        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", initializers[i]->to_string());
+        }
         ret += fmt::format("{}", initializers.back()->to_string());
     }
     ret += ")";
@@ -480,12 +509,12 @@ std::string struct_named_initializer_expression::to_string() const
     }
     else
     {
-        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
-        {
-            ret += fmt::format("{}={}, ", member_names[i]->to_string(), initializers[i]->to_string());
-        }
         if(initializers.size() > 0)
         {
+            for(std::size_t i = 0; i < initializers.size() - 1; ++i)
+            {
+                ret += fmt::format("{}={}, ", member_names[i]->to_string(), initializers[i]->to_string());
+            }
             ret += fmt::format("{}={}", member_names.back()->to_string(), initializers.back()->to_string());
         }
         ret += ")";
@@ -751,12 +780,12 @@ void prototype_ast::finish_type_check(ty::context& ctx) const
 std::string prototype_ast::to_string() const
 {
     std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, return_type.s);
-    for(std::size_t i = 0; i < args.size() - 1; ++i)
-    {
-        ret += fmt::format("(name={}, type={}), ", args[i].first.s, args[i].second.s);
-    }
     if(args.size() > 0)
     {
+        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        {
+            ret += fmt::format("(name={}, type={}), ", args[i].first.s, args[i].second.s);
+        }
         ret += fmt::format("(name={}, type={})", args.back().first.s, args.back().second.s);
     }
     ret += "))";
@@ -803,12 +832,12 @@ std::optional<std::string> block::type_check(ty::context& ctx) const
 std::string block::to_string() const
 {
     std::string ret = "Block(exprs=(";
-    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
-    {
-        ret += fmt::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
-    }
     if(exprs.size() > 0)
     {
+        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
+        }
         ret += fmt::format("{}", exprs.back() ? exprs.back()->to_string() : std::string("<none>"));
     }
     ret += "))";
@@ -849,10 +878,25 @@ void function_expression::collect_names(ty::context& ctx) const
     prototype->collect_names(ctx);
 }
 
+void function_expression::clear_directives()
+{
+    // TODO
+    throw std::runtime_error("function_expression::clear_directives not implemented.");
+}
+
+void function_expression::add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+{
+    // TODO
+    throw std::runtime_error("function_expression::add_directive not implemented.");
+}
+
 std::optional<std::string> function_expression::type_check(ty::context& ctx) const
 {
     prototype->type_check(ctx);
-    body->type_check(ctx);
+    if(body)
+    {
+        body->type_check(ctx);
+    }
     prototype->finish_type_check(ctx);
 
     return std::nullopt;
@@ -913,12 +957,12 @@ std::optional<std::string> call_expression::type_check(ty::context& ctx) const
 std::string call_expression::to_string() const
 {
     std::string ret = fmt::format("Call(callee={}, args=(", callee.s);
-    for(std::size_t i = 0; i < args.size() - 1; ++i)
-    {
-        ret += fmt::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
-    }
     if(args.size() > 0)
     {
+        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
+        }
         ret += fmt::format("{}, ", args.back() ? args.back()->to_string() : std::string("<none>"));
     }
     ret += "))";

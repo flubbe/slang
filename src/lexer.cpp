@@ -343,6 +343,10 @@ std::optional<token> lexer::next()
         {
             break;
         }
+        else if(*c == '#')    // directives
+        {
+            break;
+        }
         else
         {
             throw lexical_error(fmt::format("{}: Unexpected character '{}' (0x{:x})", to_string(loc), *c, static_cast<int>(*c)));

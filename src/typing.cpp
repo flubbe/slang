@@ -80,6 +80,21 @@ std::string scope::to_string() const
  * Typing context.
  */
 
+void context::add_import(std::vector<token> path)
+{
+    if(path.size() == 0)
+    {
+        throw type_error("Typing context: Cannot add empty import.");
+    }
+
+    if(current_scope != &global_scope)
+    {
+        throw type_error(path[0].location, fmt::format("Import statement can only occur in the global scope."));
+    }
+
+    imports.emplace_back(std::move(path));
+}
+
 void context::add_variable(token name, token type)
 {
     if(current_scope == nullptr)
@@ -333,13 +348,11 @@ const struct_definition* context::get_struct_definition(token_location loc, cons
     throw type_error(loc, fmt::format("Unknown struct '{}'.", name));
 }
 
-/** Push a struct lookup. */
 void context::push_struct_definition(const struct_definition* s)
 {
     struct_stack.push_back(s);
 }
 
-/** Pop a struct definition. */
 void context::pop_struct_definition()
 {
     if(struct_stack.size() == 0)
@@ -350,9 +363,29 @@ void context::pop_struct_definition()
     struct_stack.pop_back();
 }
 
+void context::resolve_imports()
+{
+    for(auto& it: imports)
+    {
+        auto transform = [](const token& t) -> std::string
+        { return t.s; };
+    }
+
+    // TODO
+    throw std::runtime_error("context::resolve_imports not implemented.");
+}
+
 std::string context::to_string() const
 {
-    return global_scope.to_string();
+    std::string ret = "Imports:\n";
+    for(auto& it: imports)
+    {
+        auto transform = [](const token& t) -> std::string
+        { return t.s; };
+        ret += fmt::format("* {}\n", slang::utils::join(it, {transform}, "::"));
+    }
+
+    return fmt::format("{}\n{}", ret, global_scope.to_string());
 }
 
 }    // namespace slang::typing

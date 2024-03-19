@@ -287,6 +287,9 @@ class context
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
+    /** Import list. */
+    std::vector<std::vector<token>> imports;
+
     /** Struct/type stack, for member/type lookups. */
     std::vector<const struct_definition*> struct_stack;
 
@@ -299,6 +302,16 @@ public:
     /** Default assignments. */
     context& operator=(const context&) = default;
     context& operator=(context&&) = default;
+
+    /**
+     * Add an import to the context.
+     *
+     * @throws A type_error if the import is not in the global scope.
+     * @throws A type_error if the import is already added.
+     *
+     * @param path The import path.
+     */
+    void add_import(std::vector<token> path);
 
     /**
      * Add a variable to the context.
@@ -404,6 +417,9 @@ public:
 
     /** Pop a struct definition. */
     void pop_struct_definition();
+
+    /** Resolve the imports from the name collection phase. */
+    void resolve_imports();
 
     /** Get a string representation of the context. */
     std::string to_string() const;

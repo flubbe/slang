@@ -150,6 +150,9 @@ protected:
     /** Parse a struct definition. */
     std::unique_ptr<ast::struct_definition_expression> parse_struct();
 
+    /** Parse a compiler directive. */
+    std::unique_ptr<ast::directive_expression> parse_directive();
+
     /**
      * Parse any block of expressions between { and }.
      *
