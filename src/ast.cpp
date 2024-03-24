@@ -39,9 +39,37 @@ static bool is_builtin_type(const std::string& s)
  * expression.
  */
 
-void expression::add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+void expression::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
 {
-    throw ty::type_error(name.location, fmt::format("Directive '{}' is not supported by the following expression.", name.s));
+    if(!supports_directive(name.s))
+    {
+        throw ty::type_error(name.location, fmt::format("Directive '{}' is not supported by the following expression.", name.s));
+    }
+
+    directive_stack.emplace_back(name, args);
+}
+
+void expression::pop_directive()
+{
+    if(directive_stack.size() == 0)
+    {
+        throw ty::type_error("Cannot pop directive for expression. Directive stack is empty.");
+    }
+
+    directive_stack.pop_back();
+}
+
+std::vector<directive> expression::get_directives(const std::string& s) const
+{
+    std::vector<directive> ret;
+    for(auto& it: directive_stack)
+    {
+        if(it.name.s == s)
+        {
+            ret.emplace_back(it);
+        }
+    }
+    return ret;
 }
 
 /*
@@ -288,9 +316,10 @@ std::string import_expression::to_string() const
 
 std::unique_ptr<slang::codegen::value> directive_expression::generate_code(slang::codegen::context* ctx, memory_context mc) const
 {
-    expr->clear_directives();
-    expr->add_directive(name, args);
-    return expr->generate_code(ctx, mc);
+    expr->push_directive(name, args);
+    std::unique_ptr<slang::codegen::value> ret = expr->generate_code(ctx, mc);
+    expr->pop_directive();
+    return ret;
 }
 
 std::optional<std::string> directive_expression::type_check(slang::typing::context& ctx) const
@@ -753,6 +782,24 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
     return ctx->create_function(name.s, return_type.s, std::move(function_args));
 }
 
+void prototype_ast::generate_native_binding(const std::string& lib_name, slang::codegen::context* ctx) const
+{
+    std::vector<std::unique_ptr<cg::variable>> function_args;
+    for(auto& a: args)
+    {
+        if(is_builtin_type(a.second.s))
+        {
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, a.second.s));
+        }
+        else
+        {
+            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, "composite", a.second.s));
+        }
+    }
+
+    ctx->create_native_function(lib_name, name.s, return_type.s, std::move(function_args));
+}
+
 void prototype_ast::collect_names(ty::context& ctx) const
 {
     std::vector<token> arg_types;
@@ -859,27 +906,61 @@ std::string block::to_string() const
 
 std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::context* ctx, memory_context mc) const
 {
-    if(mc != memory_context::none)
+    auto directives = get_directives("native");
+    if(directives.size() == 0)
     {
-        throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
+        if(mc != memory_context::none)
+        {
+            throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
+        }
+
+        cg::function* fn = prototype->generate_code(ctx);
+        cg::basic_block* bb = fn->create_basic_block("entry");
+
+        cg::scope_guard sg{ctx, fn->get_scope()};
+
+        ctx->set_insertion_point(bb);
+
+        if(!body)
+        {
+            throw cg::codegen_error(loc, fmt::format("No function body defined for '{}'.", prototype->get_name().s));
+        }
+        auto v = body->generate_code(ctx);
+
+        // generate return instruction if required.
+        if(!bb->ends_with_return())
+        {
+            ctx->generate_ret();
+            return {};
+        }
+
+        return v;
     }
-
-    cg::function* fn = prototype->generate_code(ctx);
-    cg::basic_block* bb = fn->create_basic_block("entry");
-
-    cg::scope_guard sg{ctx, fn->get_scope()};
-
-    ctx->set_insertion_point(bb);
-    auto v = body->generate_code(ctx);
-
-    // generate return instruction if required.
-    if(!ctx->ends_with_return())
+    else if(directives.size() == 1)
     {
-        ctx->generate_ret();
+        auto& directive = directives[0];
+        if(directive.args.size() != 1 || directive.args[0].first.s != "lib")
+        {
+            throw cg::codegen_error(loc, fmt::format("Native function '{}': Expected argument 'lib' for directive.", prototype->get_name().s));
+        }
+
+        if(directive.args[0].second.type != token_type::str_literal && directive.args[0].second.type != token_type::identifier)
+        {
+            throw cg::codegen_error(loc, "Expected 'lib=<identifier>' or 'lib=<string-literal>'.");
+        }
+
+        std::string lib_name =
+          (directive.args[0].second.type == token_type::str_literal)
+            ? std::get<std::string>(*directive.args[0].second.value)
+            : directive.args[0].second.s;
+
+        prototype->generate_native_binding(lib_name, ctx);
         return {};
     }
-
-    return v;
+    else
+    {
+        throw cg::codegen_error(loc, "Too many 'native' directives. Can only bind to a single native function.");
+    }
 }
 
 void function_expression::collect_names(ty::context& ctx) const
@@ -887,16 +968,14 @@ void function_expression::collect_names(ty::context& ctx) const
     prototype->collect_names(ctx);
 }
 
-void function_expression::clear_directives()
+bool function_expression::supports_directive(const std::string& name) const
 {
-    // TODO
-    throw std::runtime_error("function_expression::clear_directives not implemented.");
-}
+    if(name == "native")
+    {
+        return true;
+    }
 
-void function_expression::add_directive(const token& name, const std::vector<std::pair<token, token>>& args)
-{
-    // TODO
-    throw std::runtime_error("function_expression::add_directive not implemented.");
+    return false;
 }
 
 std::optional<std::string> function_expression::type_check(ty::context& ctx) const

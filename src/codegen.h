@@ -21,6 +21,7 @@
 namespace slang
 {
 struct token_location;
+class language_module;
 }    // namespace slang
 
 namespace slang::codegen
@@ -31,7 +32,7 @@ class codegen_error : public std::runtime_error
 {
 public:
     /**
-     * Construct a codegen_error.
+     * Construct a `codegen_error`.
      *
      * NOTE Use the other constructor if you want to include location information in the error message.
      *
@@ -43,7 +44,7 @@ public:
     }
 
     /**
-     * Construct a codegen_error.
+     * Construct a `codegen_error`.
      *
      * @param loc The error location in the source.
      * @param message The error message.
@@ -66,7 +67,7 @@ protected:
     /**
      * Validate the value.
      *
-     * @throws A codegen_error if the pair (type, composite_type) is invalid.
+     * @throws A `codegen_error` if the pair (type, composite_type) is invalid.
      */
     void validate() const
     {
@@ -139,7 +140,7 @@ public:
     /**
      * Get the value's composite type.
      *
-     * @throws A codegen_error if called on non-composite type.
+     * @throws A `codegen_error` if called on non-composite type.
      */
     std::string get_composite_type() const
     {
@@ -626,7 +627,7 @@ public:
     /**
      * Add a non-branching instruction.
      *
-     * Throws a codegen_error if the instruction is branching.
+     * Throws a `codegen_error` if the instruction is branching.
      *
      * @param instr The instruction.
      */
@@ -915,6 +916,12 @@ class function
     /** The function's name. */
     std::string name;
 
+    /** Whether this is a native function. */
+    bool native;
+
+    /** Import library name for native functions. */
+    std::string import_library;
+
     /** The function's return type. */
     std::string return_type;
 
@@ -931,10 +938,32 @@ public:
     function(function&&) = default;
 
     /**
-     * Construct a function from a name and return type.
+     * Construct a function from name, return type and argument list.
+     *
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param args The function's argument list.
      */
     function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
     : name{name}
+    , native{false}
+    , return_type{std::move(return_type)}
+    , scope{std::move(name), std::move(args)}
+    {
+    }
+
+    /**
+     * Construct a native function from import library name and function name.
+     *
+     * @param import_library The import library's name.
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param args The function's argument list.
+     */
+    function(std::string import_library, std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
+    : name{name}
+    , native{true}
+    , import_library{import_library}
     , return_type{std::move(return_type)}
     , scope{std::move(name), std::move(args)}
     {
@@ -978,10 +1007,73 @@ public:
         return &scope;
     }
 
+    /** Returns the function's signature as a pair (return_type, arg_types). */
+    std::pair<std::string, std::vector<std::string>> get_signature() const
+    {
+        std::vector<std::string> arg_types;
+        auto& args = scope.get_args();
+        std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
+                       [](const auto& arg)
+                       {
+                           // FIXME This seems complicated for getting the type.
+                           auto v = arg->get_value();
+                           if(v.is_composite())
+                           {
+                               return v.get_composite_type();
+                           }
+                           else
+                           {
+                               return v.get_type();
+                           }
+                       });
+        return std::make_pair<std::string, std::vector<std::string>>(std::string{return_type}, std::move(arg_types));
+    }
+
+    /** Return whether this is a native function. */
+    bool is_native() const
+    {
+        return native;
+    }
+
+    /**
+     * Return the import library for a native function.
+     *
+     * @throws Throws a `codegen_error` if this is not a native function.
+     *
+     * @returns The import library name.
+     */
+    std::string get_import_library() const
+    {
+        if(!native)
+        {
+            throw codegen_error(fmt::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
+        }
+
+        return import_library;
+    }
+
+    /**
+     * Return the basic blocks.
+     *
+     * @returns The function's basic blocks.
+     */
+    const std::list<basic_block>& get_basic_blocks() const
+    {
+        return instr_blocks;
+    }
+
     /** String representation of function. */
     std::string to_string() const
     {
-        std::string buf = fmt::format("define {} @{}(", return_type, name);
+        std::string buf;
+        if(native)
+        {
+            buf = fmt::format("native ({}) {} @{}(", import_library, return_type, name);
+        }
+        else
+        {
+            buf = fmt::format("define {} @{}(", return_type, name);
+        }
 
         const auto& args = scope.get_args();
         if(args.size() > 0)
@@ -990,23 +1082,26 @@ public:
             {
                 buf += fmt::format("{}, ", args[i]->to_string());
             }
-            buf += fmt::format("{}) ", args.back()->to_string());
+            buf += fmt::format("{})", args.back()->to_string());
         }
         else
         {
-            buf += ") ";
+            buf += ")";
         }
 
-        buf += "{\n";
-        for(auto& v: scope.get_locals())
+        if(!native)
         {
-            buf += fmt::format("local {}\n", v->to_string());
+            buf += " {\n";
+            for(auto& v: scope.get_locals())
+            {
+                buf += fmt::format("local {}\n", v->to_string());
+            }
+            for(auto& b: instr_blocks)
+            {
+                buf += fmt::format("{}\n", b.to_string());
+            }
+            buf += "}";
         }
-        for(auto& b: instr_blocks)
-        {
-            buf += fmt::format("{}\n", b.to_string());
-        }
-        buf += "}";
 
         return buf;
     }
@@ -1127,14 +1222,32 @@ class context
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
 
+    /*
+     * Module generation.
+     */
+
+    /** Final instruction buffer. */
+    std::vector<std::byte> instruction_buffer;
+
+    /** Function definition offsets inside the instruction buffer. */
+    std::unordered_map<std::string, std::uint32_t> function_offsets;
+
+    /** Whether this context was finalized. */
+    bool finalized = false;
+
 protected:
     /**
      * Check that the insertion point is not null.
      *
-     * Throws a codegen_error if the insertion point is null.
+     * @throws Throws a `codegen_error` if the insertion point is null or if the context already was finalized.
      */
     void validate_insertion_point() const
     {
+        if(finalized)
+        {
+            throw codegen_error("Cannot insert into finalized context.");
+        }
+
         if(!insertion_point)
         {
             throw codegen_error("Invalid insertion point (nullptr).");
@@ -1160,7 +1273,8 @@ public:
     /**
      * Create a type.
      *
-     * Throws a codegen_error if the type already exists or if it contains undefined types.
+     * Throws a `codegen_error` if the type already exists or if it contains undefined types.
+     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param name The type's name.
      * @returns A representation of the created type.
@@ -1178,7 +1292,8 @@ public:
     /**
      * Add a function definition.
      *
-     * Throws a codegen_error if the function name already exists.
+     * Throws a `codegen_error` if the function name already exists.
+     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param name The function's name.
      * @param return_type The function's return type.
@@ -1188,7 +1303,22 @@ public:
     function* create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args);
 
     /**
+     * Add a function with a native implementation in a library.
+     *
+     * Throws a `codegen_error` if the function name already exists.
+     * Throws a `codegen_error` if the context already was finalized.
+     *
+     * @param lib_name Name of the library the function should be imported from.
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param args The function's arguments.
+     */
+    void create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> arg);
+
+    /**
      * Set instruction insertion point.
+     *
+     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param ip The insertion point for instructions.
      */
@@ -1203,20 +1333,34 @@ public:
     /**
      * Enter a new scope.
      *
+     * Throws a `codegen_error` if the context already was finalized.
+     *
      * @param s The new scope.
      */
     void enter_scope(scope* s)
     {
+        if(finalized)
+        {
+            throw codegen_error("Cannot enter scope, as the context is already finalized.");
+        }
+
         current_scopes.push_back(s);
     }
 
     /**
      * Exit a scope.
      *
+     * Throws a `codegen_error` if the context already was finalized.
+     *
      * @param s The scope to leave. Has to be the last entered scope.
      */
     void exit_scope(scope* s)
     {
+        if(finalized)
+        {
+            throw codegen_error("Cannot enter scope, as the context is already finalized.");
+        }
+
         if(current_scopes.size() == 0)
         {
             throw codegen_error("No scope to leave.");
@@ -1339,15 +1483,36 @@ public:
      */
     void generate_store_element(std::vector<int> indices);
 
-    /** Returns whether the last instruction was a return instruction. */
-    bool ends_with_return() const;
+    /**
+     * Finalize code generation. Resolves e.g. jump labels into relative offsets
+     * and generates the binary representation of the bytecode.
+     *
+     * @throws Throws a `codegen_error` if `finalize` was already called.
+     */
+    void finalize();
+
+    /*
+     * Module generation.
+     */
+
+    /**
+     * Generate a module from the current context state.
+     *
+     * @returns A module representing the context state.
+     * @throws Throws a `codegen_error` if the contet was not finalized.
+     */
+    language_module to_module() const;
+
+    /*
+     * Readable representation.
+     */
 
     /** Generate a string representation. */
     std::string to_string() const
     {
         std::string buf;
 
-        // string table.
+        // strings.
         if(strings.size())
         {
             auto make_printable = [](const std::string& s) -> std::string
@@ -1357,7 +1522,7 @@ public:
                 // replace non-printable characters by their character codes.
                 for(auto& c: s)
                 {
-                    if(!::isalnum(c) && c != ' ')
+                    if(!isalnum(c) && c != ' ')
                     {
                         str += fmt::format("\\x{:02x}", c);
                     }
@@ -1383,6 +1548,7 @@ public:
             }
         }
 
+        // types.
         if(types.size() != 0)
         {
             for(std::size_t i = 0; i < types.size() - 1; ++i)
@@ -1398,6 +1564,7 @@ public:
             }
         }
 
+        // functions.
         if(funcs.size() != 0)
         {
             for(std::size_t i = 0; i < funcs.size() - 1; ++i)
@@ -1414,6 +1581,7 @@ public:
 /*
  * const_argument implementation.
  */
+
 inline void const_argument::register_const(context* ctx)
 {
     if(type.get_type() == "str")

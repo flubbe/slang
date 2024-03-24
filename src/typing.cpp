@@ -363,18 +363,6 @@ void context::pop_struct_definition()
     struct_stack.pop_back();
 }
 
-void context::resolve_imports()
-{
-    for(auto& it: imports)
-    {
-        auto transform = [](const token& t) -> std::string
-        { return t.s; };
-    }
-
-    // TODO
-    throw std::runtime_error("context::resolve_imports not implemented.");
-}
-
 std::string context::to_string() const
 {
     std::string ret = "Imports:\n";

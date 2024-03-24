@@ -12,6 +12,7 @@
 
 #include "token.h"
 #include "codegen.h"
+#include "module.h"
 
 namespace slang::codegen
 {
@@ -66,6 +67,11 @@ std::string to_string(binary_op op)
 
 type* context::create_type(std::string name, std::vector<std::pair<std::string, std::string>> members)
 {
+    if(finalized)
+    {
+        throw codegen_error("Cannot create type, as the context is already finalized.");
+    }
+
     if(std::find_if(types.begin(), types.end(),
                     [&name](const std::unique_ptr<type>& t) -> bool
                     {
@@ -93,6 +99,11 @@ std::size_t context::get_string(std::string str)
 
 function* context::create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
 {
+    if(finalized)
+    {
+        throw codegen_error("Cannot create function, as the context is already finalized.");
+    }
+
     if(std::find_if(funcs.begin(), funcs.end(),
                     [&name](const std::unique_ptr<function>& fn) -> bool
                     {
@@ -106,8 +117,33 @@ function* context::create_function(std::string name, std::string return_type, st
     return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
 }
 
+void context::create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
+{
+    if(finalized)
+    {
+        throw codegen_error("Cannot create native function, as the context is already finalized.");
+    }
+
+    if(std::find_if(funcs.begin(), funcs.end(),
+                    [&name](const std::unique_ptr<function>& fn) -> bool
+                    {
+                        return fn->get_name() == name;
+                    })
+       != funcs.end())
+    {
+        throw codegen_error(fmt::format("Function '{}' already defined.", name));
+    }
+
+    funcs.emplace_back(std::make_unique<function>(std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
+}
+
 void context::set_insertion_point(basic_block* ip)
 {
+    if(ip != nullptr && finalized)
+    {
+        throw codegen_error("Cannot set insertion point, as the context is already finalized.");
+    }
+
     basic_block* old_ip = insertion_point;
     insertion_point = nullptr;
     if(old_ip != nullptr)
@@ -255,10 +291,108 @@ void context::generate_store_element(std::vector<int> indices)
     insertion_point->add_instruction(std::make_unique<instruction>("store_element", std::move(args)));
 }
 
-bool context::ends_with_return() const
+void context::finalize()
 {
-    validate_insertion_point();
-    return insertion_point->ends_with_return();
+    if(finalized)
+    {
+        throw codegen_error("Cannot finalize context, as the context is already finalized.");
+    }
+
+    if(instruction_buffer.size() != 0)
+    {
+        throw codegen_error("Error during finalize: Instruction buffer not empty.");
+    }
+
+    std::unordered_map<std::uint32_t, std::string> jumps;          // (offset, label)
+    std::unordered_map<std::string, std::int32_t> jump_targets;    // (label, offset)
+
+    // write all instructions to memory, replacing jumps with placeholders.
+    for(auto& f: funcs)
+    {
+        if(f->is_native())
+        {
+            continue;
+        }
+
+        // clear jump lists, since jumps can only occur within a function.
+        jumps.clear();
+        jump_targets.clear();
+
+        if(function_offsets.find(f->get_name()) != function_offsets.end())
+        {
+            throw codegen_error(fmt::format("Error during finalize: Function '{}' already finalized.", f->get_name()));
+        }
+        function_offsets[f->get_name()] = instruction_buffer.size();
+
+        const std::list<basic_block>& basic_blocks = f->get_basic_blocks();
+        for(auto& bb: basic_blocks)
+        {
+            for(auto& instr: bb.instrs)
+            {
+                // TODO Write instructions and fill `jumps` and `jump_targets`.
+                throw std::runtime_error("context::finalize: code path not implemented yet.");
+            }
+        }
+    }
+
+    // Resolve jumps.
+    for(const auto& [offset, label]: jumps)
+    {
+        // TODO find the label, calculate the jump offset and write it to the instruction buffer.
+        throw std::runtime_error("context::finalize: jump resolution not implemented.");
+    }
+
+    finalized = true;
+}
+
+/*
+ * Module generation.
+ */
+
+language_module context::to_module() const
+{
+    if(!finalized)
+    {
+        throw codegen_error("Cannot create module from context, as the context is not finalized.");
+    }
+
+    language_module mod;
+
+    for(auto& it: strings)
+    {
+        // TODO write strings.
+        throw codegen_error("context::to_module: not implemented for strings.");
+    }
+
+    for(auto& it: types)
+    {
+        // TODO write type definitions.
+        throw codegen_error("context::to_module: not implemented for type definitions.");
+    }
+
+    for(auto& it: funcs)
+    {
+        auto sig = it->get_signature();
+
+        if(it->is_native())
+        {
+            auto [return_type, arg_types] = it->get_signature();
+            mod.add_native_function(it->get_name(), std::move(return_type), std::move(arg_types), it->get_import_library());
+        }
+        else
+        {
+            auto offs_it = function_offsets.find(it->get_name());
+            if(offs_it == function_offsets.end())
+            {
+                throw codegen_error(fmt::format("No entry point generated for function '{}'.", it->get_name()));
+            }
+
+            // TODO write signature and entry point.
+            throw std::runtime_error("context::to_module: not implemented for functions.");
+        }
+    }
+
+    return mod;
 }
 
 }    // namespace slang::codegen

@@ -418,8 +418,11 @@ public:
     /** Pop a struct definition. */
     void pop_struct_definition();
 
-    /** Resolve the imports from the name collection phase. */
-    void resolve_imports();
+    /** Get the import list. */
+    const std::vector<std::vector<token>>& get_imports() const
+    {
+        return imports;
+    }
 
     /** Get a string representation of the context. */
     std::string to_string() const;

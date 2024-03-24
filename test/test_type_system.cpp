@@ -16,9 +16,11 @@
 #include "parser.h"
 #include "codegen.h"
 #include "typing.h"
+#include "resolve.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
+namespace rs = slang::resolve;
 
 namespace
 {
@@ -1256,10 +1258,11 @@ TEST(type_system, examples)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->collect_names(ctx));
-        EXPECT_NO_THROW(ctx.resolve_imports());
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        rs::context resolve_ctx;
+        EXPECT_NO_THROW(ast->collect_names(type_ctx));
+        EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
 
@@ -1294,10 +1297,11 @@ TEST(type_system, native_binding)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->collect_names(ctx));
-        EXPECT_NO_THROW(ctx.resolve_imports());
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        rs::context resolve_ctx;
+        EXPECT_NO_THROW(ast->collect_names(type_ctx));
+        EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
 

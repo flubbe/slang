@@ -26,9 +26,10 @@ target_link_libraries(test_lexer fmt::fmt GTest::gtest GTest::gtest_main)
 add_executable(test_parser
     test_parser.cpp
     ../src/ast.cpp
-    ../src/lexer.cpp
-    ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
     ../src/typing.cpp
     ../src/utils.cpp
 )
@@ -37,9 +38,10 @@ target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main)
 add_executable(test_codegen
     test_codegen.cpp
     ../src/ast.cpp
-    ../src/lexer.cpp
-    ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
     ../src/typing.cpp
     ../src/utils.cpp
 )
@@ -48,9 +50,10 @@ target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main)
 add_executable(test_compile_ir
     test_compile_ir.cpp
     ../src/ast.cpp
-    ../src/lexer.cpp
-    ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
     ../src/typing.cpp
     ../src/utils.cpp
 )
@@ -59,10 +62,38 @@ target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)
 add_executable(test_type_system
     test_type_system.cpp
     ../src/ast.cpp
-    ../src/lexer.cpp
-    ../src/parser.cpp
     ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
+    ../src/resolve.cpp
     ../src/typing.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main)
+
+add_executable(test_resolve
+    test_resolve.cpp
+    ../src/ast.cpp
+    ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
+    ../src/resolve.cpp
+    ../src/typing.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main)
+
+add_executable(test_output
+test_output.cpp
+    ../src/ast.cpp
+    ../src/codegen.cpp
+    ../src/lexer.cpp
+    ../src/module.cpp
+    ../src/parser.cpp
+    ../src/resolve.cpp
+    ../src/typing.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main)

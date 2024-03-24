@@ -19,8 +19,10 @@ add_executable(slang
     src/compiler.cpp
     src/lexer.cpp
     src/main.cpp
+    src/module.cpp
     src/package.cpp
     src/parser.cpp
+    src/resolve.cpp
     src/typing.cpp
     src/utils.cpp
 )

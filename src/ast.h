@@ -46,12 +46,41 @@ enum class memory_context
     store, /** storing context. */
 };
 
+/** A directive that modifies an expression. */
+struct directive
+{
+    /** The directive's name. */
+    token name;
+
+    /** The directive's arguments. */
+    std::vector<std::pair<token, token>> args;
+
+    /** Default constructors. */
+    directive() = default;
+    directive(const directive&) = default;
+    directive(directive&&) = default;
+
+    /** Default assignments. */
+    directive& operator=(const directive&) = default;
+    directive& operator=(directive&&) = default;
+
+    /** Default constructor. */
+    directive(token name, std::vector<std::pair<token, token>> args)
+    : name{std::move(name)}
+    , args{std::move(args)}
+    {
+    }
+};
+
 /** Base class for all expression nodes. */
 class expression
 {
 protected:
     /** The expression's location. */
     token_location loc;
+
+    /** The expression's directive stack. */
+    std::vector<directive> directive_stack;
 
 public:
     /** No default constructor. */
@@ -95,20 +124,40 @@ public:
     {
     }
 
-    /** Clear any applied directives. */
-    virtual void clear_directives()
-    {
-    }
-
     /**
-     * Add a directive (during code generation).
+     * Push a directive to the expression's directive stack (during code generation).
      *
      * @throws A type_error if the directive is not supported by the expression.
      *
      * @param name The directive's name.
      * @param args The directive's arguments.
      */
-    virtual void add_directive(const token& name, const std::vector<std::pair<token, token>>& args);
+    void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
+
+    /**
+     * Pop the last directive from the expression's directive stack.
+     *
+     * @throws A type_error if the stack was empty.
+     */
+    void pop_directive();
+
+    /**
+     * Check whether a directive is supported by the expression.
+     *
+     * @returns True if the directive is supported, and false otherwise.
+     */
+    virtual bool supports_directive(const std::string& s) const
+    {
+        return false;
+    }
+
+    /**
+     * Get a list of matching directives.
+     *
+     * @param name The directive name.
+     * @returns A vector of directives matching the name, or an empty vector if none are found.
+     */
+    std::vector<directive> get_directives(const std::string& s) const;
 
     /**
      * Type checking.
@@ -746,10 +795,16 @@ public:
     }
 
     slang::codegen::function* generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const;
+    void generate_native_binding(const std::string& lib_name, slang::codegen::context* ctx) const;
     void collect_names(slang::typing::context& ctx) const;
     void type_check(slang::typing::context& ctx) const;
     void finish_type_check(slang::typing::context& ctx) const;
     std::string to_string() const;
+
+    token get_name() const
+    {
+        return name;
+    }
 };
 
 /** AST of a code block. This can refer to any block, e.g. the whole program, or a function body. */
@@ -831,8 +886,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context* ctx, memory_context mc = memory_context::none) const override;
     void collect_names(slang::typing::context& ctx) const override;
-    void clear_directives() override;
-    void add_directive(const token& name, const std::vector<std::pair<token, token>>& args) override;
+    bool supports_directive(const std::string& s) const override;
     std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
 };
