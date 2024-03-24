@@ -80,7 +80,7 @@ TEST(parser, function)
 {
     {
         const std::string test_input =
-          "fn f(s: string) -> i32 {}";
+          "fn f(s: str) -> i32 {}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -92,7 +92,7 @@ TEST(parser, function)
     }
     {
         const std::string test_input =
-          "fn f(s: string, i: i32, f: f32) -> i32 {}";
+          "fn f(s: str, i: i32, f: f32) -> i32 {}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -104,7 +104,7 @@ TEST(parser, function)
     }
     {
         const std::string test_input =
-          "fn f(s: string) -> i32 {a = b; c;}";
+          "fn f(s: str) -> i32 {a = b; c;}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -157,7 +157,7 @@ TEST(parser, function)
     {
         // test incomplete definition.
         const std::string test_input =
-          "fn f(s: string)";
+          "fn f(s: str)";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -168,7 +168,7 @@ TEST(parser, function)
     {
         // test missing return type.
         const std::string test_input =
-          "fn f(s: string) {}";
+          "fn f(s: str) {}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -179,7 +179,7 @@ TEST(parser, function)
     {
         // test missing/incomplete return type.
         const std::string test_input =
-          "fn f(s: string) -> {}";
+          "fn f(s: str) -> {}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -190,7 +190,7 @@ TEST(parser, function)
     {
         // test incomplete function body.
         const std::string test_input =
-          "fn f(s: string) -> i32 {";
+          "fn f(s: str) -> i32 {";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -201,7 +201,7 @@ TEST(parser, function)
     {
         // test nested function definitions.
         const std::string test_input =
-          "fn f(s: string) -> i32 { fn g() -> void {} }";
+          "fn f(s: str) -> i32 { fn g() -> void {} }";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -217,7 +217,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           "\treturn 0;\n"
           "}";
@@ -234,7 +234,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           "\treturn +1234.5;\n"
           "}";
@@ -251,7 +251,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           "\treturn -1+2*3;\n"
           "}";
@@ -268,7 +268,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           "\treturn \"Test\";\n"
           "}";
@@ -285,7 +285,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           "\treturn 0\n"
           "}";
@@ -300,7 +300,7 @@ TEST(parser, return_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{"
           "return 0";
 
@@ -488,7 +488,7 @@ TEST(parser, hello_world)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       "\tstd::print(\"Hello, World!\\n\");\n"
       "}";
@@ -506,7 +506,7 @@ TEST(parser, function_call)
 {
     {
         const std::string test_input =
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " return add(+4, -5) + mul(-7, add(1,-2));\n"
           "}";
@@ -521,7 +521,7 @@ TEST(parser, function_call)
     }
     {
         const std::string test_input =
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " return add(sub(2, 3+4.3), 5) + mul(7, add(1,2));\n"
           "}";
@@ -536,7 +536,7 @@ TEST(parser, function_call)
     }
     {
         const std::string test_input =
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " return add(+4, *5) + mul(-7, add(1,-2));\n"
           "}";
@@ -555,7 +555,7 @@ TEST(parser, if_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " if(1 == 2)\n"
           " {\n"
@@ -575,7 +575,7 @@ TEST(parser, if_statement)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " if(1 == 2)\n"
           " {\n"
@@ -599,7 +599,7 @@ TEST(parser, if_else_statement)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       " if(1 == 2)\n"
       " {\n"
@@ -625,7 +625,7 @@ TEST(parser, if_elseif_statement)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       " if(1 == 2 && 3 != 3)\n"
       " {\n"
@@ -651,7 +651,7 @@ TEST(parser, while_statement)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       " while(1 == 2 || 3)\n"
       " {\n"
@@ -673,7 +673,7 @@ TEST(parser, while_if_break_statement)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       " while(1 == 2 || 3)\n"
       " {\n"
@@ -699,7 +699,7 @@ TEST(parser, while_if_continue_statement)
     const std::string test_input =
       "import std;\n"
       "\n"
-      "fn main(s: string) -> i32\n"
+      "fn main(s: str) -> i32\n"
       "{\n"
       " while(1 == 2 || 3)\n"
       " {\n"
@@ -728,7 +728,7 @@ TEST(parser, variable_declaration)
           "\n"
           "let k : i32 = 3;\n"
           "\n"
-          "fn main(s: string) -> i32\n"
+          "fn main(s: str) -> i32\n"
           "{\n"
           " let a : f32;\n"
           " let b : f32 = 2*a;"

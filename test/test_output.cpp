@@ -61,14 +61,38 @@ TEST(output, native_binding)
         rs::context resolve_ctx;
         cg::context codegen_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(type_ctx));
-        EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx));
-        EXPECT_NO_THROW(ast->generate_code(&codegen_ctx));
-        EXPECT_NO_THROW(codegen_ctx.finalize());
+        ASSERT_NO_THROW(ast->collect_names(type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(&codegen_ctx));
+        ASSERT_NO_THROW(codegen_ctx.finalize());
 
         slang::language_module mod = codegen_ctx.to_module();
-        // TODO validate module.
+        const slang::module_header& header = mod.get_header();
+
+        ASSERT_EQ(header.exports.size(), 2);
+        EXPECT_EQ(header.imports.size(), 0);
+        EXPECT_EQ(header.strings.size(), 0);
+
+        ASSERT_EQ(header.exports[0].type, slang::symbol_type::function);
+        EXPECT_EQ(header.exports[0].name, "print");
+        {
+            auto desc = std::get<slang::function_descriptor>(header.exports[0].desc);
+            EXPECT_EQ(desc.native, true);
+            EXPECT_EQ(desc.signature.return_type, "void");
+            ASSERT_EQ(desc.signature.arg_types.size(), 1);
+            EXPECT_EQ(desc.signature.arg_types[0], "str");
+        }
+
+        ASSERT_EQ(header.exports[1].type, slang::symbol_type::function);
+        EXPECT_EQ(header.exports[1].name, "println");
+        {
+            auto desc = std::get<slang::function_descriptor>(header.exports[1].desc);
+            EXPECT_EQ(desc.native, true);
+            EXPECT_EQ(desc.signature.return_type, "void");
+            ASSERT_EQ(desc.signature.arg_types.size(), 1);
+            EXPECT_EQ(desc.signature.arg_types[0], "str");
+        }
     }
 }
 
