@@ -86,7 +86,8 @@ add_executable(test_resolve
 target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main)
 
 add_executable(test_output
-test_output.cpp
+    test_output.cpp
+    ../src/archives/file.cpp
     ../src/ast.cpp
     ../src/codegen.cpp
     ../src/lexer.cpp
@@ -97,3 +98,9 @@ test_output.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main)
+
+add_executable(test_serialization
+    test_serialization.cpp
+    ../src/archives/file.cpp
+)
+target_link_libraries(test_serialization fmt::fmt GTest::gtest GTest::gtest_main)

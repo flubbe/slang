@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include "archives/archive.h"
+
 namespace slang
 {
 
@@ -33,13 +35,36 @@ public:
 };
 
 /** Symbol types for imports and exports. */
-enum class symbol_type
+enum class symbol_type : std::uint8_t
 {
     package = 0,
     variable = 1,
     function = 2,
     type = 3,
 };
+
+/**
+ * `symbol_type` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param s The symbol type to serialize.
+ */
+inline archive& operator&(archive& ar, symbol_type& s)
+{
+    std::uint8_t i = static_cast<std::uint8_t>(s);
+    ar & i;
+
+    if(i != static_cast<std::uint8_t>(symbol_type::package)
+       && i != static_cast<std::uint8_t>(symbol_type::variable)
+       && i != static_cast<std::uint8_t>(symbol_type::function)
+       && i != static_cast<std::uint8_t>(symbol_type::type))
+    {
+        throw serialization_error("Invalid symbol type.");
+    }
+
+    s = static_cast<symbol_type>(i);
+    return ar;
+}
 
 /** Function signature. */
 struct function_signature
@@ -72,6 +97,19 @@ struct function_signature
     }
 };
 
+/**
+ * Function signature serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param s The symbol type to serialize.
+ */
+inline archive& operator&(archive& ar, function_signature& s)
+{
+    ar & s.return_type;
+    ar & s.arg_types;
+    return ar;
+}
+
 /** Additional details for native functions. */
 struct native_function_details
 {
@@ -98,6 +136,18 @@ struct native_function_details
     }
 };
 
+/**
+ * Detail serializer for native functions.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The native function details.
+ */
+inline archive& operator&(archive& ar, native_function_details& details)
+{
+    ar & details.library_name;
+    return ar;
+}
+
 /** Additional details for functions. */
 struct function_details
 {
@@ -107,6 +157,19 @@ struct function_details
     /** Size of the function in the module file, in bytes. */
     std::size_t size;
 };
+
+/**
+ * Serializer for function details.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The function details.
+ */
+inline archive& operator&(archive& ar, function_details& details)
+{
+    ar & details.offset;
+    ar & details.size;
+    return ar;
+}
 
 /** Function descriptor. */
 struct function_descriptor
@@ -144,12 +207,70 @@ struct function_descriptor
     }
 };
 
+/**
+ * Serializer for function descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The function descriptor.
+ */
+inline archive& operator&(archive& ar, function_descriptor& desc)
+{
+    if(!ar.is_reading() && !ar.is_writing())
+    {
+        throw serialization_error("Unknown archive mode.");
+    }
+
+    ar & desc.signature;
+    ar & desc.native;
+    if(desc.native)
+    {
+        if(ar.is_reading())
+        {
+            native_function_details details;
+            ar & details;
+            desc.details = std::move(details);
+        }
+        else if(ar.is_writing())
+        {
+            auto& details = std::get<native_function_details>(desc.details);
+            ar & details;
+        }
+    }
+    else
+    {
+        if(ar.is_reading())
+        {
+            native_function_details details;
+            ar & details;
+            desc.details = std::move(details);
+        }
+        else if(ar.is_writing())
+        {
+            auto& details = std::get<function_details>(desc.details);
+            ar & details;
+        }
+    }
+    return ar;
+}
+
 /** Type descriptor. */
 struct type_descriptor
 {
     /** Member types. */
     std::vector<std::string> member_types;
 };
+
+/**
+ * Serializer for type descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The type descriptor.
+ */
+inline archive& operator&(archive& ar, type_descriptor& desc)
+{
+    ar & desc.member_types;
+    return ar;
+}
 
 /** An entry in the import table. */
 struct imported_symbol
@@ -163,6 +284,20 @@ struct imported_symbol
     /** Index into the package import table. Unused for package imports (set to `(uint32_t)(-1)`). */
     std::uint32_t package_index;
 };
+
+/**
+ * Serializer for imported symbols.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The imported symbol.
+ */
+inline archive& operator&(archive& ar, imported_symbol& s)
+{
+    ar & s.type;
+    ar & s.name;
+    ar & s.package_index;
+    return ar;
+}
 
 /** An entry in the export table. */
 struct exported_symbol
@@ -200,6 +335,71 @@ struct exported_symbol
     }
 };
 
+/**
+ * Serializer for exported symbols.
+ *
+ * @param ar The archive to use for serialization.
+ * @param details The exported symbol.
+ */
+inline archive& operator&(archive& ar, exported_symbol& s)
+{
+    if(!ar.is_reading() && !ar.is_writing())
+    {
+        throw serialization_error("Unknown archive mode.");
+    }
+
+    ar & s.type;
+    ar & s.name;
+    if(s.type == symbol_type::variable)
+    {
+        if(ar.is_reading())
+        {
+            std::string desc;
+            ar & desc;
+            s.desc = std::move(desc);
+        }
+        else if(ar.is_writing())
+        {
+            auto& desc = std::get<std::string>(s.desc);
+            ar & desc;
+        }
+    }
+    else if(s.type == symbol_type::function)
+    {
+        if(ar.is_reading())
+        {
+            function_descriptor desc;
+            ar & desc;
+            s.desc = std::move(desc);
+        }
+        else if(ar.is_writing())
+        {
+            auto& desc = std::get<function_descriptor>(s.desc);
+            ar & desc;
+        }
+    }
+    else if(s.type == symbol_type::type)
+    {
+        if(ar.is_reading())
+        {
+            type_descriptor desc;
+            ar & desc;
+            s.desc = std::move(desc);
+        }
+        else if(ar.is_writing())
+        {
+            auto& desc = std::get<type_descriptor>(s.desc);
+            ar & desc;
+        }
+    }
+    else if(s.type != symbol_type::package)
+    {
+        throw serialization_error("Unknown symbol type.");
+    }
+
+    return ar;
+}
+
 /** Header of a module. */
 struct module_header
 {
@@ -212,6 +412,20 @@ struct module_header
     /** String table. */
     std::vector<std::string> strings;
 };
+
+/**
+ * Serializer for the module header.
+ *
+ * @param ar The archive to use for serialization.
+ * @param header The module header.
+ */
+inline archive& operator&(archive& ar, module_header& header)
+{
+    ar & header.imports;
+    ar & header.exports;
+    ar & header.strings;
+    return ar;
+}
 
 /** A compiled binary file. */
 class language_module
@@ -248,6 +462,12 @@ public:
      * @param lib_name Name of the library to import the function from.
      */
     void add_native_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::string lib_name);
+
+    /** Get the module header. */
+    const module_header& get_header() const
+    {
+        return header;
+    }
 };
 
 }    // namespace slang
