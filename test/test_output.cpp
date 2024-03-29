@@ -66,7 +66,7 @@ TEST(output, native_binding)
         ASSERT_NO_THROW(ast->collect_names(type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(&codegen_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(codegen_ctx.finalize());
 
         slang::language_module mod = codegen_ctx.to_module();

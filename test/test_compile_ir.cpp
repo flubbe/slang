@@ -37,7 +37,7 @@ TEST(compile_ir, empty)
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
-    ast->generate_code(&ctx);
+    ast->generate_code(ctx);
 
     EXPECT_EQ(ctx.to_string().length(), 0);
 }
@@ -61,7 +61,7 @@ TEST(compile_ir, double_definition)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
         const std::string test_input =
@@ -83,7 +83,7 @@ TEST(compile_ir, double_definition)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
         const std::string test_input =
@@ -106,7 +106,7 @@ TEST(compile_ir, double_definition)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
 
@@ -129,7 +129,7 @@ TEST(compile_ir, empty_function)
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
-    ast->generate_code(&ctx);
+    ast->generate_code(ctx);
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
@@ -159,7 +159,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -187,7 +187,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define f32 @f() {\n"
@@ -215,7 +215,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   ".string @0 \"test\"\n"
@@ -247,7 +247,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f(i32 %i, str %j, f32 %k) {\n"
@@ -275,7 +275,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, str %j, f32 %k) {\n"
@@ -307,7 +307,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -339,7 +339,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -370,7 +370,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -407,7 +407,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -443,7 +443,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -479,7 +479,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -515,7 +515,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -555,7 +555,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -595,7 +595,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -640,7 +640,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -678,7 +678,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -723,7 +723,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ASSERT_NO_THROW(ast->generate_code(&ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -766,7 +766,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        EXPECT_THROW(ast->generate_code(&ctx), cg::codegen_error);
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
 
@@ -791,7 +791,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -819,7 +819,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   ".string @0 \"Test\"\n"
@@ -852,7 +852,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(&ctx);
+        ast->generate_code(ctx);
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"

@@ -76,7 +76,7 @@ std::vector<directive> expression::get_directives(const std::string& s) const
  * literal_expression.
  */
 
-std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(!tok.value)
     {
@@ -105,17 +105,17 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context* ctx, m
 
     if(tok.type == token_type::int_literal)
     {
-        ctx->generate_const({"i32"}, *tok.value);
+        ctx.generate_const({"i32"}, *tok.value);
         return std::make_unique<cg::value>("i32");
     }
     else if(tok.type == token_type::fp_literal)
     {
-        ctx->generate_const({"f32"}, *tok.value);
+        ctx.generate_const({"f32"}, *tok.value);
         return std::make_unique<cg::value>("f32");
     }
     else if(tok.type == token_type::str_literal)
     {
-        ctx->generate_const({"str"}, *tok.value);
+        ctx.generate_const({"str"}, *tok.value);
         return std::make_unique<cg::value>("str");
     }
     else
@@ -194,7 +194,7 @@ std::string literal_expression::to_string() const
  * type_cast_expression.
  */
 
-std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: type_cast_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -237,7 +237,7 @@ std::string type_cast_expression::to_string() const
  * scope_expression.
  */
 
-std::unique_ptr<cg::value> scope_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> scope_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: scope_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -261,7 +261,7 @@ std::string scope_expression::to_string() const
  * access_expression.
  */
 
-std::unique_ptr<cg::value> access_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: access_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -286,7 +286,7 @@ std::string access_expression::to_string() const
  * import_expression.
  */
 
-std::unique_ptr<cg::value> import_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> import_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: import_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -314,7 +314,7 @@ std::string import_expression::to_string() const
  * directive_expression.
  */
 
-std::unique_ptr<slang::codegen::value> directive_expression::generate_code(slang::codegen::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     expr->push_directive(name, args);
     std::unique_ptr<slang::codegen::value> ret = expr->generate_code(ctx, mc);
@@ -339,9 +339,9 @@ std::string directive_expression::to_string() const
  * variable_reference_expression.
  */
 
-std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto* s = ctx->get_scope();
+    auto* s = ctx.get_scope();
     if(s == nullptr)
     {
         throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
@@ -364,11 +364,11 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(mc == memory_context::none || mc == memory_context::load)
     {
-        ctx->generate_load(std::make_unique<cg::variable_argument>(*var));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
     }
     else
     {
-        ctx->generate_store(std::make_unique<cg::variable_argument>(*var));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
     }
 
     return std::make_unique<cg::value>(var->get_value());
@@ -388,14 +388,14 @@ std::string variable_reference_expression::to_string() const
  * variable_declaration_expression.
  */
 
-std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
     {
         throw cg::codegen_error(loc, fmt::format("Invalid memory context for variable declaration."));
     }
 
-    cg::scope* s = ctx->get_scope();
+    cg::scope* s = ctx.get_scope();
     if(s == nullptr)
     {
         throw cg::codegen_error(loc, fmt::format("No scope available for adding locals."));
@@ -407,11 +407,11 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         auto v = expr->generate_code(ctx);
         if(is_builtin_type(type.s))
         {
-            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, type.s}));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, type.s}));
         }
         else
         {
-            ctx->generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, "composite", type.s}));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, "composite", type.s}));
         }
     }
 
@@ -449,7 +449,7 @@ std::string variable_declaration_expression::to_string() const
  * struct_definition_expression.
  */
 
-std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_definition_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -494,7 +494,7 @@ std::string struct_definition_expression::to_string() const
  * struct_anonymous_initializer_expression.
  */
 
-std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -525,7 +525,7 @@ std::string struct_anonymous_initializer_expression::to_string() const
  * struct_named_initializer_expression.
  */
 
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_named_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
@@ -580,7 +580,7 @@ static std::tuple<bool, bool, std::string> classify_binary_op(const std::string&
     return {is_assignment, is_compound, reduced_op};
 }
 
-std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto [is_assignment, is_compound, reduced_op] = classify_binary_op(op.s);
 
@@ -622,7 +622,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context* ctx, me
         auto it = op_map.find(reduced_op);
         if(it != op_map.end())
         {
-            ctx->generate_binary_op(it->second, *lhs_value);
+            ctx.generate_binary_op(it->second, *lhs_value);
 
             if(is_compound)
             {
@@ -715,7 +715,7 @@ std::string binary_expression::to_string() const
  * unary_ast.
  */
 
-std::unique_ptr<cg::value> unary_ast::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: unary_ast::generate_code not implemented", slang::to_string(loc)));
@@ -759,7 +759,7 @@ std::string unary_ast::to_string() const
  * prototype_ast.
  */
 
-cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) const
+cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -779,10 +779,10 @@ cg::function* prototype_ast::generate_code(cg::context* ctx, memory_context mc) 
         }
     }
 
-    return ctx->create_function(name.s, return_type.s, std::move(function_args));
+    return ctx.create_function(name.s, return_type.s, std::move(function_args));
 }
 
-void prototype_ast::generate_native_binding(const std::string& lib_name, slang::codegen::context* ctx) const
+void prototype_ast::generate_native_binding(const std::string& lib_name, slang::codegen::context& ctx) const
 {
     std::vector<std::unique_ptr<cg::variable>> function_args;
     for(auto& a: args)
@@ -797,7 +797,7 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, slang::
         }
     }
 
-    ctx->create_native_function(lib_name, name.s, return_type.s, std::move(function_args));
+    ctx.create_native_function(lib_name, name.s, return_type.s, std::move(function_args));
 }
 
 void prototype_ast::collect_names(ty::context& ctx) const
@@ -852,7 +852,7 @@ std::string prototype_ast::to_string() const
  * block.
  */
 
-std::unique_ptr<cg::value> block::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -904,7 +904,7 @@ std::string block::to_string() const
  * function_expression.
  */
 
-std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto directives = get_directives("native");
     if(directives.size() == 0)
@@ -919,7 +919,7 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
 
         cg::scope_guard sg{ctx, fn->get_scope()};
 
-        ctx->set_insertion_point(bb);
+        ctx.set_insertion_point(bb);
 
         if(!body)
         {
@@ -930,7 +930,7 @@ std::unique_ptr<slang::codegen::value> function_expression::generate_code(cg::co
         // generate return instruction if required.
         if(!bb->ends_with_return())
         {
-            ctx->generate_ret();
+            ctx.generate_ret();
             return {};
         }
 
@@ -1001,7 +1001,7 @@ std::string function_expression::to_string() const
  * call_expression.
  */
 
-std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -1012,7 +1012,7 @@ std::unique_ptr<slang::codegen::value> call_expression::generate_code(cg::contex
     {
         arg->generate_code(ctx, memory_context::load);
     }
-    ctx->generate_invoke(std::make_unique<cg::function_argument>(callee.s));
+    ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s));
     return {};    // FIXME return the return type of the function?
 }
 
@@ -1061,7 +1061,7 @@ std::string call_expression::to_string() const
  * return_statement.
  */
 
-std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -1073,7 +1073,7 @@ std::unique_ptr<slang::codegen::value> return_statement::generate_code(cg::conte
     {
         throw cg::codegen_error(loc, "Expression did not yield a type.");
     }
-    ctx->generate_ret(*v);
+    ctx.generate_ret(*v);
     return {};
 }
 
@@ -1124,7 +1124,7 @@ std::string return_statement::to_string() const
  * if_statement.
  */
 
-std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: if_statement::generate_code not implemented.", slang::to_string(loc)));
@@ -1169,7 +1169,7 @@ std::string if_statement::to_string() const
  * while_statement.
  */
 
-std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: while_statement::generate_code not implemented.", slang::to_string(loc)));
@@ -1206,7 +1206,7 @@ std::string while_statement::to_string() const
  * break_statement.
  */
 
-std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: break_statement::generate_code not implemented.", slang::to_string(loc)));
@@ -1216,7 +1216,7 @@ std::unique_ptr<slang::codegen::value> break_statement::generate_code(cg::contex
  * continue_statement.
  */
 
-std::unique_ptr<slang::codegen::value> continue_statement::generate_code(cg::context* ctx, memory_context mc) const
+std::unique_ptr<slang::codegen::value> continue_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: continue_statement::generate_code not implemented.", slang::to_string(loc)));

@@ -227,7 +227,7 @@ public:
     argument& operator=(argument&&) = default;
 
     /** Register this argument in the constant table, if necessary. */
-    virtual void register_const(class context* ctx)
+    virtual void register_const(class context& ctx)
     {
     }
 
@@ -311,7 +311,7 @@ public:
     {
     }
 
-    void register_const(class context* ctx) override;
+    void register_const(class context& ctx) override;
 
     std::string to_string() const override
     {
@@ -879,7 +879,7 @@ public:
 class scope_guard
 {
     /** The associated context. */
-    context* ctx;
+    context& ctx;
 
     /** The scope. */
     scope* s;
@@ -898,14 +898,14 @@ public:
      * @param ctx The associated context.
      * @param s The scope.
      */
-    scope_guard(context* ctx, scope* s);
+    scope_guard(context& ctx, scope* s);
 
     /** Destructor. */
     ~scope_guard();
 
     /** Default assignments.*/
-    scope_guard& operator=(const scope_guard&) = default;
-    scope_guard& operator=(scope_guard&&) = default;
+    scope_guard& operator=(const scope_guard&) = delete;
+    scope_guard& operator=(scope_guard&&) = delete;
 };
 
 /**
@@ -1582,11 +1582,11 @@ public:
  * const_argument implementation.
  */
 
-inline void const_argument::register_const(context* ctx)
+inline void const_argument::register_const(context& ctx)
 {
     if(type.get_type() == "str")
     {
-        constant_index = ctx->get_string(std::get<std::string>(value));
+        constant_index = ctx.get_string(std::get<std::string>(value));
     }
 }
 
@@ -1616,16 +1616,16 @@ inline void basic_block::set_inserting_context(context* ctx)
  * scope_guard implementation.
  */
 
-inline scope_guard::scope_guard(context* ctx, scope* s)
+inline scope_guard::scope_guard(context& ctx, scope* s)
 : ctx{ctx}
 , s{s}
 {
-    ctx->enter_scope(s);
+    ctx.enter_scope(s);
 }
 
 inline scope_guard::~scope_guard()
 {
-    ctx->exit_scope(s);
+    ctx.exit_scope(s);
 }
 
 }    // namespace slang::codegen

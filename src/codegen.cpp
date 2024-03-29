@@ -239,7 +239,7 @@ void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> 
 void context::generate_load(std::unique_ptr<argument> arg)
 {
     validate_insertion_point();
-    arg->register_const(this);
+    arg->register_const(*this);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
     insertion_point->add_instruction(std::make_unique<instruction>("load", std::move(args)));
