@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * archive and serialization support.
+ * portable archive and serialization support.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2024
@@ -31,6 +31,10 @@ enum class endian
     native = __BYTE_ORDER__
 #endif
 };
+
+/*
+ * Assert assumptions use in the code.
+ */
 
 static_assert(
   endian::native == endian::little || endian::native == endian::big,
@@ -98,13 +102,16 @@ struct vle_int
  *
  * @param ar The archive to use for serialization.
  * @param i The integer to be serialized.
+ * @returns The input archive.
  */
 class archive& operator&(class archive& ar, vle_int& i);
 
 /** An abstract archive for byte-order independent serialization. */
 class archive
 {
-protected:
+    /** The target byte order for persistent archives. */
+    endian target_byte_order;
+
     /** Whether this is a read archive. */
     bool read;
 
@@ -114,6 +121,7 @@ protected:
     /** Whether this is a persistent archive. */
     bool persistent;
 
+protected:
     /**
      * Serialize raw bytes.
      *
@@ -137,9 +145,11 @@ public:
      * @param read Whether this is a read archive.
      * @param write Whether this is a write archive.
      * @param persistent Whether this is a persistent archive.
+     * @param target_byte_order The target byte order for persistent archives.
      */
-    archive(bool read, bool write, bool persistent)
-    : read{read}
+    archive(bool read, bool write, bool persistent, endian target_byte_order = endian::native)
+    : target_byte_order{target_byte_order}
+    , read{read}
     , write{write}
     , persistent{persistent}
     {
@@ -166,6 +176,12 @@ public:
 
     /** Get the size of the archive. */
     virtual std::size_t size() = 0;
+
+    /** Return the target byte order for this archive. Only used/relevant for persistent archives. */
+    endian get_target_byte_order() const
+    {
+        return target_byte_order;
+    }
 
     /** Returns whether this is a read archive. */
     bool is_reading() const
@@ -202,15 +218,15 @@ public:
         else
         {
             // persistent archive.
-            if constexpr(endian::native == endian::little)
+            if(target_byte_order == endian::native)
             {
                 serialize_bytes(buffer, c);
             }
             else
             {
-                for(std::size_t i = c - 1; i >= 0; --i)
+                for(std::size_t i = c; i > 0; --i)
                 {
-                    serialize_bytes(&buffer[i], 1);
+                    serialize_bytes(&buffer[i - 1], 1);
                 }
             }
         }
@@ -306,28 +322,60 @@ public:
         serialize(reinterpret_cast<std::byte*>(&d), 8);
         return *this;
     }
-
-    /** Serialize a string. */
-    archive& operator&(std::string& s)
-    {
-        vle_int len = s.length();
-        (*this) & len;
-        if(is_reading())
-        {
-            s.resize(len.i);
-        }
-        for(std::int64_t i = 0; i < len.i; ++i)
-        {
-            (*this) & s[i];
-        }
-        return *this;
-    }
 };
 
-/*
- * Variable length integers.
+/**
+ * Serialize a string.
+ *
+ * @param ar The archive to use.
+ * @param s The string to serialize.
+ * @returns The input archive.
  */
+inline archive& operator&(archive& ar, std::string& s)
+{
+    vle_int len = s.length();
+    ar & len;
+    if(ar.is_reading())
+    {
+        s.resize(len.i);
+    }
+    for(std::int64_t i = 0; i < len.i; ++i)
+    {
+        ar& s[i];
+    }
+    return ar;
+}
 
+/**
+ * Serialize a templated std::vector.
+ *
+ * @param ar The archive to use.
+ * @param v The vector to be serialized.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, std::vector<T>& v)
+{
+    vle_int len = v.size();
+    ar & len;
+    if(ar.is_reading())
+    {
+        v.resize(len.i);
+    }
+    for(std::int64_t i = 0; i < len.i; ++i)
+    {
+        ar& v[i];
+    }
+    return ar;
+}
+
+/**
+ * Serialize a variable-length-encoded integer.
+ *
+ * @param ar The archive to use.
+ * @param i The VLE integer.
+ * @returns The input archive.
+ */
 inline archive& operator&(archive& ar, vle_int& i)
 {
     std::uint64_t v = std::abs(i.i);
@@ -371,29 +419,6 @@ inline archive& operator&(archive& ar, vle_int& i)
         i.i = -i.i;
     }
 
-    return ar;
-}
-
-/*
- * std::vector serializer.
- */
-
-/**
- * Serialize a templated std::vector.
- */
-template<typename T>
-archive& operator&(archive& ar, std::vector<T>& v)
-{
-    vle_int len = v.size();
-    ar & len;
-    if(ar.is_reading())
-    {
-        v.resize(len.i);
-    }
-    for(std::int64_t i = 0; i < len.i; ++i)
-    {
-        ar& v[i];
-    }
     return ar;
 }
 

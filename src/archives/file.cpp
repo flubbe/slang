@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * archive and serialization support.
+ * portable archive and serialization support.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2024
@@ -15,8 +15,8 @@
 namespace slang
 {
 
-file_archive::file_archive(fs::path path, bool read, bool write)
-: archive{read, write, true}
+file_archive::file_archive(fs::path path, bool read, bool write, endian target_byte_order)
+: archive{read, write, true, target_byte_order}
 , path{std::move(path)}
 {
     if(read && write)

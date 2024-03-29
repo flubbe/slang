@@ -217,7 +217,7 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
 {
     if(!ar.is_reading() && !ar.is_writing())
     {
-        throw serialization_error("Unknown archive mode.");
+        throw serialization_error("Archive has to be reading or writing.");
     }
 
     ar & desc.signature;
@@ -345,7 +345,7 @@ inline archive& operator&(archive& ar, exported_symbol& s)
 {
     if(!ar.is_reading() && !ar.is_writing())
     {
-        throw serialization_error("Unknown archive mode.");
+        throw serialization_error("Archive has to be reading or writing.");
     }
 
     ar & s.type;

@@ -46,8 +46,9 @@ public:
      * @param path The file path.
      * @param read Whether the file is readable.
      * @param write Whether the file is writable.
+     * @param target_byte_order The target byte order for persistent archives.
      */
-    file_archive(fs::path path, bool read, bool write);
+    file_archive(fs::path path, bool read, bool write, endian target_byte_order = endian::little);
 };
 
 /** A file writer. */
@@ -73,9 +74,10 @@ public:
      * Open a file for writing.
      *
      * @param path The file path.
+     * @param byte_order The archive's byte order. Defaults to endian::little.
      */
-    file_write_archive(fs::path path)
-    : file_archive{std::move(path), false, true}
+    file_write_archive(fs::path path, endian byte_order = endian::little)
+    : file_archive{std::move(path), false, true, byte_order}
     {
     }
 
@@ -128,9 +130,10 @@ public:
      * Open a file for reading.
      *
      * @param path The file path.
+     * @param byte_order The archive's byte order. Defaults to endian::little.
      */
-    file_read_archive(fs::path path)
-    : file_archive{std::move(path), true, false}
+    file_read_archive(fs::path path, endian byte_order = endian::little)
+    : file_archive{std::move(path), true, false, byte_order}
     {
     }
 
