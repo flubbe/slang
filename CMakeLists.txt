@@ -13,10 +13,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(fmt REQUIRED)
 
 add_executable(slang
+    src/archives/file.cpp
     src/ast.cpp
     src/codegen.cpp
     src/commandline.cpp
     src/compiler.cpp
+    src/filemanager.cpp
     src/lexer.cpp
     src/main.cpp
     src/module.cpp

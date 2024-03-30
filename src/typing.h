@@ -287,7 +287,7 @@ class context
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
-    /** Import list. */
+    /** Imported modules. */
     std::vector<std::vector<token>> imports;
 
     /** Struct/type stack, for member/type lookups. */

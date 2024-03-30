@@ -70,42 +70,6 @@ public:
     }
 };
 
-/** A variable-length-encoded integer. */
-struct vle_int
-{
-    /** The integer. */
-    std::int64_t i;
-
-    /** Default constructors. */
-    vle_int() = default;
-    vle_int(const vle_int&) = default;
-    vle_int(vle_int&&) = default;
-
-    /** Default assignments. */
-    vle_int& operator=(const vle_int&) = default;
-    vle_int& operator=(vle_int&&) = default;
-
-    /**
-     * Construct a variable length integer instance.
-     * Just initializes the stored integer.
-     *
-     * @param i The integer.
-     */
-    vle_int(std::int64_t i)
-    : i{i}
-    {
-    }
-};
-
-/**
- * Serialize a variable-length-encoded integer.
- *
- * @param ar The archive to use for serialization.
- * @param i The integer to be serialized.
- * @returns The input archive.
- */
-class archive& operator&(class archive& ar, vle_int& i);
-
 /** An abstract archive for byte-order independent serialization. */
 class archive
 {
@@ -324,50 +288,32 @@ public:
     }
 };
 
-/**
- * Serialize a string.
- *
- * @param ar The archive to use.
- * @param s The string to serialize.
- * @returns The input archive.
- */
-inline archive& operator&(archive& ar, std::string& s)
+/** A variable-length-encoded integer. */
+struct vle_int
 {
-    vle_int len = s.length();
-    ar & len;
-    if(ar.is_reading())
-    {
-        s.resize(len.i);
-    }
-    for(std::int64_t i = 0; i < len.i; ++i)
-    {
-        ar& s[i];
-    }
-    return ar;
-}
+    /** The integer. */
+    std::int64_t i;
 
-/**
- * Serialize a templated std::vector.
- *
- * @param ar The archive to use.
- * @param v The vector to be serialized.
- * @returns The input archive.
- */
-template<typename T>
-archive& operator&(archive& ar, std::vector<T>& v)
-{
-    vle_int len = v.size();
-    ar & len;
-    if(ar.is_reading())
+    /** Default constructors. */
+    vle_int() = default;
+    vle_int(const vle_int&) = default;
+    vle_int(vle_int&&) = default;
+
+    /** Default assignments. */
+    vle_int& operator=(const vle_int&) = default;
+    vle_int& operator=(vle_int&&) = default;
+
+    /**
+     * Construct a variable length integer instance.
+     * Just initializes the stored integer.
+     *
+     * @param i The integer.
+     */
+    vle_int(std::int64_t i)
+    : i{i}
     {
-        v.resize(len.i);
     }
-    for(std::int64_t i = 0; i < len.i; ++i)
-    {
-        ar& v[i];
-    }
-    return ar;
-}
+};
 
 /**
  * Serialize a variable-length-encoded integer.
@@ -419,6 +365,51 @@ inline archive& operator&(archive& ar, vle_int& i)
         i.i = -i.i;
     }
 
+    return ar;
+}
+
+/**
+ * Serialize a string.
+ *
+ * @param ar The archive to use.
+ * @param s The string to serialize.
+ * @returns The input archive.
+ */
+inline archive& operator&(archive& ar, std::string& s)
+{
+    vle_int len = s.length();
+    ar & len;
+    if(ar.is_reading())
+    {
+        s.resize(len.i);
+    }
+    for(std::int64_t i = 0; i < len.i; ++i)
+    {
+        ar& s[i];
+    }
+    return ar;
+}
+
+/**
+ * Serialize a templated std::vector.
+ *
+ * @param ar The archive to use.
+ * @param v The vector to be serialized.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, std::vector<T>& v)
+{
+    vle_int len = v.size();
+    ar & len;
+    if(ar.is_reading())
+    {
+        v.resize(len.i);
+    }
+    for(std::int64_t i = 0; i < len.i; ++i)
+    {
+        ar& v[i];
+    }
     return ar;
 }
 

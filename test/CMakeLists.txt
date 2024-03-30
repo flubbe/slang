@@ -61,8 +61,10 @@ target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)
 
 add_executable(test_type_system
     test_type_system.cpp
+    ../src/archives/file.cpp
     ../src/ast.cpp
     ../src/codegen.cpp
+    ../src/filemanager.cpp
     ../src/lexer.cpp
     ../src/module.cpp
     ../src/parser.cpp
@@ -74,8 +76,10 @@ target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main)
 
 add_executable(test_resolve
     test_resolve.cpp
+    ../src/archives/file.cpp
     ../src/ast.cpp
     ../src/codegen.cpp
+    ../src/filemanager.cpp
     ../src/lexer.cpp
     ../src/module.cpp
     ../src/parser.cpp
@@ -90,6 +94,7 @@ add_executable(test_output
     ../src/archives/file.cpp
     ../src/ast.cpp
     ../src/codegen.cpp
+    ../src/filemanager.cpp
     ../src/lexer.cpp
     ../src/module.cpp
     ../src/parser.cpp
@@ -104,3 +109,10 @@ add_executable(test_serialization
     ../src/archives/file.cpp
 )
 target_link_libraries(test_serialization fmt::fmt GTest::gtest GTest::gtest_main)
+
+add_executable(test_filemanager
+    test_filemanager.cpp
+    ../src/archives/file.cpp
+    ../src/filemanager.cpp
+)
+target_link_libraries(test_filemanager fmt::fmt GTest::gtest GTest::gtest_main)

@@ -99,6 +99,31 @@ struct token
 
     /** Evaluated token, for token_type::int_literal, token_type::fp_literal and token_type::string_literal. */
     std::optional<std::variant<int, float, std::string>> value;
+
+    /** Default constructors. */
+    token() = default;
+    token(const token&) = default;
+    token(token&&) = default;
+
+    /** Default assignments. */
+    token& operator=(const token&) = default;
+    token& operator=(token&&) = default;
+
+    /**
+     * Initializing constructor for a token.
+     *
+     * @param s The token's string.
+     * @param location The token's location.
+     * @param type The token's type. Defaults to token_type::unknown.
+     * @param value The token's value. Defaults to std::nullopt.
+     */
+    token(std::string s, token_location location, token_type type = token_type::unknown, std::optional<std::variant<int, float, std::string>> value = std::nullopt)
+    : s{std::move(s)}
+    , location{std::move(location)}
+    , type{type}
+    , value{std::move(value)}
+    {
+    }
 };
 
 }    // namespace slang

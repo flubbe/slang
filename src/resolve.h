@@ -12,6 +12,9 @@
 
 #include <exception>
 
+#include "filemanager.h"
+#include "token.h"
+
 /*
  * Forward declarations.
  */
@@ -56,7 +59,29 @@ struct import_definition
 /** Resolver context. */
 class context
 {
+    /** The associated file manager. */
+    file_manager& mgr;
+
 public:
+    /** Default constructors. */
+    context() = delete;
+    context(const context&) = default;
+    context(context&&) = default;
+
+    /** Default assignments. */
+    context& operator=(const context&) = delete;
+    context& operator=(context&&) = delete;
+
+    /**
+     * Construct a resolver context.
+     *
+     * @param mgr The file manager used for path resolution.
+     */
+    context(file_manager& mgr)
+    : mgr{mgr}
+    {
+    }
+
     /**
      * Resolve imports from a type context.
      *

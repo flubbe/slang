@@ -37,7 +37,7 @@ public:
     inline static const std::string delimiter = "::";
 
     /** File extension for modules. */
-    inline static const std::string module_ext = "slc";
+    inline static const std::string module_ext = "cmod";
 
     /** File extension for source files. */
     inline static const std::string source_ext = "sl";

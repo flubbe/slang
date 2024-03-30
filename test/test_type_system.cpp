@@ -1258,8 +1258,12 @@ TEST(type_system, examples)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
+        slang::file_manager mgr;
+        mgr.add_search_path("src/lang");
+        ASSERT_TRUE(mgr.is_file("std.cmod"));
+
         ty::context type_ctx;
-        rs::context resolve_ctx;
+        rs::context resolve_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(type_ctx));
         EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx));
@@ -1297,8 +1301,9 @@ TEST(type_system, native_binding)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
+        slang::file_manager mgr;
         ty::context type_ctx;
-        rs::context resolve_ctx;
+        rs::context resolve_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(type_ctx));
         EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx));

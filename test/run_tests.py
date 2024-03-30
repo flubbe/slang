@@ -13,6 +13,10 @@ _tests = [
     "test_codegen",
     "test_compile_ir",
     "test_type_system",
+    "test_filemanager",
+    "test_serialization",
+    "test_output",
+    "test_resolve",
 ]
 
 if __name__ == "__main__":

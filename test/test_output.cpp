@@ -59,8 +59,9 @@ TEST(output, native_binding)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
+        slang::file_manager mgr;
         ty::context type_ctx;
-        rs::context resolve_ctx;
+        rs::context resolve_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(type_ctx));
