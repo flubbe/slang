@@ -210,6 +210,13 @@ public:
         return *this;
     }
 
+    /** Serialize a byte. */
+    archive& operator&(std::byte& b)
+    {
+        serialize(reinterpret_cast<std::byte*>(&b), 1);
+        return *this;
+    }
+
     /** Serialize a std::int8_t. */
     archive& operator&(std::int8_t& i)
     {

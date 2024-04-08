@@ -15,6 +15,7 @@
 
 #include "parser.h"
 #include "codegen.h"
+#include "emitter.h"
 #include "typing.h"
 #include "resolve.h"
 #include "module.h"
@@ -63,14 +64,15 @@ TEST(output, native_binding)
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
         cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-        ASSERT_NO_THROW(codegen_ctx.finalize());
+        ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = codegen_ctx.to_module();
+        slang::language_module mod = emitter.to_module();
         slang::module_header header = mod.get_header();
 
         ASSERT_EQ(header.exports.size(), 2);
@@ -133,6 +135,51 @@ TEST(output, native_binding)
                 EXPECT_EQ(desc.signature.arg_types[0], "str");
             }
         }
+    }
+}
+
+TEST(output, emitter)
+{
+    {
+        const std::string test_input =
+          "fn test() -> i32 {\n"
+          " return 1;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("test_output.bin");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        slang::language_module mod;
+        slang::file_read_archive read_ar("test_output.bin");
+        EXPECT_NO_THROW(read_ar & mod);
+        auto& bin = mod.get_binary();
+        EXPECT_EQ(bin.size(), 6);
     }
 }
 

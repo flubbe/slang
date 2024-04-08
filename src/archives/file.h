@@ -31,7 +31,7 @@ protected:
     std::fstream file;
 
 public:
-    /** Default constructors. */
+    /** Defaulted and deleted constructors. */
     file_archive() = delete;
     file_archive(const file_archive&) = delete;
     file_archive(file_archive&&) = default;
@@ -61,7 +61,7 @@ protected:
     }
 
 public:
-    /** Constructors. */
+    /** Defaulted and deleted constructors. */
     file_write_archive() = delete;
     file_write_archive(const file_write_archive&) = delete;
     file_write_archive(file_write_archive&&) = default;
@@ -117,7 +117,7 @@ protected:
     }
 
 public:
-    /** Constructors. */
+    /** Defaulted and deleted constructors. */
     file_read_archive() = delete;
     file_read_archive(const file_read_archive&) = delete;
     file_read_archive(file_read_archive&&) = default;

@@ -94,9 +94,11 @@ add_executable(test_output
     ../src/archives/file.cpp
     ../src/ast.cpp
     ../src/codegen.cpp
+    ../src/emitter.cpp
     ../src/filemanager.cpp
     ../src/lexer.cpp
     ../src/module.cpp
+    ../src/opcodes.cpp
     ../src/parser.cpp
     ../src/resolve.cpp
     ../src/typing.cpp

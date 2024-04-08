@@ -17,11 +17,15 @@
 
 #include <fmt/core.h>
 
+#include "archives/archive.h"
+#include "archives/memory.h"
+
 /* Forward declarations. */
 namespace slang
 {
 struct token_location;
 class language_module;
+class instruction_emitter;
 }    // namespace slang
 
 namespace slang::codegen
@@ -57,17 +61,20 @@ public:
  */
 class value
 {
-    /** The variable's type. Can be one of: i32, f32, str, addr, ptr, composite. */
+    /** The value's type. Can be one of: i32, f32, str, addr, ptr, aggregate. */
     std::string type;
 
-    /** Composite type name. Only valid if type is value_type::composite. */
-    std::optional<std::string> composite_type;
+    /** Aggregate type name. Only valid if type is "aggregate". */
+    std::optional<std::string> aggregate_type;
+
+    /** An optional name for the value. */
+    std::optional<std::string> name;
 
 protected:
     /**
      * Validate the value.
      *
-     * @throws A `codegen_error` if the pair (type, composite_type) is invalid.
+     * @throws A `codegen_error` if the pair (type, aggregate_type) is invalid.
      */
     void validate() const
     {
@@ -75,17 +82,28 @@ protected:
         bool is_ref = (type == "addr") || (type == "ptr");
         if(is_builtin || is_ref)
         {
+            if(aggregate_type.has_value())
+            {
+                throw codegen_error("Aggregate type cannot contain value for built-in types.");
+            }
+
             return;
         }
 
-        if(type != "composite")
+        if(type != "aggregate")
         {
             throw codegen_error(fmt::format("Invalid value type '{}'.", type));
         }
 
-        if(!composite_type.has_value() || composite_type->length() == 0)
+        if(!aggregate_type.has_value() || aggregate_type->length() == 0)
         {
-            throw codegen_error("Empty composite type.");
+            throw codegen_error("Empty aggregate type.");
+        }
+
+        is_builtin = (*aggregate_type == "i32") || (*aggregate_type == "f32") || (*aggregate_type == "str");
+        if(is_builtin)
+        {
+            throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *aggregate_type));
         }
     }
 
@@ -103,13 +121,23 @@ public:
      * Construct a value.
      *
      * @param type The value type.
-     * @param composite_type Type name for composite types.
+     * @param aggregate_type Type name for aggregate types.
+     * @param name Optional name for this value.
      */
-    value(std::string type, std::optional<std::string> composite_type = std::nullopt)
+    value(std::string type, std::optional<std::string> aggregate_type = std::nullopt, std::optional<std::string> name = std::nullopt)
     : type{std::move(type)}
-    , composite_type{std::move(composite_type)}
+    , aggregate_type{std::move(aggregate_type)}
+    , name{std::move(name)}
     {
         validate();
+    }
+
+    /**
+     * Copy the type into a new value.
+     */
+    value copy_type() const
+    {
+        return {type, aggregate_type, std::nullopt};
     }
 
     /**
@@ -117,12 +145,12 @@ public:
      */
     std::string to_string() const
     {
-        if(!is_composite())
+        if(has_name())
         {
-            return type;
+            return fmt::format("{} %{}", is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
         }
 
-        return get_composite_type();
+        return fmt::format("{}", is_aggregate() ? get_aggregate_type() : get_type());
     }
 
     /** Get the value's type. */
@@ -131,80 +159,196 @@ public:
         return type;
     }
 
-    /** Return whether this value has a composite type. */
-    bool is_composite() const
+    /** Return whether this value has an aggregate type. */
+    bool is_aggregate() const
     {
-        return type == "composite";
+        return type == "aggregate";
     }
 
     /**
-     * Get the value's composite type.
+     * Get the value's aggregate type.
      *
-     * @throws A `codegen_error` if called on non-composite type.
+     * @throws A `codegen_error` if called on non-aggregate type.
      */
-    std::string get_composite_type() const
+    std::string get_aggregate_type() const
     {
-        if(!is_composite())
+        if(!is_aggregate())
         {
-            throw codegen_error(fmt::format("Cannot get composite type for '{}', as it is not composite.", type));
+            throw codegen_error(fmt::format("Cannot get aggregate type for '{}', as it is not aggregate.", type));
         }
 
-        return *composite_type;
+        return *aggregate_type;
     }
-};
 
-/**
- * A variable.
- */
-class variable
-{
-    /** The variable's name. */
-    std::string name;
-
-    /** The variable's type. */
-    value type;
-
-public:
-    /** Default constructors. */
-    variable() = default;
-    variable(const variable&) = default;
-    variable(variable&&) = default;
-
-    /** Destructor. */
-    virtual ~variable() = default;
-
-    /** Default assignments. */
-    variable& operator=(const variable&) = default;
-    variable& operator=(variable&&) = default;
-
-    /**
-     * Construct a variable.
-     *
-     * @param name The variable's name.
-     * @param type The variable's type.
-     */
-    variable(std::string name, std::string type, std::string composite_type = {})
-    : name{std::move(name)}
-    , type{std::move(type), std::move(composite_type)}
+    /** Get the value's type, also resolving aggregate types. */
+    std::string get_resolved_type() const
     {
+        if(is_aggregate())
+        {
+            return get_aggregate_type();
+        }
+
+        return get_type();
     }
 
-    /** Get a string representation of the variable. */
-    std::string to_string() const
+    /** Set the value's name. */
+    void set_name(std::string name)
     {
-        return fmt::format("{} %{}", type.to_string(), name);
+        this->name = std::move(name);
     }
 
-    /** Get the variable's name. */
-    std::string get_name() const
+    /** Get the value's name. */
+    std::optional<std::string> get_name() const
     {
         return name;
     }
 
-    /** Get the variable's type. */
-    class value get_value() const
+    /** Delete the value's name. */
+    void delete_name()
     {
-        return type;
+        name = std::nullopt;
+    }
+
+    /** Return whether the value has a name. */
+    bool has_name() const
+    {
+        return name != std::nullopt;
+    }
+};
+
+/**
+ * A constant integer value.
+ */
+class constant_int : public value
+{
+    /** The integer. */
+    int i;
+
+public:
+    /** Default constructors. */
+    constant_int() = default;
+    constant_int(const constant_int&) = default;
+    constant_int(constant_int&&) = default;
+
+    /** Default assignments. */
+    constant_int& operator=(const constant_int&) = default;
+    constant_int& operator=(constant_int&&) = default;
+
+    /**
+     * Construct a constant integer.
+     *
+     * @param i The integer.
+     * @param name An optional name.
+     */
+    constant_int(int i, std::optional<std::string> name = std::nullopt)
+    : value{"i32", std::nullopt, std::move(name)}
+    , i{i}
+    {
+    }
+
+    /** Get the integer. */
+    int get_int() const
+    {
+        return i;
+    }
+};
+
+/**
+ * A constant floating point value.
+ */
+class constant_float : public value
+{
+    /** The floating point value. */
+    float f;
+
+public:
+    /** Default constructors. */
+    constant_float() = default;
+    constant_float(const constant_float&) = default;
+    constant_float(constant_float&&) = default;
+
+    /** Default assignments. */
+    constant_float& operator=(const constant_float&) = default;
+    constant_float& operator=(constant_float&&) = default;
+
+    /**
+     * Construct a constant floating point value.
+     *
+     * @param f The floating point value.
+     * @param name An optional name.
+     */
+    constant_float(float f, std::optional<std::string> name = std::nullopt)
+    : value{"f32", std::nullopt, std::move(name)}
+    , f{f}
+    {
+    }
+
+    /** Get the floating point value. */
+    float get_float() const
+    {
+        return f;
+    }
+};
+
+/**
+ * A constant string value.
+ */
+class constant_str : public value
+{
+    /** The string. */
+    std::string s;
+
+    /** Index into the string table. */
+    int constant_index{-1};
+
+public:
+    /** Default constructors. */
+    constant_str() = default;
+    constant_str(const constant_str&) = default;
+    constant_str(constant_str&&) = default;
+
+    /** Default assignments. */
+    constant_str& operator=(const constant_str&) = default;
+    constant_str& operator=(constant_str&&) = default;
+
+    /**
+     * Construct a constant string value.
+     *
+     * @param s The string.
+     * @param name An optional name.
+     */
+    constant_str(std::string s, std::optional<std::string> name = std::nullopt)
+    : value{"str", std::nullopt, std::move(name)}
+    , s{std::move(s)}
+    {
+    }
+
+    /** Get the string value. */
+    std::string get_str() const
+    {
+        return s;
+    }
+
+    /**
+     * Set the index into the string table.
+     *
+     * @param index The new index. A index of -1 means "no index".
+     *              Must be non-negative or -1.
+     */
+    void set_constant_index(int index)
+    {
+        if(index < -1)
+        {
+            throw codegen_error(fmt::format("String index must be non-negative or -1. Got {}.", index));
+        }
+
+        constant_index = index;
+    }
+
+    /** Get the index into the string table. A value of -1 indicates "no index". */
+    int get_constant_index() const
+    {
+        return constant_index;
     }
 };
 
@@ -234,8 +378,8 @@ public:
     /** Get a string representation of the argument. */
     virtual std::string to_string() const = 0;
 
-    /** Get the argument value. */
-    virtual value get_value() const = 0;
+    /** Get the argument type. */
+    virtual const value* get_value() const = 0;
 };
 
 /**
@@ -244,22 +388,16 @@ public:
 class const_argument : public argument
 {
     /** The constant type. */
-    value type;
-
-    /** The constant. */
-    std::variant<int, float, std::string> value;
-
-    /** Index into the constant table (for strings). */
-    std::optional<std::int32_t> constant_index{std::nullopt};
+    std::unique_ptr<value> type;
 
 public:
-    /** Default constructors. */
+    /** Default and delered constructors. */
     const_argument() = default;
-    const_argument(const const_argument&) = default;
+    const_argument(const const_argument&) = delete;
     const_argument(const_argument&&) = default;
 
-    /** Default assignments. */
-    const_argument& operator=(const const_argument&) = default;
+    /** Default and deleted assignments. */
+    const_argument& operator=(const const_argument&) = delete;
     const_argument& operator=(const_argument&&) = default;
 
     /**
@@ -269,45 +407,31 @@ public:
      */
     const_argument(int i)
     : argument()
-    , type{"i32"}
-    , value{i}
+    , type{std::make_unique<constant_int>(i)}
     {
     }
 
     /**
      * Create a floating-point argument.
      *
-     * @param f The floating-point integer.
+     * @param f The floating-point value.
      */
     const_argument(float f)
     : argument()
-    , type{"f32"}
-    , value{f}
+    , type{std::make_unique<constant_float>(f)}
     {
     }
 
     /**
      * Create a string argument.
      *
+     * NOTE A string needs to be registered with a context using `register_const`.
+     *
      * @param s The string.
      */
     const_argument(std::string s)
     : argument()
-    , type{"str"}
-    , value{s}
-    {
-    }
-
-    /**
-     * Create a constant argument from a type and a variant.
-     *
-     * @param type The constant type.
-     * @param v The variant containing the constant.
-     */
-    const_argument(std::string type, std::variant<int, float, std::string> v)
-    : argument()
-    , type{type}
-    , value{std::move(v)}
+    , type{std::make_unique<constant_str>(s)}
     {
     }
 
@@ -315,25 +439,27 @@ public:
 
     std::string to_string() const override
     {
-        if(type.get_type() == "i32")
+        std::string type_name = type->get_resolved_type();
+
+        if(type_name == "i32")
         {
-            return fmt::format("i32 {}", std::get<int>(value));
+            return fmt::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());
         }
-        else if(type.get_type() == "f32")
+        else if(type_name == "f32")
         {
-            return fmt::format("f32 {}", std::get<float>(value));
+            return fmt::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());
         }
-        else if(type.get_type() == "str")
+        else if(type_name == "str")
         {
-            return fmt::format("str @{}", (constant_index.has_value() ? *constant_index : -1));
+            return fmt::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());
         }
 
         throw codegen_error(fmt::format("Unrecognized const_argument type."));
     }
 
-    virtual slang::codegen::value get_value() const override
+    const slang::codegen::value* get_value() const override
     {
-        return type;
+        return type.get();
     }
 };
 
@@ -371,7 +497,7 @@ public:
         return fmt::format("@{}", name);
     }
 
-    value get_value() const override
+    value* get_value() const override
     {
         throw codegen_error(fmt::format("Requested type of a function argument."));
     }
@@ -398,11 +524,11 @@ public:
     /**
      * Create a type argument.
      *
-     * @param v The variable.
+     * @param v Value containing the type information to use.
      */
     type_argument(value vt)
     : argument()
-    , vt{std::move(vt)}
+    , vt{vt.copy_type()}
     {
     }
 
@@ -411,9 +537,9 @@ public:
         return vt.to_string();
     }
 
-    value get_value() const override
+    const value* get_value() const override
     {
-        return vt;
+        return &vt;
     }
 };
 
@@ -423,7 +549,7 @@ public:
 class variable_argument : public argument
 {
     /** The variable. */
-    variable var;
+    value var;
 
 public:
     /** Default constructors. */
@@ -440,7 +566,7 @@ public:
      *
      * @param v The variable.
      */
-    variable_argument(variable v)
+    variable_argument(value v)
     : argument()
     , var{std::move(v)}
     {
@@ -451,9 +577,9 @@ public:
         return fmt::format("{}", var.to_string());
     }
 
-    value get_value() const override
+    const value* get_value() const override
     {
-        return var.get_value();
+        return &var;
     }
 };
 
@@ -491,7 +617,7 @@ public:
         return fmt::format("%{}", label);
     }
 
-    value get_value() const override
+    value* get_value() const override
     {
         throw codegen_error(fmt::format("Cannot get type from label '{}'.", to_string()));
     }
@@ -553,6 +679,18 @@ public:
     virtual bool is_return() const
     {
         return name == "ret";
+    }
+
+    /** Get the instruction name. */
+    const std::string& get_name() const
+    {
+        return name;
+    }
+
+    /** Get the instruction's arguments. */
+    const std::vector<std::unique_ptr<argument>>& get_args() const
+    {
+        return args;
     }
 
     /** Get instruction representation as string. */
@@ -691,6 +829,12 @@ public:
         }
         return branch_return_count == 1 && last_instruction_branch_return;
     }
+
+    /** Get the block's instructions. */
+    const std::vector<std::unique_ptr<instruction>>& get_instructions() const
+    {
+        return instrs;
+    }
 };
 
 /**
@@ -705,10 +849,10 @@ class scope
     scope* outer{nullptr};
 
     /** Arguments for function scopes. */
-    std::vector<std::unique_ptr<variable>> args;
+    std::vector<std::unique_ptr<value>> args;
 
     /** Variables inside the scope. */
-    std::vector<std::unique_ptr<variable>> locals;
+    std::vector<std::unique_ptr<value>> locals;
 
 public:
     /** Constructors. */
@@ -739,7 +883,7 @@ public:
      * @param name The scope's name (usually the same as the function's name)
      * @param args The function's arguments.
      */
-    scope(std::string name, std::vector<std::unique_ptr<variable>> args)
+    scope(std::string name, std::vector<std::unique_ptr<value>> args)
     : name{std::move(name)}
     , args{std::move(args)}
     {
@@ -749,13 +893,19 @@ public:
      * Check if the name is already contained in this scope as an argument or a local variable.
      *
      * @returns True if the name exists.
+     * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
      */
     bool contains(const std::string& name) const
     {
         if(std::find_if(args.begin(), args.end(),
-                        [&name](const std::unique_ptr<variable>& v) -> bool
+                        [&name](const std::unique_ptr<value>& v) -> bool
                         {
-                            return v->get_name() == name;
+                            if(!v->has_name())
+                            {
+                                throw codegen_error("Scope contains unnamed value.");
+                            }
+
+                            return *v->get_name() == name;
                         })
            != args.end())
         {
@@ -763,9 +913,14 @@ public:
         }
 
         if(std::find_if(locals.begin(), locals.end(),
-                        [&name](const std::unique_ptr<variable>& v) -> bool
+                        [&name](const std::unique_ptr<value>& v) -> bool
                         {
-                            return v->get_name() == name;
+                            if(!v->has_name())
+                            {
+                                throw codegen_error("Scope contains unnamed value.");
+                            }
+
+                            return *v->get_name() == name;
                         })
            != locals.end())
         {
@@ -780,13 +935,19 @@ public:
      *
      * @param name The variable's name.
      * @returns The variable or nullptr.
+     * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
      */
-    variable* get_variable(const std::string& name)
+    value* get_value(const std::string& name)
     {
         auto it = std::find_if(args.begin(), args.end(),
-                               [&name](const std::unique_ptr<variable>& v) -> bool
+                               [&name](const std::unique_ptr<value>& v) -> bool
                                {
-                                   return v->get_name() == name;
+                                   if(!v->has_name())
+                                   {
+                                       throw codegen_error("Scope contains unnamed value.");
+                                   }
+
+                                   return *v->get_name() == name;
                                });
         if(it != args.end())
         {
@@ -794,9 +955,14 @@ public:
         }
 
         it = std::find_if(locals.begin(), locals.end(),
-                          [&name](const std::unique_ptr<variable>& v) -> bool
+                          [&name](const std::unique_ptr<value>& v) -> bool
                           {
-                              return v->get_name() == name;
+                              if(!v->has_name())
+                              {
+                                  throw codegen_error("Scope contains unnamed value.");
+                              }
+
+                              return *v->get_name() == name;
                           });
 
         if(it != locals.end())
@@ -811,13 +977,19 @@ public:
      * Add an argument.
      *
      * @param arg The argument.
-     * @throws Throws a `codegen_error` if the scope already has an object with the same name.
+     * @throws Throws a `codegen_error` if the supplied argument has no name or if the
+     *         scope already has an object with the same name.
      */
-    void add_argument(std::unique_ptr<variable> arg)
+    void add_argument(std::unique_ptr<value> arg)
     {
-        if(contains(arg->get_name()))
+        if(!arg->has_name())
         {
-            throw codegen_error(fmt::format("Name '{}' already contained in scope.", arg->get_name()));
+            throw codegen_error("Cannot add unnamed argument to scope.");
+        }
+
+        if(contains(*arg->get_name()))
+        {
+            throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
         }
         args.emplace_back(std::move(arg));
     }
@@ -826,25 +998,31 @@ public:
      * Add a local variable.
      *
      * @param arg The variable.
-     * @throws Throws a `codegen_error` if the scope already has an object with the same name.
+     * @throws Throws a `codegen_error` if the supplied local has no name or if the
+     *         scope already has an object with the same name.
      */
-    void add_local(std::unique_ptr<variable> arg)
+    void add_local(std::unique_ptr<value> arg)
     {
-        if(contains(arg->get_name()))
+        if(!arg->has_name())
         {
-            throw codegen_error(fmt::format("Name '{}' already contained in scope.", arg->get_name()));
+            throw codegen_error("Cannot add unnamed argument to scope.");
+        }
+
+        if(contains(*arg->get_name()))
+        {
+            throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
         }
         locals.emplace_back(std::move(arg));
     }
 
     /** Get the arguments for this scope. */
-    const std::vector<std::unique_ptr<variable>>& get_args() const
+    const std::vector<std::unique_ptr<value>>& get_args() const
     {
         return args;
     }
 
     /** Get the locals for this scope. */
-    const std::vector<std::unique_ptr<variable>>& get_locals() const
+    const std::vector<std::unique_ptr<value>>& get_locals() const
     {
         return locals;
     }
@@ -944,7 +1122,7 @@ public:
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
+    function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
     : name{name}
     , native{false}
     , return_type{std::move(return_type)}
@@ -960,7 +1138,7 @@ public:
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(std::string import_library, std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args)
+    function(std::string import_library, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
     : name{name}
     , native{true}
     , import_library{import_library}
@@ -990,7 +1168,7 @@ public:
     }
 
     /** Create a local variable. */
-    void create_local(std::unique_ptr<variable> v)
+    void create_local(std::unique_ptr<value> v)
     {
         scope.add_local(std::move(v));
     }
@@ -1015,16 +1193,7 @@ public:
         std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                        [](const auto& arg)
                        {
-                           // FIXME This seems complicated for getting the type.
-                           auto v = arg->get_value();
-                           if(v.is_composite())
-                           {
-                               return v.get_composite_type();
-                           }
-                           else
-                           {
-                               return v.get_type();
-                           }
+                           return arg->get_resolved_type();
                        });
         return std::make_pair<std::string, std::vector<std::string>>(std::string{return_type}, std::move(arg_types));
     }
@@ -1204,6 +1373,8 @@ std::string to_string(binary_op op);
  */
 class context
 {
+    friend class slang::instruction_emitter;
+
     /** List of types. */
     std::vector<std::unique_ptr<type>> types;
 
@@ -1222,32 +1393,14 @@ class context
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
 
-    /*
-     * Module generation.
-     */
-
-    /** Final instruction buffer. */
-    std::vector<std::byte> instruction_buffer;
-
-    /** Function definition offsets inside the instruction buffer. */
-    std::unordered_map<std::string, std::uint32_t> function_offsets;
-
-    /** Whether this context was finalized. */
-    bool finalized = false;
-
 protected:
     /**
      * Check that the insertion point is not null.
      *
-     * @throws Throws a `codegen_error` if the insertion point is null or if the context already was finalized.
+     * @throws Throws a `codegen_error` if the insertion point is null.
      */
     void validate_insertion_point() const
     {
-        if(finalized)
-        {
-            throw codegen_error("Cannot insert into finalized context.");
-        }
-
         if(!insertion_point)
         {
             throw codegen_error("Invalid insertion point (nullptr).");
@@ -1274,7 +1427,6 @@ public:
      * Create a type.
      *
      * Throws a `codegen_error` if the type already exists or if it contains undefined types.
-     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param name The type's name.
      * @returns A representation of the created type.
@@ -1293,32 +1445,28 @@ public:
      * Add a function definition.
      *
      * Throws a `codegen_error` if the function name already exists.
-     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's arguments.
      * @returns A representation of the function.
      */
-    function* create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> args);
+    function* create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args);
 
     /**
      * Add a function with a native implementation in a library.
      *
      * Throws a `codegen_error` if the function name already exists.
-     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param lib_name Name of the library the function should be imported from.
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's arguments.
      */
-    void create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<variable>> arg);
+    void create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> arg);
 
     /**
      * Set instruction insertion point.
-     *
-     * Throws a `codegen_error` if the context already was finalized.
      *
      * @param ip The insertion point for instructions.
      */
@@ -1333,34 +1481,20 @@ public:
     /**
      * Enter a new scope.
      *
-     * Throws a `codegen_error` if the context already was finalized.
-     *
      * @param s The new scope.
      */
     void enter_scope(scope* s)
     {
-        if(finalized)
-        {
-            throw codegen_error("Cannot enter scope, as the context is already finalized.");
-        }
-
         current_scopes.push_back(s);
     }
 
     /**
      * Exit a scope.
      *
-     * Throws a `codegen_error` if the context already was finalized.
-     *
      * @param s The scope to leave. Has to be the last entered scope.
      */
     void exit_scope(scope* s)
     {
-        if(finalized)
-        {
-            throw codegen_error("Cannot enter scope, as the context is already finalized.");
-        }
-
         if(current_scopes.size() == 0)
         {
             throw codegen_error("No scope to leave.");
@@ -1483,26 +1617,6 @@ public:
      */
     void generate_store_element(std::vector<int> indices);
 
-    /**
-     * Finalize code generation. Resolves e.g. jump labels into relative offsets
-     * and generates the binary representation of the bytecode.
-     *
-     * @throws Throws a `codegen_error` if `finalize` was already called.
-     */
-    void finalize();
-
-    /*
-     * Module generation.
-     */
-
-    /**
-     * Generate a module from the current context state.
-     *
-     * @returns A module representing the context state.
-     * @throws Throws a `codegen_error` if the contet was not finalized.
-     */
-    language_module to_module() const;
-
     /*
      * Readable representation.
      */
@@ -1584,9 +1698,10 @@ public:
 
 inline void const_argument::register_const(context& ctx)
 {
-    if(type.get_type() == "str")
+    if(type->get_resolved_type() == "str")
     {
-        constant_index = ctx.get_string(std::get<std::string>(value));
+        auto type_str = static_cast<constant_str*>(type.get());
+        type_str->set_constant_index(ctx.get_string(type_str->get_str()));
     }
 }
 

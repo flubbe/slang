@@ -288,8 +288,8 @@ std::string access_expression::to_string() const
 
 std::unique_ptr<cg::value> import_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: import_expression::generate_code not implemented.", slang::to_string(loc)));
+    // import expressions are handled by the import resolver.
+    return {};
 }
 
 void import_expression::collect_names(ty::context& ctx) const
@@ -347,10 +347,10 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
     }
 
-    const cg::variable* var{nullptr};
+    const cg::value* var{nullptr};
     while(s != nullptr)
     {
-        if((var = s->get_variable(name.s)) != nullptr)
+        if((var = s->get_value(name.s)) != nullptr)
         {
             break;
         }
@@ -371,7 +371,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
     }
 
-    return std::make_unique<cg::value>(var->get_value());
+    return std::make_unique<cg::value>(*var);
 }
 
 std::optional<std::string> variable_reference_expression::type_check(ty::context& ctx) const
@@ -400,18 +400,26 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     {
         throw cg::codegen_error(loc, fmt::format("No scope available for adding locals."));
     }
-    s->add_local(std::make_unique<cg::variable>(name.s, type.s));
+
+    if(is_builtin_type(type.s))
+    {
+        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s));
+    }
+    else
+    {
+        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s));
+    }
 
     if(expr)
     {
         auto v = expr->generate_code(ctx);
         if(is_builtin_type(type.s))
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, type.s}));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
         }
         else
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::variable{name.s, "composite", type.s}));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
         }
     }
 
@@ -766,16 +774,16 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
         throw cg::codegen_error(loc, "Invalid memory context for prototype_ast.");
     }
 
-    std::vector<std::unique_ptr<cg::variable>> function_args;
+    std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
         if(is_builtin_type(a.second.s))
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, a.second.s));
+            function_args.emplace_back(std::make_unique<cg::value>(a.second.s, std::nullopt, a.first.s));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, "composite", a.second.s));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", a.second.s, a.first.s));
         }
     }
 
@@ -784,16 +792,16 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, slang::codegen::context& ctx) const
 {
-    std::vector<std::unique_ptr<cg::variable>> function_args;
+    std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
         if(is_builtin_type(a.second.s))
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, a.second.s));
+            function_args.emplace_back(std::make_unique<cg::value>(a.second.s, std::nullopt, a.first.s));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::variable>(a.first.s, "composite", a.second.s));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", a.second.s, a.first.s));
         }
     }
 

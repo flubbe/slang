@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "archives/archive.h"
+#include "archives/memory.h"
 
 namespace slang
 {
@@ -153,9 +154,6 @@ struct function_details
 {
     /** Offset into the module file (not counting the header). */
     std::size_t offset;
-
-    /** Size of the function in the module file, in bytes. */
-    std::size_t size;
 };
 
 /**
@@ -167,7 +165,6 @@ struct function_details
 inline archive& operator&(archive& ar, function_details& details)
 {
     ar & details.offset;
-    ar & details.size;
     return ar;
 }
 
@@ -240,7 +237,7 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
     {
         if(ar.is_reading())
         {
-            native_function_details details;
+            function_details details;
             ar & details;
             desc.details = std::move(details);
         }
@@ -433,6 +430,9 @@ class language_module
     /** The header. */
     module_header header;
 
+    /** The binary part. */
+    std::vector<std::byte> binary;
+
 public:
     /** Default constructors. */
     language_module() = default;
@@ -463,11 +463,42 @@ public:
      */
     void add_native_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::string lib_name);
 
+    /**
+     * Set the binary module part.
+     *
+     * @param binary The binary part.
+     */
+    void set_binary(std::vector<std::byte> binary)
+    {
+        this->binary = std::move(binary);
+    }
+
     /** Get the module header. */
     const module_header& get_header() const
     {
         return header;
     }
+
+    /** Get the binary. */
+    const std::vector<std::byte>& get_binary() const
+    {
+        return binary;
+    }
+
+    friend archive& operator&(archive& ar, language_module& mod);
 };
+
+/**
+ * Module serializer.
+ *
+ * @param ar The archive.
+ * @returns The archive.
+ */
+inline archive& operator&(archive& ar, language_module& mod)
+{
+    ar & mod.header;
+    ar & mod.binary;
+    return ar;
+}
 
 }    // namespace slang
