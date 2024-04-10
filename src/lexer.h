@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <exception>
+#include <stdexcept>
 #include <optional>
 #include <string>
 #include <variant>

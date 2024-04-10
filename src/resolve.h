@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <exception>
+#include <stdexcept>
 
 #include "filemanager.h"
 #include "token.h"

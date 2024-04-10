@@ -36,6 +36,9 @@ enum class opcode : opcode_base
     opcode_count /** Opcode count. Not an opcode. */
 };
 
+/** Get a string representation of the opcode. */
+std::string to_string(opcode op);
+
 /** A opcode error. */
 class opcode_error : public std::runtime_error
 {

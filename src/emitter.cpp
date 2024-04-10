@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <exception>
+#include <stdexcept>
 #include <unordered_map>
 
 #include "codegen.h"

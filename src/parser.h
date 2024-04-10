@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <exception>
+#include <stdexcept>
 
 #include "ast.h"
 #include "lexer.h"

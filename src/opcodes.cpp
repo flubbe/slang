@@ -15,6 +15,27 @@
 namespace slang
 {
 
+std::string to_string(opcode op)
+{
+    switch(op)
+    {
+    case opcode::iconst: return "iconst";
+    case opcode::fconst: return "fconst";
+    case opcode::sconst: return "sconst";
+    case opcode::iload: return "iload";
+    case opcode::fload: return "fload";
+    case opcode::sload: return "sload";
+    case opcode::istore: return "istore";
+    case opcode::fstore: return "fstore";
+    case opcode::sstore: return "sstore";
+    case opcode::invoke: return "invoke";
+    case opcode::ret: return "ret";
+    case opcode::opcode_count:; /* fall-through */
+    }
+
+    return "unknown";
+}
+
 archive& operator&(archive& ar, opcode& op)
 {
     auto op_base = static_cast<opcode_base>(op);

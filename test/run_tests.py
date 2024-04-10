@@ -17,6 +17,7 @@ _tests = [
     "test_serialization",
     "test_output",
     "test_resolve",
+    "test_interpreter",
 ]
 
 if __name__ == "__main__":

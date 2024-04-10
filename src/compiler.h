@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include <exception>
+#include <stdexcept>
 
 #include "package.h"
 
@@ -81,14 +81,14 @@ public:
 
     /**
      * Set the compiler up for compiling packages.
-     * 
+     *
      * @param pkgs The packages to compile.
      */
     void setup(const std::vector<package>& pkgs);
 
     /**
      * Invoke the lexer. This should be done after calling setup.
-     * 
+     *
      * @throws lexer_error
      */
     void invoke_lexer();
