@@ -17,31 +17,30 @@
 namespace slang::interpreter
 {
 
-call_result context::exec(const language_module& mod, std::size_t offset)
+value context::exec(const language_module& mod, const function& f, const std::vector<value>& args)
 {
+    if(args.size() != 0)
+    {
+        throw std::runtime_error("context::exec: arguments not implemented.");
+    }
+
     const std::vector<std::byte>& binary = mod.get_binary();
+    std::size_t offset = f.get_entry_point();
     if(offset >= binary.size())
     {
-        throw interpreter_error(fmt::format("context::exec: offset greater-equal to binary size ({} >= {}).", offset, binary.size()));
+        throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
     }
 
     exec_stack stack;
-    result_type last_load_type{result_type::rt_void};
     while(offset < binary.size())
     {
         auto instr = binary[offset];
         ++offset;
 
-        if(instr >= static_cast<std::byte>(opcode::opcode_count))
-        {
-            throw interpreter_error(fmt::format("Invalid opcode '{}'.", static_cast<std::uint8_t>(instr)));
-        }
-
         if(static_cast<opcode>(instr) == opcode::ret)
         {
             break;
         }
-        last_load_type = result_type::rt_void;
 
         switch(static_cast<opcode>(instr))
         {
@@ -55,7 +54,6 @@ call_result context::exec(const language_module& mod, std::size_t offset)
             offset += 4;
 
             stack.push_i32(i_u8[0] + (i_u8[1] << 8) + (i_u8[2] << 16) + (i_u8[3] << 24));
-            last_load_type = result_type::rt_int;
 
             break;
         } /* opcode::iload */
@@ -65,14 +63,15 @@ call_result context::exec(const language_module& mod, std::size_t offset)
         }
     }
 
-    if(last_load_type == result_type::rt_int)
+    auto& signature = f.get_signature();
+    if(signature.return_type == "i32")
     {
         return {stack.pop_i32()};
     }
 
-    if(last_load_type != result_type::rt_void)
+    if(signature.return_type != "void")
     {
-        throw interpreter_error(fmt::format("Expected result type 0 (void), got '{}'", static_cast<int>(last_load_type)));
+        throw interpreter_error(fmt::format("Expected result type 0 (void), got '{}'", signature.return_type));
     }
 
     return {};
@@ -93,17 +92,9 @@ void context::load_module(const std::string& name, const language_module& mod)
     {
         throw interpreter_error("context::load_module: import resolution not implemented.");
     }
-}
 
-call_result context::invoke(const std::string& module_name, const std::string& function_name)
-{
-    auto mod_it = module_map.find(module_name);
-    if(mod_it == module_map.end())
-    {
-        throw interpreter_error(fmt::format("Module '{}' not loaded.", module_name));
-    }
-
-    auto& header = mod_it->second.get_header();
+    // populate function map.
+    std::unordered_map<std::string, function> fmap;
     for(auto& it: header.exports)
     {
         if(it.type != symbol_type::function)
@@ -111,25 +102,45 @@ call_result context::invoke(const std::string& module_name, const std::string& f
             continue;
         }
 
-        auto& desc = std::get<function_descriptor>(it.desc);
-
-        if(it.name == function_name)
+        if(fmap.find(it.name) != fmap.end())
         {
-            if(desc.native)
-            {
-                throw interpreter_error("context::invoke not implemented for native functions.");
-            }
-            else
-            {
-                auto& details = std::get<function_details>(desc.details);
-                return exec(mod_it->second, details.offset);
-            }
+            throw interpreter_error(fmt::format("Function '{}' already exists in export map.", it.name));
+        }
 
-            break;
+        auto& desc = std::get<function_descriptor>(it.desc);
+        if(desc.native)
+        {
+            throw interpreter_error("context::load_module: not implemented for native functions.");
+        }
+        else
+        {
+            fmap.insert({it.name, function(desc.signature, std::get<function_details>(desc.details).offset)});
         }
     }
+    function_map.insert({name, std::move(fmap)});
+}
 
-    throw std::runtime_error("context::invoke: code path not implemented.");
+value context::invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args)
+{
+    auto mod_it = module_map.find(module_name);
+    if(mod_it == module_map.end())
+    {
+        throw interpreter_error(fmt::format("Module '{}' not found.", module_name));
+    }
+
+    auto func_mod_it = function_map.find(module_name);
+    if(func_mod_it == function_map.end())
+    {
+        throw interpreter_error(fmt::format("Module '{}' not found.", module_name));
+    }
+
+    auto func_it = func_mod_it->second.find(function_name);
+    if(func_it == func_mod_it->second.end())
+    {
+        throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
+    }
+
+    return exec(mod_it->second, func_it->second, args);
 }
 
 }    // namespace slang::interpreter

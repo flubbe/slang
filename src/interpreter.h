@@ -13,13 +13,7 @@
 #include <variant>
 #include <vector>
 
-/*
- * Forward declarations.
- */
-namespace slang
-{
-class language_module;
-}    // namespace slang
+#include "module.h"
 
 namespace slang::interpreter
 {
@@ -39,65 +33,50 @@ public:
     }
 };
 
-/** Result type. */
-enum class result_type
+/** Result and argument type. */
+using value = std::variant<int, float, std::string>;
+
+/** A function. */
+class function
 {
-    rt_void,
-    rt_int,
-    rt_float,
-    rt_string,
-    rt_aggregate
-};
+    /** Function signature. */
+    function_signature signature;
 
-/** Result from calling a function. */
-struct call_result
-{
-    /** The result. */
-    std::variant<int, float, std::string> result;
+    /** Entry point (offset into binary). */
+    std::size_t entry_point;
 
-    /** The result type. */
-    result_type type{result_type::rt_void};
-
+public:
     /** Default constructors. */
-    call_result() = default;
-    call_result(const call_result&) = default;
-    call_result(call_result&&) = default;
+    function() = default;
+    function(const function&) = default;
+    function(function&&) = default;
 
     /** Default assignments. */
-    call_result& operator=(const call_result&) = default;
-    call_result& operator=(call_result&&) = default;
+    function& operator=(const function&) = default;
+    function& operator=(function&&) = default;
 
     /**
-     * Construct a `call_result` from an integer.
+     * Construct a function.
      *
-     * @param i The integer.
+     * @param signature The function's signature.
+     * @param entry_point The function's entry point, given as an offset into a module binary.
      */
-    call_result(int i)
-    : result{i}
-    , type{result_type::rt_int}
+    function(function_signature signature, std::size_t entry_point)
+    : signature{std::move(signature)}
+    , entry_point{entry_point}
     {
     }
 
-    /**
-     * Construct a `call_result` from a float.
-     *
-     * @param f The float.
-     */
-    call_result(float f)
-    : result{f}
-    , type{result_type::rt_float}
+    /** Get the function signature. */
+    const function_signature& get_signature() const
     {
+        return signature;
     }
 
-    /**
-     * Construct a `call_result` from a string.
-     *
-     * @param s The string.
-     */
-    call_result(std::string s)
-    : result{s}
-    , type{result_type::rt_string}
+    /** Get the function's entry point. */
+    const std::size_t get_entry_point() const
     {
+        return entry_point;
     }
 };
 
@@ -172,7 +151,7 @@ public:
 
     /** Disallow popping from stack for non-(int, float, std::string) types. */
     template<typename T>
-    call_result pop_result()
+    value pop_result()
     {
         static_assert(
           !std::is_same<T, int>::value
@@ -183,21 +162,21 @@ public:
 
     /** Pop the call result from the stack. */
     template<>
-    call_result pop_result<int>()
+    value pop_result<int>()
     {
         return {pop_i32()};
     }
 
     /** Pop the call result from the stack. */
     template<>
-    call_result pop_result<float>()
+    value pop_result<float>()
     {
         return {pop_f32()};
     }
 
     /** Pop the call result from the stack. */
     template<>
-    call_result pop_result<std::string>()
+    value pop_result<std::string>()
     {
         throw std::runtime_error("exec_stack::pop_result<std::string> not implemented.");
     }
@@ -209,11 +188,19 @@ class context
     /** Loaded modules. */
     std::unordered_map<std::string, language_module> module_map;
 
+    /** Functions, ordered by module and name. */
+    std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
+
 protected:
     /**
      * Execute a function.
+     *
+     * @param mod The function's module.
+     * @param f The function to execute.
+     * @param args The function's arguments.
+     * @return The function's return value.
      */
-    call_result exec(const language_module& mod, std::size_t offset);
+    value exec(const language_module& mod, const function& f, const std::vector<value>& args);
 
 public:
     /** Default constructors. */
@@ -236,12 +223,12 @@ public:
     /**
      * Invoke a function from a module.
      *
-     * TODO arguments and return value.
-     *
      * @param module_name Name of the module of the function.
-     * @param name The function's name.
+     * @param function_name The function's name.
+     * @param args The function's arguments.
+     * @returns The function's return value.
      */
-    call_result invoke(const std::string& module_name, const std::string& function_name);
+    value invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args);
 };
 
 }    // namespace slang::interpreter
