@@ -142,8 +142,37 @@ TEST(output, emitter)
 {
     {
         const std::string test_input =
-          "fn test() -> i32 {\n"
+          /* i32 */
+          "fn itest() -> i32 {\n"
           " return 1;\n"
+          "}\n"
+          "fn iadd() -> i32 {\n"
+          " return 1+2;\n"
+          "}\n"
+          "fn isub() -> i32 {\n"
+          " return 3-2;\n"
+          "}\n"
+          "fn imul() -> i32 {\n"
+          " return 2*3;\n"
+          "}\n"
+          "fn idiv() -> i32 {\n"
+          " return 6 / 2;\n"
+          "}\n"
+          /* f32 */
+          "fn ftest() -> f32 {\n"
+          " return 1.1;\n"
+          "}\n"
+          "fn fadd() -> f32 {\n"
+          " return 1.1+2.1;\n"
+          "}\n"
+          "fn fsub() -> f32 {\n"
+          " return 3.1-2.1;\n"
+          "}\n"
+          "fn fmul() -> f32 {\n"
+          " return 2.1*3.1;\n"
+          "}\n"
+          "fn fdiv() -> f32 {\n"
+          " return 6.4 / 2.0;\n"
           "}\n";
 
         slang::lexer lexer;
@@ -178,8 +207,6 @@ TEST(output, emitter)
         slang::language_module mod;
         slang::file_read_archive read_ar("test_output.bin");
         EXPECT_NO_THROW(read_ar & mod);
-        auto& bin = mod.get_binary();
-        EXPECT_EQ(bin.size(), 6);
     }
 }
 

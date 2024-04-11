@@ -30,6 +30,14 @@ enum class opcode : opcode_base
     istore, /** Store i32 from stack. */
     fstore, /** Store f32 from stack. */
     sstore, /** Store str from stack. */
+    iadd,   /** Add two i32 from the stack. */
+    fadd,   /** Add two f32 from the stack. */
+    isub,   /** Subtract two i32 from the stack. */
+    fsub,   /** Subtract two f32 from the stack.  */
+    imul,   /** Mulitply two i32 from the stack. */
+    fmul,   /** Multiply two f32 from the stack. */
+    idiv,   /** Divide two i32 from the stack. */
+    fdiv,   /** Divide two f32 from the stack.  */
     invoke, /** Invoke a function. */
     ret,    /** Return void from a function. */
 

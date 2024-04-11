@@ -37,9 +37,36 @@ TEST(interpreter, loading)
     slang::interpreter::context ctx;
     EXPECT_NO_THROW(ctx.load_module("test_output", mod));
 
-    // slang::interpreter::value res;
-    // EXPECT_NO_THROW(res = ctx.invoke("test_output", "test"));
-    // EXPECT_EQ(std::get<int>(res.result), 1);
+    slang::interpreter::value res;
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
+    EXPECT_EQ(std::get<int>(res), 1);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "iadd", {}));
+    EXPECT_EQ(std::get<int>(res), 3);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "isub", {}));
+    EXPECT_EQ(std::get<int>(res), 1);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "imul", {}));
+    EXPECT_EQ(std::get<int>(res), 6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "idiv", {}));
+    EXPECT_EQ(std::get<int>(res), 3);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "ftest", {}));
+    EXPECT_NEAR(std::get<float>(res), 1.1, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fadd", {}));
+    EXPECT_NEAR(std::get<float>(res), 3.2, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fsub", {}));
+    EXPECT_NEAR(std::get<float>(res), 1.0, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fmul", {}));
+    EXPECT_NEAR(std::get<float>(res), 6.51, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fdiv", {}));
+    EXPECT_NEAR(std::get<float>(res), 3.2, 1e-6);
 }
 
 }    // namespace

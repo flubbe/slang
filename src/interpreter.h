@@ -118,7 +118,7 @@ public:
      *
      * @param F The floating-point value.
      */
-    void push_i32(float f)
+    void push_f32(float f)
     {
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&f), reinterpret_cast<std::uint8_t*>(&f) + 4);
     }

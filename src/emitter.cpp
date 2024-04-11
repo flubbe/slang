@@ -66,7 +66,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<slang::codegen:
         }
     };
 
-    if(name == "const")
+    auto emit_typed = [this, &name, &args, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
@@ -76,22 +76,69 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<slang::codegen:
 
         if(type == "i32")
         {
-            emit(instruction_buffer, opcode::iload, static_cast<const cg::constant_int*>(v)->get_int());
+            emit(instruction_buffer, i32_opcode);
         }
         else if(type == "f32")
         {
-            // TODO
-            throw std::runtime_error(fmt::format("instruction_emitter::emit_instruction: instruction generation for '{}'/f32 not implemented.", name));
-        }
-        else if(type == "str")
-        {
-            // TODO
-            throw std::runtime_error(fmt::format("instruction_emitter::emit_instruction: instruction generation for '{}'/str not implemented.", name));
+            emit(instruction_buffer, f32_opcode);
         }
         else
         {
+            if(type == "str" && str_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("instruction_emitter::emit_instruction not implemented for instruction '{}' and type '{}'.", name, type));
+            }
+
             throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
         }
+    };
+
+    auto emit_typed_one_arg = [this, &name, &args, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt)
+    {
+        expect_arg_size(1);
+
+        slang::codegen::const_argument* arg = static_cast<slang::codegen::const_argument*>(args[0].get());
+        const cg::value* v = arg->get_value();
+        std::string type = v->get_resolved_type();
+
+        if(type == "i32")
+        {
+            emit(instruction_buffer, i32_opcode, static_cast<std::int32_t>(static_cast<const cg::constant_int*>(v)->get_int()));
+        }
+        else if(type == "f32")
+        {
+            emit(instruction_buffer, f32_opcode, static_cast<const cg::constant_float*>(v)->get_float());
+        }
+        else
+        {
+            if(type == "str" && str_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("instruction_emitter::emit_instruction not implemented for instruction '{}' and type '{}'.", name, type));
+            }
+
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+        }
+    };
+
+    if(name == "add")
+    {
+        emit_typed(opcode::iadd, opcode::fadd);
+    }
+    else if(name == "sub")
+    {
+        emit_typed(opcode::isub, opcode::fsub);
+    }
+    else if(name == "mul")
+    {
+        emit_typed(opcode::imul, opcode::fmul);
+    }
+    else if(name == "div")
+    {
+        emit_typed(opcode::idiv, opcode::fdiv);
+    }
+    else if(name == "const")
+    {
+        emit_typed_one_arg(opcode::iconst, opcode::fconst, opcode::sconst);
     }
     else if(name == "ret")
     {

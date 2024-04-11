@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include "archives/memory.h"
 #include "interpreter.h"
 #include "module.h"
 #include "opcodes.h"
@@ -44,8 +45,65 @@ value context::exec(const language_module& mod, const function& f, const std::ve
 
         switch(static_cast<opcode>(instr))
         {
-        case opcode::iload:
+        case opcode::iadd:
         {
+            stack.push_i32(stack.pop_i32() + stack.pop_i32());
+            break;
+        } /* opcode::iadd */
+        case opcode::isub:
+        {
+            stack.push_i32(-stack.pop_i32() + stack.pop_i32());
+            break;
+        } /* opcode::isub */
+        case opcode::imul:
+        {
+            stack.push_i32(stack.pop_i32() * stack.pop_i32());
+            break;
+        } /* opcode::imul */
+        case opcode::idiv:
+        {
+            std::int32_t divisor = stack.pop_i32();
+            if(divisor == 0)
+            {
+                throw interpreter_error("Division by zero.");
+            }
+            std::int32_t dividend = stack.pop_i32();
+            stack.push_i32(dividend / divisor);
+            break;
+        } /* opcode::idiv */
+        case opcode::fadd:
+        {
+            stack.push_f32(stack.pop_f32() + stack.pop_f32());
+            break;
+        } /* opcode::fadd */
+        case opcode::fsub:
+        {
+            stack.push_f32(-stack.pop_f32() + stack.pop_f32());
+            break;
+        } /* opcode::fsub */
+        case opcode::fmul:
+        {
+            stack.push_f32(stack.pop_f32() * stack.pop_f32());
+            break;
+        } /* opcode::fmul */
+        case opcode::fdiv:
+        {
+            float divisor = stack.pop_f32();
+            if(divisor == 0)
+            {
+                throw interpreter_error("Division by zero.");
+            }
+            float dividend = stack.pop_f32();
+            stack.push_f32(dividend / divisor);
+            break;
+        } /* opcode::fdiv */
+        case opcode::iconst:
+        {
+            if(offset + 4 >= binary.size())
+            {
+                throw interpreter_error("Instruction tried to read outside of code segment.");
+            }
+
             uint8_t i_u8[4] = {
               static_cast<std::uint8_t>(binary[offset]),
               static_cast<std::uint8_t>(binary[offset + 1]),
@@ -56,7 +114,26 @@ value context::exec(const language_module& mod, const function& f, const std::ve
             stack.push_i32(i_u8[0] + (i_u8[1] << 8) + (i_u8[2] << 16) + (i_u8[3] << 24));
 
             break;
-        } /* opcode::iload */
+        } /* opcode::iconst */
+        case opcode::fconst:
+        {
+            if(offset + 4 >= binary.size())
+            {
+                throw interpreter_error("Instruction tried to read outside of code segment.");
+            }
+
+            uint8_t f_u8[4] = {
+              static_cast<std::uint8_t>(binary[offset]),
+              static_cast<std::uint8_t>(binary[offset + 1]),
+              static_cast<std::uint8_t>(binary[offset + 2]),
+              static_cast<std::uint8_t>(binary[offset + 3])};
+            offset += 4;
+
+            // push i32, will be read as f32.
+            stack.push_i32(f_u8[0] + (f_u8[1] << 8) + (f_u8[2] << 16) + (f_u8[3] << 24));
+
+            break;
+        } /* opcode::fconst */
 
         default:
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
@@ -68,10 +145,14 @@ value context::exec(const language_module& mod, const function& f, const std::ve
     {
         return {stack.pop_i32()};
     }
+    else if(signature.return_type == "f32")
+    {
+        return {stack.pop_f32()};
+    }
 
     if(signature.return_type != "void")
     {
-        throw interpreter_error(fmt::format("Expected result type 0 (void), got '{}'", signature.return_type));
+        throw interpreter_error(fmt::format("Expected result type 'void', got '{}'", signature.return_type));
     }
 
     return {};
