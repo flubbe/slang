@@ -338,27 +338,25 @@ inline archive& operator&(archive& ar, vle_int& i)
     b0 |= (v & 0x3f);                             // data
 
     ar & b0;
-    i.i = (b0 & 0x3f);
 
+    i.i = 0;
     if(b0 & 0x40)    // continuation bit
     {
-        i.i <<= 6;
+        std::uint8_t b = 0;
         v >>= 6;
 
-        std::uint8_t b = (v >= 0x80 ? 0x80 : 0x00);    // continuation bit
-        b |= (v & 0x7f);                               // data
-        ar & b;
-
         // loop while continuation bit is set, but at most 7 times for a 64-bit integer.
-        for(std::size_t j = 0; j < 7 && (b & 0x80); ++j)
+        for(std::size_t j = 0; j < 8; ++j)
         {
-            v >>= 7;
             b = (v >= 0x80 ? 0x80 : 0x00) | (v & 0x7f);
-
             ar & b;
+            i.i = (i.i << 7) | (b & 0x7f);
+            v >>= 7;
 
-            i.i <<= 7;
-            i.i |= b;
+            if(!(b & 0x80))
+            {
+                break;
+            }
         }
 
         if(b & 0x80)
@@ -366,6 +364,7 @@ inline archive& operator&(archive& ar, vle_int& i)
             throw serialization_error("Inconsistent VLE integer encoding (continuation bit is set, exceeding maximum integer size).");
         }
     }
+    i.i = (i.i << 6) | (b0 & 0x3f);
 
     if(b0 & 0x80)
     {

@@ -150,10 +150,18 @@ TEST(serialization, big_endian_file_archive)
         std::uint32_t dw = 0x12345678;
         float f = 1.234f;
         double d = -123.4561234;
+        long i = 0x123456789012345;
+        slang::vle_int vi{i};
 
-        ar & bo & by & w & dw & f & d;
+        ar & bo /* 1 byte */
+          & by  /* 1 byte*/
+          & w   /* 2 bytes */
+          & dw  /* 4 bytes */
+          & f   /* 4 bytes */
+          & d   /* 8 bytes */
+          & vi; /* 9 bytes */
 
-        ASSERT_EQ(ar.tell(), 20);
+        ASSERT_EQ(ar.tell(), 29);
     }
     {
         std::ifstream file{"big_endian.bin", std::ifstream::binary};
@@ -163,10 +171,10 @@ TEST(serialization, big_endian_file_archive)
         std::size_t offs = file.tellg();
         file.seekg(0, std::ios::beg);
         offs -= file.tellg();
-        ASSERT_EQ(offs, 20);
+        ASSERT_EQ(offs, 29);
 
         std::vector<std::uint8_t> buf{std::istreambuf_iterator<char>(file), {}};
-        ASSERT_EQ(buf.size(), 20);
+        ASSERT_EQ(buf.size(), 29);
 
         bool bo = true;
         std::uint8_t by = 0x01;
