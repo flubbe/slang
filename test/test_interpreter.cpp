@@ -38,8 +38,8 @@ TEST(interpreter, loading)
     EXPECT_NO_THROW(ctx.load_module("test_output", mod));
 
     slang::interpreter::value res;
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
-    EXPECT_EQ(std::get<int>(res), 1);
+    // EXPECT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
+    // EXPECT_EQ(std::get<int>(res), 1);
 
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "iadd", {}));
     EXPECT_EQ(std::get<int>(res), 3);

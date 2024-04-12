@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -45,6 +46,9 @@ class function
     /** Entry point (offset into binary). */
     std::size_t entry_point;
 
+    /** Bytecode size. */
+    std::size_t size;
+
 public:
     /** Default constructors. */
     function() = default;
@@ -60,10 +64,12 @@ public:
      *
      * @param signature The function's signature.
      * @param entry_point The function's entry point, given as an offset into a module binary.
+     * @param size The bytecode size.
      */
-    function(function_signature signature, std::size_t entry_point)
+    function(function_signature signature, std::size_t entry_point, std::size_t size)
     : signature{std::move(signature)}
     , entry_point{entry_point}
+    , size{size}
     {
     }
 
@@ -74,9 +80,15 @@ public:
     }
 
     /** Get the function's entry point. */
-    const std::size_t get_entry_point() const
+    std::size_t get_entry_point() const
     {
         return entry_point;
+    }
+
+    /** Get the bytecode size. */
+    std::size_t get_size() const
+    {
+        return size;
     }
 };
 
@@ -185,22 +197,33 @@ public:
 /** Interpreter context. */
 class context
 {
-    /** Loaded modules. */
-    std::unordered_map<std::string, language_module> module_map;
+    /**
+     * Loaded modules as `(name, (header, bytecode))`. The `bytecode` contains all constants
+     * in the machine's native byte order.
+     */
+    std::unordered_map<std::string, std::pair<slang::module_header, std::vector<std::byte>>> module_map;
 
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
 
 protected:
     /**
+     * Decode a module.
+     *
+     * @param mod The module.
+     * @returns The decoded header/bytecode pair.
+     */
+    std::pair<module_header, std::vector<std::byte>> decode(const language_module& mod) const;
+
+    /**
      * Execute a function.
      *
-     * @param mod The function's module.
+     * @param binary The decoded bytecode.
      * @param f The function to execute.
      * @param args The function's arguments.
      * @return The function's return value.
      */
-    value exec(const language_module& mod, const function& f, const std::vector<value>& args);
+    value exec(const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args);
 
 public:
     /** Default constructors. */

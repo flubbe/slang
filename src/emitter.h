@@ -18,6 +18,7 @@
 
 namespace slang
 {
+struct function_details;
 class language_module;
 }    // namespace slang
 
@@ -52,8 +53,8 @@ class instruction_emitter
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
 
-    /** Function entry points. */
-    std::unordered_map<std::string, std::size_t> entry_points;
+    /** Function details. */
+    std::unordered_map<std::string, function_details> func_details;
 
 protected:
     /**

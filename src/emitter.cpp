@@ -160,7 +160,7 @@ void instruction_emitter::run()
         throw emitter_error("Instruction buffer not empty.");
     }
 
-    if(entry_points.size() != 0)
+    if(func_details.size() != 0)
     {
         throw emitter_error("Entry points not empty.");
     }
@@ -170,7 +170,7 @@ void instruction_emitter::run()
         if(f->is_native())
         {
             // verify that no entry point for a native function exists.
-            if(entry_points.find(f->get_name()) != entry_points.end())
+            if(func_details.find(f->get_name()) != func_details.end())
             {
                 throw emitter_error(fmt::format("Function '{}' already has an entry point.", f->get_name()));
             }
@@ -179,11 +179,12 @@ void instruction_emitter::run()
         }
 
         // verify that an entry point for the function exists.
-        if(entry_points.find(f->get_name()) != entry_points.end())
+        if(func_details.find(f->get_name()) != func_details.end())
         {
             throw emitter_error(fmt::format("Function '{}' already has an entry point.", f->get_name()));
         }
-        entry_points[f->get_name()] = instruction_buffer.tell();
+
+        std::size_t entry_point = instruction_buffer.tell();
 
         // allocate and map locals.
         auto& locals = f->get_scope()->get_locals();
@@ -203,6 +204,10 @@ void instruction_emitter::run()
 
             // TODO Jump offset resolution
         }
+
+        // insert function details
+        std::size_t size = instruction_buffer.tell() - entry_point;
+        func_details.insert({f->get_name(), {entry_point, size}});
     }
 }
 
@@ -232,13 +237,13 @@ language_module instruction_emitter::to_module() const
         }
         else
         {
-            auto ep = entry_points.find(it->get_name());
-            if(ep == entry_points.end())
+            auto details = func_details.find(it->get_name());
+            if(details == func_details.end())
             {
                 throw emitter_error(fmt::format("Unable to find entry point for function '{}'.", it->get_name()));
             }
 
-            mod.add_function(it->get_name(), std::move(return_type), std::move(arg_types), ep->second);
+            mod.add_function(it->get_name(), std::move(return_type), std::move(arg_types), details->second.offset, details->second.size);
         }
     }
 

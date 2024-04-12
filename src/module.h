@@ -154,6 +154,9 @@ struct function_details
 {
     /** Offset into the module file (not counting the header). */
     std::size_t offset;
+
+    /** Bytecode size. */
+    std::size_t size;
 };
 
 /**
@@ -165,6 +168,7 @@ struct function_details
 inline archive& operator&(archive& ar, function_details& details)
 {
     ar & details.offset;
+    ar & details.size;
     return ar;
 }
 
@@ -450,8 +454,9 @@ public:
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      * @param entry_point The entry point of the function.
+     * @param size The function's bytecode size.
      */
-    void add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t entry_point);
+    void add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t entry_point, std::size_t size);
 
     /**
      * Add a native function to the module.
