@@ -469,6 +469,16 @@ public:
     void add_native_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::string lib_name);
 
     /**
+     * Set the string table.
+     *
+     * @param strings The new string table.
+     */
+    void set_string_table(const std::vector<std::string>& strings)
+    {
+        header.strings = strings;
+    }
+
+    /**
      * Set the binary module part.
      *
      * @param binary The binary part.

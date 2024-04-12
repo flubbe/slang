@@ -72,6 +72,15 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
                 code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + 4);
                 break;
             }
+            /* opcodes with one VLE integer. */
+            case opcode::sload:
+            {
+                vle_int i;
+                ar & i;
+
+                code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + 8);
+                break;
+            }
             default:
                 throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
             }
@@ -85,7 +94,7 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
     return {std::move(header), std::move(code)};
 }
 
-value context::exec(const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args)
+value context::exec(const std::vector<std::string>& string_table, const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args)
 {
     if(args.size() != 0)
     {
@@ -108,6 +117,11 @@ value context::exec(const std::vector<std::byte>& binary, const function& f, con
         if(static_cast<opcode>(instr) == opcode::ret)
         {
             break;
+        }
+
+        if(offset == function_end)
+        {
+            throw interpreter_error(fmt::format("Execution reached function boundary."));
         }
 
         switch(static_cast<opcode>(instr))
@@ -174,6 +188,19 @@ value context::exec(const std::vector<std::byte>& binary, const function& f, con
             stack.push_i32(i_u32);
             break;
         } /* opcode::iconst, opcode::fconst */
+        case opcode::sload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += 8;
+
+            if(i < 0 || i >= string_table.size())
+            {
+                throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
+            }
+
+            stack.push_addr(&string_table[i]);
+            break;
+        } /* opcode::sload */
 
         default:
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
@@ -189,12 +216,17 @@ value context::exec(const std::vector<std::byte>& binary, const function& f, con
     {
         return {stack.pop_f32()};
     }
+    else if(signature.return_type == "str")
+    {
+        return {std::string{*stack.pop_addr<std::string>()}};
+    }
 
     if(signature.return_type != "void")
     {
         throw interpreter_error(fmt::format("Expected result type 'void', got '{}'", signature.return_type));
     }
 
+    // return 'void'.
     return {};
 }
 
@@ -261,7 +293,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
     }
 
-    return exec(mod_it->second.second, func_it->second, args);
+    return exec(mod_it->second.first.strings, mod_it->second.second, func_it->second, args);
 }
 
 }    // namespace slang::interpreter

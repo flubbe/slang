@@ -128,11 +128,22 @@ public:
     /**
      * Push an f32 onto the stack.
      *
-     * @param F The floating-point value.
+     * @param f The floating-point value.
      */
     void push_f32(float f)
     {
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&f), reinterpret_cast<std::uint8_t*>(&f) + 4);
+    }
+
+    /**
+     * Push an address onto the stack.
+     *
+     * @param addr The address.
+     */
+    template<typename T>
+    void push_addr(const T* addr)
+    {
+        stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&addr), reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
     }
 
     /** Pop an i32 from the stack. */
@@ -159,6 +170,20 @@ public:
         float f = *reinterpret_cast<float*>(&stack[stack.size() - 4]);
         stack.resize(stack.size() - 4);
         return f;
+    }
+
+    /** Pop an address from the stack. */
+    template<typename T>
+    T* pop_addr()
+    {
+        if(stack.size() < sizeof(T*))
+        {
+            throw interpreter_error("Stack underflow.");
+        }
+
+        T* addr = *reinterpret_cast<T**>(&stack[stack.size() - sizeof(T*)]);
+        stack.resize(stack.size() - sizeof(T*));
+        return addr;
     }
 
     /** Disallow popping from stack for non-(int, float, std::string) types. */
@@ -218,12 +243,16 @@ protected:
     /**
      * Execute a function.
      *
+     * @param string_table The module's string table.
      * @param binary The decoded bytecode.
      * @param f The function to execute.
      * @param args The function's arguments.
      * @return The function's return value.
      */
-    value exec(const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args);
+    value exec(const std::vector<std::string>& string_table,
+               const std::vector<std::byte>& binary,
+               const function& f,
+               const std::vector<value>& args);
 
 public:
     /** Default constructors. */

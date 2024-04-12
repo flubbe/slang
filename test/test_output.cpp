@@ -173,6 +173,10 @@ TEST(output, emitter)
           "}\n"
           "fn fdiv() -> f32 {\n"
           " return 6.4 / 2.0;\n"
+          "}\n"
+          /* str */
+          "fn stest() -> str {\n"
+          " return \"Test\";\n"
           "}\n";
 
         slang::lexer lexer;

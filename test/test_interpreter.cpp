@@ -67,6 +67,9 @@ TEST(interpreter, loading)
 
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "fdiv", {}));
     EXPECT_NEAR(std::get<float>(res), 3.2, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
+    EXPECT_EQ(std::get<std::string>(res), "Test");
 }
 
 }    // namespace

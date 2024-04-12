@@ -113,10 +113,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<slang::codegen:
         {
             if(type == "str" && str_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("instruction_emitter::emit_instruction not implemented for instruction '{}' and type '{}'.", name, type));
+                emit(instruction_buffer, *str_opcode, vle_int{static_cast<const cg::constant_str*>(v)->get_constant_index()});
             }
-
-            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            else
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
         }
     };
 
@@ -145,6 +147,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<slang::codegen:
         // the arguments are relevant for type checking, but can be ignored here.
         expect_arg_size(0, 1);
         emit(instruction_buffer, opcode::ret);
+    }
+    else if(name == "load")
+    {
+        emit_typed_one_arg(opcode::iload, opcode::fload, opcode::sload);
     }
     else
     {
@@ -215,12 +221,10 @@ language_module instruction_emitter::to_module() const
 {
     language_module mod;
 
-    for(auto& it: ctx.strings)
-    {
-        // TODO write strings.
-        throw std::runtime_error("instruction_emitter::to_module: not implemented for strings.");
-    }
+    // strings.
+    mod.set_string_table(ctx.strings);
 
+    // types.
     for(auto& it: ctx.types)
     {
         // TODO write type definitions.
