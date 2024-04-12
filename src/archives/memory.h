@@ -40,7 +40,7 @@ public:
     memory_write_archive& operator=(memory_write_archive&&) = default;
 
     /**
-     * Construct an in-memory archive.
+     * Construct an in-memory write archive.
      *
      * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
@@ -58,6 +58,78 @@ public:
     std::size_t seek(std::size_t pos) override
     {
         throw serialization_error("memory_write_archive::seek: Operation not supported by archive.");
+    }
+
+    std::size_t size() override
+    {
+        return memory_buffer.size();
+    }
+
+    /** Get the internal buffer. */
+    const std::vector<std::byte>& get_buffer() const
+    {
+        return memory_buffer;
+    }
+};
+
+/** Archive for in-memory reads. */
+class memory_read_archive : public archive
+{
+protected:
+    /** The archive's buffer reference. */
+    const std::vector<std::byte>& memory_buffer;
+
+    /** Current buffer read offset. */
+    std::size_t offset = 0;
+
+    void serialize_bytes(std::byte* buffer, std::size_t c) override
+    {
+        if(offset + c > memory_buffer.size())
+        {
+            throw std::runtime_error("memory_read_archive: read out of bounds.");
+        }
+
+        std::copy(memory_buffer.begin() + offset, memory_buffer.begin() + offset + c, buffer);
+        offset += c;
+    }
+
+public:
+    /** Defaulted and deleted constructors. */
+    memory_read_archive() = delete;
+    memory_read_archive(const memory_read_archive&) = default;
+    memory_read_archive(memory_read_archive&&) = default;
+
+    /** Deleted assignments. */
+    memory_read_archive& operator=(const memory_read_archive&) = delete;
+    memory_read_archive& operator=(memory_read_archive&&) = delete;
+
+    /**
+     * Construct an in-memory read archive.
+     *
+     * @param memory_buffer The underlying buffer.
+     * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
+     * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
+     */
+    memory_read_archive(const std::vector<std::byte>& memory_buffer, bool persistent, endian byte_order = endian::little)
+    : memory_buffer{memory_buffer}
+    , archive{true, false, persistent, byte_order}
+    {
+    }
+
+    std::size_t tell() override
+    {
+        return offset;
+    }
+
+    std::size_t seek(std::size_t pos) override
+    {
+        if(pos >= memory_buffer.size())
+        {
+            throw std::runtime_error("memory_read_archive::seek: position out of bounds.");
+        }
+
+        offset = pos;
+        return offset;
     }
 
     std::size_t size() override

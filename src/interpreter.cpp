@@ -21,7 +21,7 @@ namespace slang::interpreter
 std::pair<module_header, std::vector<std::byte>> context::decode(const language_module& mod) const
 {
     module_header header = mod.get_header();
-    const std::vector<std::byte>& binary = mod.get_binary();
+    memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
 
     std::vector<std::byte> code;
     for(auto& it: header.exports)
@@ -40,11 +40,14 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
         auto& details = std::get<function_details>(desc.details);
         std::size_t decoded_offset = code.size();
         std::size_t end_offset = details.offset + details.size;
-        for(std::size_t i = details.offset; i < end_offset;)
+
+        ar.seek(details.offset);
+        while(ar.tell() < end_offset)
         {
-            auto instr = binary[i];
+            std::byte instr;
+            ar & instr;
+
             code.push_back(instr);
-            ++i;
 
             switch(static_cast<opcode>(instr))
             {
@@ -63,19 +66,8 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
             case opcode::iconst:
             case opcode::fconst:
             {
-                if(i + 4 >= binary.size())
-                {
-                    throw interpreter_error("Cannot decode instruction (unexpected EOF).");
-                }
-
-                std::uint8_t i_u8[4] = {
-                  static_cast<std::uint8_t>(binary[i]),
-                  static_cast<std::uint8_t>(binary[i + 1]),
-                  static_cast<std::uint8_t>(binary[i + 2]),
-                  static_cast<std::uint8_t>(binary[i + 3])};
-                i += 4;
-
-                std::uint32_t i_u32 = i_u8[0] + (i_u8[1] << 8) + (i_u8[2] << 16) + (i_u8[3] << 24);
+                std::uint32_t i_u32;
+                ar & i_u32;
 
                 code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + 4);
                 break;
