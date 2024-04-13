@@ -77,6 +77,16 @@ TEST(interpreter, loading)
     EXPECT_EQ(std::get<int>(res), 16);
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
     EXPECT_EQ(std::get<int>(res), -99);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {1.0f}));
+    EXPECT_NEAR(std::get<float>(res), 3.0, 1e-6);
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {-1.0f}));
+    EXPECT_NEAR(std::get<float>(res), -1.0, 1e-6);
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {0.f}));
+    EXPECT_NEAR(std::get<float>(res), 1.0, 1e-6);
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
+    EXPECT_EQ(std::get<std::string>(res), "Test");
 }
 
 }    // namespace

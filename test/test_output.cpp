@@ -181,6 +181,12 @@ TEST(output, emitter)
           /* arguments */
           "fn arg(a: i32) -> i32 {\n"
           " return 1 + a;\n"
+          "}\n"
+          "fn arg2(a: f32) -> f32 {\n"
+          " return 2.0*a+1.0;\n"
+          "}\n"
+          "fn sid(a: str) -> str {\n"
+          " return a;\n"
           "}\n";
 
         slang::lexer lexer;

@@ -103,7 +103,7 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
                 std::uint32_t i_u32;
                 ar & i_u32;
 
-                code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + 4);
+                code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
                 break;
             }
             /* opcodes with one VLE integer. */
@@ -314,7 +314,6 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
 
             if(i < 0)
             {
-                // TODO globals?
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
@@ -326,6 +325,24 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
             stack.push_i32(*reinterpret_cast<std::uint32_t*>(&locals[i]));
             break;
         } /* opcode::iload, opcode::fload */
+        case opcode::sload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::uint64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::uint32_t) > locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            stack.push_addr(*reinterpret_cast<std::string**>(&locals[i]));
+            break;
+        } /* opcode::sload */
 
         default:
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
