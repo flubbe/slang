@@ -247,6 +247,23 @@ protected:
     std::pair<module_header, std::vector<std::byte>> decode(const language_module& mod) const;
 
     /**
+     * Decode the function's arguments and locals.
+     *
+     * @param details The function's details.
+     */
+    void decode_locals(function_details& details) const;
+
+    /**
+     * Decode an instruction.
+     *
+     * @param ar The archive to read from.
+     * @param instr The instruction to decode.
+     * @param details The function's details.
+     * @param code Buffer to write the decoded bytes into.
+     */
+    void decode_instruction(archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const;
+
+    /**
      * Execute a function.
      *
      * @param string_table The module's string table.
@@ -259,6 +276,21 @@ protected:
                const std::vector<std::byte>& binary,
                const function& f,
                const std::vector<value>& args);
+
+    /**
+     * Execute a function.
+     *
+     * @param string_table The module's string table.
+     * @param binary The decoded bytecode.
+     * @param f The function to execute.
+     * @param locals The function's arguments and locals, given as a byte buffer.
+     * @param stack The stack to use for evaluation. Will hold the function's return value.
+     */
+    void exec(const std::vector<std::string>& string_table,
+              const std::vector<std::byte>& binary,
+              const function& f,
+              std::vector<std::byte>& locals,
+              exec_stack& stack);
 
 public:
     /** Default constructors. */

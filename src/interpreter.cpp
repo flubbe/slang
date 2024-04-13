@@ -18,6 +18,94 @@
 namespace slang::interpreter
 {
 
+void context::decode_locals(function_details& details) const
+{
+    details.locals_size = 0;
+    for(auto& it: details.locals)
+    {
+        it.offset = details.locals_size;
+
+        if(it.type == "i32")
+        {
+            it.size = sizeof(std::uint32_t);
+        }
+        else if(it.type == "f32")
+        {
+            it.size = sizeof(float);
+        }
+        else if(it.type == "str")
+        {
+            it.size = sizeof(std::string*);
+        }
+        else
+        {
+            throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", it.type));
+        }
+
+        details.locals_size += it.size;
+    }
+}
+
+void context::decode_instruction(archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
+{
+    switch(static_cast<opcode>(instr))
+    {
+    /* opcodes without arguments. */
+    case opcode::ret:
+    case opcode::iadd:
+    case opcode::isub:
+    case opcode::imul:
+    case opcode::idiv:
+    case opcode::fadd:
+    case opcode::fsub:
+    case opcode::fmul:
+    case opcode::fdiv:
+        break;
+    /* opcodes with one 4-byte argument. */
+    case opcode::iconst:
+    case opcode::fconst:
+    {
+        std::uint32_t i_u32;
+        ar & i_u32;
+
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
+        break;
+    }
+    /* opcodes with one VLE integer. */
+    case opcode::sconst:
+    {
+        vle_int i;
+        ar & i;
+
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
+        break;
+    }
+    /* opcodes that need to resolve a variable. */
+    case opcode::iload:
+    case opcode::fload:
+    case opcode::sload:
+    case opcode::istore:
+    case opcode::fstore:
+    case opcode::sstore:
+    {
+        vle_int i;
+        ar & i;
+
+        if(i.i < 0 || i.i >= details.locals.size())
+        {
+            throw interpreter_error(fmt::format("index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
+        }
+
+        std::int64_t offset = details.locals[i.i].offset;
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+
+        break;
+    }
+    default:
+        throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
+    }
+}
+
 std::pair<module_header, std::vector<std::byte>> context::decode(const language_module& mod) const
 {
     module_header header = mod.get_header();
@@ -43,176 +131,45 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
          * arguments and locals.
          */
 
-        details.locals_size = 0;
-        for(auto& it: details.locals)
-        {
-            it.offset = details.locals_size;
-
-            if(it.type == "i32")
-            {
-                it.size = sizeof(std::uint32_t);
-            }
-            else if(it.type == "f32")
-            {
-                it.size = sizeof(float);
-            }
-            else if(it.type == "str")
-            {
-                it.size = sizeof(std::string*);
-            }
-            else
-            {
-                throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", it.type));
-            }
-
-            details.locals_size += it.size;
-        }
+        decode_locals(details);
 
         /*
          * instructions.
          */
 
-        std::size_t decoded_offset = code.size();
-        std::size_t end_offset = details.offset + details.size;
+        std::size_t bytecode_end = details.offset + details.size;
 
         ar.seek(details.offset);
-        while(ar.tell() < end_offset)
-        {
-            std::byte instr;
-            ar & instr;
+        details.offset = code.size();
 
+        std::byte instr;
+
+        while(ar.tell() < bytecode_end)
+        {
+            ar & instr;
             code.push_back(instr);
 
-            switch(static_cast<opcode>(instr))
-            {
-            /* opcodes without arguments. */
-            case opcode::ret:
-            case opcode::iadd:
-            case opcode::isub:
-            case opcode::imul:
-            case opcode::idiv:
-            case opcode::fadd:
-            case opcode::fsub:
-            case opcode::fmul:
-            case opcode::fdiv:
-                break;
-            /* opcodes with one 4-byte argument. */
-            case opcode::iconst:
-            case opcode::fconst:
-            {
-                std::uint32_t i_u32;
-                ar & i_u32;
-
-                code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
-                break;
-            }
-            /* opcodes with one VLE integer. */
-            case opcode::sconst:
-            {
-                vle_int i;
-                ar & i;
-
-                code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
-                break;
-            }
-            /* opcodes that need to resolve a variable. */
-            case opcode::iload:
-            case opcode::fload:
-            case opcode::sload:
-            case opcode::istore:
-            case opcode::fstore:
-            case opcode::sstore:
-            {
-                vle_int i;
-                ar & i;
-
-                if(i.i < 0 || i.i >= details.locals.size())
-                {
-                    throw interpreter_error(fmt::format("index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
-                }
-
-                std::int64_t offset = details.locals[i.i].offset;
-                code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
-
-                break;
-            }
-            default:
-                throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
-            }
+            decode_instruction(ar, instr, details, code);
         }
-        std::size_t decoded_size = code.size() - decoded_offset;
 
-        details.offset = decoded_offset;
-        details.size = decoded_size;
+        details.size = code.size() - details.offset;
     }
 
     return {std::move(header), std::move(code)};
 }
 
-value context::exec(const std::vector<std::string>& string_table, const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args)
+void context::exec(const std::vector<std::string>& string_table,
+                   const std::vector<std::byte>& binary,
+                   const function& f,
+                   std::vector<std::byte>& locals,
+                   exec_stack& stack)
 {
-    // allocate locals and decode arguments.
-    std::vector<std::byte> locals{f.locals_size};
-    std::vector<std::string> local_strings;
-
-    auto& arg_types = f.get_signature().arg_types;
-    if(arg_types.size() != args.size())
-    {
-        throw interpreter_error(fmt::format("Arguments for function '{}' do not match: got {}, expected {}.", arg_types.size(), args.size()));
-    }
-
-    std::size_t offset = 0;
-    for(std::size_t i = 0; i < args.size(); ++i)
-    {
-        auto& arg_type = arg_types[i];
-        if(arg_type == "i32")
-        {
-            if(offset + sizeof(std::int32_t) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
-
-            *reinterpret_cast<std::int32_t*>(&locals[offset]) = std::get<int>(args[i]);
-
-            offset += sizeof(std::int32_t);
-        }
-        else if(arg_type == "f32")
-        {
-            if(offset + sizeof(float) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
-
-            *reinterpret_cast<float*>(&locals[offset]) = std::get<float>(args[i]);
-
-            offset += sizeof(float);
-        }
-        else if(arg_type == "str")
-        {
-            if(offset + sizeof(std::string*) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
-
-            local_strings.emplace_back(std::get<std::string>(args[i]));
-            *reinterpret_cast<std::string**>(&locals[offset]) = &local_strings.back();
-
-            offset += sizeof(std::string*);
-        }
-        else
-        {
-            throw interpreter_error(fmt::format("Argument type '{}' not implemented.", arg_type));
-        }
-    }
-
-    // execute the instructions.
-    offset = f.get_entry_point();
+    std::size_t offset = f.get_entry_point();
     if(offset >= binary.size())
     {
         throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
     }
 
-    exec_stack stack;
     const std::size_t function_end = f.get_entry_point() + f.get_size();
     while(offset < function_end)
     {
@@ -221,7 +178,7 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
 
         if(static_cast<opcode>(instr) == opcode::ret)
         {
-            break;
+            return;
         }
 
         if(offset == function_end)
@@ -348,6 +305,80 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
         }
     }
+
+    throw interpreter_error("Out of bounds code read.");
+}
+
+value context::exec(const std::vector<std::string>& string_table,
+                    const std::vector<std::byte>& binary,
+                    const function& f,
+                    const std::vector<value>& args)
+{
+    /*
+     * allocate locals and decode arguments.
+     */
+    std::vector<std::byte> locals{f.locals_size};
+    std::vector<std::string> local_strings;
+
+    auto& arg_types = f.get_signature().arg_types;
+    if(arg_types.size() != args.size())
+    {
+        throw interpreter_error(fmt::format("Arguments for function '{}' do not match: got {}, expected {}.", arg_types.size(), args.size()));
+    }
+
+    std::size_t offset = 0;
+    for(std::size_t i = 0; i < args.size(); ++i)
+    {
+        auto& arg_type = arg_types[i];
+        if(arg_type == "i32")
+        {
+            if(offset + sizeof(std::int32_t) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            *reinterpret_cast<std::int32_t*>(&locals[offset]) = std::get<int>(args[i]);
+
+            offset += sizeof(std::int32_t);
+        }
+        else if(arg_type == "f32")
+        {
+            if(offset + sizeof(float) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            *reinterpret_cast<float*>(&locals[offset]) = std::get<float>(args[i]);
+
+            offset += sizeof(float);
+        }
+        else if(arg_type == "str")
+        {
+            if(offset + sizeof(std::string*) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            local_strings.emplace_back(std::get<std::string>(args[i]));
+            *reinterpret_cast<std::string**>(&locals[offset]) = &local_strings.back();
+
+            offset += sizeof(std::string*);
+        }
+        else
+        {
+            throw interpreter_error(fmt::format("Argument type '{}' not implemented.", arg_type));
+        }
+    }
+
+    /*
+     * Execute the function.
+     */
+    exec_stack stack;
+    exec(string_table, binary, f, locals, stack);
+
+    /*
+     * generate return values.
+     */
 
     auto& signature = f.get_signature();
     if(signature.return_type == "i32")
