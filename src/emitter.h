@@ -11,20 +11,17 @@
 #pragma once
 
 #include "archives/memory.h"
+#include "module.h"
 
 /*
  * Forward declarations.
  */
 
-namespace slang
-{
-struct function_details;
-class language_module;
-}    // namespace slang
-
 namespace slang::codegen
 {
 class context;
+class instruction;
+class function;
 }    // namespace slang::codegen
 
 namespace slang
@@ -60,9 +57,10 @@ protected:
     /**
      * Emit an instruction.
      *
+     * @param func The current function.
      * @param instr The instruction to emit.
      */
-    void emit_instruction(const std::unique_ptr<slang::codegen::instruction>& instr);
+    void emit_instruction(const std::unique_ptr<slang::codegen::function>& func, const std::unique_ptr<slang::codegen::instruction>& instr);
 
 public:
     /** Delete constructors. */

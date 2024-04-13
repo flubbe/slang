@@ -67,6 +67,67 @@ inline archive& operator&(archive& ar, symbol_type& s)
     return ar;
 }
 
+/** A symbol. */
+struct symbol
+{
+    /** The symbol's size. */
+    std::size_t size;
+
+    /** The offset. */
+    std::size_t offset;
+};
+
+/**
+ * Serializer for symbols.
+ *
+ * @param ar The archive to use for serialization.
+ * @param s The symbol.
+ */
+inline archive& operator&(archive& ar, symbol& s)
+{
+    ar & s.offset;
+    ar & s.size;
+    return ar;
+}
+
+/** A variable. */
+struct variable : public symbol
+{
+    /** The variable's type. */
+    std::string type;
+
+    /** Default constructors. */
+    variable() = default;
+    variable(const variable&) = default;
+    variable(variable&&) = default;
+
+    /** Default assignments. */
+    variable& operator=(const variable&) = default;
+    variable& operator=(variable&&) = default;
+
+    /**
+     * Construct a variable.
+     *
+     * @param type The variable's type.
+     */
+    variable(std::string type)
+    : type{std::move(type)}
+    {
+    }
+};
+
+/**
+ * Serializer for variables.
+ *
+ * @param ar The archive to use for serialization.
+ * @param s The variable.
+ */
+inline archive& operator&(archive& ar, variable& v)
+{
+    ar & v.type;
+    return ar;
+}
+
 /** Function signature. */
 struct function_signature
 {
@@ -150,13 +211,35 @@ inline archive& operator&(archive& ar, native_function_details& details)
 }
 
 /** Additional details for functions. */
-struct function_details
+struct function_details : public symbol
 {
-    /** Offset into the module file (not counting the header). */
-    std::size_t offset;
+    /** Locals (including arguments). */
+    std::vector<variable> locals;
 
-    /** Bytecode size. */
-    std::size_t size;
+    /** Decoded size of locals. Not serialized. */
+    std::size_t locals_size;
+
+    /** Default constructors. */
+    function_details() = default;
+    function_details(const function_details&) = default;
+    function_details(function_details&&) = default;
+
+    /** Default assignments. */
+    function_details& operator=(const function_details&) = default;
+    function_details& operator=(function_details&&) = default;
+
+    /**
+     * Construct function details.
+     *
+     * @param size The size of the function's bytecode.
+     * @param offset The offset of the function
+     * @param locals The function's arguments and locals.
+     */
+    function_details(std::size_t size, std::size_t offset, std::vector<variable> locals)
+    : symbol{size, offset}
+    , locals{std::move(locals)}
+    {
+    }
 };
 
 /**
@@ -167,8 +250,8 @@ struct function_details
  */
 inline archive& operator&(archive& ar, function_details& details)
 {
-    ar & details.offset;
-    ar & details.size;
+    ar& static_cast<symbol&>(details);
+    ar & details.locals;
     return ar;
 }
 
@@ -453,10 +536,11 @@ public:
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
-     * @param entry_point The entry point of the function.
      * @param size The function's bytecode size.
+     * @param entry_point The entry point of the function.
+     * @param locals The function's arguments and locals.
      */
-    void add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t entry_point, std::size_t size);
+    void add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t size, std::size_t entry_point, std::vector<variable> locals);
 
     /**
      * Add a native function to the module.

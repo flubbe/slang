@@ -221,7 +221,7 @@ TEST(compile_ir, builtin_return_values)
                   ".string @0 \"test\"\n"
                   "define str @f() {\n"
                   "entry:\n"
-                  " load str @0\n"
+                  " const str @0\n"
                   " ret str\n"
                   "}");
     }
@@ -827,7 +827,7 @@ TEST(compile_ir, function_calls)
                   "entry:\n"
                   " const i32 1\n"
                   " const f32 2.3\n"
-                  " load str @0\n"
+                  " const str @0\n"
                   " invoke @h\n"
                   " invoke @g\n"
                   " ret\n"

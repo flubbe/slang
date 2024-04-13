@@ -974,6 +974,52 @@ public:
     }
 
     /**
+     * Get the index on argument or a local. Indices are with respect to
+     * the list `[arg1, ... argN, local1, ... localM]`.
+     *
+     * Indices are not constant during code generation. They are constant
+     * during instruction emission.
+     *
+     * @param name Name or the local or the argument.
+     * @throws A `codegen_error` the the name could not be found.
+     */
+    std::size_t get_index(const std::string& name) const
+    {
+        auto it = std::find_if(args.begin(), args.end(),
+                               [&name](const std::unique_ptr<value>& v) -> bool
+                               {
+                                   if(!v->has_name())
+                                   {
+                                       throw codegen_error("Scope contains unnamed value.");
+                                   }
+
+                                   return *v->get_name() == name;
+                               });
+        if(it != args.end())
+        {
+            return it - args.begin();
+        }
+
+        it = std::find_if(locals.begin(), locals.end(),
+                          [&name](const std::unique_ptr<value>& v) -> bool
+                          {
+                              if(!v->has_name())
+                              {
+                                  throw codegen_error("Scope contains unnamed value.");
+                              }
+
+                              return *v->get_name() == name;
+                          });
+
+        if(it != locals.end())
+        {
+            return args.size() + (it - locals.begin());
+        }
+
+        throw codegen_error(fmt::format("Name '{}' not found in scope.", name));
+    }
+
+    /**
      * Add an argument.
      *
      * @param arg The argument.

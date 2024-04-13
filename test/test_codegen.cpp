@@ -655,7 +655,7 @@ TEST(codegen, strings)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_load(std::make_unique<cg::const_argument>("\tTest\n"));
+        ctx.generate_const({"str"}, "\tTest\n");
         ctx.generate_ret(std::make_optional<cg::value>("str"));
 
         EXPECT_TRUE(block->is_valid());
@@ -664,7 +664,7 @@ TEST(codegen, strings)
                   ".string @0 \"\\x09Test\\x0a\"\n"
                   "define str @f() {\n"
                   "entry:\n"
-                  " load str @0\n"
+                  " const str @0\n"
                   " ret str\n"
                   "}");
     }

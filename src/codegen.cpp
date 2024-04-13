@@ -192,8 +192,9 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
     }
     else if(vt.get_type() == "str")
     {
-        generate_load(std::make_unique<const_argument>(std::get<std::string>(v)));    // this also registers the arguments/strings.
-        return;
+        auto arg = std::make_unique<const_argument>(std::get<std::string>(v));
+        arg->register_const(*this);
+        args.emplace_back(std::move(arg));
     }
     else
     {
@@ -220,7 +221,6 @@ void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> 
 void context::generate_load(std::unique_ptr<argument> arg)
 {
     validate_insertion_point();
-    arg->register_const(*this);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
     insertion_point->add_instruction(std::make_unique<instruction>("load", std::move(args)));

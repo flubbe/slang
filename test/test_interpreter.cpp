@@ -70,6 +70,13 @@ TEST(interpreter, loading)
 
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
     EXPECT_EQ(std::get<std::string>(res), "Test");
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {1}));
+    EXPECT_EQ(std::get<int>(res), 2);
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {15}));
+    EXPECT_EQ(std::get<int>(res), 16);
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
+    EXPECT_EQ(std::get<int>(res), -99);
 }
 
 }    // namespace

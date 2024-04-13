@@ -50,6 +50,10 @@ class function
     std::size_t size;
 
 public:
+    /** Argument and locals size. Not serialized. */
+    std::size_t locals_size = 0;
+
+public:
     /** Default constructors. */
     function() = default;
     function(const function&) = default;
@@ -65,11 +69,13 @@ public:
      * @param signature The function's signature.
      * @param entry_point The function's entry point, given as an offset into a module binary.
      * @param size The bytecode size.
+     * @param locals_size The arguments and locals size.
      */
-    function(function_signature signature, std::size_t entry_point, std::size_t size)
+    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
     : signature{std::move(signature)}
     , entry_point{entry_point}
     , size{size}
+    , locals_size{locals_size}
     {
     }
 

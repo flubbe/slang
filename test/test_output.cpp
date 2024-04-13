@@ -177,6 +177,10 @@ TEST(output, emitter)
           /* str */
           "fn stest() -> str {\n"
           " return \"Test\";\n"
+          "}\n"
+          /* arguments */
+          "fn arg(a: i32) -> i32 {\n"
+          " return 1 + a;\n"
           "}\n";
 
         slang::lexer lexer;

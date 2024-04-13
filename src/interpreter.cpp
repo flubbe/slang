@@ -38,6 +38,40 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
         }
 
         auto& details = std::get<function_details>(desc.details);
+
+        /*
+         * arguments and locals.
+         */
+
+        details.locals_size = 0;
+        for(auto& it: details.locals)
+        {
+            it.offset = details.locals_size;
+
+            if(it.type == "i32")
+            {
+                it.size = sizeof(std::uint32_t);
+            }
+            else if(it.type == "f32")
+            {
+                it.size = sizeof(float);
+            }
+            else if(it.type == "str")
+            {
+                it.size = sizeof(std::string*);
+            }
+            else
+            {
+                throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", it.type));
+            }
+
+            details.locals_size += it.size;
+        }
+
+        /*
+         * instructions.
+         */
+
         std::size_t decoded_offset = code.size();
         std::size_t end_offset = details.offset + details.size;
 
@@ -73,12 +107,33 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
                 break;
             }
             /* opcodes with one VLE integer. */
-            case opcode::sload:
+            case opcode::sconst:
             {
                 vle_int i;
                 ar & i;
 
-                code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + 8);
+                code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
+                break;
+            }
+            /* opcodes that need to resolve a variable. */
+            case opcode::iload:
+            case opcode::fload:
+            case opcode::sload:
+            case opcode::istore:
+            case opcode::fstore:
+            case opcode::sstore:
+            {
+                vle_int i;
+                ar & i;
+
+                if(i.i < 0 || i.i >= details.locals.size())
+                {
+                    throw interpreter_error(fmt::format("index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
+                }
+
+                std::int64_t offset = details.locals[i.i].offset;
+                code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+
                 break;
             }
             default:
@@ -96,12 +151,62 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
 
 value context::exec(const std::vector<std::string>& string_table, const std::vector<std::byte>& binary, const function& f, const std::vector<value>& args)
 {
-    if(args.size() != 0)
+    // allocate locals and decode arguments.
+    std::vector<std::byte> locals{f.locals_size};
+    std::vector<std::string> local_strings;
+
+    auto& arg_types = f.get_signature().arg_types;
+    if(arg_types.size() != args.size())
     {
-        throw std::runtime_error("context::exec: arguments not implemented.");
+        throw interpreter_error(fmt::format("Arguments for function '{}' do not match: got {}, expected {}.", arg_types.size(), args.size()));
     }
 
-    std::size_t offset = f.get_entry_point();
+    std::size_t offset = 0;
+    for(std::size_t i = 0; i < args.size(); ++i)
+    {
+        auto& arg_type = arg_types[i];
+        if(arg_type == "i32")
+        {
+            if(offset + sizeof(std::int32_t) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            *reinterpret_cast<std::int32_t*>(&locals[offset]) = std::get<int>(args[i]);
+
+            offset += sizeof(std::int32_t);
+        }
+        else if(arg_type == "f32")
+        {
+            if(offset + sizeof(float) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            *reinterpret_cast<float*>(&locals[offset]) = std::get<float>(args[i]);
+
+            offset += sizeof(float);
+        }
+        else if(arg_type == "str")
+        {
+            if(offset + sizeof(std::string*) > f.locals_size)
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            local_strings.emplace_back(std::get<std::string>(args[i]));
+            *reinterpret_cast<std::string**>(&locals[offset]) = &local_strings.back();
+
+            offset += sizeof(std::string*);
+        }
+        else
+        {
+            throw interpreter_error(fmt::format("Argument type '{}' not implemented.", arg_type));
+        }
+    }
+
+    // execute the instructions.
+    offset = f.get_entry_point();
     if(offset >= binary.size())
     {
         throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
@@ -182,16 +287,16 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
         case opcode::fconst:
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
-            uint32_t i_u32 = *reinterpret_cast<const std::uint32_t*>(&binary[offset]);
-            offset += 4;
+            std::uint32_t i_u32 = *reinterpret_cast<const std::uint32_t*>(&binary[offset]);
+            offset += sizeof(std::uint32_t);
 
             stack.push_i32(i_u32);
             break;
         } /* opcode::iconst, opcode::fconst */
-        case opcode::sload:
+        case opcode::sconst:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += 8;
+            offset += sizeof(std::uint64_t);
 
             if(i < 0 || i >= string_table.size())
             {
@@ -200,7 +305,27 @@ value context::exec(const std::vector<std::string>& string_table, const std::vec
 
             stack.push_addr(&string_table[i]);
             break;
-        } /* opcode::sload */
+        } /* opcode::sconst */
+        case opcode::iload:
+        case opcode::fload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::uint64_t);
+
+            if(i < 0)
+            {
+                // TODO globals?
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::uint32_t) > locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            stack.push_i32(*reinterpret_cast<std::uint32_t*>(&locals[i]));
+            break;
+        } /* opcode::iload, opcode::fload */
 
         default:
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
@@ -237,18 +362,18 @@ void context::load_module(const std::string& name, const language_module& mod)
         throw interpreter_error(fmt::format("Module '{}' already loaded.", name));
     }
 
-    module_map.insert({name, decode(mod)});
+    auto [decoded_header, decoded_binary] = decode(mod);
+    module_map.insert({name, {decoded_header, decoded_binary}});
 
     // resolve dependencies.
-    auto& header = mod.get_header();
-    for(auto& it: header.imports)
+    for(auto& it: decoded_header.imports)
     {
         throw interpreter_error("context::load_module: import resolution not implemented.");
     }
 
     // populate function map.
     std::unordered_map<std::string, function> fmap;
-    for(auto& it: header.exports)
+    for(auto& it: decoded_header.exports)
     {
         if(it.type != symbol_type::function)
         {
@@ -267,7 +392,8 @@ void context::load_module(const std::string& name, const language_module& mod)
         }
         else
         {
-            fmap.insert({it.name, function(desc.signature, std::get<function_details>(desc.details).offset, std::get<function_details>(desc.details).size)});
+            auto& details = std::get<function_details>(desc.details);
+            fmap.insert({it.name, function(desc.signature, details.offset, details.size, details.locals_size)});
         }
     }
     function_map.insert({name, std::move(fmap)});
