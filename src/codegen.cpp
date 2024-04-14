@@ -93,6 +93,35 @@ std::size_t context::get_string(std::string str)
     return strings.size() - 1;
 }
 
+prototype* context::add_prototype(std::string name, std::string return_type, std::vector<value> args)
+{
+    if(std::find_if(prototypes.begin(), prototypes.end(),
+                    [&name](const std::unique_ptr<prototype>& p) -> bool
+                    {
+                        return p->get_name() == name;
+                    })
+       != prototypes.end())
+    {
+        throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
+    }
+
+    return prototypes.emplace_back(std::make_unique<prototype>(std::move(name), std::move(return_type), std::move(args))).get();
+}
+
+const prototype& context::get_prototype(const std::string& name) const
+{
+    auto it = std::find_if(prototypes.begin(), prototypes.end(),
+                           [&name](const std::unique_ptr<prototype>& p) -> bool
+                           {
+                               return p->get_name() == name;
+                           });
+    if(it == prototypes.end())
+    {
+        throw codegen_error(fmt::format("Prototype '{}' not found.", name));
+    }
+    return **it;
+}
+
 function* context::create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
 {
     if(std::find_if(funcs.begin(), funcs.end(),
@@ -195,6 +224,10 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
         auto arg = std::make_unique<const_argument>(std::get<std::string>(v));
         arg->register_const(*this);
         args.emplace_back(std::move(arg));
+    }
+    else if(vt.get_type() == "fn")
+    {
+        // Nothing to do.
     }
     else
     {

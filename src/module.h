@@ -17,6 +17,12 @@
 #include "archives/archive.h"
 #include "archives/memory.h"
 
+/* Forward declarations. */
+namespace slang::interpreter
+{
+class context;
+};
+
 namespace slang
 {
 
@@ -216,8 +222,14 @@ struct function_details : public symbol
     /** Locals (including arguments). */
     std::vector<variable> locals;
 
+    /** Decoded arguments size. Not serialized. */
+    std::size_t args_size;
+
     /** Decoded size of locals. Not serialized. */
     std::size_t locals_size;
+
+    /** Decoded return type size. Not serialized. */
+    std::size_t return_size;
 
     /** Default constructors. */
     function_details() = default;
@@ -520,6 +532,9 @@ class language_module
     /** The binary part. */
     std::vector<std::byte> binary;
 
+    /** Whether this is a decoded module. */
+    bool decoded = false;
+
 public:
     /** Default constructors. */
     language_module() = default;
@@ -529,6 +544,16 @@ public:
     /** Default assignments. */
     language_module& operator=(const language_module&) = default;
     language_module& operator=(language_module&&) = default;
+
+    /**
+     * Construct a module from header.
+     *
+     * @param header THe module's header.
+     */
+    language_module(module_header header)
+    : header{std::move(header)}
+    {
+    }
 
     /**
      * Add a function to the module.
@@ -584,7 +609,14 @@ public:
         return binary;
     }
 
+    /** Get whether the module is decoded. */
+    bool is_decoded() const
+    {
+        return decoded;
+    }
+
     friend archive& operator&(archive& ar, language_module& mod);
+    friend class slang::interpreter::context;
 };
 
 /**

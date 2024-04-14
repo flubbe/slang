@@ -23,6 +23,11 @@ namespace slang::typing
 class context;
 }    // namespace slang::typing
 
+namespace slang::codegen
+{
+class context;
+}    // namespace slang::codegen
+
 namespace slang::resolve
 {
 
@@ -85,9 +90,10 @@ public:
     /**
      * Resolve imports from a type context.
      *
-     * @param ctx The type context.
+     * @param ctx The code generation context.
+     * @param ctx The typing context.
      */
-    void resolve_imports(slang::typing::context& ctx);
+    void resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx);
 };
 
 }    // namespace slang::resolve

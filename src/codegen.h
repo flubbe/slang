@@ -78,7 +78,7 @@ protected:
      */
     void validate() const
     {
-        bool is_builtin = (type == "i32") || (type == "f32") || (type == "str");
+        bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
         bool is_ref = (type == "addr") || (type == "ptr");
         if(is_builtin || is_ref)
         {
@@ -469,16 +469,16 @@ public:
 class function_argument : public argument
 {
     /** The function's name. */
-    std::string name;
+    std::unique_ptr<value> name;
 
 public:
-    /** Default constructors. */
+    /** Default and deleted constructors. */
     function_argument() = default;
-    function_argument(const function_argument&) = default;
+    function_argument(const function_argument&) = delete;
     function_argument(function_argument&&) = default;
 
-    /** Default assignments. */
-    function_argument& operator=(const function_argument&) = default;
+    /** Defaulted and deleted assignments. */
+    function_argument& operator=(const function_argument&) = delete;
     function_argument& operator=(function_argument&&) = default;
 
     /**
@@ -488,18 +488,18 @@ public:
      */
     function_argument(std::string name)
     : argument()
-    , name{std::move(name)}
+    , name{std::make_unique<value>("fn", std::nullopt, std::move(name))}
     {
     }
 
     std::string to_string() const override
     {
-        return fmt::format("@{}", name);
+        return fmt::format("@{}", *name->get_name());
     }
 
-    value* get_value() const override
+    const slang::codegen::value* get_value() const override
     {
-        throw codegen_error(fmt::format("Requested type of a function argument."));
+        return name.get();
     }
 };
 
@@ -1133,6 +1133,63 @@ public:
 };
 
 /**
+ * Function prototype information.
+ */
+class prototype
+{
+    /** The function's name. */
+    std::string name;
+
+    /** The return type of the function. */
+    std::string return_type;
+
+    /** The argument types. */
+    std::vector<value> arg_types;
+
+public:
+    /** Default constructors. */
+    prototype() = default;
+    prototype(const prototype&) = default;
+    prototype(prototype&&) = default;
+
+    /** Default assignments. */
+    prototype& operator=(const prototype&) = default;
+    prototype& operator=(prototype&&) = default;
+
+    /**
+     * Construct a function prototype.
+     *
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param arg_type The function's argument types.
+     */
+    prototype(std::string name, std::string return_type, std::vector<value> arg_types)
+    : name{std::move(name)}
+    , return_type{std::move(return_type)}
+    , arg_types{std::move(arg_types)}
+    {
+    }
+
+    /** Get the function's name. */
+    const std::string& get_name() const
+    {
+        return name;
+    }
+
+    /** Get the function's return type. */
+    const std::string& get_return_type() const
+    {
+        return return_type;
+    }
+
+    /** Get the function's argument types. */
+    const std::vector<value> get_arg_types() const
+    {
+        return arg_types;
+    }
+};
+
+/**
  * A relocatable function.
  */
 class function
@@ -1433,6 +1490,9 @@ class context
     /** The current scope stack. */
     std::vector<scope*> current_scopes;
 
+    /** List of function prototypes. */
+    std::vector<std::unique_ptr<prototype>> prototypes;
+
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
@@ -1486,6 +1546,27 @@ public:
      * @returns An index into the string table.
      */
     std::size_t get_string(std::string str);
+
+    /**
+     * Add a function prototype.
+     *
+     * Throws a `codegen_error` if the prototype already exists.
+     *
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param args The function's arguments.
+     * @returns A representation of the prototype.
+     */
+    prototype* add_prototype(std::string name, std::string return_type, std::vector<value> args);
+
+    /**
+     * Get a function's prototype.
+     *
+     * Throws a `codegen_error` if the prototype is not found.
+     *
+     * @param name The function's name.
+     */
+    const prototype& get_prototype(const std::string& name) const;
 
     /**
      * Add a function definition.

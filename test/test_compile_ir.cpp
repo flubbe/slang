@@ -15,8 +15,10 @@
 
 #include "parser.h"
 #include "codegen.h"
+#include "typing.h"
 
 namespace cg = slang::codegen;
+namespace ty = slang::typing;
 
 namespace
 {
@@ -37,7 +39,7 @@ TEST(compile_ir, empty)
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
-    ast->generate_code(ctx);
+    ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string().length(), 0);
 }
@@ -129,7 +131,7 @@ TEST(compile_ir, empty_function)
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
-    ast->generate_code(ctx);
+    ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
@@ -159,7 +161,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -187,7 +189,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define f32 @f() {\n"
@@ -215,7 +217,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   ".string @0 \"test\"\n"
@@ -247,7 +249,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f(i32 %i, str %j, f32 %k) {\n"
@@ -275,7 +277,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, str %j, f32 %k) {\n"
@@ -307,7 +309,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -339,7 +341,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -370,7 +372,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -407,7 +409,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -443,7 +445,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -479,7 +481,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -515,7 +517,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -555,7 +557,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -595,7 +597,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -640,7 +642,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -678,7 +680,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -777,7 +779,9 @@ TEST(compile_ir, function_calls)
           "fn f() -> void\n"
           "{\n"
           " g();\n"
-          "}";
+          "}\n"
+          "fn g() -> void\n"
+          "{}";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -791,12 +795,18 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
                   " invoke @g\n"
+                  " ret\n"
+                  "}\n"
+                  "define void @g() {\n"
+                  "entry:\n"
                   " ret\n"
                   "}");
     }
@@ -805,6 +815,11 @@ TEST(compile_ir, function_calls)
           "fn f() -> void\n"
           "{\n"
           " g(1, 2.3, \"Test\", h());\n"
+          "}\n"
+          "fn g(a: i32, b: f32, c: str, d: i32) -> void\n"
+          "{}\n"
+          "fn h() -> i32 {\n"
+          " return 0;\n"
           "}";
 
         slang::lexer lexer;
@@ -819,7 +834,9 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   ".string @0 \"Test\"\n"
@@ -831,6 +848,15 @@ TEST(compile_ir, function_calls)
                   " invoke @h\n"
                   " invoke @g\n"
                   " ret\n"
+                  "}\n"
+                  "define void @g(i32 %a, f32 %b, str %c, i32 %d) {\n"
+                  "entry:\n"
+                  " ret\n"
+                  "}\n"
+                  "define i32 @h() {\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
                   "}");
     }
     {
@@ -838,6 +864,8 @@ TEST(compile_ir, function_calls)
           "fn f() -> void\n"
           "{\n"
           " g(1 + 2 * 3, 2.3);\n"
+          "}\n"
+          "fn g(i: i32, j:f32) -> void {\n"
           "}";
 
         slang::lexer lexer;
@@ -852,7 +880,9 @@ TEST(compile_ir, function_calls)
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
-        ast->generate_code(ctx);
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -865,7 +895,36 @@ TEST(compile_ir, function_calls)
                   " const f32 2.3\n"
                   " invoke @g\n"
                   " ret\n"
+                  "}\n"
+                  "define void @g(i32 %i, f32 %j) {\n"
+                  "entry:\n"
+                  " ret\n"
                   "}");
+    }
+    {
+        const std::string test_input =
+          "fn arg(a: i32) -> i32 {\n"
+          " return 1 + a;\n"
+          "}\n"
+          "fn arg2(a: i32) -> i32 {\n"
+          " return arg(a) - 1;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
     }
 }
 

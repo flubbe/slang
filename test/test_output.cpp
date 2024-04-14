@@ -66,8 +66,8 @@ TEST(output, native_binding)
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -100,13 +100,13 @@ TEST(output, native_binding)
         }
 
         {
-            slang::file_write_archive write_ar("test_output.bin");
+            slang::file_write_archive write_ar("std.cmod");
             EXPECT_NO_THROW(write_ar & header);
         }
 
         {
             slang::module_header read_header;
-            slang::file_read_archive read_ar("test_output.bin");
+            slang::file_read_archive read_ar("std.cmod");
             ASSERT_NO_THROW(read_ar & read_header);
 
             EXPECT_EQ(read_header.exports.size(), header.exports.size());
@@ -187,6 +187,10 @@ TEST(output, emitter)
           "}\n"
           "fn sid(a: str) -> str {\n"
           " return a;\n"
+          "}\n"
+          /* function calls */
+          "fn call(a: i32) -> i32 {\n"
+          " return arg(a) - 1;\n"
           "}\n";
 
         slang::lexer lexer;
@@ -206,8 +210,8 @@ TEST(output, emitter)
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());

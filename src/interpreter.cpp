@@ -18,35 +18,85 @@
 namespace slang::interpreter
 {
 
-void context::decode_locals(function_details& details) const
+void context::decode_locals(function_descriptor& desc) const
 {
-    details.locals_size = 0;
-    for(auto& it: details.locals)
+    if(desc.native)
     {
-        it.offset = details.locals_size;
+        throw interpreter_error("Cannot decode locals for native function.");
+    }
+    auto& details = std::get<function_details>(desc.details);
 
-        if(it.type == "i32")
+    auto set_size = [](variable& v)
+    {
+        if(v.type == "i32")
         {
-            it.size = sizeof(std::uint32_t);
+            v.size = sizeof(std::uint32_t);
         }
-        else if(it.type == "f32")
+        else if(v.type == "f32")
         {
-            it.size = sizeof(float);
+            v.size = sizeof(float);
         }
-        else if(it.type == "str")
+        else if(v.type == "str")
         {
-            it.size = sizeof(std::string*);
+            v.size = sizeof(std::string*);
         }
         else
         {
-            throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", it.type));
+            throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", v.type));
         }
+    };
 
-        details.locals_size += it.size;
+    details.args_size = 0;
+    details.locals_size = 0;
+
+    std::size_t arg_count = desc.signature.arg_types.size();
+
+    // arguments.
+    for(std::size_t i = 0; i < arg_count; ++i)
+    {
+        auto& v = details.locals[i];
+
+        v.offset = details.locals_size;
+        set_size(v);
+        details.locals_size += v.size;
+
+        details.args_size += v.size;
+    }
+
+    // locals.
+    for(std::size_t i = arg_count; i < details.locals.size(); ++i)
+    {
+        auto& v = details.locals[i];
+
+        v.offset = details.locals_size;
+        set_size(v);
+        details.locals_size += v.size;
+    }
+
+    // return type
+    if(desc.signature.return_type == "void")
+    {
+        details.return_size = 0;
+    }
+    if(desc.signature.return_type == "i32")
+    {
+        details.return_size = sizeof(std::uint32_t);
+    }
+    else if(desc.signature.return_type == "f32")
+    {
+        details.return_size = sizeof(float);
+    }
+    else if(desc.signature.return_type == "str")
+    {
+        details.return_size = sizeof(std::string*);
+    }
+    else
+    {
+        throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", desc.signature.return_type));
     }
 }
 
-void context::decode_instruction(archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
+void context::decode_instruction(const language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
 {
     switch(static_cast<opcode>(instr))
     {
@@ -80,6 +130,36 @@ void context::decode_instruction(archive& ar, std::byte instr, const function_de
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
         break;
     }
+    /** invoke. */
+    case opcode::invoke:
+    {
+        vle_int i;
+        ar & i;
+
+        // resolve to address.
+        if(i.i < 0)
+        {
+            // TODO
+            throw interpreter_error("interpreter::decode_instruction: invoke not implemented for imports.");
+        }
+
+        auto& symbol = mod.get_header().exports[i.i];
+        if(symbol.type != symbol_type::function)
+        {
+            throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
+        }
+        auto& desc = std::get<function_descriptor>(symbol.desc);
+
+        if(desc.native)
+        {
+            // TODO
+            throw interpreter_error("interpreter::decode_instruction: native function calls not yet implemented.");
+        }
+
+        const function_descriptor* desc_ptr = &desc;
+        code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+        break;
+    }
     /* opcodes that need to resolve a variable. */
     case opcode::iload:
     case opcode::fload:
@@ -106,13 +186,43 @@ void context::decode_instruction(archive& ar, std::byte instr, const function_de
     }
 }
 
-std::pair<module_header, std::vector<std::byte>> context::decode(const language_module& mod) const
+language_module context::decode(const language_module& mod) const
 {
+    if(mod.is_decoded())
+    {
+        throw interpreter_error("Tried to decode a module that already is decoded.");
+    }
+
     module_header header = mod.get_header();
     memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
 
-    std::vector<std::byte> code;
+    /*
+     * arguments and locals.
+     */
     for(auto& it: header.exports)
+    {
+        if(it.type != symbol_type::function)
+        {
+            continue;
+        }
+
+        auto& desc = std::get<function_descriptor>(it.desc);
+        if(desc.native)
+        {
+            continue;
+        }
+
+        decode_locals(desc);
+    }
+
+    // store header in decoded module.
+    language_module decoded_module{std::move(header)};
+
+    /*
+     * instructions.
+     */
+    std::vector<std::byte> code;
+    for(auto& it: decoded_module.header.exports)
     {
         if(it.type != symbol_type::function)
         {
@@ -127,16 +237,6 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
 
         auto& details = std::get<function_details>(desc.details);
 
-        /*
-         * arguments and locals.
-         */
-
-        decode_locals(details);
-
-        /*
-         * instructions.
-         */
-
         std::size_t bytecode_end = details.offset + details.size;
 
         ar.seek(details.offset);
@@ -149,28 +249,39 @@ std::pair<module_header, std::vector<std::byte>> context::decode(const language_
             ar & instr;
             code.push_back(instr);
 
-            decode_instruction(ar, instr, details, code);
+            decode_instruction(decoded_module, ar, instr, details, code);
         }
 
         details.size = code.size() - details.offset;
     }
 
-    return {std::move(header), std::move(code)};
+    decoded_module.set_binary(std::move(code));
+    decoded_module.decoded = true;
+
+    return decoded_module;
 }
 
-void context::exec(const std::vector<std::string>& string_table,
-                   const std::vector<std::byte>& binary,
-                   const function& f,
+void context::exec(const language_module& mod,
+                   std::size_t entry_point,
+                   std::size_t size,
                    std::vector<std::byte>& locals,
                    exec_stack& stack)
 {
-    std::size_t offset = f.get_entry_point();
+    if(!mod.is_decoded())
+    {
+        throw interpreter_error("Cannot execute function using non-decoded module.");
+    }
+
+    const module_header& header = mod.get_header();
+    const std::vector<std::byte>& binary = mod.get_binary();
+
+    std::size_t offset = entry_point;
     if(offset >= binary.size())
     {
         throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
     }
 
-    const std::size_t function_end = f.get_entry_point() + f.get_size();
+    const std::size_t function_end = offset + size;
     while(offset < function_end)
     {
         auto instr = binary[offset];
@@ -255,12 +366,12 @@ void context::exec(const std::vector<std::string>& string_table,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::uint64_t);
 
-            if(i < 0 || i >= string_table.size())
+            if(i < 0 || i >= header.strings.size())
             {
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
             }
 
-            stack.push_addr(&string_table[i]);
+            stack.push_addr(&header.strings[i]);
             break;
         } /* opcode::sconst */
         case opcode::iload:
@@ -300,6 +411,32 @@ void context::exec(const std::vector<std::string>& string_table,
             stack.push_addr(*reinterpret_cast<std::string**>(&locals[i]));
             break;
         } /* opcode::sload */
+        case opcode::invoke:
+        {
+            function_descriptor* const* desc_ptr = reinterpret_cast<function_descriptor* const*>(&binary[offset]);
+            offset += sizeof(desc_ptr);
+
+            const function_descriptor* desc = *desc_ptr;
+            if(desc->native)
+            {
+                throw interpreter_error("opcode::invoke not implemented for native functions.");
+            }
+
+            auto& details = std::get<function_details>(desc->details);
+
+            std::vector<std::byte> locals{details.locals_size};
+            std::copy(locals.data(), locals.data() + details.args_size, reinterpret_cast<std::byte*>(stack.end(details.args_size)));
+            stack.discard(details.args_size);
+
+            exec_stack callee_stack;
+            exec(mod, details.offset, details.size, locals, callee_stack);
+            if(callee_stack.size() != details.return_size)
+            {
+                throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_stack.size()));
+            }
+            stack.push_stack(callee_stack);
+            break;
+        } /* opcode::invoke */
 
         default:
             throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
@@ -309,8 +446,7 @@ void context::exec(const std::vector<std::string>& string_table,
     throw interpreter_error("Out of bounds code read.");
 }
 
-value context::exec(const std::vector<std::string>& string_table,
-                    const std::vector<std::byte>& binary,
+value context::exec(const language_module& mod,
                     const function& f,
                     const std::vector<value>& args)
 {
@@ -374,7 +510,7 @@ value context::exec(const std::vector<std::string>& string_table,
      * Execute the function.
      */
     exec_stack stack;
-    exec(string_table, binary, f, locals, stack);
+    exec(mod, f.get_entry_point(), f.get_size(), locals, stack);
 
     /*
      * generate return values.
@@ -410,8 +546,8 @@ void context::load_module(const std::string& name, const language_module& mod)
         throw interpreter_error(fmt::format("Module '{}' already loaded.", name));
     }
 
-    auto [decoded_header, decoded_binary] = decode(mod);
-    module_map.insert({name, {decoded_header, decoded_binary}});
+    module_map.insert({name, decode(mod)});
+    const module_header& decoded_header = module_map[name].get_header();
 
     // resolve dependencies.
     for(auto& it: decoded_header.imports)
@@ -467,7 +603,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
     }
 
-    return exec(mod_it->second.first.strings, mod_it->second.second, func_it->second, args);
+    return exec(mod_it->second, func_it->second, args);
 }
 
 }    // namespace slang::interpreter

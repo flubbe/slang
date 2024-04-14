@@ -48,8 +48,8 @@ TEST(resolve, std)
         rs::context resolve_ctx{mgr};
         cg::context codegen_ctx;
 
-        ASSERT_NO_THROW(ast->collect_names(type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
@@ -79,8 +79,8 @@ TEST(resolve, std)
         rs::context resolve_ctx{mgr};
         cg::context codegen_ctx;
 
-        ASSERT_NO_THROW(ast->collect_names(type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
@@ -108,8 +108,10 @@ TEST(resolve, std)
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
-        EXPECT_NO_THROW(ast->collect_names(type_ctx));
-        EXPECT_NO_THROW(resolve_ctx.resolve_imports(type_ctx));
+        cg::context codegen_ctx;
+
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }

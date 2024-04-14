@@ -116,9 +116,15 @@ public:
     exec_stack& operator=(exec_stack&&) = default;
 
     /** Check if the stack is empty. */
-    inline bool empty() const noexcept
+    bool empty() const noexcept
     {
         return stack.empty();
+    }
+
+    /** Get the current stack size. */
+    std::size_t size() const noexcept
+    {
+        return stack.size();
     }
 
     /**
@@ -150,6 +156,16 @@ public:
     void push_addr(const T* addr)
     {
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&addr), reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
+    }
+
+    /**
+     * Push another stack onto this stack.
+     *
+     * @param other The other stack.
+     */
+    void push_stack(const exec_stack& other)
+    {
+        stack.insert(stack.end(), other.stack.begin(), other.stack.end());
     }
 
     /** Pop an i32 from the stack. */
@@ -223,16 +239,43 @@ public:
     {
         throw std::runtime_error("exec_stack::pop_result<std::string> not implemented.");
     }
+
+    /**
+     * Get a pointer to the end minus an offset.
+     *
+     * @param offset Offset to subtract from the end.
+     * @throws Throws an `interpreter_error` if a stack underflow occurs.
+     */
+    std::uint8_t* end(std::size_t offset = 0)
+    {
+        if(offset > stack.size())
+        {
+            throw interpreter_error("Stack underflow");
+        }
+        return &stack[stack.size() - offset];
+    }
+
+    /**
+     * Discard bytes.
+     *
+     * @param byte_count The count of bytes to discard.
+     * @throws Throws an `interpreter_error` if a stack underflow occurs.
+     */
+    void discard(std::size_t byte_count)
+    {
+        if(byte_count > stack.size())
+        {
+            throw interpreter_error("Stack underflow");
+        }
+        stack.resize(stack.size() - byte_count);
+    }
 };
 
 /** Interpreter context. */
 class context
 {
-    /**
-     * Loaded modules as `(name, (header, bytecode))`. The `bytecode` contains all constants
-     * in the machine's native byte order.
-     */
-    std::unordered_map<std::string, std::pair<slang::module_header, std::vector<std::byte>>> module_map;
+    /** Loaded modules as `(name, decoded_module)`. */
+    std::unordered_map<std::string, language_module> module_map;
 
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
@@ -242,53 +285,56 @@ protected:
      * Decode a module.
      *
      * @param mod The module.
-     * @returns The decoded header/bytecode pair.
+     * @returns The decoded module.
      */
-    std::pair<module_header, std::vector<std::byte>> decode(const language_module& mod) const;
+    language_module decode(const language_module& mod) const;
 
     /**
      * Decode the function's arguments and locals.
      *
-     * @param details The function's details.
+     * @param desc The function descriptor.
      */
-    void decode_locals(function_details& details) const;
+    void decode_locals(function_descriptor& desc) const;
 
     /**
      * Decode an instruction.
      *
+     * @param mod The decoded module.
      * @param ar The archive to read from.
      * @param instr The instruction to decode.
      * @param details The function's details.
      * @param code Buffer to write the decoded bytes into.
      */
-    void decode_instruction(archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const;
+    void decode_instruction(const language_module& mod,
+                            archive& ar,
+                            std::byte instr,
+                            const function_details& details,
+                            std::vector<std::byte>& code) const;
 
     /**
      * Execute a function.
      *
-     * @param string_table The module's string table.
-     * @param binary The decoded bytecode.
+     * @param mod The decoded module.
      * @param f The function to execute.
      * @param args The function's arguments.
      * @return The function's return value.
      */
-    value exec(const std::vector<std::string>& string_table,
-               const std::vector<std::byte>& binary,
+    value exec(const language_module& mod,
                const function& f,
                const std::vector<value>& args);
 
     /**
      * Execute a function.
      *
-     * @param string_table The module's string table.
-     * @param binary The decoded bytecode.
-     * @param f The function to execute.
+     * @param mod The module.
+     * @param entry_point The function's entry point/offset in the binary buffer.
+     * @param size The function's bytecode size.
      * @param locals The function's arguments and locals, given as a byte buffer.
      * @param stack The stack to use for evaluation. Will hold the function's return value.
      */
-    void exec(const std::vector<std::string>& string_table,
-              const std::vector<std::byte>& binary,
-              const function& f,
+    void exec(const language_module& mod,
+              std::size_t entry_point,
+              std::size_t size,
               std::vector<std::byte>& locals,
               exec_stack& stack);
 

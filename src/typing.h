@@ -20,6 +20,15 @@
 namespace slang::typing
 {
 
+/**
+ * Check whether a string represents a built-in type, that is,
+ * void, i32, f32 or str.
+ */
+inline bool is_builtin_type(const std::string& s)
+{
+    return s == "void" || s == "i32" || s == "f32" || s == "str";
+}
+
 /** Type errors. */
 class type_error : public std::runtime_error
 {

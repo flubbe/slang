@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include "codegen.h"
 #include "module.h"
 #include "package.h"
 #include "resolve.h"
@@ -34,9 +35,9 @@ resolve_error::resolve_error(const token_location& loc, const std::string& messa
  * resolver context.
  */
 
-void context::resolve_imports(ty::context& ctx)
+void context::resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx)
 {
-    const std::vector<std::vector<token>>& imports = ctx.get_imports();
+    const std::vector<std::vector<token>>& imports = type_ctx.get_imports();
 
     auto transform = [](const token& p) -> std::string
     { return p.s; };
@@ -63,13 +64,26 @@ void context::resolve_imports(ty::context& ctx)
             {
                 auto& desc = std::get<function_descriptor>(exp.desc);
 
+                std::vector<slang::codegen::value> prototype_arg_types;
+                std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
+                               [](const std::string& arg)
+                               {
+                                   if(ty::is_builtin_type(arg))
+                                   {
+                                       return slang::codegen::value{arg};
+                                   }
+
+                                   return slang::codegen::value{"aggregate", arg};
+                               });
+                ctx.add_prototype(exp.name, desc.signature.return_type, prototype_arg_types);
+
                 std::vector<token> arg_types;
                 for(auto& arg: desc.signature.arg_types)
                 {
                     arg_types.emplace_back(arg, reference_location);
                 }
 
-                ctx.add_function({exp.name, reference_location}, std::move(arg_types), {desc.signature.return_type, reference_location});
+                type_ctx.add_function({exp.name, reference_location}, std::move(arg_types), {desc.signature.return_type, reference_location});
             }
             else
             {

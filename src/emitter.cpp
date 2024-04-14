@@ -71,7 +71,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
 
-        slang::codegen::const_argument* arg = static_cast<slang::codegen::const_argument*>(args[0].get());
+        cg::const_argument* arg = static_cast<cg::const_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
         std::string type = v->get_resolved_type();
 
@@ -98,7 +98,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
 
-        slang::codegen::const_argument* arg = static_cast<slang::codegen::const_argument*>(args[0].get());
+        cg::const_argument* arg = static_cast<cg::const_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
         std::string type = v->get_resolved_type();
 
@@ -127,7 +127,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
 
-        slang::codegen::variable_argument* arg = static_cast<slang::codegen::variable_argument*>(args[0].get());
+        cg::variable_argument* arg = static_cast<cg::variable_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
         std::string type = v->get_resolved_type();
 
@@ -187,6 +187,28 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     else if(name == "store")
     {
         emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore);
+    }
+    else if(name == "invoke")
+    {
+        expect_arg_size(1);
+        cg::function_argument* arg = static_cast<cg::function_argument*>(args[0].get());
+        const cg::value* v = arg->get_value();
+
+        // TODO resolve imports.
+
+        auto it = std::find_if(ctx.funcs.begin(), ctx.funcs.end(),
+                               [&v](const std::unique_ptr<cg::function>& f) -> bool
+                               {
+                                   return f->get_name() == *v->get_name();
+                               });
+        if(it == ctx.funcs.end())
+        {
+            throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
+        }
+
+        vle_int index = it - ctx.funcs.begin();
+        emit(instruction_buffer, opcode::invoke);
+        instruction_buffer & index;
     }
     else if(name == "ret")
     {

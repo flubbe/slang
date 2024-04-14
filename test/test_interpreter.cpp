@@ -87,6 +87,9 @@ TEST(interpreter, loading)
 
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
     EXPECT_EQ(std::get<std::string>(res), "Test");
+
+    EXPECT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
+    EXPECT_EQ(std::get<int>(res), 0);
 }
 
 }    // namespace
