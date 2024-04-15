@@ -264,15 +264,13 @@ language_module context::decode(const language_module& mod) const
 void context::exec(const language_module& mod,
                    std::size_t entry_point,
                    std::size_t size,
-                   std::vector<std::byte>& locals,
-                   exec_stack& stack)
+                   stack_frame& frame)
 {
     if(!mod.is_decoded())
     {
         throw interpreter_error("Cannot execute function using non-decoded module.");
     }
 
-    const module_header& header = mod.get_header();
     const std::vector<std::byte>& binary = mod.get_binary();
 
     std::size_t offset = entry_point;
@@ -301,54 +299,54 @@ void context::exec(const language_module& mod,
         {
         case opcode::iadd:
         {
-            stack.push_i32(stack.pop_i32() + stack.pop_i32());
+            frame.stack.push_i32(frame.stack.pop_i32() + frame.stack.pop_i32());
             break;
         } /* opcode::iadd */
         case opcode::isub:
         {
-            stack.push_i32(-stack.pop_i32() + stack.pop_i32());
+            frame.stack.push_i32(-frame.stack.pop_i32() + frame.stack.pop_i32());
             break;
         } /* opcode::isub */
         case opcode::imul:
         {
-            stack.push_i32(stack.pop_i32() * stack.pop_i32());
+            frame.stack.push_i32(frame.stack.pop_i32() * frame.stack.pop_i32());
             break;
         } /* opcode::imul */
         case opcode::idiv:
         {
-            std::int32_t divisor = stack.pop_i32();
+            std::int32_t divisor = frame.stack.pop_i32();
             if(divisor == 0)
             {
                 throw interpreter_error("Division by zero.");
             }
-            std::int32_t dividend = stack.pop_i32();
-            stack.push_i32(dividend / divisor);
+            std::int32_t dividend = frame.stack.pop_i32();
+            frame.stack.push_i32(dividend / divisor);
             break;
         } /* opcode::idiv */
         case opcode::fadd:
         {
-            stack.push_f32(stack.pop_f32() + stack.pop_f32());
+            frame.stack.push_f32(frame.stack.pop_f32() + frame.stack.pop_f32());
             break;
         } /* opcode::fadd */
         case opcode::fsub:
         {
-            stack.push_f32(-stack.pop_f32() + stack.pop_f32());
+            frame.stack.push_f32(-frame.stack.pop_f32() + frame.stack.pop_f32());
             break;
         } /* opcode::fsub */
         case opcode::fmul:
         {
-            stack.push_f32(stack.pop_f32() * stack.pop_f32());
+            frame.stack.push_f32(frame.stack.pop_f32() * frame.stack.pop_f32());
             break;
         } /* opcode::fmul */
         case opcode::fdiv:
         {
-            float divisor = stack.pop_f32();
+            float divisor = frame.stack.pop_f32();
             if(divisor == 0)
             {
                 throw interpreter_error("Division by zero.");
             }
-            float dividend = stack.pop_f32();
-            stack.push_f32(dividend / divisor);
+            float dividend = frame.stack.pop_f32();
+            frame.stack.push_f32(dividend / divisor);
             break;
         } /* opcode::fdiv */
         case opcode::iconst:
@@ -358,7 +356,7 @@ void context::exec(const language_module& mod,
             std::uint32_t i_u32 = *reinterpret_cast<const std::uint32_t*>(&binary[offset]);
             offset += sizeof(std::uint32_t);
 
-            stack.push_i32(i_u32);
+            frame.stack.push_i32(i_u32);
             break;
         } /* opcode::iconst, opcode::fconst */
         case opcode::sconst:
@@ -366,12 +364,12 @@ void context::exec(const language_module& mod,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::uint64_t);
 
-            if(i < 0 || i >= header.strings.size())
+            if(i < 0 || i >= frame.string_table.size())
             {
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
             }
 
-            stack.push_addr(&header.strings[i]);
+            frame.stack.push_addr(&frame.string_table[i]);
             break;
         } /* opcode::sconst */
         case opcode::iload:
@@ -385,12 +383,12 @@ void context::exec(const language_module& mod,
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
-            if(i + sizeof(std::uint32_t) > locals.size())
+            if(i + sizeof(std::uint32_t) > frame.locals.size())
             {
                 throw interpreter_error("Stack overflow.");
             }
 
-            stack.push_i32(*reinterpret_cast<std::uint32_t*>(&locals[i]));
+            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i]));
             break;
         } /* opcode::iload, opcode::fload */
         case opcode::sload:
@@ -403,12 +401,12 @@ void context::exec(const language_module& mod,
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
-            if(i + sizeof(std::uint32_t) > locals.size())
+            if(i + sizeof(std::uint32_t) > frame.locals.size())
             {
                 throw interpreter_error("Stack overflow.");
             }
 
-            stack.push_addr(*reinterpret_cast<std::string**>(&locals[i]));
+            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
             break;
         } /* opcode::sload */
         case opcode::invoke:
@@ -424,17 +422,18 @@ void context::exec(const language_module& mod,
 
             auto& details = std::get<function_details>(desc->details);
 
-            std::vector<std::byte> locals{details.locals_size};
-            std::copy(locals.data(), locals.data() + details.args_size, reinterpret_cast<std::byte*>(stack.end(details.args_size)));
-            stack.discard(details.args_size);
+            stack_frame callee_frame{frame.string_table, details.locals_size};
+            auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
+            std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
+            frame.stack.discard(details.args_size);
 
-            exec_stack callee_stack;
-            exec(mod, details.offset, details.size, locals, callee_stack);
-            if(callee_stack.size() != details.return_size)
+            exec(mod, details.offset, details.size, callee_frame);
+
+            if(callee_frame.stack.size() != details.return_size)
             {
-                throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_stack.size()));
+                throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
             }
-            stack.push_stack(callee_stack);
+            frame.stack.push_stack(callee_frame.stack);
             break;
         } /* opcode::invoke */
 
@@ -453,7 +452,7 @@ value context::exec(const language_module& mod,
     /*
      * allocate locals and decode arguments.
      */
-    std::vector<std::byte> locals{f.locals_size};
+    stack_frame frame{mod.get_header().strings, f.locals_size};
     std::vector<std::string> local_strings;
 
     auto& arg_types = f.get_signature().arg_types;
@@ -473,7 +472,7 @@ value context::exec(const language_module& mod,
                 throw interpreter_error("Stack overflow during argument allocation.");
             }
 
-            *reinterpret_cast<std::int32_t*>(&locals[offset]) = std::get<int>(args[i]);
+            *reinterpret_cast<std::int32_t*>(&frame.locals[offset]) = std::get<int>(args[i]);
 
             offset += sizeof(std::int32_t);
         }
@@ -484,7 +483,7 @@ value context::exec(const language_module& mod,
                 throw interpreter_error("Stack overflow during argument allocation.");
             }
 
-            *reinterpret_cast<float*>(&locals[offset]) = std::get<float>(args[i]);
+            *reinterpret_cast<float*>(&frame.locals[offset]) = std::get<float>(args[i]);
 
             offset += sizeof(float);
         }
@@ -496,7 +495,7 @@ value context::exec(const language_module& mod,
             }
 
             local_strings.emplace_back(std::get<std::string>(args[i]));
-            *reinterpret_cast<std::string**>(&locals[offset]) = &local_strings.back();
+            *reinterpret_cast<std::string**>(&frame.locals[offset]) = &local_strings.back();
 
             offset += sizeof(std::string*);
         }
@@ -509,8 +508,7 @@ value context::exec(const language_module& mod,
     /*
      * Execute the function.
      */
-    exec_stack stack;
-    exec(mod, f.get_entry_point(), f.get_size(), locals, stack);
+    exec(mod, f.get_entry_point(), f.get_size(), frame);
 
     /*
      * generate return values.
@@ -519,15 +517,15 @@ value context::exec(const language_module& mod,
     auto& signature = f.get_signature();
     if(signature.return_type == "i32")
     {
-        return {stack.pop_i32()};
+        return {frame.stack.pop_i32()};
     }
     else if(signature.return_type == "f32")
     {
-        return {stack.pop_f32()};
+        return {frame.stack.pop_f32()};
     }
     else if(signature.return_type == "str")
     {
-        return {std::string{*stack.pop_addr<std::string>()}};
+        return {std::string{*frame.stack.pop_addr<std::string>()}};
     }
 
     if(signature.return_type != "void")

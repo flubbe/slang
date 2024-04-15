@@ -98,8 +98,8 @@ public:
     }
 };
 
-/** Execution stack. */
-class exec_stack
+/** Operand stack. */
+class operand_stack
 {
 protected:
     /** The stack. */
@@ -107,13 +107,13 @@ protected:
 
 public:
     /** Default constructors. */
-    exec_stack() = default;
-    exec_stack(const exec_stack&) = default;
-    exec_stack(exec_stack&&) = default;
+    operand_stack() = default;
+    operand_stack(const operand_stack&) = default;
+    operand_stack(operand_stack&&) = default;
 
     /** Default assignments. */
-    exec_stack& operator=(const exec_stack&) = default;
-    exec_stack& operator=(exec_stack&&) = default;
+    operand_stack& operator=(const operand_stack&) = default;
+    operand_stack& operator=(operand_stack&&) = default;
 
     /** Check if the stack is empty. */
     bool empty() const noexcept
@@ -163,7 +163,7 @@ public:
      *
      * @param other The other stack.
      */
-    void push_stack(const exec_stack& other)
+    void push_stack(const operand_stack& other)
     {
         stack.insert(stack.end(), other.stack.begin(), other.stack.end());
     }
@@ -216,7 +216,7 @@ public:
           !std::is_same<T, int>::value
             && !std::is_same<T, float>::value
             && !std::is_same<T, std::string>::value,
-          "exec_stack::pop_result is only available for int, float and std::string.");
+          "operand_stack::pop_result is only available for int, float and std::string.");
     }
 
     /** Pop the call result from the stack. */
@@ -237,7 +237,7 @@ public:
     template<>
     value pop_result<std::string>()
     {
-        throw std::runtime_error("exec_stack::pop_result<std::string> not implemented.");
+        throw std::runtime_error("operand_stack::pop_result<std::string> not implemented.");
     }
 
     /**
@@ -268,6 +268,40 @@ public:
             throw interpreter_error("Stack underflow");
         }
         stack.resize(stack.size() - byte_count);
+    }
+};
+
+/** A stack frame. */
+struct stack_frame
+{
+    /** String table reference. */
+    const std::vector<std::string>& string_table;
+
+    /** Locals and arguments. */
+    std::vector<std::byte> locals;
+
+    /** The operand stack. */
+    operand_stack stack;
+
+    /** Default constructors. */
+    stack_frame() = delete;
+    stack_frame(const stack_frame&) = delete;
+    stack_frame(stack_frame&&) = default;
+
+    /** Default assignments. */
+    stack_frame& operator=(const stack_frame&) = delete;
+    stack_frame& operator=(stack_frame&&) = delete;
+
+    /**
+     * Construct a stack frame.
+     *
+     * @param string_table Reference to the module string table.
+     * @param locals_size Size to allocate for the locals.
+     */
+    stack_frame(const std::vector<std::string>& string_table, std::size_t locals_size)
+    : string_table{string_table}
+    , locals{locals_size}
+    {
     }
 };
 
@@ -329,14 +363,12 @@ protected:
      * @param mod The module.
      * @param entry_point The function's entry point/offset in the binary buffer.
      * @param size The function's bytecode size.
-     * @param locals The function's arguments and locals, given as a byte buffer.
-     * @param stack The stack to use for evaluation. Will hold the function's return value.
+     * @param frame The stack frame for the function.
      */
     void exec(const language_module& mod,
               std::size_t entry_point,
               std::size_t size,
-              std::vector<std::byte>& locals,
-              exec_stack& stack);
+              stack_frame& frame);
 
 public:
     /** Default constructors. */
