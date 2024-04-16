@@ -89,8 +89,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             {
                 emit(instruction_buffer, *str_opcode);
             }
-
-            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            else
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
         }
     };
 
@@ -212,9 +214,17 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "ret")
     {
-        // the arguments are relevant for type checking, but can be ignored here.
         expect_arg_size(0, 1);
-        emit(instruction_buffer, opcode::ret);
+
+        if(args.size() == 0)
+        {
+            // return void from a function.
+            emit(instruction_buffer, opcode::ret);
+        }
+        else
+        {
+            emit_typed(opcode::iret, opcode::fret, opcode::sret);
+        }
     }
     else
     {

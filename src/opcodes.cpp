@@ -38,6 +38,9 @@ std::string to_string(opcode op)
     case opcode::fdiv: return "fdiv";
     case opcode::invoke: return "invoke";
     case opcode::ret: return "ret";
+    case opcode::iret: return "iret";
+    case opcode::fret: return "fret";
+    case opcode::sret: return "sret";
     case opcode::opcode_count:; /* fall-through */
     }
 

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "module.h"
+#include "opcodes.h"
 
 namespace slang::interpreter
 {
@@ -364,11 +365,12 @@ protected:
      * @param entry_point The function's entry point/offset in the binary buffer.
      * @param size The function's bytecode size.
      * @param frame The stack frame for the function.
+     * @return THe function's return opcode.
      */
-    void exec(const language_module& mod,
-              std::size_t entry_point,
-              std::size_t size,
-              stack_frame& frame);
+    opcode exec(const language_module& mod,
+                std::size_t entry_point,
+                std::size_t size,
+                stack_frame& frame);
 
 public:
     /** Default constructors. */

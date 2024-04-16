@@ -101,15 +101,18 @@ void context::decode_instruction(const language_module& mod, archive& ar, std::b
     switch(static_cast<opcode>(instr))
     {
     /* opcodes without arguments. */
-    case opcode::ret:
     case opcode::iadd:
-    case opcode::isub:
-    case opcode::imul:
-    case opcode::idiv:
     case opcode::fadd:
+    case opcode::isub:
     case opcode::fsub:
+    case opcode::imul:
     case opcode::fmul:
+    case opcode::idiv:
     case opcode::fdiv:
+    case opcode::ret:
+    case opcode::iret:
+    case opcode::fret:
+    case opcode::sret:
         break;
     /* opcodes with one 4-byte argument. */
     case opcode::iconst:
@@ -261,10 +264,10 @@ language_module context::decode(const language_module& mod) const
     return decoded_module;
 }
 
-void context::exec(const language_module& mod,
-                   std::size_t entry_point,
-                   std::size_t size,
-                   stack_frame& frame)
+opcode context::exec(const language_module& mod,
+                     std::size_t entry_point,
+                     std::size_t size,
+                     stack_frame& frame)
 {
     if(!mod.is_decoded())
     {
@@ -285,9 +288,10 @@ void context::exec(const language_module& mod,
         auto instr = binary[offset];
         ++offset;
 
-        if(static_cast<opcode>(instr) == opcode::ret)
+        // return.
+        if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::sret))
         {
-            return;
+            return static_cast<opcode>(instr);
         }
 
         if(offset == function_end)
@@ -438,7 +442,7 @@ void context::exec(const language_module& mod,
         } /* opcode::invoke */
 
         default:
-            throw interpreter_error(fmt::format("Opcode '{}' not implemented.", to_string(static_cast<opcode>(instr))));
+            throw interpreter_error(fmt::format("Opcode '{}' ({}) not implemented.", to_string(static_cast<opcode>(instr)), instr));
         }
     }
 
@@ -508,33 +512,30 @@ value context::exec(const language_module& mod,
     /*
      * Execute the function.
      */
-    exec(mod, f.get_entry_point(), f.get_size(), frame);
+    opcode ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
 
     /*
-     * generate return values.
+     * Decode return value.
      */
-
-    auto& signature = f.get_signature();
-    if(signature.return_type == "i32")
+    value ret;
+    if(ret_opcode == opcode::iret)
     {
-        return {frame.stack.pop_i32()};
+        ret = frame.stack.pop_i32();
     }
-    else if(signature.return_type == "f32")
+    else if(ret_opcode == opcode::fret)
     {
-        return {frame.stack.pop_f32()};
+        ret = frame.stack.pop_f32();
     }
-    else if(signature.return_type == "str")
+    else if(ret_opcode == opcode::sret)
     {
-        return {std::string{*frame.stack.pop_addr<std::string>()}};
+        ret = std::string{*frame.stack.pop_addr<std::string>()};
     }
-
-    if(signature.return_type != "void")
+    else
     {
-        throw interpreter_error(fmt::format("Expected result type 'void', got '{}'", signature.return_type));
+        throw interpreter_error(fmt::format("Invalid return opcode '{}' ({}).", to_string(ret_opcode), static_cast<int>(ret_opcode)));
     }
 
-    // return 'void'.
-    return {};
+    return ret;
 }
 
 void context::load_module(const std::string& name, const language_module& mod)

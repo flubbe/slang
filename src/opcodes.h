@@ -40,6 +40,9 @@ enum class opcode : opcode_base
     fdiv,   /** Divide two f32 from the stack.  */
     invoke, /** Invoke a function. */
     ret,    /** Return void from a function. */
+    iret,   /** Return an i32 from a function. */
+    fret,   /** Return an f32 from a function. */
+    sret,   /** Return a str from a function. */
 
     opcode_count /** Opcode count. Not an opcode. */
 };
