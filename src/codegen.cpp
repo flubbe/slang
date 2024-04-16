@@ -66,6 +66,33 @@ std::string to_string(binary_op op)
  * Context.
  */
 
+std::size_t context::get_import_index(symbol_type type, std::string import_path, std::string name)
+{
+    auto it = std::find_if(imports.begin(), imports.end(),
+                           [&name](const imported_symbol& s) -> bool
+                           {
+                               return name == s.name;
+                           });
+    if(it != imports.end())
+    {
+        if(it->import_path != import_path)
+        {
+            throw codegen_error(fmt::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
+        }
+
+        if(it->type != type)
+        {
+            throw codegen_error(fmt::format("Found different symbol types for import '{}': '{}' and '{}'.", name, slang::to_string(it->type), slang::to_string(type)));
+        }
+
+        return it - imports.end();
+    }
+
+    // add the import.
+    imports.emplace_back(type, std::move(name), std::move(import_path));
+    return imports.size() - 1;
+}
+
 type* context::create_type(std::string name, std::vector<std::pair<std::string, std::string>> members)
 {
     if(std::find_if(types.begin(), types.end(),
@@ -93,7 +120,7 @@ std::size_t context::get_string(std::string str)
     return strings.size() - 1;
 }
 
-prototype* context::add_prototype(std::string name, std::string return_type, std::vector<value> args)
+prototype* context::add_prototype(std::string name, std::string return_type, std::vector<value> args, std::optional<std::string> import_path)
 {
     if(std::find_if(prototypes.begin(), prototypes.end(),
                     [&name](const std::unique_ptr<prototype>& p) -> bool
@@ -105,7 +132,7 @@ prototype* context::add_prototype(std::string name, std::string return_type, std
         throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
     }
 
-    return prototypes.emplace_back(std::make_unique<prototype>(std::move(name), std::move(return_type), std::move(args))).get();
+    return prototypes.emplace_back(std::make_unique<prototype>(std::move(name), std::move(return_type), std::move(args), std::move(import_path))).get();
 }
 
 const prototype& context::get_prototype(const std::string& name) const

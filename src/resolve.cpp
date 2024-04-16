@@ -51,8 +51,10 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
 
         auto reference_location = import[0].location;
 
-        fs::path import_path = fs::path{utils::join(import, {transform}, "/")}.replace_extension(package::module_ext);
-        fs::path resolved_path = mgr.resolve(import_path);
+        std::string import_path = utils::join(import, {transform}, package::delimiter);
+
+        fs::path fs_path = fs::path{utils::join(import, {transform}, "/")}.replace_extension(package::module_ext);
+        fs::path resolved_path = mgr.resolve(fs_path);
         std::unique_ptr<slang::file_archive> ar = mgr.open(resolved_path, slang::file_manager::open_mode::read);
 
         module_header hdr;
@@ -75,7 +77,8 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
 
                                    return slang::codegen::value{"aggregate", arg};
                                });
-                ctx.add_prototype(exp.name, desc.signature.return_type, prototype_arg_types);
+
+                ctx.add_prototype(exp.name, desc.signature.return_type, prototype_arg_types, import_path);
 
                 std::vector<token> arg_types;
                 for(auto& arg: desc.signature.arg_types)

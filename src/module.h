@@ -73,6 +73,19 @@ inline archive& operator&(archive& ar, symbol_type& s)
     return ar;
 }
 
+/** Return a readable string for a symbol type. */
+inline std::string to_string(symbol_type s)
+{
+    switch(s)
+    {
+    case symbol_type::package: return "package";
+    case symbol_type::variable: return "variable";
+    case symbol_type::function: return "function";
+    case symbol_type::type: return "type";
+    }
+    return "<unknown>";
+}
+
 /** A symbol. */
 struct symbol
 {
@@ -379,6 +392,29 @@ struct imported_symbol
 
     /** Index into the package import table. Unused for package imports (set to `(uint32_t)(-1)`). */
     std::uint32_t package_index;
+
+    /** Default constructors. */
+    imported_symbol() = default;
+    imported_symbol(const imported_symbol&) = default;
+    imported_symbol(imported_symbol&&) = default;
+
+    /** Default assignments. */
+    imported_symbol& operator=(const imported_symbol&) = default;
+    imported_symbol& operator=(imported_symbol&&) = default;
+
+    /**
+     * Construct an imported symbol
+     *
+     * @param type The symbol's type.
+     * @param name The symbol's name.
+     * @param package_index The symbol's package index as an index of the import table. Unused for package imports.
+     */
+    imported_symbol(symbol_type type, std::string name, std::uint32_t package_index = static_cast<std::uint32_t>(-1))
+    : type{type}
+    , name{std::move(name)}
+    , package_index{package_index}
+    {
+    }
 };
 
 /**
@@ -554,6 +590,16 @@ public:
     : header{std::move(header)}
     {
     }
+
+    /**
+     * Add an import to the module.
+     *
+     * @param type The symbol type.
+     * @param name The symbol's name.
+     * @param package_index The symbol's package index as an index into the import table. Ignored for `symbol_type::package`.
+     * @returns The import's index inside the import table.
+     */
+    std::size_t add_import(symbol_type type, std::string name, std::uint32_t package_index = static_cast<std::uint32_t>(-1));
 
     /**
      * Add a function to the module.

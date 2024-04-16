@@ -196,21 +196,35 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         cg::function_argument* arg = static_cast<cg::function_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
 
-        // TODO resolve imports.
-
+        // resolve inside this module.
         auto it = std::find_if(ctx.funcs.begin(), ctx.funcs.end(),
                                [&v](const std::unique_ptr<cg::function>& f) -> bool
                                {
                                    return f->get_name() == *v->get_name();
                                });
-        if(it == ctx.funcs.end())
+        if(it != ctx.funcs.end())
         {
-            throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
+            vle_int index = it - ctx.funcs.begin();
+            emit(instruction_buffer, opcode::invoke);
+            instruction_buffer & index;
+            return;
         }
 
-        vle_int index = it - ctx.funcs.begin();
-        emit(instruction_buffer, opcode::invoke);
-        instruction_buffer & index;
+        // resolve imports.
+        auto import_it = std::find_if(ctx.prototypes.begin(), ctx.prototypes.end(),
+                                      [&v](const std::unique_ptr<cg::prototype>& p) -> bool
+                                      {
+                                          return p->is_import() && p->get_name() == *v->get_name();
+                                      });
+        if(import_it != ctx.prototypes.end())
+        {
+            vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
+            emit(instruction_buffer, opcode::invoke);
+            instruction_buffer & index;
+            return;
+        }
+
+        throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
     }
     else if(name == "ret")
     {
@@ -347,6 +361,67 @@ void instruction_emitter::run()
 language_module instruction_emitter::to_module() const
 {
     language_module mod;
+
+    // imports.
+    std::vector<std::string> packages;
+    for(const auto& it: ctx.imports)
+    {
+        if(it.type == symbol_type::package)
+        {
+            auto p_it = std::find(packages.begin(), packages.end(), it.name);
+            if(p_it != packages.end())
+            {
+                packages.erase(p_it);
+            }
+        }
+        else
+        {
+            // ensure we import the symbol's package.
+            auto p_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                     [&it](auto& s) -> bool
+                                     {
+                                         return s.type == symbol_type::package && s.name == it.import_path;
+                                     });
+            if(p_it == ctx.imports.end())
+            {
+                auto p_it = std::find(packages.begin(), packages.end(), it.name);
+                if(p_it == packages.end())
+                {
+                    packages.push_back(it.import_path);
+                }
+            }
+        }
+    }
+
+    for(const auto& it: ctx.imports)
+    {
+        std::uint32_t package_index = 0;
+
+        auto p_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                 [&it](auto& s) -> bool
+                                 {
+                                     return s.type == symbol_type::package && s.name == it.import_path;
+                                 });
+        if(p_it != ctx.imports.end())
+        {
+            package_index = p_it - ctx.imports.begin();
+        }
+        else
+        {
+            auto p_it = std::find(packages.begin(), packages.end(), it.import_path);
+            if(p_it == packages.end())
+            {
+                throw std::runtime_error(fmt::format("Package '{}' not found in package table.", it.import_path));
+            }
+            package_index = ctx.imports.size() + p_it - packages.begin();
+        }
+
+        mod.add_import(it.type, it.name, package_index);
+    }
+    for(const auto& it: packages)
+    {
+        mod.add_import(symbol_type::package, it);
+    }
 
     // strings.
     mod.set_string_table(ctx.strings);

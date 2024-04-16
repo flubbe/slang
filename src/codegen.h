@@ -23,9 +23,10 @@
 /* Forward declarations. */
 namespace slang
 {
-struct token_location;
-class language_module;
-class instruction_emitter;
+struct token_location;                 /* token.h */
+enum class symbol_type : std::uint8_t; /* module.h */
+class language_module;                 /* module.h */
+class instruction_emitter;             /* emitter.h */
 }    // namespace slang
 
 namespace slang::codegen
@@ -1146,6 +1147,9 @@ class prototype
     /** The argument types. */
     std::vector<value> arg_types;
 
+    /** The module path for imported functions and std::nullopt for prototypes within the current module. */
+    std::optional<std::string> import_path;
+
 public:
     /** Default constructors. */
     prototype() = default;
@@ -1162,11 +1166,13 @@ public:
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param arg_type The function's argument types.
+     * @param import_path The import path of the module for imported functions.
      */
-    prototype(std::string name, std::string return_type, std::vector<value> arg_types)
+    prototype(std::string name, std::string return_type, std::vector<value> arg_types, std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
+    , import_path{std::move(import_path)}
     {
     }
 
@@ -1183,9 +1189,21 @@ public:
     }
 
     /** Get the function's argument types. */
-    const std::vector<value> get_arg_types() const
+    const std::vector<value>& get_arg_types() const
     {
         return arg_types;
+    }
+
+    /** Return whether this is an imported function. */
+    bool is_import() const
+    {
+        return import_path.has_value();
+    }
+
+    /** Return the import path. */
+    const std::optional<std::string>& get_import_path() const
+    {
+        return import_path;
     }
 };
 
@@ -1471,6 +1489,42 @@ enum class binary_op
  */
 std::string to_string(binary_op op);
 
+/** An imported symbol. */
+struct imported_symbol
+{
+    /** Symbol type. */
+    symbol_type type;
+
+    /** Symbol name. */
+    std::string name;
+
+    /** The import path of the module. */
+    std::string import_path;
+
+    /** Default constructors. */
+    imported_symbol() = default;
+    imported_symbol(const imported_symbol&) = default;
+    imported_symbol(imported_symbol&&) = default;
+
+    /** Default assignments. */
+    imported_symbol& operator=(const imported_symbol&) = default;
+    imported_symbol& operator=(imported_symbol&&) = default;
+
+    /**
+     * Construct an `imported_symbol`.
+     *
+     * @param type The symbol's type.
+     * @param name The symbol's name.
+     * @param import_path Path of the module the symbol is imported from.
+     */
+    imported_symbol(symbol_type type, std::string name, std::string import_path)
+    : type{type}
+    , name{std::move(name)}
+    , import_path{std::move(import_path)}
+    {
+    }
+};
+
 /**
  * Code generator context.
  */
@@ -1495,6 +1549,9 @@ class context
 
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
+
+    /** Imported symbols. */
+    std::vector<imported_symbol> imports;
 
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
@@ -1530,6 +1587,17 @@ public:
     context& operator=(context&&) = default;
 
     /**
+     * Get the import index of a symbol. If the symbol is not found in the imports,
+     * it is added.
+     *
+     * @param type The symbol type.
+     * @param import_path Path of the module that exports the symbol.
+     * @param name The symbol's name.
+     * @return The symbol's index in the import table.
+     */
+    std::size_t get_import_index(symbol_type type, std::string import_path, std::string name);
+
+    /**
      * Create a type.
      *
      * Throws a `codegen_error` if the type already exists or if it contains undefined types.
@@ -1555,9 +1623,10 @@ public:
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's arguments.
+     * @param import_path The import path for the prototype.
      * @returns A representation of the prototype.
      */
-    prototype* add_prototype(std::string name, std::string return_type, std::vector<value> args);
+    prototype* add_prototype(std::string name, std::string return_type, std::vector<value> args, std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a function's prototype.
