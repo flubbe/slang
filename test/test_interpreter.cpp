@@ -34,7 +34,8 @@ TEST(interpreter, loading)
         throw e;
     }
 
-    slang::interpreter::context ctx;
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
     EXPECT_NO_THROW(ctx.load_module("test_output", mod));
 
     slang::interpreter::value res;
@@ -90,6 +91,27 @@ TEST(interpreter, loading)
 
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
     EXPECT_EQ(std::get<int>(res), 0);
+}
+
+TEST(interpreter, hello_world)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("hello_world.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'hello_world.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path("src/lang");
+    slang::interpreter::context ctx{file_mgr};
+    EXPECT_NO_THROW(ctx.load_module("hello_world", mod));
 }
 
 }    // namespace

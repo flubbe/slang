@@ -14,6 +14,8 @@
 #include "interpreter.h"
 #include "module.h"
 #include "opcodes.h"
+#include "package.h"
+#include "utils.h"
 
 namespace slang::interpreter
 {
@@ -551,6 +553,52 @@ void context::load_module(const std::string& name, const language_module& mod)
     // resolve dependencies.
     for(auto& it: decoded_header.imports)
     {
+        if(it.type == symbol_type::package)
+        {
+            // packages are loaded while resolving other symbols.
+            continue;
+        }
+
+        // resolve the symbol's package.
+        if(it.package_index >= decoded_header.imports.size())
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
+        }
+        else if(decoded_header.imports[it.package_index].type != symbol_type::package)
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
+        }
+
+        std::string import_name = decoded_header.imports[it.package_index].name;
+        slang::utils::replace_all(import_name, package::delimiter, "/");
+
+        fs::path fs_path = fs::path{import_name}.replace_extension(package::module_ext);
+        fs::path resolved_path = file_mgr.resolve(fs_path);
+        std::unique_ptr<slang::file_archive> ar = file_mgr.open(resolved_path, slang::file_manager::open_mode::read);
+
+        language_module import_mod;
+        (*ar) & import_mod;
+
+        load_module(import_name, import_mod);
+
+        // find the imported symbol.
+        const module_header& import_header = module_map[import_name].get_header();
+        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
+                                   [&it](const exported_symbol& exp) -> bool
+                                   {
+                                       return exp.name == it.name;
+                                   });
+        if(exp_it == import_header.exports.end())
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.", it.name, import_name));
+        }
+        if(exp_it->type != it.type)
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').", it.name, import_name, slang::to_string(it.type), slang::to_string(exp_it->type)));
+        }
+
+        // TODO
+
         throw interpreter_error("context::load_module: import resolution not implemented.");
     }
 
@@ -571,6 +619,10 @@ void context::load_module(const std::string& name, const language_module& mod)
         auto& desc = std::get<function_descriptor>(it.desc);
         if(desc.native)
         {
+            auto& details = std::get<native_function_details>(desc.details);
+
+            // TODO
+
             throw interpreter_error("context::load_module: not implemented for native functions.");
         }
         else

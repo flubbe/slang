@@ -107,7 +107,7 @@ public:
      * Open a file using an archive. If the file path is not an absolute path,
      * the path is check within the search paths.
      *
-     * Files are be opened as little endian archives.
+     * Files are opened as little endian archives.
      *
      * @param path The file path.
      * @param mode The opening mode (read or write).

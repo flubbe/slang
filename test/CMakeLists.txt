@@ -122,6 +122,7 @@ target_link_libraries(test_filemanager fmt::fmt GTest::gtest GTest::gtest_main)
 add_executable(test_interpreter
     test_interpreter.cpp
     ../src/archives/file.cpp
+    ../src/filemanager.cpp
     ../src/interpreter.cpp
     ../src/opcodes.cpp
 )

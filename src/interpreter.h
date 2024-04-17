@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+#include "filemanager.h"
 #include "module.h"
 #include "opcodes.h"
 
@@ -315,7 +316,9 @@ class context
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
 
-protected:
+    /** File manager reference. */
+    file_manager& file_mgr;
+
     /**
      * Decode a module.
      *
@@ -374,13 +377,23 @@ protected:
 
 public:
     /** Default constructors. */
-    context() = default;
+    context() = delete;
     context(const context&) = default;
     context(context&&) = default;
 
     /** Default assignments. */
-    context& operator=(const context&) = default;
-    context& operator=(context&&) = default;
+    context& operator=(const context&) = delete;
+    context& operator=(context&&) = delete;
+
+    /**
+     * Construct an interpreter context.
+     *
+     * @param file_mgr The file manager to use for module resolution.
+     */
+    context(file_manager& file_mgr)
+    : file_mgr{file_mgr}
+    {
+    }
 
     /**
      * Load a module.

@@ -77,6 +77,23 @@ std::string join(const std::vector<T>& v, std::function<std::string(const T&)> t
 }
 
 /**
+ * Replace all occurrences of a substring.
+ *
+ * @param str The string to operate on.
+ * @param old_value The value to replace.
+ * @param new_value The value to use as a replacement.
+ */
+inline void replace_all(std::string& str, const std::string& old_value, const std::string& new_value)
+{
+    size_t i = 0;
+    while((i = str.find(old_value, i)) != std::string::npos)
+    {
+        str.replace(i, old_value.length(), new_value);
+        i += new_value.length();
+    }
+}
+
+/**
  * Insert line breaks between words after at most len characters.
  * Preserves line breaks in the original string.
  *
