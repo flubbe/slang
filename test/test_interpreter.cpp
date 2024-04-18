@@ -36,7 +36,7 @@ TEST(interpreter, loading)
 
     slang::file_manager file_mgr;
     slang::interpreter::context ctx{file_mgr};
-    EXPECT_NO_THROW(ctx.load_module("test_output", mod));
+    ASSERT_NO_THROW(ctx.load_module("test_output", mod));
 
     slang::interpreter::value res;
     EXPECT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
@@ -111,7 +111,22 @@ TEST(interpreter, hello_world)
     slang::file_manager file_mgr;
     file_mgr.add_search_path("src/lang");
     slang::interpreter::context ctx{file_mgr};
-    EXPECT_NO_THROW(ctx.load_module("hello_world", mod));
+
+    ctx.register_native_function("slang", "print",
+                                 [](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     fmt::print("{}", *s);
+                                 });
+    ctx.register_native_function("slang", "println",
+                                 [](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     fmt::print("{}\n", *s);
+                                 });
+
+    ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
+    EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {"Test"}));
 }
 
 }    // namespace

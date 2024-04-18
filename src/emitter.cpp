@@ -218,7 +218,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                                       });
         if(import_it != ctx.prototypes.end())
         {
-            vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
+            vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name()) - 1;
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;

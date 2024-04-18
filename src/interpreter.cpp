@@ -98,7 +98,7 @@ void context::decode_locals(function_descriptor& desc) const
     }
 }
 
-void context::decode_instruction(const language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
+void context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
 {
     switch(static_cast<opcode>(instr))
     {
@@ -144,25 +144,41 @@ void context::decode_instruction(const language_module& mod, archive& ar, std::b
         // resolve to address.
         if(i.i < 0)
         {
-            // TODO
-            throw interpreter_error("interpreter::decode_instruction: invoke not implemented for imports.");
-        }
+            auto& imp_symbol = mod.header.imports[-i.i - 1];
+            if(imp_symbol.type != symbol_type::function)
+            {
+                throw interpreter_error(fmt::format("Cannot resolve call: Import header at index {} does not refer to a function.", -i.i - 1));
+            }
 
-        auto& symbol = mod.get_header().exports[i.i];
-        if(symbol.type != symbol_type::function)
+            auto& exp_symbol = std::get<exported_symbol*>(imp_symbol.export_reference);
+            if(exp_symbol->type != imp_symbol.type)
+            {
+                throw interpreter_error(fmt::format("Cannot resolve call: Export type for '{}' does not match import type ({} != {}).", imp_symbol.name, slang::to_string(exp_symbol->type), slang::to_string(imp_symbol.type)));
+            }
+
+            auto& desc = std::get<function_descriptor>(exp_symbol->desc);
+
+            const language_module* mod_ptr = std::get<const language_module*>(mod.header.imports[imp_symbol.package_index].export_reference);
+            code.insert(code.end(), reinterpret_cast<const std::byte*>(&mod_ptr), reinterpret_cast<const std::byte*>(&mod_ptr) + sizeof(mod_ptr));
+
+            const function_descriptor* desc_ptr = &desc;
+            code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+        }
+        else
         {
-            throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
-        }
-        auto& desc = std::get<function_descriptor>(symbol.desc);
+            auto& exp_symbol = mod.header.exports[i.i];
+            if(exp_symbol.type != symbol_type::function)
+            {
+                throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
+            }
+            auto& desc = std::get<function_descriptor>(exp_symbol.desc);
 
-        if(desc.native)
-        {
-            // TODO
-            throw interpreter_error("interpreter::decode_instruction: native function calls not yet implemented.");
-        }
+            const language_module* mod_ptr = &mod;
+            code.insert(code.end(), reinterpret_cast<const std::byte*>(&mod_ptr), reinterpret_cast<const std::byte*>(&mod_ptr) + sizeof(mod_ptr));
 
-        const function_descriptor* desc_ptr = &desc;
-        code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+            const function_descriptor* desc_ptr = &desc;
+            code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+        }
         break;
     }
     /* opcodes that need to resolve a variable. */
@@ -191,7 +207,7 @@ void context::decode_instruction(const language_module& mod, archive& ar, std::b
     }
 }
 
-language_module context::decode(const language_module& mod) const
+std::unique_ptr<language_module> context::decode(const language_module& mod)
 {
     if(mod.is_decoded())
     {
@@ -200,6 +216,84 @@ language_module context::decode(const language_module& mod) const
 
     module_header header = mod.get_header();
     memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
+
+    /*
+     * resolve imports.
+     */
+    for(auto& it: header.imports)
+    {
+        if(it.type == symbol_type::package)
+        {
+            // packages are loaded while resolving other symbols.
+            continue;
+        }
+
+        // resolve the symbol's package.
+        if(it.package_index >= header.imports.size())
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
+        }
+        else if(header.imports[it.package_index].type != symbol_type::package)
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
+        }
+
+        std::string import_name = header.imports[it.package_index].name;
+        slang::utils::replace_all(import_name, package::delimiter, "/");
+
+        fs::path fs_path = fs::path{import_name}.replace_extension(package::module_ext);
+        fs::path resolved_path = file_mgr.resolve(fs_path);
+        std::unique_ptr<slang::file_archive> ar = file_mgr.open(resolved_path, slang::file_manager::open_mode::read);
+
+        language_module import_mod;
+        (*ar) & import_mod;
+
+        load_module(import_name, import_mod);
+
+        // find the imported symbol.
+        module_header& import_header = module_map[import_name]->header;
+        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
+                                   [&it](const exported_symbol& exp) -> bool
+                                   {
+                                       return exp.name == it.name;
+                                   });
+        if(exp_it == import_header.exports.end())
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.", it.name, import_name));
+        }
+        if(exp_it->type != it.type)
+        {
+            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').", it.name, import_name, slang::to_string(it.type), slang::to_string(exp_it->type)));
+        }
+
+        it.export_reference = &(*exp_it);
+
+        // resolve symbol
+        if(it.type != symbol_type::function)
+        {
+            continue;
+        }
+
+        auto& desc = std::get<function_descriptor>(exp_it->desc);
+        if(desc.native)
+        {
+            // resolve native function.
+            auto& details = std::get<native_function_details>(desc.details);
+            auto mod_it = native_function_map.find(details.library_name);
+            if(mod_it == native_function_map.end())
+            {
+                throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (library not found).", exp_it->name, details.library_name));
+            }
+
+            auto func_it = mod_it->second.find(exp_it->name);
+            if(func_it == mod_it->second.end())
+            {
+                throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (function not found).", exp_it->name, details.library_name));
+            }
+
+            details.func = func_it->second;
+        }
+    }
 
     /*
      * arguments and locals.
@@ -221,13 +315,13 @@ language_module context::decode(const language_module& mod) const
     }
 
     // store header in decoded module.
-    language_module decoded_module{std::move(header)};
+    auto decoded_module = std::make_unique<language_module>(std::move(header));
 
     /*
      * instructions.
      */
     std::vector<std::byte> code;
-    for(auto& it: decoded_module.header.exports)
+    for(auto& it: decoded_module->header.exports)
     {
         if(it.type != symbol_type::function)
         {
@@ -254,14 +348,14 @@ language_module context::decode(const language_module& mod) const
             ar & instr;
             code.push_back(instr);
 
-            decode_instruction(decoded_module, ar, instr, details, code);
+            decode_instruction(*decoded_module, ar, instr, details, code);
         }
 
         details.size = code.size() - details.offset;
     }
 
-    decoded_module.set_binary(std::move(code));
-    decoded_module.decoded = true;
+    decoded_module->set_binary(std::move(code));
+    decoded_module->decoded = true;
 
     return decoded_module;
 }
@@ -417,29 +511,40 @@ opcode context::exec(const language_module& mod,
         } /* opcode::sload */
         case opcode::invoke:
         {
+            language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);
+            offset += sizeof(callee_mod);
+
             function_descriptor* const* desc_ptr = reinterpret_cast<function_descriptor* const*>(&binary[offset]);
             offset += sizeof(desc_ptr);
 
             const function_descriptor* desc = *desc_ptr;
             if(desc->native)
             {
-                throw interpreter_error("opcode::invoke not implemented for native functions.");
+                auto& details = std::get<native_function_details>(desc->details);
+                if(!details.func)
+                {
+                    throw interpreter_error("Tried to invoke unresolved native function.");
+                }
+
+                details.func(frame.stack);
             }
-
-            auto& details = std::get<function_details>(desc->details);
-
-            stack_frame callee_frame{frame.string_table, details.locals_size};
-            auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
-            std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
-            frame.stack.discard(details.args_size);
-
-            exec(mod, details.offset, details.size, callee_frame);
-
-            if(callee_frame.stack.size() != details.return_size)
+            else
             {
-                throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
+                auto& details = std::get<function_details>(desc->details);
+
+                stack_frame callee_frame{frame.string_table, details.locals_size};
+                auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
+                std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
+                frame.stack.discard(details.args_size);
+
+                exec(mod, details.offset, details.size, callee_frame);
+
+                if(callee_frame.stack.size() != details.return_size)
+                {
+                    throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
+                }
+                frame.stack.push_stack(callee_frame.stack);
             }
-            frame.stack.push_stack(callee_frame.stack);
             break;
         } /* opcode::invoke */
 
@@ -514,13 +619,44 @@ value context::exec(const language_module& mod,
     /*
      * Execute the function.
      */
-    opcode ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
+    opcode ret_opcode;
+    if(f.is_native())
+    {
+        auto& func = f.get_function();
+        func(frame.stack);
+
+        auto& ret_type = f.get_signature().return_type;
+        if(ret_type == "void")
+        {
+            ret_opcode = opcode::ret;
+        }
+        else if(ret_type == "i32")
+        {
+            ret_opcode = opcode::iret;
+        }
+        else if(ret_type == "f32")
+        {
+            ret_opcode = opcode::fret;
+        }
+        else if(ret_type == "str")
+        {
+            ret_opcode = opcode::sret;
+        }
+    }
+    else
+    {
+        ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
+    }
 
     /*
      * Decode return value.
      */
     value ret;
-    if(ret_opcode == opcode::iret)
+    if(ret_opcode == opcode::ret)
+    {
+        /* return void */
+    }
+    else if(ret_opcode == opcode::iret)
     {
         ret = frame.stack.pop_i32();
     }
@@ -540,6 +676,26 @@ value context::exec(const language_module& mod,
     return ret;
 }
 
+void context::register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func)
+{
+    // TODO Also check module functions.
+
+    auto mod_it = native_function_map.find(mod_name);
+    if(mod_it == native_function_map.end())
+    {
+        native_function_map.insert({mod_name, {{std::move(fn_name), std::move(func)}}});
+    }
+    else
+    {
+        if(mod_it->second.find(fn_name) != mod_it->second.end())
+        {
+            throw interpreter_error(fmt::format("Cannot register native function: '{}' is already definded for module '{}'.", fn_name, mod_name));
+        }
+
+        mod_it->second.insert({std::move(fn_name), std::move(func)});
+    }
+}
+
 void context::load_module(const std::string& name, const language_module& mod)
 {
     if(module_map.find(name) != module_map.end())
@@ -548,59 +704,7 @@ void context::load_module(const std::string& name, const language_module& mod)
     }
 
     module_map.insert({name, decode(mod)});
-    const module_header& decoded_header = module_map[name].get_header();
-
-    // resolve dependencies.
-    for(auto& it: decoded_header.imports)
-    {
-        if(it.type == symbol_type::package)
-        {
-            // packages are loaded while resolving other symbols.
-            continue;
-        }
-
-        // resolve the symbol's package.
-        if(it.package_index >= decoded_header.imports.size())
-        {
-            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
-        }
-        else if(decoded_header.imports[it.package_index].type != symbol_type::package)
-        {
-            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
-        }
-
-        std::string import_name = decoded_header.imports[it.package_index].name;
-        slang::utils::replace_all(import_name, package::delimiter, "/");
-
-        fs::path fs_path = fs::path{import_name}.replace_extension(package::module_ext);
-        fs::path resolved_path = file_mgr.resolve(fs_path);
-        std::unique_ptr<slang::file_archive> ar = file_mgr.open(resolved_path, slang::file_manager::open_mode::read);
-
-        language_module import_mod;
-        (*ar) & import_mod;
-
-        load_module(import_name, import_mod);
-
-        // find the imported symbol.
-        const module_header& import_header = module_map[import_name].get_header();
-        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
-                                   [&it](const exported_symbol& exp) -> bool
-                                   {
-                                       return exp.name == it.name;
-                                   });
-        if(exp_it == import_header.exports.end())
-        {
-            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.", it.name, import_name));
-        }
-        if(exp_it->type != it.type)
-        {
-            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').", it.name, import_name, slang::to_string(it.type), slang::to_string(exp_it->type)));
-        }
-
-        // TODO
-
-        throw interpreter_error("context::load_module: import resolution not implemented.");
-    }
+    module_header& decoded_header = module_map[name]->header;
 
     // populate function map.
     std::unordered_map<std::string, function> fmap;
@@ -620,15 +724,25 @@ void context::load_module(const std::string& name, const language_module& mod)
         if(desc.native)
         {
             auto& details = std::get<native_function_details>(desc.details);
+            auto mod_it = native_function_map.find(details.library_name);
+            if(mod_it == native_function_map.end())
+            {
+                // TODO Add e.g. a callback to resolve the library?
+                throw interpreter_error(fmt::format("Cannot resolve module '{}' containing native function '{}'.", details.library_name, it.name));
+            }
 
-            // TODO
+            auto func_it = mod_it->second.find(it.name);
+            if(func_it == mod_it->second.end())
+            {
+                throw interpreter_error(fmt::format("Cannot resolve native function '{}' in module '{}'.", it.name, details.library_name));
+            }
 
-            throw interpreter_error("context::load_module: not implemented for native functions.");
+            fmap.insert({it.name, function{desc.signature, func_it->second}});
         }
         else
         {
             auto& details = std::get<function_details>(desc.details);
-            fmap.insert({it.name, function(desc.signature, details.offset, details.size, details.locals_size)});
+            fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals_size}});
         }
     }
     function_map.insert({name, std::move(fmap)});
@@ -654,7 +768,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
     }
 
-    return exec(mod_it->second, func_it->second, args);
+    return exec(*mod_it->second, func_it->second, args);
 }
 
 }    // namespace slang::interpreter

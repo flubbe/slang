@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -20,8 +21,9 @@
 /* Forward declarations. */
 namespace slang::interpreter
 {
+class operand_stack;
 class context;
-};
+};    // namespace slang::interpreter
 
 namespace slang
 {
@@ -196,6 +198,9 @@ struct native_function_details
 {
     /** The library name. */
     std::string library_name;
+
+    /** The resolved function. Not serialized. */
+    std::function<void(slang::interpreter::operand_stack&)> func;
 
     /** Default constructors. */
     native_function_details() = default;
@@ -392,6 +397,9 @@ struct imported_symbol
 
     /** Index into the package import table. Unused for package imports (set to `(uint32_t)(-1)`). */
     std::uint32_t package_index;
+
+    /** If the import is resolved, this points to the corresponding module or into the export table. Not serialized. */
+    std::variant<const class language_module*, struct exported_symbol*> export_reference;
 
     /** Default constructors. */
     imported_symbol() = default;

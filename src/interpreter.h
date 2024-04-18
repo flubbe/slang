@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <functional>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
@@ -38,67 +39,6 @@ public:
 
 /** Result and argument type. */
 using value = std::variant<int, float, std::string>;
-
-/** A function. */
-class function
-{
-    /** Function signature. */
-    function_signature signature;
-
-    /** Entry point (offset into binary). */
-    std::size_t entry_point;
-
-    /** Bytecode size. */
-    std::size_t size;
-
-public:
-    /** Argument and locals size. Not serialized. */
-    std::size_t locals_size = 0;
-
-public:
-    /** Default constructors. */
-    function() = default;
-    function(const function&) = default;
-    function(function&&) = default;
-
-    /** Default assignments. */
-    function& operator=(const function&) = default;
-    function& operator=(function&&) = default;
-
-    /**
-     * Construct a function.
-     *
-     * @param signature The function's signature.
-     * @param entry_point The function's entry point, given as an offset into a module binary.
-     * @param size The bytecode size.
-     * @param locals_size The arguments and locals size.
-     */
-    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
-    : signature{std::move(signature)}
-    , entry_point{entry_point}
-    , size{size}
-    , locals_size{locals_size}
-    {
-    }
-
-    /** Get the function signature. */
-    const function_signature& get_signature() const
-    {
-        return signature;
-    }
-
-    /** Get the function's entry point. */
-    std::size_t get_entry_point() const
-    {
-        return entry_point;
-    }
-
-    /** Get the bytecode size. */
-    std::size_t get_size() const
-    {
-        return size;
-    }
-};
 
 /** Operand stack. */
 class operand_stack
@@ -273,6 +213,96 @@ public:
     }
 };
 
+/** A function. */
+class function
+{
+    /** Function signature. */
+    function_signature signature;
+
+    /** Whether this is a native function. */
+    bool native;
+
+    /** Entry point (offset into binary) or function pointer for native functions. */
+    std::variant<std::size_t, std::function<void(operand_stack&)>> entry_point_or_function;
+
+    /** Bytecode size for interpreted functions. */
+    std::size_t size;
+
+public:
+    /** Argument and locals size. Not serialized. */
+    std::size_t locals_size = 0;
+
+public:
+    /** Default constructors. */
+    function() = default;
+    function(const function&) = default;
+    function(function&&) = default;
+
+    /** Default assignments. */
+    function& operator=(const function&) = default;
+    function& operator=(function&&) = default;
+
+    /**
+     * Construct a function.
+     *
+     * @param signature The function's signature.
+     * @param entry_point The function's entry point, given as an offset into a module binary.
+     * @param size The bytecode size.
+     * @param locals_size The arguments and locals size.
+     */
+    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
+    : signature{std::move(signature)}
+    , native{false}
+    , entry_point_or_function{entry_point}
+    , size{size}
+    , locals_size{locals_size}
+    {
+    }
+
+    /**
+     * Construct a native function.
+     *
+     * @param signature The function's signature.
+     * @param func An std::function.
+     */
+    function(function_signature signature, std::function<void(operand_stack&)> func)
+    : signature{std::move(signature)}
+    , native{true}
+    , entry_point_or_function{std::move(func)}
+    {
+    }
+
+    /** Get the function signature. */
+    const function_signature& get_signature() const
+    {
+        return signature;
+    }
+
+    /** Return whether this is a native function. */
+    bool is_native() const
+    {
+        return native;
+    }
+
+    /** Get the function's entry point. */
+    std::size_t get_entry_point() const
+    {
+        return std::get<std::size_t>(entry_point_or_function);
+    }
+
+    /** Get a std::function. */
+    const std::function<void(operand_stack&)>& get_function() const
+    {
+        return std::get<std::function<void(operand_stack&)>>(entry_point_or_function);
+    }
+
+    /** Get the bytecode size. */
+    std::size_t get_size() const
+    {
+        return size;
+    }
+};
+
 /** A stack frame. */
 struct stack_frame
 {
@@ -311,10 +341,13 @@ struct stack_frame
 class context
 {
     /** Loaded modules as `(name, decoded_module)`. */
-    std::unordered_map<std::string, language_module> module_map;
+    std::unordered_map<std::string, std::unique_ptr<language_module>> module_map;
 
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
+
+    /** Native functions, ordered by module and name. */
+    std::unordered_map<std::string, std::unordered_map<std::string, std::function<void(operand_stack&)>>> native_function_map;
 
     /** File manager reference. */
     file_manager& file_mgr;
@@ -325,7 +358,7 @@ class context
      * @param mod The module.
      * @returns The decoded module.
      */
-    language_module decode(const language_module& mod) const;
+    std::unique_ptr<language_module> decode(const language_module& mod);
 
     /**
      * Decode the function's arguments and locals.
@@ -343,7 +376,7 @@ class context
      * @param details The function's details.
      * @param code Buffer to write the decoded bytes into.
      */
-    void decode_instruction(const language_module& mod,
+    void decode_instruction(language_module& mod,
                             archive& ar,
                             std::byte instr,
                             const function_details& details,
@@ -394,6 +427,16 @@ public:
     : file_mgr{file_mgr}
     {
     }
+
+    /**
+     * Register a native function to a module.
+     *
+     * @param mod_name The name of the module to bind to.
+     * @param fn_name The function's name.
+     * @param func The function.
+     * @throws Throws a `codegen_error` if the function given by `mod_name` and `fn_name` is already registered.
+     */
+    void register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func);
 
     /**
      * Load a module.
