@@ -84,7 +84,7 @@ constexpr std::size_t operator_count = 34;
 /**
  * Supported operators.
  *
- * NOTE We treat the access operator . separately, since it could also start a floating-point literal.
+ * @note We treat the access operator `.` separately, since it could also start a floating-point literal.
  */
 static std::array<std::string, operator_count> operators = {
   // clang-format off

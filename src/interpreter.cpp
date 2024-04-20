@@ -20,6 +20,35 @@
 namespace slang::interpreter
 {
 
+/**
+ * Return the size of a built-in type.
+ *
+ * @param type The type name.
+ * @return Returns the type size.
+ * @throws Throws an `interpreter_error` if the type is not known.
+ */
+static std::size_t get_type_size(const std::string& type)
+{
+    if(type == "void")
+    {
+        return 0;
+    }
+    else if(type == "i32")
+    {
+        return sizeof(std::uint32_t);
+    }
+    else if(type == "f32")
+    {
+        return sizeof(float);
+    }
+    else if(type == "str")
+    {
+        return sizeof(std::string*);
+    }
+
+    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type));
+}
+
 void context::decode_locals(function_descriptor& desc) const
 {
     if(desc.native)
@@ -27,26 +56,6 @@ void context::decode_locals(function_descriptor& desc) const
         throw interpreter_error("Cannot decode locals for native function.");
     }
     auto& details = std::get<function_details>(desc.details);
-
-    auto set_size = [](variable& v)
-    {
-        if(v.type == "i32")
-        {
-            v.size = sizeof(std::uint32_t);
-        }
-        else if(v.type == "f32")
-        {
-            v.size = sizeof(float);
-        }
-        else if(v.type == "str")
-        {
-            v.size = sizeof(std::string*);
-        }
-        else
-        {
-            throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", v.type));
-        }
-    };
 
     details.args_size = 0;
     details.locals_size = 0;
@@ -59,7 +68,7 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        set_size(v);
+        v.size = get_type_size(v.type);
         details.locals_size += v.size;
 
         details.args_size += v.size;
@@ -71,31 +80,12 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        set_size(v);
+        v.size = get_type_size(v.type);
         details.locals_size += v.size;
     }
 
     // return type
-    if(desc.signature.return_type == "void")
-    {
-        details.return_size = 0;
-    }
-    if(desc.signature.return_type == "i32")
-    {
-        details.return_size = sizeof(std::uint32_t);
-    }
-    else if(desc.signature.return_type == "f32")
-    {
-        details.return_size = sizeof(float);
-    }
-    else if(desc.signature.return_type == "str")
-    {
-        details.return_size = sizeof(std::string*);
-    }
-    else
-    {
-        throw interpreter_error(fmt::format("Size/offset resolution not implemented for type '{}'.", desc.signature.return_type));
-    }
+    details.return_size = get_type_size(desc.signature.return_type);
 }
 
 void context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
@@ -558,7 +548,7 @@ opcode context::exec(const language_module& mod,
 
 value context::exec(const language_module& mod,
                     const function& f,
-                    const std::vector<value>& args)
+                    std::vector<value> args)
 {
     /*
      * allocate locals and decode arguments.
@@ -569,51 +559,23 @@ value context::exec(const language_module& mod,
     auto& arg_types = f.get_signature().arg_types;
     if(arg_types.size() != args.size())
     {
-        throw interpreter_error(fmt::format("Arguments for function '{}' do not match: got {}, expected {}.", arg_types.size(), args.size()));
+        throw interpreter_error(fmt::format("Arguments for function do not match: got {}, expected {}.", arg_types.size(), args.size()));
     }
 
     std::size_t offset = 0;
     for(std::size_t i = 0; i < args.size(); ++i)
     {
-        auto& arg_type = arg_types[i];
-        if(arg_type == "i32")
+        if(arg_types[i] != args[i].get_type())
         {
-            if(offset + sizeof(std::int32_t) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
-
-            *reinterpret_cast<std::int32_t*>(&frame.locals[offset]) = std::get<int>(args[i]);
-
-            offset += sizeof(std::int32_t);
+            throw interpreter_error(fmt::format("Argument {} for function has wrong type (expected '{}', got '{}').", i, arg_types[i], args[i].get_type()));
         }
-        else if(arg_type == "f32")
+
+        if(offset + args[i].get_size() > f.locals_size)
         {
-            if(offset + sizeof(float) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
-
-            *reinterpret_cast<float*>(&frame.locals[offset]) = std::get<float>(args[i]);
-
-            offset += sizeof(float);
+            throw interpreter_error("Stack overflow during argument allocation.");
         }
-        else if(arg_type == "str")
-        {
-            if(offset + sizeof(std::string*) > f.locals_size)
-            {
-                throw interpreter_error("Stack overflow during argument allocation.");
-            }
 
-            local_strings.emplace_back(std::get<std::string>(args[i]));
-            *reinterpret_cast<std::string**>(&frame.locals[offset]) = &local_strings.back();
-
-            offset += sizeof(std::string*);
-        }
-        else
-        {
-            throw interpreter_error(fmt::format("Argument type '{}' not implemented.", arg_type));
-        }
+        offset += args[i].write(&frame.locals[offset]);
     }
 
     /*
@@ -748,7 +710,7 @@ void context::load_module(const std::string& name, const language_module& mod)
     function_map.insert({name, std::move(fmap)});
 }
 
-value context::invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args)
+value context::invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args)
 {
     auto mod_it = module_map.find(module_name);
     if(mod_it == module_map.end())
@@ -768,7 +730,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
     }
 
-    return exec(*mod_it->second, func_it->second, args);
+    return exec(*mod_it->second, func_it->second, std::move(args));
 }
 
 }    // namespace slang::interpreter

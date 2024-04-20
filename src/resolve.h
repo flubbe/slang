@@ -38,7 +38,7 @@ public:
     /**
      * Construct a resolve_error.
      *
-     * NOTE Use the other constructor if you want to include location information in the error message.
+     * @note Use the other constructor if you want to include location information in the error message.
      *
      * @param message The error message.
      */

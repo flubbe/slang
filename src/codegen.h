@@ -39,7 +39,7 @@ public:
     /**
      * Construct a `codegen_error`.
      *
-     * NOTE Use the other constructor if you want to include location information in the error message.
+     * @note Use the other constructor if you want to include location information in the error message.
      *
      * @param message The error message.
      */
@@ -426,7 +426,7 @@ public:
     /**
      * Create a string argument.
      *
-     * NOTE A string needs to be registered with a context using `register_const`.
+     * @note A string needs to be registered with a context using `register_const`.
      *
      * @param s The string.
      */
@@ -1525,9 +1525,7 @@ struct imported_symbol
     }
 };
 
-/**
- * Code generator context.
- */
+/** Code generator context. */
 class context
 {
     friend class slang::instruction_emitter;
@@ -1782,7 +1780,7 @@ public:
     /**
      * Load an element from a structure onto the stack.
      *
-     * NOTE indices is a vector of `int`'s, since currently constant instruction arguments
+     * @note indices is a vector of `int`'s, since currently constant instruction arguments
      *      are `i32`, `f32` or `str`.
      *
      * @param indices Indices into a (possibly nested) structure.
@@ -1806,7 +1804,7 @@ public:
     /**
      * Store the top of the stack into a structure.
      *
-     * NOTE indices is a vector of `int`'s, since currently constant instruction arguments
+     * @note indices is a vector of `int`'s, since currently constant instruction arguments
      *      are `i32`, `f32` or `str`.
      *
      * @param indices Indices into a (possibly nested) structure.

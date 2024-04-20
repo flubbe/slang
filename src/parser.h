@@ -27,7 +27,7 @@ public:
     /**
      * Construct a parser_error.
      *
-     * NOTE Use the other constructor if you want to include token location information in the error message.
+     * @note Use the other constructor if you want to include token location information in the error message.
      *
      * @param message The error message.
      */
@@ -54,7 +54,7 @@ public:
     /**
      * Construct a syntax_error.
      *
-     * NOTE Use the other constructor if you want to include token location information in the error message.
+     * @note Use the other constructor if you want to include token location information in the error message.
      *
      * @param message The error message.
      */

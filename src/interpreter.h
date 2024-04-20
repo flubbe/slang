@@ -38,7 +38,225 @@ public:
 };
 
 /** Result and argument type. */
-using value = std::variant<int, float, std::string>;
+class value
+{
+    /** The stored value. */
+    std::variant<int, float, std::string> v;
+
+    /** Read this value from memory. */
+    std::function<std::size_t(std::byte*, value&)> reader;
+
+    /** Write this value to memory. */
+    std::function<std::size_t(std::byte*, value&)> writer;
+
+    /** Size of the value, in bytes. */
+    std::size_t size;
+
+    /** String identifying the type. */
+    std::string type;
+
+    /**
+     * Reads a primitive type into a `value`.
+     *
+     * @param memory The memory to read from.
+     * @param v The value to write the integer to.
+     * @returns Returns `sizeof(T)`.
+     */
+    template<typename T>
+    static std::size_t read_primitive_type(std::byte* memory, value& v)
+    {
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+                      "Primitive type must be an integer or a floating point type.");
+        v = *reinterpret_cast<T*>(memory);
+        return sizeof(T);
+    }
+
+    /**
+     * Writes a primitive type value into memory.
+     *
+     * @param memory The memory to write into.
+     * @param v The value to write.
+     * @returns Returns `sizeof(T)`.
+     */
+    template<typename T>
+    static std::size_t write_primitive_type(std::byte* memory, value& v)
+    {
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+                      "Primitive type must be an integer or a floating point type.");
+        *reinterpret_cast<T*>(memory) = std::get<T>(v.v);
+        return sizeof(T);
+    }
+
+    /**
+     * Reads a string into a `value`.
+     *
+     * @note This copies the string.
+     *
+     * @param memory The memory to read from.
+     * @param v The value write the string to.
+     * @returns Returns `sizeof(std::string*)`.
+     */
+    static std::size_t read_str(std::byte* memory, value& v)
+    {
+        std::string* s = *reinterpret_cast<std::string**>(memory);
+        v = *s;
+        return sizeof(std::string*);
+    }
+
+    /**
+     * Writes a string reference into memory.
+     *
+     * @note The string is owned by `v`.
+     *
+     * @param memory The memory to write into.
+     * @param v The string value to write.
+     * @returns Returns `sizeof(std::string*)`.
+     */
+    static std::size_t write_str(std::byte* memory, value& v)
+    {
+        std::string* s = std::get_if<std::string>(&v.v);
+        if(!s)
+        {
+            throw std::bad_variant_access();
+        }
+        *reinterpret_cast<std::string**>(memory) = s;
+        return sizeof(std::string*);
+    }
+
+public:
+    /** Default constructors. */
+    value() = default;
+    value(const value&) = default;
+    value(value&&) = default;
+
+    /** Default assignments. */
+    value& operator=(const value&) = default;
+    value& operator=(value&&) = default;
+
+    /**
+     * Construct a integer value.
+     *
+     * @param i The integer.
+     */
+    value(int i)
+    : v{i}
+    , reader{read_primitive_type<int>}
+    , writer{write_primitive_type<int>}
+    , size{sizeof(int)}
+    , type{"i32"}
+    {
+    }
+
+    /**
+     * Construct a floating point value.
+     *
+     * @param f The floating point value.
+     */
+    value(float f)
+    : v{f}
+    , reader{read_primitive_type<float>}
+    , writer{write_primitive_type<float>}
+    , size{sizeof(float)}
+    , type{"f32"}
+    {
+    }
+
+    /**
+     * Construct a string value.
+     *
+     * @note The string is owned by this `value`. This is relevant when using `write`,
+     * which writes a pointer to the specified memory address.
+     *
+     * @param s The string.
+     */
+    value(std::string s)
+    : v{std::move(s)}
+    , reader{read_str}
+    , writer{write_str}
+    , size{sizeof(std::string*)}
+    , type{"str"}
+    {
+    }
+
+    /**
+     * Construct a string value.
+     *
+     * @param s The string.
+     */
+    value(const char* s)
+    : v{s}
+    , reader{read_str}
+    , writer{write_str}
+    , size{sizeof(std::string*)}
+    , type{"str"}
+    {
+    }
+
+    /**
+     * Read the value from memory.
+     *
+     * @param memory The memory to read from.
+     * @returns Returns the value's size in bytes.
+     */
+    std::size_t read(std::byte* memory)
+    {
+        return reader(memory, *this);
+    }
+
+    /**
+     * Write the value into memory.
+     *
+     * @param memory The memory to write to.
+     * @returns Returns the value's size in bytes.
+     */
+    std::size_t write(std::byte* memory)
+    {
+        return writer(memory, *this);
+    }
+
+    /** Get the value's size. */
+    std::size_t get_size() const
+    {
+        return size;
+    }
+
+    /** Get the value's type. */
+    const std::string& get_type() const
+    {
+        return type;
+    }
+
+    /** Access the underlying value. */
+    template<typename T>
+    T* get()
+    {
+        T* v_ptr = std::get_if<T>(&v);
+        if(!v_ptr)
+        {
+            throw std::bad_variant_access();
+        }
+        return v_ptr;
+    }
+
+    /** Access the underlying value. */
+    template<typename T>
+    const T* get() const
+    {
+        T* v_ptr = std::get_if<T>(&v);
+        if(!v_ptr)
+        {
+            throw std::bad_variant_access();
+        }
+        return v_ptr;
+    }
+
+    /** Check if the value holds a given type. */
+    template<typename T>
+    bool holds_type() const
+    {
+        return std::holds_alternative<T>(v);
+    }
+};
 
 /** Operand stack. */
 class operand_stack
@@ -233,13 +451,13 @@ public:
     std::size_t locals_size = 0;
 
 public:
-    /** Default constructors. */
+    /** Defaulted and deleted constructors. */
     function() = default;
-    function(const function&) = default;
+    function(const function&) = delete;
     function(function&&) = default;
 
-    /** Default assignments. */
-    function& operator=(const function&) = default;
+    /** Default and deleted assignments. */
+    function& operator=(const function&) = delete;
     function& operator=(function&&) = default;
 
     /**
@@ -392,7 +610,7 @@ class context
      */
     value exec(const language_module& mod,
                const function& f,
-               const std::vector<value>& args);
+               std::vector<value> args);
 
     /**
      * Execute a function.
@@ -454,7 +672,7 @@ public:
      * @param args The function's arguments.
      * @returns The function's return value.
      */
-    value invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args);
+    value invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args);
 };
 
 }    // namespace slang::interpreter
