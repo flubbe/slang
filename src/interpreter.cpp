@@ -604,6 +604,10 @@ value context::exec(const language_module& mod,
         {
             ret_opcode = opcode::sret;
         }
+        else
+        {
+            throw interpreter_error(fmt::format("Return opcode not implemented for type '{}'.", ret_type));
+        }
     }
     else
     {
@@ -640,21 +644,28 @@ value context::exec(const language_module& mod,
 
 void context::register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func)
 {
-    // TODO Also check module functions.
-
-    auto mod_it = native_function_map.find(mod_name);
-    if(mod_it == native_function_map.end())
-    {
-        native_function_map.insert({mod_name, {{std::move(fn_name), std::move(func)}}});
-    }
-    else
+    auto mod_it = function_map.find(mod_name);
+    if(mod_it != function_map.end())
     {
         if(mod_it->second.find(fn_name) != mod_it->second.end())
         {
             throw interpreter_error(fmt::format("Cannot register native function: '{}' is already definded for module '{}'.", fn_name, mod_name));
         }
+    }
 
-        mod_it->second.insert({std::move(fn_name), std::move(func)});
+    auto native_mod_it = native_function_map.find(mod_name);
+    if(native_mod_it == native_function_map.end())
+    {
+        native_function_map.insert({mod_name, {{std::move(fn_name), std::move(func)}}});
+    }
+    else
+    {
+        if(native_mod_it->second.find(fn_name) != native_mod_it->second.end())
+        {
+            throw interpreter_error(fmt::format("Cannot register native function: '{}' is already definded for module '{}'.", fn_name, mod_name));
+        }
+
+        native_mod_it->second.insert({std::move(fn_name), std::move(func)});
     }
 }
 

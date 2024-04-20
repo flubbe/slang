@@ -112,21 +112,33 @@ TEST(interpreter, hello_world)
     file_mgr.add_search_path("src/lang");
     slang::interpreter::context ctx{file_mgr};
 
+    std::vector<std::string> print_buf;
+
     ctx.register_native_function("slang", "print",
-                                 [](slang::interpreter::operand_stack& stack)
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}", *s);
+                                     print_buf.push_back(*s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [](slang::interpreter::operand_stack& stack)
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}\n", *s);
+                                     print_buf.push_back(fmt::format("{}\n", *s));
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
     EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {"Test"}));
+    ASSERT_EQ(print_buf.size(), 1);
+    EXPECT_EQ(print_buf[0], "Hello, World!\n");
+
+    // re-defining functions should fail.
+    EXPECT_THROW(ctx.register_native_function("slang", "println",
+                                              [](slang::interpreter::operand_stack& stack) {}),
+                 slang::interpreter::interpreter_error);
+    EXPECT_THROW(ctx.register_native_function("hello_world", "main",
+                                              [](slang::interpreter::operand_stack& stack) {}),
+                 slang::interpreter::interpreter_error);
 }
 
 }    // namespace
