@@ -1,3 +1,11 @@
 /.mypy_cache/
 /build/
 /CMakeUserPresets.json
+
+/*.bin
+/**/*.cmod
+
+/.vscode
+/.VSCodeCounter
+
+/**/.DS_Store

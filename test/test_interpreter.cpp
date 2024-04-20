@@ -39,57 +39,57 @@ TEST(interpreter, loading)
     ASSERT_NO_THROW(ctx.load_module("test_output", mod));
 
     slang::interpreter::value res;
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "iadd", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "iadd", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "isub", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "isub", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "imul", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "imul", {}));
     EXPECT_EQ(*res.get<int>(), 6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "idiv", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "idiv", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "ftest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "ftest", {}));
     EXPECT_NEAR(*res.get<float>(), 1.1, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fadd", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fadd", {}));
     EXPECT_NEAR(*res.get<float>(), 3.2, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fsub", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fsub", {}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fmul", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fmul", {}));
     EXPECT_NEAR(*res.get<float>(), 6.51, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "fdiv", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fdiv", {}));
     EXPECT_NEAR(*res.get<float>(), 3.2, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {1}));
     EXPECT_EQ(*res.get<int>(), 2);
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {15}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {15}));
     EXPECT_EQ(*res.get<int>(), 16);
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
     EXPECT_EQ(*res.get<int>(), -99);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {1.0f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {1.0f}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {-1.0f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {-1.0f}));
     EXPECT_NEAR(*res.get<float>(), -1.0, 1e-6);
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "arg2", {0.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {0.f}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    EXPECT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
     EXPECT_EQ(*res.get<int>(), 0);
 }
 
@@ -133,10 +133,10 @@ TEST(interpreter, hello_world)
     EXPECT_EQ(print_buf[0], "Hello, World!\n");
 
     // re-defining functions should fail.
-    EXPECT_THROW(ctx.register_native_function("slang", "println",
+    EXPECT_THROW(ctx.register_native_function("slang", "println",    // collides with a native function name
                                               [](slang::interpreter::operand_stack& stack) {}),
                  slang::interpreter::interpreter_error);
-    EXPECT_THROW(ctx.register_native_function("hello_world", "main",
+    EXPECT_THROW(ctx.register_native_function("hello_world", "main",    // collides with a scripted function name
                                               [](slang::interpreter::operand_stack& stack) {}),
                  slang::interpreter::interpreter_error);
 }

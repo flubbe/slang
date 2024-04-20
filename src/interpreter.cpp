@@ -49,6 +49,61 @@ static std::size_t get_type_size(const std::string& type)
     throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type));
 }
 
+/**
+ * Generate the return opcode from the signature's return type for native functions.
+ *
+ * @param return_type The return type.
+ * @returns A return opcode.
+ * @throws Throws an `interpreter_error` if the `return_type` is invalid.
+ */
+static opcode get_return_opcode(const std::string& return_type)
+{
+    if(return_type == "void")
+    {
+        return opcode::ret;
+    }
+    else if(return_type == "i32")
+    {
+        return opcode::iret;
+    }
+    else if(return_type == "f32")
+    {
+        return opcode::fret;
+    }
+    else if(return_type == "str")
+    {
+        return opcode::sret;
+    }
+
+    throw interpreter_error(fmt::format("Type '{}' has no return opcode.", return_type));
+}
+
+/*
+ * function implementation.
+ */
+
+function::function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
+: signature{std::move(signature)}
+, native{false}
+, entry_point_or_function{entry_point}
+, size{size}
+, locals_size{locals_size}
+{
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+}
+
+function::function(function_signature signature, std::function<void(operand_stack&)> func)
+: signature{std::move(signature)}
+, native{true}
+, entry_point_or_function{std::move(func)}
+{
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+}
+
+/*
+ * context implementation.
+ */
+
 void context::decode_locals(function_descriptor& desc) const
 {
     if(desc.native)
@@ -586,32 +641,15 @@ value context::exec(const language_module& mod,
     {
         auto& func = f.get_function();
         func(frame.stack);
-
-        auto& ret_type = f.get_signature().return_type;
-        if(ret_type == "void")
-        {
-            ret_opcode = opcode::ret;
-        }
-        else if(ret_type == "i32")
-        {
-            ret_opcode = opcode::iret;
-        }
-        else if(ret_type == "f32")
-        {
-            ret_opcode = opcode::fret;
-        }
-        else if(ret_type == "str")
-        {
-            ret_opcode = opcode::sret;
-        }
-        else
-        {
-            throw interpreter_error(fmt::format("Return opcode not implemented for type '{}'.", ret_type));
-        }
+        ret_opcode = f.get_return_opcode();
     }
     else
     {
         ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
+        if(ret_opcode != f.get_return_opcode())
+        {
+            throw interpreter_error(fmt::format("Type error during function return: Expected '{}', got '{}'.", slang::to_string(f.get_return_opcode()), slang::to_string(ret_opcode)));
+        }
     }
 
     /*

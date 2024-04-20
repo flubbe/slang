@@ -446,6 +446,9 @@ class function
     /** Bytecode size for interpreted functions. */
     std::size_t size;
 
+    /** Return opcode. */
+    opcode ret_opcode;
+
 public:
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
@@ -468,14 +471,7 @@ public:
      * @param size The bytecode size.
      * @param locals_size The arguments and locals size.
      */
-    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
-    : signature{std::move(signature)}
-    , native{false}
-    , entry_point_or_function{entry_point}
-    , size{size}
-    , locals_size{locals_size}
-    {
-    }
+    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size);
 
     /**
      * Construct a native function.
@@ -483,12 +479,7 @@ public:
      * @param signature The function's signature.
      * @param func An std::function.
      */
-    function(function_signature signature, std::function<void(operand_stack&)> func)
-    : signature{std::move(signature)}
-    , native{true}
-    , entry_point_or_function{std::move(func)}
-    {
-    }
+    function(function_signature signature, std::function<void(operand_stack&)> func);
 
     /** Get the function signature. */
     const function_signature& get_signature() const
@@ -518,6 +509,12 @@ public:
     std::size_t get_size() const
     {
         return size;
+    }
+
+    /** Get the return opcode. */
+    opcode get_return_opcode() const
+    {
+        return ret_opcode;
     }
 };
 
