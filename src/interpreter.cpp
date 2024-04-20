@@ -569,7 +569,7 @@ opcode context::exec(const language_module& mod,
         case opcode::fload:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::uint64_t);
+            offset += sizeof(std::int64_t);
 
             if(i < 0)
             {
@@ -587,7 +587,7 @@ opcode context::exec(const language_module& mod,
         case opcode::sload:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::uint64_t);
+            offset += sizeof(std::int64_t);
 
             if(i < 0)
             {
@@ -602,6 +602,25 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
             break;
         } /* opcode::sload */
+        case opcode::istore:
+        case opcode::fstore:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            *reinterpret_cast<std::uint32_t*>(&frame.locals[i]) = frame.stack.pop_i32();
+            break;
+        } /* opcode::istore, opcode::fstore */
         case opcode::invoke:
         {
             language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);

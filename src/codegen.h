@@ -836,6 +836,12 @@ public:
     {
         return instrs;
     }
+
+    /** Get the block's instructions. */
+    std::vector<std::unique_ptr<instruction>>& get_instructions()
+    {
+        return instrs;
+    }
 };
 
 /**

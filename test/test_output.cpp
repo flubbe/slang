@@ -191,6 +191,15 @@ TEST(output, emitter)
           /* function calls */
           "fn call(a: i32) -> i32 {\n"
           " return arg(a) - 1;\n"
+          "}\n"
+          /* locals. */
+          "fn local(a: i32) -> i32 {\n"
+          " let b: i32 = -1;\n"
+          " return a+b;\n"
+          "}\n"
+          "fn local2(a: i32) -> i32 {\n"
+          " let b: i32 = -1;\n"
+          " return a-b;\n"
           "}\n";
 
         slang::lexer lexer;

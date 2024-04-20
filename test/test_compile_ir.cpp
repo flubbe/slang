@@ -387,6 +387,78 @@ TEST(compile_ir, function_arguments_and_locals)
     }
 }
 
+TEST(compile_ir, unary_operators)
+{
+    {
+        const std::string test_input =
+          "fn local(a: i32) -> i32 {\n"
+          " let b: i32 = -1;\n"
+          " return a+b;\n"
+          "}\n";
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @local(i32 %a) {\n"
+                  "local i32 %b\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " const i32 1\n"
+                  " sub i32\n"
+                  " store i32 %b\n"
+                  " load i32 %a\n"
+                  " load i32 %b\n"
+                  " add i32\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn local(a: i32) -> i32 {\n"
+          " let b: i32 = ~1;\n"
+          " return a+b;\n"
+          "}\n";
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @local(i32 %a) {\n"
+                  "local i32 %b\n"
+                  "entry:\n"
+                  " const i32 -1\n"
+                  " const i32 1\n"
+                  " xor i32\n"
+                  " store i32 %b\n"
+                  " load i32 %a\n"
+                  " load i32 %b\n"
+                  " add i32\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
 TEST(compile_ir, binary_operators)
 {
     {

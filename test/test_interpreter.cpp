@@ -91,6 +91,11 @@ TEST(interpreter, loading)
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
     EXPECT_EQ(*res.get<int>(), 0);
+
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local", {0}));
+    EXPECT_EQ(*res.get<int>(), -1);
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {0}));
+    EXPECT_EQ(*res.get<int>(), 1);
 }
 
 TEST(interpreter, hello_world)

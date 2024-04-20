@@ -716,8 +716,66 @@ std::string binary_expression::to_string() const
 
 std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: unary_ast::generate_code not implemented", slang::to_string(loc)));
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Cannot store into unary expression.");
+    }
+
+    if(op.s == "+")
+    {
+        return operand->generate_code(ctx, mc);
+    }
+    else if(op.s == "-")
+    {
+        auto& instrs = ctx.get_insertion_point()->get_instructions();
+        std::size_t pos = instrs.size();
+        auto v = operand->generate_code(ctx, mc);
+
+        std::vector<std::unique_ptr<cg::argument>> args;
+        if(v->get_type() == "i32")
+        {
+            args.emplace_back(std::make_unique<cg::const_argument>(0));
+        }
+        else if(v->get_type() == "f32")
+        {
+            args.emplace_back(std::make_unique<cg::const_argument>(0.f));
+        }
+        else
+        {
+            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32' or 'f32', got '{}'.", v->get_type()));
+        }
+        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
+
+        ctx.generate_binary_op(cg::binary_op::op_sub, *v);
+        return v;
+    }
+    else if(op.s == "!")
+    {
+        // TODO
+        throw std::runtime_error(fmt::format("{}: unary_ast::generate_code not implemented for logical not.", slang::to_string(loc)));
+    }
+    else if(op.s == "~")
+    {
+        auto& instrs = ctx.get_insertion_point()->get_instructions();
+        std::size_t pos = instrs.size();
+        auto v = operand->generate_code(ctx, mc);
+
+        std::vector<std::unique_ptr<cg::argument>> args;
+        if(v->get_type() == "i32")
+        {
+            args.emplace_back(std::make_unique<cg::const_argument>(~0));
+        }
+        else
+        {
+            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32', got '{}'.", v->get_type()));
+        }
+        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
+
+        ctx.generate_binary_op(cg::binary_op::op_xor, *v);
+        return v;
+    }
+
+    throw std::runtime_error(fmt::format("{}: Code generation for unary operator '{}' not implemented.", slang::to_string(loc), op.s));
 }
 
 std::optional<std::string> unary_ast::type_check(slang::typing::context& ctx) const

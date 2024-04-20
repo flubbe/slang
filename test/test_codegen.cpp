@@ -472,7 +472,7 @@ TEST(codegen, invoke)
          *     return g(b, a);
          * }
          *
-         * fn g(a: i32, b:i32) -> i32
+         * fn g(a: i32, b: i32) -> i32
          * {
          *     return a*b;
          * }
