@@ -265,15 +265,29 @@ protected:
     /** The stack. */
     std::vector<std::uint8_t> stack;
 
+    /** Maximal size. */
+    std::size_t max_size;
+
 public:
-    /** Default constructors. */
-    operand_stack() = default;
+    /** Defaulted and deleted constructors. */
+    operand_stack() = delete;
     operand_stack(const operand_stack&) = default;
     operand_stack(operand_stack&&) = default;
 
     /** Default assignments. */
     operand_stack& operator=(const operand_stack&) = default;
     operand_stack& operator=(operand_stack&&) = default;
+
+    /**
+     * Construct a stack with a maximal size.
+     *
+     * @param max_size The maximal stack size.
+     */
+    operand_stack(std::size_t max_size)
+    : max_size{max_size}
+    {
+        stack.reserve(max_size);
+    }
 
     /** Check if the stack is empty. */
     bool empty() const noexcept
@@ -287,6 +301,12 @@ public:
         return stack.size();
     }
 
+    /** Get the maximal stack size. */
+    std::size_t get_max_size() const noexcept
+    {
+        return max_size;
+    }
+
     /**
      * Push an i32 onto the stack.
      *
@@ -294,6 +314,10 @@ public:
      */
     void push_i32(std::int32_t i)
     {
+        if(stack.size() + 4 > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&i), reinterpret_cast<std::uint8_t*>(&i) + 4);
     }
 
@@ -304,6 +328,10 @@ public:
      */
     void push_f32(float f)
     {
+        if(stack.size() + 4 > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&f), reinterpret_cast<std::uint8_t*>(&f) + 4);
     }
 
@@ -315,6 +343,10 @@ public:
     template<typename T>
     void push_addr(const T* addr)
     {
+        if(stack.size() + sizeof(const T*) > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
         stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&addr), reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
     }
 
@@ -325,6 +357,10 @@ public:
      */
     void push_stack(const operand_stack& other)
     {
+        if(stack.size() + other.stack.size() > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
         stack.insert(stack.end(), other.stack.begin(), other.stack.end());
     }
 
@@ -449,9 +485,11 @@ class function
     /** Return opcode. */
     opcode ret_opcode;
 
-public:
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
+
+    /** Stack size. Not serialized. */
+    std::size_t stack_size = 0;
 
 public:
     /** Defaulted and deleted constructors. */
@@ -470,8 +508,9 @@ public:
      * @param entry_point The function's entry point, given as an offset into a module binary.
      * @param size The bytecode size.
      * @param locals_size The arguments and locals size.
+     * @param stack_size The operand stack size.
      */
-    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size);
+    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size, std::size_t stack_size);
 
     /**
      * Construct a native function.
@@ -511,6 +550,18 @@ public:
         return size;
     }
 
+    /** Get the local's size. */
+    std::size_t get_locals_size() const
+    {
+        return locals_size;
+    }
+
+    /** Get the operand stack size. */
+    std::size_t get_stack_size() const
+    {
+        return stack_size;
+    }
+
     /** Get the return opcode. */
     opcode get_return_opcode() const
     {
@@ -544,10 +595,12 @@ struct stack_frame
      *
      * @param string_table Reference to the module string table.
      * @param locals_size Size to allocate for the locals.
+     * @param stack_size The operand stack size.
      */
-    stack_frame(const std::vector<std::string>& string_table, std::size_t locals_size)
+    stack_frame(const std::vector<std::string>& string_table, std::size_t locals_size, std::size_t stack_size)
     : string_table{string_table}
     , locals{locals_size}
+    , stack{stack_size}
     {
     }
 };
@@ -590,12 +643,13 @@ class context
      * @param instr The instruction to decode.
      * @param details The function's details.
      * @param code Buffer to write the decoded bytes into.
+     * @return Delta (in bytes) by which the instruction changes the stack size.
      */
-    void decode_instruction(language_module& mod,
-                            archive& ar,
-                            std::byte instr,
-                            const function_details& details,
-                            std::vector<std::byte>& code) const;
+    std::int32_t decode_instruction(language_module& mod,
+                                    archive& ar,
+                                    std::byte instr,
+                                    const function_details& details,
+                                    std::vector<std::byte>& code) const;
 
     /**
      * Execute a function.

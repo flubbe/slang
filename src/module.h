@@ -249,6 +249,9 @@ struct function_details : public symbol
     /** Decoded return type size. Not serialized. */
     std::size_t return_size;
 
+    /** Operand stack size needed for this function. Not serialized. */
+    std::size_t stack_size;
+
     /** Default constructors. */
     function_details() = default;
     function_details(const function_details&) = default;

@@ -78,16 +78,34 @@ static opcode get_return_opcode(const std::string& return_type)
     throw interpreter_error(fmt::format("Type '{}' has no return opcode.", return_type));
 }
 
+/**
+ * Calculate the stack size delta from a function's signature.
+ *
+ * @param s The signature.
+ * @returns The stack size delta.
+ */
+static int32_t get_stack_delta(const function_signature& s)
+{
+    std::int32_t return_type_size = get_type_size(s.return_type);
+    std::int32_t arg_size = 0;
+    for(auto& it: s.arg_types)
+    {
+        arg_size += get_type_size(it);
+    }
+    return return_type_size - arg_size;
+}
+
 /*
  * function implementation.
  */
 
-function::function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size)
+function::function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size, std::size_t stack_size)
 : signature{std::move(signature)}
 , native{false}
 , entry_point_or_function{entry_point}
 , size{size}
 , locals_size{locals_size}
+, stack_size{stack_size}
 {
     ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
@@ -143,7 +161,7 @@ void context::decode_locals(function_descriptor& desc) const
     details.return_size = get_type_size(desc.signature.return_type);
 }
 
-void context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
+std::int32_t context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
 {
     switch(static_cast<opcode>(instr))
     {
@@ -156,11 +174,12 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
     case opcode::fmul:
     case opcode::idiv:
     case opcode::fdiv:
+        return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
     case opcode::ret:
     case opcode::iret:
     case opcode::fret:
     case opcode::sret:
-        break;
+        return 0;
     /* opcodes with one 4-byte argument. */
     case opcode::iconst:
     case opcode::fconst:
@@ -169,7 +188,7 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
         ar & i_u32;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
-        break;
+        return sizeof(std::uint32_t);
     }
     /* opcodes with one VLE integer. */
     case opcode::sconst:
@@ -178,7 +197,7 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
         ar & i;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
-        break;
+        return sizeof(std::string*);
     }
     /** invoke. */
     case opcode::invoke:
@@ -208,6 +227,8 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
 
             const function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+
+            return get_stack_delta(desc.signature);
         }
         else
         {
@@ -223,8 +244,9 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
 
             const function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+
+            return get_stack_delta(desc.signature);
         }
-        break;
     }
     /* opcodes that need to resolve a variable. */
     case opcode::iload:
@@ -245,7 +267,20 @@ void context::decode_instruction(language_module& mod, archive& ar, std::byte in
         std::int64_t offset = details.locals[i.i].offset;
         code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
 
-        break;
+        // return correct size.
+        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
+                        || (static_cast<opcode>(instr) == opcode::fstore)
+                        || (static_cast<opcode>(instr) == opcode::sstore);
+        bool is_string = (static_cast<opcode>(instr) == opcode::sload)
+                         || (static_cast<opcode>(instr) == opcode::sstore);
+        if(!is_string)
+        {
+            return is_store ? -static_cast<std::int32_t>(sizeof(std::uint32_t)) : sizeof(std::uint32_t);    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
+        }
+        else
+        {
+            return is_store ? -static_cast<std::int32_t>(sizeof(std::string*)) : sizeof(std::string*);
+        }
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
@@ -388,15 +423,28 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
 
         std::byte instr;
 
+        std::int32_t stack_size = 0;
+        std::size_t max_stack_size = 0;
+
         while(ar.tell() < bytecode_end)
         {
             ar & instr;
             code.push_back(instr);
 
-            decode_instruction(*decoded_module, ar, instr, details, code);
+            stack_size += decode_instruction(*decoded_module, ar, instr, details, code);
+            if(stack_size < 0)
+            {
+                throw interpreter_error("Error during decode: Got negative stack size.");
+            }
+
+            if(stack_size > max_stack_size)
+            {
+                max_stack_size = stack_size;
+            }
         }
 
         details.size = code.size() - details.offset;
+        details.stack_size = max_stack_size;
     }
 
     decoded_module->set_binary(std::move(code));
@@ -577,7 +625,7 @@ opcode context::exec(const language_module& mod,
             {
                 auto& details = std::get<function_details>(desc->details);
 
-                stack_frame callee_frame{frame.string_table, details.locals_size};
+                stack_frame callee_frame{frame.string_table, details.locals_size, details.stack_size};
                 auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
                 frame.stack.discard(details.args_size);
@@ -608,7 +656,7 @@ value context::exec(const language_module& mod,
     /*
      * allocate locals and decode arguments.
      */
-    stack_frame frame{mod.get_header().strings, f.locals_size};
+    stack_frame frame{mod.get_header().strings, f.get_locals_size(), f.get_stack_size()};
     std::vector<std::string> local_strings;
 
     auto& arg_types = f.get_signature().arg_types;
@@ -625,7 +673,7 @@ value context::exec(const language_module& mod,
             throw interpreter_error(fmt::format("Argument {} for function has wrong type (expected '{}', got '{}').", i, arg_types[i], args[i].get_type()));
         }
 
-        if(offset + args[i].get_size() > f.locals_size)
+        if(offset + args[i].get_size() > f.get_locals_size())
         {
             throw interpreter_error("Stack overflow during argument allocation.");
         }
@@ -646,10 +694,6 @@ value context::exec(const language_module& mod,
     else
     {
         ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
-        if(ret_opcode != f.get_return_opcode())
-        {
-            throw interpreter_error(fmt::format("Type error during function return: Expected '{}', got '{}'.", slang::to_string(f.get_return_opcode()), slang::to_string(ret_opcode)));
-        }
     }
 
     /*
@@ -753,7 +797,7 @@ void context::load_module(const std::string& name, const language_module& mod)
         else
         {
             auto& details = std::get<function_details>(desc.details);
-            fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals_size}});
+            fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals_size, details.stack_size}});
         }
     }
     function_map.insert({name, std::move(fmap)});
