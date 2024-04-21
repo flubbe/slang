@@ -227,11 +227,18 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             return;
         }
 
+        auto& import_path = arg->get_import_path();
+        if(!import_path.has_value())
+        {
+            throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
+        }
+
         // resolve imports.
         auto import_it = std::find_if(ctx.prototypes.begin(), ctx.prototypes.end(),
-                                      [&v](const std::unique_ptr<cg::prototype>& p) -> bool
+                                      [&v, &import_path](const std::unique_ptr<cg::prototype>& p) -> bool
                                       {
-                                          return p->is_import() && p->get_name() == *v->get_name();
+                                          return p->is_import() && *p->get_import_path() == *import_path
+                                                 && p->get_name() == *v->get_name();
                                       });
         if(import_it != ctx.prototypes.end())
         {

@@ -339,8 +339,14 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
 void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> name)
 {
     validate_insertion_point();
+
     if(name.has_value())
     {
+        if(resolution_scopes.size() > 0)
+        {
+            (*name)->set_import_path(slang::utils::join(resolution_scopes, "::"));
+        }
+
         std::vector<std::unique_ptr<argument>> args;
         args.emplace_back(std::move(*name));
         insertion_point->add_instruction(std::make_unique<instruction>("invoke", std::move(args)));

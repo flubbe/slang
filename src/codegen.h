@@ -472,6 +472,9 @@ class function_argument : public argument
     /** The function's name. */
     std::unique_ptr<value> name;
 
+    /** An optional import path for the function. */
+    std::optional<std::string> import_path = std::nullopt;
+
 public:
     /** Default and deleted constructors. */
     function_argument() = default;
@@ -493,8 +496,29 @@ public:
     {
     }
 
+    /**
+     * Set the import path.
+     *
+     * @param path The import path, or `std::nullopt`.
+     */
+    void set_import_path(std::optional<std::string> import_path)
+    {
+        this->import_path = std::move(import_path);
+    }
+
+    /** Get the import path. */
+    const std::optional<std::string>& get_import_path() const
+    {
+        return import_path;
+    }
+
     std::string to_string() const override
     {
+        if(import_path.has_value())
+        {
+            return fmt::format("@{}::{}", *import_path, *name->get_name());
+        }
+
         return fmt::format("@{}", *name->get_name());
     }
 
