@@ -187,8 +187,36 @@ std::string literal_expression::to_string() const
 
 std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: type_cast_expression::generate_code not implemented.", slang::to_string(loc)));
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, fmt::format("Invalid memory context for type cast expression."));
+    }
+
+    auto v = expr->generate_code(ctx, mc);
+
+    // only cast if necessary.
+    if(target_type.s != v->get_resolved_type())
+    {
+        if(target_type.s == "i32" && v->get_resolved_type() == "f32")
+        {
+            ctx.generate_cast(cg::type_cast::f32_to_i32);
+        }
+        else if(target_type.s == "f32" && v->get_resolved_type() == "i32")
+        {
+            ctx.generate_cast(cg::type_cast::i32_to_f32);
+        }
+        else
+        {
+            throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to '{}'.", v->get_resolved_type(), target_type.s));
+        }
+    }
+
+    if(ty::is_builtin_type(target_type.s))
+    {
+        return std::make_unique<cg::value>(target_type.s);
+    }
+
+    return std::make_unique<cg::value>("aggregate", target_type.s);
 }
 
 std::optional<std::string> type_cast_expression::type_check(ty::context& ctx) const

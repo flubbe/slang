@@ -63,6 +63,22 @@ std::string to_string(binary_op op)
 }
 
 /*
+ * Type casts.
+ */
+std::string to_string(type_cast tc)
+{
+    std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
+
+    std::size_t idx = static_cast<std::size_t>(tc);
+    if(idx < 0 || idx > strs.size())
+    {
+        throw codegen_error("Invalid type cast index in to_string(type_cast).");
+    }
+
+    return strs[idx];
+}
+
+/*
  * Context.
  */
 
@@ -213,6 +229,15 @@ void context::generate_branch(std::unique_ptr<label_argument> label)
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(label));
     insertion_point->add_instruction(std::make_unique<instruction>("jmp", std::move(args)));
+}
+
+void context::generate_cast(type_cast tc)
+{
+    validate_insertion_point();
+    auto arg0 = std::make_unique<cast_argument>(codegen::to_string(tc));
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::move(arg0));
+    insertion_point->add_instruction(std::make_unique<instruction>("cast", std::move(args)));
 }
 
 void context::generate_cmp()

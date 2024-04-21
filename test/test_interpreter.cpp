@@ -19,7 +19,7 @@
 namespace
 {
 
-TEST(interpreter, loading)
+TEST(interpreter, module_and_functions)
 {
     slang::language_module mod;
 
@@ -96,6 +96,11 @@ TEST(interpreter, loading)
     EXPECT_EQ(*res.get<int>(), -1);
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {0}));
     EXPECT_EQ(*res.get<int>(), 1);
+
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {23}));
+    EXPECT_EQ(*res.get<float>(), 23.0);
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_f2i", {92.3f}));
+    EXPECT_EQ(*res.get<int>(), 92);
 }
 
 TEST(interpreter, hello_world)

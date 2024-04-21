@@ -200,6 +200,13 @@ TEST(output, emitter)
           "fn local2(a: i32) -> i32 {\n"
           " let b: i32 = -1;\n"
           " return a-b;\n"
+          "}\n"
+          /* Type casts. */
+          "fn cast_i2f(a: i32) -> f32 {\n"
+          " return a as f32;\n"
+          "}\n"
+          "fn cast_f2i(a: f32) -> i32 {\n"
+          " return a as i32;\n"
           "}\n";
 
         slang::lexer lexer;

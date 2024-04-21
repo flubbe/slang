@@ -175,6 +175,8 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::idiv:
     case opcode::fdiv:
         return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
+    case opcode::i2f:
+    case opcode::f2i:
     case opcode::ret:
     case opcode::iret:
     case opcode::fret:
@@ -542,6 +544,16 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_f32(dividend / divisor);
             break;
         } /* opcode::fdiv */
+        case opcode::i2f:
+        {
+            frame.stack.push_f32(frame.stack.pop_i32());
+            break;
+        } /* opcode::i2f */
+        case opcode::f2i:
+        {
+            frame.stack.push_i32(frame.stack.pop_f32());
+            break;
+        } /* opcode::f2i */
         case opcode::iconst:
         case opcode::fconst:
         {

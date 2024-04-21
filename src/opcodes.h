@@ -38,6 +38,8 @@ enum class opcode : opcode_base
     fmul,   /** Multiply two f32 from the stack. */
     idiv,   /** Divide two i32 from the stack. */
     fdiv,   /** Divide two f32 from the stack.  */
+    i2f,    /** Convert a i32 into an f32. */
+    f2i,    /** Convert a f32 into an i32. */
     invoke, /** Invoke a function. */
     ret,    /** Return void from a function. */
     iret,   /** Return an i32 from a function. */

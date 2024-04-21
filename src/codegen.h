@@ -458,7 +458,7 @@ public:
         throw codegen_error(fmt::format("Unrecognized const_argument type."));
     }
 
-    const slang::codegen::value* get_value() const override
+    const value* get_value() const override
     {
         return type.get();
     }
@@ -498,7 +498,7 @@ public:
         return fmt::format("@{}", *name->get_name());
     }
 
-    const slang::codegen::value* get_value() const override
+    const value* get_value() const override
     {
         return name.get();
     }
@@ -618,9 +618,70 @@ public:
         return fmt::format("%{}", label);
     }
 
-    value* get_value() const override
+    const value* get_value() const override
     {
         throw codegen_error(fmt::format("Cannot get type from label '{}'.", to_string()));
+    }
+};
+
+/**
+ * A type cast argument.
+ */
+class cast_argument : public argument
+{
+    /** The type cast, as a string. */
+    std::string cast;
+
+    /** Value of the cast. */
+    std::unique_ptr<value> v;
+
+public:
+    /** Default constructors. */
+    cast_argument() = default;
+    cast_argument(const cast_argument&) = delete;
+    cast_argument(cast_argument&&) = default;
+
+    /** Default assignments. */
+    cast_argument& operator=(const cast_argument&) = delete;
+    cast_argument& operator=(cast_argument&&) = default;
+
+    /**
+     * Construct a type cast.
+     *
+     * @param cast The cast type.
+     */
+    cast_argument(std::string cast)
+    : argument()
+    , cast{std::move(cast)}
+    {
+        if(this->cast == "i32_to_f32")
+        {
+            v = std::make_unique<value>("f32");
+        }
+        else if(this->cast == "f32_to_i32")
+        {
+            v = std::make_unique<value>("i32");
+        }
+        else
+        {
+            throw codegen_error("Unknown cast type.");
+        }
+    }
+
+    /** Return the cast type. */
+    std::string get_cast() const
+    {
+        return cast;
+    }
+
+    std::string to_string() const override
+    {
+        return fmt::format("{}", cast);
+    }
+
+    const value* get_value() const override
+    {
+        return v.get();
     }
 };
 
@@ -1495,6 +1556,21 @@ enum class binary_op
  */
 std::string to_string(binary_op op);
 
+/** Type casts. */
+enum class type_cast
+{
+    i32_to_f32, /* i32 to f32 */
+    f32_to_i32, /* f32 to i32 */
+};
+
+/**
+ * Return a string representation of the type cast.
+ *
+ * @param tc The type cast.
+ * @returns A string representation of the type cast.
+ */
+std::string to_string(type_cast tc);
+
 /** An imported symbol. */
 struct imported_symbol
 {
@@ -1739,6 +1815,15 @@ public:
      * @param label The name of the jump target. This is the label of a basic_block.
      */
     void generate_branch(std::unique_ptr<label_argument> label);
+
+    /**
+     * Generate a type cast.
+     *
+     * Reads a value of a type from the stack and pushes the same value as another type back to the stack.
+     *
+     * @param tc The type cast to do.
+     */
+    void generate_cast(type_cast tc);
 
     /**
      * Generate a compare instruction.

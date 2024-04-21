@@ -36,6 +36,8 @@ std::string to_string(opcode op)
     case opcode::fmul: return "fmul";
     case opcode::idiv: return "idiv";
     case opcode::fdiv: return "fdiv";
+    case opcode::i2f: return "i2f";
+    case opcode::f2i: return "f2i";
     case opcode::invoke: return "invoke";
     case opcode::ret: return "ret";
     case opcode::iret: return "iret";
