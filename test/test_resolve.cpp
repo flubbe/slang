@@ -57,7 +57,7 @@ TEST(resolve, std)
         const std::string test_input =
           "import std;\n"
           "fn main() -> i32 {\n"
-          " println(\"Hello, World!\");\n"
+          " std::println(\"Hello, World!\");\n"
           "}";
 
         slang::lexer lexer;
@@ -88,7 +88,7 @@ TEST(resolve, std)
         const std::string test_input =
           "import std;\n"
           "fn main() -> i32 {\n"
-          " println(1);\n"
+          " std::println(1);\n"
           "}";
 
         slang::lexer lexer;

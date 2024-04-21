@@ -1267,7 +1267,7 @@ TEST(type_system, examples)
           "\n"
           "fn main(s: str) -> i32\n"
           "{\n"
-          "\tprintln(\"Hello, World!\");\n"
+          "\tstd::println(\"Hello, World!\");\n"
           "\treturn 0;\n"
           "}";
 

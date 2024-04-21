@@ -14,6 +14,7 @@
 #include "codegen.h"
 #include "module.h"
 #include "opcodes.h"
+#include "utils.h"
 
 namespace slang::codegen
 {
@@ -139,9 +140,17 @@ std::size_t context::get_string(std::string str)
 prototype* context::add_prototype(std::string name, std::string return_type, std::vector<value> args, std::optional<std::string> import_path)
 {
     if(std::find_if(prototypes.begin(), prototypes.end(),
-                    [&name](const std::unique_ptr<prototype>& p) -> bool
+                    [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
                     {
-                        return p->get_name() == name;
+                        if(p->get_name() != name)
+                        {
+                            return false;
+                        }
+                        if(p->get_import_path().has_value() && import_path.has_value())
+                        {
+                            return *p->get_import_path() == *import_path;
+                        }
+                        return !p->get_import_path().has_value() && !import_path.has_value();
                     })
        != prototypes.end())
     {
@@ -153,16 +162,34 @@ prototype* context::add_prototype(std::string name, std::string return_type, std
 
 const prototype& context::get_prototype(const std::string& name) const
 {
-    auto it = std::find_if(prototypes.begin(), prototypes.end(),
-                           [&name](const std::unique_ptr<prototype>& p) -> bool
-                           {
-                               return p->get_name() == name;
-                           });
-    if(it == prototypes.end())
+    if(resolution_scopes.size() > 0)
     {
-        throw codegen_error(fmt::format("Prototype '{}' not found.", name));
+        std::string import_path = slang::utils::join(resolution_scopes, "::");
+        auto it = std::find_if(prototypes.begin(), prototypes.end(),
+                               [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+                               {
+                                   return p->get_import_path().has_value() && *p->get_import_path() == import_path
+                                          && p->get_name() == name;
+                               });
+        if(it == prototypes.end())
+        {
+            throw codegen_error(fmt::format("Prototype '{}' not found in '{}'.", name, import_path));
+        }
+        return **it;
     }
-    return **it;
+    else
+    {
+        auto it = std::find_if(prototypes.begin(), prototypes.end(),
+                               [&name](const std::unique_ptr<prototype>& p) -> bool
+                               {
+                                   return p->get_name() == name && !p->get_import_path().has_value();
+                               });
+        if(it == prototypes.end())
+        {
+            throw codegen_error(fmt::format("Prototype '{}' not found.", name));
+        }
+        return **it;
+    }
 }
 
 function* context::create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
@@ -208,6 +235,27 @@ void context::set_insertion_point(basic_block* ip)
     if(insertion_point != nullptr && insertion_point->get_inserting_context() != this)
     {
         insertion_point->set_inserting_context(this);
+    }
+}
+
+/*
+ * Name resolution.
+ */
+
+void context::push_resolution_scope(std::string name)
+{
+    resolution_scopes.emplace_back(std::move(name));
+}
+
+void context::pop_resolution_scope()
+{
+    if(resolution_scopes.size() > 0)
+    {
+        resolution_scopes.pop_back();
+    }
+    else
+    {
+        throw codegen_error("Cannot pop from name resolution stack: The stack is empty.");
     }
 }
 

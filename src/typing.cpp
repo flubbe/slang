@@ -121,21 +121,41 @@ void context::add_variable(token name, token type)
     current_scope->variables[name.s] = {name, std::move(type)};
 }
 
-void context::add_function(token name, std::vector<token> arg_types, token ret_type)
+void context::add_function(token name, std::vector<token> arg_types, token ret_type, std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
     {
         throw std::runtime_error("Typing context: No current scope.");
     }
 
-    // check for existing names.
-    auto tok = current_scope->find(name.s);
-    if(tok != std::nullopt)
+    if(import_path.has_value())
     {
-        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+        auto mod_it = imported_functions.find(*import_path);
+        if(mod_it == imported_functions.end())
+        {
+            imported_functions.insert({*import_path, {{name.s, {name, std::move(arg_types), std::move(ret_type)}}}});
+        }
+        else
+        {
+            auto func_it = mod_it->second.find(name.s);
+            if(func_it != mod_it->second.end())
+            {
+                throw type_error(name.location, fmt::format("The module '{}' containing the symbol '{}' already is imported.", *import_path, name.s));
+            }
+            imported_functions[*import_path].insert({name.s, {name, std::move(arg_types), std::move(ret_type)}});
+        }
     }
+    else
+    {
+        // check for existing names.
+        auto tok = current_scope->find(name.s);
+        if(tok != std::nullopt)
+        {
+            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+        }
 
-    current_scope->functions[name.s] = {name, std::move(arg_types), std::move(ret_type)};
+        current_scope->functions.insert({name.s, {name, std::move(arg_types), std::move(ret_type)}});
+    }
 }
 
 void context::add_type(token name, std::vector<std::pair<token, token>> members)
@@ -215,16 +235,55 @@ std::string context::get_type(const token& name) const
 
 const function_signature& context::get_function_signature(const token& name) const
 {
-    for(scope* s = current_scope; s != nullptr; s = s->parent)
+    if(resolution_scope.size() > 0)
     {
-        auto it = s->functions.find(name.s);
-        if(it != s->functions.end())
+        // check for an import of the scope's name.
+        auto import_path = slang::utils::join(resolution_scope, "::");
+        auto mod_it = imported_functions.find(import_path);
+        if(mod_it != imported_functions.end())
         {
-            return it->second;
+            auto func_it = mod_it->second.find(name.s);
+            if(func_it != mod_it->second.end())
+            {
+                return func_it->second;
+            }
+        }
+    }
+    else
+    {
+        for(scope* s = current_scope; s != nullptr; s = s->parent)
+        {
+            auto it = s->functions.find(name.s);
+            if(it != s->functions.end())
+            {
+                return it->second;
+            }
         }
     }
 
     throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+}
+
+void context::push_resolution_scope(std::string component)
+{
+    resolution_scope.emplace_back(std::move(component));
+}
+
+void context::pop_resolution_scope()
+{
+    if(resolution_scope.size() > 0)
+    {
+        resolution_scope.pop_back();
+    }
+    else
+    {
+        throw type_error("Cannot pop scope: Scope stack underflow.");
+    }
+}
+
+std::string context::get_resolution_scope() const
+{
+    return slang::utils::join(resolution_scope, "::");
 }
 
 void context::enter_function_scope(token name)
@@ -236,7 +295,7 @@ void context::enter_function_scope(token name)
 
     if(function_scope != std::nullopt)
     {
-        throw type_error(name.location, fmt::format("Nested function are not allowed."));
+        throw type_error(name.location, fmt::format("Nested functions are not allowed."));
     }
     function_scope = name;
 

@@ -293,11 +293,17 @@ class context
     /** The current function scope. */
     std::optional<token> function_scope;
 
+    /** The scope we're resolving the names in. Clear this to use the default scope. */
+    std::vector<std::string> resolution_scope;
+
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
     /** Imported modules. */
     std::vector<std::vector<token>> imports;
+
+    /** Imported functions, indexed by (import_path, function_name). */
+    std::unordered_map<std::string, std::unordered_map<std::string, function_signature>> imported_functions;
 
     /** Struct/type stack, for member/type lookups. */
     std::vector<const struct_definition*> struct_stack;
@@ -342,8 +348,9 @@ public:
      * @param name The function's name.
      * @param arg_types The functions's argument types.
      * @param ret_type The function's return type.
+     * @param import_path The import path for the function.
      */
-    void add_function(token name, std::vector<token> arg_types, token ret_type);
+    void add_function(token name, std::vector<token> arg_types, token ret_type, std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Add a type to the context.
@@ -383,6 +390,23 @@ public:
      * @returns A reference to the function signature.
      */
     const function_signature& get_function_signature(const token& name) const;
+
+    /**
+     * Add to the scope for name resolution.
+     *
+     * @param component The scope component to add.
+     */
+    void push_resolution_scope(std::string component);
+
+    /**
+     * Clear the last scope component for name resolution.
+     *
+     * @throws Throws a `type_error` if the scope stack was empty.
+     */
+    void pop_resolution_scope();
+
+    /** Get the resolution scope. */
+    std::string get_resolution_scope() const;
 
     /**
      * Enter a function's scope.

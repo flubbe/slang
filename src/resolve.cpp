@@ -86,7 +86,7 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
                     arg_types.emplace_back(arg, reference_location);
                 }
 
-                type_ctx.add_function({exp.name, reference_location}, std::move(arg_types), {desc.signature.return_type, reference_location});
+                type_ctx.add_function({exp.name, reference_location}, std::move(arg_types), {desc.signature.return_type, reference_location}, import_path);
             }
             else
             {

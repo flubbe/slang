@@ -258,16 +258,16 @@ std::string type_cast_expression::to_string() const
 
 std::unique_ptr<cg::value> scope_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: scope_expression::generate_code not implemented.", slang::to_string(loc)));
+    ctx.push_resolution_scope(name.s);
+    return expr->generate_code(ctx, mc);
+    ctx.pop_resolution_scope();
 }
 
 std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
 {
-    ctx.enter_function_scope(name);
+    ctx.push_resolution_scope(name.s);
     auto type = expr->type_check(ctx);
-    ctx.exit_function_scope(name);
-
+    ctx.pop_resolution_scope();
     return type;
 }
 

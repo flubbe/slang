@@ -1624,6 +1624,9 @@ class context
     /** The current scope stack. */
     std::vector<scope*> current_scopes;
 
+    /** Scope name stack for name resolution. */
+    std::vector<std::string> resolution_scopes;
+
     /** List of function prototypes. */
     std::vector<std::unique_ptr<prototype>> prototypes;
 
@@ -1714,6 +1717,7 @@ public:
      * Throws a `codegen_error` if the prototype is not found.
      *
      * @param name The function's name.
+     * @returns A reference the the function's prototype.
      */
     const prototype& get_prototype(const std::string& name) const;
 
@@ -1753,6 +1757,20 @@ public:
     {
         return insertion_point;
     }
+
+    /**
+     * Push a scope for name resolution.
+     *
+     * @param name The scope's name.
+     */
+    void push_resolution_scope(std::string name);
+
+    /**
+     * Pop a scope from the name resolution stack.
+     *
+     * @throws Throws a `codegen_error` if the stack is empty.
+     */
+    void pop_resolution_scope();
 
     /**
      * Enter a new scope.
