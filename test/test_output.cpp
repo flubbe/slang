@@ -350,7 +350,8 @@ TEST(output, operators)
       "fn or(a: i32, b: i32) -> i32 { return a | b; }\n"
       "fn xor(a: i32, b: i32) -> i32 { return a ^ b; }\n"
       "fn shl(a: i32, b: i32) -> i32 { return a << b; }\n"
-      "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n";
+      "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n"
+      "fn mod(a: i32, b: i32) -> i32 { return a % b; }\n";
 
     slang::lexer lexer;
     slang::parser parser;

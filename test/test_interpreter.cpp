@@ -183,6 +183,8 @@ TEST(interpreter, operators)
     EXPECT_EQ(*res.get<int>(), 216);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "shr", {27, 3}));
     EXPECT_EQ(*res.get<int>(), 3);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "mod", {127, 23}));
+    EXPECT_EQ(*res.get<int>(), 12);
 }
 
 }    // namespace
