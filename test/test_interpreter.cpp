@@ -151,4 +151,38 @@ TEST(interpreter, hello_world)
                  slang::interpreter::interpreter_error);
 }
 
+TEST(interpreter, operators)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("operators.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'operators.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("operators", mod));
+    ASSERT_NO_THROW(ctx.invoke("operators", "main", {}));
+
+    slang::interpreter::value res;
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "and", {27, 3}));
+    EXPECT_EQ(*res.get<int>(), 3);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "or", {27, 4}));
+    EXPECT_EQ(*res.get<int>(), 31);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "xor", {27, 3}));
+    EXPECT_EQ(*res.get<int>(), 24);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "shl", {27, 3}));
+    EXPECT_EQ(*res.get<int>(), 216);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "shr", {27, 3}));
+    EXPECT_EQ(*res.get<int>(), 3);
+}
+
 }    // namespace

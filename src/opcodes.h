@@ -38,6 +38,7 @@ enum class opcode : opcode_base
     fmul,   /** Multiply two f32 from the stack. */
     idiv,   /** Divide two i32 from the stack. */
     fdiv,   /** Divide two f32 from the stack.  */
+    imod,   /** Modulus of the division of two i32. */
     i2f,    /** Convert a i32 into an f32. */
     f2i,    /** Convert a f32 into an i32. */
     invoke, /** Invoke a function. */
@@ -45,6 +46,11 @@ enum class opcode : opcode_base
     iret,   /** Return an i32 from a function. */
     fret,   /** Return an f32 from a function. */
     sret,   /** Return a str from a function. */
+    iand,   /** Bitwise and for two i32 from the stack. */
+    ior,    /** Bitwise or for two i32 from the stack. */
+    ixor,   /** Bitwise xor for two i32 from the stack. */
+    ishl,   /** Left shift for i32. */
+    ishr,   /** Right shift for i32. */
 
     opcode_count /** Opcode count. Not an opcode. */
 };

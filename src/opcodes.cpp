@@ -43,6 +43,12 @@ std::string to_string(opcode op)
     case opcode::iret: return "iret";
     case opcode::fret: return "fret";
     case opcode::sret: return "sret";
+    case opcode::iand: return "iand";
+    case opcode::ior: return "ior";
+    case opcode::ixor: return "ixor";
+    case opcode::ishl: return "ishl";
+    case opcode::ishr: return "ishr";
+    case opcode::imod: return "imod";
     case opcode::opcode_count:; /* fall-through */
     }
 

@@ -174,6 +174,12 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::fmul:
     case opcode::idiv:
     case opcode::fdiv:
+    case opcode::iand:
+    case opcode::ior:
+    case opcode::ixor:
+    case opcode::ishl:
+    case opcode::ishr:
+    case opcode::imod:
         return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
     case opcode::i2f:
     case opcode::f2i:
@@ -518,6 +524,17 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(dividend / divisor);
             break;
         } /* opcode::idiv */
+        case opcode::imod:
+        {
+            std::int32_t divisor = frame.stack.pop_i32();
+            if(divisor == 0)
+            {
+                throw interpreter_error("Division by zero.");
+            }
+            std::int32_t dividend = frame.stack.pop_i32();
+            frame.stack.push_i32(dividend % divisor);
+            break;
+        } /* opcode::imod */
         case opcode::fadd:
         {
             frame.stack.push_f32(frame.stack.pop_f32() + frame.stack.pop_f32());
@@ -671,7 +688,41 @@ opcode context::exec(const language_module& mod,
             }
             break;
         } /* opcode::invoke */
+        case opcode::iand:
+        {
+            frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());
+            break;
+        } /* opcode::iand */
+        case opcode::ior:
+        {
+            frame.stack.push_i32(frame.stack.pop_i32() | frame.stack.pop_i32());
+            break;
+        } /* opcode::ior */
+        case opcode::ixor:
+        {
+            frame.stack.push_i32(frame.stack.pop_i32() ^ frame.stack.pop_i32());
+            break;
+        } /* opcode::ixor */
+        case opcode::ishl:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
+            std::int32_t s = frame.stack.pop_i32();
+            std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);
 
+            frame.stack.push_i32(s_u32 << a_u32);
+            break;
+        } /* opcode::ishl */
+        case opcode::ishr:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
+            std::int32_t s = frame.stack.pop_i32();
+            std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);
+
+            frame.stack.push_i32(s_u32 >> a_u32);
+            break;
+        } /* opcode::ishr */
         default:
             throw interpreter_error(fmt::format("Opcode '{}' ({}) not implemented.", to_string(static_cast<opcode>(instr)), instr));
         }
@@ -693,7 +744,7 @@ value context::exec(const language_module& mod,
     auto& arg_types = f.get_signature().arg_types;
     if(arg_types.size() != args.size())
     {
-        throw interpreter_error(fmt::format("Arguments for function do not match: got {}, expected {}.", arg_types.size(), args.size()));
+        throw interpreter_error(fmt::format("Arguments for function do not match: Expected {}, got {}.", arg_types.size(), args.size()));
     }
 
     std::size_t offset = 0;

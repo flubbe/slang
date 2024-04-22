@@ -67,7 +67,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
     };
 
-    auto emit_typed = [this, &name, &args, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt)
+    auto emit_typed = [this, &name, &args, expect_arg_size](
+                        opcode i32_opcode, std::optional<opcode> f32_opcode = std::nullopt, std::optional<opcode> str_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
@@ -81,18 +82,25 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(type == "f32")
         {
-            emit(instruction_buffer, f32_opcode);
-        }
-        else
-        {
-            if(type == "str" && str_opcode.has_value())
-            {
-                emit(instruction_buffer, *str_opcode);
-            }
-            else
+            if(!f32_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
             }
+
+            emit(instruction_buffer, *f32_opcode);
+        }
+        else if(type == "str")
+        {
+            if(!str_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
+
+            emit(instruction_buffer, *str_opcode);
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
         }
     };
 
@@ -112,16 +120,18 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             emit(instruction_buffer, f32_opcode, static_cast<const cg::constant_float*>(v)->get_float());
         }
-        else
+        else if(type == "str")
         {
-            if(type == "str" && str_opcode.has_value())
-            {
-                emit(instruction_buffer, *str_opcode, vle_int{static_cast<const cg::constant_str*>(v)->get_constant_index()});
-            }
-            else
+            if(!str_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
             }
+
+            emit(instruction_buffer, *str_opcode, vle_int{static_cast<const cg::constant_str*>(v)->get_constant_index()});
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
         }
     };
 
@@ -149,14 +159,16 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(type == "str")
         {
-            if(type == "str" && str_opcode.has_value())
-            {
-                emit(instruction_buffer, *str_opcode);
-            }
-            else
+            if(!str_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
             }
+
+            emit(instruction_buffer, *str_opcode);
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
         }
 
         instruction_buffer & index;
@@ -177,6 +189,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     else if(name == "div")
     {
         emit_typed(opcode::idiv, opcode::fdiv);
+    }
+    else if(name == "mod")
+    {
+        emit_typed(opcode::imod);
     }
     else if(name == "const")
     {
@@ -263,6 +279,26 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             emit_typed(opcode::iret, opcode::fret, opcode::sret);
         }
+    }
+    else if(name == "and")
+    {
+        emit_typed(opcode::iand);
+    }
+    else if(name == "or")
+    {
+        emit_typed(opcode::ior);
+    }
+    else if(name == "xor")
+    {
+        emit_typed(opcode::ixor);
+    }
+    else if(name == "shl")
+    {
+        emit_typed(opcode::ishl);
+    }
+    else if(name == "shr")
+    {
+        emit_typed(opcode::ishr);
     }
     else
     {
