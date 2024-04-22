@@ -286,6 +286,39 @@ TEST(output, hello_world)
         slang::file_write_archive write_ar("hello_world.cmod");
         EXPECT_NO_THROW(write_ar & mod);
     }
+    {
+        const std::string test_input =
+          "import lang::std;\n"
+          "\n"
+          "fn main(s: str) -> i32\n"
+          "{\n"
+          "\tlang::println(\"Hello, World!\");\n"    // wrong function path
+          "\treturn 0;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+        mgr.add_search_path("src");
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+    }
 }
 
 }    // namespace

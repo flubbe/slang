@@ -248,6 +248,19 @@ const function_signature& context::get_function_signature(const token& name) con
                 return func_it->second;
             }
         }
+
+        // check if the module was imported.
+        for(auto& it: imports)
+        {
+            auto path = slang::utils::join(it, {[](const token& t) -> std::string
+                                                { return t.s; }},
+                                           "::");
+            if(path == import_path)
+            {
+                throw type_error(name.location, fmt::format("Function '{}' not found in '{}'.", name.s, import_path));
+            }
+        }
+        throw type_error(name.location, fmt::format("Cannot resolve function '{}' in module '{}', since the module is not imported.", name.s, import_path));
     }
     else
     {
@@ -259,9 +272,9 @@ const function_signature& context::get_function_signature(const token& name) con
                 return it->second;
             }
         }
-    }
 
-    throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+        throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+    }
 }
 
 void context::push_resolution_scope(std::string component)
