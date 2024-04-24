@@ -367,8 +367,8 @@ void context::enter_anonymous_scope(token_location loc)
 
     // check if the scope already exists.
     auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
-                           [](const scope& s) -> bool
-                           { return true; });
+                           [&anonymous_scope](const scope& s) -> bool
+                           { return s.name.s == anonymous_scope.s; });
     if(it != current_scope->children.end())
     {
         // this should never happen.

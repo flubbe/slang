@@ -402,7 +402,7 @@ void instruction_emitter::run()
 
         for(auto& it: f->get_basic_blocks())
         {
-            for(auto& instr: it.get_instructions())
+            for(auto& instr: it->get_instructions())
             {
                 emit_instruction(f, instr);
             }

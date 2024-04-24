@@ -804,6 +804,9 @@ class basic_block
 {
     friend class context;
 
+    /** The associated context. */
+    class context& ctx;
+
     /** The block's entry label. */
     std::string label;
 
@@ -821,11 +824,22 @@ class basic_block
      */
     void set_inserting_context(class context* ctx);
 
+    /**
+     * Create a basic_block.
+     *
+     * @param label The block's label.
+     */
+    basic_block(class context& ctx, std::string label)
+    : ctx{ctx}
+    , label{std::move(label)}
+    {
+    }
+
 public:
     /** Default constructors. */
-    basic_block() = default;
-    basic_block(const basic_block&) = default;
-    basic_block(basic_block&&) = default;
+    basic_block() = delete;
+    basic_block(const basic_block&) = delete;
+    basic_block(basic_block&&) = delete;
 
     /** Destructor. */
     virtual ~basic_block()
@@ -835,18 +849,8 @@ public:
     }
 
     /** Default assignments. */
-    basic_block& operator=(const basic_block&) = default;
-    basic_block& operator=(basic_block&&) = default;
-
-    /**
-     * Create a basic_block.
-     *
-     * @param label The block's label.
-     */
-    basic_block(std::string label)
-    : label{std::move(label)}
-    {
-    }
+    basic_block& operator=(const basic_block&) = delete;
+    basic_block& operator=(basic_block&&) = delete;
 
     /**
      * Add a non-branching instruction.
@@ -895,6 +899,12 @@ public:
         return instrs.size() > 0 && instrs.back()->is_return();
     }
 
+    /** Return whether this block ends with a branch statement. */
+    bool ends_with_branch() const
+    {
+        return instrs.size() > 0 && instrs.back()->is_branching();
+    }
+
     /**
      * Return whether this block is valid.
      *
@@ -927,6 +937,15 @@ public:
     {
         return instrs;
     }
+
+    /**
+     * Create a `basic_block`.
+     *
+     * @param ctx The context for the new block.
+     * @param name The block name.
+     * @return Returns a new `basic_block`.
+     */
+    static basic_block* create(class context& ctx, std::string name);
 };
 
 /**
@@ -1204,9 +1223,9 @@ public:
     /** No default constructor. */
     scope_guard() = delete;
 
-    /** Default copy and move constructors. */
-    scope_guard(const scope_guard&) = default;
-    scope_guard(scope_guard&&) = default;
+    /** Deleted copy and move constructors. */
+    scope_guard(const scope_guard&) = delete;
+    scope_guard(scope_guard&&) = delete;
 
     /**
      * Construct a scope guard.
@@ -1219,9 +1238,44 @@ public:
     /** Destructor. */
     ~scope_guard();
 
-    /** Default assignments.*/
+    /** Deleted assignments.*/
     scope_guard& operator=(const scope_guard&) = delete;
     scope_guard& operator=(scope_guard&&) = delete;
+};
+
+/**
+ * A guard that signals function entry and exit.
+ */
+class function_guard
+{
+    /** The associated context. */
+    context& ctx;
+
+    /** The function. */
+    class function* fn;
+
+public:
+    /** No default constructor. */
+    function_guard() = delete;
+
+    /** Deleted copy and move constructors. */
+    function_guard(const function_guard&) = delete;
+    function_guard(function_guard&&) = delete;
+
+    /**
+     * Construct a scope guard.
+     *
+     * @param ctx The associated context.
+     * @param s The scope.
+     */
+    function_guard(context& ctx, function* s);
+
+    /** Destructor. */
+    ~function_guard();
+
+    /** Deleted assignments.*/
+    function_guard& operator=(const function_guard&) = delete;
+    function_guard& operator=(function_guard&&) = delete;
 };
 
 /**
@@ -1303,6 +1357,9 @@ public:
  */
 class function
 {
+    /** The associated context. */
+    class context& ctx;
+
     /** The function's name. */
     std::string name;
 
@@ -1319,23 +1376,25 @@ class function
     scope scope;
 
     /** Function instructions. */
-    std::list<basic_block> instr_blocks;
+    std::list<basic_block*> instr_blocks;
 
 public:
     /** Constructors. */
-    function() = default;
+    function() = delete;
     function(const function&) = delete;
     function(function&&) = default;
 
     /**
      * Construct a function from name, return type and argument list.
      *
+     * @param ctx The associated context.
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
-    : name{name}
+    function(class context& ctx, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
+    : ctx{ctx}
+    , name{name}
     , native{false}
     , return_type{std::move(return_type)}
     , scope{std::move(name), std::move(args)}
@@ -1345,13 +1404,19 @@ public:
     /**
      * Construct a native function from import library name and function name.
      *
+     * @param ctx The associated context.
      * @param import_library The import library's name.
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(std::string import_library, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
-    : name{name}
+    function(class context& ctx,
+             std::string import_library,
+             std::string name,
+             std::string return_type,
+             std::vector<std::unique_ptr<value>> args)
+    : ctx{ctx}
+    , name{name}
     , native{true}
     , import_library{import_library}
     , return_type{std::move(return_type)}
@@ -1360,11 +1425,11 @@ public:
     }
 
     /** Destructor. */
-    virtual ~function() = default;
+    ~function() = default;
 
     /** Assignments. */
     function& operator=(const function&) = delete;
-    function& operator=(function&&) = default;
+    function& operator=(function&&) = delete;
 
     /** Get the function's name. */
     const std::string& get_name() const
@@ -1372,11 +1437,20 @@ public:
         return name;
     }
 
-    /** Get the instruction block. */
-    basic_block* create_basic_block(std::string name)
+    /**
+     * Append an instruction block.
+     *
+     * @param block The instruction block to append.
+     */
+    void append_basic_block(basic_block* block)
     {
-        instr_blocks.emplace_back(std::move(name));
-        return &instr_blocks.back();
+        instr_blocks.push_back(block);
+    }
+
+    /** Return whether the function ends with a return statement. */
+    bool ends_with_return() const
+    {
+        return instr_blocks.size() > 0 && instr_blocks.back()->ends_with_return();
     }
 
     /** Create a local variable. */
@@ -1438,7 +1512,7 @@ public:
      *
      * @returns The function's basic blocks.
      */
-    const std::list<basic_block>& get_basic_blocks() const
+    const std::list<basic_block*>& get_basic_blocks() const
     {
         return instr_blocks;
     }
@@ -1479,7 +1553,7 @@ public:
             }
             for(auto& b: instr_blocks)
             {
-                buf += fmt::format("{}\n", b.to_string());
+                buf += fmt::format("{}\n", b->to_string());
             }
             buf += "}";
         }
@@ -1635,6 +1709,7 @@ struct imported_symbol
 class context
 {
     friend class slang::instruction_emitter;
+    friend class basic_block;
 
     /** List of types. */
     std::vector<std::unique_ptr<type>> types;
@@ -1657,8 +1732,17 @@ class context
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
+    /** The currently compiled function, or `nullptr`. */
+    function* current_function{nullptr};
+
+    /** List of basic blocks. */
+    std::vector<std::unique_ptr<basic_block>> basic_blocks;
+
     /** Imported symbols. */
     std::vector<imported_symbol> imports;
+
+    /** A label counter for unique label generation. */
+    std::size_t label_count = 0;
 
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
@@ -1776,9 +1860,19 @@ public:
      */
     void set_insertion_point(basic_block* ip);
 
-    /** Get the current insertion point. */
-    basic_block* get_insertion_point() const
+    /**
+     * Get the current insertion point.
+     *
+     * @param validate Whether to throw a `codegen_error` if the insertion point is `nullptr`.
+     *                 Defaults to `false`.
+     * @return Returns the current insertion point.
+     */
+    basic_block* get_insertion_point(bool validate = false) const
     {
+        if(validate && insertion_point == nullptr)
+        {
+            throw codegen_error("Invalid insertion point.");
+        }
         return insertion_point;
     }
 
@@ -1837,6 +1931,49 @@ public:
         return global_scope.get();
     }
 
+    /**
+     * Enter a function. Only one function can be entered at a time.
+     *
+     * @param fn The function.
+     */
+    void enter_function(function* fn)
+    {
+        if(current_function != nullptr)
+        {
+            throw codegen_error("Nested function definition.");
+        }
+
+        if(fn == nullptr)
+        {
+            throw codegen_error("No functino specified.");
+        }
+
+        current_function = fn;
+    }
+
+    /** Exit a function. */
+    void exit_function()
+    {
+        if(current_function == nullptr)
+        {
+            throw codegen_error("No function to exit.");
+        }
+
+        current_function = nullptr;
+    }
+
+    /**
+     * Return the current function, or nullptr.
+     *
+     * @param validate If set to `true`, the function will throw a `codegen_error` instead of returning `nullptr`.
+     *                 Defaults to `false`.
+     * @return Returns the current function.
+     */
+    function* get_current_function(bool validate = false)
+    {
+        return current_function;
+    }
+
     /*
      * Code generation.
      */
@@ -1870,20 +2007,20 @@ public:
     /**
      * Generate a compare instruction.
      *
-     * Reads two values [value0, value1] from the stack and pushes the comparison result to the stack:
-     * If value0==value1, 0 is pushed onto the stack. If value0<value1, -1 is pushed onto the stack.
-     * If value0>value1, 1 is pushed onto the stack.
+     * Reads two `i32` values `[value0, value1]` from the stack and pushes the `i32` comparison result to the stack:
+     * If `value0==value1`, `0` is pushed onto the stack. If `value0<value1`, `-1` is pushed onto the stack.
+     * If `value0>value1`, `1` is pushed onto the stack.
      */
     void generate_cmp();
 
     /**
      * Generate a conditional branch.
      *
-     * Pops the top three values [condition, jmp_true, jmp_false] (all i32) off the
-     * stack. If 'condition' is != 0, jumps to jmp_true, else to jmp_false.
+     * Pops 'condition off the stack. If 'condition' is != 0, jumps to `then_block`, else to `else_block`.
      *
-     * @param then_block The block to jump to if the condition is not false.
-     * @param else_block The block to jump to if the condition is false.
+     * @param then_block The block to jump to if the condition is not false. Cannot be a `nullptr`.
+     * @param else_block The block to jump to if the condition is false. Can be a `nullptr`.
+     * @throws Throws a `codegen_error` if `then_block` is `nullptr`.
      */
     void generate_cond_branch(basic_block* then_block, basic_block* else_block);
 
@@ -1943,6 +2080,13 @@ public:
      * @param indices Indices into a (possibly nested) structure.
      */
     void generate_store_element(std::vector<int> indices);
+
+    /**
+     * Generate a label to be used by branches and jump instructions.
+     *
+     * @returns A unique label identifier.
+     */
+    std::string generate_label();
 
     /*
      * Readable representation.
@@ -2054,6 +2198,11 @@ inline void basic_block::set_inserting_context(context* ctx)
     }
 }
 
+inline basic_block* basic_block::create(context& ctx, std::string name)
+{
+    return ctx.basic_blocks.emplace_back(std::unique_ptr<basic_block>(new basic_block(ctx, name))).get();
+}
+
 /*
  * scope_guard implementation.
  */
@@ -2068,6 +2217,22 @@ inline scope_guard::scope_guard(context& ctx, scope* s)
 inline scope_guard::~scope_guard()
 {
     ctx.exit_scope(s);
+}
+
+/*
+ * function_guard implementation.
+ */
+
+inline function_guard::function_guard(context& ctx, function* fn)
+: ctx{ctx}
+, fn{fn}
+{
+    ctx.enter_function(fn);
+}
+
+inline function_guard::~function_guard()
+{
+    ctx.exit_function();
 }
 
 }    // namespace slang::codegen

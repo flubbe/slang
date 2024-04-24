@@ -31,14 +31,16 @@ TEST(codegen, create_function)
     auto fn = ctx.create_function("test", "void", {});
     ASSERT_NE(fn, nullptr);
 
-    cg::basic_block* fn_block = fn->create_basic_block("entry");
+    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
     auto other_fn = ctx.create_function("test2", "i32", {});
     ASSERT_NE(other_fn, nullptr);
     ASSERT_NE(fn, other_fn);
 
-    cg::basic_block* other_fn_block = fn->create_basic_block("entry");
+    cg::basic_block* other_fn_block = cg::basic_block::create(ctx, "entry");
+    fn->append_basic_block(other_fn_block);
     ASSERT_NE(other_fn_block, nullptr);
 
     ASSERT_NE(fn_block, other_fn_block);
@@ -53,31 +55,23 @@ TEST(codegen, insertion_points)
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
-    cg::basic_block* fn_block = fn->create_basic_block("entry");
+    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
     ctx.set_insertion_point(fn_block);
     EXPECT_EQ(ctx.get_insertion_point(), fn_block);
 
-    // scoped basic block.
-    {
-        auto scoped_block = cg::basic_block("scope");
-        ctx.set_insertion_point(&scoped_block);
-        EXPECT_EQ(ctx.get_insertion_point(), &scoped_block);
-        EXPECT_EQ(scoped_block.get_inserting_context(), &ctx);
-    }
-    EXPECT_EQ(ctx.get_insertion_point(), nullptr);
-
     // scoped context.
-    auto block = cg::basic_block("outer");
+    auto block = cg::basic_block::create(ctx, "outer");
     {
         auto inner_ctx = cg::context();
-        inner_ctx.set_insertion_point(&block);
+        inner_ctx.set_insertion_point(block);
 
-        EXPECT_EQ(inner_ctx.get_insertion_point(), &block);
-        EXPECT_EQ(block.get_inserting_context(), &inner_ctx);
+        EXPECT_EQ(inner_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &inner_ctx);
     }
-    EXPECT_EQ(block.get_inserting_context(), nullptr);
+    EXPECT_EQ(block->get_inserting_context(), nullptr);
 }
 
 TEST(codegen, validate_basic_block)
@@ -87,7 +81,8 @@ TEST(codegen, validate_basic_block)
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
-    cg::basic_block* fn_block = fn->create_basic_block("entry");
+    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
     ctx.set_insertion_point(fn_block);
@@ -121,7 +116,8 @@ TEST(codegen, generate_function)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = fn->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
         ctx.set_insertion_point(block);
@@ -153,7 +149,8 @@ TEST(codegen, generate_function)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = fn->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
         ctx.set_insertion_point(block);
@@ -187,7 +184,8 @@ TEST(codegen, generate_function)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = fn->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
         ctx.set_insertion_point(block);
@@ -225,7 +223,8 @@ TEST(codegen, operators)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = fn->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -274,14 +273,19 @@ TEST(codegen, conditional_branch)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* cond = fn->create_basic_block("entry");
+        cg::basic_block* cond = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(cond);
         ASSERT_NE(cond, nullptr);
         EXPECT_EQ(cond->get_inserting_context(), nullptr);
         EXPECT_EQ(cond->get_label(), "entry");
 
-        auto then_block = fn->create_basic_block("then");
-        auto else_block = fn->create_basic_block("else");
-        auto cont_block = fn->create_basic_block("cont");
+        cg::basic_block* then_block = cg::basic_block::create(ctx, "then");
+        cg::basic_block* else_block = cg::basic_block::create(ctx, "else");
+        cg::basic_block* cont_block = cg::basic_block::create(ctx, "cont");
+
+        fn->append_basic_block(then_block);
+        fn->append_basic_block(else_block);
+        fn->append_basic_block(cont_block);
 
         ctx.set_insertion_point(cond);
         EXPECT_EQ(ctx.get_insertion_point(), cond);
@@ -345,7 +349,8 @@ TEST(codegen, locals_store)
 
         fn->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
 
-        cg::basic_block* block = fn->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -397,7 +402,8 @@ TEST(codegen, invoke)
 
         fn_f->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
 
-        cg::basic_block* block = fn_f->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -426,7 +432,8 @@ TEST(codegen, invoke)
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
-        block = fn_g->create_basic_block("entry");
+        block = cg::basic_block::create(ctx, "entry");
+        fn_g->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -486,7 +493,8 @@ TEST(codegen, invoke)
 
         fn_f->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
 
-        cg::basic_block* block = fn_f->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -516,7 +524,8 @@ TEST(codegen, invoke)
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
-        block = fn_g->create_basic_block("entry");
+        block = cg::basic_block::create(ctx, "entry");
+        fn_g->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -586,7 +595,8 @@ TEST(codegen, aggregate_data)
 
         fn_f->create_local(std::make_unique<cg::value>("aggregate", "S", "s"));
 
-        cg::basic_block* block = fn_f->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
@@ -646,7 +656,8 @@ TEST(codegen, strings)
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        cg::basic_block* block = fn_f->create_basic_block("entry");
+        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");

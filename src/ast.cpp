@@ -1013,9 +1013,11 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         }
 
         cg::function* fn = prototype->generate_code(ctx);
-        cg::basic_block* bb = fn->create_basic_block("entry");
-
+        cg::function_guard fg{ctx, fn};
         cg::scope_guard sg{ctx, fn->get_scope()};
+
+        cg::basic_block* bb = cg::basic_block::create(ctx, "entry");
+        fn->append_basic_block(bb);
 
         ctx.set_insertion_point(bb);
 
@@ -1026,7 +1028,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         auto v = body->generate_code(ctx);
 
         // generate return instruction if required.
-        if(!bb->ends_with_return())
+        if(!fn->ends_with_return())
         {
             ctx.generate_ret();
             return {};
@@ -1231,8 +1233,49 @@ std::string return_statement::to_string() const
 
 std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: if_statement::generate_code not implemented.", slang::to_string(loc)));
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
+    }
+
+    auto v = condition->generate_code(ctx, memory_context::load);
+    if(!v)
+    {
+        throw cg::codegen_error(loc, "Condition did not yield a type.");
+    }
+    if(v->get_resolved_type() != "i32")
+    {
+        throw cg::codegen_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", v->get_resolved_type()));
+    }
+
+    ctx.generate_const({"i32"}, 0);    // TODO comparison target value. This probably should be used by the `ifeq` instruction.
+
+    auto* function_insertion_point = ctx.get_insertion_point(true);
+
+    // code generation for if block.
+    auto if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    ctx.get_current_function(true)->append_basic_block(if_basic_block);
+    ctx.set_insertion_point(if_basic_block);
+    if_block->generate_code(ctx, memory_context::none);
+
+    // optional code generation for else block.
+    if(!else_block)
+    {
+        ctx.set_insertion_point(function_insertion_point);
+        ctx.generate_cond_branch(if_basic_block, nullptr);
+    }
+    else
+    {
+        auto else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+        ctx.get_current_function(true)->append_basic_block(else_basic_block);
+        ctx.set_insertion_point(else_basic_block);
+        else_block->generate_code(ctx, memory_context::none);
+
+        ctx.set_insertion_point(function_insertion_point);
+        ctx.generate_cond_branch(if_basic_block, else_basic_block);
+    }
+
+    return {};
 }
 
 std::optional<std::string> if_statement::type_check(ty::context& ctx) const

@@ -1000,4 +1000,54 @@ TEST(compile_ir, function_calls)
     }
 }
 
+TEST(compile_ir, if_statement)
+{
+    {
+        const std::string test_input =
+          "fn test_if_else(a: i32) -> i32\n"
+          "{\n"
+          " if(a > 0)\n"
+          " {\n"
+          "  return 1;\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 0;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test_if_else(i32 %a) {\n"
+                  "entry:\n"
+                  " load i32 %a\n"
+                  " const i32 0\n"
+                  " greater i32\n"
+                  " const i32 0\n"
+                  " ifeq %label0, %label1\n"
+                  "label0:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "label1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
 }    // namespace

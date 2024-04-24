@@ -204,7 +204,7 @@ function* context::create_function(std::string name, std::string return_type, st
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
+    return funcs.emplace_back(std::make_unique<function>(*this, std::move(name), std::move(return_type), std::move(args))).get();
 }
 
 void context::create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
@@ -219,7 +219,7 @@ void context::create_native_function(std::string lib_name, std::string name, std
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    funcs.emplace_back(std::make_unique<function>(std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
+    funcs.emplace_back(std::make_unique<function>(*this, std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
 }
 
 void context::set_insertion_point(basic_block* ip)
@@ -296,7 +296,13 @@ void context::generate_cmp()
 
 void context::generate_cond_branch(basic_block* then_block, basic_block* else_block)
 {
+    if(then_block == nullptr)
+    {
+        throw codegen_error("context::generate_cond_branch: Invalid block.");
+    }
+
     validate_insertion_point();
+
     auto arg0 = std::make_unique<label_argument>(then_block->get_label());
     auto arg1 = std::make_unique<label_argument>(else_block->get_label());
     std::vector<std::unique_ptr<argument>> args;
@@ -409,6 +415,13 @@ void context::generate_store_element(std::vector<int> indices)
         args.emplace_back(std::make_unique<const_argument>(i));
     }
     insertion_point->add_instruction(std::make_unique<instruction>("store_element", std::move(args)));
+}
+
+std::string context::generate_label()
+{
+    std::string label = fmt::format("label{}", label_count);
+    ++label_count;
+    return label;
 }
 
 }    // namespace slang::codegen
