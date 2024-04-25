@@ -308,7 +308,7 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     args.emplace_back(std::move(arg1));
-    insertion_point->add_instruction(std::make_unique<instruction>("ifeq", std::move(args)));
+    insertion_point->add_instruction(std::make_unique<instruction>("ifnz", std::move(args)));
 }
 
 void context::generate_const(value vt, std::variant<int, float, std::string> v)

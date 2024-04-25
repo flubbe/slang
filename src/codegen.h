@@ -637,6 +637,12 @@ public:
     {
     }
 
+    /** Return the label. */
+    const std::string& get_label() const
+    {
+        return label;
+    }
+
     std::string to_string() const override
     {
         return fmt::format("%{}", label);
@@ -758,7 +764,7 @@ public:
     /** Returns whether the instruction is branching. */
     virtual bool is_branching() const
     {
-        return name == "jmp" || name == "ifeq";
+        return name == "jmp" || name == "ifnz";
     }
 
     /** Returns whether the instruction is a return instruction. */

@@ -1248,8 +1248,6 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
         throw cg::codegen_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", v->get_resolved_type()));
     }
 
-    ctx.generate_const({"i32"}, 0);    // TODO comparison target value. This probably should be used by the `ifeq` instruction.
-
     auto* function_insertion_point = ctx.get_insertion_point(true);
 
     // code generation for if block.

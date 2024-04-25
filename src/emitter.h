@@ -53,6 +53,9 @@ class instruction_emitter
     /** Function details. */
     std::unordered_map<std::string, function_details> func_details;
 
+    /** Referenced jump targets. */
+    std::set<std::string> jump_targets;
+
 protected:
     /**
      * Emit an instruction.

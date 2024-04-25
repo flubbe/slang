@@ -316,7 +316,7 @@ TEST(codegen, conditional_branch)
                   " load i32 %a\n"
                   " const i32 1\n"
                   " cmp\n"
-                  " ifeq %then, %else\n"
+                  " ifnz %then, %else\n"
                   "then:\n"
                   " const i32 1\n"
                   " ret i32\n"

@@ -51,6 +51,20 @@ enum class opcode : opcode_base
     ixor,   /** Bitwise xor for two i32 from the stack. */
     ishl,   /** Left shift for i32. */
     ishr,   /** Right shift for i32. */
+    icmpl,  /** Check if the first i32 is less than the second i32. */
+    fcmpl,  /** Check if the first f32 is less than the second f32. */
+    icmple, /** Check if the first i32 is less than or equal to the second i32. */
+    fcmple, /** Check if the first f32 is less than or equal to the second f32. */
+    icmpgt, /** Check if the first i32 is greater than the second i32. */
+    fcmpgt, /** Check if the first f32 is greater than the second f32. */
+    icmpge, /** Check if the first i32 is greater than or equal to the second i32. */
+    fcmpge, /** Check if the first f32 is greater than or equal to the second f32. */
+    icmpeq, /** Check if two i32 are equal. */
+    fcmpeq, /** Check if two f32 are equal. */
+    icmpne, /** Check if two i32 are not equal */
+    fcmpne, /** Check if two i32 are not equal */
+    ifnz,   /** Jump if not zero. */
+    label,  /** A label. Not executable */
 
     opcode_count /** Opcode count. Not an opcode. */
 };

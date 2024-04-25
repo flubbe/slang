@@ -300,6 +300,56 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed(opcode::ishr);
     }
+    else if(name == "less")
+    {
+        emit_typed(opcode::icmpl, opcode::fcmpl);
+    }
+    else if(name == "less_equal")
+    {
+        emit_typed(opcode::icmple, opcode::fcmple);
+    }
+    else if(name == "greater")
+    {
+        emit_typed(opcode::icmpgt, opcode::fcmpgt);
+    }
+    else if(name == "greater_equal")
+    {
+        emit_typed(opcode::icmpge, opcode::fcmpge);
+    }
+    else if(name == "equal")
+    {
+        emit_typed(opcode::icmpeq, opcode::fcmpeq);
+    }
+    else if(name == "not_equal")
+    {
+        emit_typed(opcode::icmpne, opcode::fcmpne);
+    }
+    else if(name == "ifnz")
+    {
+        auto& args = instr->get_args();
+
+        auto then_label = static_cast<cg::label_argument*>(args[0].get())->get_label();
+        auto else_label = static_cast<cg::label_argument*>(args[1].get())->get_label();
+
+        auto then_it = jump_targets.find(then_label);
+        if(then_it == jump_targets.end())
+        {
+            throw emitter_error(fmt::format("Cannot find label '{}'.", then_label));
+        }
+
+        auto else_it = jump_targets.find(else_label);
+        if(else_it == jump_targets.end())
+        {
+            throw emitter_error(fmt::format("Cannot find label '{}'.", else_label));
+        }
+
+        vle_int then_index = std::distance(jump_targets.begin(), then_it);
+        vle_int else_index = std::distance(jump_targets.begin(), else_it);
+
+        emit(instruction_buffer, opcode::ifnz);
+        instruction_buffer & then_index;
+        instruction_buffer & else_index;
+    }
     else
     {
         // TODO
@@ -317,6 +367,11 @@ void instruction_emitter::run()
     if(func_details.size() != 0)
     {
         throw emitter_error("Entry points not empty.");
+    }
+
+    if(jump_targets.size() != 0)
+    {
+        throw emitter_error("Jump targets not empty.");
     }
 
     for(auto& f: ctx.funcs)
@@ -396,18 +451,40 @@ void instruction_emitter::run()
         }
 
         /*
+         * collect jump targets.
+         */
+        for(auto& it: f->get_basic_blocks())
+        {
+            for(auto& instr: it->get_instructions())
+            {
+                if(instr->get_name() == "ifnz")
+                {
+                    auto& args = instr->get_args();
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args[0].get())->get_label());
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args[1].get())->get_label());
+                }
+            }
+        }
+
+        /*
          * instruction generation.
          */
         std::size_t entry_point = instruction_buffer.tell();
 
         for(auto& it: f->get_basic_blocks())
         {
+            auto jump_it = jump_targets.find(it->get_label());
+            if(jump_it != jump_targets.end())
+            {
+                vle_int index = std::distance(jump_targets.begin(), jump_it);
+                emit(instruction_buffer, opcode::label);
+                instruction_buffer & index;
+            }
+
             for(auto& instr: it->get_instructions())
             {
                 emit_instruction(f, instr);
             }
-
-            // TODO Jump offset resolution
         }
 
         /*

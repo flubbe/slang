@@ -187,4 +187,31 @@ TEST(interpreter, operators)
     EXPECT_EQ(*res.get<int>(), 12);
 }
 
+TEST(interpreter, control_flow)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("control_flow.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'control_flow.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
+
+    slang::interpreter::value res;
+    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {2}));
+    EXPECT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {-1}));
+    EXPECT_EQ(*res.get<int>(), 0);
+}
+
 }    // namespace

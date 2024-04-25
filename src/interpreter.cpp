@@ -174,12 +174,24 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::fmul:
     case opcode::idiv:
     case opcode::fdiv:
+    case opcode::imod:
     case opcode::iand:
     case opcode::ior:
     case opcode::ixor:
     case opcode::ishl:
     case opcode::ishr:
-    case opcode::imod:
+    case opcode::icmpl:
+    case opcode::fcmpl:
+    case opcode::icmple:
+    case opcode::fcmple:
+    case opcode::icmpgt:
+    case opcode::fcmpgt:
+    case opcode::icmpge:
+    case opcode::fcmpge:
+    case opcode::icmpeq:
+    case opcode::fcmpeq:
+    case opcode::icmpne:
+    case opcode::fcmpne:
         return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
     case opcode::i2f:
     case opcode::f2i:
@@ -206,6 +218,29 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
         return sizeof(std::string*);
+    }
+    case opcode::label:
+    {
+        vle_int i;
+        ar & i;
+        // store jump target for later resolution.
+        mod.jump_targets.insert({i.i, code.size()});
+        return 0;
+    }
+    /* opcodes with two VLE integers. */
+    case opcode::ifnz:
+    {
+        vle_int i1, i2;
+        ar & i1 & i2;
+
+        // store jump origin for later resolution and write zeros instead.
+        std::size_t z = 0;
+        mod.jump_origins.insert({code.size(), i1.i});
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+
+        mod.jump_origins.insert({code.size(), i2.i});
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+        return 0;
     }
     /** invoke. */
     case opcode::invoke:
@@ -453,6 +488,17 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
 
         details.size = code.size() - details.offset;
         details.stack_size = max_stack_size;
+
+        // jumps target resolution.
+        for(auto& [origin, id]: decoded_module->jump_origins)
+        {
+            auto target_it = decoded_module->jump_targets.find(id);
+            if(target_it == decoded_module->jump_targets.end())
+            {
+                throw interpreter_error(fmt::format("Unable to resolve jump target for label '{}'.", id));
+            }
+            *reinterpret_cast<std::size_t*>(&code[origin]) = target_it->second;
+        }
     }
 
     decoded_module->set_binary(std::move(code));
@@ -723,6 +769,108 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(s_u32 >> a_u32);
             break;
         } /* opcode::ishr */
+        case opcode::icmpl:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b < a);
+            break;
+        } /* opcode::icmpl */
+        case opcode::fcmpl:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b < a);
+            break;
+        } /* opcode::fcmpl */
+        case opcode::icmple:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b <= a);
+            break;
+        } /* opcode::icmple */
+        case opcode::fcmple:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b <= a);
+            break;
+        } /* opcode::fcmple */
+        case opcode::icmpgt:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b > a);
+            break;
+        } /* opcode::icmpgt */
+        case opcode::fcmpgt:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b > a);
+            break;
+        } /* opcode::fcmpgt */
+        case opcode::icmpge:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b >= a);
+            break;
+        } /* opcode::icmpge */
+        case opcode::fcmpge:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b >= a);
+            break;
+        } /* opcode::fcmpge */
+        case opcode::icmpeq:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b == a);
+            break;
+        } /* opcode::icmpeq */
+        case opcode::fcmpeq:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b == a);
+            break;
+        } /* opcode::fcmpeq */
+        case opcode::icmpne:
+        {
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b != a);
+            break;
+        } /* opcode::icmpne */
+        case opcode::fcmpne:
+        {
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_i32(b != a);
+            break;
+        } /* opcode::fcmpne */
+        case opcode::ifnz:
+        {
+            std::size_t then_offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::size_t);
+            std::size_t else_offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::size_t);
+
+            std::int32_t cond = frame.stack.pop_i32();
+            if(cond != 0)
+            {
+                offset = then_offset;
+            }
+            else
+            {
+                offset = else_offset;
+            }
+            break;
+        } /* opcode::ifnz */
         default:
             throw interpreter_error(fmt::format("Opcode '{}' ({}) not implemented.", to_string(static_cast<opcode>(instr)), instr));
         }
