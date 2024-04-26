@@ -387,6 +387,7 @@ TEST(output, operators)
 TEST(output, control_flow)
 {
     const std::string test_input =
+      "import std;\n"
       "fn test_if_else(a: i32) -> i32\n"
       "{\n"
       " if(a > 0)\n"
@@ -397,7 +398,18 @@ TEST(output, control_flow)
       " {\n"
       "  return 0;\n"
       " }\n"
-      "}";
+      "}\n"
+      "fn conditional_hello_world(a: f32) -> void\n"
+      "{\n"
+      " if(a > 2.5)\n"
+      " {\n"
+      "  std::println(\"Hello, World!\");\n"
+      " }\n"
+      " else\n"
+      " {\n"
+      "  std::println(\"World, hello!\");\n"
+      " }\n"
+      "}\n";
 
     slang::lexer lexer;
     slang::parser parser;

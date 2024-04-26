@@ -42,17 +42,17 @@ std::string to_string(binary_op op)
       "sub",
       "shl",
       "shr",
-      "less",
-      "less_equal",
-      "greater",
-      "greater_equal",
-      "equal",
-      "not_equal",
+      "cmpl",
+      "cmple",
+      "cmpg",
+      "cmpge",
+      "cmpeq",
+      "cmpne",
       "and",
       "xor",
       "or",
-      "logical_and",
-      "logical_or"};
+      "land",
+      "lor"};
 
     std::size_t idx = static_cast<std::size_t>(op);
     if(idx < 0 || idx >= strs.size())
@@ -102,7 +102,7 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
             throw codegen_error(fmt::format("Found different symbol types for import '{}': '{}' and '{}'.", name, slang::to_string(it->type), slang::to_string(type)));
         }
 
-        return it - imports.end();
+        return std::distance(imports.begin(), it);
     }
 
     // add the import.
@@ -271,11 +271,17 @@ void context::generate_binary_op(binary_op op, value op_type)
     insertion_point->add_instruction(std::make_unique<instruction>(codegen::to_string(op), std::move(args)));
 }
 
-void context::generate_branch(std::unique_ptr<label_argument> label)
+void context::generate_branch(basic_block* block)
 {
+    if(block == nullptr)
+    {
+        throw codegen_error("context::generate_branch: Invalid block.");
+    }
+
     validate_insertion_point();
+    auto arg = std::make_unique<label_argument>(block->get_label());
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::move(label));
+    args.emplace_back(std::move(arg));
     insertion_point->add_instruction(std::make_unique<instruction>("jmp", std::move(args)));
 }
 
@@ -308,7 +314,7 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     args.emplace_back(std::move(arg1));
-    insertion_point->add_instruction(std::make_unique<instruction>("ifnz", std::move(args)));
+    insertion_point->add_instruction(std::make_unique<instruction>("jnz", std::move(args)));
 }
 
 void context::generate_const(value vt, std::variant<int, float, std::string> v)
@@ -385,17 +391,16 @@ void context::generate_load_element(std::vector<int> indices)
 void context::generate_ret(std::optional<value> arg)
 {
     validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
     if(!arg)
     {
-        insertion_point->add_instruction(std::make_unique<instruction>("ret"));
+        args.emplace_back(std::make_unique<type_argument>(value{"void"}));
     }
     else
     {
-        auto ret_arg = std::make_unique<type_argument>(*arg);
-        std::vector<std::unique_ptr<argument>> args;
-        args.emplace_back(std::move(ret_arg));
-        insertion_point->add_instruction(std::make_unique<instruction>("ret", std::move(args)));
+        args.emplace_back(std::make_unique<type_argument>(*arg));
     }
+    insertion_point->add_instruction(std::make_unique<instruction>("ret", std::move(args)));
 }
 
 void context::generate_store(std::unique_ptr<variable_argument> arg)
@@ -419,9 +424,8 @@ void context::generate_store_element(std::vector<int> indices)
 
 std::string context::generate_label()
 {
-    std::string label = fmt::format("label{}", label_count);
     ++label_count;
-    return label;
+    return fmt::format("{}", label_count - 1);
 }
 
 }    // namespace slang::codegen

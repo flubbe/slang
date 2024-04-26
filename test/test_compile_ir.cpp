@@ -136,7 +136,7 @@ TEST(compile_ir, empty_function)
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
               "entry:\n"
-              " ret\n"
+              " ret void\n"
               "}");
 }
 
@@ -254,7 +254,7 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_EQ(ctx.to_string(),
                   "define void @f(i32 %i, str %j, f32 %k) {\n"
                   "entry:\n"
-                  " ret\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -637,10 +637,10 @@ TEST(compile_ir, binary_operators)
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
-                  " greater i32\n"
+                  " cmpg i32\n"
                   " const i32 3\n"
                   " const i32 4\n"
-                  " less i32\n"
+                  " cmpl i32\n"
                   " const i32 4\n"
                   " and i32\n"
                   " or i32\n"
@@ -677,11 +677,11 @@ TEST(compile_ir, binary_operators)
                   "entry:\n"
                   " const i32 5\n"
                   " const i32 7\n"
-                  " less_equal i32\n"
+                  " cmple i32\n"
                   " const i32 2\n"
                   " const i32 2\n"
                   " const i32 1\n"
-                  " greater_equal i32\n"
+                  " cmpge i32\n"
                   " and i32\n"
                   " xor i32\n"
                   " store i32 %i\n"
@@ -875,11 +875,11 @@ TEST(compile_ir, function_calls)
                   "define void @f() {\n"
                   "entry:\n"
                   " invoke @g\n"
-                  " ret\n"
+                  " ret void\n"
                   "}\n"
                   "define void @g() {\n"
                   "entry:\n"
-                  " ret\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -919,11 +919,11 @@ TEST(compile_ir, function_calls)
                   " const str @0\n"
                   " invoke @h\n"
                   " invoke @g\n"
-                  " ret\n"
+                  " ret void\n"
                   "}\n"
                   "define void @g(i32 %a, f32 %b, str %c, i32 %d) {\n"
                   "entry:\n"
-                  " ret\n"
+                  " ret void\n"
                   "}\n"
                   "define i32 @h() {\n"
                   "entry:\n"
@@ -966,11 +966,11 @@ TEST(compile_ir, function_calls)
                   " add i32\n"
                   " const f32 2.3\n"
                   " invoke @g\n"
-                  " ret\n"
+                  " ret void\n"
                   "}\n"
                   "define void @g(i32 %i, f32 %j) {\n"
                   "entry:\n"
-                  " ret\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -1037,14 +1037,18 @@ TEST(compile_ir, if_statement)
                   "entry:\n"
                   " load i32 %a\n"
                   " const i32 0\n"
-                  " greater i32\n"
-                  " ifnz %label0, %label1\n"
-                  "label0:\n"
+                  " cmpg i32\n"
+                  " jnz %0, %2\n"
+                  "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
-                  "label1:\n"
+                  " jmp %1\n"
+                  "2:\n"
                   " const i32 0\n"
                   " ret i32\n"
+                  " jmp %1\n"
+                  "1:\n"
+                  " unreachable\n"
                   "}");
     }
 }

@@ -764,7 +764,7 @@ public:
     /** Returns whether the instruction is branching. */
     virtual bool is_branching() const
     {
-        return name == "jmp" || name == "ifnz";
+        return name == "jmp" || name == "jnz";
     }
 
     /** Returns whether the instruction is a return instruction. */
@@ -822,6 +822,9 @@ class basic_block
     /** The associated inserting context (if any). */
     class context* inserting_context{nullptr};
 
+    /** Whether the block is marked as unreachable. */
+    bool unreachable = false;
+
     /**
      * Set a new context for inserting instructions.
      * Pass nullptr to clear the context.
@@ -873,6 +876,11 @@ public:
     /** Get string representation of block. */
     std::string to_string() const
     {
+        if(unreachable)
+        {
+            return fmt::format("{}:\n unreachable", label);
+        }
+
         if(instrs.size() == 0)
         {
             return fmt::format("{}:", label);
@@ -909,6 +917,22 @@ public:
     bool ends_with_branch() const
     {
         return instrs.size() > 0 && instrs.back()->is_branching();
+    }
+
+    /** Mark the block as unreachable. */
+    void set_unreachable()
+    {
+        unreachable = true;
+    }
+
+    /**
+     * Check whether this block is unreachable.
+     *
+     * Currently this is done by checking if the block is explicitly marked as unreachable.
+     */
+    bool is_unreachable() const
+    {
+        return unreachable;
     }
 
     /**
@@ -1997,9 +2021,9 @@ public:
     /**
      * Generate an unconditional branch instruction.
      *
-     * @param label The name of the jump target. This is the label of a basic_block.
+     * @param block The block to jump to. Cannot be a `nullptr`.
      */
-    void generate_branch(std::unique_ptr<label_argument> label);
+    void generate_branch(basic_block* block);
 
     /**
      * Generate a type cast.

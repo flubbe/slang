@@ -184,8 +184,8 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::fcmpl:
     case opcode::icmple:
     case opcode::fcmple:
-    case opcode::icmpgt:
-    case opcode::fcmpgt:
+    case opcode::icmpg:
+    case opcode::fcmpg:
     case opcode::icmpge:
     case opcode::fcmpge:
     case opcode::icmpeq:
@@ -223,12 +223,24 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     {
         vle_int i;
         ar & i;
+
         // store jump target for later resolution.
         mod.jump_targets.insert({i.i, code.size()});
         return 0;
     }
+    case opcode::jmp:
+    {
+        vle_int i;
+        ar & i;
+
+        // store jump origin for later resolution and write zeros instead.
+        std::size_t z = 0;
+        mod.jump_origins.insert({code.size(), i.i});
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+        return 0;
+    }
     /* opcodes with two VLE integers. */
-    case opcode::ifnz:
+    case opcode::jnz:
     {
         vle_int i1, i2;
         ar & i1 & i2;
@@ -472,7 +484,12 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
         while(ar.tell() < bytecode_end)
         {
             ar & instr;
-            code.push_back(instr);
+
+            // don't store non-executable instructions.
+            if(static_cast<opcode>(instr) != opcode::label)
+            {
+                code.push_back(instr);
+            }
 
             stack_size += decode_instruction(*decoded_module, ar, instr, details, code);
             if(stack_size < 0)
@@ -797,20 +814,20 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(b <= a);
             break;
         } /* opcode::fcmple */
-        case opcode::icmpgt:
+        case opcode::icmpg:
         {
             std::int32_t a = frame.stack.pop_i32();
             std::int32_t b = frame.stack.pop_i32();
             frame.stack.push_i32(b > a);
             break;
-        } /* opcode::icmpgt */
-        case opcode::fcmpgt:
+        } /* opcode::icmpg */
+        case opcode::fcmpg:
         {
             float a = frame.stack.pop_f32();
             float b = frame.stack.pop_f32();
             frame.stack.push_i32(b > a);
             break;
-        } /* opcode::fcmpgt */
+        } /* opcode::fcmpg */
         case opcode::icmpge:
         {
             std::int32_t a = frame.stack.pop_i32();
@@ -853,7 +870,7 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(b != a);
             break;
         } /* opcode::fcmpne */
-        case opcode::ifnz:
+        case opcode::jnz:
         {
             std::size_t then_offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::size_t);
@@ -870,7 +887,12 @@ opcode context::exec(const language_module& mod,
                 offset = else_offset;
             }
             break;
-        } /* opcode::ifnz */
+        } /* opcode::jnz */
+        case opcode::jmp:
+        {
+            offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            break;
+        } /* opcode::jmp */
         default:
             throw interpreter_error(fmt::format("Opcode '{}' ({}) not implemented.", to_string(static_cast<opcode>(instr)), instr));
         }

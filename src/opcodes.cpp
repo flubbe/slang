@@ -53,15 +53,16 @@ std::string to_string(opcode op)
     case opcode::fcmpl: return "fcmpl";
     case opcode::icmple: return "icmple";
     case opcode::fcmple: return "fcmple";
-    case opcode::icmpgt: return "icmpgt";
-    case opcode::fcmpgt: return "fcmpgt";
+    case opcode::icmpg: return "icmpg";
+    case opcode::fcmpg: return "fcmpg";
     case opcode::icmpge: return "icmpge";
     case opcode::fcmpge: return "fcmpge";
     case opcode::icmpeq: return "icmpeq";
     case opcode::fcmpeq: return "fcmpeq";
     case opcode::icmpne: return "icmpne";
     case opcode::fcmpne: return "fcmpne";
-    case opcode::ifnz: return "ifnz";
+    case opcode::jnz: return "jnz";
+    case opcode::jmp: return "jmp";
     case opcode::label: return "label";
     case opcode::opcode_count:; /* fall-through */
     }

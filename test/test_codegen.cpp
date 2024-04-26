@@ -94,7 +94,7 @@ TEST(codegen, validate_basic_block)
 
     EXPECT_TRUE(fn_block->is_valid());
 
-    ctx.generate_branch(std::make_unique<cg::label_argument>("some_label"));
+    ctx.generate_branch(fn_block);
 
     EXPECT_FALSE(fn_block->is_valid());
 }
@@ -130,7 +130,7 @@ TEST(codegen, generate_function)
         EXPECT_EQ(ctx.to_string(),
                   "define void @f(i32 %a) {\n"
                   "entry:\n"
-                  " ret\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -300,7 +300,7 @@ TEST(codegen, conditional_branch)
         ctx.generate_ret(std::make_optional<cg::value>("i32"));
 
         ctx.set_insertion_point(else_block);
-        ctx.generate_branch(std::make_unique<cg::label_argument>("cont"));
+        ctx.generate_branch(cont_block);
 
         ctx.set_insertion_point(cont_block);
         ctx.generate_const({"i32"}, 0);
@@ -316,7 +316,7 @@ TEST(codegen, conditional_branch)
                   " load i32 %a\n"
                   " const i32 1\n"
                   " cmp\n"
-                  " ifnz %then, %else\n"
+                  " jnz %then, %else\n"
                   "then:\n"
                   " const i32 1\n"
                   " ret i32\n"
@@ -371,7 +371,7 @@ TEST(codegen, locals_store)
                   "entry:\n"
                   " load i32 %a\n"
                   " store i32 %b\n"
-                  " ret\n"
+                  " ret void\n"
                   "}");
     }
 }

@@ -259,8 +259,9 @@ std::string type_cast_expression::to_string() const
 std::unique_ptr<cg::value> scope_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     ctx.push_resolution_scope(name.s);
-    return expr->generate_code(ctx, mc);
+    auto type = expr->generate_code(ctx, mc);
     ctx.pop_resolution_scope();
+    return type;
 }
 
 std::optional<std::string> scope_expression::type_check(ty::context& ctx) const
@@ -308,7 +309,7 @@ std::string access_expression::to_string() const
 std::unique_ptr<cg::value> import_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // import expressions are handled by the import resolver.
-    return {};
+    return nullptr;
 }
 
 void import_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -442,7 +443,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         }
     }
 
-    return {};
+    return nullptr;
 }
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
@@ -591,12 +592,13 @@ std::string struct_named_initializer_expression::to_string() const
  * binary_expression.
  */
 
-static std::tuple<bool, bool, std::string> classify_binary_op(const std::string& s)
+static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::string& s)
 {
     bool is_assignment = (s == "=" || s == "+=" || s == "-="
                           || s == "*=" || s == "/=" || s == "%="
                           || s == "&=" || s == "|=" || s == "<<=" || s == ">>=");
     bool is_compound = is_assignment && (s != "=");
+    bool is_comparison = (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
 
     std::string reduced_op = s;
     if(is_compound)
@@ -604,12 +606,12 @@ static std::tuple<bool, bool, std::string> classify_binary_op(const std::string&
         reduced_op.pop_back();
     }
 
-    return {is_assignment, is_compound, reduced_op};
+    return {is_assignment, is_compound, is_comparison, reduced_op};
 }
 
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto [is_assignment, is_compound, reduced_op] = classify_binary_op(op.s);
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     if(!is_assignment || is_compound)
     {
@@ -661,7 +663,14 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 }
             }
 
-            return lhs_value;
+            if(is_comparison)
+            {
+                return std::make_unique<cg::value>("i32");
+            }
+            else
+            {
+                return lhs_value;
+            }
         }
         else
         {
@@ -698,7 +707,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
 std::optional<std::string> binary_expression::type_check(ty::context& ctx) const
 {
-    auto [is_assignment, is_compound, reduced_op] = classify_binary_op(op.s);
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     auto lhs_type = lhs->type_check(ctx);
     auto rhs_type = rhs->type_check(ctx);
@@ -726,6 +735,12 @@ std::optional<std::string> binary_expression::type_check(ty::context& ctx) const
     if(*lhs_type != *rhs_type)
     {
         throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", *lhs_type, reduced_op, *rhs_type));
+    }
+
+    // comparisons return i32.
+    if(is_comparison)
+    {
+        return {"i32"};
     }
 
     return lhs_type;
@@ -1025,16 +1040,16 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         {
             throw cg::codegen_error(loc, fmt::format("No function body defined for '{}'.", prototype->get_name().s));
         }
+
         auto v = body->generate_code(ctx);
 
-        // generate return instruction if required.
-        if(!fn->ends_with_return())
+        auto ip = ctx.get_insertion_point(true);
+        if(!ip->ends_with_return() && !ip->is_unreachable())
         {
-            ctx.generate_ret();
-            return {};
+            ctx.generate_ret(v ? std::make_optional(*v) : std::nullopt);
         }
 
-        return v;
+        return nullptr;
     }
     else if(directives.size() == 1)
     {
@@ -1055,7 +1070,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             : directive.args[0].second.s;
 
         prototype->generate_native_binding(lib_name, ctx);
-        return {};
+        return nullptr;
     }
     else
     {
@@ -1181,7 +1196,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
         throw cg::codegen_error(loc, "Expression did not yield a type.");
     }
     ctx.generate_ret(*v);
-    return {};
+    return nullptr;
 }
 
 std::optional<std::string> return_statement::type_check(ty::context& ctx) const
@@ -1250,13 +1265,21 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
 
     auto* function_insertion_point = ctx.get_insertion_point(true);
 
-    // code generation for if block.
+    // set up basic blocks.
     auto if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    cg::basic_block* else_basic_block = nullptr;
+    auto merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    bool if_ends_with_return = false, else_ends_with_return = false;
+
+    // code generation for if block.
     ctx.get_current_function(true)->append_basic_block(if_basic_block);
     ctx.set_insertion_point(if_basic_block);
     if_block->generate_code(ctx, memory_context::none);
+    if_ends_with_return = if_basic_block->ends_with_return();
+    ctx.generate_branch(merge_basic_block);
 
-    // optional code generation for else block.
+    // code generation for optional else block.
     if(!else_block)
     {
         ctx.set_insertion_point(function_insertion_point);
@@ -1264,16 +1287,28 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     }
     else
     {
-        auto else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+        else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
         ctx.get_current_function(true)->append_basic_block(else_basic_block);
         ctx.set_insertion_point(else_basic_block);
         else_block->generate_code(ctx, memory_context::none);
+        else_ends_with_return = else_basic_block->ends_with_return();
+        ctx.generate_branch(merge_basic_block);
 
         ctx.set_insertion_point(function_insertion_point);
         ctx.generate_cond_branch(if_basic_block, else_basic_block);
     }
 
-    return {};
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    // check if the merge block is reachable.
+    if(if_ends_with_return && else_ends_with_return)
+    {
+        merge_basic_block->set_unreachable();
+    }
+
+    return nullptr;
 }
 
 std::optional<std::string> if_statement::type_check(ty::context& ctx) const

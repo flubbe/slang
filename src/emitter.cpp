@@ -268,9 +268,9 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "ret")
     {
-        expect_arg_size(0, 1);
+        expect_arg_size(1);
 
-        if(args.size() == 0)
+        if(args[0]->get_value()->get_resolved_type() == "void")
         {
             // return void from a function.
             emit(instruction_buffer, opcode::ret);
@@ -300,32 +300,34 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed(opcode::ishr);
     }
-    else if(name == "less")
+    else if(name == "cmpl")
     {
         emit_typed(opcode::icmpl, opcode::fcmpl);
     }
-    else if(name == "less_equal")
+    else if(name == "cmple")
     {
         emit_typed(opcode::icmple, opcode::fcmple);
     }
-    else if(name == "greater")
+    else if(name == "cmpg")
     {
-        emit_typed(opcode::icmpgt, opcode::fcmpgt);
+        emit_typed(opcode::icmpg, opcode::fcmpg);
     }
-    else if(name == "greater_equal")
+    else if(name == "cmpge")
     {
         emit_typed(opcode::icmpge, opcode::fcmpge);
     }
-    else if(name == "equal")
+    else if(name == "cmpeq")
     {
         emit_typed(opcode::icmpeq, opcode::fcmpeq);
     }
-    else if(name == "not_equal")
+    else if(name == "cmpne")
     {
         emit_typed(opcode::icmpne, opcode::fcmpne);
     }
-    else if(name == "ifnz")
+    else if(name == "jnz")
     {
+        expect_arg_size(2);
+
         auto& args = instr->get_args();
 
         auto then_label = static_cast<cg::label_argument*>(args[0].get())->get_label();
@@ -346,9 +348,26 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         vle_int then_index = std::distance(jump_targets.begin(), then_it);
         vle_int else_index = std::distance(jump_targets.begin(), else_it);
 
-        emit(instruction_buffer, opcode::ifnz);
+        emit(instruction_buffer, opcode::jnz);
         instruction_buffer & then_index;
         instruction_buffer & else_index;
+    }
+    else if(name == "jmp")
+    {
+        expect_arg_size(1);
+
+        auto& args = instr->get_args();
+        auto label = static_cast<cg::label_argument*>(args[0].get())->get_label();
+
+        auto it = jump_targets.find(label);
+        if(it == jump_targets.end())
+        {
+            throw emitter_error(fmt::format("Cannot find label '{}'.", label));
+        }
+
+        vle_int index = std::distance(jump_targets.begin(), it);
+        emit(instruction_buffer, opcode::jmp);
+        instruction_buffer & index;
     }
     else
     {
@@ -457,11 +476,16 @@ void instruction_emitter::run()
         {
             for(auto& instr: it->get_instructions())
             {
-                if(instr->get_name() == "ifnz")
+                if(instr->get_name() == "jnz")
                 {
                     auto& args = instr->get_args();
                     jump_targets.emplace(static_cast<cg::label_argument*>(args[0].get())->get_label());
                     jump_targets.emplace(static_cast<cg::label_argument*>(args[1].get())->get_label());
+                }
+                else if(instr->get_name() == "jmp")
+                {
+                    auto& args = instr->get_args();
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args[0].get())->get_label());
                 }
             }
         }

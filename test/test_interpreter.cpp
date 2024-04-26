@@ -203,15 +203,40 @@ TEST(interpreter, control_flow)
     }
 
     slang::file_manager file_mgr;
+    file_mgr.add_search_path("src/lang");
     slang::interpreter::context ctx{file_mgr};
+
+    std::vector<std::string> print_buf;
+
+    ctx.register_native_function("slang", "print",
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(*s);
+                                 });
+    ctx.register_native_function("slang", "println",
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(fmt::format("{}\n", *s));
+                                 });
 
     ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
 
     slang::interpreter::value res;
+
     ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {2}));
     EXPECT_EQ(*res.get<int>(), 1);
     ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {-1}));
     EXPECT_EQ(*res.get<int>(), 0);
+
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {3.f}));
+    ASSERT_EQ(print_buf.size(), 1);
+    EXPECT_EQ(print_buf.back(), "Hello, World!\n");
+
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {2.2f}));
+    ASSERT_EQ(print_buf.size(), 2);
+    EXPECT_EQ(print_buf.back(), "World, hello!\n");
 }
 
 }    // namespace
