@@ -237,6 +237,17 @@ TEST(interpreter, control_flow)
     ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {2.2f}));
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf.back(), "World, hello!\n");
+
+    print_buf.clear();
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {1}));
+    ASSERT_EQ(print_buf.size(), 2);
+    EXPECT_EQ(print_buf[0], "a>0\n");
+    EXPECT_EQ(print_buf[1], "Test\n");
+
+    print_buf.clear();
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {-2}));
+    ASSERT_EQ(print_buf.size(), 1);
+    EXPECT_EQ(print_buf[0], "Test\n");
 }
 
 }    // namespace

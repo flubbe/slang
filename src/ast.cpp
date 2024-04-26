@@ -1283,7 +1283,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     if(!else_block)
     {
         ctx.set_insertion_point(function_insertion_point);
-        ctx.generate_cond_branch(if_basic_block, nullptr);
+        ctx.generate_cond_branch(if_basic_block, merge_basic_block);
     }
     else
     {

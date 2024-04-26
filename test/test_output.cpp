@@ -409,6 +409,14 @@ TEST(output, control_flow)
       " {\n"
       "  std::println(\"World, hello!\");\n"
       " }\n"
+      "}\n"
+      "fn no_else(a: i32) -> void\n"
+      "{\n"
+      " if(a > 0)\n"
+      " {\n"
+      "  std::println(\"a>0\");\n"
+      " }\n"
+      " std::println(\"Test\");\n"
       "}\n";
 
     slang::lexer lexer;
