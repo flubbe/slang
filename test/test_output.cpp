@@ -496,6 +496,62 @@ TEST(output, loops)
         slang::file_write_archive write_ar("loops.cmod");
         EXPECT_NO_THROW(write_ar & mod);
     }
+    {
+        const std::string test_input =
+          "import std;\n"
+          "\n"
+          "fn main_b() -> void\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " while(i < 10)\n"
+          " {\n"
+          "  std::println(\"Hello, World!\");\n"
+          "  i += 1;\n"
+          "  break;\n"
+          " }\n"
+          "}\n"
+          "fn main_c() -> void\n"
+          "{\n"
+          " let i: i32 = 0;\n"
+          " while(i < 10)\n"
+          " {\n"
+          "  std::println(\"Hello, World!\");\n"
+          "  i = 10;\n"
+          "  continue;\n"
+          "  i = 1;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+        mgr.add_search_path("src/lang");
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("loops_bc.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
 }
 
 }    // namespace

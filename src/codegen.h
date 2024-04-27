@@ -1765,6 +1765,9 @@ class context
     /** The currently compiled function, or `nullptr`. */
     function* current_function{nullptr};
 
+    /** The basic blocks for `break` and `continue` statements. */
+    std::vector<std::pair<basic_block*, basic_block*>> basic_block_brk_cnt;
+
     /** List of basic blocks. */
     std::vector<std::unique_ptr<basic_block>> basic_blocks;
 
@@ -1975,7 +1978,7 @@ public:
 
         if(fn == nullptr)
         {
-            throw codegen_error("No functino specified.");
+            throw codegen_error("No function specified.");
         }
 
         current_function = fn;
@@ -2002,6 +2005,44 @@ public:
     function* get_current_function(bool validate = false)
     {
         return current_function;
+    }
+
+    /**
+     * Push a new `break`-`continue` `basic_block` pair.
+     *
+     * @param brk_cnt The `break`-`continue` pair.
+     */
+    void push_break_continue(std::pair<basic_block*, basic_block*> brk_cnt)
+    {
+        basic_block_brk_cnt.push_back(std::move(brk_cnt));
+    }
+
+    /**
+     * Pop a `break`-`continue` `basic_block` pair.
+     *
+     * @throws Throws a `codegen_error` if the stack is empty.
+     */
+    void pop_break_continue()
+    {
+        if(basic_block_brk_cnt.size() == 0)
+        {
+            throw codegen_error("Encountered break or continue statement outside of loop.");
+        }
+        basic_block_brk_cnt.pop_back();
+    }
+
+    /**
+     * Return the top `break`-`continue` `basic_block` pair.
+     *
+     * @throws Throws a `codegen_error` if the stack is empty.
+     */
+    std::pair<basic_block*, basic_block*> top_break_continue() const
+    {
+        if(basic_block_brk_cnt.size() == 0)
+        {
+            throw codegen_error("Encountered break or continue statement outside of loop.");
+        }
+        return basic_block_brk_cnt.back();
     }
 
     /*
