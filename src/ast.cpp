@@ -1250,7 +1250,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
+        throw cg::codegen_error(loc, "Invalid memory context for if_statement.");
     }
 
     auto v = condition->generate_code(ctx, memory_context::load);
@@ -1263,6 +1263,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
         throw cg::codegen_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", v->get_resolved_type()));
     }
 
+    // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
 
     // set up basic blocks.
@@ -1352,8 +1353,45 @@ std::string if_statement::to_string() const
 
 std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: while_statement::generate_code not implemented.", slang::to_string(loc)));
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error(loc, "Invalid memory context for while_statement.");
+    }
+
+    // set up basic blocks.
+    auto while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    // while loop header.
+    ctx.get_current_function(true)->append_basic_block(while_loop_header_basic_block);
+    ctx.set_insertion_point(while_loop_header_basic_block);
+
+    auto v = condition->generate_code(ctx, memory_context::load);
+    if(!v)
+    {
+        throw cg::codegen_error(loc, "Condition did not yield a type.");
+    }
+    if(v->get_resolved_type() != "i32")
+    {
+        throw cg::codegen_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", v->get_resolved_type()));
+    }
+
+    ctx.generate_cond_branch(while_loop_basic_block, merge_basic_block);
+
+    // while loop body.
+    ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
+    ctx.set_insertion_point(while_loop_basic_block);
+    while_block->generate_code(ctx, memory_context::none);
+
+    ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
+    ctx.generate_branch(while_loop_header_basic_block);
+
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    return nullptr;
 }
 
 std::optional<std::string> while_statement::type_check(ty::context& ctx) const

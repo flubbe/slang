@@ -250,4 +250,50 @@ TEST(interpreter, control_flow)
     EXPECT_EQ(print_buf[0], "Test\n");
 }
 
+TEST(interpreter, loops)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("loops.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'loops.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path("src/lang");
+    slang::interpreter::context ctx{file_mgr};
+
+    std::vector<std::string> print_buf;
+
+    ctx.register_native_function("slang", "print",
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(*s);
+                                 });
+    ctx.register_native_function("slang", "println",
+                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(fmt::format("{}\n", *s));
+                                 });
+
+    ASSERT_NO_THROW(ctx.load_module("loops", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("loops", "main", {}));
+    EXPECT_EQ(print_buf.size(), 10);
+    for(auto& it: print_buf)
+    {
+        EXPECT_EQ(it, "Hello, World!\n");
+    }
+}
+
 }    // namespace
