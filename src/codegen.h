@@ -2185,11 +2185,12 @@ public:
     void generate_invoke(std::optional<std::unique_ptr<function_argument>> name = std::nullopt);
 
     /**
-     * Load a variable onto the stack.
+     * Load an array element onto the stack
      *
      * @param arg The variable or function to load.
+     * @param index Optional index into the array. If set, must be `0`.
      */
-    void generate_load(std::unique_ptr<argument> arg);
+    void generate_load(std::unique_ptr<argument> arg, std::optional<std::int32_t> index = std::nullopt);
 
     /**
      * Load an element from a structure onto the stack.
@@ -2209,11 +2210,12 @@ public:
     void generate_ret(std::optional<value> arg = std::nullopt);
 
     /**
-     * Store the top of the stack into a variable.
+     * Store the top of the stack into an array element.
      *
      * @param arg The variable to store into.
+     * @param index Optional index into the array. If set, must be `0`.
      */
-    void generate_store(std::unique_ptr<variable_argument> arg);
+    void generate_store(std::unique_ptr<variable_argument> arg, std::optional<std::int32_t> index = std::nullopt);
 
     /**
      * Store the top of the stack into a structure.

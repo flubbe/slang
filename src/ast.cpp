@@ -386,18 +386,15 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     {
         element_expr->generate_code(ctx, memory_context::load);
     }
-    else
-    {
-        ctx.generate_const({"i32"}, 0);
-    }
+    std::optional<std::int32_t> index = element_expr ? std::nullopt : std::make_optional(0);
 
     if(mc == memory_context::none || mc == memory_context::load)
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(*var), index);
     }
     else
     {
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*var), index);
     }
 
     return std::make_unique<cg::value>(*var);
@@ -452,35 +449,27 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         auto v = expr->generate_code(ctx);
         if(ty::is_builtin_type(type.s))
         {
-            if(!is_array())
+            if(is_array())
             {
-                ctx.generate_const({"i32"}, 0);
-                ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
-            }
-            else
-            {
-                for(std::size_t i = 0; i < *array_size; ++i)
+                for(std::size_t i = *array_size - 1; i >= 1; --i)
                 {
-                    ctx.generate_const({"i32"}, static_cast<std::int32_t>(*array_size - i - 1));
+                    ctx.generate_const({"i32"}, static_cast<int>(i));
                     ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
                 }
             }
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}), 0);
         }
         else
         {
-            if(!is_array())
+            if(is_array())
             {
-                ctx.generate_const({"i32"}, 0);
-                ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
-            }
-            else
-            {
-                for(std::size_t i = 0; i < *array_size; ++i)
+                for(std::size_t i = *array_size - 1; i >= 1; --i)
                 {
-                    ctx.generate_const({"i32"}, static_cast<std::int32_t>(*array_size - i - 1));
+                    ctx.generate_const({"i32"}, static_cast<int>(i));
                     ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
                 }
             }
+            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}), 0);
         }
     }
 

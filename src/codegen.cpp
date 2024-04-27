@@ -369,12 +369,23 @@ void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> 
     }
 }
 
-void context::generate_load(std::unique_ptr<argument> arg)
+void context::generate_load(std::unique_ptr<argument> arg, std::optional<std::int32_t> index)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
-    insertion_point->add_instruction(std::make_unique<instruction>("load", std::move(args)));
+    if(index.has_value())
+    {
+        if(*index != 0)
+        {
+            throw codegen_error(fmt::format("Cannot generate indexed load instruction with index != 0."));
+        }
+        insertion_point->add_instruction(std::make_unique<instruction>("load", std::move(args)));
+    }
+    else
+    {
+        insertion_point->add_instruction(std::make_unique<instruction>("loada", std::move(args)));
+    }
 }
 
 void context::generate_load_element(std::vector<int> indices)
@@ -403,12 +414,24 @@ void context::generate_ret(std::optional<value> arg)
     insertion_point->add_instruction(std::make_unique<instruction>("ret", std::move(args)));
 }
 
-void context::generate_store(std::unique_ptr<variable_argument> arg)
+void context::generate_store(std::unique_ptr<variable_argument> arg, std::optional<std::int32_t> index)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
-    insertion_point->add_instruction(std::make_unique<instruction>("store", std::move(args)));
+
+    if(index.has_value())
+    {
+        if(*index != 0)
+        {
+            throw codegen_error(fmt::format("Cannot generate indexed store instruction with index != 0."));
+        }
+        insertion_point->add_instruction(std::make_unique<instruction>("store", std::move(args)));
+    }
+    else
+    {
+        insertion_point->add_instruction(std::make_unique<instruction>("storea", std::move(args)));
+    }
 }
 
 void context::generate_store_element(std::vector<int> indices)

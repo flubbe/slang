@@ -21,51 +21,57 @@ using opcode_base = std::uint8_t;
 /** Instruction opcodes. */
 enum class opcode : opcode_base
 {
-    iconst, /** Load i32 constant onto stack. */
-    fconst, /** Load f32 constant onto stack. */
-    sconst, /** Load str constant onto stack. */
-    iload,  /** Load i32 variable onto stack. */
-    fload,  /** Load f32 variable onto stack. */
-    sload,  /** Load str variable onto stack. */
-    istore, /** Store i32 from stack. */
-    fstore, /** Store f32 from stack. */
-    sstore, /** Store str from stack. */
-    iadd,   /** Add two i32 from the stack. */
-    fadd,   /** Add two f32 from the stack. */
-    isub,   /** Subtract two i32 from the stack. */
-    fsub,   /** Subtract two f32 from the stack.  */
-    imul,   /** Mulitply two i32 from the stack. */
-    fmul,   /** Multiply two f32 from the stack. */
-    idiv,   /** Divide two i32 from the stack. */
-    fdiv,   /** Divide two f32 from the stack.  */
-    imod,   /** Modulus of the division of two i32. */
-    i2f,    /** Convert a i32 into an f32. */
-    f2i,    /** Convert a f32 into an i32. */
-    invoke, /** Invoke a function. */
-    ret,    /** Return void from a function. */
-    iret,   /** Return an i32 from a function. */
-    fret,   /** Return an f32 from a function. */
-    sret,   /** Return a str from a function. */
-    iand,   /** Bitwise and for two i32 from the stack. */
-    ior,    /** Bitwise or for two i32 from the stack. */
-    ixor,   /** Bitwise xor for two i32 from the stack. */
-    ishl,   /** Left shift for i32. */
-    ishr,   /** Right shift for i32. */
-    icmpl,  /** Check if the first i32 is less than the second i32. */
-    fcmpl,  /** Check if the first f32 is less than the second f32. */
-    icmple, /** Check if the first i32 is less than or equal to the second i32. */
-    fcmple, /** Check if the first f32 is less than or equal to the second f32. */
-    icmpg,  /** Check if the first i32 is greater than the second i32. */
-    fcmpg,  /** Check if the first f32 is greater than the second f32. */
-    icmpge, /** Check if the first i32 is greater than or equal to the second i32. */
-    fcmpge, /** Check if the first f32 is greater than or equal to the second f32. */
-    icmpeq, /** Check if two i32 are equal. */
-    fcmpeq, /** Check if two f32 are equal. */
-    icmpne, /** Check if two i32 are not equal */
-    fcmpne, /** Check if two i32 are not equal */
-    jnz,    /** Jump if not zero. */
-    jmp,    /** Unconditional jump. */
-    label,  /** A label. Not executable */
+    iconst,  /** Load i32 constant onto stack. */
+    fconst,  /** Load f32 constant onto stack. */
+    sconst,  /** Load str constant onto stack. */
+    iloada,  /** Load element from i32 array onto stack. */
+    floada,  /** Load element from f32 array onto stack. */
+    sloada,  /** Load element from str array onto stack. */
+    istorea, /** Store from stack into i32 array. */
+    fstorea, /** Store from stack into f32 array. */
+    sstorea, /** Store from stack into str array. */
+    iload,   /** Load element at index 0 from i32 array onto stack. */
+    fload,   /** Load element at index 0 from f32 array onto stack. */
+    sload,   /** Load element at index 0 from str array onto stack. */
+    istore,  /** Store from stack into i32 array at index 0. */
+    fstore,  /** Store from stack into f32 array at index 0. */
+    sstore,  /** Store from stack into str array at index 0. */
+    iadd,    /** Add two i32 from the stack. */
+    fadd,    /** Add two f32 from the stack. */
+    isub,    /** Subtract two i32 from the stack. */
+    fsub,    /** Subtract two f32 from the stack.  */
+    imul,    /** Mulitply two i32 from the stack. */
+    fmul,    /** Multiply two f32 from the stack. */
+    idiv,    /** Divide two i32 from the stack. */
+    fdiv,    /** Divide two f32 from the stack.  */
+    imod,    /** Modulus of the division of two i32. */
+    i2f,     /** Convert a i32 into an f32. */
+    f2i,     /** Convert a f32 into an i32. */
+    invoke,  /** Invoke a function. */
+    ret,     /** Return void from a function. */
+    iret,    /** Return an i32 from a function. */
+    fret,    /** Return an f32 from a function. */
+    sret,    /** Return a str from a function. */
+    iand,    /** Bitwise and for two i32 from the stack. */
+    ior,     /** Bitwise or for two i32 from the stack. */
+    ixor,    /** Bitwise xor for two i32 from the stack. */
+    ishl,    /** Left shift for i32. */
+    ishr,    /** Right shift for i32. */
+    icmpl,   /** Check if the first i32 is less than the second i32. */
+    fcmpl,   /** Check if the first f32 is less than the second f32. */
+    icmple,  /** Check if the first i32 is less than or equal to the second i32. */
+    fcmple,  /** Check if the first f32 is less than or equal to the second f32. */
+    icmpg,   /** Check if the first i32 is greater than the second i32. */
+    fcmpg,   /** Check if the first f32 is greater than the second f32. */
+    icmpge,  /** Check if the first i32 is greater than or equal to the second i32. */
+    fcmpge,  /** Check if the first f32 is greater than or equal to the second f32. */
+    icmpeq,  /** Check if two i32 are equal. */
+    fcmpeq,  /** Check if two f32 are equal. */
+    icmpne,  /** Check if two i32 are not equal */
+    fcmpne,  /** Check if two i32 are not equal */
+    jnz,     /** Jump if not zero. */
+    jmp,     /** Unconditional jump. */
+    label,   /** A label. Not executable */
 
     opcode_count /** Opcode count. Not an opcode. */
 };

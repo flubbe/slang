@@ -305,6 +305,12 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         }
     }
     /* opcodes that need to resolve a variable. */
+    case opcode::iloada:
+    case opcode::floada:
+    case opcode::sloada:
+    case opcode::istorea:
+    case opcode::fstorea:
+    case opcode::sstorea:
     case opcode::iload:
     case opcode::fload:
     case opcode::sload:
@@ -324,10 +330,15 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
 
         // return correct size.
-        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
+        bool is_store = (static_cast<opcode>(instr) == opcode::istorea)
+                        || (static_cast<opcode>(instr) == opcode::fstorea)
+                        || (static_cast<opcode>(instr) == opcode::sstorea)
+                        || (static_cast<opcode>(instr) == opcode::istore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
                         || (static_cast<opcode>(instr) == opcode::sstore);
-        bool is_string = (static_cast<opcode>(instr) == opcode::sload)
+        bool is_string = (static_cast<opcode>(instr) == opcode::sloada)
+                         || (static_cast<opcode>(instr) == opcode::sstorea)
+                         || (static_cast<opcode>(instr) == opcode::sload)
                          || (static_cast<opcode>(instr) == opcode::sstore);
         if(!is_string)
         {
@@ -665,8 +676,8 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_addr(&frame.string_table[i]);
             break;
         } /* opcode::sconst */
-        case opcode::iload:
-        case opcode::fload:
+        case opcode::iloada:
+        case opcode::floada:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
@@ -685,8 +696,8 @@ opcode context::exec(const language_module& mod,
 
             frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]));
             break;
-        } /* opcode::iload, opcode::fload */
-        case opcode::sload:
+        } /* opcode::iloada, opcode::floada */
+        case opcode::sloada:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
@@ -705,9 +716,9 @@ opcode context::exec(const language_module& mod,
 
             frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i + array_offset]));
             break;
-        } /* opcode::sload */
-        case opcode::istore:
-        case opcode::fstore:
+        } /* opcode::sloada */
+        case opcode::istorea:
+        case opcode::fstorea:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
@@ -725,6 +736,62 @@ opcode context::exec(const language_module& mod,
             }
 
             *reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]) = frame.stack.pop_i32();
+            break;
+        } /* opcode::istorea, opcode::fstorea */
+        case opcode::iload:
+        case opcode::fload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            {
+                throw interpreter_error("Invalid memory access.");
+            }
+
+            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i]));
+            break;
+        } /* opcode::iload, opcode::fload */
+        case opcode::sload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::string*) > frame.locals.size())
+            {
+                throw interpreter_error("Invalid memory access.");
+            }
+
+            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
+            break;
+        } /* opcode::sload */
+        case opcode::istore:
+        case opcode::fstore:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            *reinterpret_cast<std::uint32_t*>(&frame.locals[i]) = frame.stack.pop_i32();
             break;
         } /* opcode::istore, opcode::fstore */
         case opcode::invoke:

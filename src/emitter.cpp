@@ -198,6 +198,14 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed_one_arg(opcode::iconst, opcode::fconst, opcode::sconst);
     }
+    else if(name == "loada")
+    {
+        emit_typed_one_var_arg(opcode::iloada, opcode::floada, opcode::sloada);
+    }
+    else if(name == "storea")
+    {
+        emit_typed_one_var_arg(opcode::istorea, opcode::fstorea, opcode::sstorea);
+    }
     else if(name == "load")
     {
         emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload);

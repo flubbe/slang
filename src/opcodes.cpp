@@ -28,6 +28,12 @@ std::string to_string(opcode op)
     case opcode::istore: return "istore";
     case opcode::fstore: return "fstore";
     case opcode::sstore: return "sstore";
+    case opcode::iloada: return "iloada";
+    case opcode::floada: return "floada";
+    case opcode::sloada: return "sloada";
+    case opcode::istorea: return "istorea";
+    case opcode::fstorea: return "fstorea";
+    case opcode::sstorea: return "sstorea";
     case opcode::iadd: return "iadd";
     case opcode::fadd: return "fadd";
     case opcode::isub: return "isub";
