@@ -620,6 +620,12 @@ class context
     /** File manager reference. */
     file_manager& file_mgr;
 
+    /** Maximum call stack depth. */
+    unsigned int max_call_stack_depth;
+
+    /** The current call stack level. */
+    unsigned int call_stack_level;
+
     /**
      * Decode a module.
      *
@@ -691,9 +697,11 @@ public:
      * Construct an interpreter context.
      *
      * @param file_mgr The file manager to use for module resolution.
+     * @param max_call_stack_depth The maximum allowed function call stack depth.
      */
-    context(file_manager& file_mgr)
+    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 1000)
     : file_mgr{file_mgr}
+    , max_call_stack_depth{max_call_stack_depth}
     {
     }
 

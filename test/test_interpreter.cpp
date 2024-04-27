@@ -344,4 +344,29 @@ TEST(interpreter, loop_break_continue)
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 }
 
+TEST(interpreter, infinite_recursion)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("inf_recursion.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'inf_recursion.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("inf_recursion", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), slang::interpreter::interpreter_error);
+}
+
 }    // namespace

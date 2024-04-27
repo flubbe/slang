@@ -534,6 +534,12 @@ opcode context::exec(const language_module& mod,
         throw interpreter_error("Cannot execute function using non-decoded module.");
     }
 
+    ++call_stack_level;
+    if(call_stack_level > max_call_stack_depth)
+    {
+        throw interpreter_error(fmt::format("Function call exceeded maximum call stack depth ({}).", max_call_stack_depth));
+    }
+
     const std::vector<std::byte>& binary = mod.get_binary();
 
     std::size_t offset = entry_point;
@@ -551,6 +557,7 @@ opcode context::exec(const language_module& mod,
         // return.
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::sret))
         {
+            --call_stack_level;
             return static_cast<opcode>(instr);
         }
 
