@@ -201,6 +201,10 @@ TEST(output, emitter)
           " let b: i32 = -1;\n"
           " return a-b;\n"
           "}\n"
+          "fn local3() -> str {\n"
+          " let s: str = \"Test\";\n"
+          " return s;\n"
+          "}\n"
           /* Type casts. */
           "fn cast_i2f(a: i32) -> f32 {\n"
           " return a as f32;\n"

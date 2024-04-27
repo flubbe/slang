@@ -96,6 +96,8 @@ TEST(interpreter, module_and_functions)
     EXPECT_EQ(*res.get<int>(), -1);
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {0}));
     EXPECT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local3", {}));
+    EXPECT_EQ(*res.get<std::string>(), "Test");
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {23}));
     EXPECT_EQ(*res.get<float>(), 23.0);

@@ -738,6 +738,26 @@ opcode context::exec(const language_module& mod,
             *reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]) = frame.stack.pop_i32();
             break;
         } /* opcode::istorea, opcode::fstorea */
+        case opcode::sstorea:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + array_offset + sizeof(std::string*) > frame.locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            *reinterpret_cast<std::string**>(&frame.locals[i + array_offset]) = frame.stack.pop_addr<std::string>();
+            break;
+        } /* opcode::sstorea */
         case opcode::iload:
         case opcode::fload:
         {
@@ -794,6 +814,24 @@ opcode context::exec(const language_module& mod,
             *reinterpret_cast<std::uint32_t*>(&frame.locals[i]) = frame.stack.pop_i32();
             break;
         } /* opcode::istore, opcode::fstore */
+        case opcode::sstore:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::string*) > frame.locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            *reinterpret_cast<std::string**>(&frame.locals[i]) = frame.stack.pop_addr<std::string>();
+            break;
+        } /* opcode::sstore */
         case opcode::invoke:
         {
             language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);
