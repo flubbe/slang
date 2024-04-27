@@ -91,7 +91,7 @@ inline std::string to_string(symbol_type s)
 /** A symbol. */
 struct symbol
 {
-    /** The symbol's size. */
+    /** The symbol's size. If the symbol is an array, this is the size of a single element. */
     std::size_t size;
 
     /** The offset. */
@@ -117,6 +117,9 @@ struct variable : public symbol
     /** The variable's type. */
     std::string type;
 
+    /** The variable's array size. */
+    vle_int array_size;
+
     /** Default constructors. */
     variable() = default;
     variable(const variable&) = default;
@@ -130,9 +133,11 @@ struct variable : public symbol
      * Construct a variable.
      *
      * @param type The variable's type.
+     * @param array_size The variable's array size.
      */
-    variable(std::string type)
+    variable(std::string type, std::int64_t array_size)
     : type{std::move(type)}
+    , array_size{array_size}
     {
     }
 };
@@ -146,6 +151,7 @@ struct variable : public symbol
 inline archive& operator&(archive& ar, variable& v)
 {
     ar & v.type;
+    ar & v.array_size;
     return ar;
 }
 

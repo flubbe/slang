@@ -594,4 +594,51 @@ TEST(output, infinite_recursion)
     }
 }
 
+TEST(output, arrays)
+{
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let b: [i32; 2] = [1, 2];\n"
+          " return b[1];\n"
+          "}\n"
+          "fn g() -> i32\n"
+          "{\n"
+          " let b: [i32; 3] = [-1, 0, f()];\n"
+          " b[1] = 3;\n"
+          " return b[1];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("arrays.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+}
+
 }    // namespace

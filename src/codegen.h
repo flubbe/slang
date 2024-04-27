@@ -63,6 +63,9 @@ public:
  */
 class value
 {
+    /** Array size, or an index into the array. */
+    std::optional<std::size_t> array_size_or_index;
+
     /** The value's type. Can be one of: i32, f32, str, addr, ptr, aggregate. */
     std::string type;
 
@@ -125,9 +128,14 @@ public:
      * @param type The value type.
      * @param aggregate_type Type name for aggregate types.
      * @param name Optional name for this value.
+     * @param array_size_or_index Optional array size or an index into the array. Set to `std::nullopt` for non-array types.
      */
-    value(std::string type, std::optional<std::string> aggregate_type = std::nullopt, std::optional<std::string> name = std::nullopt)
-    : type{std::move(type)}
+    value(std::string type,
+          std::optional<std::string> aggregate_type = std::nullopt,
+          std::optional<std::string> name = std::nullopt,
+          std::optional<std::size_t> array_size_or_index = std::nullopt)
+    : array_size_or_index{std::move(array_size_or_index)}
+    , type{std::move(type)}
     , aggregate_type{std::move(aggregate_type)}
     , name{std::move(name)}
     {
@@ -139,7 +147,7 @@ public:
      */
     value copy_type() const
     {
-        return {type, aggregate_type, std::nullopt};
+        return {type, aggregate_type, std::nullopt, array_size_or_index};
     }
 
     /**
@@ -149,10 +157,20 @@ public:
     {
         if(has_name())
         {
-            return fmt::format("{} %{}", is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
+            if(!is_array())
+            {
+                return fmt::format("{} %{}", is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
+            }
+
+            return fmt::format("[{}; {}] %{}", *array_size_or_index, is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
         }
 
-        return fmt::format("{}", is_aggregate() ? get_aggregate_type() : get_type());
+        if(!is_array())
+        {
+            return fmt::format("{}", is_aggregate() ? get_aggregate_type() : get_type());
+        }
+
+        return fmt::format("[{}; {}]", *array_size_or_index, is_aggregate() ? get_aggregate_type() : get_type());
     }
 
     /** Get the value's type. */
@@ -215,6 +233,44 @@ public:
     bool has_name() const
     {
         return name != std::nullopt;
+    }
+
+    /** Returns whether the value is an array. */
+    bool is_array() const
+    {
+        return array_size_or_index.has_value();
+    }
+
+    /**
+     * If used in a declaration context, returns the array size for array values.
+     *
+     * @throws Throws a `codegen_error` if used on non-array types.
+     * @returns The array size or array index.
+     */
+    std::size_t get_array_size() const
+    {
+        if(!array_size_or_index.has_value())
+        {
+            throw codegen_error("Requested array size for non-array type.");
+        }
+
+        return *array_size_or_index;
+    }
+
+    /**
+     * If used in an accessing context, returns the accessed array index.
+     *
+     * @throws Throws a `codegen_error` if used on non-array types.
+     * @returns The array size or array index.
+     */
+    std::size_t get_array_index() const
+    {
+        if(!array_size_or_index.has_value())
+        {
+            throw codegen_error("Requested array size for non-array type.");
+        }
+
+        return *array_size_or_index;
     }
 };
 

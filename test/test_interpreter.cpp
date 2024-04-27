@@ -369,4 +369,33 @@ TEST(interpreter, infinite_recursion)
     ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), slang::interpreter::interpreter_error);
 }
 
+TEST(interpreter, arrays)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("arrays.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'arrays.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("arrays", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("arrays", "f", {}));
+    EXPECT_EQ(*res.get<int>(), 2);
+
+    ASSERT_NO_THROW(res = ctx.invoke("arrays", "g", {}));
+    EXPECT_EQ(*res.get<int>(), 3);
+}
+
 }    // namespace

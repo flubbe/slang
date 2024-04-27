@@ -142,9 +142,10 @@ void context::decode_locals(function_descriptor& desc) const
 
         v.offset = details.locals_size;
         v.size = get_type_size(v.type);
-        details.locals_size += v.size;
 
-        details.args_size += v.size;
+        auto total_size = v.size * v.array_size.i;
+        details.locals_size += total_size;
+        details.args_size += total_size;
     }
 
     // locals.
@@ -154,7 +155,7 @@ void context::decode_locals(function_descriptor& desc) const
 
         v.offset = details.locals_size;
         v.size = get_type_size(v.type);
-        details.locals_size += v.size;
+        details.locals_size += v.size * v.array_size.i;
     }
 
     // return type
@@ -316,7 +317,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
 
         if(i.i < 0 || i.i >= details.locals.size())
         {
-            throw interpreter_error(fmt::format("index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
+            throw interpreter_error(fmt::format("Index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
         }
 
         std::int64_t offset = details.locals[i.i].offset;
@@ -670,17 +671,19 @@ opcode context::exec(const language_module& mod,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
 
+            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
+
             if(i < 0)
             {
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
-            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            if(i + array_offset + sizeof(std::uint32_t) > frame.locals.size())
             {
-                throw interpreter_error("Stack overflow.");
+                throw interpreter_error("Invalid memory access.");
             }
 
-            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i]));
+            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]));
             break;
         } /* opcode::iload, opcode::fload */
         case opcode::sload:
@@ -688,17 +691,19 @@ opcode context::exec(const language_module& mod,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
 
+            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::string*);
+
             if(i < 0)
             {
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
-            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            if(i + array_offset + sizeof(std::string*) > frame.locals.size())
             {
-                throw interpreter_error("Stack overflow.");
+                throw interpreter_error("Invalid memory access.");
             }
 
-            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
+            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i + array_offset]));
             break;
         } /* opcode::sload */
         case opcode::istore:
@@ -707,17 +712,19 @@ opcode context::exec(const language_module& mod,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
 
+            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
+
             if(i < 0)
             {
                 throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
             }
 
-            if(i + sizeof(std::uint32_t) > frame.locals.size())
+            if(i + array_offset + sizeof(std::uint32_t) > frame.locals.size())
             {
                 throw interpreter_error("Stack overflow.");
             }
 
-            *reinterpret_cast<std::uint32_t*>(&frame.locals[i]) = frame.stack.pop_i32();
+            *reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]) = frame.stack.pop_i32();
             break;
         } /* opcode::istore, opcode::fstore */
         case opcode::invoke:

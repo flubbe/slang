@@ -296,26 +296,92 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     }
 
     get_next_token();
-    if(current_token->type != token_type::identifier)
+    if(current_token->type != token_type::identifier && current_token->s != "[")
     {
-        throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+        throw syntax_error(*current_token, fmt::format("Expected '<identifier>' or '[<identifier>; <length>]', got '{}'.", current_token->s));
     }
 
     token type = *current_token;
+    std::optional<std::size_t> array_size = std::nullopt;
+
+    // re-parse type info if we've encountered an array.
+    if(current_token->s == "[")
+    {
+        // parse array definition.
+        get_next_token();
+        if(current_token->type != token_type::identifier)
+        {
+            throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+        }
+        type = *current_token;
+
+        get_next_token();
+        if(current_token->s != ";")
+        {
+            throw syntax_error(*current_token, fmt::format("Expected ';', got '{}'.", current_token->s));
+        }
+
+        get_next_token();
+        if(current_token->type != token_type::int_literal || std::get<int>(*current_token->value) <= 0)
+        {
+            throw syntax_error(*current_token, fmt::format("Expected positive '<int-literal>', got '{}'.", current_token->s));
+        }
+        array_size = std::get<int>(*current_token->value);
+
+        get_next_token();
+        if(current_token->s != "]")
+        {
+            throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+        }
+    }
+
     validate_type_name(type);
 
     get_next_token();
     if(current_token->s == ";")
     {
-        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), nullptr);
+        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), std::move(array_size), nullptr);
     }
     else if(current_token->s == "=")
     {
         get_next_token();    // skip '='.
-        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), parse_expression());
+        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), std::move(array_size), parse_expression());
     }
 
     throw syntax_error(*current_token, fmt::format("Expected '=', got '{}'.", current_token->s));
+}
+
+// array_initializer_expr ::= '[' exprs ']'
+// exprs ::= expression ',' exprs
+//         | expression
+std::unique_ptr<ast::array_initializer_expression> parser::parse_array_initializer_expression()
+{
+    token_location loc = current_token->location;
+    get_next_token();    // skip '['.
+
+    std::vector<std::unique_ptr<ast::expression>> exprs;
+    while(true)
+    {
+        exprs.emplace_back(parse_expression());
+
+        if(current_token->s == "]")
+        {
+            // skip ']';
+            get_next_token();
+
+            break;
+        }
+        else if(current_token->s == ",")
+        {
+            get_next_token();    // skip ';'.
+        }
+        else
+        {
+            throw syntax_error(*current_token, fmt::format("Expected ',' or ']', got '{}'.", current_token->s));
+        }
+    }
+
+    return std::make_unique<ast::array_initializer_expression>(std::move(loc), std::move(exprs));
 }
 
 // struct_expr ::= 'struct' identifier '{' variable_declaration* '}'
@@ -355,16 +421,49 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
             }
             get_next_token();    // skip ':'.
 
-            if(current_token->type != token_type::identifier)
+            if(current_token->type != token_type::identifier && current_token->s != "[")
             {
-                throw syntax_error(*current_token, fmt::format("Expected <identifier>, got '{}'.", current_token->s));
+                throw syntax_error(*current_token, fmt::format("Expected '<identifier>' or '[<identifier>; <length>]', got '{}'.", current_token->s));
             }
+
             token member_type = *current_token;
+            std::optional<std::size_t> array_size = std::nullopt;
+
+            if(current_token->s == "[")
+            {
+                // parse array definition.
+                get_next_token();
+                if(current_token->type != token_type::identifier)
+                {
+                    throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+                }
+                member_type = *current_token;
+
+                get_next_token();
+                if(current_token->s != ";")
+                {
+                    throw syntax_error(*current_token, fmt::format("Expected ';', got '{}'.", current_token->s));
+                }
+
+                get_next_token();
+                if(current_token->type != token_type::int_literal || std::get<int>(*current_token->value) <= 0)
+                {
+                    throw syntax_error(*current_token, fmt::format("Expected positive '<int-literal>', got '{}'.", current_token->s));
+                }
+                array_size = std::get<int>(*current_token->value);
+
+                get_next_token();
+                if(current_token->s != "]")
+                {
+                    throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+                }
+            }
+
             validate_type_name(member_type);
 
             get_next_token();
 
-            members.emplace_back(std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(member_name), std::move(member_type), nullptr));
+            members.emplace_back(std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(member_name), std::move(member_type), std::move(array_size), nullptr));
         }
 
         if(current_token->s == "}")
@@ -543,6 +642,10 @@ std::unique_ptr<ast::expression> parser::parse_primary()
     {
         expr = parse_paren_expression();
     }
+    else if(current_token->s == "[")
+    {
+        expr = parse_array_initializer_expression();
+    }
     else
     {
         throw syntax_error(*current_token, fmt::format("Expected <primary-expression>, got '{}'.", current_token->s));
@@ -695,6 +798,7 @@ std::unique_ptr<ast::expression> parser::parse_unary()
 //                  | identifier '.' identifierexpr
 //                  | identifier '{' primary* '}'
 //                  | identifier '{' (identifier: primary_expr)* '}'
+//                  | identifier '[' primary ']'
 std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 {
     token identifier = *current_token;
@@ -808,6 +912,19 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
         {
             return std::make_unique<ast::struct_anonymous_initializer_expression>(std::move(identifier), std::move(initializers));
         }
+    }
+    else if(current_token->s == "[")    // array access.
+    {
+        get_next_token();    // skip '['
+        auto index_expression = parse_expression();
+        if(current_token->s != "]")
+        {
+            throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+        }
+
+        get_next_token();    // skip ']'
+
+        return std::make_unique<ast::variable_reference_expression>(std::move(identifier), std::move(index_expression));
     }
 
     // variable reference

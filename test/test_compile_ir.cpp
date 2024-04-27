@@ -284,7 +284,9 @@ TEST(compile_ir, function_arguments_and_locals)
                   "local i32 %a\n"
                   "entry:\n"
                   " const i32 1\n"
+                  " const i32 0\n"
                   " store i32 %a\n"
+                  " const i32 0\n"
                   " load i32 %a\n"
                   " ret i32\n"
                   "}");
@@ -315,8 +317,11 @@ TEST(compile_ir, function_arguments_and_locals)
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "local i32 %a\n"
                   "entry:\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
+                  " const i32 0\n"
                   " store i32 %a\n"
+                  " const i32 0\n"
                   " load i32 %a\n"
                   " ret i32\n"
                   "}");
@@ -347,7 +352,9 @@ TEST(compile_ir, function_arguments_and_locals)
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "entry:\n"
                   " const i32 3\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
                   " ret i32\n"
                   "}");
@@ -378,11 +385,53 @@ TEST(compile_ir, function_arguments_and_locals)
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "entry:\n"
                   " const i32 3\n"
+                  " const i32 0\n"
                   " store i32 %j\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
                   " ret i32\n"
+                  "}");
+    }
+}
+
+TEST(compile_ir, arrays)
+{
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " let b: [i32; 2] = [1, 2];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "local [2; i32] %b\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " const i32 2\n"
+                  " const i32 1\n"
+                  " store i32 %b\n"
+                  " const i32 0\n"
+                  " store i32 %b\n"
+                  " ret void\n"
                   "}");
     }
 }
@@ -416,8 +465,11 @@ TEST(compile_ir, unary_operators)
                   " const i32 0\n"
                   " const i32 1\n"
                   " sub i32\n"
+                  " const i32 0\n"
                   " store i32 %b\n"
+                  " const i32 0\n"
                   " load i32 %a\n"
+                  " const i32 0\n"
                   " load i32 %b\n"
                   " add i32\n"
                   " ret i32\n"
@@ -450,8 +502,11 @@ TEST(compile_ir, unary_operators)
                   " const i32 -1\n"
                   " const i32 1\n"
                   " xor i32\n"
+                  " const i32 0\n"
                   " store i32 %b\n"
+                  " const i32 0\n"
                   " load i32 %a\n"
+                  " const i32 0\n"
                   " load i32 %b\n"
                   " add i32\n"
                   " ret i32\n"
@@ -492,7 +547,9 @@ TEST(compile_ir, binary_operators)
                   " mul i32\n"
                   " const i32 3\n"
                   " add i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -528,7 +585,9 @@ TEST(compile_ir, binary_operators)
                   " const i32 3\n"
                   " add i32\n"
                   " mul i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -564,7 +623,9 @@ TEST(compile_ir, binary_operators)
                   " const i32 3\n"
                   " sub i32\n"
                   " div i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -604,7 +665,9 @@ TEST(compile_ir, binary_operators)
                   " const i32 1\n"
                   " shr i32\n"
                   " or i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -644,7 +707,9 @@ TEST(compile_ir, binary_operators)
                   " const i32 4\n"
                   " and i32\n"
                   " or i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -684,7 +749,9 @@ TEST(compile_ir, binary_operators)
                   " cmpge i32\n"
                   " and i32\n"
                   " xor i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -721,11 +788,15 @@ TEST(compile_ir, compound_assignments)
                   "local i32 %i\n"
                   "entry:\n"
                   " const i32 0\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " const i32 1\n"
                   " add i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -760,17 +831,25 @@ TEST(compile_ir, compound_assignments)
                   "local i32 %j\n"
                   "entry:\n"
                   " const i32 0\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
                   " const i32 1\n"
+                  " const i32 0\n"
                   " store i32 %j\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
                   " const i32 1\n"
                   " add i32\n"
+                  " const i32 0\n"
                   " store i32 %j\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
                   " add i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -805,15 +884,21 @@ TEST(compile_ir, compound_assignments)
                   "local i32 %j\n"
                   "entry:\n"
                   " const i32 0\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
                   " const i32 1\n"
+                  " const i32 0\n"
                   " store i32 %j\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %j\n"
                   " const i32 2\n"
                   " add i32\n"
                   " add i32\n"
+                  " const i32 0\n"
                   " store i32 %i\n"
+                  " const i32 0\n"
                   " load i32 %i\n"
                   " ret i32\n"
                   "}");
@@ -1035,6 +1120,7 @@ TEST(compile_ir, if_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test_if_else(i32 %a) {\n"
                   "entry:\n"
+                  " const i32 0\n"
                   " load i32 %a\n"
                   " const i32 0\n"
                   " cmpg i32\n"

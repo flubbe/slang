@@ -382,6 +382,15 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
     }
 
+    if(element_expr)
+    {
+        element_expr->generate_code(ctx, memory_context::load);
+    }
+    else
+    {
+        ctx.generate_const({"i32"}, 0);
+    }
+
     if(mc == memory_context::none || mc == memory_context::load)
     {
         ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
@@ -396,6 +405,14 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
 std::optional<std::string> variable_reference_expression::type_check(ty::context& ctx) const
 {
+    if(element_expr)
+    {
+        auto v = element_expr->type_check(ctx);
+        if(!v.has_value() || *v != "i32")
+        {
+            throw ty::type_error(loc, "Expected <integer> for array element access.");
+        }
+    }
     return ctx.get_type(name);
 }
 
@@ -423,11 +440,11 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
     if(ty::is_builtin_type(type.s))
     {
-        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s));
+        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s, array_size));
     }
     else
     {
-        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s));
+        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s, array_size));
     }
 
     if(expr)
@@ -435,11 +452,35 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         auto v = expr->generate_code(ctx);
         if(ty::is_builtin_type(type.s))
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
+            if(!is_array())
+            {
+                ctx.generate_const({"i32"}, 0);
+                ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
+            }
+            else
+            {
+                for(std::size_t i = 0; i < *array_size; ++i)
+                {
+                    ctx.generate_const({"i32"}, static_cast<std::int32_t>(*array_size - i - 1));
+                    ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
+                }
+            }
         }
         else
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
+            if(!is_array())
+            {
+                ctx.generate_const({"i32"}, 0);
+                ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
+            }
+            else
+            {
+                for(std::size_t i = 0; i < *array_size; ++i)
+                {
+                    ctx.generate_const({"i32"}, static_cast<std::int32_t>(*array_size - i - 1));
+                    ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
+                }
+            }
         }
     }
 
@@ -459,7 +500,8 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
         }
 
-        if(*rhs != type.s)
+        std::string var_type = array_size.has_value() ? fmt::format("[{}; {}]", type.s, *array_size) : type.s;
+        if(*rhs != var_type)
         {
             throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, type.s));
         }
@@ -470,7 +512,84 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
 
 std::string variable_declaration_expression::to_string() const
 {
+    if(is_array())
+    {
+        return fmt::format("VariableDeclaration(name={}, type={}, array_size={}, expr={})", name.s, type.s, *array_size, expr ? expr->to_string() : std::string("<none>"));
+    }
     return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name.s, type.s, expr ? expr->to_string() : std::string("<none>"));
+}
+
+/*
+ * array_initializer_expression.
+ */
+
+std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
+{
+    std::unique_ptr<cg::value> v;
+
+    for(auto& expr: exprs)
+    {
+        auto expr_value = expr->generate_code(ctx, memory_context::load);
+        if(!v)
+        {
+            v = std::move(expr_value);
+        }
+        else
+        {
+            if(v->get_resolved_type() != expr_value->get_resolved_type())
+            {
+                throw cg::codegen_error(loc, fmt::format("Found inconsistent types during array initialization: '{}' and '{}'.", v->get_resolved_type(), expr_value->get_resolved_type()));
+            }
+        }
+    }
+
+    return v;
+}
+
+std::optional<std::string> array_initializer_expression::type_check(slang::typing::context& ctx) const
+{
+    std::optional<std::string> t;
+    for(auto& it: exprs)
+    {
+        auto expr_type = it->type_check(ctx);
+
+        if(!expr_type.has_value())
+        {
+            throw ty::type_error(loc, "Initializer expression has no type.");
+        }
+
+        if(t.has_value())
+        {
+            if(*t != *expr_type)
+            {
+                throw ty::type_error(loc, fmt::format("Initializer types do not match. Found '{}' and '{}'.", *t, *expr_type));
+            }
+        }
+        else
+        {
+            t = expr_type;
+        }
+    }
+
+    if(!t.has_value())
+    {
+        throw ty::type_error(loc, "Initializer expression has no type.");
+    }
+
+    return fmt::format("[{}; {}]", *t, exprs.size());
+}
+
+std::string array_initializer_expression::to_string() const
+{
+    std::string ret = "ArrayInitializer(exprs=(";
+
+    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", exprs[i]->to_string());
+    }
+    ret += fmt::format("{}))", exprs.back()->to_string());
+
+    return ret;
 }
 
 /*

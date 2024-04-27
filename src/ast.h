@@ -439,6 +439,9 @@ class variable_reference_expression : public expression
     /** The variable name. */
     token name;
 
+    /** An optional expression for element access. */
+    std::unique_ptr<expression> element_expr;
+
 public:
     /** No default constructor. */
     variable_reference_expression() = delete;
@@ -447,21 +450,23 @@ public:
     virtual ~variable_reference_expression() = default;
 
     /** Default copy and move constructors. */
-    variable_reference_expression(const variable_reference_expression&) = default;
+    variable_reference_expression(const variable_reference_expression&) = delete;
     variable_reference_expression(variable_reference_expression&&) = default;
 
     /** Default assignment operators. */
-    variable_reference_expression& operator=(const variable_reference_expression&) = default;
+    variable_reference_expression& operator=(const variable_reference_expression&) = delete;
     variable_reference_expression& operator=(variable_reference_expression&&) = default;
 
     /**
      * Construct a variable reference expression.
      *
      * @param name The variable's name.
+     * @param element_expr An optional expression for array element access.
      */
-    variable_reference_expression(token name)
+    variable_reference_expression(token name, std::unique_ptr<expression> element_expr = nullptr)
     : expression{name.location}
     , name{std::move(name)}
+    , element_expr{std::move(element_expr)}
     {
     }
 
@@ -478,6 +483,9 @@ class variable_declaration_expression : public expression
 
     /** The variable's type. */
     token type;
+
+    /** The associated array size. */
+    std::optional<std::size_t> array_size;
 
     /** An optional initializer expression. */
     std::unique_ptr<ast::expression> expr;
@@ -503,12 +511,14 @@ public:
      * @param loc The location.
      * @param name The variable's name.
      * @param type The variable's type.
+     * @param array_size The array length. Zero means no array.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, token name, token type, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(token_location loc, token name, token type, std::optional<std::size_t> array_size, std::unique_ptr<ast::expression> expr)
     : expression{std::move(loc)}
     , name{std::move(name)}
     , type{std::move(type)}
+    , array_size{std::move(array_size)}
     , expr{std::move(expr)}
     {
     }
@@ -528,6 +538,53 @@ public:
     {
         return type;
     }
+
+    /** Whether this variable is an array. */
+    bool is_array() const
+    {
+        return array_size.has_value();
+    }
+
+    /** Get the array length. Only valid when used on an array. */
+    std::size_t get_array_size() const
+    {
+        return *array_size;
+    }
+};
+
+/** An array initializer expression. */
+class array_initializer_expression : public expression
+{
+    /** Initializer expressions for each element. */
+    std::vector<std::unique_ptr<ast::expression>> exprs;
+
+public:
+    /** No default constructor. */
+    array_initializer_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~array_initializer_expression() = default;
+
+    /** Copy and move constructors. */
+    array_initializer_expression(const array_initializer_expression&) = delete;
+    array_initializer_expression(array_initializer_expression&&) = default;
+
+    /** Assignment operators. */
+    array_initializer_expression& operator=(const array_initializer_expression&) = delete;
+    array_initializer_expression& operator=(array_initializer_expression&&) = default;
+
+    /**
+     * Construct an array initializer expression.
+     */
+    array_initializer_expression(token_location loc, std::vector<std::unique_ptr<ast::expression>> exprs)
+    : expression{std::move(loc)}
+    , exprs{std::move(exprs)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
 };
 
 /** Struct definition. */

@@ -147,6 +147,9 @@ protected:
     /** Parse a variable declaration. */
     std::unique_ptr<ast::variable_declaration_expression> parse_variable();
 
+    /** Parse an array initializer expression. */
+    std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();
+
     /** Parse a struct definition. */
     std::unique_ptr<ast::struct_definition_expression> parse_struct();
 

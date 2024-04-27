@@ -744,7 +744,58 @@ TEST(parser, variable_declaration)
     }
     {
         const std::string test_input =
-          "let 1: i32 = 2;";
+          "fn f() -> void\n"
+          "{\n"
+          " let b: [i32; 2] = [1, 2];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        // clang-format off
+        std::string expected =
+          "Block("
+            "exprs=("
+              "Function("
+                "prototype=Prototype("
+                  "name=f, "
+                  "return_type=void, "
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("
+                    "VariableDeclaration("
+                      "name=b, "
+                      "type=i32, "
+                      "array_size=2, "
+                      "expr=ArrayInitializer("
+                        "exprs=("
+                          "IntLiteral("
+                            "value=1"
+                          "), "
+                          "IntLiteral("
+                            "value=2"
+                          ")"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+
+        EXPECT_TRUE(lexer.eof());
+    }
+    {
+        const std::string test_input =
+          "let 1: i32 = 2;";    // non-identifier as name.
 
         slang::lexer lexer;
         slang::parser parser;
@@ -754,7 +805,17 @@ TEST(parser, variable_declaration)
     }
     {
         const std::string test_input =
-          "let if: i32 = 2;";
+          "let if: i32 = 2;";    // keyword as name.
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "let i: i32 = 2";    // missing semicolon.
 
         slang::lexer lexer;
         slang::parser parser;
