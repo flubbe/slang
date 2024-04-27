@@ -1389,7 +1389,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
     ctx.generate_branch(while_loop_header_basic_block);
 
-    ctx.pop_break_continue();
+    ctx.pop_break_continue(loc);
 
     // emit merge block.
     ctx.get_current_function(true)->append_basic_block(merge_basic_block);
@@ -1431,7 +1431,7 @@ std::string while_statement::to_string() const
 
 std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto [break_block, continue_block] = ctx.top_break_continue();
+    auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
     return nullptr;
 }
@@ -1442,7 +1442,7 @@ std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, memo
 
 std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto [break_block, continue_block] = ctx.top_break_continue();
+    auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
     return nullptr;
 }

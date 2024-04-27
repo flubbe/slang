@@ -20,10 +20,11 @@
 #include "archives/archive.h"
 #include "archives/memory.h"
 
+#include "token.h"
+
 /* Forward declarations. */
 namespace slang
 {
-struct token_location;                 /* token.h */
 enum class symbol_type : std::uint8_t; /* module.h */
 class language_module;                 /* module.h */
 class instruction_emitter;             /* emitter.h */
@@ -2020,13 +2021,21 @@ public:
     /**
      * Pop a `break`-`continue` `basic_block` pair.
      *
+     * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
-    void pop_break_continue()
+    void pop_break_continue(std::optional<token_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.size() == 0)
         {
-            throw codegen_error("Encountered break or continue statement outside of loop.");
+            if(loc.has_value())
+            {
+                throw codegen_error(*loc, "Encountered break or continue statement outside of loop.");
+            }
+            else
+            {
+                throw codegen_error("Encountered break or continue statement outside of loop.");
+            }
         }
         basic_block_brk_cnt.pop_back();
     }
@@ -2034,13 +2043,21 @@ public:
     /**
      * Return the top `break`-`continue` `basic_block` pair.
      *
+     * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
-    std::pair<basic_block*, basic_block*> top_break_continue() const
+    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<token_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.size() == 0)
         {
-            throw codegen_error("Encountered break or continue statement outside of loop.");
+            if(loc.has_value())
+            {
+                throw codegen_error(*loc, "Encountered break or continue statement outside of loop.");
+            }
+            else
+            {
+                throw codegen_error("Encountered break or continue statement outside of loop.");
+            }
         }
         return basic_block_brk_cnt.back();
     }

@@ -1053,4 +1053,58 @@ TEST(compile_ir, if_statement)
     }
 }
 
+TEST(compile_ir, break_fail)
+{
+    {
+        const std::string test_input =
+          "fn test_break_fail(a: i32) -> i32\n"
+          "{\n"
+          " break;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
+    }
+}
+
+TEST(compile_ir, continue_fail)
+{
+    {
+        const std::string test_input =
+          "fn test_continue_fail(a: i32) -> i32\n"
+          "{\n"
+          " continue;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
+    }
+}
+
 }    // namespace
