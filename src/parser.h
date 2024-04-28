@@ -147,6 +147,14 @@ protected:
     /** Parse a variable declaration. */
     std::unique_ptr<ast::variable_declaration_expression> parse_variable();
 
+    /**
+     * Parse a type name.
+     *
+     * @return Returns a pair `(token, optional_array_length)`. For non-array types,
+     *         `optional_array_length` is `std::nullopt`.
+     * */
+    std::pair<token, std::optional<std::size_t>> parse_type_name();
+
     /** Parse an array initializer expression. */
     std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();
 

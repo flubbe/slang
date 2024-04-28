@@ -35,7 +35,10 @@ std::size_t language_module::add_import(symbol_type type, std::string name, std:
     return header.imports.size() - 1;
 }
 
-void language_module::add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t size, std::size_t entry_point, std::vector<variable> locals)
+void language_module::add_function(std::string name,
+                                   std::pair<std::string, std::optional<std::size_t>> return_type,
+                                   std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                                   std::size_t size, std::size_t entry_point, std::vector<variable> locals)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
@@ -51,7 +54,10 @@ void language_module::add_function(std::string name, std::string return_type, st
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
-void language_module::add_native_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::string lib_name)
+void language_module::add_native_function(std::string name,
+                                          std::pair<std::string, std::optional<std::size_t>> return_type,
+                                          std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                                          std::string lib_name)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& t) -> bool

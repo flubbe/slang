@@ -16,6 +16,20 @@
 namespace slang::typing
 {
 
+std::string to_string(const std::pair<token, std::optional<std::size_t>>& t)
+{
+    return to_string({std::get<0>(t).s, std::get<1>(t)});
+}
+
+std::string to_string(const std::pair<std::string, std::optional<std::size_t>>& t)
+{
+    if(std::get<1>(t).has_value())
+    {
+        return fmt::format("[{}; {}]", std::get<0>(t), *std::get<1>(t));
+    }
+    return std::get<0>(t);
+}
+
 /*
  * Exceptions.
  */
@@ -31,9 +45,14 @@ type_error::type_error(const token_location& loc, const std::string& message)
 
 std::string function_signature::to_string() const
 {
-    auto transform = [](const token& t)
-    { return t.s; };
-    return fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "), ret_type.s);
+    auto transform = [](const std::pair<token, std::optional<std::size_t>>& t)
+    {
+        return slang::typing::to_string(t);
+    };
+    std::string ret_type_str = std::get<1>(ret_type).has_value()
+                                 ? fmt::format("[{}; {}]", std::get<0>(ret_type).s, *std::get<1>(ret_type))
+                                 : std::get<0>(ret_type).s;
+    return fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "), ret_type_str);
 }
 
 /*
@@ -55,7 +74,7 @@ std::string scope::to_string() const
     std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
     for(auto& [name, type]: variables)
     {
-        repr += fmt::format("[v] name: {}, type: {}\n", name, type.type.s);
+        repr += fmt::format("[v] name: {}, type: {}\n", name, slang::typing::to_string(type.type));
     }
     for(auto& [name, sig]: functions)
     {
@@ -66,7 +85,7 @@ std::string scope::to_string() const
         repr += fmt::format("[s] name: {}\n    members:\n", name);
         for(auto& [n, t]: s.members)
         {
-            repr += fmt::format("    - name: {}, type: {}\n", n.s, t.s);
+            repr += fmt::format("    - name: {}, type: {}\n", n.s, slang::typing::to_string(t));
         }
     }
 
@@ -95,7 +114,7 @@ void context::add_import(std::vector<token> path)
     imports.emplace_back(std::move(path));
 }
 
-void context::add_variable(token name, token type)
+void context::add_variable(token name, std::pair<token, std::optional<std::size_t>> type)
 {
     if(current_scope == nullptr)
     {
@@ -110,18 +129,21 @@ void context::add_variable(token name, token type)
     }
 
     // check if the type is known.
-    if(type.s != "i32" && type.s != "f32" && type.s != "str")
+    if(std::get<0>(type).s != "i32" && std::get<0>(type).s != "f32" && std::get<0>(type).s != "str")
     {
-        if(!has_type(type.s))
+        if(!has_type(std::get<0>(type).s))
         {
-            throw type_error(type.location, fmt::format("Unknown type '{}'.", type.s));
+            throw type_error(std::get<0>(type).location, fmt::format("Unknown type '{}'.", std::get<0>(type).s));
         }
     }
 
     current_scope->variables[name.s] = {name, std::move(type)};
 }
 
-void context::add_function(token name, std::vector<token> arg_types, token ret_type, std::optional<std::string> import_path)
+void context::add_function(token name,
+                           std::vector<std::pair<token, std::optional<std::size_t>>> arg_types,
+                           std::pair<token, std::optional<std::size_t>> ret_type,
+                           std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
     {
@@ -158,7 +180,7 @@ void context::add_function(token name, std::vector<token> arg_types, token ret_t
     }
 }
 
-void context::add_type(token name, std::vector<std::pair<token, token>> members)
+void context::add_type(token name, std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> members)
 {
     if(current_scope == nullptr)
     {
@@ -175,11 +197,12 @@ void context::add_type(token name, std::vector<std::pair<token, token>> members)
     // check if all types are known.
     for(auto& [name, type]: members)
     {
-        if(type.s != "i32" && type.s != "f32" && type.s != "str")
+        auto& [type_token, array_length] = type;
+        if(type_token.s != "i32" && type_token.s != "f32" && type_token.s != "str")
         {
-            if(!has_type(type.s))
+            if(!has_type(type_token.s))
             {
-                throw type_error(type.location, fmt::format("Struct member has unknown type '{}'.", type.s));
+                throw type_error(type_token.location, fmt::format("Struct member has unknown base type '{}'.", type_token.s));
             }
         }
     }
@@ -205,7 +228,7 @@ bool context::has_type(const std::string& name) const
     return false;
 }
 
-std::string context::get_type(const token& name) const
+std::pair<std::string, std::optional<std::size_t>> context::get_type(const token& name) const
 {
     // check if we're accessing a struct.
     if(struct_stack.size() > 0)
@@ -214,7 +237,7 @@ std::string context::get_type(const token& name) const
         {
             if(n.s == name.s)
             {
-                return t.s;
+                return {std::get<0>(t).s, std::get<1>(t)};
             }
         }
     }

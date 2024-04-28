@@ -770,7 +770,7 @@ TEST(parser, variable_declaration)
                     "VariableDeclaration("
                       "name=b, "
                       "type=i32, "
-                      "array_size=2, "
+                      "array_length=2, "
                       "expr=ArrayInitializer("
                         "exprs=("
                           "IntLiteral("

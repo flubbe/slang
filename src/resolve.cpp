@@ -68,25 +68,40 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
 
                 std::vector<slang::codegen::value> prototype_arg_types;
                 std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
-                               [](const std::string& arg)
+                               [](const auto& arg)
                                {
-                                   if(ty::is_builtin_type(arg))
+                                   if(ty::is_builtin_type(std::get<0>(arg)))
                                    {
-                                       return slang::codegen::value{arg};
+                                       return slang::codegen::value{std::get<0>(arg), std::nullopt, std::nullopt, std::get<1>(arg)};
                                    }
 
-                                   return slang::codegen::value{"aggregate", arg};
+                                   return slang::codegen::value{"aggregate", std::get<0>(arg), std::nullopt, std::get<1>(arg)};
                                });
 
-                ctx.add_prototype(exp.name, desc.signature.return_type, prototype_arg_types, import_path);
-
-                std::vector<token> arg_types;
-                for(auto& arg: desc.signature.arg_types)
+                slang::codegen::value return_type;
+                if(ty::is_builtin_type(std::get<0>(desc.signature.return_type)))
                 {
-                    arg_types.emplace_back(arg, reference_location);
+                    return_type = {std::get<0>(desc.signature.return_type), std::nullopt, std::nullopt, std::get<1>(desc.signature.return_type)};
+                }
+                else
+                {
+                    return_type = {"aggregate", std::get<0>(desc.signature.return_type), std::nullopt, std::get<1>(desc.signature.return_type)};
                 }
 
-                type_ctx.add_function({exp.name, reference_location}, std::move(arg_types), {desc.signature.return_type, reference_location}, import_path);
+                ctx.add_prototype(exp.name, return_type, prototype_arg_types, import_path);
+
+                std::vector<std::pair<token, std::optional<std::size_t>>> arg_types;
+                for(auto& arg: desc.signature.arg_types)
+                {
+                    arg_types.emplace_back(std::make_pair(token{std::get<0>(arg), reference_location}, std::get<1>(arg)));
+                }
+
+                std::pair<token, std::optional<std::size_t>> return_type_pair = {
+                  token{return_type.get_resolved_type(), reference_location},
+                  return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt};
+
+                type_ctx.add_function({exp.name, reference_location},
+                                      std::move(arg_types), std::move(return_type_pair), import_path);
             }
             else
             {

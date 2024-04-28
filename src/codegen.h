@@ -153,25 +153,7 @@ public:
     /**
      * Get the value as a readable string.
      */
-    std::string to_string() const
-    {
-        if(has_name())
-        {
-            if(!is_array())
-            {
-                return fmt::format("{} %{}", is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
-            }
-
-            return fmt::format("[{}; {}] %{}", *array_size_or_index, is_aggregate() ? get_aggregate_type() : get_type(), *get_name());
-        }
-
-        if(!is_array())
-        {
-            return fmt::format("{}", is_aggregate() ? get_aggregate_type() : get_type());
-        }
-
-        return fmt::format("[{}; {}]", *array_size_or_index, is_aggregate() ? get_aggregate_type() : get_type());
-    }
+    std::string to_string() const;
 
     /** Get the value's type. */
     std::string get_type() const
@@ -247,7 +229,7 @@ public:
      * @throws Throws a `codegen_error` if used on non-array types.
      * @returns The array size or array index.
      */
-    std::size_t get_array_size() const
+    std::size_t get_array_length() const
     {
         if(!array_size_or_index.has_value())
         {
@@ -1374,7 +1356,7 @@ class prototype
     std::string name;
 
     /** The return type of the function. */
-    std::string return_type;
+    value return_type;
 
     /** The argument types. */
     std::vector<value> arg_types;
@@ -1400,7 +1382,7 @@ public:
      * @param arg_type The function's argument types.
      * @param import_path The import path of the module for imported functions.
      */
-    prototype(std::string name, std::string return_type, std::vector<value> arg_types, std::optional<std::string> import_path = std::nullopt)
+    prototype(std::string name, value return_type, std::vector<value> arg_types, std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
@@ -1415,7 +1397,7 @@ public:
     }
 
     /** Get the function's return type. */
-    const std::string& get_return_type() const
+    const value& get_return_type() const
     {
         return return_type;
     }
@@ -1457,7 +1439,7 @@ class function
     std::string import_library;
 
     /** The function's return type. */
-    std::string return_type;
+    value return_type;
 
     /** The function variable scope. */
     scope scope;
@@ -1479,7 +1461,7 @@ public:
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(class context& ctx, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
+    function(class context& ctx, std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
     : ctx{ctx}
     , name{name}
     , native{false}
@@ -1500,7 +1482,7 @@ public:
     function(class context& ctx,
              std::string import_library,
              std::string name,
-             std::string return_type,
+             value return_type,
              std::vector<std::unique_ptr<value>> args)
     : ctx{ctx}
     , name{name}
@@ -1558,17 +1540,23 @@ public:
         return &scope;
     }
 
-    /** Returns the function's signature as a pair (return_type, arg_types). */
-    std::pair<std::string, std::vector<std::string>> get_signature() const
+    /** Returns the function's signature as a pair `(return_type, arg_types)`. */
+    std::pair<
+      std::pair<std::string, std::optional<std::size_t>>,
+      std::vector<std::pair<std::string, std::optional<std::size_t>>>>
+      get_signature() const
     {
-        std::vector<std::string> arg_types;
+        std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types;
         auto& args = scope.get_args();
         std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                       [](const auto& arg)
+                       [](const auto& arg) -> std::pair<std::string, std::optional<std::size_t>>
                        {
-                           return arg->get_resolved_type();
+                           return {arg->get_resolved_type(),
+                                   arg->is_array() ? std::make_optional(arg->get_array_length()) : std::nullopt};
                        });
-        return std::make_pair<std::string, std::vector<std::string>>(std::string{return_type}, std::move(arg_types));
+        return {{return_type.get_resolved_type(),
+                 return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt},
+                std::move(arg_types)};
     }
 
     /** Return whether this is a native function. */
@@ -1610,11 +1598,12 @@ public:
         std::string buf;
         if(native)
         {
-            buf = fmt::format("native ({}) {} @{}(", import_library, return_type, name);
+
+            buf = fmt::format("native ({}) {} @{}(", import_library, return_type.to_string(), name);
         }
         else
         {
-            buf = fmt::format("define {} @{}(", return_type, name);
+            buf = fmt::format("define {} @{}(", return_type.to_string(), name);
         }
 
         const auto& args = scope.get_args();
@@ -1907,7 +1896,7 @@ public:
      * @param import_path The import path for the prototype.
      * @returns A representation of the prototype.
      */
-    prototype* add_prototype(std::string name, std::string return_type, std::vector<value> args, std::optional<std::string> import_path = std::nullopt);
+    prototype* add_prototype(std::string name, value return_type, std::vector<value> args, std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a function's prototype.
@@ -1929,7 +1918,7 @@ public:
      * @param args The function's arguments.
      * @returns A representation of the function.
      */
-    function* create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args);
+    function* create_function(std::string name, value return_type, std::vector<std::unique_ptr<value>> args);
 
     /**
      * Add a function with a native implementation in a library.

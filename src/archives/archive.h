@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <optional>
 
 namespace slang
 {
@@ -416,6 +417,57 @@ archive& operator&(archive& ar, std::vector<T>& v)
     {
         ar& v[i];
     }
+    return ar;
+}
+
+/**
+ * Serialize `std::optional`.
+ *
+ * @param ar The archive to use.
+ * @param o The optional to be serialized.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, std::optional<T>& o)
+{
+    bool has_value = o.has_value();
+    ar & has_value;
+
+    if(!has_value)
+    {
+        if(ar.is_reading())
+        {
+            o = std::nullopt;
+        }
+        return ar;
+    }
+
+    if(ar.is_reading())
+    {
+        T v;
+        ar & v;
+        o = std::move(v);
+    }
+    else
+    {
+        ar&(*o);
+    }
+
+    return ar;
+}
+
+/**
+ * Serialize `std::pair`.
+ *
+ * @param ar The archive to use.
+ * @param o The pair to be serialized.
+ * @returns The input archive.
+ */
+template<typename S, typename T>
+archive& operator&(archive& ar, std::pair<S, T>& p)
+{
+    ar& std::get<0>(p);
+    ar& std::get<1>(p);
     return ar;
 }
 

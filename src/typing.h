@@ -29,6 +29,20 @@ inline bool is_builtin_type(const std::string& s)
     return s == "void" || s == "i32" || s == "f32" || s == "str";
 }
 
+/**
+ * Convert a type to a string.
+ *
+ * @param t The type, given as a pair of `(base_type, optional_array_length)`.
+ */
+std::string to_string(const std::pair<std::string, std::optional<std::size_t>>& t);
+
+/**
+ * Convert a type to a string.
+ *
+ * @param t The type, given as a pair of `(base_type, optional_array_length)`.
+ */
+std::string to_string(const std::pair<token, std::optional<std::size_t>>& t);
+
 /** Type errors. */
 class type_error : public std::runtime_error
 {
@@ -60,8 +74,8 @@ struct variable_type
     /** The variable's name. */
     token name;
 
-    /** The variable's type. */
-    token type;
+    /** The variable's type, given as `(base_type, optional_array_length)`. */
+    std::pair<token, std::optional<std::size_t>> type;
 
     /** Default constructors. */
     variable_type() = default;
@@ -76,9 +90,9 @@ struct variable_type
      * Construct a new variable type.
      *
      * @param name The variable's name.
-     * @param type The variable's type.
+     * @param type The variable's type, given as `(base_type, optional_array_length)`.
      */
-    variable_type(token name, token type)
+    variable_type(token name, std::pair<token, std::optional<std::size_t>> type)
     : name{std::move(name)}
     , type{std::move(type)}
     {
@@ -92,10 +106,10 @@ struct function_signature
     token name;
 
     /** Argument types. */
-    std::vector<token> arg_types;
+    std::vector<std::pair<token, std::optional<std::size_t>>> arg_types;
 
     /** Return type. */
-    token ret_type;
+    std::pair<token, std::optional<std::size_t>> ret_type;
 
     /** Default constructors. */
     function_signature() = default;
@@ -113,7 +127,9 @@ struct function_signature
      * @param arg_types The function's argument types.
      * @param ret_type The function's return type.
      */
-    function_signature(token name, std::vector<token> arg_types, token ret_type)
+    function_signature(token name,
+                       std::vector<std::pair<token, std::optional<std::size_t>>> arg_types,
+                       std::pair<token, std::optional<std::size_t>> ret_type)
     : name{std::move(name)}
     , arg_types{std::move(arg_types)}
     , ret_type{std::move(ret_type)}
@@ -130,8 +146,8 @@ struct struct_definition
     /** The struct's name. */
     token name;
 
-    /** The struct's members as (name, type) pairs. */
-    std::vector<std::pair<token, token>> members;
+    /** The struct's members as `(name, type)` pairs. */
+    std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> members;
 
     /** Default constructors. */
     struct_definition() = default;
@@ -148,7 +164,7 @@ struct struct_definition
      * @param name The struct's name.
      * @param members The struct's members.
      */
-    struct_definition(token name, std::vector<std::pair<token, token>> members)
+    struct_definition(token name, std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> members)
     : name{std::move(name)}
     , members{std::move(members)}
     {
@@ -255,20 +271,20 @@ struct scope
      * Get the type of a name in this scope.
      *
      * @param name The name to find.
-     * @returns If the name is found, returns its type, and std::nullopt otherwise.
+     * @returns If the name is found, returns its type as `(base_type, optional_array_length)`, and std::nullopt otherwise.
      */
-    std::optional<std::string> get_type(const std::string& name) const
+    std::optional<std::pair<std::string, std::optional<std::size_t>>> get_type(const std::string& name) const
     {
         auto var_it = variables.find(name);
         if(var_it != variables.end())
         {
-            return {var_it->second.type.s};
+            return {{std::get<0>(var_it->second.type).s, std::get<1>(var_it->second.type)}};
         }
 
         auto func_it = functions.find(name);
         if(func_it != functions.end())
         {
-            return {func_it->second.to_string()};
+            return {{func_it->second.to_string(), std::nullopt}};
         }
 
         return std::nullopt;
@@ -335,9 +351,9 @@ public:
      * @throws A type_error if the given type is unknown.
      *
      * @param name The variable's name.
-     * @param type String representation of the type.
+     * @param type The variable's type, given as `(base_type, optional_array_size)`.
      */
-    void add_variable(token name, token type);
+    void add_variable(token name, std::pair<token, std::optional<std::size_t>> type);
 
     /**
      * Add a function to the context.
@@ -350,7 +366,10 @@ public:
      * @param ret_type The function's return type.
      * @param import_path The import path for the function.
      */
-    void add_function(token name, std::vector<token> arg_types, token ret_type, std::optional<std::string> import_path = std::nullopt);
+    void add_function(token name,
+                      std::vector<std::pair<token, std::optional<std::size_t>>> arg_types,
+                      std::pair<token, std::optional<std::size_t>> ret_type,
+                      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Add a type to the context.
@@ -361,7 +380,7 @@ public:
      * @param name The name of the type.
      * @param members The members, given as pairs (name, type).
      */
-    void add_type(token name, std::vector<std::pair<token, token>> members);
+    void add_type(token name, std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> members);
 
     /**
      * Check if the context has a specific type.
@@ -377,9 +396,9 @@ public:
      * @throws A type_error if the name is unknown.
      *
      * @param name The name.
-     * @returns The string representation of the type.
+     * @returns A pair `(type_name, array_size)`.
      */
-    std::string get_type(const token& name) const;
+    std::pair<std::string, std::optional<std::size_t>> get_type(const token& name) const;
 
     /**
      * Get the signature of a function.

@@ -16,6 +16,16 @@
 #include "opcodes.h"
 #include "utils.h"
 
+/*
+ * Forward declarations.
+ */
+namespace slang::typing
+{
+std::string to_string(const std::pair<std::string, std::optional<std::size_t>>&); /* typing.h */
+};
+
+namespace ty = slang::typing;
+
 namespace slang::codegen
 {
 
@@ -80,6 +90,19 @@ std::string to_string(type_cast tc)
 }
 
 /*
+ * Value.
+ */
+
+std::string value::to_string() const
+{
+    if(has_name())
+    {
+        return fmt::format("{} %{}", ty::to_string({get_resolved_type(), array_size_or_index}), *get_name());
+    }
+    return fmt::format("{}", ty::to_string({get_resolved_type(), array_size_or_index}));
+}
+
+/*
  * Context.
  */
 
@@ -137,7 +160,9 @@ std::size_t context::get_string(std::string str)
     return strings.size() - 1;
 }
 
-prototype* context::add_prototype(std::string name, std::string return_type, std::vector<value> args, std::optional<std::string> import_path)
+prototype* context::add_prototype(std::string name,
+                                  value return_type,
+                                  std::vector<value> args, std::optional<std::string> import_path)
 {
     if(std::find_if(prototypes.begin(), prototypes.end(),
                     [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
@@ -157,7 +182,9 @@ prototype* context::add_prototype(std::string name, std::string return_type, std
         throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
     }
 
-    return prototypes.emplace_back(std::make_unique<prototype>(std::move(name), std::move(return_type), std::move(args), std::move(import_path))).get();
+    return prototypes.emplace_back(std::make_unique<prototype>(
+                                     std::move(name), std::move(return_type), std::move(args), std::move(import_path)))
+      .get();
 }
 
 const prototype& context::get_prototype(const std::string& name) const
@@ -192,7 +219,7 @@ const prototype& context::get_prototype(const std::string& name) const
     }
 }
 
-function* context::create_function(std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
+function* context::create_function(std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
 {
     if(std::find_if(funcs.begin(), funcs.end(),
                     [&name](const std::unique_ptr<function>& fn) -> bool

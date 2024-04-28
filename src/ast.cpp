@@ -290,7 +290,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
 std::optional<std::string> access_expression::type_check(ty::context& ctx) const
 {
     auto type = ctx.get_type(name);
-    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, type);
+    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, std::get<0>(type));
     ctx.push_struct_definition(struct_def);
     auto expr_type = expr->type_check(ctx);
     ctx.pop_struct_definition();
@@ -409,8 +409,16 @@ std::optional<std::string> variable_reference_expression::type_check(ty::context
         {
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
+
+        auto t = ctx.get_type(name);
+        if(!std::get<1>(t).has_value())
+        {
+            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+        }
+
+        return std::get<0>(ctx.get_type(name));
     }
-    return ctx.get_type(name);
+    return ty::to_string(ctx.get_type(name));
 }
 
 std::string variable_reference_expression::to_string() const
@@ -437,11 +445,11 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
     if(ty::is_builtin_type(type.s))
     {
-        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s, array_size));
+        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s, array_length));
     }
     else
     {
-        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s, array_size));
+        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s, array_length));
     }
 
     if(expr)
@@ -451,7 +459,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         {
             if(is_array())
             {
-                for(std::size_t i = *array_size - 1; i >= 1; --i)
+                for(std::size_t i = *array_length - 1; i >= 1; --i)
                 {
                     ctx.generate_const({"i32"}, static_cast<int>(i));
                     ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
@@ -463,7 +471,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         {
             if(is_array())
             {
-                for(std::size_t i = *array_size - 1; i >= 1; --i)
+                for(std::size_t i = *array_length - 1; i >= 1; --i)
                 {
                     ctx.generate_const({"i32"}, static_cast<int>(i));
                     ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
@@ -478,7 +486,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable(name, type);
+    ctx.add_variable(name, {type, array_length});
 
     if(expr)
     {
@@ -489,7 +497,7 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
         }
 
-        std::string var_type = array_size.has_value() ? fmt::format("[{}; {}]", type.s, *array_size) : type.s;
+        std::string var_type = typing::to_string({type.s, array_length});
         if(*rhs != var_type)
         {
             throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, type.s));
@@ -503,7 +511,7 @@ std::string variable_declaration_expression::to_string() const
 {
     if(is_array())
     {
-        return fmt::format("VariableDeclaration(name={}, type={}, array_size={}, expr={})", name.s, type.s, *array_size, expr ? expr->to_string() : std::string("<none>"));
+        return fmt::format("VariableDeclaration(name={}, type={}, array_length={}, expr={})", name.s, type.s, *array_length, expr ? expr->to_string() : std::string("<none>"));
     }
     return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name.s, type.s, expr ? expr->to_string() : std::string("<none>"));
 }
@@ -565,7 +573,7 @@ std::optional<std::string> array_initializer_expression::type_check(slang::typin
         throw ty::type_error(loc, "Initializer expression has no type.");
     }
 
-    return fmt::format("[{}; {}]", *t, exprs.size());
+    return typing::to_string({*t, exprs.size()});
 }
 
 std::string array_initializer_expression::to_string() const
@@ -593,10 +601,12 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 void struct_definition_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
-    std::vector<std::pair<token, token>> struct_members;
+    std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> struct_members;
     for(auto& m: members)
     {
-        struct_members.emplace_back(m->get_name(), m->get_type());
+        struct_members.emplace_back(std::make_pair(m->get_name(),
+                                                   std::make_pair(m->get_type(),
+                                                                  m->is_array() ? std::make_optional(m->get_array_length()) : std::nullopt)));
     }
     type_ctx.add_type(name, std::move(struct_members));
 }
@@ -977,17 +987,21 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
     std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
-        if(ty::is_builtin_type(a.second.s))
+        if(ty::is_builtin_type(std::get<1>(a).s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(a.second.s, std::nullopt, a.first.s));
+            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a)));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", a.second.s, a.first.s));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a)));
         }
     }
 
-    return ctx.create_function(name.s, return_type.s, std::move(function_args));
+    cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
+                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type)}
+                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type)};
+
+    return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
 }
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
@@ -995,17 +1009,17 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
-        if(ty::is_builtin_type(a.second.s))
+        if(ty::is_builtin_type(std::get<1>(a).s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(a.second.s, std::nullopt, a.first.s));
+            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a)));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", a.second.s, a.first.s));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a)));
         }
     }
 
-    ctx.create_native_function(lib_name, name.s, return_type.s, std::move(function_args));
+    ctx.create_native_function(lib_name, name.s, std::get<0>(return_type).s, std::move(function_args));
 }
 
 void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -1014,19 +1028,24 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
     std::transform(args.cbegin(), args.cend(), std::back_inserter(prototype_arg_types),
                    [](const auto& arg)
                    {
-                       if(ty::is_builtin_type(arg.second.s))
+                       if(ty::is_builtin_type(std::get<1>(arg).s))
                        {
-                           return cg::value{arg.second.s};
+                           return cg::value{std::get<1>(arg).s, std::nullopt, std::nullopt, std::get<2>(arg)};
                        }
 
-                       return cg::value{"aggregate", arg.second.s};
+                       return cg::value{"aggregate", std::get<1>(arg).s, std::nullopt, std::get<2>(arg)};
                    });
-    ctx.add_prototype(name.s, return_type.s, prototype_arg_types);
 
-    std::vector<token> arg_types;
+    cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
+                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type)}
+                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type)};
+
+    ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
+
+    std::vector<std::pair<token, std::optional<std::size_t>>> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [](const auto& arg)
-                   { return arg.second; });
+                   { return std::make_pair(std::get<1>(arg), std::get<2>(arg)); });
     type_ctx.add_function(name, std::move(arg_types), return_type);
 }
 
@@ -1038,13 +1057,13 @@ void prototype_ast::type_check(ty::context& ctx) const
     // add the arguments to the current scope.
     for(auto arg: args)
     {
-        ctx.add_variable(arg.first, arg.second);
+        ctx.add_variable(std::get<0>(arg), {std::get<1>(arg), std::get<2>(arg)});
     }
 
     // check the return type.
-    if(!ty::is_builtin_type(return_type.s) && !ctx.has_type(return_type.s))
+    if(!ty::is_builtin_type(std::get<0>(return_type).s) && !ctx.has_type(std::get<0>(return_type).s))
     {
-        throw ty::type_error(return_type.location, fmt::format("Unknown return type '{}'.", return_type.s));
+        throw ty::type_error(std::get<0>(return_type).location, fmt::format("Unknown return type '{}'.", std::get<0>(return_type).s));
     }
 }
 
@@ -1056,14 +1075,17 @@ void prototype_ast::finish_type_check(ty::context& ctx) const
 
 std::string prototype_ast::to_string() const
 {
-    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, return_type.s);
+    std::string ret_type_str = ty::to_string(return_type);
+    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, ret_type_str);
     if(args.size() > 0)
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            ret += fmt::format("(name={}, type={}), ", args[i].first.s, args[i].second.s);
+            std::string arg_type_str = ty::to_string({std::get<1>(args[i]), std::get<2>(args[i])});
+            ret += fmt::format("(name={}, type={}), ", std::get<0>(args[i]).s, arg_type_str);
         }
-        ret += fmt::format("(name={}, type={})", args.back().first.s, args.back().second.s);
+        std::string arg_type_str = ty::to_string({std::get<1>(args.back()), std::get<2>(args.back())});
+        ret += fmt::format("(name={}, type={})", std::get<0>(args.back()).s, arg_type_str);
     }
     ret += "))";
     return ret;
@@ -1237,13 +1259,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     }
     ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s));
 
-    // get the return type of the callee
-    const cg::prototype& proto = ctx.get_prototype(callee.s);
-    if(ty::is_builtin_type(proto.get_return_type()))
-    {
-        return std::make_unique<cg::value>(proto.get_return_type());
-    }
-    return std::make_unique<cg::value>("aggregate", proto.get_return_type());
+    return std::make_unique<cg::value>(ctx.get_prototype(callee.s).get_return_type());
 }
 
 std::optional<std::string> call_expression::type_check(ty::context& ctx) const
@@ -1263,13 +1279,13 @@ std::optional<std::string> call_expression::type_check(ty::context& ctx) const
             throw ty::type_error(args[i]->get_location(), fmt::format("Cannot evaluate type of argument {}.", i + 1));
         }
 
-        if(sig.arg_types[i].s != *arg_type)
+        if(ty::to_string(sig.arg_types[i]) != *arg_type)
         {
-            throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, sig.arg_types[i].s, *arg_type));
+            throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, ty::to_string(sig.arg_types[i]), *arg_type));
         }
     }
 
-    return sig.ret_type.s;
+    return ty::to_string(sig.ret_type);
 }
 
 std::string call_expression::to_string() const
@@ -1315,7 +1331,7 @@ std::optional<std::string> return_statement::type_check(ty::context& ctx) const
         throw ty::type_error(loc, "Cannot have return statement outside a function.");
     }
 
-    if(sig->ret_type.s == "void")
+    if(ty::to_string(sig->ret_type) == "void")
     {
         if(expr)
         {
@@ -1327,15 +1343,15 @@ std::optional<std::string> return_statement::type_check(ty::context& ctx) const
         auto ret_type = expr->type_check(ctx);
         if(ret_type == std::nullopt)
         {
-            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has no type, expected '{}'.", sig->name.s, sig->ret_type.s));
+            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has no type, expected '{}'.", sig->name.s, ty::to_string(sig->ret_type)));
         }
-        if(ret_type != sig->ret_type.s)
+        if(*ret_type != ty::to_string(sig->ret_type))
         {
-            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has type '{}', expected '{}'.", sig->name.s, *ret_type, sig->ret_type.s));
+            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has type '{}', expected '{}'.", sig->name.s, *ret_type, ty::to_string(sig->ret_type)));
         }
     }
 
-    return sig->ret_type.s;
+    return ty::to_string(sig->ret_type);
 }
 
 std::string return_statement::to_string() const

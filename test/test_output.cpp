@@ -84,9 +84,9 @@ TEST(output, native_binding)
         {
             auto desc = std::get<slang::function_descriptor>(header.exports[0].desc);
             EXPECT_EQ(desc.native, true);
-            EXPECT_EQ(desc.signature.return_type, "void");
+            EXPECT_EQ(ty::to_string(desc.signature.return_type), "void");
             ASSERT_EQ(desc.signature.arg_types.size(), 1);
-            EXPECT_EQ(desc.signature.arg_types[0], "str");
+            EXPECT_EQ(ty::to_string(desc.signature.arg_types[0]), "str");
         }
 
         ASSERT_EQ(header.exports[1].type, slang::symbol_type::function);
@@ -94,9 +94,9 @@ TEST(output, native_binding)
         {
             auto desc = std::get<slang::function_descriptor>(header.exports[1].desc);
             EXPECT_EQ(desc.native, true);
-            EXPECT_EQ(desc.signature.return_type, "void");
+            EXPECT_EQ(ty::to_string(desc.signature.return_type), "void");
             ASSERT_EQ(desc.signature.arg_types.size(), 1);
-            EXPECT_EQ(desc.signature.arg_types[0], "str");
+            EXPECT_EQ(ty::to_string(desc.signature.arg_types[0]), "str");
         }
 
         {
@@ -120,9 +120,9 @@ TEST(output, native_binding)
             {
                 auto desc = std::get<slang::function_descriptor>(read_header.exports[0].desc);
                 EXPECT_EQ(desc.native, true);
-                EXPECT_EQ(desc.signature.return_type, "void");
+                EXPECT_EQ(ty::to_string(desc.signature.return_type), "void");
                 ASSERT_EQ(desc.signature.arg_types.size(), 1);
-                EXPECT_EQ(desc.signature.arg_types[0], "str");
+                EXPECT_EQ(ty::to_string(desc.signature.arg_types[0]), "str");
             }
 
             ASSERT_EQ(read_header.exports[1].type, slang::symbol_type::function);
@@ -130,9 +130,9 @@ TEST(output, native_binding)
             {
                 auto desc = std::get<slang::function_descriptor>(read_header.exports[1].desc);
                 EXPECT_EQ(desc.native, true);
-                EXPECT_EQ(desc.signature.return_type, "void");
+                EXPECT_EQ(ty::to_string(desc.signature.return_type), "void");
                 ASSERT_EQ(desc.signature.arg_types.size(), 1);
-                EXPECT_EQ(desc.signature.arg_types[0], "str");
+                EXPECT_EQ(ty::to_string(desc.signature.arg_types[0]), "str");
             }
         }
     }
@@ -642,6 +642,103 @@ TEST(output, arrays)
 
         slang::file_write_archive write_ar("arrays.cmod");
         EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn return_array() -> [i32; 2]\n"
+          "{\n"
+          " let b: [i32; 2] = [1, 2];\n"
+          " return b;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("return_array.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn return_array() -> [i32; 2]\n"
+          "{\n"
+          " let b: [i32; 2] = [1, 2];\n"
+          " return b[0];\n"    // wrong return type
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+    }
+    {
+        const std::string test_input =
+          "fn return_array() -> i32\n"
+          "{\n"
+          " let b: i32 = 1;\n"
+          " return b[0];\n"    // not an array
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
 

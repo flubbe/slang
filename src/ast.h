@@ -31,6 +31,7 @@ class value;
 namespace slang::typing
 {
 class context;
+std::string to_string(const std::pair<std::string, std::optional<std::size_t>>&);
 }    // namespace slang::typing
 
 namespace slang::ast
@@ -485,7 +486,7 @@ class variable_declaration_expression : public expression
     token type;
 
     /** The associated array size. */
-    std::optional<std::size_t> array_size;
+    std::optional<std::size_t> array_length;
 
     /** An optional initializer expression. */
     std::unique_ptr<ast::expression> expr;
@@ -511,14 +512,14 @@ public:
      * @param loc The location.
      * @param name The variable's name.
      * @param type The variable's type.
-     * @param array_size The array length. Zero means no array.
+     * @param array_length The array length. Passing `std::nullopt` means no array.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, token name, token type, std::optional<std::size_t> array_size, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(token_location loc, token name, token type, std::optional<std::size_t> array_length, std::unique_ptr<ast::expression> expr)
     : expression{std::move(loc)}
     , name{std::move(name)}
     , type{std::move(type)}
-    , array_size{std::move(array_size)}
+    , array_length{std::move(array_length)}
     , expr{std::move(expr)}
     {
     }
@@ -542,13 +543,13 @@ public:
     /** Whether this variable is an array. */
     bool is_array() const
     {
-        return array_size.has_value();
+        return array_length.has_value();
     }
 
     /** Get the array length. Only valid when used on an array. */
-    std::size_t get_array_size() const
+    std::size_t get_array_length() const
     {
-        return *array_size;
+        return *array_length;
     }
 };
 
@@ -818,11 +819,11 @@ class prototype_ast
     /** The function name. */
     token name;
 
-    /** The function's arguments as tuples (name, type). */
-    std::vector<std::pair<token, token>> args;
+    /** The function's arguments as tuples `(name, type, array_length)`. */
+    std::vector<std::tuple<token, token, std::optional<std::size_t>>> args;
 
-    /** The function's return type. */
-    token return_type;
+    /** The function's return type as `(type, array_length)`. */
+    std::pair<token, std::optional<std::size_t>> return_type;
 
 public:
     /** No default constructor. */
@@ -844,10 +845,13 @@ public:
      *
      * @param loc The location.
      * @param name The function's name.
-     * @param args The function's arguments as a vector of tuples (location, type_identifier, name).
-     * @param return_type The function's return type.
+     * @param args The function's arguments as a vector of tuples `(name, type, array_length)`.
+     * @param return_type The function's return type as a pair `(type, array_length)`.
      */
-    prototype_ast(token_location loc, token name, std::vector<std::pair<token, token>> args, token return_type)
+    prototype_ast(token_location loc,
+                  token name,
+                  std::vector<std::tuple<token, token, std::optional<std::size_t>>> args,
+                  std::pair<token, std::optional<std::size_t>> return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}

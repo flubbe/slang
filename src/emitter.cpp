@@ -453,12 +453,12 @@ void instruction_emitter::run()
 
             if(it->is_array())
             {
-                if(it->get_array_size() >= std::numeric_limits<std::int64_t>::max())
+                if(it->get_array_length() >= std::numeric_limits<std::int64_t>::max())
                 {
-                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_size(), std::numeric_limits<std::int64_t>::max()));
+                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_length(), std::numeric_limits<std::int64_t>::max()));
                 }
 
-                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_size())};
+                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_length())};
             }
             else
             {
@@ -483,12 +483,12 @@ void instruction_emitter::run()
 
             if(it->is_array())
             {
-                if(it->get_array_size() >= std::numeric_limits<std::int64_t>::max())
+                if(it->get_array_length() >= std::numeric_limits<std::int64_t>::max())
                 {
-                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_size(), std::numeric_limits<std::int64_t>::max()));
+                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_length(), std::numeric_limits<std::int64_t>::max()));
                 }
 
-                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_size())};
+                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_length())};
             }
             else
             {

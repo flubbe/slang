@@ -52,8 +52,8 @@ class value
     /** Size of the value, in bytes. */
     std::size_t size;
 
-    /** String identifying the type. */
-    std::string type;
+    /** Type identifier. */
+    std::pair<std::string, std::optional<std::size_t>> type;
 
     /**
      * Reads a primitive type into a `value`.
@@ -143,7 +143,7 @@ public:
     , reader{read_primitive_type<int>}
     , writer{write_primitive_type<int>}
     , size{sizeof(int)}
-    , type{"i32"}
+    , type{"i32", std::nullopt}
     {
     }
 
@@ -157,7 +157,7 @@ public:
     , reader{read_primitive_type<float>}
     , writer{write_primitive_type<float>}
     , size{sizeof(float)}
-    , type{"f32"}
+    , type{"f32", std::nullopt}
     {
     }
 
@@ -174,7 +174,7 @@ public:
     , reader{read_str}
     , writer{write_str}
     , size{sizeof(std::string*)}
-    , type{"str"}
+    , type{"str", std::nullopt}
     {
     }
 
@@ -188,7 +188,7 @@ public:
     , reader{read_str}
     , writer{write_str}
     , size{sizeof(std::string*)}
-    , type{"str"}
+    , type{"str", std::nullopt}
     {
     }
 
@@ -221,7 +221,7 @@ public:
     }
 
     /** Get the value's type. */
-    const std::string& get_type() const
+    const std::pair<std::string, std::optional<std::size_t>>& get_type() const
     {
         return type;
     }

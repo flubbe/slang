@@ -117,8 +117,8 @@ struct variable : public symbol
     /** The variable's type. */
     std::string type;
 
-    /** The variable's array size. */
-    vle_int array_size;
+    /** The variable's array length. */
+    vle_int array_length;
 
     /** Default constructors. */
     variable() = default;
@@ -133,11 +133,11 @@ struct variable : public symbol
      * Construct a variable.
      *
      * @param type The variable's type.
-     * @param array_size The variable's array size.
+     * @param array_length The variable's array length.
      */
-    variable(std::string type, std::int64_t array_size)
+    variable(std::string type, std::int64_t array_length)
     : type{std::move(type)}
-    , array_size{array_size}
+    , array_length{array_length}
     {
     }
 };
@@ -151,7 +151,7 @@ struct variable : public symbol
 inline archive& operator&(archive& ar, variable& v)
 {
     ar & v.type;
-    ar & v.array_size;
+    ar & v.array_length;
     return ar;
 }
 
@@ -159,10 +159,10 @@ inline archive& operator&(archive& ar, variable& v)
 struct function_signature
 {
     /** Return type. */
-    std::string return_type;
+    std::pair<std::string, std::optional<std::size_t>> return_type;
 
     /** Argument type list. */
-    std::vector<std::string> arg_types;
+    std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -179,7 +179,8 @@ struct function_signature
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      */
-    function_signature(std::string return_type, std::vector<std::string> arg_types)
+    function_signature(std::pair<std::string, std::optional<std::size_t>> return_type,
+                       std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types)
     : return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
     {
@@ -634,7 +635,10 @@ public:
      * @param entry_point The entry point of the function.
      * @param locals The function's arguments and locals.
      */
-    void add_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::size_t size, std::size_t entry_point, std::vector<variable> locals);
+    void add_function(std::string name,
+                      std::pair<std::string, std::optional<std::size_t>> return_type,
+                      std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                      std::size_t size, std::size_t entry_point, std::vector<variable> locals);
 
     /**
      * Add a native function to the module.
@@ -644,7 +648,10 @@ public:
      * @param arg_types The function's argument types.
      * @param lib_name Name of the library to import the function from.
      */
-    void add_native_function(std::string name, std::string return_type, std::vector<std::string> arg_types, std::string lib_name);
+    void add_native_function(std::string name,
+                             std::pair<std::string, std::optional<std::size_t>> return_type,
+                             std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                             std::string lib_name);
 
     /**
      * Set the string table.

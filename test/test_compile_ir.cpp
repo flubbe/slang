@@ -412,7 +412,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
-                  "local [2; i32] %b\n"
+                  "local [i32; 2] %b\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"

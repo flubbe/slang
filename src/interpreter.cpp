@@ -27,26 +27,29 @@ namespace slang::interpreter
  * @return Returns the type size.
  * @throws Throws an `interpreter_error` if the type is not known.
  */
-static std::size_t get_type_size(const std::string& type)
+static std::size_t get_type_size(const std::pair<std::string, std::optional<std::size_t>>& type)
 {
-    if(type == "void")
+    auto& name = std::get<0>(type);
+    std::size_t length = std::get<1>(type).has_value() ? *std::get<1>(type) : 1;
+
+    if(name == "void")
     {
         return 0;
     }
-    else if(type == "i32")
+    else if(name == "i32")
     {
-        return sizeof(std::uint32_t);
+        return sizeof(std::uint32_t) * length;
     }
-    else if(type == "f32")
+    else if(name == "f32")
     {
-        return sizeof(float);
+        return sizeof(float) * length;
     }
-    else if(type == "str")
+    else if(name == "str")
     {
-        return sizeof(std::string*);
+        return sizeof(std::string*) * length;
     }
 
-    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type));
+    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", name));
 }
 
 /**
@@ -56,26 +59,34 @@ static std::size_t get_type_size(const std::string& type)
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::string& return_type)
+static opcode get_return_opcode(const std::pair<std::string, std::optional<std::size_t>>& return_type)
 {
-    if(return_type == "void")
+    auto& name = std::get<0>(return_type);
+    std::size_t length = std::get<1>(return_type).has_value() ? *std::get<1>(return_type) : 1;
+
+    if(length != 1)
+    {
+        throw interpreter_error("Returning arrays is not yet implemented.");
+    }
+
+    if(name == "void")
     {
         return opcode::ret;
     }
-    else if(return_type == "i32")
+    else if(name == "i32")
     {
         return opcode::iret;
     }
-    else if(return_type == "f32")
+    else if(name == "f32")
     {
         return opcode::fret;
     }
-    else if(return_type == "str")
+    else if(name == "str")
     {
         return opcode::sret;
     }
 
-    throw interpreter_error(fmt::format("Type '{}' has no return opcode.", return_type));
+    throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
 }
 
 /**
@@ -141,9 +152,9 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type);
+        v.size = get_type_size({v.type, 1});
 
-        auto total_size = v.size * v.array_size.i;
+        auto total_size = v.size * v.array_length.i;
         details.locals_size += total_size;
         details.args_size += total_size;
     }
@@ -154,8 +165,8 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type);
-        details.locals_size += v.size * v.array_size.i;
+        v.size = get_type_size({v.type, 1});
+        details.locals_size += v.size * v.array_length.i;
     }
 
     // return type
@@ -1039,9 +1050,22 @@ value context::exec(const language_module& mod,
     std::size_t offset = 0;
     for(std::size_t i = 0; i < args.size(); ++i)
     {
-        if(arg_types[i] != args[i].get_type())
+        if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
         {
-            throw interpreter_error(fmt::format("Argument {} for function has wrong type (expected '{}', got '{}').", i, arg_types[i], args[i].get_type()));
+            throw interpreter_error(
+              fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
+                          i, std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type())));
+        }
+
+        if(std::get<1>(arg_types[i]).has_value())
+        {
+            if(!std::get<1>(args[i].get_type()).has_value()
+               || *std::get<1>(arg_types[i]) != *std::get<1>(args[i].get_type()))
+            {
+                throw interpreter_error(
+                  fmt::format("Argument {} for function has wrong array length (expected '{}', got '{}').",
+                              i, *std::get<1>(arg_types[i]) != *std::get<1>(args[i].get_type())));
+            }
         }
 
         if(offset + args[i].get_size() > f.get_locals_size())
