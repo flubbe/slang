@@ -90,18 +90,17 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
 
                 ctx.add_prototype(exp.name, return_type, prototype_arg_types, import_path);
 
-                std::vector<std::pair<token, std::optional<std::size_t>>> arg_types;
+                std::vector<ty::type> arg_types;
                 for(auto& arg: desc.signature.arg_types)
                 {
-                    arg_types.emplace_back(std::make_pair(token{std::get<0>(arg), reference_location}, std::get<1>(arg)));
+                    arg_types.emplace_back(type_ctx.get_type(std::get<0>(arg), std::get<1>(arg)));
                 }
 
-                std::pair<token, std::optional<std::size_t>> return_type_pair = {
-                  token{return_type.get_resolved_type(), reference_location},
-                  return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt};
+                ty::type resolved_return_type = type_ctx.get_type(return_type.get_resolved_type(),
+                                                                  return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt);
 
                 type_ctx.add_function({exp.name, reference_location},
-                                      std::move(arg_types), std::move(return_type_pair), import_path);
+                                      std::move(arg_types), std::move(resolved_return_type), import_path);
             }
             else
             {

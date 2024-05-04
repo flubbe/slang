@@ -289,8 +289,8 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
 
 std::optional<std::string> access_expression::type_check(ty::context& ctx) const
 {
-    auto type = ctx.get_type(name);
-    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, std::get<0>(type));
+    auto type = ctx.get_identifier_type(name);
+    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, type.get_base_type().s);
     ctx.push_struct_definition(struct_def);
     auto expr_type = expr->type_check(ctx);
     ctx.pop_struct_definition();
@@ -410,15 +410,15 @@ std::optional<std::string> variable_reference_expression::type_check(ty::context
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
 
-        auto t = ctx.get_type(name);
-        if(!std::get<1>(t).has_value())
+        auto t = ctx.get_identifier_type(name);
+        if(!t.is_array())
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        return std::get<0>(ctx.get_type(name));
+        return ctx.get_identifier_type(name).get_base_type().s;
     }
-    return ty::to_string(ctx.get_type(name));
+    return ty::to_string(ctx.get_identifier_type(name));
 }
 
 std::string variable_reference_expression::to_string() const
@@ -486,7 +486,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable(name, {type, array_length});
+    ctx.add_variable(name, ctx.get_type(type, array_length));
 
     if(expr)
     {
@@ -601,14 +601,14 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 void struct_definition_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
-    std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> struct_members;
+    std::vector<std::pair<token, ty::type>> struct_members;
     for(auto& m: members)
     {
         struct_members.emplace_back(std::make_pair(m->get_name(),
-                                                   std::make_pair(m->get_type(),
-                                                                  m->is_array() ? std::make_optional(m->get_array_length()) : std::nullopt)));
+                                                   type_ctx.get_unresolved_type(m->get_type(),
+                                                                                m->is_array() ? std::make_optional(m->get_array_length()) : std::nullopt, false)));
     }
-    type_ctx.add_type(name, std::move(struct_members));
+    type_ctx.add_struct(name, std::move(struct_members));
 }
 
 std::optional<std::string> struct_definition_expression::type_check(ty::context& ctx) const
@@ -1042,11 +1042,12 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 
-    std::vector<std::pair<token, std::optional<std::size_t>>> arg_types;
+    std::vector<ty::type> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                   [](const auto& arg)
-                   { return std::make_pair(std::get<1>(arg), std::get<2>(arg)); });
-    type_ctx.add_function(name, std::move(arg_types), return_type);
+                   [&type_ctx](const auto& arg) -> ty::type
+                   { return type_ctx.get_unresolved_type(std::get<1>(arg), std::get<2>(arg), false); });
+    type_ctx.add_function(name, std::move(arg_types),
+                          type_ctx.get_unresolved_type(std::get<0>(return_type), std::get<1>(return_type), false));
 }
 
 void prototype_ast::type_check(ty::context& ctx) const
@@ -1057,7 +1058,7 @@ void prototype_ast::type_check(ty::context& ctx) const
     // add the arguments to the current scope.
     for(auto arg: args)
     {
-        ctx.add_variable(std::get<0>(arg), {std::get<1>(arg), std::get<2>(arg)});
+        ctx.add_variable(std::get<0>(arg), ctx.get_type(std::get<1>(arg), std::get<2>(arg)));
     }
 
     // check the return type.

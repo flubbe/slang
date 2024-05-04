@@ -16,18 +16,23 @@
 namespace slang::typing
 {
 
+std::string to_string(const type& t)
+{
+    if(t.is_array())
+    {
+        return fmt::format("[{}; {}]", t.get_base_type().s, t.get_array_length());
+    }
+    return t.get_base_type().s;
+}
+
 std::string to_string(const std::pair<token, std::optional<std::size_t>>& t)
 {
-    return to_string({std::get<0>(t).s, std::get<1>(t)});
+    return to_string(type{std::get<0>(t), std::get<1>(t), 0 /* unknown type id */, false});
 }
 
 std::string to_string(const std::pair<std::string, std::optional<std::size_t>>& t)
 {
-    if(std::get<1>(t).has_value())
-    {
-        return fmt::format("[{}; {}]", std::get<0>(t), *std::get<1>(t));
-    }
-    return std::get<0>(t);
+    return to_string(type{{std::get<0>(t), {0, 0}}, std::get<1>(t), 0 /* unknown type id */, false});
 }
 
 /*
@@ -45,14 +50,14 @@ type_error::type_error(const token_location& loc, const std::string& message)
 
 std::string function_signature::to_string() const
 {
-    auto transform = [](const std::pair<token, std::optional<std::size_t>>& t)
+    auto transform = [](const type& t)
     {
         return slang::typing::to_string(t);
     };
-    std::string ret_type_str = std::get<1>(ret_type).has_value()
-                                 ? fmt::format("[{}; {}]", std::get<0>(ret_type).s, *std::get<1>(ret_type))
-                                 : std::get<0>(ret_type).s;
-    return fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "), ret_type_str);
+    return fmt::format("fn {}({}) -> {}",
+                       name.s,
+                       slang::utils::join(arg_types, {transform}, ", "),
+                       slang::typing::to_string(ret_type));
 }
 
 /*
@@ -74,7 +79,7 @@ std::string scope::to_string() const
     std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
     for(auto& [name, type]: variables)
     {
-        repr += fmt::format("[v] name: {}, type: {}\n", name, slang::typing::to_string(type.type));
+        repr += fmt::format("[v] name: {}, type: {}\n", name, slang::typing::to_string(type.var_type));
     }
     for(auto& [name, sig]: functions)
     {
@@ -114,7 +119,7 @@ void context::add_import(std::vector<token> path)
     imports.emplace_back(std::move(path));
 }
 
-void context::add_variable(token name, std::pair<token, std::optional<std::size_t>> type)
+void context::add_variable(token name, type var_type)
 {
     if(current_scope == nullptr)
     {
@@ -128,21 +133,12 @@ void context::add_variable(token name, std::pair<token, std::optional<std::size_
         throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
     }
 
-    // check if the type is known.
-    if(std::get<0>(type).s != "i32" && std::get<0>(type).s != "f32" && std::get<0>(type).s != "str")
-    {
-        if(!has_type(std::get<0>(type).s))
-        {
-            throw type_error(std::get<0>(type).location, fmt::format("Unknown type '{}'.", std::get<0>(type).s));
-        }
-    }
-
-    current_scope->variables[name.s] = {name, std::move(type)};
+    current_scope->variables.insert({name.s, {name, std::move(var_type)}});
 }
 
 void context::add_function(token name,
-                           std::vector<std::pair<token, std::optional<std::size_t>>> arg_types,
-                           std::pair<token, std::optional<std::size_t>> ret_type,
+                           std::vector<type> arg_types,
+                           type ret_type,
                            std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
@@ -155,7 +151,8 @@ void context::add_function(token name,
         auto mod_it = imported_functions.find(*import_path);
         if(mod_it == imported_functions.end())
         {
-            imported_functions.insert({*import_path, {{name.s, {name, std::move(arg_types), std::move(ret_type)}}}});
+            auto func_type = get_function_type(name, arg_types, ret_type);
+            imported_functions.insert({*import_path, {{name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}}}});
         }
         else
         {
@@ -164,7 +161,8 @@ void context::add_function(token name,
             {
                 throw type_error(name.location, fmt::format("The module '{}' containing the symbol '{}' already is imported.", *import_path, name.s));
             }
-            imported_functions[*import_path].insert({name.s, {name, std::move(arg_types), std::move(ret_type)}});
+            auto func_type = get_function_type(name, arg_types, ret_type);
+            imported_functions[*import_path].insert({name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
         }
     }
     else
@@ -176,11 +174,12 @@ void context::add_function(token name,
             throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
         }
 
-        current_scope->functions.insert({name.s, {name, std::move(arg_types), std::move(ret_type)}});
+        auto func_type = get_function_type(name, arg_types, ret_type);
+        current_scope->functions.insert({name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
     }
 }
 
-void context::add_type(token name, std::vector<std::pair<token, std::pair<token, std::optional<std::size_t>>>> members)
+void context::add_struct(token name, std::vector<std::pair<token, type>> members)
 {
     if(current_scope == nullptr)
     {
@@ -197,13 +196,16 @@ void context::add_type(token name, std::vector<std::pair<token, std::pair<token,
     // check if all types are known.
     for(auto& [name, type]: members)
     {
-        auto& [type_token, array_length] = type;
-        if(type_token.s != "i32" && type_token.s != "f32" && type_token.s != "str")
+        if(!is_builtin_type(type.get_base_type().s))
         {
-            if(!has_type(type_token.s))
+            if(!has_type(type.get_base_type().s))
             {
-                throw type_error(type_token.location, fmt::format("Struct member has unknown base type '{}'.", type_token.s));
+                throw type_error(name.location, fmt::format("Struct member has unknown base type '{}'.", type.get_base_type().s));
             }
+        }
+        else if(type.get_base_type().s == "void")
+        {
+            throw type_error(name.location, fmt::format("Struct member '{}' cannot have type 'void'.", name.s));
         }
     }
 
@@ -228,16 +230,16 @@ bool context::has_type(const std::string& name) const
     return false;
 }
 
-std::pair<std::string, std::optional<std::size_t>> context::get_type(const token& name) const
+type context::get_identifier_type(const token& identifier) const
 {
     // check if we're accessing a struct.
     if(struct_stack.size() > 0)
     {
         for(auto [n, t]: struct_stack.back()->members)
         {
-            if(n.s == name.s)
+            if(n.s == identifier.s)
             {
-                return {std::get<0>(t).s, std::get<1>(t)};
+                return t;
             }
         }
     }
@@ -245,7 +247,7 @@ std::pair<std::string, std::optional<std::size_t>> context::get_type(const token
     {
         for(scope* s = current_scope; s != nullptr; s = s->parent)
         {
-            auto type = s->get_type(name.s);
+            auto type = s->get_type(identifier.s);
             if(type != std::nullopt)
             {
                 return *type;
@@ -253,7 +255,63 @@ std::pair<std::string, std::optional<std::size_t>> context::get_type(const token
         }
     }
 
-    throw type_error(name.location, fmt::format("Name '{}' not found in current scope.", name.s));
+    throw type_error(identifier.location, fmt::format("Name '{}' not found in current scope.", identifier.s));
+}
+
+void context::resolve_types()
+{
+    // add structs to type map.
+    for(auto& s: global_scope.structs)
+    {
+        auto it = std::find_if(type_map.begin(), type_map.end(),
+                               [&s](const std::pair<type, std::uint64_t>& t) -> bool
+                               {
+                                   if(s.first != t.first.get_base_type().s)
+                                   {
+                                       return false;
+                                   }
+                                   return !t.first.is_array();
+                               });
+        if(it == type_map.end())
+        {
+            auto type_id = generate_type_id();
+            type_map.push_back({type{s.second.name, std::nullopt, type_id, false}, type_id});
+        }
+    }
+
+    // check that all types are resolved.
+
+    // don't resolve built-in types and function types.
+    std::vector<type> unresolved;
+    std::copy_if(unresolved_types.begin(),
+                 unresolved_types.end(),
+                 std::back_inserter(unresolved),
+                 [](const type& t) -> bool
+                 {
+                     return !is_builtin_type(t.get_base_type().s) && !t.is_function_type();
+                 });
+    unresolved_types = std::move(unresolved);    // this clears the moved-from vector.
+
+    // find all unresolved types.
+    for(auto& it: unresolved_types)
+    {
+        if(!has_type(it.get_base_type().s))
+        {
+            throw type_error(it.get_base_type().location, fmt::format("Function type resolution not implemented (type: '{}').", it.get_base_type().s));
+        }
+    }
+
+    unresolved_types.clear();
+}
+
+type context::get_function_type(const token& name, const std::vector<type>& arg_types, const type& ret_type)
+{
+    auto transform = [](const type& t) -> std::string
+    { return slang::typing::to_string(t); };
+    std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
+                                          slang::typing::to_string(ret_type));
+
+    return get_unresolved_type({type_string, name.location}, std::nullopt, true);
 }
 
 const function_signature& context::get_function_signature(const token& name) const

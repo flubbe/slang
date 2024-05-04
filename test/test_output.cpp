@@ -68,6 +68,7 @@ TEST(output, native_binding)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -232,6 +233,7 @@ TEST(output, emitter)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -281,6 +283,7 @@ TEST(output, hello_world)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -321,6 +324,7 @@ TEST(output, hello_world)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
@@ -378,6 +382,7 @@ TEST(output, operators)
 
     ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
     ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+    ASSERT_NO_THROW(type_ctx.resolve_types());
     ASSERT_NO_THROW(ast->type_check(type_ctx));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(emitter.run());
@@ -444,6 +449,7 @@ TEST(output, control_flow)
 
     ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
     ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+    ASSERT_NO_THROW(type_ctx.resolve_types());
     ASSERT_NO_THROW(ast->type_check(type_ctx));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(emitter.run());
@@ -491,6 +497,7 @@ TEST(output, loops)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -547,6 +554,7 @@ TEST(output, loops)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -587,6 +595,7 @@ TEST(output, infinite_recursion)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -634,6 +643,7 @@ TEST(output, arrays)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -671,6 +681,7 @@ TEST(output, arrays)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
@@ -708,6 +719,7 @@ TEST(output, arrays)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
@@ -738,6 +750,7 @@ TEST(output, arrays)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }

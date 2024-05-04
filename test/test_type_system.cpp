@@ -73,6 +73,7 @@ TEST(type_system, name_collection)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -93,8 +94,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input = "let a: f32 = 1.0;";
@@ -110,8 +114,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input = "let a: str = \"test\";";
@@ -127,8 +134,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input = "let a: str = 1.0;";
@@ -144,8 +154,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input = "let a: i32 = 1.0;";
@@ -161,8 +174,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input = "let a: f32 = \"Test\";";
@@ -178,8 +194,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -197,8 +216,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -216,8 +238,11 @@ TEST(type_system, variables)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -237,6 +262,7 @@ TEST(type_system, variables)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
@@ -258,8 +284,11 @@ TEST(type_system, explicit_cast)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -276,8 +305,11 @@ TEST(type_system, explicit_cast)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -294,8 +326,11 @@ TEST(type_system, explicit_cast)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -312,8 +347,11 @@ TEST(type_system, explicit_cast)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -354,8 +392,11 @@ TEST(type_system, binary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -372,8 +413,11 @@ TEST(type_system, binary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -390,8 +434,11 @@ TEST(type_system, binary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -408,8 +455,11 @@ TEST(type_system, binary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -426,8 +476,11 @@ TEST(type_system, binary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
 
@@ -451,8 +504,11 @@ TEST(type_system, unary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -470,8 +526,11 @@ TEST(type_system, unary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -488,8 +547,11 @@ TEST(type_system, unary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -506,8 +568,11 @@ TEST(type_system, unary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -524,8 +589,11 @@ TEST(type_system, unary_operators)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
 
@@ -548,8 +616,11 @@ TEST(type_system, functions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -569,8 +640,11 @@ TEST(type_system, functions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -590,8 +664,11 @@ TEST(type_system, functions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -611,8 +688,10 @@ TEST(type_system, functions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_THROW(type_ctx.resolve_types(), ty::type_error);
     }
     {
         const std::string test_input =
@@ -633,8 +712,11 @@ TEST(type_system, functions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }
 
@@ -659,8 +741,11 @@ TEST(type_system, structs)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_NO_THROW(ast->type_check(ctx));
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
         const std::string test_input =
@@ -682,7 +767,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+        EXPECT_THROW(type_ctx.resolve_types(), ty::type_error);
     }
     {
         const std::string test_input =
@@ -704,7 +789,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+        EXPECT_THROW(type_ctx.resolve_types(), ty::type_error);
     }
     {
         const std::string test_input =
@@ -731,6 +816,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -758,6 +844,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -783,6 +870,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -808,6 +896,7 @@ TEST(type_system, structs)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -838,6 +927,7 @@ TEST(type_system, function_calls)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -864,6 +954,7 @@ TEST(type_system, function_calls)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -887,8 +978,11 @@ TEST(type_system, function_calls)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -914,6 +1008,7 @@ TEST(type_system, function_calls)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -941,6 +1036,7 @@ TEST(type_system, function_calls)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -965,8 +1061,11 @@ TEST(type_system, return_expressions)
         const slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        ty::context ctx;
-        EXPECT_THROW(ast->type_check(ctx), ty::type_error);
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+        EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
         const std::string test_input =
@@ -989,6 +1088,7 @@ TEST(type_system, return_expressions)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1016,6 +1116,7 @@ TEST(type_system, return_expressions)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -1045,6 +1146,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1070,6 +1172,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
@@ -1097,6 +1200,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1124,6 +1228,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
@@ -1151,6 +1256,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1178,6 +1284,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
     {
@@ -1205,6 +1312,7 @@ TEST(type_system, element_access)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -1233,6 +1341,7 @@ TEST(type_system, examples)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1259,6 +1368,7 @@ TEST(type_system, examples)
         ty::context type_ctx;
         cg::context codegen_ctx;
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
     {
@@ -1291,6 +1401,7 @@ TEST(type_system, examples)
         rs::context resolve_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }
@@ -1332,6 +1443,7 @@ TEST(type_system, native_binding)
         rs::context resolve_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
 }

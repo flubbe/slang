@@ -178,42 +178,42 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     switch(static_cast<opcode>(instr))
     {
     /* opcodes without arguments. */
-    case opcode::iadd:
-    case opcode::fadd:
-    case opcode::isub:
-    case opcode::fsub:
-    case opcode::imul:
-    case opcode::fmul:
-    case opcode::idiv:
-    case opcode::fdiv:
-    case opcode::imod:
-    case opcode::iand:
-    case opcode::ior:
-    case opcode::ixor:
-    case opcode::ishl:
-    case opcode::ishr:
-    case opcode::icmpl:
-    case opcode::fcmpl:
-    case opcode::icmple:
-    case opcode::fcmple:
-    case opcode::icmpg:
-    case opcode::fcmpg:
-    case opcode::icmpge:
-    case opcode::fcmpge:
-    case opcode::icmpeq:
-    case opcode::fcmpeq:
-    case opcode::icmpne:
+    case opcode::iadd: [[fallthrough]];
+    case opcode::fadd: [[fallthrough]];
+    case opcode::isub: [[fallthrough]];
+    case opcode::fsub: [[fallthrough]];
+    case opcode::imul: [[fallthrough]];
+    case opcode::fmul: [[fallthrough]];
+    case opcode::idiv: [[fallthrough]];
+    case opcode::fdiv: [[fallthrough]];
+    case opcode::imod: [[fallthrough]];
+    case opcode::iand: [[fallthrough]];
+    case opcode::ior: [[fallthrough]];
+    case opcode::ixor: [[fallthrough]];
+    case opcode::ishl: [[fallthrough]];
+    case opcode::ishr: [[fallthrough]];
+    case opcode::icmpl: [[fallthrough]];
+    case opcode::fcmpl: [[fallthrough]];
+    case opcode::icmple: [[fallthrough]];
+    case opcode::fcmple: [[fallthrough]];
+    case opcode::icmpg: [[fallthrough]];
+    case opcode::fcmpg: [[fallthrough]];
+    case opcode::icmpge: [[fallthrough]];
+    case opcode::fcmpge: [[fallthrough]];
+    case opcode::icmpeq: [[fallthrough]];
+    case opcode::fcmpeq: [[fallthrough]];
+    case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
         return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
-    case opcode::i2f:
-    case opcode::f2i:
-    case opcode::ret:
-    case opcode::iret:
-    case opcode::fret:
+    case opcode::i2f: [[fallthrough]];
+    case opcode::f2i: [[fallthrough]];
+    case opcode::ret: [[fallthrough]];
+    case opcode::iret: [[fallthrough]];
+    case opcode::fret: [[fallthrough]];
     case opcode::sret:
         return 0;
     /* opcodes with one 4-byte argument. */
-    case opcode::iconst:
+    case opcode::iconst: [[fallthrough]];
     case opcode::fconst:
     {
         std::uint32_t i_u32;
@@ -316,17 +316,17 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         }
     }
     /* opcodes that need to resolve a variable. */
-    case opcode::iloada:
-    case opcode::floada:
-    case opcode::sloada:
-    case opcode::istorea:
-    case opcode::fstorea:
-    case opcode::sstorea:
-    case opcode::iload:
-    case opcode::fload:
-    case opcode::sload:
-    case opcode::istore:
-    case opcode::fstore:
+    case opcode::iloada: [[fallthrough]];
+    case opcode::floada: [[fallthrough]];
+    case opcode::sloada: [[fallthrough]];
+    case opcode::istorea: [[fallthrough]];
+    case opcode::fstorea: [[fallthrough]];
+    case opcode::sstorea: [[fallthrough]];
+    case opcode::iload: [[fallthrough]];
+    case opcode::fload: [[fallthrough]];
+    case opcode::sload: [[fallthrough]];
+    case opcode::istore: [[fallthrough]];
+    case opcode::fstore: [[fallthrough]];
     case opcode::sstore:
     {
         vle_int i;
@@ -664,7 +664,7 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(frame.stack.pop_f32());
             break;
         } /* opcode::f2i */
-        case opcode::iconst:
+        case opcode::iconst: [[fallthrough]];
         case opcode::fconst:
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
@@ -687,7 +687,7 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_addr(&frame.string_table[i]);
             break;
         } /* opcode::sconst */
-        case opcode::iloada:
+        case opcode::iloada: [[fallthrough]];
         case opcode::floada:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
@@ -728,7 +728,7 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i + array_offset]));
             break;
         } /* opcode::sloada */
-        case opcode::istorea:
+        case opcode::istorea: [[fallthrough]];
         case opcode::fstorea:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
@@ -769,7 +769,7 @@ opcode context::exec(const language_module& mod,
             *reinterpret_cast<std::string**>(&frame.locals[i + array_offset]) = frame.stack.pop_addr<std::string>();
             break;
         } /* opcode::sstorea */
-        case opcode::iload:
+        case opcode::iload: [[fallthrough]];
         case opcode::fload:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
@@ -806,7 +806,7 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
             break;
         } /* opcode::sload */
-        case opcode::istore:
+        case opcode::istore: [[fallthrough]];
         case opcode::fstore:
         {
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
