@@ -331,66 +331,99 @@ TEST(output, hello_world)
 
 TEST(output, operators)
 {
-    const std::string test_input =
-      "fn main() -> i32\n"
-      "{\n"
-      "\tlet a: i32 = 1 + 2;\n"
-      "\ta = 1 - 2;\n"
-      "\ta = 1 * 2;\n"
-      "\ta = 1 / 2;\n"
-      "\ta += -1;\n"
-      "\ta -= -2;\n"
-      "\ta *= -3;\n"
-      "\ta /= -2;\n"
-      "\ta %= 1;\n"
-      "\tlet b: f32 = 1.0 + 2.0;\n"
-      "\tb = 1.0 - 2.0;\n"
-      "\tb = 1.0 * 2.0;\n"
-      "\tb = 1.0 / 2.0;\n"
-      "\tlet c: i32 = 1 & 2;\n"
-      "\tc = 1 | 2;\n"
-      "\tc = 1 ^ 2;\n"
-      "\tc = 1 << 2;\n"
-      "\tc = 1 >> 2;\n"
-      "\treturn 0;\n"
-      "}\n"
-      "fn and(a: i32, b: i32) -> i32 { return a & b; }\n"
-      "fn or(a: i32, b: i32) -> i32 { return a | b; }\n"
-      "fn xor(a: i32, b: i32) -> i32 { return a ^ b; }\n"
-      "fn shl(a: i32, b: i32) -> i32 { return a << b; }\n"
-      "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n"
-      "fn mod(a: i32, b: i32) -> i32 { return a % b; }\n";
+    {
+        const std::string test_input =
+          "fn main() -> i32\n"
+          "{\n"
+          "\tlet a: i32 = 1 + 2;\n"
+          "\ta = 1 - 2;\n"
+          "\ta = 1 * 2;\n"
+          "\ta = 1 / 2;\n"
+          "\ta += -1;\n"
+          "\ta -= -2;\n"
+          "\ta *= -3;\n"
+          "\ta /= -2;\n"
+          "\ta %= 1;\n"
+          "\tlet b: f32 = 1.0 + 2.0;\n"
+          "\tb = 1.0 - 2.0;\n"
+          "\tb = 1.0 * 2.0;\n"
+          "\tb = 1.0 / 2.0;\n"
+          "\tlet c: i32 = 1 & 2;\n"
+          "\tc = 1 | 2;\n"
+          "\tc = 1 ^ 2;\n"
+          "\tc = 1 << 2;\n"
+          "\tc = 1 >> 2;\n"
+          "\treturn 0;\n"
+          "}\n"
+          "fn and(a: i32, b: i32) -> i32 { return a & b; }\n"
+          "fn or(a: i32, b: i32) -> i32 { return a | b; }\n"
+          "fn xor(a: i32, b: i32) -> i32 { return a ^ b; }\n"
+          "fn shl(a: i32, b: i32) -> i32 { return a << b; }\n"
+          "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n"
+          "fn mod(a: i32, b: i32) -> i32 { return a % b; }\n";
 
-    slang::lexer lexer;
-    slang::parser parser;
+        slang::lexer lexer;
+        slang::parser parser;
 
-    lexer.set_input(test_input);
-    parser.parse(lexer);
+        lexer.set_input(test_input);
+        parser.parse(lexer);
 
-    EXPECT_TRUE(lexer.eof());
+        EXPECT_TRUE(lexer.eof());
 
-    const slang::ast::block* ast = parser.get_ast();
-    ASSERT_NE(ast, nullptr);
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
 
-    slang::file_manager mgr;
-    mgr.add_search_path("src/lang");
+        slang::file_manager mgr;
+        mgr.add_search_path("src/lang");
 
-    ty::context type_ctx;
-    rs::context resolve_ctx{mgr};
-    cg::context codegen_ctx;
-    slang::instruction_emitter emitter{codegen_ctx};
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
-    ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-    ASSERT_NO_THROW(emitter.run());
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
 
-    slang::language_module mod = emitter.to_module();
+        slang::language_module mod = emitter.to_module();
 
-    slang::file_write_archive write_ar("operators.cmod");
-    EXPECT_NO_THROW(write_ar & mod);
+        slang::file_write_archive write_ar("operators.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn main() -> [i32; 2]\n"
+          "{\n"
+          "\treturn 1 + 2;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+        mgr.add_search_path("src/lang");
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+    }
 }
 
 TEST(output, control_flow)

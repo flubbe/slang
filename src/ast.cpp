@@ -390,13 +390,52 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(mc == memory_context::none || mc == memory_context::load)
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(*var), index);
+        if(!element_expr && var->is_array())
+        {
+            // load all array elements.
+            if(var->get_array_length() >= std::numeric_limits<int>::max())
+            {
+                throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", var->get_array_length(), std::numeric_limits<int>::max()));
+            }
+            ctx.generate_load(std::make_unique<cg::variable_argument>(*var), 0);
+            for(std::size_t i = 1; i < var->get_array_length(); ++i)
+            {
+                ctx.generate_const({"i32"}, static_cast<int>(i));
+                ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            }
+        }
+        else
+        {
+            ctx.generate_load(std::make_unique<cg::variable_argument>(*var), index);
+        }
     }
     else
     {
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*var), index);
+        if(!element_expr && var->is_array())
+        {
+            // store all array elements.
+            if(var->get_array_length() >= std::numeric_limits<int>::max())
+            {
+                throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", var->get_array_length(), std::numeric_limits<int>::max()));
+            }
+            std::size_t array_length = var->get_array_length();
+            for(std::size_t i = 0; i < array_length - 1; ++i)
+            {
+                ctx.generate_const({"i32"}, static_cast<int>(array_length - i - 1));
+                ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
+            }
+            ctx.generate_store(std::make_unique<cg::variable_argument>(*var), 0);
+        }
+        else
+        {
+            ctx.generate_store(std::make_unique<cg::variable_argument>(*var), index);
+        }
     }
 
+    if(element_expr)
+    {
+        return std::make_unique<cg::value>(var->deref());
+    }
     return std::make_unique<cg::value>(*var);
 }
 

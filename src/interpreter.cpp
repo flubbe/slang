@@ -56,34 +56,29 @@ static std::size_t get_type_size(const std::pair<std::string, std::optional<std:
  * Generate the return opcode from the signature's return type for native functions.
  *
  * @param return_type The return type.
- * @returns A return opcode.
+ * @returns A return opcode, together with an array size. An array size of 0 indicates "no array".
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<std::string, std::optional<std::size_t>>& return_type)
+static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::string, std::optional<std::size_t>>& return_type)
 {
     auto& name = std::get<0>(return_type);
-    std::size_t length = std::get<1>(return_type).has_value() ? *std::get<1>(return_type) : 1;
-
-    if(length != 1)
-    {
-        throw interpreter_error("Returning arrays is not yet implemented.");
-    }
+    std::size_t length = std::get<1>(return_type).has_value() ? *std::get<1>(return_type) : 0;
 
     if(name == "void")
     {
-        return opcode::ret;
+        return std::make_pair(opcode::ret, 0);
     }
     else if(name == "i32")
     {
-        return opcode::iret;
+        return std::make_pair(opcode::iret, length);
     }
     else if(name == "f32")
     {
-        return opcode::fret;
+        return std::make_pair(opcode::fret, length);
     }
     else if(name == "str")
     {
-        return opcode::sret;
+        return std::make_pair(opcode::sret, length);
     }
 
     throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
@@ -118,7 +113,9 @@ function::function(function_signature signature, std::size_t entry_point, std::s
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    auto [oc, length] = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    ret_opcode = oc;
+    ret_array_length = length;
 }
 
 function::function(function_signature signature, std::function<void(operand_stack&)> func)
@@ -126,7 +123,9 @@ function::function(function_signature signature, std::function<void(operand_stac
 , native{true}
 , entry_point_or_function{std::move(func)}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    auto [oc, length] = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    ret_opcode = oc;
+    ret_array_length = length;
 }
 
 /*
@@ -207,10 +206,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
-    case opcode::ret: [[fallthrough]];
-    case opcode::iret: [[fallthrough]];
-    case opcode::fret: [[fallthrough]];
-    case opcode::sret:
+    case opcode::ret:
         return 0;
     /* opcodes with one 4-byte argument. */
     case opcode::iconst: [[fallthrough]];
@@ -223,6 +219,9 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         return sizeof(std::uint32_t);
     }
     /* opcodes with one VLE integer. */
+    case opcode::iret: [[fallthrough]];
+    case opcode::fret: [[fallthrough]];
+    case opcode::sret: [[fallthrough]];
     case opcode::sconst:
     {
         vle_int i;
@@ -547,10 +546,10 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
     return decoded_module;
 }
 
-opcode context::exec(const language_module& mod,
-                     std::size_t entry_point,
-                     std::size_t size,
-                     stack_frame& frame)
+std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
+                                              std::size_t entry_point,
+                                              std::size_t size,
+                                              stack_frame& frame)
 {
     if(!mod.is_decoded())
     {
@@ -581,7 +580,15 @@ opcode context::exec(const language_module& mod,
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::sret))
         {
             --call_stack_level;
-            return static_cast<opcode>(instr);
+
+            std::int64_t array_length = 0;
+            if(instr != static_cast<std::byte>(opcode::ret))
+            {
+                // read array length.
+                array_length = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            }
+
+            return std::make_pair(static_cast<opcode>(instr), array_length);
         }
 
         if(offset == function_end)
@@ -1080,15 +1087,22 @@ value context::exec(const language_module& mod,
      * Execute the function.
      */
     opcode ret_opcode;
+    std::int64_t array_length = 0;
     if(f.is_native())
     {
         auto& func = f.get_function();
         func(frame.stack);
         ret_opcode = f.get_return_opcode();
+        if(f.returns_array())
+        {
+            array_length = f.get_returned_array_length();
+        }
     }
     else
     {
-        ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), frame);
+        auto [oc, length] = exec(mod, f.get_entry_point(), f.get_size(), frame);
+        ret_opcode = oc;
+        array_length = length;
     }
 
     /*
@@ -1101,15 +1115,54 @@ value context::exec(const language_module& mod,
     }
     else if(ret_opcode == opcode::iret)
     {
-        ret = frame.stack.pop_i32();
+        if(array_length == 0)
+        {
+            ret = frame.stack.pop_i32();
+        }
+        else
+        {
+            std::vector<int> iret;
+            iret.resize(array_length);
+            for(std::size_t i = 0; i < array_length; ++i)
+            {
+                iret[array_length - i - 1] = frame.stack.pop_i32();
+            }
+            ret = std::move(iret);
+        }
     }
     else if(ret_opcode == opcode::fret)
     {
-        ret = frame.stack.pop_f32();
+        if(array_length == 0)
+        {
+            ret = frame.stack.pop_f32();
+        }
+        else
+        {
+            std::vector<float> fret;
+            fret.resize(array_length);
+            for(std::size_t i = 0; i < array_length; ++i)
+            {
+                fret[array_length - i - 1] = frame.stack.pop_f32();
+            }
+            ret = std::move(fret);
+        }
     }
     else if(ret_opcode == opcode::sret)
     {
-        ret = std::string{*frame.stack.pop_addr<std::string>()};
+        if(array_length == 0)
+        {
+            ret = std::string{*frame.stack.pop_addr<std::string>()};
+        }
+        else
+        {
+            std::vector<std::string> str_ret;
+            str_ret.resize(array_length);
+            for(std::size_t i = 0; i < array_length; ++i)
+            {
+                str_ret[array_length - i - 1] = *frame.stack.pop_addr<std::string>();
+            }
+            ret = std::move(str_ret);
+        }
     }
     else
     {

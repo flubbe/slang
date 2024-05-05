@@ -286,6 +286,24 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         else
         {
             emit_typed(opcode::iret, opcode::fret, opcode::sret);
+
+            vle_int vle_array_length = 0;    // 0 means "no array", i.e. a single value.
+            if(args[0]->get_value()->is_array())
+            {
+                // Store array length.
+                std::size_t array_length = args[0]->get_value()->get_array_length();
+                if(array_length == 0)
+                {
+                    throw emitter_error(fmt::format("Invalid array size of 0 for return instruction."));
+                }
+                if(array_length >= std::numeric_limits<std::int64_t>::max())
+                {
+                    throw emitter_error(fmt::format("Array size exceeds {}.", std::numeric_limits<std::int64_t>::max()));
+                }
+
+                vle_array_length = array_length;
+            }
+            instruction_buffer & vle_array_length;
         }
     }
     else if(name == "and")

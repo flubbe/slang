@@ -151,6 +151,21 @@ public:
     }
 
     /**
+     * Return the de-referenced type.
+     *
+     * @throws Throws a `codegen_error` if the value is not an array.
+     */
+    value deref() const
+    {
+        if(!is_array())
+        {
+            throw codegen_error("Attempted to de-reference a non-array type.");
+        }
+
+        return {type, aggregate_type, std::nullopt, std::nullopt};
+    }
+
+    /**
      * Get the value as a readable string.
      */
     std::string to_string() const;

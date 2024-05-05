@@ -41,7 +41,7 @@ public:
 class value
 {
     /** The stored value. */
-    std::variant<int, float, std::string> v;
+    std::variant<int, float, std::string, std::vector<int>, std::vector<float>, std::vector<std::string>> v;
 
     /** Read this value from memory. */
     std::function<std::size_t(std::byte*, value&)> reader;
@@ -63,11 +63,11 @@ class value
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t read_primitive_type(std::byte* memory, value& v)
+    static std::size_t read_primitive_type(const std::byte* memory, value& v)
     {
         static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
                       "Primitive type must be an integer or a floating point type.");
-        v = *reinterpret_cast<T*>(memory);
+        v = *reinterpret_cast<const T*>(memory);
         return sizeof(T);
     }
 
@@ -79,12 +79,52 @@ class value
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t write_primitive_type(std::byte* memory, value& v)
+    static std::size_t write_primitive_type(std::byte* memory, const value& v)
     {
         static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
                       "Primitive type must be an integer or a floating point type.");
         *reinterpret_cast<T*>(memory) = std::get<T>(v.v);
         return sizeof(T);
+    }
+
+    /**
+     * Reads a vector of a primitive type into a `value`.
+     *
+     * @param memory The memory to read from.
+     * @param v The value to write the integer to.
+     * @returns Returns `sizeof(T)`.
+     */
+    template<typename T>
+    static std::size_t read_vector_type(const std::byte* memory, value& v)
+    {
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+                      "Vector type must be an integer or a floating point type.");
+        for(auto& it: std::get<std::vector<T>>(v.v))
+        {
+            it = *reinterpret_cast<const T*>(memory);
+            memory += sizeof(T);
+        }
+        return sizeof(T) * std::get<std::vector<T>>(v.v).size();
+    }
+
+    /**
+     * Reads a vector of a primitive type into a `value`.
+     *
+     * @param memory The memory to write into.
+     * @param v The value to write.
+     * @returns Returns `sizeof(T)`.
+     */
+    template<typename T>
+    static std::size_t write_vector_type(std::byte* memory, const value& v)
+    {
+        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+                      "Vector type must be an integer or a floating point type.");
+        for(auto& it: std::get<std::vector<T>>(v.v))
+        {
+            *reinterpret_cast<T*>(memory) = it;
+            memory += sizeof(T);
+        }
+        return sizeof(T) * std::get<std::vector<T>>(v.v).size();
     }
 
     /**
@@ -96,9 +136,9 @@ class value
      * @param v The value write the string to.
      * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t read_str(std::byte* memory, value& v)
+    static std::size_t read_str(const std::byte* memory, value& v)
     {
-        std::string* s = *reinterpret_cast<std::string**>(memory);
+        std::string* s = *reinterpret_cast<std::string* const*>(memory);
         v = *s;
         return sizeof(std::string*);
     }
@@ -112,15 +152,55 @@ class value
      * @param v The string value to write.
      * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t write_str(std::byte* memory, value& v)
+    static std::size_t write_str(std::byte* memory, const value& v)
     {
-        std::string* s = std::get_if<std::string>(&v.v);
+        const std::string* s = std::get_if<std::string>(&v.v);
         if(!s)
         {
             throw std::bad_variant_access();
         }
-        *reinterpret_cast<std::string**>(memory) = s;
+        *reinterpret_cast<const std::string**>(memory) = s;
         return sizeof(std::string*);
+    }
+
+    /**
+     * Reads a vector of strings into a `value`.
+     *
+     * @note This copies the strings.
+     *
+     * @param memory The memory to read from.
+     * @param v The value to read the strings into.
+     * @returns Returns `sizeof(std::string*) * length_of_v`.
+     */
+    static std::size_t read_vector_str(const std::byte* memory, value& v)
+    {
+        for(auto& it: std::get<std::vector<std::string>>(v.v))
+        {
+            std::string* s = *reinterpret_cast<std::string* const*>(memory);
+            it = *s;
+            memory += sizeof(std::string*);
+        }
+
+        return sizeof(std::string*) * std::get<std::vector<std::string>>(v.v).size();
+    }
+
+    /**
+     * Writes string references into memory.
+     *
+     * @note The strings are owned by `v`.
+     *
+     * @param memory The memory to write into.
+     * @param v The string values to write.
+     * @returns Returns `sizeof(std::string*) * length_of_v`.
+     */
+    static std::size_t write_vector_str(std::byte* memory, const value& v)
+    {
+        for(auto& it: std::get<std::vector<std::string>>(v.v))
+        {
+            *reinterpret_cast<const std::string**>(memory) = &it;
+            memory += sizeof(std::string*);
+        }
+        return sizeof(std::string*) * std::get<std::vector<std::string>>(v.v).size();
     }
 
 public:
@@ -190,6 +270,51 @@ public:
     , size{sizeof(std::string*)}
     , type{"str", std::nullopt}
     {
+    }
+
+    /**
+     * Construct an integer array value.
+     *
+     * @param int_vec The integers.
+     */
+    value(std::vector<int> int_vec)
+    : v{std::move(int_vec)}
+    , reader{read_vector_type<int>}
+    , writer{write_vector_type<int>}
+    {
+        size = sizeof(int) * std::get<std::vector<int>>(v).size();
+        type = {"i32", std::get<std::vector<int>>(v).size()};
+    }
+
+    /**
+     * Construct a floating point array value.
+     *
+     * @param float_vec The floating point values.
+     */
+    value(std::vector<float> float_vec)
+    : v{std::move(float_vec)}
+    , reader{read_vector_type<float>}
+    , writer{write_vector_type<float>}
+    {
+        size = sizeof(float) * std::get<std::vector<float>>(v).size();
+        type = {"f32", std::get<std::vector<float>>(v).size()};
+    }
+
+    /**
+     * Construct a string array value.
+     *
+     * @note The strings are owned by this `value`. This is relevant when using `write`,
+     * which writes a pointer to the specified memory address.
+     *
+     * @param string_vec The strings.
+     */
+    value(std::vector<std::string> string_vec)
+    : v{std::move(string_vec)}
+    , reader{read_vector_str}
+    , writer{write_vector_str}
+    {
+        size = sizeof(std::string*) * std::get<std::vector<std::string>>(v).size();
+        type = {"str", std::get<std::vector<std::string>>(v).size()};
     }
 
     /**
@@ -485,6 +610,9 @@ class function
     /** Return opcode. */
     opcode ret_opcode;
 
+    /** Returned array length. A length of `0` means "no array". */
+    std::int64_t ret_array_length = 0;
+
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
 
@@ -566,6 +694,18 @@ public:
     opcode get_return_opcode() const
     {
         return ret_opcode;
+    }
+
+    /** Return whether the returned value is an array. */
+    bool returns_array() const
+    {
+        return ret_array_length != 0;
+    }
+
+    /** Get the returned array's length. */
+    std::int64_t get_returned_array_length() const
+    {
+        return ret_array_length;
     }
 };
 
@@ -676,12 +816,14 @@ class context
      * @param entry_point The function's entry point/offset in the binary buffer.
      * @param size The function's bytecode size.
      * @param frame The stack frame for the function.
-     * @return THe function's return opcode.
+     * @return A pair of the function's return opcode and an array length.
+     *         If the array length is zero and the return type not `void`,
+     *         a single element is returned.
      */
-    opcode exec(const language_module& mod,
-                std::size_t entry_point,
-                std::size_t size,
-                stack_frame& frame);
+    std::pair<opcode, std::int64_t> exec(const language_module& mod,
+                                         std::size_t entry_point,
+                                         std::size_t size,
+                                         stack_frame& frame);
 
 public:
     /** Default constructors. */
