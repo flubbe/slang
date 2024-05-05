@@ -701,7 +701,12 @@ TEST(output, arrays)
           "fn f(a: [i32; 2]) -> i32\n"
           "{\n"
           " return a[1];\n"
-          "}\n";
+          "}\n"
+          "fn invalid_index() -> i32\n"
+          "{\n"
+          " let b: [i32; 2] = [0, 1];\n"
+          " return b[3];\n"
+          "}";
 
         slang::lexer lexer;
         slang::parser parser;

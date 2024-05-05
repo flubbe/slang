@@ -428,7 +428,7 @@ TEST(interpreter, return_arrays)
     EXPECT_EQ((*res.get<std::vector<int>>())[1], 2);
 }
 
-TEST(interpreter, _SC_PASS_MAX)
+TEST(interpreter, pass_array)
 {
     slang::language_module mod;
 
@@ -452,6 +452,29 @@ TEST(interpreter, _SC_PASS_MAX)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "pass_array", {}));
     EXPECT_EQ(*res.get<int>(), 3);
+}
+
+TEST(interpreter, invalid_index)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_array.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+
+    ASSERT_THROW(ctx.invoke("return_array", "invalid_index", {}), slang::interpreter::interpreter_error);
 }
 
 }    // namespace
