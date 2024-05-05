@@ -692,7 +692,16 @@ TEST(output, arrays)
           "{\n"
           " let b: [i32; 2] = [1, 2];\n"
           " return b;\n"
-          "}";
+          "}\n"
+          "fn pass_array() -> i32\n"
+          "{\n"
+          " let b: [i32; 2] = [2, 3];\n"
+          " return f(b);\n"
+          "}\n"
+          "fn f(a: [i32; 2]) -> i32\n"
+          "{\n"
+          " return a[1];\n"
+          "}\n";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -762,6 +771,41 @@ TEST(output, arrays)
           " let b: i32 = 1;\n"
           " return b[0];\n"    // not an array
           "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+    }
+    {
+        const std::string test_input =
+          "fn pass_array() -> i32\n"
+          "{\n"
+          " let b: [i32; 2] = [2, 3];\n"
+          " return f(b);\n"    // passed array has wrong size
+          "}\n"
+          "fn f(a: [i32; 3]) -> i32\n"
+          "{\n"
+          " return a[1];\n"
+          "}\n";
 
         slang::lexer lexer;
         slang::parser parser;
