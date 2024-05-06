@@ -764,7 +764,7 @@ class context
     unsigned int max_call_stack_depth;
 
     /** The current call stack level. */
-    unsigned int call_stack_level;
+    unsigned int call_stack_level = 0;
 
     /**
      * Decode a module.
@@ -874,6 +874,12 @@ public:
      * @returns The function's return value.
      */
     value invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args);
+
+    /** Reset the interpreter. Needs to be called when an exception was thrown and caught. */
+    void reset()
+    {
+        call_stack_level = 0;
+    }
 };
 
 }    // namespace slang::interpreter
