@@ -553,6 +553,9 @@ inline archive& operator&(archive& ar, exported_symbol& s)
 /** Header of a module. */
 struct module_header
 {
+    /** Tag. */
+    std::uint32_t tag;
+
     /** Import table. */
     std::vector<imported_symbol> imports;
 
@@ -562,20 +565,6 @@ struct module_header
     /** String table. */
     std::vector<std::string> strings;
 };
-
-/**
- * Serializer for the module header.
- *
- * @param ar The archive to use for serialization.
- * @param header The module header.
- */
-inline archive& operator&(archive& ar, module_header& header)
-{
-    ar & header.imports;
-    ar & header.exports;
-    ar & header.strings;
-    return ar;
-}
 
 /** A compiled binary file. */
 class language_module
@@ -596,6 +585,9 @@ class language_module
     std::unordered_map<std::size_t, std::int64_t> jump_origins;
 
 public:
+    /** Module tag. */
+    static constexpr std::uint32_t tag = 0x63326c73;
+
     /** Default constructors. */
     language_module() = default;
     language_module(const language_module&) = default;
@@ -694,6 +686,29 @@ public:
     friend archive& operator&(archive& ar, language_module& mod);
     friend class slang::interpreter::context;
 };
+
+/**
+ * Serializer for the module header.
+ *
+ * @param ar The archive to use for serialization.
+ * @param header The module header.
+ */
+inline archive& operator&(archive& ar, module_header& header)
+{
+    if(ar.is_writing())
+    {
+        header.tag = language_module::tag;
+    }
+    ar & header.tag;
+    if(ar.is_reading() && header.tag != language_module::tag)
+    {
+        throw module_error("Not a language module.");
+    }
+    ar & header.imports;
+    ar & header.exports;
+    ar & header.strings;
+    return ar;
+}
 
 /**
  * Module serializer.
