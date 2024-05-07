@@ -761,7 +761,7 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
             offset += sizeof(std::int64_t);
 
-            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
+            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::string*);
 
             if(i < 0)
             {

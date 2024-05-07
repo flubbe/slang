@@ -477,4 +477,36 @@ TEST(interpreter, invalid_index)
     ASSERT_THROW(ctx.invoke("return_array", "invalid_index", {}), slang::interpreter::interpreter_error);
 }
 
+TEST(interpreter, return_str_array)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_array.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
+    ASSERT_EQ(res.get<std::vector<std::string>>()->size(), 3);
+    EXPECT_EQ((*res.get<std::vector<std::string>>())[0], "a");
+    EXPECT_EQ((*res.get<std::vector<std::string>>())[1], "test");
+    EXPECT_EQ((*res.get<std::vector<std::string>>())[2], "123");
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_array", "ret_str", {}));
+    EXPECT_EQ(*res.get<std::string>(), "123");
+}
+
 }    // namespace

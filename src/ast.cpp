@@ -1213,6 +1213,12 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
 
         auto v = body->generate_code(ctx);
 
+        // verify that the break-continue-stack is empty.
+        if(ctx.get_break_continue_stack_size() != 0)
+        {
+            throw cg::codegen_error(loc, fmt::format("Internal error: Break-continue stack is not empty."));
+        }
+
         auto ip = ctx.get_insertion_point(true);
         if(!ip->ends_with_return() && !ip->is_unreachable())
         {

@@ -2122,6 +2122,12 @@ public:
         return basic_block_brk_cnt.back();
     }
 
+    /** Get `break`-`continue` stack size. */
+    std::size_t get_break_continue_stack_size() const
+    {
+        return basic_block_brk_cnt.size();
+    }
+
     /*
      * Code generation.
      */
