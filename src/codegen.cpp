@@ -375,6 +375,14 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
     insertion_point->add_instruction(std::make_unique<instruction>("const", std::move(args)));
 }
 
+void context::generate_dup(value vt)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(std::move(vt)));
+    insertion_point->add_instruction(std::make_unique<instruction>("dup", std::move(args)));
+}
+
 void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> name)
 {
     validate_insertion_point();

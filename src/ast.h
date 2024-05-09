@@ -810,6 +810,48 @@ public:
     std::string to_string() const override;
 };
 
+/** Postfix operator expression. */
+class postfix_expression : public expression
+{
+    /** The operand. */
+    std::unique_ptr<expression> identifier;
+
+    /** The operator. */
+    token op;
+
+public:
+    /** No default constructor. */
+    postfix_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~postfix_expression() = default;
+
+    /** Copy and move constructors. */
+    postfix_expression(const postfix_expression&) = delete;
+    postfix_expression(postfix_expression&&) = default;
+
+    /** Assignment operators. */
+    postfix_expression& operator=(const postfix_expression&) = delete;
+    postfix_expression& operator=(postfix_expression&&) = default;
+
+    /**
+     * Construct a unary expression.
+     *
+     * @param identifier The operand.
+     * @param op The operator.
+     */
+    postfix_expression(std::unique_ptr<expression> identifier, token op)
+    : expression{identifier->get_location()}
+    , identifier{std::move(identifier)}
+    , op{std::move(op)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
+};
+
 /** Function prototype. */
 class prototype_ast
 {

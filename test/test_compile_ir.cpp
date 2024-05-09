@@ -728,6 +728,44 @@ TEST(compile_ir, binary_operators)
     }
 }
 
+TEST(compile_ir, postfix_operators)
+{
+    const std::string test_input =
+      "fn f() -> void\n"
+      "{\n"
+      " let i: i32 = 0;\n"
+      " i++;\n"
+      "}";
+
+    slang::lexer lexer;
+    slang::parser parser;
+
+    lexer.set_input(test_input);
+    parser.parse(lexer);
+
+    EXPECT_TRUE(lexer.eof());
+
+    const slang::ast::block* ast = parser.get_ast();
+    ASSERT_NE(ast, nullptr);
+
+    cg::context ctx;
+    ASSERT_NO_THROW(ast->generate_code(ctx));
+
+    EXPECT_EQ(ctx.to_string(),
+              "define void @f() {\n"
+              "local i32 %i\n"
+              "entry:\n"
+              " const i32 0\n"
+              " store i32 %i\n"
+              " load i32 %i\n"
+              " dup i32\n"
+              " const i32 1\n"
+              " add i32\n"
+              " store i32 %i\n"
+              " ret i32\n"
+              "}");
+}
+
 TEST(compile_ir, compound_assignments)
 {
     {

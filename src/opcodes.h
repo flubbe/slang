@@ -36,6 +36,8 @@ enum class opcode : opcode_base
     istore,  /** Store from stack into i32 array at index 0. */
     fstore,  /** Store from stack into f32 array at index 0. */
     sstore,  /** Store from stack into str array at index 0. */
+    idup,    /** Duplicate top i32 on stack. */
+    fdup,    /** Duplicate top f32 on stack. */
     iadd,    /** Add two i32 from the stack. */
     fadd,    /** Add two f32 from the stack. */
     isub,    /** Subtract two i32 from the stack. */

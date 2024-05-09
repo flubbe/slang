@@ -481,6 +481,66 @@ TEST(parser, operators)
 
         EXPECT_TRUE(lexer.eof());
     }
+    {
+        const std::string test_input =
+          "let s: i32 = ++a * --b;\n"
+          "let t: i32 = a++ * b--;\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        std::string expected =
+          "Block("
+            "exprs=("
+              "VariableDeclaration("
+                "name=s, "
+                "type=i32, "
+                "expr=Binary("
+                  "op=\"*\", "
+                  "lhs=Unary(op=\"++\", "
+                  "operand=VariableReference("
+                    "name=a"
+                  ")"
+                "), "
+                "rhs=Unary("
+                  "op=\"--\", "
+                    "operand=VariableReference("
+                      "name=b"
+                    ")"
+                  ")"
+                ")"
+              "), "
+              "VariableDeclaration("
+                "name=t, "
+                "type=i32, "
+                "expr=Binary("
+                  "op=\"*\", "
+                  "lhs=Postfix("
+                    "identifier=VariableReference("
+                      "name=a"
+                    "), "
+                    "op=\"++\""
+                  "), "
+                  "rhs=Postfix("
+                    "identifier=VariableReference("
+                      "name=b"
+                    "), "
+                    "op=\"--\""
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
 }
 
 TEST(parser, hello_world)

@@ -512,4 +512,44 @@ TEST(interpreter, return_str_array)
     EXPECT_EQ(*res.get<int>(), 1);
 }
 
+TEST(interpreter, prefix_postfix)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("prefix_postfix.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'prefix_postfix.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("prefix_postfix", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_i32", {1}));
+    ASSERT_EQ(*res.get<int>(), 2);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_i32", {1}));
+    ASSERT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_i32", {1}));
+    ASSERT_EQ(*res.get<int>(), 0);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_i32", {1}));
+    ASSERT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_f32", {1.f}));
+    ASSERT_EQ(*res.get<float>(), 2.f);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_f32", {1.f}));
+    ASSERT_EQ(*res.get<float>(), 1.f);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_f32", {1.f}));
+    ASSERT_EQ(*res.get<float>(), 0.f);
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_f32", {1.f}));
+    ASSERT_EQ(*res.get<float>(), 1.f);
+}
+
 }    // namespace

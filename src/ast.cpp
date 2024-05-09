@@ -921,7 +921,51 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
         throw cg::codegen_error(loc, "Cannot store into unary expression.");
     }
 
-    if(op.s == "+")
+    if(op.s == "++")
+    {
+        auto v = operand->generate_code(ctx, mc);
+        if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+        {
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+        }
+
+        if(v->get_resolved_type() == "i32")
+        {
+            ctx.generate_const(*v, 1);
+        }
+        else if(v->get_resolved_type() == "f32")
+        {
+            ctx.generate_const(*v, 1.f);
+        }
+        ctx.generate_binary_op(cg::binary_op::op_add, *v);
+
+        ctx.generate_dup(*v);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        return v;
+    }
+    else if(op.s == "--")
+    {
+        auto v = operand->generate_code(ctx, mc);
+        if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+        {
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+        }
+
+        if(v->get_resolved_type() == "i32")
+        {
+            ctx.generate_const(*v, 1);
+        }
+        else if(v->get_resolved_type() == "f32")
+        {
+            ctx.generate_const(*v, 1.f);
+        }
+        ctx.generate_binary_op(cg::binary_op::op_sub, *v);
+
+        ctx.generate_dup(*v);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        return v;
+    }
+    else if(op.s == "+")
     {
         return operand->generate_code(ctx, mc);
     }
@@ -981,6 +1025,8 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
 std::optional<std::string> unary_ast::type_check(slang::typing::context& ctx) const
 {
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
+      {"++", {"i32", "f32"}},
+      {"--", {"i32", "f32"}},
       {"+", {"i32", "f32"}},
       {"-", {"i32", "f32"}},
       {"!", {"i32"}},
@@ -1010,6 +1056,80 @@ std::optional<std::string> unary_ast::type_check(slang::typing::context& ctx) co
 std::string unary_ast::to_string() const
 {
     return fmt::format("Unary(op=\"{}\", operand={})", op.s, operand ? operand->to_string() : std::string("<none>"));
+}
+
+/*
+ * postfix_expression.
+ */
+
+std::unique_ptr<cg::value> postfix_expression::generate_code(slang::codegen::context& ctx, memory_context mc) const
+{
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Cannot store into postfix operator expression.");
+    }
+
+    auto v = identifier->generate_code(ctx, memory_context::load);
+    if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+    {
+        throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for postfix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+    }
+
+    if(op.s == "++")
+    {
+        ctx.generate_dup(*v);    // keep the value on the stack.
+        if(v->get_resolved_type() == "i32")
+        {
+            ctx.generate_const({v->get_resolved_type()}, 1);
+        }
+        else if(v->get_resolved_type() == "f32")
+        {
+            ctx.generate_const({v->get_resolved_type()}, 1.f);
+        }
+        ctx.generate_binary_op(cg::binary_op::op_add, *v);
+
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+    }
+    else if(op.s == "--")
+    {
+        ctx.generate_dup(*v);    // keep the value on the stack.
+        if(v->get_resolved_type() == "i32")
+        {
+            ctx.generate_const({v->get_resolved_type()}, 1);
+        }
+        else if(v->get_resolved_type() == "f32")
+        {
+            ctx.generate_const({v->get_resolved_type()}, 1.f);
+        }
+        ctx.generate_binary_op(cg::binary_op::op_sub, *v);
+
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+    }
+    else
+    {
+        throw cg::codegen_error(op.location, fmt::format("Unknown postfix operator '{}'.", op.s));
+    }
+
+    return v;
+}
+
+std::optional<std::string> postfix_expression::type_check(slang::typing::context& ctx) const
+{
+    auto identifier_type = identifier->type_check(ctx);
+    if(identifier_type == std::nullopt)
+    {
+        throw ty::type_error(identifier->get_location(), fmt::format("Cannot evaluate type of expression."));
+    }
+    if(*identifier_type != "i32" && *identifier_type != "f32")
+    {
+        throw ty::type_error(identifier->get_location(), fmt::format("Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').", op.s, *identifier_type));
+    }
+    return identifier_type;
+}
+
+std::string postfix_expression::to_string() const
+{
+    return fmt::format("Postfix(identifier={}, op=\"{}\")", identifier->to_string(), op.s);
 }
 
 /*

@@ -734,14 +734,14 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 }
 
 //  unary ::= primary
-//          | ('-' | '+' | '~' | '!') primary
+//          | ('++' | '--' | '-' | '+' | '~' | '!') primary
 std::unique_ptr<ast::expression> parser::parse_unary()
 {
     token op = *current_token;
     token_location loc = current_token->location;
 
     // if we're not parsing a unary operator, it must be a primary expression.
-    if(op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
+    if(op.s != "++" && op.s != "--" && op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
     {
         return parse_primary();
     }
@@ -751,6 +751,7 @@ std::unique_ptr<ast::expression> parser::parse_unary()
 }
 
 // identifierexpr ::= identifier
+//                  | identifier ('++' | '--')
 //                  | identifier '[' primary ']'
 //                  | identifier '(' expression* ')'
 //                  | identifier '(' expression* ')' '[' primary ']'
@@ -763,7 +764,15 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
     token identifier = *current_token;
     get_next_token();    // skip identifier
 
-    if(current_token->s == "(")    // function call.
+    if(current_token->s == "++" || current_token->s == "--")    // postfix operators.
+    {
+        token postfix_op = *current_token;
+        get_next_token();
+
+        return std::make_unique<ast::postfix_expression>(
+          std::make_unique<ast::variable_reference_expression>(std::move(identifier)), std::move(postfix_op));
+    }
+    else if(current_token->s == "(")    // function call.
     {
         get_next_token();    // skip "("
 

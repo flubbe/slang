@@ -177,6 +177,9 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     switch(static_cast<opcode>(instr))
     {
     /* opcodes without arguments. */
+    case opcode::idup: [[fallthrough]];
+    case opcode::fdup:
+        return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))    case opcode::iadd: [[fallthrough]];
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
     case opcode::isub: [[fallthrough]];
@@ -203,7 +206,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::fcmpeq: [[fallthrough]];
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
-        return -static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for all (since sizeof(float) == sizeof(std::uint32_t))
+        return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
     case opcode::ret:
@@ -598,6 +601,12 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
 
         switch(static_cast<opcode>(instr))
         {
+        case opcode::idup: [[fallthrough]];
+        case opcode::fdup:
+        {
+            frame.stack.dup_i32();
+            break;
+        } /* opcode::idup, opcode::fdup */
         case opcode::iadd:
         {
             frame.stack.push_i32(frame.stack.pop_i32() + frame.stack.pop_i32());

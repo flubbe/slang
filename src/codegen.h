@@ -2217,6 +2217,13 @@ public:
     void generate_const(value vt, std::variant<int, float, std::string> val);
 
     /**
+     * Duplicate the top stack value.
+     *
+     * @param vt The value type.
+     */
+    void generate_dup(value vt);
+
+    /**
      * Statically or dynamically invoke a function. If the invokation
      * is dynamic, the function is loaded from the stack.
      *

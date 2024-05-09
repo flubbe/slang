@@ -44,6 +44,8 @@ std::string to_string(opcode op)
     case opcode::fdiv: return "fdiv";
     case opcode::i2f: return "i2f";
     case opcode::f2i: return "f2i";
+    case opcode::idup: return "idup";
+    case opcode::fdup: return "fdup";
     case opcode::invoke: return "invoke";
     case opcode::ret: return "ret";
     case opcode::iret: return "iret";

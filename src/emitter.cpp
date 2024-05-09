@@ -214,6 +214,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore);
     }
+    else if(name == "dup")
+    {
+        emit_typed(opcode::idup, opcode::fdup);
+    }
     else if(name == "cast")
     {
         expect_arg_size(1);
