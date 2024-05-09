@@ -965,6 +965,9 @@ class call_expression : public expression
     /** The function's arguments. */
     std::vector<std::unique_ptr<expression>> args;
 
+    /** An optional index expression for return value array access. */
+    std::unique_ptr<expression> index_expr;
+
 public:
     /** No default constructor. */
     call_expression() = delete;
@@ -973,11 +976,11 @@ public:
     virtual ~call_expression() = default;
 
     /** Default copy and move constructors. */
-    call_expression(const call_expression&) = default;
+    call_expression(const call_expression&) = delete;
     call_expression(call_expression&&) = default;
 
     /** Default assignment operators. */
-    call_expression& operator=(const call_expression&) = default;
+    call_expression& operator=(const call_expression&) = delete;
     call_expression& operator=(call_expression&&) = default;
 
     /**
@@ -986,10 +989,11 @@ public:
      * @param callee The callee's name.
      * @param args The argument expressions.
      */
-    call_expression(token callee, std::vector<std::unique_ptr<expression>> args)
+    call_expression(token callee, std::vector<std::unique_ptr<expression>> args, std::unique_ptr<expression> index_expr = nullptr)
     : expression{callee.location}
     , callee{std::move(callee)}
     , args{std::move(args)}
+    , index_expr{std::move(index_expr)}
     {
     }
 

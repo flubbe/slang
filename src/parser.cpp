@@ -751,12 +751,13 @@ std::unique_ptr<ast::expression> parser::parse_unary()
 }
 
 // identifierexpr ::= identifier
+//                  | identifier '[' primary ']'
 //                  | identifier '(' expression* ')'
+//                  | identifier '(' expression* ')' '[' primary ']'
 //                  | identifier '::' identifierexpr
 //                  | identifier '.' identifierexpr
 //                  | identifier '{' primary* '}'
-//                  | identifier '{' (identifier: primary_expr)* '}'
-//                  | identifier '[' primary ']'
+//                  | identifier '{' (identifier ':' primary_expr)* '}'
 std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 {
     token identifier = *current_token;
@@ -786,6 +787,20 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
             }
         }
         get_next_token();    // skip ")"
+
+        if(current_token->s == "[")    // array access.
+        {
+            get_next_token();    // skip '['
+            auto index_expression = parse_expression();
+            if(current_token->s != "]")
+            {
+                throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+            }
+
+            get_next_token();    // skip ']'
+
+            return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args), std::move(index_expression));
+        }
 
         return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args));
     }

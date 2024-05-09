@@ -1305,7 +1305,41 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     }
     ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s));
 
-    return std::make_unique<cg::value>(ctx.get_prototype(callee.s).get_return_type());
+    auto return_type = ctx.get_prototype(callee.s).get_return_type();
+    if(index_expr)
+    {
+        // Store the returned array inside a temporary and then index into it.
+        cg::value temporary;
+        if(ty::is_builtin_type(return_type.get_type()))
+        {
+            temporary = ctx.get_scope()->add_temporary(std::make_unique<cg::value>(return_type.get_type(), std::nullopt, std::nullopt, return_type.get_array_length()));
+        }
+        else
+        {
+            temporary = ctx.get_scope()->add_temporary(std::make_unique<cg::value>("aggregate", return_type.get_type(), std::nullopt, return_type.get_array_length()));
+        }
+
+        if(return_type.get_array_length() >= std::numeric_limits<int>::max())
+        {
+            throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", return_type.get_array_length(), std::numeric_limits<int>::max()));
+        }
+        std::size_t array_length = return_type.get_array_length();
+        for(std::size_t i = 0; i < array_length - 1; ++i)
+        {
+            ctx.generate_const({"i32"}, static_cast<int>(array_length - i - 1));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(temporary));
+        }
+        ctx.generate_store(std::make_unique<cg::variable_argument>(temporary), 0);
+
+        // evaluate the index expression.
+        index_expr->generate_code(ctx, memory_context::load);
+
+        // load the element from the temporary.
+        ctx.generate_load(std::make_unique<cg::variable_argument>(temporary));
+        return std::make_unique<cg::value>(std::move(return_type.deref()));
+    }
+
+    return std::make_unique<cg::value>(std::move(return_type));
 }
 
 std::optional<std::string> call_expression::type_check(ty::context& ctx) const
@@ -1329,6 +1363,22 @@ std::optional<std::string> call_expression::type_check(ty::context& ctx) const
         {
             throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, ty::to_string(sig.arg_types[i]), *arg_type));
         }
+    }
+
+    if(index_expr)
+    {
+        auto v = index_expr->type_check(ctx);
+        if(!v.has_value() || *v != "i32")
+        {
+            throw ty::type_error(loc, "Expected <integer> for array element access.");
+        }
+
+        if(!sig.ret_type.is_array())
+        {
+            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+        }
+
+        return sig.ret_type.get_base_type().s;
     }
 
     return ty::to_string(sig.ret_type);

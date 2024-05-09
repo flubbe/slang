@@ -507,6 +507,9 @@ TEST(interpreter, return_str_array)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "ret_str", {}));
     EXPECT_EQ(*res.get<std::string>(), "123");
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_array", "call_return", {}));
+    EXPECT_EQ(*res.get<int>(), 1);
 }
 
 }    // namespace

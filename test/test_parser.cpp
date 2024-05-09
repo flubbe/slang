@@ -1077,4 +1077,38 @@ TEST(parser, directives)
     }
 }
 
+TEST(parser, array_return)
+{
+    {
+        const std::string test_input =
+          "fn f() -> [i32; 2] { return [1, 2]; }";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void { let a: i32 = g()[0]; }";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32 { return g()[0]; }";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_NO_THROW(parser.parse(lexer));
+    }
+}
+
 }    // namespace

@@ -716,6 +716,10 @@ TEST(output, arrays)
           "{\n"
           " let s: [str; 3] = [\"a\", \"test\", \"123\"];"
           " return s[2];"
+          "}\n"
+          "fn call_return() -> i32\n"
+          "{\n"
+          " return return_array()[0];\n"
           "}";
 
         slang::lexer lexer;

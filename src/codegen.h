@@ -1049,6 +1049,9 @@ class scope
     /** Variables inside the scope. */
     std::vector<std::unique_ptr<value>> locals;
 
+    /** Temporary variable counter. */
+    std::size_t temporary_count = 0;
+
 public:
     /** Constructors. */
     scope() = default;
@@ -1254,6 +1257,33 @@ public:
             throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
         }
         locals.emplace_back(std::move(arg));
+    }
+
+    /**
+     * Add a temporary local variable.
+     *
+     * @param arg The variable.
+     * @returns The passed-in value.
+     * @throws Throws a `codegen_error` if the supplied local has no name or if the
+     *         scope already has an object with the same name.
+     */
+    value add_temporary(std::unique_ptr<value> arg)
+    {
+        if(arg->has_name())
+        {
+            throw codegen_error("Temporaries cannot have names.");
+        }
+
+        arg->set_name(fmt::format("@temp{}", temporary_count));
+        ++temporary_count;
+
+        if(contains(*arg->get_name()))
+        {
+            throw codegen_error(fmt::format("Temporary '{}' already exists in scope.", *arg->get_name()));
+        }
+        locals.emplace_back(std::move(arg));
+
+        return *locals.back();
     }
 
     /** Get the arguments for this scope. */
