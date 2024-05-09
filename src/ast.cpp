@@ -766,6 +766,12 @@ static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::s
     return {is_assignment, is_compound, is_comparison, reduced_op};
 }
 
+bool binary_expression::needs_pop() const
+{
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
+    return !is_assignment;
+}
+
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
@@ -1266,8 +1272,14 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
     for(auto& expr: this->exprs)
     {
         v = expr->generate_code(ctx, memory_context::none);
+
+        // non-assigning expressions need cleanup.
+        if(expr->needs_pop() && v && v->get_resolved_type() != "void")
+        {
+            ctx.generate_pop(*v);
+        }
     }
-    return v;
+    return nullptr;
 }
 
 void block::collect_names(cg::context& ctx, ty::context& type_ctx) const

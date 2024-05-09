@@ -2250,6 +2250,13 @@ public:
     void generate_load_element(std::vector<int> indices);
 
     /**
+     * Pop a value from the stack.
+     *
+     * @param vt The value type.
+     */
+    void generate_pop(value vt);
+
+    /**
      * Return from a function.
      *
      * @param arg The returned type or std::nullopt.

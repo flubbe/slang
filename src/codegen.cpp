@@ -434,6 +434,30 @@ void context::generate_load_element(std::vector<int> indices)
     insertion_point->add_instruction(std::make_unique<instruction>("load_element", std::move(args)));
 }
 
+void context::generate_pop(value vt)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+
+    if(vt.is_aggregate())
+    {
+        throw codegen_error("Cannot generate pop instruction for aggregate type.");
+    }
+
+    if(vt.get_resolved_type() != "i32" && vt.get_resolved_type() != "f32" && vt.get_resolved_type() != "str")
+    {
+        throw codegen_error(fmt::format("Cannot generate pop instruction for type '{}'.", vt.get_resolved_type()));
+    }
+
+    std::size_t pop_count = vt.is_array() ? vt.get_array_length() : 1;
+    std::string instr_name = (vt.get_resolved_type() == "str") ? "spop" : "pop";
+    for(std::size_t i = 0; i < pop_count; ++i)
+    {
+        args.emplace_back(std::make_unique<type_argument>(vt));
+        insertion_point->add_instruction(std::make_unique<instruction>(instr_name, std::move(args)));
+    }
+}
+
 void context::generate_ret(std::optional<value> arg)
 {
     validate_insertion_point();
@@ -459,7 +483,7 @@ void context::generate_store(std::unique_ptr<variable_argument> arg, std::option
     {
         if(*index != 0)
         {
-            throw codegen_error(fmt::format("Cannot generate indexed store instruction with index != 0."));
+            throw codegen_error("Cannot generate indexed store instruction with index != 0.");
         }
         insertion_point->add_instruction(std::make_unique<instruction>("store", std::move(args)));
     }

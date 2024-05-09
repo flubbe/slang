@@ -552,4 +552,79 @@ TEST(interpreter, prefix_postfix)
     ASSERT_EQ(*res.get<float>(), 1.f);
 }
 
+TEST(interpreter, return_discard)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_discard.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_discard.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_discard", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_discard", "f", {}));
+}
+
+TEST(interpreter, return_discard_array)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_discard_array.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_discard_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_discard_array", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_discard_array", "f", {}));
+}
+
+TEST(interpreter, return_discard_strings)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_discard_strings.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_discard_strings.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_discard_strings", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_discard_strings", "f", {}));
+}
+
 }    // namespace

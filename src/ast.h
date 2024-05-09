@@ -111,6 +111,12 @@ public:
     /** Default destructor. */
     virtual ~expression() = default;
 
+    /** Whether this expression needs stack cleanup. */
+    virtual bool needs_pop() const
+    {
+        return false;
+    }
+
     /**
      * Generate IR.
      *
@@ -427,6 +433,11 @@ public:
     , args{std::move(args)}
     , expr{std::move(expr)}
     {
+    }
+
+    bool needs_pop() const override
+    {
+        return expr->needs_pop();
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
@@ -762,6 +773,8 @@ public:
     {
     }
 
+    bool needs_pop() const override;
+
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<std::string> type_check(slang::typing::context& ctx) const override;
     std::string to_string() const override;
@@ -1037,6 +1050,11 @@ public:
     , args{std::move(args)}
     , index_expr{std::move(index_expr)}
     {
+    }
+
+    bool needs_pop() const override
+    {
+        return true;
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;

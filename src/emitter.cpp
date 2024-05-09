@@ -218,6 +218,23 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed(opcode::idup, opcode::fdup);
     }
+    else if(name == "pop")
+    {
+        emit_typed(opcode::pop, opcode::pop);    // same instruction for i32 and f32.
+    }
+    else if(name == "spop")
+    {
+        expect_arg_size(1);
+
+        if(args[0]->get_value()->get_resolved_type() == "str")
+        {
+            emit(instruction_buffer, opcode::spop);
+        }
+        else
+        {
+            throw emitter_error(fmt::format("Invalid type '{}' for spop.", args[0]->get_value()->get_resolved_type()));
+        }
+    }
     else if(name == "cast")
     {
         expect_arg_size(1);

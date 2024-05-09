@@ -921,4 +921,146 @@ TEST(output, arrays)
     }
 }
 
+TEST(output, return_discard)
+{
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}\n"
+          "fn g() -> i32\n"
+          "{\n"
+          " return 123;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        ASSERT_EQ(codegen_ctx.to_string(),
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " invoke @g\n"
+                  " pop i32\n"
+                  " ret void\n"
+                  "}\n"
+                  "define i32 @g() {\n"
+                  "entry:\n"
+                  " const i32 123\n"
+                  " ret i32\n"
+                  "}");
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("return_discard.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}\n"
+          "fn g() -> [i32; 2]\n"
+          "{\n"
+          " let r: [i32; 2] = [1, 2];\n"
+          " return r;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("return_discard_array.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}\n"
+          "fn g() -> [str; 2]\n"
+          "{\n"
+          " let r: [str; 2] = [\"a\", \"test\"];\n"
+          " return r;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("return_discard_strings.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+}
+
 }    // namespace

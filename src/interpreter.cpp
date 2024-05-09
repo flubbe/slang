@@ -180,6 +180,10 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
         return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))    case opcode::iadd: [[fallthrough]];
+    case opcode::pop:
+        return -static_cast<std::int32_t>(sizeof(std::int32_t));
+    case opcode::spop:
+        return -static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
     case opcode::isub: [[fallthrough]];
@@ -607,6 +611,16 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             frame.stack.dup_i32();
             break;
         } /* opcode::idup, opcode::fdup */
+        case opcode::pop:
+        {
+            frame.stack.pop_i32();
+            break;
+        } /* opcode::pop */
+        case opcode::spop:
+        {
+            frame.stack.pop_addr<std::string>();
+            break;
+        } /* opcode::spop */
         case opcode::iadd:
         {
             frame.stack.push_i32(frame.stack.pop_i32() + frame.stack.pop_i32());
@@ -1176,6 +1190,12 @@ value context::exec(const language_module& mod,
     else
     {
         throw interpreter_error(fmt::format("Invalid return opcode '{}' ({}).", to_string(ret_opcode), static_cast<int>(ret_opcode)));
+    }
+
+    // verify that the stack is empty.
+    if(!frame.stack.empty())
+    {
+        throw interpreter_error("Non-empty stack on function exit.");
     }
 
     return ret;
