@@ -133,7 +133,7 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
     return imports.size() - 1;
 }
 
-type* context::create_type(std::string name, std::vector<std::pair<std::string, std::string>> members)
+type* context::create_type(std::string name, std::vector<std::pair<std::string, value>> members)
 {
     if(std::find_if(types.begin(), types.end(),
                     [&name](const std::unique_ptr<type>& t) -> bool

@@ -627,4 +627,50 @@ TEST(interpreter, return_discard_strings)
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_strings", "f", {}));
 }
 
+TEST(interpreter, structs)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("structs.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'structs.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    auto& header = mod.get_header();
+    ASSERT_EQ(header.exports.size(), 2);
+    EXPECT_EQ(header.exports[0].type, slang::symbol_type::type);
+    EXPECT_EQ(header.exports[0].name, "S");
+    EXPECT_EQ(header.exports[1].type, slang::symbol_type::type);
+    EXPECT_EQ(header.exports[1].name, "T");
+
+    {
+        auto& desc = std::get<slang::type_descriptor>(header.exports[0].desc);
+        ASSERT_EQ(desc.member_types.size(), 2);
+        EXPECT_EQ(desc.member_types[0].first, "i");
+        EXPECT_EQ(desc.member_types[0].second, "i32");
+        EXPECT_EQ(desc.member_types[1].first, "j");
+        EXPECT_EQ(desc.member_types[1].second, "f32");
+    }
+
+    {
+        auto& desc = std::get<slang::type_descriptor>(header.exports[1].desc);
+        ASSERT_EQ(desc.member_types.size(), 2);
+        EXPECT_EQ(desc.member_types[0].first, "s");
+        EXPECT_EQ(desc.member_types[0].second, "S");
+        EXPECT_EQ(desc.member_types[1].first, "t");
+        EXPECT_EQ(desc.member_types[1].second, "str");
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("structs", mod));
+}
+
 }    // namespace

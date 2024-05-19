@@ -60,9 +60,9 @@ void language_module::add_native_function(std::string name,
                                           std::string lib_name)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& t) -> bool
+                    [&name](const exported_symbol& s) -> bool
                     {
-                        return t.name == name;
+                        return s.name == name;
                     })
        != header.exports.end())
     {
@@ -71,6 +71,22 @@ void language_module::add_native_function(std::string name,
 
     function_descriptor desc{{std::move(return_type), std::move(arg_types)}, true, native_function_details{std::move(lib_name)}};
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
+}
+
+void language_module::add_type(std::string name, std::vector<std::pair<std::string, std::string>> members)
+{
+    if(std::find_if(header.exports.begin(), header.exports.end(),
+                    [&name](const exported_symbol& s) -> bool
+                    {
+                        return s.name == name;
+                    })
+       != header.exports.end())
+    {
+        throw module_error(fmt::format("Cannot add type: Symbol '{}' already defined.", name));
+    }
+
+    type_descriptor desc{std::move(members)};
+    header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 
 }    // namespace slang

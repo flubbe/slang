@@ -179,7 +179,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     /* opcodes without arguments. */
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
-        return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))    case opcode::iadd: [[fallthrough]];
+        return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::pop:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::spop:
@@ -1237,6 +1237,8 @@ void context::load_module(const std::string& name, const language_module& mod)
 
     module_map.insert({name, decode(mod)});
     module_header& decoded_header = module_map[name]->header;
+
+    // TODO populate type map.
 
     // populate function map.
     std::unordered_map<std::string, function> fmap;

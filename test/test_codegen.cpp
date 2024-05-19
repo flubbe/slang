@@ -584,7 +584,7 @@ TEST(codegen, aggregate_data)
          * }
          */
 
-        ctx.create_type("S", {{"a", "i32"}, {"b", "i32"}});
+        ctx.create_type("S", {{"a", {"i32"}}, {"b", {"i32"}}});
 
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));

@@ -634,8 +634,43 @@ std::string array_initializer_expression::to_string() const
 
 std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: struct_definition_expression::generate_code not implemented.", slang::to_string(loc)));
+    if(mc != memory_context::none)
+    {
+        throw cg::codegen_error(loc, fmt::format("Invalid memory context for struct definition."));
+    }
+
+    cg::scope* s = ctx.get_scope();    // cannot return nullptr.
+    if(!ctx.is_global_scope(s))
+    {
+        throw cg::codegen_error(loc, fmt::format("Cannot declare type outside global scope."));
+    }
+
+    std::vector<std::pair<std::string, cg::value>> struct_members;
+    for(auto& m: members)
+    {
+        std::optional<std::size_t> array_length = std::nullopt;
+        if(m->is_array())
+        {
+            array_length = m->get_array_length();
+        }
+
+        cg::value v;
+        if(ty::is_builtin_type(m->get_type().s))
+        {
+            v = {m->get_type().s, std::nullopt, m->get_name().s, array_length};
+        }
+        else
+        {
+            v = {"aggregate", m->get_type().s, m->get_name().s, array_length};
+        }
+
+        struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
+    }
+
+    s->add_type(name.s, struct_members);    // FIXME do we need this?
+    ctx.create_type(name.s, std::move(struct_members));
+
+    return nullptr;
 }
 
 void struct_definition_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const

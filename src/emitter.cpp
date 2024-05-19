@@ -661,8 +661,17 @@ language_module instruction_emitter::to_module() const
     // types.
     for(auto& it: ctx.types)
     {
-        // TODO write type definitions.
-        throw std::runtime_error("instruction_emitter::to_module: not implemented for type definitions.");
+        auto members = it->get_members();
+        std::vector<std::pair<std::string, std::string>> transformed_members;
+
+        std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
+                       [](const std::pair<std::string, cg::value>& m)
+                       {
+                           // FIXME misses array type/length.
+                           return std::make_pair(std::get<0>(m), std::get<1>(m).get_resolved_type());
+                       });
+
+        mod.add_type(it->get_name(), std::move(transformed_members));
     }
 
     for(auto& it: ctx.funcs)

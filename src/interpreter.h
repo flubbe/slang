@@ -41,7 +41,13 @@ public:
 class value
 {
     /** The stored value. */
-    std::variant<int, float, std::string, std::vector<int>, std::vector<float>, std::vector<std::string>> v;
+    std::variant<int,
+                 float,
+                 std::string,
+                 std::vector<int>,
+                 std::vector<float>,
+                 std::vector<std::string>>
+      v;
 
     /** Read this value from memory. */
     std::function<std::size_t(std::byte*, value&)> reader;

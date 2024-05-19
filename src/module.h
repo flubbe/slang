@@ -380,8 +380,8 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
 /** Type descriptor. */
 struct type_descriptor
 {
-    /** Member types. */
-    std::vector<std::string> member_types;
+    /** Members as (name, type). */
+    std::vector<std::pair<std::string, std::string>> member_types;
 };
 
 /**
@@ -646,6 +646,14 @@ public:
                              std::string lib_name);
 
     /**
+     * Add a type to the module.
+     *
+     * @param name The type's name.
+     * @param members The type's members as `(name, type)`.
+     */
+    void add_type(std::string name, std::vector<std::pair<std::string, std::string>> members);
+
+    /**
      * Set the string table.
      *
      * @param strings The new string table.
@@ -702,7 +710,7 @@ inline archive& operator&(archive& ar, module_header& header)
     ar & header.tag;
     if(ar.is_reading() && header.tag != language_module::tag)
     {
-        throw module_error("Not a language module.");
+        throw module_error("Not a module.");
     }
     ar & header.imports;
     ar & header.exports;

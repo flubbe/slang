@@ -1052,6 +1052,9 @@ class scope
     /** Temporary variable counter. */
     std::size_t temporary_count = 0;
 
+    /** Types. */
+    std::unordered_map<std::string, std::vector<std::pair<std::string, value>>> types;
+
 public:
     /** Constructors. */
     scope() = default;
@@ -1284,6 +1287,23 @@ public:
         locals.emplace_back(std::move(arg));
 
         return *locals.back();
+    }
+
+    /**
+     * Add a type to the scope.
+     *
+     * @param name The type's name.
+     * @param members The type's members.
+     * @throws Throws a `codegen_error` if the name is already registered as a type in this scope.
+     */
+    void add_type(std::string name, std::vector<std::pair<std::string, value>> members)
+    {
+        if(types.find(name) != types.end())
+        {
+            throw codegen_error(fmt::format("Type '{}' already exists in scope.", name));
+        }
+
+        types.insert({std::move(name), std::move(members)});
     }
 
     /** Get the arguments for this scope. */
@@ -1691,8 +1711,8 @@ class type
     /** The type's name. */
     std::string name;
 
-    /** The type's members as pairs (type_name, member_name). */
-    std::vector<std::pair<std::string, std::string>> members;
+    /** The type's members as pairs `(name, type)`. */
+    std::vector<std::pair<std::string, value>> members;
 
 public:
     /** Default constructors. */
@@ -1713,7 +1733,7 @@ public:
      * @param name The type's name.
      * @param members The type's members.
      */
-    type(std::string name, std::vector<std::pair<std::string, std::string>> members)
+    type(std::string name, std::vector<std::pair<std::string, value>> members)
     : name{std::move(name)}
     , members{std::move(members)}
     {
@@ -1725,6 +1745,12 @@ public:
         return name;
     }
 
+    /** Get the type's members. */
+    const std::vector<std::pair<std::string, value>>& get_members() const
+    {
+        return members;
+    }
+
     /** String representation of a type. */
     std::string to_string() const
     {
@@ -1733,9 +1759,9 @@ public:
         {
             for(std::size_t i = 0; i < members.size() - 1; ++i)
             {
-                buf += fmt::format(" {} %{},\n", members[i].second, members[i].first);
+                buf += fmt::format(" {} %{},\n", members[i].second.get_resolved_type(), members[i].first);
             }
-            buf += fmt::format(" {} %{},\n", members.back().second, members.back().first);
+            buf += fmt::format(" {} %{},\n", members.back().second.get_resolved_type(), members.back().first);
         }
         buf += "}";
         return buf;
@@ -1918,9 +1944,10 @@ public:
      * Throws a `codegen_error` if the type already exists or if it contains undefined types.
      *
      * @param name The type's name.
+     * @param members The type's members as pairs `(name, type)`.
      * @returns A representation of the created type.
      */
-    type* create_type(std::string name, std::vector<std::pair<std::string, std::string>> members);
+    type* create_type(std::string name, std::vector<std::pair<std::string, value>> members);
 
     /**
      * Get a reference to a string or create a new one if it does not exist.
@@ -2053,6 +2080,12 @@ public:
         }
 
         return global_scope.get();
+    }
+
+    /** Return whether a given scope is the global scope. */
+    bool is_global_scope(const scope* s) const
+    {
+        return s == global_scope.get();
     }
 
     /**
