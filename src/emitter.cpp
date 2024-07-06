@@ -68,14 +68,23 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     };
 
     auto emit_typed = [this, &name, &args, expect_arg_size](
-                        opcode i32_opcode, std::optional<opcode> f32_opcode = std::nullopt, std::optional<opcode> str_opcode = std::nullopt)
+                        opcode i32_opcode,
+                        std::optional<opcode> f32_opcode = std::nullopt,
+                        std::optional<opcode> str_opcode = std::nullopt,
+                        std::optional<opcode> array_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
         cg::const_argument* arg = static_cast<cg::const_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
-        std::string type = v->get_resolved_type();
 
+        if(array_opcode.has_value() && v->is_array())
+        {
+            emit(instruction_buffer, *array_opcode);
+            return;
+        }
+
+        std::string type = v->get_resolved_type();
         if(type == "i32")
         {
             emit(instruction_buffer, i32_opcode);
@@ -135,13 +144,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
     };
 
-    auto emit_typed_one_var_arg = [this, &name, &args, &func, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt)
+    auto emit_typed_one_var_arg = [this, &name, &args, &func, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt, std::optional<opcode> array_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
         cg::variable_argument* arg = static_cast<cg::variable_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
-        std::string type = v->get_resolved_type();
 
         if(!v->has_name())
         {
@@ -149,7 +157,17 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         vle_int index = func->get_scope()->get_index(*v->get_name());
 
-        if(type == "i32")
+        std::string type = v->get_resolved_type();
+        if(v->is_array())
+        {
+            if(!array_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
+
+            emit(instruction_buffer, *array_opcode);
+        }
+        else if(type == "i32")
         {
             emit(instruction_buffer, i32_opcode);
         }
@@ -198,42 +216,29 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed_one_arg(opcode::iconst, opcode::fconst, opcode::sconst);
     }
-    else if(name == "loada")
-    {
-        emit_typed_one_var_arg(opcode::iloada, opcode::floada, opcode::sloada);
-    }
-    else if(name == "storea")
-    {
-        emit_typed_one_var_arg(opcode::istorea, opcode::fstorea, opcode::sstorea);
-    }
     else if(name == "load")
     {
-        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload);
+        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload, opcode::aload);
     }
     else if(name == "store")
     {
-        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore);
+        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore, opcode::astore);
+    }
+    else if(name == "load_element")
+    {
+        emit_typed(opcode::iaload, opcode::faload, opcode::saload);
+    }
+    else if(name == "store_element")
+    {
+        emit_typed(opcode::iastore, opcode::fastore, opcode::sastore);
     }
     else if(name == "dup")
     {
-        emit_typed(opcode::idup, opcode::fdup);
+        emit_typed(opcode::idup, opcode::fdup, std::nullopt, opcode::adup);
     }
     else if(name == "pop")
     {
-        emit_typed(opcode::pop, opcode::pop);    // same instruction for i32 and f32.
-    }
-    else if(name == "spop")
-    {
-        expect_arg_size(1);
-
-        if(args[0]->get_value()->get_resolved_type() == "str")
-        {
-            emit(instruction_buffer, opcode::spop);
-        }
-        else
-        {
-            throw emitter_error(fmt::format("Invalid type '{}' for spop.", args[0]->get_value()->get_resolved_type()));
-        }
+        emit_typed(opcode::pop, opcode::pop, opcode::spop, opcode::apop);    // same instruction for i32 and f32.
     }
     else if(name == "cast")
     {
@@ -306,25 +311,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else
         {
-            emit_typed(opcode::iret, opcode::fret, opcode::sret);
-
-            vle_int vle_array_length = 0;    // 0 means "no array", i.e. a single value.
-            if(args[0]->get_value()->is_array())
-            {
-                // Store array length.
-                std::size_t array_length = args[0]->get_value()->get_array_length();
-                if(array_length == 0)
-                {
-                    throw emitter_error(fmt::format("Invalid array size of 0 for return instruction."));
-                }
-                if(array_length >= std::numeric_limits<std::int64_t>::max())
-                {
-                    throw emitter_error(fmt::format("Array size exceeds {}.", std::numeric_limits<std::int64_t>::max()));
-                }
-
-                vle_array_length = array_length;
-            }
-            instruction_buffer & vle_array_length;
+            emit_typed(opcode::iret, opcode::fret, opcode::sret, opcode::aret);
         }
     }
     else if(name == "and")
@@ -416,6 +403,38 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         emit(instruction_buffer, opcode::jmp);
         instruction_buffer & index;
     }
+    else if(name == "newarray")
+    {
+        expect_arg_size(1);
+
+        auto& args = instr->get_args();
+        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();
+
+        array_type type;
+        if(type_str == "i32")
+        {
+            type = array_type::i32;
+        }
+        else if(type_str == "f32")
+        {
+            type = array_type::f32;
+        }
+        else if(type_str == "str")
+        {
+            type = array_type::str;
+        }
+        else if(type_str == "addr")
+        {
+            type = array_type::ref;
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Unknown array type '{}' for newarray.", type_str));
+        }
+
+        emit(instruction_buffer, opcode::newarray);
+        instruction_buffer & type;
+    }
     else
     {
         // TODO
@@ -501,7 +520,7 @@ void instruction_emitter::run()
             }
             else
             {
-                locals[index] = {it->get_type(), 1};
+                locals[index] = {it->get_type()};
             }
         }
 
@@ -531,7 +550,7 @@ void instruction_emitter::run()
             }
             else
             {
-                locals[index] = {it->get_type(), 1};
+                locals[index] = {it->get_type()};
             }
         }
 

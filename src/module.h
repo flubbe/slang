@@ -111,14 +111,50 @@ inline archive& operator&(archive& ar, symbol& s)
     return ar;
 }
 
+/** Array type. */
+enum class array_type : std::uint8_t
+{
+    i32 = 0,
+    f32 = 1,
+    str = 2,
+    ref = 3
+};
+
+/**
+ * Array type serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param t The array type.
+ */
+inline archive& operator&(archive& ar, array_type& t)
+{
+    std::uint8_t v = static_cast<std::uint8_t>(t);
+    ar & v;
+    if(v != static_cast<std::uint8_t>(array_type::i32)
+       && v != static_cast<std::uint8_t>(array_type::f32)
+       && v != static_cast<std::uint8_t>(array_type::str)
+       && v != static_cast<std::uint8_t>(array_type::ref))
+    {
+        throw serialization_error("Invalid array type.");
+    }
+    t = static_cast<array_type>(v);
+    return ar;
+}
+
 /** A variable. */
 struct variable : public symbol
 {
     /** The variable's type. */
     std::string type;
 
-    /** The variable's array length. */
-    vle_int array_length;
+    /** Array length. */
+    std::optional<vle_int> array_length;
+
+    /** Type constructor. */
+    std::function<void(void*)> type_constructor = nullptr;
+
+    /** Type destructor. */
+    std::function<void(void*)> type_destructor = nullptr;
 
     /** Default constructors. */
     variable() = default;
@@ -133,11 +169,16 @@ struct variable : public symbol
      * Construct a variable.
      *
      * @param type The variable's type.
-     * @param array_length The variable's array length.
+     * @param array_length The variable's array length or `std::nullopt` if not an array.
      */
-    variable(std::string type, std::int64_t array_length)
+    variable(std::string type,
+             std::optional<std::int64_t> array_length = std::nullopt,
+             std::function<void(void*)> type_constructor = nullptr,
+             std::function<void(void*)> type_destructor = nullptr)
     : type{std::move(type)}
-    , array_length{array_length}
+    , array_length{std::move(array_length)}
+    , type_constructor{std::move(type_constructor)}
+    , type_destructor{std::move(type_destructor)}
     {
     }
 };

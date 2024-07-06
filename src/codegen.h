@@ -84,7 +84,7 @@ protected:
     void validate() const
     {
         bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
-        bool is_ref = (type == "addr") || (type == "ptr");
+        bool is_ref = (type == "addr");
         if(is_builtin || is_ref)
         {
             if(aggregate_type.has_value())
@@ -1897,6 +1897,9 @@ class context
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
 
+    /** Holds the array type when declaring an array. */
+    std::optional<value> array_type = std::nullopt;
+
 protected:
     /**
      * Check that the insertion point is not null.
@@ -2132,6 +2135,35 @@ public:
     }
 
     /**
+     * Return the array type.
+     *
+     * @return The array type.
+     * @throws Throws a `codegen_error` if no array was declared.
+     */
+    value get_array_type() const
+    {
+        if(!array_type.has_value())
+        {
+            throw codegen_error("Cannot get array type since no array was declared.");
+        }
+        return *array_type;
+    }
+
+    /**
+     * Clear the array type. Needs to be called when array declaration is completed.
+     *
+     * @throws Throws a `codegen_error` if no array was declared.
+     */
+    void clear_array_type()
+    {
+        if(!array_type.has_value())
+        {
+            throw codegen_error("Cannot clear array type since no array was declared.");
+        }
+        array_type.reset();
+    }
+
+    /**
      * Push a new `break`-`continue` `basic_block` pair.
      *
      * @param brk_cnt The `break`-`continue` pair.
@@ -2267,10 +2299,10 @@ public:
     /**
      * Load an array element onto the stack
      *
-     * @param arg The variable or function to load.
-     * @param index Optional index into the array. If set, must be `0`.
+     * @param arg The variable to load or `nullptr` for a reference already loaded onto the stack.
+     * @param load_element Whether we are loading an element from an array.
      */
-    void generate_load(std::unique_ptr<argument> arg, std::optional<std::int32_t> index = std::nullopt);
+    void generate_load(std::unique_ptr<argument> arg, bool load_element = false);
 
     /**
      * Load an element from a structure onto the stack.
@@ -2281,6 +2313,13 @@ public:
      * @param indices Indices into a (possibly nested) structure.
      */
     void generate_load_element(std::vector<int> indices);
+
+    /**
+     * Create a new array of the given type.
+     *
+     * @param vt The array type.
+     */
+    void generate_newarray(value vt);
 
     /**
      * Pop a value from the stack.
@@ -2300,9 +2339,9 @@ public:
      * Store the top of the stack into an array element.
      *
      * @param arg The variable to store into.
-     * @param index Optional index into the array. If set, must be `0`.
+     * @param store_element Whether we are storing an element into an array.
      */
-    void generate_store(std::unique_ptr<variable_argument> arg, std::optional<std::int32_t> index = std::nullopt);
+    void generate_store(std::unique_ptr<argument> arg, bool store_element = false);
 
     /**
      * Store the top of the stack into a structure.

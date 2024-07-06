@@ -423,9 +423,13 @@ TEST(interpreter, return_arrays)
     slang::interpreter::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "return_array", {}));
-    ASSERT_EQ(res.get<std::vector<int>>()->size(), 2);
-    EXPECT_EQ((*res.get<std::vector<int>>())[0], 1);
-    EXPECT_EQ((*res.get<std::vector<int>>())[1], 2);
+
+    auto v = *reinterpret_cast<std::vector<int>**>(res.get<void*>());
+    ASSERT_EQ(v->size(), 2);
+    EXPECT_EQ((*v)[0], 1);
+    EXPECT_EQ((*v)[1], 2);
+
+    ASSERT_NO_THROW(delete v);
 }
 
 TEST(interpreter, pass_array)
@@ -500,10 +504,21 @@ TEST(interpreter, return_str_array)
     slang::interpreter::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
-    ASSERT_EQ(res.get<std::vector<std::string>>()->size(), 3);
-    EXPECT_EQ((*res.get<std::vector<std::string>>())[0], "a");
-    EXPECT_EQ((*res.get<std::vector<std::string>>())[1], "test");
-    EXPECT_EQ((*res.get<std::vector<std::string>>())[2], "123");
+
+    {
+        auto array = *reinterpret_cast<std::vector<std::string*>**>(res.get<void*>());
+        ASSERT_EQ(array->size(), 3);
+        EXPECT_EQ(*(*array)[0], "a");
+        EXPECT_EQ(*(*array)[1], "test");
+        EXPECT_EQ(*(*array)[2], "123");
+
+        for(std::string*& s: *array)
+        {
+            ASSERT_NO_THROW(delete s);
+        }
+
+        ASSERT_NO_THROW(delete array);
+    }
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "ret_str", {}));
     EXPECT_EQ(*res.get<std::string>(), "123");

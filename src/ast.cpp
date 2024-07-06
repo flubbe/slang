@@ -382,54 +382,41 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
     }
 
-    if(element_expr)
+    if(mc == memory_context::none)
     {
-        element_expr->generate_code(ctx, memory_context::load);
-    }
-    std::optional<std::int32_t> index = element_expr ? std::nullopt : std::make_optional(0);
-
-    if(mc == memory_context::none || mc == memory_context::load)
-    {
-        if(!element_expr && var->is_array())
+        // load arrays for assignments.
+        if(element_expr)
         {
-            // load all array elements.
-            if(var->get_array_length() >= std::numeric_limits<int>::max())
-            {
-                throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", var->get_array_length(), std::numeric_limits<int>::max()));
-            }
-            ctx.generate_load(std::make_unique<cg::variable_argument>(*var), 0);
-            for(std::size_t i = 1; i < var->get_array_length(); ++i)
-            {
-                ctx.generate_const({"i32"}, static_cast<int>(i));
-                ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
-            }
+            ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            element_expr->generate_code(ctx, memory_context::load);
+        }
+    }
+    else if(mc == memory_context::load)
+    {
+        ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+
+        if(element_expr)
+        {
+            element_expr->generate_code(ctx, memory_context::load);
+            ctx.generate_load(std::make_unique<cg::type_argument>(var->deref()), true);
+        }
+    }
+    else if(mc == memory_context::store)
+    {
+        if(element_expr)
+        {
+            ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            element_expr->generate_code(ctx, memory_context::load);
+            ctx.generate_store(std::make_unique<cg::type_argument>(var->deref()), true);
         }
         else
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(*var), index);
+            ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
         }
     }
     else
     {
-        if(!element_expr && var->is_array())
-        {
-            // store all array elements.
-            if(var->get_array_length() >= std::numeric_limits<int>::max())
-            {
-                throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", var->get_array_length(), std::numeric_limits<int>::max()));
-            }
-            std::size_t array_length = var->get_array_length();
-            for(std::size_t i = 0; i < array_length - 1; ++i)
-            {
-                ctx.generate_const({"i32"}, static_cast<int>(array_length - i - 1));
-                ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
-            }
-            ctx.generate_store(std::make_unique<cg::variable_argument>(*var), 0);
-        }
-        else
-        {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(*var), index);
-        }
+        throw cg::codegen_error(loc, "Invalid memory context.");
     }
 
     if(element_expr)
@@ -462,6 +449,10 @@ std::optional<std::string> variable_reference_expression::type_check(ty::context
 
 std::string variable_reference_expression::to_string() const
 {
+    if(element_expr)
+    {
+        return fmt::format("VariableReference(name={}, element_expr={})", name.s, element_expr->to_string());
+    }
     return fmt::format("VariableReference(name={})", name.s);
 }
 
@@ -482,42 +473,39 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         throw cg::codegen_error(loc, fmt::format("No scope available for adding locals."));
     }
 
+    cg::value v;
     if(ty::is_builtin_type(type.s))
     {
-        s->add_local(std::make_unique<cg::value>(type.s, std::nullopt, name.s, array_length));
+        v = {type.s, std::nullopt, name.s, array_length};
     }
     else
     {
-        s->add_local(std::make_unique<cg::value>("aggregate", type.s, name.s, array_length));
+        v = {"aggregate", type.s, name.s, array_length};
+    }
+
+    s->add_local(std::make_unique<cg::value>(v));
+
+    if(is_array())
+    {
+        if(array_length.value() >= std::numeric_limits<std::int32_t>::max())
+        {
+            throw cg::codegen_error(loc, fmt::format("Array size exceeds max i32 size ({}).", std::numeric_limits<std::int32_t>::max()));
+        }
+
+        ctx.generate_const({"i32"}, static_cast<std::int32_t>(array_length.value()));
+        ctx.generate_newarray(v);
     }
 
     if(expr)
     {
-        auto v = expr->generate_code(ctx);
-        if(ty::is_builtin_type(type.s))
-        {
-            if(is_array())
-            {
-                for(std::size_t i = *array_length - 1; i >= 1; --i)
-                {
-                    ctx.generate_const({"i32"}, static_cast<int>(i));
-                    ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}));
-                }
-            }
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{type.s, std::nullopt, name.s}), 0);
-        }
-        else
-        {
-            if(is_array())
-            {
-                for(std::size_t i = *array_length - 1; i >= 1; --i)
-                {
-                    ctx.generate_const({"i32"}, static_cast<int>(i));
-                    ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}));
-                }
-            }
-            ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"aggregate", type.s, name.s}), 0);
-        }
+        expr->generate_code(ctx, memory_context::load);
+    }
+
+    ctx.generate_store(std::make_unique<cg::variable_argument>(v));
+
+    if(is_array())
+    {
+        ctx.clear_array_type();
     }
 
     return nullptr;
@@ -562,10 +550,23 @@ std::string variable_declaration_expression::to_string() const
 std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     std::unique_ptr<cg::value> v;
+    auto array_type = ctx.get_array_type();
 
-    for(auto& expr: exprs)
+    for(std::size_t i = 0; i < exprs.size(); ++i)
     {
+        auto& expr = exprs[i];
+
+        // the top of the stack contains the array address.
+        ctx.generate_dup(array_type);
+        ctx.generate_const({"i32"}, static_cast<std::int32_t>(i));
+
         auto expr_value = expr->generate_code(ctx, memory_context::load);
+        if(i >= std::numeric_limits<std::int32_t>::max())
+        {
+            throw cg::codegen_error(loc, fmt::format("Array index exceeds max i32 size ({}).", std::numeric_limits<std::int32_t>::max()));
+        }
+        ctx.generate_store(std::make_unique<cg::type_argument>(*expr_value), true);
+
         if(!v)
         {
             v = std::move(expr_value);
@@ -574,7 +575,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
         {
             if(v->get_resolved_type() != expr_value->get_resolved_type())
             {
-                throw cg::codegen_error(loc, fmt::format("Found inconsistent types during array initialization: '{}' and '{}'.", v->get_resolved_type(), expr_value->get_resolved_type()));
+                throw cg::codegen_error(loc, fmt::format("Inconsistent types in array initialization: '{}' and '{}'.", v->get_resolved_type(), expr_value->get_resolved_type()));
             }
         }
     }
@@ -883,14 +884,10 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             throw cg::codegen_error(loc, "Invalid memory context for assignment.");
         }
 
+        auto lhs_value = lhs->generate_code(ctx, memory_context::none);
         auto rhs_value = rhs->generate_code(ctx, memory_context::load);
-        auto lhs_value = lhs->generate_code(ctx, memory_context::store);
 
-        // TODO This is handled by the type system.
-        if(lhs_value->get_type() != rhs_value->get_type())
-        {
-            throw cg::codegen_error(loc, fmt::format("Types don't match in assignment. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
-        }
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*lhs_value), lhs->is_member_access());
 
         if(mc == memory_context::load)
         {
@@ -981,7 +978,7 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
         ctx.generate_binary_op(cg::binary_op::op_add, *v);
 
         ctx.generate_dup(*v);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
         return v;
     }
     else if(op.s == "--")
@@ -1003,7 +1000,7 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
         ctx.generate_binary_op(cg::binary_op::op_sub, *v);
 
         ctx.generate_dup(*v);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
         return v;
     }
     else if(op.s == "+")
@@ -1129,7 +1126,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(slang::codegen::con
         }
         ctx.generate_binary_op(cg::binary_op::op_add, *v);
 
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
     }
     else if(op.s == "--")
     {
@@ -1144,7 +1141,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(slang::codegen::con
         }
         ctx.generate_binary_op(cg::binary_op::op_sub, *v);
 
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v), 0);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
     }
     else
     {
@@ -1475,34 +1472,9 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     auto return_type = ctx.get_prototype(callee.s).get_return_type();
     if(index_expr)
     {
-        // Store the returned array inside a temporary and then index into it.
-        cg::value temporary;
-        if(ty::is_builtin_type(return_type.get_type()))
-        {
-            temporary = ctx.get_scope()->add_temporary(std::make_unique<cg::value>(return_type.get_type(), std::nullopt, std::nullopt, return_type.get_array_length()));
-        }
-        else
-        {
-            temporary = ctx.get_scope()->add_temporary(std::make_unique<cg::value>("aggregate", return_type.get_type(), std::nullopt, return_type.get_array_length()));
-        }
-
-        if(return_type.get_array_length() >= std::numeric_limits<int>::max())
-        {
-            throw cg::codegen_error(fmt::format("Array length too large ({} >= {}).", return_type.get_array_length(), std::numeric_limits<int>::max()));
-        }
-        std::size_t array_length = return_type.get_array_length();
-        for(std::size_t i = 0; i < array_length - 1; ++i)
-        {
-            ctx.generate_const({"i32"}, static_cast<int>(array_length - i - 1));
-            ctx.generate_store(std::make_unique<cg::variable_argument>(temporary));
-        }
-        ctx.generate_store(std::make_unique<cg::variable_argument>(temporary), 0);
-
         // evaluate the index expression.
         index_expr->generate_code(ctx, memory_context::load);
-
-        // load the element from the temporary.
-        ctx.generate_load(std::make_unique<cg::variable_argument>(temporary));
+        ctx.generate_load(std::make_unique<cg::type_argument>(return_type.deref()), true);
         return std::make_unique<cg::value>(std::move(return_type.deref()));
     }
 
@@ -1577,12 +1549,20 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
         throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
     }
 
-    auto v = expr->generate_code(ctx);
-    if(!v)
+    if(expr)
     {
-        throw cg::codegen_error(loc, "Expression did not yield a type.");
+        auto v = expr->generate_code(ctx, memory_context::load);
+        if(!v)
+        {
+            throw cg::codegen_error(loc, "Expression did not yield a type.");
+        }
+        ctx.generate_ret(*v);
     }
-    ctx.generate_ret(*v);
+    else
+    {
+        ctx.generate_ret();
+    }
+
     return nullptr;
 }
 

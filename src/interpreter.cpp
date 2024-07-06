@@ -23,33 +23,126 @@ namespace slang::interpreter
 /**
  * Return the size of a built-in type.
  *
- * @param type The type name.
+ * @param type_name The base type name.
+ * @param is_array Whether the type is an array.
+ * @param is_ref Whether this is a reference.
  * @return Returns the type size.
  * @throws Throws an `interpreter_error` if the type is not known.
  */
-static std::size_t get_type_size(const std::pair<std::string, std::optional<std::size_t>>& type)
+static std::size_t get_type_size(const std::string& type_name, bool is_array, bool is_ref)
 {
-    auto& name = std::get<0>(type);
-    std::size_t length = std::get<1>(type).has_value() ? *std::get<1>(type) : 1;
+    if(is_ref || is_array)
+    {
+        return sizeof(void*);
+    }
 
-    if(name == "void")
+    if(type_name == "void")
     {
         return 0;
     }
-    else if(name == "i32")
+    else if(type_name == "i32")
     {
-        return sizeof(std::uint32_t) * length;
+        return sizeof(std::int32_t);
     }
-    else if(name == "f32")
+    else if(type_name == "f32")
     {
-        return sizeof(float) * length;
+        return sizeof(float);
     }
-    else if(name == "str")
+    else if(type_name == "str")
     {
-        return sizeof(std::string*) * length;
+        return sizeof(std::string*);
     }
 
-    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", name));
+    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
+}
+
+/**
+ * Return the constructor for a type.
+ *
+ * @param ctx The interpreter context.
+ * @param type_name The type name.
+ * @param array_length Optional array length.
+ * @return Returns a constructor function for types that need construction, and `nullptr` otherwise.
+ */
+static std::function<void(void*)> get_type_constructor(context& ctx, const std::string& type_name, std::optional<std::size_t> array_length)
+{
+    if(!array_length.has_value())
+    {
+        return nullptr;
+    }
+
+    if(type_name == "i32")
+    {
+        return std::move([&ctx, array_length](void* memory) -> void
+                         { 
+                            auto v = new std::vector<std::int32_t>();
+                            v->resize(*array_length); 
+                            *reinterpret_cast<std::vector<std::int32_t>**>(memory) = v;
+                            ctx.gc_add(v); });
+    }
+    else if(type_name == "f32")
+    {
+        return std::move([&ctx, array_length](void* memory) -> void
+                         { 
+                            auto v = new std::vector<float>();
+                            v->resize(*array_length); 
+                            *reinterpret_cast<std::vector<float>**>(memory) = v; 
+                            ctx.gc_add(v); });
+    }
+    else if(type_name == "str")
+    {
+        return std::move([&ctx, array_length](void* memory) -> void
+                         { 
+                            auto v = new std::vector<std::string*>();
+                            v->resize(*array_length); 
+                            for(auto& s : *v)
+                            {
+                                s = new std::string();
+                            }
+                            *reinterpret_cast<std::vector<std::string*>**>(memory) = v;
+                            ctx.gc_add(v); });
+    }
+    else
+    {
+        throw interpreter_error(fmt::format("No constructor for type '{}' found.", type_name));
+    }
+}
+
+/**
+ * Return the destructor for a type.
+ *
+ * @param type_name The type name.
+ * @param array_length Optional array length.
+ * @return Returns a constructor function for types that need construction, and `nullptr` otherwise.
+ */
+static std::function<void(void*)> get_type_destructor(const std::string& type_name, std::optional<std::size_t> array_length)
+{
+    if(!array_length.has_value())
+    {
+        return nullptr;
+    }
+
+    if(type_name == "i32")
+    {
+        return std::move([](void* memory) -> void
+                         { 
+                            auto v = reinterpret_cast<std::vector<std::int32_t>*>(memory);
+                            v->~vector(); });
+    }
+    else if(type_name == "f32")
+    {
+        return std::move([](void* memory) -> void
+                         { reinterpret_cast<std::vector<float>*>(memory)->std::vector<float>::~vector(); });
+    }
+    else if(type_name == "str")
+    {
+        return std::move([](void* memory) -> void
+                         { reinterpret_cast<std::vector<std::string*>*>(memory)->std::vector<std::string*>::~vector(); });
+    }
+    else
+    {
+        throw interpreter_error(fmt::format("No constructor for type '{}' found.", type_name));
+    }
 }
 
 /**
@@ -92,11 +185,11 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
  */
 static int32_t get_stack_delta(const function_signature& s)
 {
-    std::int32_t return_type_size = get_type_size(s.return_type);
+    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second.has_value(), s.return_type.second.has_value());
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        arg_size += get_type_size(it);
+        arg_size += get_type_size(it.first, it.second.has_value(), it.second.has_value());
     }
     return return_type_size - arg_size;
 }
@@ -105,11 +198,17 @@ static int32_t get_stack_delta(const function_signature& s)
  * function implementation.
  */
 
-function::function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size, std::size_t stack_size)
+function::function(function_signature signature,
+                   std::size_t entry_point,
+                   std::size_t size,
+                   std::vector<variable> locals,
+                   std::size_t locals_size,
+                   std::size_t stack_size)
 : signature{std::move(signature)}
 , native{false}
 , entry_point_or_function{entry_point}
 , size{size}
+, locals{std::move(locals)}
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
@@ -132,7 +231,7 @@ function::function(function_signature signature, std::function<void(operand_stac
  * context implementation.
  */
 
-void context::decode_locals(function_descriptor& desc) const
+void context::decode_locals(function_descriptor& desc)
 {
     if(desc.native)
     {
@@ -151,11 +250,10 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size({v.type, 1});
+        v.size = get_type_size(v.type, v.array_length.has_value(), false);
 
-        auto total_size = v.size * v.array_length.i;
-        details.locals_size += total_size;
-        details.args_size += total_size;
+        details.locals_size += v.size;
+        details.args_size += v.size;
     }
 
     // locals.
@@ -164,12 +262,19 @@ void context::decode_locals(function_descriptor& desc) const
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size({v.type, 1});
-        details.locals_size += v.size * v.array_length.i;
+        v.size = get_type_size(v.type, v.array_length.has_value(), false);
+
+        auto array_length = v.array_length.has_value()
+                              ? std::make_optional<std::size_t>(v.array_length->i)
+                              : std::nullopt;
+        v.type_constructor = get_type_constructor(*this, v.type, array_length);
+        v.type_destructor = get_type_destructor(v.type, array_length);
+
+        details.locals_size += v.size;
     }
 
     // return type
-    details.return_size = get_type_size(desc.signature.return_type);
+    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second.has_value(), desc.signature.return_type.second.has_value());
 }
 
 std::int32_t context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
@@ -180,10 +285,24 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
         return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+    case opcode::adup:
+        return static_cast<std::int32_t>(sizeof(void*));
     case opcode::pop:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::spop:
         return -static_cast<std::int32_t>(sizeof(std::string*));
+    case opcode::apop:
+        return -static_cast<std::int32_t>(sizeof(void*));
+    case opcode::iaload: [[fallthrough]];
+    case opcode::faload:
+        return -static_cast<std::int32_t>(sizeof(void*));
+    case opcode::saload:
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(std::string*));
+    case opcode::iastore: [[fallthrough]];
+    case opcode::fastore:
+        return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+    case opcode::sastore:
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
     case opcode::isub: [[fallthrough]];
@@ -213,8 +332,21 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
-    case opcode::ret:
+    case opcode::ret: [[fallthrough]];
+    case opcode::iret: [[fallthrough]];
+    case opcode::fret: [[fallthrough]];
+    case opcode::sret: [[fallthrough]];
+    case opcode::aret:
         return 0;
+    /* opcodes with one 1-byte argument. */
+    case opcode::newarray:
+    {
+        std::uint8_t i_u8;
+        ar & i_u8;
+
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u8), reinterpret_cast<std::byte*>(&i_u8) + sizeof(i_u8));
+        return static_cast<std::int32_t>(sizeof(void*));
+    }
     /* opcodes with one 4-byte argument. */
     case opcode::iconst: [[fallthrough]];
     case opcode::fconst:
@@ -223,19 +355,16 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         ar & i_u32;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
-        return sizeof(std::uint32_t);
+        return static_cast<std::int32_t>(sizeof(std::uint32_t));
     }
     /* opcodes with one VLE integer. */
-    case opcode::iret: [[fallthrough]];
-    case opcode::fret: [[fallthrough]];
-    case opcode::sret: [[fallthrough]];
     case opcode::sconst:
     {
         vle_int i;
         ar & i;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
-        return sizeof(std::string*);
+        return static_cast<std::int32_t>(sizeof(std::string*));
     }
     case opcode::label:
     {
@@ -270,7 +399,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
 
         mod.jump_origins.insert({code.size(), i2.i});
         code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
-        return 0;
+        return -static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /** invoke. */
     case opcode::invoke:
@@ -322,18 +451,14 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         }
     }
     /* opcodes that need to resolve a variable. */
-    case opcode::iloada: [[fallthrough]];
-    case opcode::floada: [[fallthrough]];
-    case opcode::sloada: [[fallthrough]];
-    case opcode::istorea: [[fallthrough]];
-    case opcode::fstorea: [[fallthrough]];
-    case opcode::sstorea: [[fallthrough]];
     case opcode::iload: [[fallthrough]];
     case opcode::fload: [[fallthrough]];
     case opcode::sload: [[fallthrough]];
+    case opcode::aload: [[fallthrough]];
     case opcode::istore: [[fallthrough]];
     case opcode::fstore: [[fallthrough]];
-    case opcode::sstore:
+    case opcode::sstore: [[fallthrough]];
+    case opcode::astore:
     {
         vle_int i;
         ar & i;
@@ -347,23 +472,26 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
 
         // return correct size.
-        bool is_store = (static_cast<opcode>(instr) == opcode::istorea)
-                        || (static_cast<opcode>(instr) == opcode::fstorea)
-                        || (static_cast<opcode>(instr) == opcode::sstorea)
-                        || (static_cast<opcode>(instr) == opcode::istore)
+        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
-                        || (static_cast<opcode>(instr) == opcode::sstore);
-        bool is_string = (static_cast<opcode>(instr) == opcode::sloada)
-                         || (static_cast<opcode>(instr) == opcode::sstorea)
-                         || (static_cast<opcode>(instr) == opcode::sload)
+                        || (static_cast<opcode>(instr) == opcode::sstore)
+                        || (static_cast<opcode>(instr) == opcode::astore);
+        bool is_string = (static_cast<opcode>(instr) == opcode::sload)
                          || (static_cast<opcode>(instr) == opcode::sstore);
-        if(!is_string)
+        bool is_ref = (static_cast<opcode>(instr) == opcode::aload)
+                      || (static_cast<opcode>(instr) == opcode::astore);
+
+        if(is_string)
         {
-            return is_store ? -static_cast<std::int32_t>(sizeof(std::uint32_t)) : sizeof(std::uint32_t);    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
+            return is_store ? -static_cast<std::int32_t>(sizeof(std::string*)) : sizeof(std::string*);
+        }
+        else if(is_ref)
+        {
+            return is_store ? -static_cast<std::int32_t>(sizeof(void*)) : sizeof(void*);
         }
         else
         {
-            return is_store ? -static_cast<std::int32_t>(sizeof(std::string*)) : sizeof(std::string*);
+            return is_store ? -static_cast<std::int32_t>(sizeof(std::uint32_t)) : sizeof(std::uint32_t);    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
         }
     }
     default:
@@ -553,10 +681,264 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
     return decoded_module;
 }
 
-std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
-                                              std::size_t entry_point,
-                                              std::size_t size,
-                                              stack_frame& frame)
+void context::gc_add_array(void* array, array_type type, std::uint32_t flags)
+{
+    if(gc_root_set.find(array) != gc_root_set.end())
+    {
+        throw interpreter_error(fmt::format("Array at {} already exists in GC root set.", array));
+    }
+
+    if(type == array_type::i32)
+    {
+        gc_root_set.insert({array, gc_object{gc_object_type::array_i32, 1, flags, array}});
+    }
+    else if(type == array_type::f32)
+    {
+        gc_root_set.insert({array, gc_object{gc_object_type::array_f32, 1, flags, array}});
+    }
+    else if(type == array_type::str)
+    {
+        gc_root_set.insert({array, gc_object{gc_object_type::array_str, 1, flags, array}});
+    }
+    else if(type == array_type::ref)
+    {
+        gc_root_set.insert({array, gc_object{gc_object_type::array_aref, 1, flags, array}});
+    }
+    else
+    {
+        throw interpreter_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(type)));
+    }
+}
+
+void context::gc_set_flags(void* obj, std::uint32_t flags, bool propagate)
+{
+    auto it = gc_root_set.find(static_cast<void*>(obj));
+    if(it == gc_root_set.end())
+    {
+        throw interpreter_error(fmt::format("Cannot set flags for object at {}, since it is not in the GC root set.", static_cast<void*>(obj)));
+    }
+
+    if(it->second.flags & gc_object::gc_flags::of_visited)
+    {
+        return;
+    }
+
+    it->second.flags |= flags;
+
+    // propagate flags.
+    if(propagate)
+    {
+        it->second.flags |= gc_object::gc_flags::of_visited;
+        if(it->second.type == gc_object_type::array_str)
+        {
+            auto array = static_cast<std::vector<std::string*>*>(obj);
+            for(std::string*& s: *array)
+            {
+                gc_set_flags(s, flags, true);
+            }
+        }
+        else if(it->second.type == gc_object_type::array_aref)
+        {
+            auto array = static_cast<std::vector<void*>*>(obj);
+            for(void*& obj: *array)
+            {
+                gc_set_flags(obj, flags, true);
+            }
+        }
+        it->second.flags &= ~gc_object::gc_flags::of_visited;
+    }
+}
+
+std::string* context::gc_add(std::string* s, std::uint32_t flags)
+{
+    if(gc_root_set.find(static_cast<void*>(s)) != gc_root_set.end())
+    {
+        throw interpreter_error(fmt::format("String at {} already exists in GC root set.", static_cast<void*>(s)));
+    }
+    gc_root_set.insert({static_cast<void*>(s), gc_object::from(s, flags)});
+    return s;
+}
+
+void context::gc_run()
+{
+    std::size_t root_set_size = gc_root_set.size();
+
+    std::unordered_map<void*, gc_object> collected;
+    for(auto& [obj, obj_info]: gc_root_set)
+    {
+        if(obj_info.flags & gc_object::of_never_collect)
+        {
+            continue;
+        }
+
+        if(obj_info.ref_count == 0)
+        {
+            collected.insert({obj, obj_info});
+        }
+    }
+
+    for(auto& [obj, obj_info]: collected)
+    {
+        gc_root_set.erase(obj);
+    }
+
+    for(auto& [obj, obj_info]: collected)
+    {
+        if(obj_info.type == gc_object_type::str)
+        {
+            auto str = static_cast<std::string*>(obj);
+            delete str;
+        }
+        else if(obj_info.type == gc_object_type::array_i32)
+        {
+            auto array = static_cast<std::vector<std::int32_t>*>(obj);
+            delete array;
+        }
+        else if(obj_info.type == gc_object_type::array_f32)
+        {
+            auto array = static_cast<std::vector<float>*>(obj);
+            delete array;
+        }
+        else if(obj_info.type == gc_object_type::array_str)
+        {
+            auto array = static_cast<std::vector<std::string*>*>(obj);
+            delete array;
+        }
+        else if(obj_info.type == gc_object_type::array_aref)
+        {
+            auto array = static_cast<std::vector<void*>*>(obj);
+            delete array;
+        }
+        else
+        {
+            throw interpreter_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
+        }
+    }
+}
+
+void context::gc_reset()
+{
+    // mark all objects.
+    for(auto& [obj, obj_info]: gc_root_set)
+    {
+        obj_info.ref_count = 0;
+    }
+
+    // delete all.
+    gc_run();
+
+    // clear root set.
+    gc_root_set.clear();
+}
+
+void context::gc_increment_refcount(void* addr, bool propagate)
+{
+    auto it = gc_root_set.find(addr);
+    if(it == gc_root_set.end())
+    {
+        throw interpreter_error(fmt::format("Reference at {} does not exists in GC root set.", addr));
+    }
+
+    if(it->second.flags & gc_object::gc_flags::of_visited)
+    {
+        return;
+    }
+
+    ++it->second.ref_count;
+
+    if(propagate)
+    {
+        it->second.flags |= gc_object::gc_flags::of_visited;
+
+        if(it->second.type == gc_object_type::array_str)
+        {
+            auto array = static_cast<std::vector<std::string*>*>(addr);
+            for(std::string*& s: *array)
+            {
+                gc_increment_refcount(s, true);
+            }
+        }
+        else if(it->second.type == gc_object_type::array_aref)
+        {
+            auto array = static_cast<std::vector<void*>*>(addr);
+            for(void*& obj: *array)
+            {
+                gc_increment_refcount(obj, true);
+            }
+        }
+
+        it->second.flags &= ~gc_object::gc_flags::of_visited;
+    }
+}
+
+void context::gc_decrement_refcount(void* addr, bool propagate)
+{
+    auto it = gc_root_set.find(addr);
+    if(it == gc_root_set.end())
+    {
+        throw interpreter_error(fmt::format("Reference at {} does not exists in GC root set.", addr));
+    }
+
+    if(it->second.flags & gc_object::of_visited)
+    {
+        return;
+    }
+
+    --it->second.ref_count;
+
+    if(propagate)
+    {
+        it->second.flags |= gc_object::of_visited;
+
+        if(it->second.type == gc_object_type::array_str)
+        {
+            auto array = static_cast<std::vector<std::string*>*>(addr);
+            for(std::string*& s: *array)
+            {
+                gc_decrement_refcount(s, true);
+            }
+        }
+        else if(it->second.type == gc_object_type::array_aref)
+        {
+            auto array = static_cast<std::vector<void*>*>(addr);
+            for(void*& obj: *array)
+            {
+                gc_decrement_refcount(obj, true);
+            }
+        }
+
+        it->second.flags &= ~gc_object::of_visited;
+    }
+}
+
+/** Handle local variable construction and destruction. */
+class local_construction_scope
+{
+    context& ctx;
+    const std::vector<variable>& locals;
+    stack_frame& frame;
+
+public:
+    local_construction_scope(context& ctx, const std::vector<variable>& locals, stack_frame& frame)
+    : ctx{ctx}
+    , locals{locals}
+    , frame{frame}
+    {
+        for(auto& local: locals)
+        {
+            if(local.type_constructor)
+            {
+                local.type_constructor(&frame.locals[local.offset]);
+            }
+        }
+    }
+};
+
+opcode context::exec(const language_module& mod,
+                     std::size_t entry_point,
+                     std::size_t size,
+                     const std::vector<variable>& locals,
+                     stack_frame& frame)
 {
     if(!mod.is_decoded())
     {
@@ -577,6 +959,8 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
         throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
     }
 
+    local_construction_scope lcs{*this, locals, frame};
+
     const std::size_t function_end = offset + size;
     while(offset < function_end)
     {
@@ -584,18 +968,28 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
         ++offset;
 
         // return.
-        if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::sret))
+        if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
         {
-            --call_stack_level;
-
-            std::int64_t array_length = 0;
-            if(instr != static_cast<std::byte>(opcode::ret))
+            // mark locals for collection.
+            for(auto& local: locals)
             {
-                // read array length.
-                array_length = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+                if(local.type == "str")
+                {
+                    gc_decrement_refcount(*reinterpret_cast<void**>(&frame.locals[local.offset]));
+                }
             }
 
-            return std::make_pair(static_cast<opcode>(instr), array_length);
+            // if we return an object, make sure it is not destroyed.
+            if(instr == static_cast<std::byte>(opcode::sret) || instr == static_cast<std::byte>(opcode::aret))
+            {
+                gc_increment_refcount(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
+            }
+
+            // run garbage collector.
+            gc_run();
+
+            --call_stack_level;
+            return static_cast<opcode>(instr);
         }
 
         if(offset == function_end)
@@ -611,6 +1005,11 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             frame.stack.dup_i32();
             break;
         } /* opcode::idup, opcode::fdup */
+        case opcode::adup:
+        {
+            frame.stack.dup_addr();
+            break;
+        } /* opcode::adup */
         case opcode::pop:
         {
             frame.stack.pop_i32();
@@ -621,6 +1020,11 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             frame.stack.pop_addr<std::string>();
             break;
         } /* opcode::spop */
+        case opcode::apop:
+        {
+            frame.stack.pop_addr<void>();
+            break;
+        } /* opcode::apop */
         case opcode::iadd:
         {
             frame.stack.push_i32(frame.stack.pop_i32() + frame.stack.pop_i32());
@@ -714,91 +1118,93 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
             }
 
-            frame.stack.push_addr(&frame.string_table[i]);
+            auto str = gc_new<std::string>();
+            *str = frame.string_table[i];
+
+            frame.stack.push_addr(str);
             break;
         } /* opcode::sconst */
-        case opcode::iloada: [[fallthrough]];
-        case opcode::floada:
+        case opcode::iaload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            std::int32_t array_index = frame.stack.pop_i32();
+            std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
 
-            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
-
-            if(i < 0)
+            if(array_index < 0 || array_index > arr->size())
             {
-                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                throw interpreter_error("Out of bounds array access.");
             }
 
-            if(i + array_offset + sizeof(std::uint32_t) > frame.locals.size())
-            {
-                throw interpreter_error("Invalid memory access.");
-            }
-
-            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]));
+            frame.stack.push_i32((*arr)[array_index]);
             break;
-        } /* opcode::iloada, opcode::floada */
-        case opcode::sloada:
+        } /* opcode::iaload */
+        case opcode::faload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            std::int32_t array_index = frame.stack.pop_i32();
+            std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
 
-            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::string*);
-
-            if(i < 0)
+            if(array_index < 0 || array_index > arr->size())
             {
-                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                throw interpreter_error("Out of bounds array access.");
             }
 
-            if(i + array_offset + sizeof(std::string*) > frame.locals.size())
-            {
-                throw interpreter_error("Invalid memory access.");
-            }
-
-            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i + array_offset]));
+            frame.stack.push_f32((*arr)[array_index]);
             break;
-        } /* opcode::sloada */
-        case opcode::istorea: [[fallthrough]];
-        case opcode::fstorea:
+        } /* opcode::faload */
+        case opcode::saload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            std::int32_t array_index = frame.stack.pop_i32();
+            std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
 
-            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::int32_t);
-
-            if(i < 0)
+            if(array_index < 0 || array_index > arr->size())
             {
-                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                throw interpreter_error("Out of bounds array access.");
             }
 
-            if(i + array_offset + sizeof(std::uint32_t) > frame.locals.size())
-            {
-                throw interpreter_error("Stack overflow.");
-            }
-
-            *reinterpret_cast<std::uint32_t*>(&frame.locals[i + array_offset]) = frame.stack.pop_i32();
+            frame.stack.push_addr((*arr)[array_index]);
             break;
-        } /* opcode::istorea, opcode::fstorea */
-        case opcode::sstorea:
+        } /* opcode::saload */
+        case opcode::iastore:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            std::int32_t v = frame.stack.pop_i32();
+            std::int32_t index = frame.stack.pop_i32();
+            std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
 
-            std::size_t array_offset = frame.stack.pop_i32() * sizeof(std::string*);
-
-            if(i < 0)
+            if(index < 0 || index > arr->size())
             {
-                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                throw interpreter_error("Out of bounds array access.");
             }
 
-            if(i + array_offset + sizeof(std::string*) > frame.locals.size())
-            {
-                throw interpreter_error("Stack overflow.");
-            }
-
-            *reinterpret_cast<std::string**>(&frame.locals[i + array_offset]) = frame.stack.pop_addr<std::string>();
+            (*arr)[index] = v;
             break;
-        } /* opcode::sstorea */
+        } /* opcode::iastore */
+        case opcode::fastore:
+        {
+            float v = frame.stack.pop_f32();
+            std::int32_t index = frame.stack.pop_i32();
+            std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
+
+            if(index < 0 || index > arr->size())
+            {
+                throw interpreter_error("Out of bounds array access.");
+            }
+
+            (*arr)[index] = v;
+            break;
+        } /* opcode::fastore */
+        case opcode::sastore:
+        {
+            std::string* s = frame.stack.pop_addr<std::string>();
+            std::int32_t index = frame.stack.pop_i32();
+            std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
+
+            if(index < 0 || index > arr->size())
+            {
+                throw interpreter_error("Out of bounds array access.");
+            }
+
+            (*arr)[index] = s;
+            break;
+        } /* opcode::sastore */
         case opcode::iload: [[fallthrough]];
         case opcode::fload:
         {
@@ -836,6 +1242,24 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
             break;
         } /* opcode::sload */
+        case opcode::aload:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(void*) > frame.locals.size())
+            {
+                throw interpreter_error("Invalid memory access.");
+            }
+
+            frame.stack.push_addr(*reinterpret_cast<void**>(&frame.locals[i]));
+            break;
+        } /* opcode::aload */
         case opcode::istore: [[fallthrough]];
         case opcode::fstore:
         {
@@ -873,6 +1297,24 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
             *reinterpret_cast<std::string**>(&frame.locals[i]) = frame.stack.pop_addr<std::string>();
             break;
         } /* opcode::sstore */
+        case opcode::astore:
+        {
+            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            offset += sizeof(std::int64_t);
+
+            if(i < 0)
+            {
+                throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+            }
+
+            if(i + sizeof(std::string*) > frame.locals.size())
+            {
+                throw interpreter_error("Stack overflow.");
+            }
+
+            *reinterpret_cast<void**>(&frame.locals[i]) = frame.stack.pop_addr<void>();
+            break;
+        } /* opcode::astore */
         case opcode::invoke:
         {
             language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);
@@ -897,20 +1339,65 @@ std::pair<opcode, std::int64_t> context::exec(const language_module& mod,
                 auto& details = std::get<function_details>(desc->details);
 
                 stack_frame callee_frame{frame.string_table, details.locals_size, details.stack_size};
+
                 auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
                 frame.stack.discard(details.args_size);
 
-                exec(mod, details.offset, details.size, callee_frame);
+                auto ret_opcode = exec(mod, details.offset, details.size, details.locals, callee_frame);
 
                 if(callee_frame.stack.size() != details.return_size)
                 {
                     throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
                 }
                 frame.stack.push_stack(callee_frame.stack);
+
+                if(ret_opcode == opcode::sret || ret_opcode == opcode::aret)
+                {
+                    gc_decrement_refcount(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
+                }
             }
             break;
         } /* opcode::invoke */
+        case opcode::newarray:
+        {
+            std::uint8_t type = static_cast<std::uint8_t>(binary[offset]);
+            offset += sizeof(type);
+
+            std::int32_t size = frame.stack.pop_i32();
+            if(size < 0)
+            {
+                throw interpreter_error(fmt::format("Invalid array size '{}'.", size));
+            }
+
+            if(type == static_cast<std::uint8_t>(array_type::i32))
+            {
+                frame.stack.push_addr(gc_new_array<std::int32_t>(size));
+            }
+            else if(type == static_cast<std::uint8_t>(array_type::f32))
+            {
+                frame.stack.push_addr(gc_new_array<float>(size));
+            }
+            else if(type == static_cast<std::uint8_t>(array_type::str))
+            {
+                auto array = gc_new_array<std::string*>(size);
+                for(std::string*& s: *array)
+                {
+                    s = gc_new<std::string>();
+                }
+                frame.stack.push_addr(array);
+            }
+            else if(type == static_cast<std::uint8_t>(array_type::ref))
+            {
+                frame.stack.push_addr(gc_new_array<void*>(size));
+            }
+            else
+            {
+                throw interpreter_error(fmt::format("Unkown array type '{}' for newarray.", type));
+            }
+
+            break;
+        } /* opcode::newarray */
         case opcode::iand:
         {
             frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());
@@ -1069,7 +1556,6 @@ value context::exec(const language_module& mod,
      * allocate locals and decode arguments.
      */
     stack_frame frame{mod.get_header().strings, f.get_locals_size(), f.get_stack_size()};
-    std::vector<std::string> local_strings;
 
     auto& arg_types = f.get_signature().arg_types;
     if(arg_types.size() != args.size())
@@ -1103,29 +1589,32 @@ value context::exec(const language_module& mod,
             throw interpreter_error("Stack overflow during argument allocation.");
         }
 
-        offset += args[i].write(&frame.locals[offset]);
+        // add types to GC.
+        if(std::get<0>(args[i].get_type()) == "str")
+        {
+            std::size_t start_offset = offset;
+            offset += args[i].write(&frame.locals[offset]);
+            gc_add(*reinterpret_cast<std::string**>(&frame.locals[start_offset]), gc_object::of_never_collect);
+        }
+        else
+        {
+            offset += args[i].write(&frame.locals[offset]);
+        }
     }
 
     /*
      * Execute the function.
      */
     opcode ret_opcode;
-    std::int64_t array_length = 0;
     if(f.is_native())
     {
         auto& func = f.get_function();
         func(frame.stack);
         ret_opcode = f.get_return_opcode();
-        if(f.returns_array())
-        {
-            array_length = f.get_returned_array_length();
-        }
     }
     else
     {
-        auto [oc, length] = exec(mod, f.get_entry_point(), f.get_size(), frame);
-        ret_opcode = oc;
-        array_length = length;
+        ret_opcode = exec(mod, f.get_entry_point(), f.get_size(), f.get_locals(), frame);
     }
 
     /*
@@ -1138,54 +1627,21 @@ value context::exec(const language_module& mod,
     }
     else if(ret_opcode == opcode::iret)
     {
-        if(array_length == 0)
-        {
-            ret = frame.stack.pop_i32();
-        }
-        else
-        {
-            std::vector<int> iret;
-            iret.resize(array_length);
-            for(std::size_t i = 0; i < array_length; ++i)
-            {
-                iret[array_length - i - 1] = frame.stack.pop_i32();
-            }
-            ret = std::move(iret);
-        }
+        ret = frame.stack.pop_i32();
     }
     else if(ret_opcode == opcode::fret)
     {
-        if(array_length == 0)
-        {
-            ret = frame.stack.pop_f32();
-        }
-        else
-        {
-            std::vector<float> fret;
-            fret.resize(array_length);
-            for(std::size_t i = 0; i < array_length; ++i)
-            {
-                fret[array_length - i - 1] = frame.stack.pop_f32();
-            }
-            ret = std::move(fret);
-        }
+        ret = frame.stack.pop_f32();
     }
     else if(ret_opcode == opcode::sret)
     {
-        if(array_length == 0)
-        {
-            ret = std::string{*frame.stack.pop_addr<std::string>()};
-        }
-        else
-        {
-            std::vector<std::string> str_ret;
-            str_ret.resize(array_length);
-            for(std::size_t i = 0; i < array_length; ++i)
-            {
-                str_ret[array_length - i - 1] = *frame.stack.pop_addr<std::string>();
-            }
-            ret = std::move(str_ret);
-        }
+        ret = std::string{*frame.stack.pop_addr<std::string>()};
+    }
+    else if(ret_opcode == opcode::aret)
+    {
+        void* addr = frame.stack.pop_addr<void>();
+        gc_set_flags(addr, gc_object::of_never_collect, true);
+        ret = value{addr};
     }
     else
     {
@@ -1276,7 +1732,7 @@ void context::load_module(const std::string& name, const language_module& mod)
         else
         {
             auto& details = std::get<function_details>(desc.details);
-            fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals_size, details.stack_size}});
+            fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals, details.locals_size, details.stack_size}});
         }
     }
     function_map.insert({name, std::move(fmap)});

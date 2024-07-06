@@ -46,7 +46,8 @@ class value
                  std::string,
                  std::vector<int>,
                  std::vector<float>,
-                 std::vector<std::string>>
+                 std::vector<std::string>,
+                 void*>
       v;
 
     /** Read this value from memory. */
@@ -73,7 +74,7 @@ class value
     {
         static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
                       "Primitive type must be an integer or a floating point type.");
-        v = *reinterpret_cast<const T*>(memory);
+        std::get<T>(v.v) = *reinterpret_cast<const T*>(memory);
         return sizeof(T);
     }
 
@@ -145,7 +146,7 @@ class value
     static std::size_t read_str(const std::byte* memory, value& v)
     {
         std::string* s = *reinterpret_cast<std::string* const*>(memory);
-        v = *s;
+        std::get<std::string>(v.v) = *s;
         return sizeof(std::string*);
     }
 
@@ -209,6 +210,33 @@ class value
         return sizeof(std::string*) * std::get<std::vector<std::string>>(v.v).size();
     }
 
+    /**
+     * Reads an address into a `value`.
+     *
+     * @param memory The memory to read from.
+     * @param v The value write the address to.
+     * @returns Returns `sizeof(void*)`.
+     */
+    static std::size_t read_addr(const std::byte* memory, value& v)
+    {
+        std::get<void*>(v.v) = *reinterpret_cast<void* const*>(memory);
+        return sizeof(void*);
+    }
+
+    /**
+     * Writes an address into memory.
+     *
+     * @param memory The memory to write into.
+     * @param v The address to write.
+     * @returns Returns `sizeof(void*)`.
+     */
+    static std::size_t write_addr(std::byte* memory, const value& v)
+    {
+        const void* addr = std::get<void*>(v.v);
+        *reinterpret_cast<const void**>(memory) = addr;
+        return sizeof(void*);
+    }
+
 public:
     /** Default constructors. */
     value() = default;
@@ -226,9 +254,9 @@ public:
      */
     value(int i)
     : v{i}
-    , reader{read_primitive_type<int>}
-    , writer{write_primitive_type<int>}
-    , size{sizeof(int)}
+    , reader{read_primitive_type<std::int32_t>}
+    , writer{write_primitive_type<std::int32_t>}
+    , size{sizeof(std::int32_t)}
     , type{"i32", std::nullopt}
     {
     }
@@ -283,13 +311,13 @@ public:
      *
      * @param int_vec The integers.
      */
-    value(std::vector<int> int_vec)
+    value(std::vector<std::int32_t> int_vec)
     : v{std::move(int_vec)}
-    , reader{read_vector_type<int>}
-    , writer{write_vector_type<int>}
+    , reader{read_vector_type<std::int32_t>}
+    , writer{write_vector_type<std::int32_t>}
     {
-        size = sizeof(int) * std::get<std::vector<int>>(v).size();
-        type = {"i32", std::get<std::vector<int>>(v).size()};
+        size = sizeof(std::int32_t) * std::get<std::vector<std::int32_t>>(v).size();
+        type = {"i32", std::get<std::vector<std::int32_t>>(v).size()};
     }
 
     /**
@@ -321,6 +349,20 @@ public:
     {
         size = sizeof(std::string*) * std::get<std::vector<std::string>>(v).size();
         type = {"str", std::get<std::vector<std::string>>(v).size()};
+    }
+
+    /**
+     * Construct an address value.
+     *
+     * @param addr The address.
+     */
+    explicit value(void* addr)
+    : v{addr}
+    , reader{read_addr}
+    , writer{write_addr}
+    , size{sizeof(void*)}
+    , type{"addr", std::nullopt}
+    {
     }
 
     /**
@@ -468,6 +510,22 @@ public:
         }
 
         stack.insert(stack.end(), stack.end() - 4, stack.end());
+    }
+
+    /** Duplicate the top address on the stack. */
+    void dup_addr()
+    {
+        if(stack.size() < sizeof(void*))
+        {
+            throw interpreter_error("Stack underflow");
+        }
+
+        if(stack.size() + sizeof(void*) > max_size)
+        {
+            throw interpreter_error("Stack overflow");
+        }
+
+        stack.insert(stack.end(), stack.end() - sizeof(void*), stack.end());
     }
 
     /**
@@ -651,6 +709,9 @@ class function
     /** Returned array length. A length of `0` means "no array". */
     std::int64_t ret_array_length = 0;
 
+    /** Locals. Not serialized. */
+    std::vector<variable> locals;
+
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
 
@@ -673,10 +734,11 @@ public:
      * @param signature The function's signature.
      * @param entry_point The function's entry point, given as an offset into a module binary.
      * @param size The bytecode size.
+     * @param locals Local variables.
      * @param locals_size The arguments and locals size.
      * @param stack_size The operand stack size.
      */
-    function(function_signature signature, std::size_t entry_point, std::size_t size, std::size_t locals_size, std::size_t stack_size);
+    function(function_signature signature, std::size_t entry_point, std::size_t size, std::vector<variable> locals, std::size_t locals_size, std::size_t stack_size);
 
     /**
      * Construct a native function.
@@ -714,6 +776,12 @@ public:
     std::size_t get_size() const
     {
         return size;
+    }
+
+    /** Get the function's locals. */
+    const std::vector<variable>& get_locals() const
+    {
+        return locals;
     }
 
     /** Get the local's size. */
@@ -783,6 +851,83 @@ struct stack_frame
     }
 };
 
+/**
+ * Garbage collector object type.
+ */
+enum class gc_object_type : std::uint8_t
+{
+    str,
+    array_i32,
+    array_f32,
+    array_str,
+    array_aref,
+};
+
+/** Garbage collector object. */
+struct gc_object
+{
+    /** Flags. */
+    enum gc_flags : std::uint32_t
+    {
+        of_none = 0,          /** No flags. */
+        of_visited = 1,       /** Whether this object was visited, e.g. during collection or reference counting. */
+        of_never_collect = 2, /** Never collect this object, even when resetting (e.g. for externally managed objects). */
+    };
+
+    /** Object type. */
+    gc_object_type type;
+
+    /** Reference count. */
+    std::size_t ref_count{0};
+
+    /** Flags. */
+    std::uint32_t flags{of_none};
+
+    /** Object address. */
+    void* addr{nullptr};
+
+    /** Create an object from a type. */
+    template<typename T>
+    static gc_object from(T* obj, std::uint32_t flags = of_none)
+    {
+        static_assert(
+          !std::is_same_v<T, std::string*>
+            && !std::is_same_v<T, std::vector<std::int32_t>*>
+            && !std::is_same_v<T, std::vector<float>*>
+            && !std::is_same_v<T, std::vector<std::string*>*>
+            && !std::is_same_v<T, std::vector<void*>*>,
+          "Cannot create GC object from type.");
+    }
+};
+
+template<>
+inline gc_object gc_object::from<std::string>(
+  std::string* obj, std::uint32_t flags)
+{
+    return {gc_object_type::str, 1, flags, obj};
+}
+
+template<>
+inline gc_object gc_object::from<std::vector<std::int32_t>>(
+  std::vector<std::int32_t>* obj, std::uint32_t flags)
+{
+    return {gc_object_type::array_i32, 1, flags, obj};
+}
+
+template<>
+inline gc_object gc_object::from<std::vector<float>>(
+  std::vector<float>* obj, std::uint32_t flags)
+{
+    return {gc_object_type::array_f32, 1, flags, obj};
+}
+
+template<>
+inline gc_object gc_object::from<std::vector<void*>>(
+  std::vector<void*>* obj, std::uint32_t flags)
+{
+    return {gc_object_type::array_aref, 1, flags, obj};
+}
+
 /** Interpreter context. */
 class context
 {
@@ -804,6 +949,9 @@ class context
     /** The current call stack level. */
     unsigned int call_stack_level = 0;
 
+    /** Garbage collector root set. */
+    std::unordered_map<void*, gc_object> gc_root_set;
+
     /**
      * Decode a module.
      *
@@ -817,7 +965,7 @@ class context
      *
      * @param desc The function descriptor.
      */
-    void decode_locals(function_descriptor& desc) const;
+    void decode_locals(function_descriptor& desc);
 
     /**
      * Decode an instruction.
@@ -853,15 +1001,39 @@ class context
      * @param mod The module.
      * @param entry_point The function's entry point/offset in the binary buffer.
      * @param size The function's bytecode size.
+     * @param locals The locals for the function.
      * @param frame The stack frame for the function.
-     * @return A pair of the function's return opcode and an array length.
-     *         If the array length is zero and the return type not `void`,
-     *         a single element is returned.
+     * @return The function's return opcode.
      */
-    std::pair<opcode, std::int64_t> exec(const language_module& mod,
-                                         std::size_t entry_point,
-                                         std::size_t size,
-                                         stack_frame& frame);
+    opcode exec(const language_module& mod,
+                std::size_t entry_point,
+                std::size_t size,
+                const std::vector<variable>& locals,
+                stack_frame& frame);
+
+    /**
+     * Add array to garbage collected set.
+     *
+     * @param array The array.
+     * @param array_type The array type.
+     * @param flags Flags.
+     */
+    void gc_add_array(void* array, array_type type, std::uint32_t flags = gc_object::of_none);
+
+    /**
+     * Set GC object flags.
+     *
+     * @param obj The object to set the flags for.
+     * @param flags The new flags to set.
+     * @param propagate Whether to propagate flags to referenced objects (e.g. entries in an array).
+     */
+    void gc_set_flags(void* obj, std::uint32_t flags, bool propagate = false);
+
+    /** Run garbage collector. */
+    void gc_run();
+
+    /** Reset the garbage collector. */
+    void gc_reset();
 
 public:
     /** Default constructors. */
@@ -879,10 +1051,16 @@ public:
      * @param file_mgr The file manager to use for module resolution.
      * @param max_call_stack_depth The maximum allowed function call stack depth.
      */
-    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 1000)
+    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 500)
     : file_mgr{file_mgr}
     , max_call_stack_depth{max_call_stack_depth}
     {
+    }
+
+    /** Destructor. */
+    virtual ~context()
+    {
+        gc_reset();
     }
 
     /**
@@ -917,7 +1095,103 @@ public:
     void reset()
     {
         call_stack_level = 0;
+        gc_reset();
     }
+
+    /**
+     * Add array to garbage collected set.
+     *
+     * @param array The array.
+     * @param flags Flags.
+     * @returns Returns the input array.
+     */
+    template<typename T>
+    std::vector<T>* gc_add(std::vector<T>* array, std::uint32_t flags = gc_object::of_none)
+    {
+        static_assert(!std::is_same_v<T, std::int32_t>
+                        && !std::is_same_v<T, float>
+                        && !std::is_same_v<T, std::string*>
+                        && !std::is_same_v<T, void*>,
+                      "No GC implementation for array type.");
+    }
+
+    /**
+     * Add a string to the garbage collected set.
+     *
+     * @param s The string.
+     * @param flags Flags.
+     * @returns Returns the input string.
+     */
+    std::string* gc_add(std::string* s, std::uint32_t flags = gc_object::of_none);
+
+    /**
+     * Allocate a new garbage collected variable.
+     *
+     * @param flags Flags.
+     * @returns Returns a (pointer to a) garbage collected variable.
+     */
+    template<typename T>
+    T* gc_new(std::uint32_t flags = gc_object::of_none)
+    {
+        return gc_add(new T, flags);
+    }
+
+    /**
+     * Allocate a new garbage collected array.
+     *
+     * @param size The array size.
+     * @param flags Flags.
+     * @returns Returns a (pointer to a) garbage collected array.
+     */
+    template<typename T>
+    std::vector<T>* gc_new_array(std::size_t size, std::uint32_t flags = gc_object::of_none)
+    {
+        auto v = new std::vector<T>();
+        v->resize(size);
+        return gc_add(v, flags);
+    }
+
+    /** Add a reference to the GC set. */
+    void gc_increment_refcount(void* addr, bool propagate = true);
+
+    /** Remove a reference from the GC set. */
+    void gc_decrement_refcount(void* addr, bool propagate = true);
 };
+
+/*
+ * Specializations for garbage collector.
+ */
+
+template<>
+inline std::vector<std::int32_t>* context::gc_add<std::int32_t>(
+  std::vector<std::int32_t>* array, std::uint32_t flags)
+{
+    gc_add_array(reinterpret_cast<void*>(array), array_type::i32, flags);
+    return array;
+}
+
+template<>
+inline std::vector<float>* context::gc_add<float>(
+  std::vector<float>* array, std::uint32_t flags)
+{
+    gc_add_array(reinterpret_cast<void*>(array), array_type::f32, flags);
+    return array;
+}
+
+template<>
+inline std::vector<std::string*>* context::gc_add<std::string*>(
+  std::vector<std::string*>* array, std::uint32_t flags)
+{
+    gc_add_array(reinterpret_cast<void*>(array), array_type::str, flags);
+    return array;
+}
+
+template<>
+inline std::vector<void*>* context::gc_add<void*>(
+  std::vector<void*>* array, std::uint32_t flags)
+{
+    gc_add_array(reinterpret_cast<void*>(array), array_type::ref, flags);
+    return array;
+}
 
 }    // namespace slang::interpreter

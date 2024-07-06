@@ -117,6 +117,12 @@ public:
         return false;
     }
 
+    /** Whether this expression is a member access of an array or struct. */
+    virtual bool is_member_access() const
+    {
+        return false;
+    }
+
     /**
      * Generate IR.
      *
@@ -480,6 +486,11 @@ public:
     , name{std::move(name)}
     , element_expr{std::move(element_expr)}
     {
+    }
+
+    bool is_member_access() const override
+    {
+        return static_cast<bool>(element_expr);
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
