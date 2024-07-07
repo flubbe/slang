@@ -19,6 +19,7 @@ add_executable(slang
     src/commandline.cpp
     src/compiler.cpp
     src/filemanager.cpp
+    src/gc.cpp
     src/lexer.cpp
     src/main.cpp
     src/module.cpp

@@ -59,6 +59,8 @@ static std::size_t get_type_size(const std::string& type_name, bool is_array, bo
 /**
  * Return the constructor for a type.
  *
+ * @note The object is allocated through the garbage collected heap.
+ *
  * @param ctx The interpreter context.
  * @param type_name The type name.
  * @param array_length Optional array length.
@@ -68,6 +70,14 @@ static std::function<void(void*)> get_type_constructor(context& ctx, const std::
 {
     if(!array_length.has_value())
     {
+        if(type_name == "str")
+        {
+            return std::move([&ctx](void* memory) -> void
+                             {
+                                auto s = ctx.get_gc().gc_new<std::string>();
+                                *reinterpret_cast<std::string**>(memory) = s; });
+        }
+
         return nullptr;
     }
 
@@ -75,32 +85,26 @@ static std::function<void(void*)> get_type_constructor(context& ctx, const std::
     {
         return std::move([&ctx, array_length](void* memory) -> void
                          { 
-                            auto v = new std::vector<std::int32_t>();
-                            v->resize(*array_length); 
-                            *reinterpret_cast<std::vector<std::int32_t>**>(memory) = v;
-                            ctx.gc_add(v); });
+                            auto v = ctx.get_gc().gc_new_array<std::int32_t>(*array_length);
+                            *reinterpret_cast<std::vector<std::int32_t>**>(memory) = v; });
     }
     else if(type_name == "f32")
     {
         return std::move([&ctx, array_length](void* memory) -> void
                          { 
-                            auto v = new std::vector<float>();
-                            v->resize(*array_length); 
-                            *reinterpret_cast<std::vector<float>**>(memory) = v; 
-                            ctx.gc_add(v); });
+                            auto v = ctx.get_gc().gc_new_array<float>(*array_length);
+                            *reinterpret_cast<std::vector<float>**>(memory) = v; });
     }
     else if(type_name == "str")
     {
         return std::move([&ctx, array_length](void* memory) -> void
                          { 
-                            auto v = new std::vector<std::string*>();
-                            v->resize(*array_length); 
+                            auto v = ctx.get_gc().gc_new_array<std::string*>(*array_length);
                             for(auto& s : *v)
                             {
-                                s = new std::string();
+                                s = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
                             }
-                            *reinterpret_cast<std::vector<std::string*>**>(memory) = v;
-                            ctx.gc_add(v); });
+                            *reinterpret_cast<std::vector<std::string*>**>(memory) = v; });
     }
     else
     {
@@ -111,14 +115,25 @@ static std::function<void(void*)> get_type_constructor(context& ctx, const std::
 /**
  * Return the destructor for a type.
  *
+ * @note The object is removed from the garbage collected heap.
+ *
+ * @param ctx The interpreter context.
  * @param type_name The type name.
  * @param array_length Optional array length.
  * @return Returns a constructor function for types that need construction, and `nullptr` otherwise.
  */
-static std::function<void(void*)> get_type_destructor(const std::string& type_name, std::optional<std::size_t> array_length)
+static std::function<void(void*)> get_type_destructor(context& ctx, const std::string& type_name, std::optional<std::size_t> array_length)
 {
     if(!array_length.has_value())
     {
+        if(type_name == "str")
+        {
+            return std::move([](void* memory) -> void
+                             {
+                                auto s = *reinterpret_cast<std::string**>(memory);
+                                s->~basic_string(); });
+        }
+
         return nullptr;
     }
 
@@ -126,18 +141,26 @@ static std::function<void(void*)> get_type_destructor(const std::string& type_na
     {
         return std::move([](void* memory) -> void
                          { 
-                            auto v = reinterpret_cast<std::vector<std::int32_t>*>(memory);
-                            v->~vector(); });
+                            auto array = *reinterpret_cast<std::vector<std::int32_t>**>(memory);
+                            array->~vector(); });
     }
     else if(type_name == "f32")
     {
         return std::move([](void* memory) -> void
-                         { reinterpret_cast<std::vector<float>*>(memory)->std::vector<float>::~vector(); });
+                         { 
+                            auto array = *reinterpret_cast<std::vector<float>**>(memory);
+                            array->std::vector<float>::~vector(); });
     }
     else if(type_name == "str")
     {
-        return std::move([](void* memory) -> void
-                         { reinterpret_cast<std::vector<std::string*>*>(memory)->std::vector<std::string*>::~vector(); });
+        return std::move([&ctx](void* memory) -> void
+                         {
+                            auto array = *reinterpret_cast<std::vector<std::string*>**>(memory);
+                            for(std::string*& s: *array)
+                            {
+                                ctx.get_gc().remove_root(s);
+                            }
+                            array->std::vector<std::string*>::~vector(); });
     }
     else
     {
@@ -268,7 +291,7 @@ void context::decode_locals(function_descriptor& desc)
                               ? std::make_optional<std::size_t>(v.array_length->i)
                               : std::nullopt;
         v.type_constructor = get_type_constructor(*this, v.type, array_length);
-        v.type_destructor = get_type_destructor(v.type, array_length);
+        v.type_destructor = get_type_destructor(*this, v.type, array_length);
 
         details.locals_size += v.size;
     }
@@ -681,242 +704,14 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
     return decoded_module;
 }
 
-void context::gc_add_array(void* array, array_type type, std::uint32_t flags)
-{
-    if(gc_root_set.find(array) != gc_root_set.end())
-    {
-        throw interpreter_error(fmt::format("Array at {} already exists in GC root set.", array));
-    }
-
-    if(type == array_type::i32)
-    {
-        gc_root_set.insert({array, gc_object{gc_object_type::array_i32, 1, flags, array}});
-    }
-    else if(type == array_type::f32)
-    {
-        gc_root_set.insert({array, gc_object{gc_object_type::array_f32, 1, flags, array}});
-    }
-    else if(type == array_type::str)
-    {
-        gc_root_set.insert({array, gc_object{gc_object_type::array_str, 1, flags, array}});
-    }
-    else if(type == array_type::ref)
-    {
-        gc_root_set.insert({array, gc_object{gc_object_type::array_aref, 1, flags, array}});
-    }
-    else
-    {
-        throw interpreter_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(type)));
-    }
-}
-
-void context::gc_set_flags(void* obj, std::uint32_t flags, bool propagate)
-{
-    auto it = gc_root_set.find(static_cast<void*>(obj));
-    if(it == gc_root_set.end())
-    {
-        throw interpreter_error(fmt::format("Cannot set flags for object at {}, since it is not in the GC root set.", static_cast<void*>(obj)));
-    }
-
-    if(it->second.flags & gc_object::gc_flags::of_visited)
-    {
-        return;
-    }
-
-    it->second.flags |= flags;
-
-    // propagate flags.
-    if(propagate)
-    {
-        it->second.flags |= gc_object::gc_flags::of_visited;
-        if(it->second.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(obj);
-            for(std::string*& s: *array)
-            {
-                gc_set_flags(s, flags, true);
-            }
-        }
-        else if(it->second.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(obj);
-            for(void*& obj: *array)
-            {
-                gc_set_flags(obj, flags, true);
-            }
-        }
-        it->second.flags &= ~gc_object::gc_flags::of_visited;
-    }
-}
-
-std::string* context::gc_add(std::string* s, std::uint32_t flags)
-{
-    if(gc_root_set.find(static_cast<void*>(s)) != gc_root_set.end())
-    {
-        throw interpreter_error(fmt::format("String at {} already exists in GC root set.", static_cast<void*>(s)));
-    }
-    gc_root_set.insert({static_cast<void*>(s), gc_object::from(s, flags)});
-    return s;
-}
-
-void context::gc_run()
-{
-    std::size_t root_set_size = gc_root_set.size();
-
-    std::unordered_map<void*, gc_object> collected;
-    for(auto& [obj, obj_info]: gc_root_set)
-    {
-        if(obj_info.flags & gc_object::of_never_collect)
-        {
-            continue;
-        }
-
-        if(obj_info.ref_count == 0)
-        {
-            collected.insert({obj, obj_info});
-        }
-    }
-
-    for(auto& [obj, obj_info]: collected)
-    {
-        gc_root_set.erase(obj);
-    }
-
-    for(auto& [obj, obj_info]: collected)
-    {
-        if(obj_info.type == gc_object_type::str)
-        {
-            auto str = static_cast<std::string*>(obj);
-            delete str;
-        }
-        else if(obj_info.type == gc_object_type::array_i32)
-        {
-            auto array = static_cast<std::vector<std::int32_t>*>(obj);
-            delete array;
-        }
-        else if(obj_info.type == gc_object_type::array_f32)
-        {
-            auto array = static_cast<std::vector<float>*>(obj);
-            delete array;
-        }
-        else if(obj_info.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(obj);
-            delete array;
-        }
-        else if(obj_info.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(obj);
-            delete array;
-        }
-        else
-        {
-            throw interpreter_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
-        }
-    }
-}
-
-void context::gc_reset()
-{
-    // mark all objects.
-    for(auto& [obj, obj_info]: gc_root_set)
-    {
-        obj_info.ref_count = 0;
-    }
-
-    // delete all.
-    gc_run();
-
-    // clear root set.
-    gc_root_set.clear();
-}
-
-void context::gc_increment_refcount(void* addr, bool propagate)
-{
-    auto it = gc_root_set.find(addr);
-    if(it == gc_root_set.end())
-    {
-        throw interpreter_error(fmt::format("Reference at {} does not exists in GC root set.", addr));
-    }
-
-    if(it->second.flags & gc_object::gc_flags::of_visited)
-    {
-        return;
-    }
-
-    ++it->second.ref_count;
-
-    if(propagate)
-    {
-        it->second.flags |= gc_object::gc_flags::of_visited;
-
-        if(it->second.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(addr);
-            for(std::string*& s: *array)
-            {
-                gc_increment_refcount(s, true);
-            }
-        }
-        else if(it->second.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(addr);
-            for(void*& obj: *array)
-            {
-                gc_increment_refcount(obj, true);
-            }
-        }
-
-        it->second.flags &= ~gc_object::gc_flags::of_visited;
-    }
-}
-
-void context::gc_decrement_refcount(void* addr, bool propagate)
-{
-    auto it = gc_root_set.find(addr);
-    if(it == gc_root_set.end())
-    {
-        throw interpreter_error(fmt::format("Reference at {} does not exists in GC root set.", addr));
-    }
-
-    if(it->second.flags & gc_object::of_visited)
-    {
-        return;
-    }
-
-    --it->second.ref_count;
-
-    if(propagate)
-    {
-        it->second.flags |= gc_object::of_visited;
-
-        if(it->second.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(addr);
-            for(std::string*& s: *array)
-            {
-                gc_decrement_refcount(s, true);
-            }
-        }
-        else if(it->second.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(addr);
-            for(void*& obj: *array)
-            {
-                gc_decrement_refcount(obj, true);
-            }
-        }
-
-        it->second.flags &= ~gc_object::of_visited;
-    }
-}
-
 /** Handle local variable construction and destruction. */
 class local_construction_scope
 {
     context& ctx;
     const std::vector<variable>& locals;
     stack_frame& frame;
+
+    bool run_destructor{true};
 
 public:
     local_construction_scope(context& ctx, const std::vector<variable>& locals, stack_frame& frame)
@@ -928,7 +723,41 @@ public:
         {
             if(local.type_constructor)
             {
-                local.type_constructor(&frame.locals[local.offset]);
+                void* addr = &frame.locals[local.offset];
+                local.type_constructor(addr);    // the constructor adds the object to the garbage collector.
+            }
+        }
+    }
+
+    ~local_construction_scope()
+    {
+        if(run_destructor)
+        {
+            destruct();
+        }
+    }
+
+    void destruct()
+    {
+        if(!run_destructor)
+        {
+            throw interpreter_error("Local destructors called multiple times.");
+        }
+        run_destructor = false;
+
+        for(auto& local: locals)
+        {
+            // if(local.type_destructor)
+            // {
+            //     void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
+            //     fmt::print("LCS: calling destructor for {}\n", addr);
+
+            //     local.type_destructor(&frame.locals[local.offset]);
+            // }
+            if(local.type_constructor)
+            {
+                void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
+                ctx.get_gc().remove_root(addr);
             }
         }
     }
@@ -970,23 +799,10 @@ opcode context::exec(const language_module& mod,
         // return.
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
         {
-            // mark locals for collection.
-            for(auto& local: locals)
-            {
-                if(local.type == "str")
-                {
-                    gc_decrement_refcount(*reinterpret_cast<void**>(&frame.locals[local.offset]));
-                }
-            }
-
-            // if we return an object, make sure it is not destroyed.
-            if(instr == static_cast<std::byte>(opcode::sret) || instr == static_cast<std::byte>(opcode::aret))
-            {
-                gc_increment_refcount(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
-            }
+            lcs.destruct();
 
             // run garbage collector.
-            gc_run();
+            gc.run();
 
             --call_stack_level;
             return static_cast<opcode>(instr);
@@ -1008,6 +824,7 @@ opcode context::exec(const language_module& mod,
         case opcode::adup:
         {
             frame.stack.dup_addr();
+            gc.add_temporary(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
             break;
         } /* opcode::adup */
         case opcode::pop:
@@ -1022,7 +839,7 @@ opcode context::exec(const language_module& mod,
         } /* opcode::spop */
         case opcode::apop:
         {
-            frame.stack.pop_addr<void>();
+            gc.remove_temporary(frame.stack.pop_addr<void>());
             break;
         } /* opcode::apop */
         case opcode::iadd:
@@ -1118,7 +935,7 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
             }
 
-            auto str = gc_new<std::string>();
+            auto str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
             *str = frame.string_table[i];
 
             frame.stack.push_addr(str);
@@ -1128,6 +945,8 @@ opcode context::exec(const language_module& mod,
         {
             std::int32_t array_index = frame.stack.pop_i32();
             std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
+
+            gc.remove_temporary(arr);
 
             if(array_index < 0 || array_index > arr->size())
             {
@@ -1142,6 +961,8 @@ opcode context::exec(const language_module& mod,
             std::int32_t array_index = frame.stack.pop_i32();
             std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
 
+            gc.remove_temporary(arr);
+
             if(array_index < 0 || array_index > arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
@@ -1155,12 +976,17 @@ opcode context::exec(const language_module& mod,
             std::int32_t array_index = frame.stack.pop_i32();
             std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
 
+            gc.remove_temporary(arr);
+
             if(array_index < 0 || array_index > arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
 
-            frame.stack.push_addr((*arr)[array_index]);
+            void* obj = (*arr)[array_index];
+            gc.add_temporary(obj);
+
+            frame.stack.push_addr(obj);
             break;
         } /* opcode::saload */
         case opcode::iastore:
@@ -1168,6 +994,8 @@ opcode context::exec(const language_module& mod,
             std::int32_t v = frame.stack.pop_i32();
             std::int32_t index = frame.stack.pop_i32();
             std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
+
+            gc.remove_temporary(arr);
 
             if(index < 0 || index > arr->size())
             {
@@ -1183,6 +1011,8 @@ opcode context::exec(const language_module& mod,
             std::int32_t index = frame.stack.pop_i32();
             std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
 
+            gc.remove_temporary(arr);
+
             if(index < 0 || index > arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
@@ -1197,12 +1027,16 @@ opcode context::exec(const language_module& mod,
             std::int32_t index = frame.stack.pop_i32();
             std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
 
+            gc.remove_temporary(s);
+            gc.remove_temporary(arr);
+
             if(index < 0 || index > arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
 
             (*arr)[index] = s;
+
             break;
         } /* opcode::sastore */
         case opcode::iload: [[fallthrough]];
@@ -1239,7 +1073,9 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Invalid memory access.");
             }
 
-            frame.stack.push_addr(*reinterpret_cast<std::string**>(&frame.locals[i]));
+            auto s = *reinterpret_cast<std::string**>(&frame.locals[i]);
+            gc.add_temporary(s);
+            frame.stack.push_addr(s);
             break;
         } /* opcode::sload */
         case opcode::aload:
@@ -1257,7 +1093,9 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Invalid memory access.");
             }
 
-            frame.stack.push_addr(*reinterpret_cast<void**>(&frame.locals[i]));
+            auto addr = *reinterpret_cast<void**>(&frame.locals[i]);
+            gc.add_temporary(addr);
+            frame.stack.push_addr(addr);
             break;
         } /* opcode::aload */
         case opcode::istore: [[fallthrough]];
@@ -1294,7 +1132,20 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Stack overflow.");
             }
 
-            *reinterpret_cast<std::string**>(&frame.locals[i]) = frame.stack.pop_addr<std::string>();
+            auto s = frame.stack.pop_addr<std::string>();
+            gc.remove_temporary(s);
+
+            auto prev = *reinterpret_cast<std::string**>(&frame.locals[i]);
+            if(s != prev)
+            {
+                if(prev != nullptr)
+                {
+                    gc.remove_root(prev);
+                }
+                gc.add_root(s);
+            }
+
+            *reinterpret_cast<std::string**>(&frame.locals[i]) = s;
             break;
         } /* opcode::sstore */
         case opcode::astore:
@@ -1312,7 +1163,20 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Stack overflow.");
             }
 
-            *reinterpret_cast<void**>(&frame.locals[i]) = frame.stack.pop_addr<void>();
+            auto obj = frame.stack.pop_addr<void>();
+            gc.remove_temporary(obj);
+
+            auto prev = *reinterpret_cast<void**>(&frame.locals[i]);
+            if(obj != prev)
+            {
+                if(prev != nullptr)
+                {
+                    gc.remove_root(prev);
+                }
+                gc.add_root(obj);
+            }
+
+            *reinterpret_cast<void**>(&frame.locals[i]) = obj;
             break;
         } /* opcode::astore */
         case opcode::invoke:
@@ -1342,20 +1206,27 @@ opcode context::exec(const language_module& mod,
 
                 auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
-                frame.stack.discard(details.args_size);
 
                 auto ret_opcode = exec(mod, details.offset, details.size, details.locals, callee_frame);
+
+                for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
+                {
+                    auto& arg = details.locals[i];
+
+                    if(arg.array_length.has_value() || arg.type == "str")
+                    {
+                        void* addr = *reinterpret_cast<void**>(&frame.locals[arg.offset]);
+                        gc.remove_temporary(addr);
+                    }
+                }
+
+                frame.stack.discard(details.args_size);
 
                 if(callee_frame.stack.size() != details.return_size)
                 {
                     throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
                 }
                 frame.stack.push_stack(callee_frame.stack);
-
-                if(ret_opcode == opcode::sret || ret_opcode == opcode::aret)
-                {
-                    gc_decrement_refcount(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
-                }
             }
             break;
         } /* opcode::invoke */
@@ -1372,24 +1243,24 @@ opcode context::exec(const language_module& mod,
 
             if(type == static_cast<std::uint8_t>(array_type::i32))
             {
-                frame.stack.push_addr(gc_new_array<std::int32_t>(size));
+                frame.stack.push_addr(gc.gc_new_array<std::int32_t>(size, gc::gc_object::of_temporary));
             }
             else if(type == static_cast<std::uint8_t>(array_type::f32))
             {
-                frame.stack.push_addr(gc_new_array<float>(size));
+                frame.stack.push_addr(gc.gc_new_array<float>(size, gc::gc_object::of_temporary));
             }
             else if(type == static_cast<std::uint8_t>(array_type::str))
             {
-                auto array = gc_new_array<std::string*>(size);
+                auto array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
                 for(std::string*& s: *array)
                 {
-                    s = gc_new<std::string>();
+                    s = gc.gc_new<std::string>(gc::gc_object::of_none, false);
                 }
                 frame.stack.push_addr(array);
             }
             else if(type == static_cast<std::uint8_t>(array_type::ref))
             {
-                frame.stack.push_addr(gc_new_array<void*>(size));
+                frame.stack.push_addr(gc.gc_new_array<void*>(size, gc::gc_object::of_temporary));
             }
             else
             {
@@ -1564,6 +1435,8 @@ value context::exec(const language_module& mod,
     }
 
     std::size_t offset = 0;
+    std::unordered_map<std::size_t, void*> arg_addrs;
+
     for(std::size_t i = 0; i < args.size(); ++i)
     {
         if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
@@ -1594,10 +1467,16 @@ value context::exec(const language_module& mod,
         {
             std::size_t start_offset = offset;
             offset += args[i].write(&frame.locals[offset]);
-            gc_add(*reinterpret_cast<std::string**>(&frame.locals[start_offset]), gc_object::of_never_collect);
+
+            void* addr = *reinterpret_cast<std::string**>(&frame.locals[start_offset]);
+            arg_addrs[start_offset] = addr;
+
+            gc.add_root(addr);
         }
         else
         {
+            arg_addrs[offset] = nullptr;
+
             offset += args[i].write(&frame.locals[offset]);
         }
     }
@@ -1635,18 +1514,31 @@ value context::exec(const language_module& mod,
     }
     else if(ret_opcode == opcode::sret)
     {
-        ret = std::string{*frame.stack.pop_addr<std::string>()};
+        std::string* s = frame.stack.pop_addr<std::string>();
+        ret = std::string{*s};
+        gc.remove_temporary(s);
     }
     else if(ret_opcode == opcode::aret)
     {
         void* addr = frame.stack.pop_addr<void>();
-        gc_set_flags(addr, gc_object::of_never_collect, true);
         ret = value{addr};
     }
     else
     {
         throw interpreter_error(fmt::format("Invalid return opcode '{}' ({}).", to_string(ret_opcode), static_cast<int>(ret_opcode)));
     }
+
+    // remove arguments from GC.
+    for(auto& [offset, addr]: arg_addrs)
+    {
+        if(addr != nullptr)
+        {
+            gc.remove_root(addr);
+        }
+    }
+
+    // invoke the garbage collector to clean up before returning.
+    gc.run();
 
     // verify that the stack is empty.
     if(!frame.stack.empty())

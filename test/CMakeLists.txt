@@ -123,6 +123,7 @@ add_executable(test_interpreter
     test_interpreter.cpp
     ../src/archives/file.cpp
     ../src/filemanager.cpp
+    ../src/gc.cpp
     ../src/interpreter.cpp
     ../src/opcodes.cpp
 )

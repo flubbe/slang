@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "filemanager.h"
+#include "gc.h"
 #include "module.h"
 #include "opcodes.h"
 
@@ -851,83 +852,6 @@ struct stack_frame
     }
 };
 
-/**
- * Garbage collector object type.
- */
-enum class gc_object_type : std::uint8_t
-{
-    str,
-    array_i32,
-    array_f32,
-    array_str,
-    array_aref,
-};
-
-/** Garbage collector object. */
-struct gc_object
-{
-    /** Flags. */
-    enum gc_flags : std::uint32_t
-    {
-        of_none = 0,          /** No flags. */
-        of_visited = 1,       /** Whether this object was visited, e.g. during collection or reference counting. */
-        of_never_collect = 2, /** Never collect this object, even when resetting (e.g. for externally managed objects). */
-    };
-
-    /** Object type. */
-    gc_object_type type;
-
-    /** Reference count. */
-    std::size_t ref_count{0};
-
-    /** Flags. */
-    std::uint32_t flags{of_none};
-
-    /** Object address. */
-    void* addr{nullptr};
-
-    /** Create an object from a type. */
-    template<typename T>
-    static gc_object from(T* obj, std::uint32_t flags = of_none)
-    {
-        static_assert(
-          !std::is_same_v<T, std::string*>
-            && !std::is_same_v<T, std::vector<std::int32_t>*>
-            && !std::is_same_v<T, std::vector<float>*>
-            && !std::is_same_v<T, std::vector<std::string*>*>
-            && !std::is_same_v<T, std::vector<void*>*>,
-          "Cannot create GC object from type.");
-    }
-};
-
-template<>
-inline gc_object gc_object::from<std::string>(
-  std::string* obj, std::uint32_t flags)
-{
-    return {gc_object_type::str, 1, flags, obj};
-}
-
-template<>
-inline gc_object gc_object::from<std::vector<std::int32_t>>(
-  std::vector<std::int32_t>* obj, std::uint32_t flags)
-{
-    return {gc_object_type::array_i32, 1, flags, obj};
-}
-
-template<>
-inline gc_object gc_object::from<std::vector<float>>(
-  std::vector<float>* obj, std::uint32_t flags)
-{
-    return {gc_object_type::array_f32, 1, flags, obj};
-}
-
-template<>
-inline gc_object gc_object::from<std::vector<void*>>(
-  std::vector<void*>* obj, std::uint32_t flags)
-{
-    return {gc_object_type::array_aref, 1, flags, obj};
-}
-
 /** Interpreter context. */
 class context
 {
@@ -949,8 +873,8 @@ class context
     /** The current call stack level. */
     unsigned int call_stack_level = 0;
 
-    /** Garbage collector root set. */
-    std::unordered_map<void*, gc_object> gc_root_set;
+    /** Garbage collector. */
+    gc::garbage_collector gc;
 
     /**
      * Decode a module.
@@ -1011,34 +935,10 @@ class context
                 const std::vector<variable>& locals,
                 stack_frame& frame);
 
-    /**
-     * Add array to garbage collected set.
-     *
-     * @param array The array.
-     * @param array_type The array type.
-     * @param flags Flags.
-     */
-    void gc_add_array(void* array, array_type type, std::uint32_t flags = gc_object::of_none);
-
-    /**
-     * Set GC object flags.
-     *
-     * @param obj The object to set the flags for.
-     * @param flags The new flags to set.
-     * @param propagate Whether to propagate flags to referenced objects (e.g. entries in an array).
-     */
-    void gc_set_flags(void* obj, std::uint32_t flags, bool propagate = false);
-
-    /** Run garbage collector. */
-    void gc_run();
-
-    /** Reset the garbage collector. */
-    void gc_reset();
-
 public:
     /** Default constructors. */
     context() = delete;
-    context(const context&) = default;
+    context(const context&) = delete;
     context(context&&) = default;
 
     /** Default assignments. */
@@ -1057,11 +957,8 @@ public:
     {
     }
 
-    /** Destructor. */
-    virtual ~context()
-    {
-        gc_reset();
-    }
+    /** Default destructor. */
+    virtual ~context() = default;
 
     /**
      * Register a native function to a module.
@@ -1095,103 +992,14 @@ public:
     void reset()
     {
         call_stack_level = 0;
-        gc_reset();
+        gc.reset();
     }
 
-    /**
-     * Add array to garbage collected set.
-     *
-     * @param array The array.
-     * @param flags Flags.
-     * @returns Returns the input array.
-     */
-    template<typename T>
-    std::vector<T>* gc_add(std::vector<T>* array, std::uint32_t flags = gc_object::of_none)
+    /** Garbage collector access. */
+    gc::garbage_collector& get_gc()
     {
-        static_assert(!std::is_same_v<T, std::int32_t>
-                        && !std::is_same_v<T, float>
-                        && !std::is_same_v<T, std::string*>
-                        && !std::is_same_v<T, void*>,
-                      "No GC implementation for array type.");
+        return gc;
     }
-
-    /**
-     * Add a string to the garbage collected set.
-     *
-     * @param s The string.
-     * @param flags Flags.
-     * @returns Returns the input string.
-     */
-    std::string* gc_add(std::string* s, std::uint32_t flags = gc_object::of_none);
-
-    /**
-     * Allocate a new garbage collected variable.
-     *
-     * @param flags Flags.
-     * @returns Returns a (pointer to a) garbage collected variable.
-     */
-    template<typename T>
-    T* gc_new(std::uint32_t flags = gc_object::of_none)
-    {
-        return gc_add(new T, flags);
-    }
-
-    /**
-     * Allocate a new garbage collected array.
-     *
-     * @param size The array size.
-     * @param flags Flags.
-     * @returns Returns a (pointer to a) garbage collected array.
-     */
-    template<typename T>
-    std::vector<T>* gc_new_array(std::size_t size, std::uint32_t flags = gc_object::of_none)
-    {
-        auto v = new std::vector<T>();
-        v->resize(size);
-        return gc_add(v, flags);
-    }
-
-    /** Add a reference to the GC set. */
-    void gc_increment_refcount(void* addr, bool propagate = true);
-
-    /** Remove a reference from the GC set. */
-    void gc_decrement_refcount(void* addr, bool propagate = true);
 };
-
-/*
- * Specializations for garbage collector.
- */
-
-template<>
-inline std::vector<std::int32_t>* context::gc_add<std::int32_t>(
-  std::vector<std::int32_t>* array, std::uint32_t flags)
-{
-    gc_add_array(reinterpret_cast<void*>(array), array_type::i32, flags);
-    return array;
-}
-
-template<>
-inline std::vector<float>* context::gc_add<float>(
-  std::vector<float>* array, std::uint32_t flags)
-{
-    gc_add_array(reinterpret_cast<void*>(array), array_type::f32, flags);
-    return array;
-}
-
-template<>
-inline std::vector<std::string*>* context::gc_add<std::string*>(
-  std::vector<std::string*>* array, std::uint32_t flags)
-{
-    gc_add_array(reinterpret_cast<void*>(array), array_type::str, flags);
-    return array;
-}
-
-template<>
-inline std::vector<void*>* context::gc_add<void*>(
-  std::vector<void*>* array, std::uint32_t flags)
-{
-    gc_add_array(reinterpret_cast<void*>(array), array_type::ref, flags);
-    return array;
-}
 
 }    // namespace slang::interpreter

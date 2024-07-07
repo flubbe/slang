@@ -120,6 +120,20 @@ enum class array_type : std::uint8_t
     ref = 3
 };
 
+/** Convert `array_type` to a readable string. */
+inline std::string to_string(array_type type)
+{
+    switch(type)
+    {
+    case array_type::i32: return "i32";
+    case array_type::f32: return "f32";
+    case array_type::str: return "str";
+    case array_type::ref: return "ref";
+    }
+
+    return "unknown";
+}
+
 /**
  * Array type serializer.
  *
@@ -176,7 +190,7 @@ struct variable : public symbol
              std::function<void(void*)> type_constructor = nullptr,
              std::function<void(void*)> type_destructor = nullptr)
     : type{std::move(type)}
-    , array_length{std::move(array_length)}
+    , array_length{array_length}
     , type_constructor{std::move(type_constructor)}
     , type_destructor{std::move(type_destructor)}
     {

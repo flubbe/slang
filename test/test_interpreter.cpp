@@ -79,6 +79,10 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
     EXPECT_EQ(*res.get<int>(), -99);
 
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {1.0f}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {-1.0f}));
@@ -86,11 +90,19 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {0.f}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
     EXPECT_EQ(*res.get<int>(), 0);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "local", {0}));
     EXPECT_EQ(*res.get<int>(), -1);
@@ -99,10 +111,18 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "local3", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {23}));
     EXPECT_EQ(*res.get<float>(), 23.0);
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_f2i", {92.3f}));
     EXPECT_EQ(*res.get<int>(), 92);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, hello_world)
@@ -127,16 +147,18 @@ TEST(interpreter, hello_world)
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
+                                     ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
+                                     ctx.get_gc().remove_temporary(s);
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
@@ -151,6 +173,10 @@ TEST(interpreter, hello_world)
     EXPECT_THROW(ctx.register_native_function("hello_world", "main",    // collides with a scripted function name
                                               [](slang::interpreter::operand_stack& stack) {}),
                  slang::interpreter::interpreter_error);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, operators)
@@ -187,6 +213,10 @@ TEST(interpreter, operators)
     EXPECT_EQ(*res.get<int>(), 3);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "mod", {127, 23}));
     EXPECT_EQ(*res.get<int>(), 12);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, control_flow)
@@ -211,16 +241,18 @@ TEST(interpreter, control_flow)
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
+                                     ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
+                                     ctx.get_gc().remove_temporary(s);
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
@@ -236,9 +268,17 @@ TEST(interpreter, control_flow)
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
     ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {2.2f}));
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf.back(), "World, hello!\n");
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
     print_buf.clear();
     ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {1}));
@@ -250,6 +290,10 @@ TEST(interpreter, control_flow)
     ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {-2}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Test\n");
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, loops)
@@ -274,16 +318,18 @@ TEST(interpreter, loops)
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
+                                     ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
+                                     ctx.get_gc().remove_temporary(s);
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("loops", mod));
@@ -296,6 +342,10 @@ TEST(interpreter, loops)
     {
         EXPECT_EQ(it, "Hello, World!\n");
     }
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, loop_break_continue)
@@ -320,16 +370,18 @@ TEST(interpreter, loop_break_continue)
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
+                                     ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
+                                     ctx.get_gc().remove_temporary(s);
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("loops_bc", mod));
@@ -344,6 +396,10 @@ TEST(interpreter, loop_break_continue)
     ASSERT_NO_THROW(res = ctx.invoke("loops_bc", "main_c", {}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, infinite_recursion)
@@ -369,6 +425,10 @@ TEST(interpreter, infinite_recursion)
     slang::interpreter::value res;
 
     ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), slang::interpreter::interpreter_error);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, arrays)
@@ -398,6 +458,10 @@ TEST(interpreter, arrays)
 
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "g", {}));
     EXPECT_EQ(*res.get<int>(), 3);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, return_arrays)
@@ -429,7 +493,12 @@ TEST(interpreter, return_arrays)
     EXPECT_EQ((*v)[0], 1);
     EXPECT_EQ((*v)[1], 2);
 
-    ASSERT_NO_THROW(delete v);
+    ASSERT_NO_THROW(ctx.get_gc().remove_temporary(v));
+    ASSERT_NO_THROW(ctx.get_gc().run());
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, pass_array)
@@ -456,6 +525,10 @@ TEST(interpreter, pass_array)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "pass_array", {}));
     EXPECT_EQ(*res.get<int>(), 3);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, invalid_index)
@@ -512,12 +585,12 @@ TEST(interpreter, return_str_array)
         EXPECT_EQ(*(*array)[1], "test");
         EXPECT_EQ(*(*array)[2], "123");
 
-        for(std::string*& s: *array)
-        {
-            ASSERT_NO_THROW(delete s);
-        }
+        ASSERT_NO_THROW(ctx.get_gc().remove_temporary(array));
+        ASSERT_NO_THROW(ctx.get_gc().run());
 
-        ASSERT_NO_THROW(delete array);
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "ret_str", {}));
@@ -525,6 +598,10 @@ TEST(interpreter, return_str_array)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "call_return", {}));
     EXPECT_EQ(*res.get<int>(), 1);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, prefix_postfix)
@@ -565,6 +642,10 @@ TEST(interpreter, prefix_postfix)
     ASSERT_EQ(*res.get<float>(), 0.f);
     ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_f32", {1.f}));
     ASSERT_EQ(*res.get<float>(), 1.f);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, return_discard)
@@ -590,6 +671,10 @@ TEST(interpreter, return_discard)
     slang::interpreter::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard", "f", {}));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, return_discard_array)
@@ -615,6 +700,10 @@ TEST(interpreter, return_discard_array)
     slang::interpreter::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_array", "f", {}));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, return_discard_strings)
@@ -640,6 +729,10 @@ TEST(interpreter, return_discard_strings)
     slang::interpreter::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_strings", "f", {}));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 TEST(interpreter, structs)
@@ -686,6 +779,10 @@ TEST(interpreter, structs)
     slang::interpreter::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("structs", mod));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
 }    // namespace
