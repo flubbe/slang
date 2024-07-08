@@ -52,6 +52,10 @@ static std::size_t get_type_size(const std::string& type_name, bool is_array, bo
     {
         return sizeof(std::string*);
     }
+    else if(type_name == "addr")
+    {
+        return sizeof(void*);
+    }
 
     throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
 }
@@ -106,61 +110,12 @@ static std::function<void(void*)> get_type_constructor(context& ctx, const std::
                             }
                             *reinterpret_cast<std::vector<std::string*>**>(memory) = v; });
     }
-    else
+    else if(type_name == "addr")
     {
-        throw interpreter_error(fmt::format("No constructor for type '{}' found.", type_name));
-    }
-}
-
-/**
- * Return the destructor for a type.
- *
- * @note The object is removed from the garbage collected heap.
- *
- * @param ctx The interpreter context.
- * @param type_name The type name.
- * @param array_length Optional array length.
- * @return Returns a constructor function for types that need construction, and `nullptr` otherwise.
- */
-static std::function<void(void*)> get_type_destructor(context& ctx, const std::string& type_name, std::optional<std::size_t> array_length)
-{
-    if(!array_length.has_value())
-    {
-        if(type_name == "str")
-        {
-            return std::move([](void* memory) -> void
-                             {
-                                auto s = *reinterpret_cast<std::string**>(memory);
-                                s->~basic_string(); });
-        }
-
-        return nullptr;
-    }
-
-    if(type_name == "i32")
-    {
-        return std::move([](void* memory) -> void
+        return std::move([&ctx, array_length](void* memory) -> void
                          { 
-                            auto array = *reinterpret_cast<std::vector<std::int32_t>**>(memory);
-                            array->~vector(); });
-    }
-    else if(type_name == "f32")
-    {
-        return std::move([](void* memory) -> void
-                         { 
-                            auto array = *reinterpret_cast<std::vector<float>**>(memory);
-                            array->std::vector<float>::~vector(); });
-    }
-    else if(type_name == "str")
-    {
-        return std::move([&ctx](void* memory) -> void
-                         {
-                            auto array = *reinterpret_cast<std::vector<std::string*>**>(memory);
-                            for(std::string*& s: *array)
-                            {
-                                ctx.get_gc().remove_root(s);
-                            }
-                            array->std::vector<std::string*>::~vector(); });
+                            auto v = ctx.get_gc().gc_new_array<void*>(*array_length);
+                            *reinterpret_cast<std::vector<void*>**>(memory) = v; });
     }
     else
     {
@@ -195,6 +150,10 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
     else if(name == "str")
     {
         return std::make_pair(opcode::sret, length);
+    }
+    else if(name == "addr")
+    {
+        return std::make_pair(opcode::aret, length);
     }
 
     throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
@@ -291,7 +250,6 @@ void context::decode_locals(function_descriptor& desc)
                               ? std::make_optional<std::size_t>(v.array_length->i)
                               : std::nullopt;
         v.type_constructor = get_type_constructor(*this, v.type, array_length);
-        v.type_destructor = get_type_destructor(*this, v.type, array_length);
 
         details.locals_size += v.size;
     }
@@ -747,13 +705,6 @@ public:
 
         for(auto& local: locals)
         {
-            // if(local.type_destructor)
-            // {
-            //     void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
-            //     fmt::print("LCS: calling destructor for {}\n", addr);
-
-            //     local.type_destructor(&frame.locals[local.offset]);
-            // }
             if(local.type_constructor)
             {
                 void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
@@ -834,7 +785,7 @@ opcode context::exec(const language_module& mod,
         } /* opcode::pop */
         case opcode::spop:
         {
-            frame.stack.pop_addr<std::string>();
+            gc.remove_temporary(frame.stack.pop_addr<std::string>());
             break;
         } /* opcode::spop */
         case opcode::apop:
@@ -1202,26 +1153,31 @@ opcode context::exec(const language_module& mod,
             {
                 auto& details = std::get<function_details>(desc->details);
 
+                // prepare stack frame
                 stack_frame callee_frame{frame.string_table, details.locals_size, details.stack_size};
 
                 auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
 
+                // invoke function
                 auto ret_opcode = exec(mod, details.offset, details.size, details.locals, callee_frame);
 
+                // clean up arguments in GC
                 for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
                 {
                     auto& arg = details.locals[i];
 
-                    if(arg.array_length.has_value() || arg.type == "str")
+                    if(arg.array_length.has_value() || arg.type == "str" || arg.type == "addr")
                     {
                         void* addr = *reinterpret_cast<void**>(&frame.locals[arg.offset]);
                         gc.remove_temporary(addr);
                     }
                 }
 
+                // clean up stack
                 frame.stack.discard(details.args_size);
 
+                // store return value
                 if(callee_frame.stack.size() != details.return_size)
                 {
                     throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));

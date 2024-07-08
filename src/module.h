@@ -167,9 +167,6 @@ struct variable : public symbol
     /** Type constructor. */
     std::function<void(void*)> type_constructor = nullptr;
 
-    /** Type destructor. */
-    std::function<void(void*)> type_destructor = nullptr;
-
     /** Default constructors. */
     variable() = default;
     variable(const variable&) = default;
@@ -187,12 +184,10 @@ struct variable : public symbol
      */
     variable(std::string type,
              std::optional<std::int64_t> array_length = std::nullopt,
-             std::function<void(void*)> type_constructor = nullptr,
-             std::function<void(void*)> type_destructor = nullptr)
+             std::function<void(void*)> type_constructor = nullptr)
     : type{std::move(type)}
     , array_length{array_length}
     , type_constructor{std::move(type_constructor)}
-    , type_destructor{std::move(type_destructor)}
     {
     }
 };
