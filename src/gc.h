@@ -65,27 +65,25 @@ inline std::string to_string(gc_object_type type)
 struct gc_object
 {
     /** Flags. */
-    enum gc_flags : std::uint32_t
+    enum gc_flags : std::uint8_t
     {
-        of_none = 0,          /** No flags. */
-        of_visited = 1,       /** Whether this object was visited, e.g. during collection or reference counting. */
-        of_reachable = 2,     /** Reachable from root set. */
-        of_never_collect = 4, /** Never collect this object, even when resetting (e.g. for externally managed objects). */
-        of_temporary = 8,     /** A temporary object (i.e., not stored in a variable). */
+        of_none = 0,      /** No flags. */
+        of_reachable = 1, /** Reachable from root set. */
+        of_temporary = 2, /** A temporary object (i.e., not stored in a variable). */
     };
 
     /** Object type. */
     gc_object_type type;
 
     /** Flags. */
-    std::uint32_t flags{of_none};
+    std::uint8_t flags{of_none};
 
     /** Object address. */
     void* addr{nullptr};
 
     /** Create an object from a type. */
     template<typename T>
-    static gc_object from(T* obj, std::uint32_t flags = of_none)
+    static gc_object from(T* obj, std::uint8_t flags = of_none)
     {
         static_assert(
           !std::is_same_v<T, std::string*>
@@ -99,35 +97,35 @@ struct gc_object
 
 template<>
 inline gc_object gc_object::from<std::string>(
-  std::string* obj, std::uint32_t flags)
+  std::string* obj, std::uint8_t flags)
 {
     return {gc_object_type::str, flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<std::vector<std::int32_t>>(
-  std::vector<std::int32_t>* obj, std::uint32_t flags)
+  std::vector<std::int32_t>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_i32, flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<std::vector<float>>(
-  std::vector<float>* obj, std::uint32_t flags)
+  std::vector<float>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_f32, flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<std::vector<std::string*>>(
-  std::vector<std::string*>* obj, std::uint32_t flags)
+  std::vector<std::string*>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_str, flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<std::vector<void*>>(
-  std::vector<void*>* obj, std::uint32_t flags)
+  std::vector<void*>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_aref, flags, obj};
 }
@@ -149,6 +147,8 @@ class garbage_collector
 
     /**
      * Mark object as reachable.
+     *
+     * @note No-op if `obj` is not in the object list.
      *
      * @param obj The object to mark.
      */
@@ -177,73 +177,20 @@ public:
         reset();
     }
 
-    /**
-     * Add array to garbage collected set.
-     *
-     * @param array The array.
-     * @param array_type The array type.
-     * @param flags Flags.
-     */
-    void add_array_root(void* array, array_type type, std::uint32_t flags = gc_object::of_none);
-
-    /**
-     * Set GC object flags.
-     *
-     * @param obj The object to set the flags for.
-     * @param flags The new flags to set.
-     * @param propagate Whether to propagate flags to referenced objects (e.g. entries in an array).
-     */
-    void set_flags(void* obj, std::uint32_t flags, bool propagate = false);
-
-    /**
-     * Clear GC object flags.
-     *
-     * @param obj The object.
-     * @param flags The flags to clear.
-     * @param propagate Whether to propagate flags to references objects (e.g. entries in an array).
-     */
-    void clear_flags(void* obj, std::uint32_t flags, bool propagate = false);
-
     /** Run garbage collector. */
     void run();
 
-    /** Reset the garbage collector. */
+    /** Reset the garbage collector and free all allocated memory. */
     void reset();
 
     /**
      * Add an object to the root set.
      *
-     * @param s The object.
+     * @param obj The object.
      * @param flags Flags.
      * @returns Returns the input object.
      */
-    void* add_root(void* s, std::uint32_t flags = gc_object::of_none);
-
-    /**
-     * Add a string to the root set.
-     *
-     * @param s The string.
-     * @param flags Flags.
-     * @returns Returns the input string.
-     */
-    std::string* add_root(std::string* s, std::uint32_t flags = gc_object::of_none);
-
-    /**
-     * Add array to root set.
-     *
-     * @param array The array.
-     * @param flags Flags.
-     * @returns Returns the input array.
-     */
-    template<typename T>
-    std::vector<T>* add_root(std::vector<T>* array, std::uint32_t flags = gc_object::of_none)
-    {
-        static_assert(!std::is_same_v<T, std::int32_t>
-                        && !std::is_same_v<T, float>
-                        && !std::is_same_v<T, std::string*>
-                        && !std::is_same_v<T, void*>,
-                      "No GC implementation for array type.");
-    }
+    void* add_root(void* obj, std::uint32_t flags = gc_object::of_none);
 
     /**
      * Remove an object from the root set.
@@ -276,9 +223,9 @@ public:
         {
             if(flags & gc_object::of_temporary)
             {
-                return static_cast<T*>(add_temporary(static_cast<void*>(obj)));
+                return static_cast<T*>(add_temporary(obj));
             }
-            return add_root(obj, flags);
+            return static_cast<T*>(add_root(obj, flags));
         }
 
         return obj;
@@ -309,7 +256,7 @@ public:
         {
             return static_cast<std::vector<T>*>(add_temporary(array));
         }
-        return add_root(array, flags);
+        return static_cast<std::vector<T>*>(add_root(array, flags));
     }
 
     /**
@@ -325,25 +272,14 @@ public:
     /**
      * Remove a temporary object (or decrease it's reference count).
      *
-     * @note This needs to be called on string and array types that are
-     * passed to native functions.
+     * @note This needs to be called on `string` and `array` types, that are
+     * 1. passed to native functions.
+     * 2. returned from `invoke` to native code.
      *
      * @param obj The object.
      * @throws Throws a `gc_error` if the object is not found in the object list.
      */
     void remove_temporary(void* obj);
-
-    /**
-     * Explicitly delete an object allocated with the garbage collector.
-     * The object must me marked as `gc_object::of_never_collect`.
-     *
-     * @throws Throws a `gc_error` if the object is not part of the root set
-     *         or not marked as `gc_object::of_never_collect`.
-     *
-     * @param obj The object to delete.
-     * @param recursive Whether the function should recursively be called for array entries.
-     */
-    void explicit_delete(void* obj, bool recursive = true);
 
     /**
      * Check if an object is in the root set.
@@ -385,41 +321,5 @@ public:
         return allocated_bytes;
     }
 };
-
-/*
- * Specializations for garbage collector.
- */
-
-template<>
-inline std::vector<std::int32_t>* garbage_collector::add_root<std::int32_t>(
-  std::vector<std::int32_t>* array, std::uint32_t flags)
-{
-    add_array_root(reinterpret_cast<void*>(array), array_type::i32, flags);
-    return array;
-}
-
-template<>
-inline std::vector<float>* garbage_collector::add_root<float>(
-  std::vector<float>* array, std::uint32_t flags)
-{
-    add_array_root(reinterpret_cast<void*>(array), array_type::f32, flags);
-    return array;
-}
-
-template<>
-inline std::vector<std::string*>* garbage_collector::add_root<std::string*>(
-  std::vector<std::string*>* array, std::uint32_t flags)
-{
-    add_array_root(reinterpret_cast<void*>(array), array_type::str, flags);
-    return array;
-}
-
-template<>
-inline std::vector<void*>* garbage_collector::add_root<void*>(
-  std::vector<void*>* array, std::uint32_t flags)
-{
-    add_array_root(reinterpret_cast<void*>(array), array_type::ref, flags);
-    return array;
-}
 
 }    // namespace slang::gc

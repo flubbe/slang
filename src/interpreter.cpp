@@ -1463,15 +1463,16 @@ value context::exec(const language_module& mod,
         }
 
         // add types to GC.
-        if(std::get<0>(args[i].get_type()) == "str")
+        if(std::get<0>(args[i].get_type()) == "str"
+           || std::get<0>(args[i].get_type()) == "addr")
         {
             std::size_t start_offset = offset;
             offset += args[i].write(&frame.locals[offset]);
 
-            void* addr = *reinterpret_cast<std::string**>(&frame.locals[start_offset]);
-            arg_addrs[start_offset] = addr;
+            void* obj = *reinterpret_cast<void**>(&frame.locals[start_offset]);
+            arg_addrs[start_offset] = obj;
 
-            gc.add_root(addr);
+            gc.add_root(obj);
         }
         else
         {

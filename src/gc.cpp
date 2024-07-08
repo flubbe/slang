@@ -23,14 +23,15 @@ namespace slang::gc
 
 void garbage_collector::mark_object(void* obj)
 {
-    if(objects.find(obj) == objects.end())
+    auto it = objects.find(obj);
+    if(it == objects.end())
     {
         // nothing to mark.
         return;
     }
 
-    gc_object& obj_info = objects[obj];
-    if(obj_info.flags & (gc_object::of_never_collect | gc_object::of_reachable))
+    gc_object& obj_info = it->second;
+    if(obj_info.flags & gc_object::of_reachable)
     {
         return;
     }
@@ -43,7 +44,7 @@ void garbage_collector::mark_object(void* obj)
         auto array = static_cast<std::vector<std::string*>*>(obj_info.addr);
         for(std::string*& s: *array)
         {
-            mark_object(static_cast<void*>(s));
+            mark_object(s);
         }
     }
     else if(obj_info.type == gc_object_type::array_aref)
@@ -56,181 +57,53 @@ void garbage_collector::mark_object(void* obj)
     }
 }
 
+/**
+ * Delete an object and track the allocated bytes.
+ *
+ * @tparam T The object type.
+ * @param obj The object to delete.
+ * @param allocated_bytes The currently allocated bytes to by updated after the deletion.
+ * @throws Throws a `gc_error` if the object size is larger than `allocated_bytes`.
+ */
+template<typename T>
+void object_deleter(void* obj, std::size_t& allocated_bytes)
+{
+    delete static_cast<T*>(obj);
+
+    if(sizeof(T) > allocated_bytes)
+    {
+        throw gc_error("Inconsistent allocation stats: sizeof(T) > allocated_bytes");
+    }
+    allocated_bytes -= sizeof(T);
+}
+
 void garbage_collector::delete_object(gc_object& obj_info)
 {
     GC_LOG("delete_object {}", obj_info.addr);
 
     if(obj_info.type == gc_object_type::str)
     {
-        auto str = static_cast<std::string*>(obj_info.addr);
-        delete str;
-        if(sizeof(std::string) > allocated_bytes)
-        {
-            throw gc_error("Inconsistent allocation stats: sizeof(std::string) > allocated_bytes");
-        }
-        allocated_bytes -= sizeof(std::string);
+        object_deleter<std::string>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i32)
     {
-        auto array = static_cast<std::vector<std::int32_t>*>(obj_info.addr);
-        delete array;
-        if(sizeof(std::vector<std::int32_t>) > allocated_bytes)
-        {
-            throw gc_error("Inconsistent allocation stats: sizeof(std::vector<std::int32_t>) > allocated_bytes");
-        }
-        allocated_bytes -= sizeof(std::vector<std::int32_t>);
+        object_deleter<std::vector<std::int32_t>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f32)
     {
-        auto array = static_cast<std::vector<float>*>(obj_info.addr);
-        delete array;
-        if(sizeof(std::vector<float>) > allocated_bytes)
-        {
-            throw gc_error("Inconsistent allocation stats: sizeof(std::vector<float>) > allocated_bytes");
-        }
-        allocated_bytes -= sizeof(std::vector<float>);
+        object_deleter<std::vector<float>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_str)
     {
-        auto array = static_cast<std::vector<std::string*>*>(obj_info.addr);
-        delete array;
-        if(sizeof(std::vector<std::string*>) > allocated_bytes)
-        {
-            throw gc_error("Inconsistent allocation stats: sizeof(std::vector<std::string*>) > allocated_bytes");
-        }
-        allocated_bytes -= sizeof(std::vector<std::string*>);
+        object_deleter<std::vector<std::string*>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_aref)
     {
-        auto array = static_cast<std::vector<void*>*>(obj_info.addr);
-        delete array;
-        if(sizeof(std::vector<void*>) > allocated_bytes)
-        {
-            throw gc_error("Inconsistent allocation stats: sizeof(std::vector<void*>) > allocated_bytes");
-        }
-        allocated_bytes -= sizeof(std::vector<void*>);
+        object_deleter<std::vector<void*>>(obj_info.addr, allocated_bytes);
     }
     else
     {
         throw gc_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
-    }
-}
-
-void garbage_collector::add_array_root(void* array, array_type type, std::uint32_t flags)
-{
-    GC_LOG("add_array {}, type {}, flags {}", array, to_string(type), flags);
-
-    if(objects.find(array) == objects.end())
-    {
-        throw gc_error(fmt::format("Array at {} does not exists in GC object set.", array));
-    }
-
-    if(root_set.find(array) != root_set.end())
-    {
-        throw gc_error(fmt::format("Array at {} already exists in GC root set.", array));
-    }
-
-    if(type == array_type::i32)
-    {
-        root_set.insert({array, 1});
-    }
-    else if(type == array_type::f32)
-    {
-        root_set.insert({array, 1});
-    }
-    else if(type == array_type::str)
-    {
-        root_set.insert({array, 1});
-    }
-    else if(type == array_type::ref)
-    {
-        root_set.insert({array, 1});
-    }
-    else
-    {
-        throw gc_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(type)));
-    }
-}
-
-void garbage_collector::set_flags(void* obj, std::uint32_t flags, bool propagate)
-{
-    GC_LOG("set_flags {}, flags {}, propagate {}", obj, flags, propagate);
-
-    auto it = objects.find(static_cast<void*>(obj));
-    if(it == objects.end())
-    {
-        throw gc_error(fmt::format("Cannot set flags for object at {}, since it is not in the GC object set.", static_cast<void*>(obj)));
-    }
-
-    if(it->second.flags & gc_object::gc_flags::of_visited)
-    {
-        return;
-    }
-
-    it->second.flags |= flags;
-
-    // propagate flags.
-    if(propagate)
-    {
-        it->second.flags |= gc_object::gc_flags::of_visited;
-        if(it->second.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(obj);
-            for(std::string*& s: *array)
-            {
-                set_flags(s, flags, true);
-            }
-        }
-        else if(it->second.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(obj);
-            for(void*& obj: *array)
-            {
-                set_flags(obj, flags, true);
-            }
-        }
-        it->second.flags &= ~gc_object::gc_flags::of_visited;
-    }
-}
-
-void garbage_collector::clear_flags(void* obj, std::uint32_t flags, bool propagate)
-{
-    GC_LOG("clear_flags {}, flags {}, propagate {}", obj, flags, propagate);
-
-    auto it = objects.find(static_cast<void*>(obj));
-    if(it == objects.end())
-    {
-        throw gc_error(fmt::format("Cannot clear flags for object at {}, since it is not in the GC object set.", static_cast<void*>(obj)));
-    }
-
-    if(it->second.flags & gc_object::gc_flags::of_visited)
-    {
-        return;
-    }
-
-    it->second.flags &= ~flags;
-
-    // propagate flags.
-    if(propagate)
-    {
-        it->second.flags |= gc_object::gc_flags::of_visited;
-        if(it->second.type == gc_object_type::array_str)
-        {
-            auto array = static_cast<std::vector<std::string*>*>(obj);
-            for(std::string*& s: *array)
-            {
-                clear_flags(s, flags, true);
-            }
-        }
-        else if(it->second.type == gc_object_type::array_aref)
-        {
-            auto array = static_cast<std::vector<void*>*>(obj);
-            for(void*& obj: *array)
-            {
-                clear_flags(obj, flags, true);
-            }
-        }
-        it->second.flags &= ~gc_object::gc_flags::of_visited;
     }
 }
 
@@ -244,11 +117,6 @@ void* garbage_collector::add_root(void* obj, std::uint32_t flags)
     }
     root_set.insert({obj, 1});
     return obj;
-}
-
-std::string* garbage_collector::add_root(std::string* s, std::uint32_t flags)
-{
-    return static_cast<std::string*>(add_root(static_cast<void*>(s), flags));
 }
 
 void garbage_collector::remove_root(void* obj)
@@ -297,11 +165,9 @@ void garbage_collector::run()
     }
 
     // free unreachable objects.
-    constexpr std::uint32_t skip_flags = gc_object::of_reachable | gc_object::of_never_collect;
-
     for(auto& [obj, obj_info]: objects)
     {
-        if(obj_info.flags & skip_flags)
+        if(obj_info.flags & gc_object::of_reachable)
         {
             continue;
         }
@@ -312,7 +178,7 @@ void garbage_collector::run()
 
     for(auto it = objects.begin(); it != objects.end();)
     {
-        if(!(it->second.flags & skip_flags))
+        if(!(it->second.flags & gc_object::of_reachable))
         {
             it = objects.erase(it);
         }
@@ -353,12 +219,18 @@ void garbage_collector::run()
 
 void garbage_collector::reset()
 {
-    GC_LOG("reset");
+    std::size_t object_count = objects.size();
 
-    // delete all.
     root_set.clear();
     temporary_objects.clear();
-    run();
+
+    for(auto& [obj, obj_info]: objects)
+    {
+        delete_object(obj_info);
+    }
+    objects.clear();
+
+    GC_LOG("reset {} -> 0", object_count);
 }
 
 void* garbage_collector::add_temporary(void* obj)
@@ -398,42 +270,6 @@ void garbage_collector::remove_temporary(void* obj)
     {
         temporary_objects.erase(it);
     }
-}
-
-void garbage_collector::explicit_delete(void* obj, bool recursive)
-{
-    GC_LOG("explicit_delete {}, recursive {}", obj, recursive);
-
-    auto it = objects.find(obj);
-    if(it == objects.end())
-    {
-        throw gc_error(fmt::format("Reference at {} does not exists in GC object set.", obj));
-    }
-
-    if(!(it->second.flags & gc_object::of_never_collect))
-    {
-        throw gc_error(fmt::format("Reference at {} must be marked as gc_object::of_never_collect for explicit deletion.", obj));
-    }
-
-    auto obj_info = it->second;
-
-    // remove object from root set
-    if(is_root(obj))
-    {
-        root_set.erase(obj);
-    }
-
-    // remove object from temporaries set
-    if(is_temporary(obj))
-    {
-        temporary_objects.erase(obj);
-    }
-
-    // remove object from map
-    objects.erase(obj);
-
-    // delete object
-    delete_object(obj_info);
 }
 
 }    // namespace slang::gc
