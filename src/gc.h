@@ -273,7 +273,7 @@ public:
      * Remove a temporary object (or decrease it's reference count).
      *
      * @note This needs to be called on `string` and `array` types, that are
-     * 1. passed to native functions.
+     * 1. passed to native functions, or
      * 2. returned from `invoke` to native code.
      *
      * @param obj The object.

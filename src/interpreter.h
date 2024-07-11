@@ -45,10 +45,11 @@ class value
     std::variant<int,
                  float,
                  std::string,
+                 void*,
                  std::vector<int>,
                  std::vector<float>,
                  std::vector<std::string>,
-                 void*>
+                 std::vector<void*>>
       v;
 
     /** Read this value from memory. */

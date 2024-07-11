@@ -20,7 +20,7 @@ Currently the only way to run anything is by writing a [test](test), as the comm
 2. Manually:
 
     The project depends on
-    - [`boost`](https://www.boost.org/) (>=1.83.0 <2.0)
+    - [`boost`](https://www.boost.org/) (>=1.83.0, <2.0)
     - [`fmt`](https://github.com/fmtlib/fmt) (>=10.0.0, <11.0)
     - [GoogleTest](https://github.com/google/googletest) (>=1.14.0, <2.0)
 
