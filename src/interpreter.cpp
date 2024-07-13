@@ -743,7 +743,9 @@ opcode context::exec(const language_module& mod,
         } /* opcode::iadd */
         case opcode::isub:
         {
-            frame.stack.push_i32(-frame.stack.pop_i32() + frame.stack.pop_i32());
+            std::int32_t a = frame.stack.pop_i32();
+            std::int32_t b = frame.stack.pop_i32();
+            frame.stack.push_i32(b - a);
             break;
         } /* opcode::isub */
         case opcode::imul:
@@ -780,7 +782,9 @@ opcode context::exec(const language_module& mod,
         } /* opcode::fadd */
         case opcode::fsub:
         {
-            frame.stack.push_f32(-frame.stack.pop_f32() + frame.stack.pop_f32());
+            float a = frame.stack.pop_f32();
+            float b = frame.stack.pop_f32();
+            frame.stack.push_f32(b - a);
             break;
         } /* opcode::fsub */
         case opcode::fmul:
