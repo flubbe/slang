@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <functional>
 #include <list>
 #include <string>
 #include <utility>

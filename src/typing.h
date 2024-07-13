@@ -10,10 +10,12 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
 #include <list>
-#include <vector>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "token.h"
 

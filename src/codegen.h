@@ -10,9 +10,11 @@
 
 #pragma once
 
+#include <algorithm>
 #include <stdexcept>
 #include <list>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <fmt/core.h>
@@ -1492,7 +1494,7 @@ class function
     value return_type;
 
     /** The function variable scope. */
-    scope scope;
+    slang::codegen::scope scope;
 
     /** Function instructions. */
     std::list<basic_block*> instr_blocks;

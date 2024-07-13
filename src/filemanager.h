@@ -8,8 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <stdexcept>
+#include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 #include <vector>
 
 #include "archives/file.h"

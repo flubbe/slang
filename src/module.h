@@ -13,6 +13,7 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "archives/archive.h"

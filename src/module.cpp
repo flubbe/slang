@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <algorithm>
+
 #include <fmt/core.h>
 
 #include "module.h"

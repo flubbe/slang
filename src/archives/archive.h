@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <string>
 #include <optional>
+#include <vector>
 
 namespace slang
 {
@@ -269,13 +270,6 @@ public:
 
     /** Serialize a std::int64_t. */
     archive& operator&(std::uint64_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);
-        return *this;
-    }
-
-    /** Serialize a std::size_t. */
-    archive& operator&(std::size_t& i)
     {
         serialize(reinterpret_cast<std::byte*>(&i), 8);
         return *this;

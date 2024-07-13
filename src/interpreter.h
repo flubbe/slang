@@ -629,6 +629,7 @@ public:
 
     /** Disallow popping from stack for non-(int, float, std::string) types. */
     template<typename T>
+    [[noreturn]]
     value pop_result()
     {
         static_assert(
@@ -636,27 +637,6 @@ public:
             && !std::is_same<T, float>::value
             && !std::is_same<T, std::string>::value,
           "operand_stack::pop_result is only available for int, float and std::string.");
-    }
-
-    /** Pop the call result from the stack. */
-    template<>
-    value pop_result<int>()
-    {
-        return {pop_i32()};
-    }
-
-    /** Pop the call result from the stack. */
-    template<>
-    value pop_result<float>()
-    {
-        return {pop_f32()};
-    }
-
-    /** Pop the call result from the stack. */
-    template<>
-    value pop_result<std::string>()
-    {
-        throw std::runtime_error("operand_stack::pop_result<std::string> not implemented.");
     }
 
     /**
@@ -689,6 +669,28 @@ public:
         stack.resize(stack.size() - byte_count);
     }
 };
+
+/*
+ * pop_result specializations.
+ */
+
+template<>
+inline value operand_stack::pop_result<int>()
+{
+    return {pop_i32()};
+}
+
+template<>
+inline value operand_stack::pop_result<float>()
+{
+    return {pop_f32()};
+}
+
+template<>
+inline value operand_stack::pop_result<std::string>()
+{
+    throw std::runtime_error("operand_stack::pop_result<std::string> not implemented.");
+}
 
 /** A function. */
 class function

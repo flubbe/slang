@@ -8,8 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <string>
 #include <list>
+#include <string>
+#include <vector>
 
 #include <fmt/core.h>
 
