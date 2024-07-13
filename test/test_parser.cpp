@@ -333,6 +333,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=a, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                   "op=\"+\", "
                   "lhs=IntLiteral("
@@ -368,6 +369,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=a, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                 "op=\"+\", "
                 "lhs=Binary("
@@ -408,6 +410,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=a, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                   "op=\"+\", "
                   "lhs=IntLiteral("
@@ -448,6 +451,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=a, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                   "op=\"=\", "
                   "lhs=VariableReference("
@@ -501,6 +505,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=s, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                   "op=\"*\", "
                   "lhs=Unary(op=\"++\", "
@@ -519,6 +524,7 @@ TEST(parser, operators)
               "VariableDeclaration("
                 "name=t, "
                 "type=i32, "
+                "array=false, "
                 "expr=Binary("
                   "op=\"*\", "
                   "lhs=Postfix("
@@ -806,7 +812,7 @@ TEST(parser, variable_declaration)
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           "}";
 
         slang::lexer lexer;
@@ -830,7 +836,7 @@ TEST(parser, variable_declaration)
                     "VariableDeclaration("
                       "name=b, "
                       "type=i32, "
-                      "array_length=2, "
+                      "array=true, "
                       "expr=ArrayInitializer("
                         "exprs=("
                           "IntLiteral("
@@ -903,6 +909,7 @@ TEST(parser, explicit_cast)
           "VariableDeclaration("
             "name=k, "
             "type=i32, "
+            "array=false, "
             "expr=TypeCast("
               "target_type=i32, "
               "expr=FloatLiteral("
@@ -1141,7 +1148,7 @@ TEST(parser, array_return)
 {
     {
         const std::string test_input =
-          "fn f() -> [i32; 2] { return [1, 2]; }";
+          "fn f() -> [i32] { return [1, 2]; }";
 
         slang::lexer lexer;
         slang::parser parser;

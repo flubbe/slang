@@ -150,10 +150,9 @@ protected:
     /**
      * Parse a type name.
      *
-     * @return Returns a pair `(token, optional_array_length)`. For non-array types,
-     *         `optional_array_length` is `std::nullopt`.
+     * @return Returns the type name as a pair `(token, is_array_type)`.
      * */
-    std::pair<token, std::optional<std::size_t>> parse_type_name();
+    std::pair<token, bool> parse_type_name();
 
     /** Parse an array initializer expression. */
     std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();
@@ -182,6 +181,9 @@ protected:
 
     /** Parse a unary operator expression. */
     std::unique_ptr<ast::expression> parse_unary();
+
+    /** Parse the new operator. */
+    std::unique_ptr<ast::expression> parse_new();
 
     /** Parse identifier expression. */
     std::unique_ptr<ast::expression> parse_identifier_expression();

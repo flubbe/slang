@@ -476,32 +476,25 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     cg::value v;
     if(ty::is_builtin_type(type.s))
     {
-        v = {type.s, std::nullopt, name.s, array_length};
+        v = {type.s, std::nullopt, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt};
     }
     else
     {
-        v = {"aggregate", type.s, name.s, array_length};
+        v = {"aggregate", type.s, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt};
     }
 
     s->add_local(std::make_unique<cg::value>(v));
 
     if(is_array())
     {
-        if(array_length.value() >= std::numeric_limits<std::int32_t>::max())
-        {
-            throw cg::codegen_error(loc, fmt::format("Array size exceeds max i32 size ({}).", std::numeric_limits<std::int32_t>::max()));
-        }
-
-        ctx.generate_const({"i32"}, static_cast<std::int32_t>(array_length.value()));
-        ctx.generate_newarray(v);
+        ctx.set_array_type(v);
     }
 
     if(expr)
     {
         expr->generate_code(ctx, memory_context::load);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(v));
     }
-
-    ctx.generate_store(std::make_unique<cg::variable_argument>(v));
 
     if(is_array())
     {
@@ -513,7 +506,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<std::string> variable_declaration_expression::type_check(ty::context& ctx) const
 {
-    ctx.add_variable(name, ctx.get_type(type, array_length));
+    ctx.add_variable(name, ctx.get_type(type, array));
 
     if(expr)
     {
@@ -524,7 +517,7 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
         }
 
-        std::string var_type = typing::to_string({type.s, array_length});
+        std::string var_type = typing::to_string({type.s, array});
         if(*rhs != var_type)
         {
             throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, type.s));
@@ -536,11 +529,7 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
 
 std::string variable_declaration_expression::to_string() const
 {
-    if(is_array())
-    {
-        return fmt::format("VariableDeclaration(name={}, type={}, array_length={}, expr={})", name.s, type.s, *array_length, expr ? expr->to_string() : std::string("<none>"));
-    }
-    return fmt::format("VariableDeclaration(name={}, type={}, expr={})", name.s, type.s, expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("VariableDeclaration(name={}, type={}, array={}, expr={})", name.s, type.s, array, expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -551,6 +540,14 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
 {
     std::unique_ptr<cg::value> v;
     auto array_type = ctx.get_array_type();
+
+    if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
+    {
+        throw cg::codegen_error(fmt::format("Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).", exprs.size(), std::numeric_limits<std::int32_t>::max()));
+    }
+
+    ctx.generate_const({"i32"}, static_cast<int>(exprs.size()));
+    ctx.generate_newarray(array_type.deref());
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
@@ -649,20 +646,16 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     std::vector<std::pair<std::string, cg::value>> struct_members;
     for(auto& m: members)
     {
-        std::optional<std::size_t> array_length = std::nullopt;
-        if(m->is_array())
-        {
-            array_length = m->get_array_length();
-        }
+        std::optional<std::size_t> array_indicator = m->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt;
 
         cg::value v;
         if(ty::is_builtin_type(m->get_type().s))
         {
-            v = {m->get_type().s, std::nullopt, m->get_name().s, array_length};
+            v = {m->get_type().s, std::nullopt, m->get_name().s, array_indicator};
         }
         else
         {
-            v = {"aggregate", m->get_type().s, m->get_name().s, array_length};
+            v = {"aggregate", m->get_type().s, m->get_name().s, array_indicator};
         }
 
         struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
@@ -681,7 +674,7 @@ void struct_definition_expression::collect_names(cg::context& ctx, ty::context& 
     {
         struct_members.emplace_back(std::make_pair(m->get_name(),
                                                    type_ctx.get_unresolved_type(m->get_type(),
-                                                                                m->is_array() ? std::make_optional(m->get_array_length()) : std::nullopt, false)));
+                                                                                m->is_array(), false)));
     }
     type_ctx.add_struct(name, std::move(struct_members));
 }
@@ -1097,6 +1090,52 @@ std::string unary_ast::to_string() const
 }
 
 /*
+ * new_expression.
+ */
+
+std::unique_ptr<slang::codegen::value> new_expression::generate_code(slang::codegen::context& ctx, memory_context mc) const
+{
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Cannot store into new expression.");
+    }
+
+    if(type.s == "void")
+    {
+        throw cg::codegen_error(loc, "Cannot create array with entries of type 'void'.");
+    }
+    else if(!ty::is_builtin_type(type.s))
+    {
+        throw cg::codegen_error(loc, fmt::format("Cannot create array with entries of non-builtin type '{}'.", type.s));
+    }
+
+    std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::load);
+    if(v->get_type() != "i32")
+    {
+        throw cg::codegen_error(loc, fmt::format("Expected <integer> as array size, got '{}'.", v->get_type()));
+    }
+
+    auto array_type = cg::value{type.s, std::nullopt, std::nullopt, std::make_optional<std::size_t>(0)};
+    ctx.generate_newarray(array_type.deref());
+
+    return std::make_unique<cg::value>(
+      v->get_type(),
+      v->is_aggregate() ? std::make_optional(v->get_aggregate_type()) : std::nullopt,
+      v->get_name(),
+      std::make_optional<std::size_t>(0));
+}
+
+std::optional<std::string> new_expression::type_check(slang::typing::context& ctx) const
+{
+    throw std::runtime_error("new_expression::type_check not implemented.");
+}
+
+std::string new_expression::to_string() const
+{
+    return fmt::format("NewExpression(type={}, expr={})", type.s, expr->to_string());
+}
+
+/*
  * postfix_expression.
  */
 
@@ -1186,17 +1225,25 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
     {
         if(ty::is_builtin_type(std::get<1>(a).s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::value>(
+              std::get<1>(a).s,
+              std::nullopt,
+              std::get<0>(a).s,
+              std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::value>(
+              "aggregate",
+              std::get<1>(a).s,
+              std::get<0>(a).s,
+              std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
     }
 
     cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
-                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type)}
-                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type)};
+                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt}
+                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt};
 
     return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
 }
@@ -1208,11 +1255,11 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     {
         if(ty::is_builtin_type(std::get<1>(a).s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a)));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
     }
 
@@ -1234,8 +1281,8 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
                    });
 
     cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
-                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type)}
-                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type)};
+                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt}
+                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt};
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 

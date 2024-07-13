@@ -63,8 +63,8 @@ public:
  */
 class value
 {
-    /** Array size, or an index into the array. */
-    std::optional<std::size_t> array_size_or_index;
+    /** An index into the array or a placeholder to indicate an array. */
+    std::optional<std::size_t> array_index_or_placeholder;
 
     /** The value's type. Can be one of: i32, f32, str, addr, ptr, aggregate. */
     std::string type;
@@ -128,13 +128,14 @@ public:
      * @param type The value type.
      * @param aggregate_type Type name for aggregate types.
      * @param name Optional name for this value.
-     * @param array_size_or_index Optional array size or an index into the array. Set to `std::nullopt` for non-array types.
+     * @param array_index_or_placeholder Optional index into the array or a placeholder to mark the value as an array.
+     * Set to `std::nullopt` for non-array types.
      */
     value(std::string type,
           std::optional<std::string> aggregate_type = std::nullopt,
           std::optional<std::string> name = std::nullopt,
-          std::optional<std::size_t> array_size_or_index = std::nullopt)
-    : array_size_or_index{std::move(array_size_or_index)}
+          std::optional<std::size_t> array_index_or_placeholder = std::nullopt)
+    : array_index_or_placeholder{std::move(array_index_or_placeholder)}
     , type{std::move(type)}
     , aggregate_type{std::move(aggregate_type)}
     , name{std::move(name)}
@@ -147,7 +148,7 @@ public:
      */
     value copy_type() const
     {
-        return {type, aggregate_type, std::nullopt, array_size_or_index};
+        return {type, aggregate_type, std::nullopt, array_index_or_placeholder};
     }
 
     /**
@@ -235,23 +236,7 @@ public:
     /** Returns whether the value is an array. */
     bool is_array() const
     {
-        return array_size_or_index.has_value();
-    }
-
-    /**
-     * If used in a declaration context, returns the array size for array values.
-     *
-     * @throws Throws a `codegen_error` if used on non-array types.
-     * @returns The array size or array index.
-     */
-    std::size_t get_array_length() const
-    {
-        if(!array_size_or_index.has_value())
-        {
-            throw codegen_error("Requested array size for non-array type.");
-        }
-
-        return *array_size_or_index;
+        return array_index_or_placeholder.has_value();
     }
 
     /**
@@ -262,12 +247,12 @@ public:
      */
     std::size_t get_array_index() const
     {
-        if(!array_size_or_index.has_value())
+        if(!array_index_or_placeholder.has_value())
         {
             throw codegen_error("Requested array size for non-array type.");
         }
 
-        return *array_size_or_index;
+        return *array_index_or_placeholder;
     }
 };
 
@@ -1606,21 +1591,17 @@ public:
     }
 
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
-    std::pair<
-      std::pair<std::string, std::optional<std::size_t>>,
-      std::vector<std::pair<std::string, std::optional<std::size_t>>>>
+    std::pair<std::pair<std::string, bool>, std::vector<std::pair<std::string, bool>>>
       get_signature() const
     {
-        std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types;
+        std::vector<std::pair<std::string, bool>> arg_types;
         auto& args = scope.get_args();
         std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                       [](const auto& arg) -> std::pair<std::string, std::optional<std::size_t>>
+                       [](const auto& arg) -> std::pair<std::string, bool>
                        {
-                           return {arg->get_resolved_type(),
-                                   arg->is_array() ? std::make_optional(arg->get_array_length()) : std::nullopt};
+                           return {arg->get_resolved_type(), arg->is_array()};
                        });
-        return {{return_type.get_resolved_type(),
-                 return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt},
+        return {{return_type.get_resolved_type(), return_type.is_array()},
                 std::move(arg_types)};
     }
 
@@ -2132,6 +2113,21 @@ public:
     function* get_current_function(bool validate = false)
     {
         return current_function;
+    }
+
+    /**
+     * Set the array type when an array is declared.
+     *
+     * @param v The array type.
+     * @throws Throws a `codegen_error` if the array type was already set.
+     */
+    void set_array_type(value v)
+    {
+        if(array_type.has_value())
+        {
+            throw codegen_error("Cannot set array type since it is already set.");
+        }
+        array_type = v;
     }
 
     /**

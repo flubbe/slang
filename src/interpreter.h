@@ -61,8 +61,8 @@ class value
     /** Size of the value, in bytes. */
     std::size_t size;
 
-    /** Type identifier. */
-    std::pair<std::string, std::optional<std::size_t>> type;
+    /** Type identifier, as `(type_name, is_array)`. */
+    std::pair<std::string, bool> type;
 
     /**
      * Reads a primitive type into a `value`.
@@ -259,7 +259,7 @@ public:
     , reader{read_primitive_type<std::int32_t>}
     , writer{write_primitive_type<std::int32_t>}
     , size{sizeof(std::int32_t)}
-    , type{"i32", std::nullopt}
+    , type{"i32", false}
     {
     }
 
@@ -273,7 +273,7 @@ public:
     , reader{read_primitive_type<float>}
     , writer{write_primitive_type<float>}
     , size{sizeof(float)}
-    , type{"f32", std::nullopt}
+    , type{"f32", false}
     {
     }
 
@@ -290,7 +290,7 @@ public:
     , reader{read_str}
     , writer{write_str}
     , size{sizeof(std::string*)}
-    , type{"str", std::nullopt}
+    , type{"str", false}
     {
     }
 
@@ -304,7 +304,7 @@ public:
     , reader{read_str}
     , writer{write_str}
     , size{sizeof(std::string*)}
-    , type{"str", std::nullopt}
+    , type{"str", false}
     {
     }
 
@@ -317,9 +317,9 @@ public:
     : v{std::move(int_vec)}
     , reader{read_vector_type<std::int32_t>}
     , writer{write_vector_type<std::int32_t>}
+    , type{"i32", true}
     {
         size = sizeof(std::int32_t) * std::get<std::vector<std::int32_t>>(v).size();
-        type = {"i32", std::get<std::vector<std::int32_t>>(v).size()};
     }
 
     /**
@@ -331,9 +331,9 @@ public:
     : v{std::move(float_vec)}
     , reader{read_vector_type<float>}
     , writer{write_vector_type<float>}
+    , type{"f32", true}
     {
         size = sizeof(float) * std::get<std::vector<float>>(v).size();
-        type = {"f32", std::get<std::vector<float>>(v).size()};
     }
 
     /**
@@ -348,9 +348,9 @@ public:
     : v{std::move(string_vec)}
     , reader{read_vector_str}
     , writer{write_vector_str}
+    , type{"str", true}
     {
         size = sizeof(std::string*) * std::get<std::vector<std::string>>(v).size();
-        type = {"str", std::get<std::vector<std::string>>(v).size()};
     }
 
     /**
@@ -363,7 +363,7 @@ public:
     , reader{read_addr}
     , writer{write_addr}
     , size{sizeof(void*)}
-    , type{"addr", std::nullopt}
+    , type{"addr", false}
     {
     }
 
@@ -396,7 +396,7 @@ public:
     }
 
     /** Get the value's type. */
-    const std::pair<std::string, std::optional<std::size_t>>& get_type() const
+    const std::pair<std::string, bool>& get_type() const
     {
         return type;
     }

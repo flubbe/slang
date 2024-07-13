@@ -97,7 +97,7 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
                 }
 
                 ty::type resolved_return_type = type_ctx.get_type(return_type.get_resolved_type(),
-                                                                  return_type.is_array() ? std::make_optional(return_type.get_array_length()) : std::nullopt);
+                                                                  return_type.is_array());
 
                 type_ctx.add_function({exp.name, reference_location},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);

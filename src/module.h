@@ -161,11 +161,11 @@ struct variable : public symbol
     /** The variable's type. */
     std::string type;
 
-    /** Array length. */
-    std::optional<vle_int> array_length;
+    /** Whether this is an array type. */
+    bool array;
 
-    /** Type constructor. */
-    std::function<void(void*)> type_constructor = nullptr;
+    /** Whether this is a reference type. */
+    bool reference;
 
     /** Default constructors. */
     variable() = default;
@@ -180,15 +180,13 @@ struct variable : public symbol
      * Construct a variable.
      *
      * @param type The variable's type.
-     * @param array_length The variable's array length or `std::nullopt` if not an array.
+     * @param array Whether this is an array type.
      */
-    variable(std::string type,
-             std::optional<std::int64_t> array_length = std::nullopt,
-             std::function<void(void*)> type_constructor = nullptr)
+    variable(std::string type, bool array = false)
     : type{std::move(type)}
-    , array_length{array_length}
-    , type_constructor{std::move(type_constructor)}
+    , array{array}
     {
+        reference = type != "void" && type != "i32" && type != "f32";
     }
 };
 
@@ -201,7 +199,8 @@ struct variable : public symbol
 inline archive& operator&(archive& ar, variable& v)
 {
     ar & v.type;
-    ar & v.array_length;
+    ar & v.array;
+    v.reference = v.type != "void" && v.type != "i32" && v.type != "f32";
     return ar;
 }
 
@@ -209,10 +208,10 @@ inline archive& operator&(archive& ar, variable& v)
 struct function_signature
 {
     /** Return type. */
-    std::pair<std::string, std::optional<std::size_t>> return_type;
+    std::pair<std::string, bool> return_type;
 
     /** Argument type list. */
-    std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types;
+    std::vector<std::pair<std::string, bool>> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -229,8 +228,8 @@ struct function_signature
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      */
-    function_signature(std::pair<std::string, std::optional<std::size_t>> return_type,
-                       std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types)
+    function_signature(std::pair<std::string, bool> return_type,
+                       std::vector<std::pair<std::string, bool>> arg_types)
     : return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
     {
@@ -678,8 +677,8 @@ public:
      * @param locals The function's arguments and locals.
      */
     void add_function(std::string name,
-                      std::pair<std::string, std::optional<std::size_t>> return_type,
-                      std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                      std::pair<std::string, bool> return_type,
+                      std::vector<std::pair<std::string, bool>> arg_types,
                       std::size_t size, std::size_t entry_point, std::vector<variable> locals);
 
     /**
@@ -691,8 +690,8 @@ public:
      * @param lib_name Name of the library to import the function from.
      */
     void add_native_function(std::string name,
-                             std::pair<std::string, std::optional<std::size_t>> return_type,
-                             std::vector<std::pair<std::string, std::optional<std::size_t>>> arg_types,
+                             std::pair<std::string, bool> return_type,
+                             std::vector<std::pair<std::string, bool>> arg_types,
                              std::string lib_name);
 
     /**

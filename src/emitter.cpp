@@ -509,19 +509,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            if(it->is_array())
-            {
-                if(it->get_array_length() >= std::numeric_limits<std::int64_t>::max())
-                {
-                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_length(), std::numeric_limits<std::int64_t>::max()));
-                }
-
-                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_length())};
-            }
-            else
-            {
-                locals[index] = {it->get_type()};
-            }
+            locals[index] = {it->get_type(), it->is_array()};
         }
 
         for(auto& it: func_locals)
@@ -539,19 +527,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            if(it->is_array())
-            {
-                if(it->get_array_length() >= std::numeric_limits<std::int64_t>::max())
-                {
-                    throw emitter_error(fmt::format("Array size too large ({} >= {}).", it->get_array_length(), std::numeric_limits<std::int64_t>::max()));
-                }
-
-                locals[index] = {it->get_type(), static_cast<std::int64_t>(it->get_array_length())};
-            }
-            else
-            {
-                locals[index] = {it->get_type()};
-            }
+            locals[index] = {it->get_type(), it->is_array()};
         }
 
         if(unset_indices.size() != 0)

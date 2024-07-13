@@ -395,7 +395,7 @@ TEST(output, operators)
     }
     {
         const std::string test_input =
-          "fn main() -> [i32; 2]\n"
+          "fn main() -> [i32]\n"
           "{\n"
           "\treturn 1 + 2;\n"
           "}";
@@ -716,12 +716,12 @@ TEST(output, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           " return b[1];\n"
           "}\n"
           "fn g() -> i32\n"
           "{\n"
-          " let b: [i32; 3] = [-1, 0, f()];\n"
+          " let b: [i32] = [-1, 0, f()];\n"
           " b[1] = 3;\n"
           " return b[1];\n"
           "}";
@@ -758,33 +758,33 @@ TEST(output, arrays)
     }
     {
         const std::string test_input =
-          "fn return_array() -> [i32; 2]\n"
+          "fn return_array() -> [i32]\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           " return b;\n"
           "}\n"
           "fn pass_array() -> i32\n"
           "{\n"
-          " let b: [i32; 2] = [2, 3];\n"
+          " let b: [i32] = [2, 3];\n"
           " return f(b);\n"
           "}\n"
-          "fn f(a: [i32; 2]) -> i32\n"
+          "fn f(a: [i32]) -> i32\n"
           "{\n"
           " return a[1];\n"
           "}\n"
           "fn invalid_index() -> i32\n"
           "{\n"
-          " let b: [i32; 2] = [0, 1];\n"
+          " let b: [i32] = [0, 1];\n"
           " return b[3];\n"
           "}\n"
-          "fn str_array() -> [str; 3]\n"
+          "fn str_array() -> [str]\n"
           "{\n"
-          " let s: [str; 3] = [\"a\", \"test\", \"123\"];"
+          " let s: [str] = [\"a\", \"test\", \"123\"];"
           " return s;\n"
           "}\n"
           "fn ret_str() -> str\n"
           "{\n"
-          " let s: [str; 3] = [\"a\", \"test\", \"123\"];"
+          " let s: [str] = [\"a\", \"test\", \"123\"];"
           " return s[2];"
           "}\n"
           "fn call_return() -> i32\n"
@@ -824,9 +824,9 @@ TEST(output, arrays)
     }
     {
         const std::string test_input =
-          "fn return_array() -> [i32; 2]\n"
+          "fn return_array() -> [i32]\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           " return b[0];\n"    // wrong return type
           "}";
 
@@ -860,41 +860,6 @@ TEST(output, arrays)
           " let b: i32 = 1;\n"
           " return b[0];\n"    // not an array
           "}";
-
-        slang::lexer lexer;
-        slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
-
-        const slang::ast::block* ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
-
-        slang::file_manager mgr;
-
-        ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
-
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
-    }
-    {
-        const std::string test_input =
-          "fn pass_array() -> i32\n"
-          "{\n"
-          " let b: [i32; 2] = [2, 3];\n"
-          " return f(b);\n"    // passed array has wrong size
-          "}\n"
-          "fn f(a: [i32; 3]) -> i32\n"
-          "{\n"
-          " return a[1];\n"
-          "}\n";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -1014,9 +979,9 @@ TEST(output, return_discard)
           "{\n"
           " g();\n"
           "}\n"
-          "fn g() -> [i32; 2]\n"
+          "fn g() -> [i32]\n"
           "{\n"
-          " let r: [i32; 2] = [1, 2];\n"
+          " let r: [i32] = [1, 2];\n"
           " return r;\n"
           "}";
 
@@ -1056,9 +1021,9 @@ TEST(output, return_discard)
           "{\n"
           " g();\n"
           "}\n"
-          "fn g() -> [str; 2]\n"
+          "fn g() -> [str]\n"
           "{\n"
-          " let r: [str; 2] = [\"a\", \"test\"];\n"
+          " let r: [str] = [\"a\", \"test\"];\n"
           " return r;\n"
           "}";
 

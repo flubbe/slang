@@ -21,7 +21,7 @@
  */
 namespace slang::typing
 {
-std::string to_string(const std::pair<std::string, std::optional<std::size_t>>&); /* typing.h */
+std::string to_string(const std::pair<std::string, bool>&); /* typing.h */
 };
 
 namespace ty = slang::typing;
@@ -97,9 +97,9 @@ std::string value::to_string() const
 {
     if(has_name())
     {
-        return fmt::format("{} %{}", ty::to_string({get_resolved_type(), array_size_or_index}), *get_name());
+        return fmt::format("{} %{}", ty::to_string({get_resolved_type(), is_array()}), *get_name());
     }
-    return fmt::format("{}", ty::to_string({get_resolved_type(), array_size_or_index}));
+    return fmt::format("{}", ty::to_string({get_resolved_type(), is_array()}));
 }
 
 /*
@@ -437,7 +437,7 @@ void context::generate_newarray(value vt)
     array_type = vt;
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt.deref()));
+    args.emplace_back(std::make_unique<type_argument>(vt));
     insertion_point->add_instruction(std::make_unique<instruction>("newarray", std::move(args)));
 }
 

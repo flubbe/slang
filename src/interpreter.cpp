@@ -17,6 +17,12 @@
 #include "package.h"
 #include "utils.h"
 
+#ifdef INTERPRETER_DEBUG
+#    define DEBUG_LOG(...) fmt::print("INT: {}\n", fmt::format(__VA_ARGS__))
+#else
+#    define DEBUG_LOG(...)
+#endif
+
 namespace slang::interpreter
 {
 
@@ -58,69 +64,6 @@ static std::size_t get_type_size(const std::string& type_name, bool is_array, bo
     }
 
     throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
-}
-
-/**
- * Return the constructor for a type.
- *
- * @note The object is allocated through the garbage collected heap.
- *
- * @param ctx The interpreter context.
- * @param type_name The type name.
- * @param array_length Optional array length.
- * @return Returns a constructor function for types that need construction, and `nullptr` otherwise.
- */
-static std::function<void(void*)> get_type_constructor(context& ctx, const std::string& type_name, std::optional<std::size_t> array_length)
-{
-    if(!array_length.has_value())
-    {
-        if(type_name == "str")
-        {
-            return std::move([&ctx](void* memory) -> void
-                             {
-                                auto s = ctx.get_gc().gc_new<std::string>();
-                                *reinterpret_cast<std::string**>(memory) = s; });
-        }
-
-        return nullptr;
-    }
-
-    if(type_name == "i32")
-    {
-        return std::move([&ctx, array_length](void* memory) -> void
-                         { 
-                            auto v = ctx.get_gc().gc_new_array<std::int32_t>(*array_length);
-                            *reinterpret_cast<std::vector<std::int32_t>**>(memory) = v; });
-    }
-    else if(type_name == "f32")
-    {
-        return std::move([&ctx, array_length](void* memory) -> void
-                         { 
-                            auto v = ctx.get_gc().gc_new_array<float>(*array_length);
-                            *reinterpret_cast<std::vector<float>**>(memory) = v; });
-    }
-    else if(type_name == "str")
-    {
-        return std::move([&ctx, array_length](void* memory) -> void
-                         { 
-                            auto v = ctx.get_gc().gc_new_array<std::string*>(*array_length);
-                            for(auto& s : *v)
-                            {
-                                s = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
-                            }
-                            *reinterpret_cast<std::vector<std::string*>**>(memory) = v; });
-    }
-    else if(type_name == "addr")
-    {
-        return std::move([&ctx, array_length](void* memory) -> void
-                         { 
-                            auto v = ctx.get_gc().gc_new_array<void*>(*array_length);
-                            *reinterpret_cast<std::vector<void*>**>(memory) = v; });
-    }
-    else
-    {
-        throw interpreter_error(fmt::format("No constructor for type '{}' found.", type_name));
-    }
 }
 
 /**
@@ -167,11 +110,11 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
  */
 static int32_t get_stack_delta(const function_signature& s)
 {
-    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second.has_value(), s.return_type.second.has_value());
+    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second, s.return_type.second);
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        arg_size += get_type_size(it.first, it.second.has_value(), it.second.has_value());
+        arg_size += get_type_size(it.first, it.second, it.second);
     }
     return return_type_size - arg_size;
 }
@@ -232,7 +175,7 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type, v.array_length.has_value(), false);
+        v.size = get_type_size(v.type, v.array, false);
 
         details.locals_size += v.size;
         details.args_size += v.size;
@@ -244,18 +187,13 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type, v.array_length.has_value(), false);
-
-        auto array_length = v.array_length.has_value()
-                              ? std::make_optional<std::size_t>(v.array_length->i)
-                              : std::nullopt;
-        v.type_constructor = get_type_constructor(*this, v.type, array_length);
+        v.size = get_type_size(v.type, v.array, false);
 
         details.locals_size += v.size;
     }
 
     // return type
-    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second.has_value(), desc.signature.return_type.second.has_value());
+    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second, desc.signature.return_type.second);
 }
 
 std::int32_t context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
@@ -679,10 +617,13 @@ public:
     {
         for(auto& local: locals)
         {
-            if(local.type_constructor)
+            if(local.array || local.reference)
             {
-                void* addr = &frame.locals[local.offset];
-                local.type_constructor(addr);    // the constructor adds the object to the garbage collector.
+                void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
+                if(addr != nullptr)
+                {
+                    ctx.get_gc().add_root(addr);
+                }
             }
         }
     }
@@ -705,10 +646,13 @@ public:
 
         for(auto& local: locals)
         {
-            if(local.type_constructor)
+            if(local.array || local.reference)
             {
                 void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
-                ctx.get_gc().remove_root(addr);
+                if(addr != nullptr)
+                {
+                    ctx.get_gc().remove_root(addr);
+                }
             }
         }
     }
@@ -1167,7 +1111,7 @@ opcode context::exec(const language_module& mod,
                 {
                     auto& arg = details.locals[i];
 
-                    if(arg.array_length.has_value() || arg.type == "str" || arg.type == "addr")
+                    if(arg.array || arg.reference)
                     {
                         void* addr = *reinterpret_cast<void**>(&frame.locals[arg.offset]);
                         gc.remove_temporary(addr);
@@ -1391,8 +1335,6 @@ value context::exec(const language_module& mod,
     }
 
     std::size_t offset = 0;
-    std::unordered_map<std::size_t, void*> arg_addrs;
-
     for(std::size_t i = 0; i < args.size(); ++i)
     {
         if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
@@ -1402,15 +1344,11 @@ value context::exec(const language_module& mod,
                           i, std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type())));
         }
 
-        if(std::get<1>(arg_types[i]).has_value())
+        if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
         {
-            if(!std::get<1>(args[i].get_type()).has_value()
-               || *std::get<1>(arg_types[i]) != *std::get<1>(args[i].get_type()))
-            {
-                throw interpreter_error(
-                  fmt::format("Argument {} for function has wrong array length (expected '{}', got '{}').",
-                              i, *std::get<1>(arg_types[i]) != *std::get<1>(args[i].get_type())));
-            }
+            throw interpreter_error(
+              fmt::format("Argument {} for function has wrong array property (expected '{}', got '{}').",
+                          i, std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
         }
 
         if(offset + args[i].get_size() > f.get_locals_size())
@@ -1418,24 +1356,7 @@ value context::exec(const language_module& mod,
             throw interpreter_error("Stack overflow during argument allocation.");
         }
 
-        // add types to GC.
-        if(std::get<0>(args[i].get_type()) == "str"
-           || std::get<0>(args[i].get_type()) == "addr")
-        {
-            std::size_t start_offset = offset;
-            offset += args[i].write(&frame.locals[offset]);
-
-            void* obj = *reinterpret_cast<void**>(&frame.locals[start_offset]);
-            arg_addrs[start_offset] = obj;
-
-            gc.add_root(obj);
-        }
-        else
-        {
-            arg_addrs[offset] = nullptr;
-
-            offset += args[i].write(&frame.locals[offset]);
-        }
+        offset += args[i].write(&frame.locals[offset]);
     }
 
     /*
@@ -1483,15 +1404,6 @@ value context::exec(const language_module& mod,
     else
     {
         throw interpreter_error(fmt::format("Invalid return opcode '{}' ({}).", to_string(ret_opcode), static_cast<int>(ret_opcode)));
-    }
-
-    // remove arguments from GC.
-    for(auto& [offset, addr]: arg_addrs)
-    {
-        if(addr != nullptr)
-        {
-            gc.remove_root(addr);
-        }
     }
 
     // invoke the garbage collector to clean up before returning.
@@ -1589,6 +1501,8 @@ void context::load_module(const std::string& name, const language_module& mod)
 
 value context::invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args)
 {
+    DEBUG_LOG("invoke: {}.{}", module_name, function_name);
+
     auto mod_it = module_map.find(module_name);
     if(mod_it == module_map.end())
     {

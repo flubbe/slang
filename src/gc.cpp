@@ -111,11 +111,16 @@ void* garbage_collector::add_root(void* obj, std::uint32_t flags)
 {
     GC_LOG("add root {}, flags {}", obj, flags);
 
-    if(root_set.find(obj) != root_set.end())
+    auto it = root_set.find(obj);
+    if(it == root_set.end())
     {
-        throw gc_error(fmt::format("Object at {} already exists in GC root set.", obj));
+        root_set.insert({obj, 1});
     }
-    root_set.insert({obj, 1});
+    else
+    {
+        ++it->second;
+    }
+
     return obj;
 }
 

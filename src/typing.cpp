@@ -20,17 +20,17 @@ std::string to_string(const type& t)
 {
     if(t.is_array())
     {
-        return fmt::format("[{}; {}]", t.get_base_type().s, t.get_array_length());
+        return fmt::format("[{}]", t.get_base_type().s);
     }
     return t.get_base_type().s;
 }
 
-std::string to_string(const std::pair<token, std::optional<std::size_t>>& t)
+std::string to_string(const std::pair<token, bool>& t)
 {
     return to_string(type{std::get<0>(t), std::get<1>(t), 0 /* unknown type id */, false});
 }
 
-std::string to_string(const std::pair<std::string, std::optional<std::size_t>>& t)
+std::string to_string(const std::pair<std::string, bool>& t)
 {
     return to_string(type{{std::get<0>(t), {0, 0}}, std::get<1>(t), 0 /* unknown type id */, false});
 }
@@ -275,7 +275,7 @@ void context::resolve_types()
         if(it == type_map.end())
         {
             auto type_id = generate_type_id();
-            type_map.push_back({type{s.second.name, std::nullopt, type_id, false}, type_id});
+            type_map.push_back({type{s.second.name, false, type_id, false}, type_id});
         }
     }
 
@@ -311,7 +311,7 @@ type context::get_function_type(const token& name, const std::vector<type>& arg_
     std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
                                           slang::typing::to_string(ret_type));
 
-    return get_unresolved_type({type_string, name.location}, std::nullopt, true);
+    return get_unresolved_type({type_string, name.location}, false, true);
 }
 
 const function_signature& context::get_function_signature(const token& name) const

@@ -393,7 +393,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           "}";
 
         slang::lexer lexer;
@@ -412,27 +412,27 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
-                  "local [i32; 2] %b\n"
+                  "local [i32] %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup [i32; 2]\n"    // array_ref
-                  " const i32 0\n"     // index
-                  " const i32 1\n"     // value
+                  " dup [i32]\n"      // array_ref
+                  " const i32 0\n"    // index
+                  " const i32 1\n"    // value
                   " store_element i32\n"
-                  " dup [i32; 2]\n"    // array_ref
-                  " const i32 1\n"     // index
-                  " const i32 2\n"     // value
+                  " dup [i32]\n"      // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
                   " store_element i32\n"
-                  " store [i32; 2] %b\n"
+                  " store [i32] %b\n"
                   " ret void\n"
                   "}");
     }
     {
         const std::string test_input =
-          "fn f() -> [i32; 2]\n"
+          "fn f() -> [i32]\n"
           "{\n"
-          " let b: [i32; 2] = [1, 2];\n"
+          " let b: [i32] = [1, 2];\n"
           " return b;\n"
           "}";
 
@@ -451,29 +451,30 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define [i32; 2] @f() {\n"
-                  "local [i32; 2] %b\n"
+                  "define [i32] @f() {\n"
+                  "local [i32] %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup [i32; 2]\n"    // array_ref
-                  " const i32 0\n"     // index
-                  " const i32 1\n"     // value
+                  " dup [i32]\n"      // array_ref
+                  " const i32 0\n"    // index
+                  " const i32 1\n"    // value
                   " store_element i32\n"
-                  " dup [i32; 2]\n"    // array_ref
-                  " const i32 1\n"     // index
-                  " const i32 2\n"     // value
+                  " dup [i32]\n"      // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
                   " store_element i32\n"
-                  " store [i32; 2] %b\n"
-                  " load [i32; 2] %b\n"
-                  " ret [i32; 2]\n"
+                  " store [i32] %b\n"
+                  " load [i32] %b\n"
+                  " ret [i32]\n"
                   "}");
     }
     {
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32; 2];\n"
+          " let b: [i32];\n"
+          " b = new i32[2];\n"
           " b[1] = 2;\n"
           " return b[0];\n"
           "}";
@@ -494,20 +495,68 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local [i32; 2] %b\n"
+                  "local [i32] %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store [i32; 2] %b\n"
-                  " load [i32; 2] %b\n"    // array_ref
-                  " const i32 1\n"         // index
-                  " const i32 2\n"         // value
+                  " store [i32] %b\n"
+                  " load [i32] %b\n"    // array_ref
+                  " const i32 1\n"      // index
+                  " const i32 2\n"      // value
                   " store_element i32\n"
-                  " load [i32; 2] %b\n"
+                  " load [i32] %b\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
                   "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let b: [i32];\n"
+          " b = new i32;\n"    // missing size
+          " b[1] = 2;\n"
+          " return b[0];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let b: [i32];\n"
+          " b = new i32[];\n"    // missing size
+          " b[1] = 2;\n"
+          " return b[0];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let b: [i32];\n"
+          " b = new [i32];\n"    // invalid type
+          " b[1] = 2;\n"
+          " return b[0];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
     }
 }
 

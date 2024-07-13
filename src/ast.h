@@ -31,7 +31,7 @@ class value;
 namespace slang::typing
 {
 class context;
-std::string to_string(const std::pair<std::string, std::optional<std::size_t>>&);
+std::string to_string(const std::pair<std::string, bool>&);
 }    // namespace slang::typing
 
 namespace slang::ast
@@ -507,8 +507,8 @@ class variable_declaration_expression : public expression
     /** The variable's type. */
     token type;
 
-    /** The associated array size. */
-    std::optional<std::size_t> array_length;
+    /** Whether the variable is an array. */
+    bool array;
 
     /** An optional initializer expression. */
     std::unique_ptr<ast::expression> expr;
@@ -534,14 +534,14 @@ public:
      * @param loc The location.
      * @param name The variable's name.
      * @param type The variable's type.
-     * @param array_length The array length. Passing `std::nullopt` means no array.
+     * @param array Whether the variable is an array.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, token name, token type, std::optional<std::size_t> array_length, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(token_location loc, token name, token type, bool array, std::unique_ptr<ast::expression> expr)
     : expression{std::move(loc)}
     , name{std::move(name)}
     , type{std::move(type)}
-    , array_length{std::move(array_length)}
+    , array{array}
     , expr{std::move(expr)}
     {
     }
@@ -565,13 +565,7 @@ public:
     /** Whether this variable is an array. */
     bool is_array() const
     {
-        return array_length.has_value();
-    }
-
-    /** Get the array length. Only valid when used on an array. */
-    std::size_t get_array_length() const
-    {
-        return *array_length;
+        return array;
     }
 };
 
@@ -834,6 +828,48 @@ public:
     std::string to_string() const override;
 };
 
+class new_expression : public expression
+{
+    /** The type. */
+    token type;
+
+    /** Array length expression. */
+    std::unique_ptr<expression> expr;
+
+public:
+    /** No default constructor. */
+    new_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~new_expression() = default;
+
+    /** Copy and move constructors. */
+    new_expression(const new_expression&) = delete;
+    new_expression(new_expression&&) = default;
+
+    /** Assignment operators. */
+    new_expression& operator=(const new_expression&) = delete;
+    new_expression& operator=(new_expression&&) = default;
+
+    /**
+     * Construct a unary expression.
+     *
+     * @param loc The location.
+     * @param type The type to be allocated.
+     * @param expr The array length expression.
+     */
+    new_expression(token_location loc, token type, std::unique_ptr<expression> expr)
+    : expression{std::move(loc)}
+    , type{std::move(type)}
+    , expr{std::move(expr)}
+    {
+    }
+
+    std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::string to_string() const override;
+};
+
 /** Postfix operator expression. */
 class postfix_expression : public expression
 {
@@ -885,11 +921,11 @@ class prototype_ast
     /** The function name. */
     token name;
 
-    /** The function's arguments as tuples `(name, type, array_length)`. */
-    std::vector<std::tuple<token, token, std::optional<std::size_t>>> args;
+    /** The function's arguments as tuples `(name, type, is_array)`. */
+    std::vector<std::tuple<token, token, bool>> args;
 
-    /** The function's return type as `(type, array_length)`. */
-    std::pair<token, std::optional<std::size_t>> return_type;
+    /** The function's return type as a pair `(type, is_array)`. */
+    std::pair<token, bool> return_type;
 
 public:
     /** No default constructor. */
@@ -911,13 +947,13 @@ public:
      *
      * @param loc The location.
      * @param name The function's name.
-     * @param args The function's arguments as a vector of tuples `(name, type, array_length)`.
-     * @param return_type The function's return type as a pair `(type, array_length)`.
+     * @param args The function's arguments as a vector of tuples `(name, type, is_array)`.
+     * @param return_type The function's return type.
      */
     prototype_ast(token_location loc,
                   token name,
-                  std::vector<std::tuple<token, token, std::optional<std::size_t>>> args,
-                  std::pair<token, std::optional<std::size_t>> return_type)
+                  std::vector<std::tuple<token, token, bool>> args,
+                  std::pair<token, bool> return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}

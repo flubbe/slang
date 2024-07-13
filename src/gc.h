@@ -242,11 +242,6 @@ public:
     std::vector<T>* gc_new_array(std::size_t size, std::uint32_t flags = gc_object::of_none)
     {
         auto array = new std::vector<T>();
-
-        if(objects.find(array) != objects.end())
-        {
-            throw gc_error("Allocated object already exists.");
-        }
         objects.insert({array, gc_object::from(array, flags)});
 
         allocated_bytes += sizeof(std::vector<T>);

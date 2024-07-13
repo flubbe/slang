@@ -456,6 +456,10 @@ TEST(interpreter, arrays)
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "f", {}));
     EXPECT_EQ(*res.get<int>(), 2);
 
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "g", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 

@@ -26,8 +26,8 @@ class type
     /** The base type name. */
     token base;
 
-    /** Optional array length. */
-    std::optional<std::size_t> array_length;
+    /** Whether the type is an array. */
+    bool array;
 
     /** Type id or std::nullopt for unresolved types. */
     std::optional<std::uint64_t> type_id;
@@ -51,13 +51,13 @@ public:
      * Create a new type.
      *
      * @param base The base type name.
-     * @param array_length Optional array length.
+     * @param array Whether the type is an array.
      * @param type_id The type's id, or std::nullopt for an unresolved type.
      * @param function_type Whether this type comes from a function.
      */
-    type(token base, std::optional<std::size_t> array_length, std::optional<std::uint64_t> type_id, bool function_type)
+    type(token base, bool array, std::optional<std::uint64_t> type_id, bool function_type)
     : base{std::move(base)}
-    , array_length{std::move(array_length)}
+    , array{array}
     , type_id{type_id}
     , function_type{function_type}
     {
@@ -84,19 +84,13 @@ public:
     /** Return whether this type is an array type. */
     bool is_array() const
     {
-        return array_length.has_value();
+        return array;
     }
 
     /** Return whether this is a function type. */
     bool is_function_type() const
     {
         return function_type;
-    }
-
-    /** Return the array length. Throws `std::bad_optional_access` if used on non-array types. */
-    std::size_t get_array_length() const
-    {
-        return array_length.value();
     }
 
     /**
@@ -119,12 +113,12 @@ public:
      * Helper to create an unresolved type.
      *
      * @param base The base type name.
-     * @param array_length Optional array length.
+     * @param array Whether the type is an array type.
      * @param function_type Whether this type comes from a function.
      */
-    static type make_unresolved(token base, std::optional<std::size_t> array_length, bool function_type)
+    static type make_unresolved(token base, bool array, bool function_type)
     {
-        return {std::move(base), array_length, std::nullopt, function_type};
+        return {std::move(base), array, std::nullopt, function_type};
     }
 };
 
@@ -149,14 +143,14 @@ std::string to_string(const type& t);
  *
  * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
  */
-std::string to_string(const std::pair<token, std::optional<std::size_t>>& t);
+std::string to_string(const std::pair<token, bool>& t);
 
 /**
  * Convert a type to a string.
  *
  * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
  */
-std::string to_string(const std::pair<std::string, std::optional<std::size_t>>& t);
+std::string to_string(const std::pair<std::string, bool>& t);
 
 /** Type errors. */
 class type_error : public std::runtime_error
@@ -503,7 +497,7 @@ class context
         }
 
         auto type_id = generate_type_id();
-        type_map.push_back({type{std::move(name), std::nullopt, type_id, false}, type_id});
+        type_map.push_back({type{std::move(name), false, type_id, false}, type_id});
     }
 
 public:
@@ -589,26 +583,23 @@ public:
     type get_identifier_type(const token& identifier) const;
 
     /**
-     * Get the type id for a name and an optional array length.
+     * Get the type id for a name.
      *
      * @param name The type name.
-     * @param array_length Optional array length.
+     * @param array Whether this is an array type.
      * @throws Throws a `type_error` if the type is not known.
      */
-    std::uint64_t get_type_id(const token& name, std::optional<std::size_t> array_length)
+    std::uint64_t get_type_id(const token& name, bool array)
     {
         auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array_length](const std::pair<type, std::uint64_t>& t) -> bool
+                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
                                {
                                    if(name.s != t.first.get_base_type().s)
                                    {
                                        return false;
                                    }
-                                   if(array_length.has_value() && t.first.is_array())
-                                   {
-                                       return *array_length == t.first.get_array_length();
-                                   }
-                                   return !array_length.has_value() && !t.first.is_array();
+                                   return (array && t.first.is_array())
+                                          || (!array && !t.first.is_array());
                                });
         if(it != type_map.end())
         {
@@ -624,25 +615,22 @@ public:
      * Adds the array type to the type map if the base type exists.
      *
      * @param name The type name.
-     * @param array_length Optional array length.
+     * @param array Whether the type is an array type.
      * @returns An existing type.
      * @throws A `type_error` if the type cnould not be resolved.
      */
-    type get_type(const token& name, std::optional<std::size_t> array_length)
+    type get_type(const token& name, bool array)
     {
         // search for an exact match.
         auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array_length](const std::pair<type, std::uint64_t>& t) -> bool
+                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
                                {
                                    if(name.s != t.first.get_base_type().s)
                                    {
                                        return false;
                                    }
-                                   if(array_length.has_value() && t.first.is_array())
-                                   {
-                                       return *array_length == t.first.get_array_length();
-                                   }
-                                   return !array_length.has_value() && !t.first.is_array();
+                                   return (array && t.first.is_array())
+                                          || (!array && !t.first.is_array());
                                });
         if(it != type_map.end())
         {
@@ -650,7 +638,7 @@ public:
         }
 
         // for arrays, also search for the base type.
-        if(array_length != std::nullopt)
+        if(array)
         {
             auto it = std::find_if(type_map.begin(), type_map.end(),
                                    [&name](const std::pair<type, std::uint64_t>& t) -> bool
@@ -669,7 +657,7 @@ public:
             {
                 // add the array type to the type map.
                 auto type_id = generate_type_id();
-                type_map.push_back({type{name, array_length, type_id, false}, type_id});
+                type_map.push_back({type{name, array, type_id, false}, type_id});
                 return type_map.back().first;
             }
         }
@@ -678,28 +666,25 @@ public:
     }
 
     /**
-     * Get the type for a name and an optional array length.
+     * Get the type for a name.
      *
      * Adds the array type to the type map if the base type exists.
      *
      * @param name The type name.
-     * @param array_length Optional array length.
+     * @param array Whether the type is an array.
      * @returns An existing type.
      */
-    type get_type(const std::string& name, std::optional<std::size_t> array_length)
+    type get_type(const std::string& name, bool array)
     {
         auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array_length](const std::pair<type, std::uint64_t>& t) -> bool
+                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
                                {
                                    if(name != t.first.get_base_type().s)
                                    {
                                        return false;
                                    }
-                                   if(array_length.has_value() && t.first.is_array())
-                                   {
-                                       return *array_length == t.first.get_array_length();
-                                   }
-                                   return !array_length.has_value() && !t.first.is_array();
+                                   return (array && t.first.is_array())
+                                          || (!array && !t.first.is_array());
                                });
         if(it != type_map.end())
         {
@@ -707,7 +692,7 @@ public:
         }
 
         // for arrays, also search for the base type.
-        if(array_length != std::nullopt)
+        if(array)
         {
             auto it = std::find_if(type_map.begin(), type_map.end(),
                                    [&name](const std::pair<type, std::uint64_t>& t) -> bool
@@ -726,7 +711,7 @@ public:
             {
                 // add the array type to the type map.
                 auto type_id = generate_type_id();
-                type_map.push_back({type{token{name, {0, 0}}, array_length, type_id, false}, type_id});
+                type_map.push_back({type{token{name, {0, 0}}, array, type_id, false}, type_id});
                 return type_map.back().first;
             }
         }
@@ -738,14 +723,14 @@ public:
      * Get a type object for an unresolved type and add mark the type for resolution.
      *
      * @param name The type name.
-     * @param array_length Optional array length.
+     * @param array Whether the type is an array type.
      * @param function_type Whether this type belongs to a function.
      * @returns An unresolved type.
      */
-    type get_unresolved_type(token name, std::optional<std::size_t> array_length, bool function_type)
+    type get_unresolved_type(token name, bool array, bool function_type)
     {
         auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
-                               [&name, &array_length, function_type](const type& t) -> bool
+                               [&name, &array, function_type](const type& t) -> bool
                                {
                                    if(name.s != t.get_base_type().s)
                                    {
@@ -755,18 +740,15 @@ public:
                                    {
                                        return false;
                                    }
-                                   if(array_length.has_value() && t.is_array())
-                                   {
-                                       return *array_length == t.get_array_length();
-                                   }
-                                   return !array_length.has_value() && !t.is_array();
+                                   return (array && t.is_array())
+                                          || (!array && !t.is_array());
                                });
         if(it != unresolved_types.end())
         {
             return *it;
         }
 
-        unresolved_types.push_back(type::make_unresolved(std::move(name), array_length, function_type));
+        unresolved_types.push_back(type::make_unresolved(std::move(name), array, function_type));
         return unresolved_types.back();
     }
 
