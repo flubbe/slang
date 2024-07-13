@@ -30,14 +30,13 @@ namespace slang::interpreter
  * Return the size of a built-in type.
  *
  * @param type_name The base type name.
- * @param is_array Whether the type is an array.
- * @param is_ref Whether this is a reference.
+ * @param reference Whether this is a reference. Note that arrays are references.
  * @return Returns the type size.
  * @throws Throws an `interpreter_error` if the type is not known.
  */
-static std::size_t get_type_size(const std::string& type_name, bool is_array, bool is_ref)
+static std::size_t get_type_size(const std::string& type_name, bool reference)
 {
-    if(is_ref || is_array)
+    if(reference)
     {
         return sizeof(void*);
     }
@@ -110,11 +109,11 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
  */
 static int32_t get_stack_delta(const function_signature& s)
 {
-    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second, s.return_type.second);
+    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second);
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        arg_size += get_type_size(it.first, it.second, it.second);
+        arg_size += get_type_size(it.first, it.second);
     }
     return return_type_size - arg_size;
 }
@@ -175,7 +174,7 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type, v.array, false);
+        v.size = get_type_size(v.type, v.array);
 
         details.locals_size += v.size;
         details.args_size += v.size;
@@ -187,13 +186,13 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type, v.array, false);
+        v.size = get_type_size(v.type, v.array);
 
         details.locals_size += v.size;
     }
 
     // return type
-    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second, desc.signature.return_type.second);
+    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second);
 }
 
 std::int32_t context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
