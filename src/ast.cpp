@@ -520,7 +520,7 @@ std::optional<std::string> variable_declaration_expression::type_check(ty::conte
         std::string var_type = typing::to_string({type.s, array});
         if(*rhs != var_type)
         {
-            throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, type.s));
+            throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", *rhs, var_type));
         }
     }
 
@@ -1127,7 +1127,27 @@ std::unique_ptr<slang::codegen::value> new_expression::generate_code(slang::code
 
 std::optional<std::string> new_expression::type_check(slang::typing::context& ctx) const
 {
-    throw std::runtime_error("new_expression::type_check not implemented.");
+    auto expr_type = expr->type_check(ctx);
+    if(expr_type == std::nullopt)
+    {
+        throw ty::type_error(expr->get_location(), "Array size has no type.");
+    }
+    if(*expr_type != "i32")
+    {
+        throw ty::type_error(expr->get_location(), fmt::format("Expected array size of type 'i32', got '{}'.", *expr_type));
+    }
+
+    if(!ty::is_builtin_type(type.s) && !ctx.has_type(type.s))
+    {
+        throw ty::type_error(type.location, fmt::format("Unknown type '{}'.", type.s));
+    }
+
+    if(type.s == "void")
+    {
+        throw ty::type_error(type.location, "Cannot use operator new with type 'void'.");
+    }
+
+    return std::make_optional(ty::to_string({type, true}));
 }
 
 std::string new_expression::to_string() const

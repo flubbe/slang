@@ -790,7 +790,17 @@ TEST(output, arrays)
           "fn call_return() -> i32\n"
           "{\n"
           " return return_array()[0];\n"
-          "}";
+          "}\n"
+          "fn new_array() -> void\n"
+          "{\n"
+          " let b: [i32] = new i32[2];\n"
+          " b[0] = 1;\n"
+          " b[1] = 10;\n"
+          "}\n"
+          "fn new_array_invalid_size() -> void\n"
+          "{\n"
+          " let b: [i32] = new i32[-1];\n"
+          "}\n";
 
         slang::lexer lexer;
         slang::parser parser;

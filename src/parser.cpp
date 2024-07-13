@@ -747,7 +747,7 @@ std::unique_ptr<ast::expression> parser::parse_unary()
     return std::make_unique<ast::unary_ast>(current_token->location, std::move(op), parse_unary());
 }
 
-// new_expr ::= 'new' identifier '[' primary ']'
+// new_expr ::= 'new' identifier '[' expr ']'
 std::unique_ptr<ast::expression> parser::parse_new()
 {
     token new_token = *current_token;
@@ -766,7 +766,7 @@ std::unique_ptr<ast::expression> parser::parse_new()
     }
     get_next_token();    // skip "["
 
-    auto expr = parse_primary();
+    auto expr = parse_expression();
 
     if(current_token->s != "]")
     {

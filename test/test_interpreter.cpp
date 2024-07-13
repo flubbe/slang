@@ -608,6 +608,37 @@ TEST(interpreter, return_str_array)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
+TEST(interpreter, operator_new)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("return_array.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_array", "new_array", {}));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
+    ASSERT_THROW(ctx.invoke("return_array", "new_array_invalid_size", {}), slang::interpreter::interpreter_error);
+}
+
 TEST(interpreter, prefix_postfix)
 {
     slang::language_module mod;
