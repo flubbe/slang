@@ -275,6 +275,15 @@ public:
         return *this;
     }
 
+#ifdef __clang__
+    /** Serialize a std::size_t. */
+    archive& operator&(std::size_t& i)
+    {
+        serialize(reinterpret_cast<std::byte*>(&i), 8);
+        return *this;
+    }
+#endif
+
     /** Serialize a float. */
     archive& operator&(float& f)
     {

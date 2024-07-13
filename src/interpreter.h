@@ -629,7 +629,6 @@ public:
 
     /** Disallow popping from stack for non-(int, float, std::string) types. */
     template<typename T>
-    [[noreturn]]
     value pop_result()
     {
         static_assert(
@@ -637,6 +636,8 @@ public:
             && !std::is_same<T, float>::value
             && !std::is_same<T, std::string>::value,
           "operand_stack::pop_result is only available for int, float and std::string.");
+
+        return {};    // unreachable
     }
 
     /**

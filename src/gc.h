@@ -83,7 +83,6 @@ struct gc_object
 
     /** Create an object from a type. */
     template<typename T>
-    [[noreturn]]
     static gc_object from(T* obj, std::uint8_t flags = of_none)
     {
         static_assert(
@@ -93,6 +92,8 @@ struct gc_object
             && !std::is_same_v<T, std::vector<std::string*>*>
             && !std::is_same_v<T, std::vector<void*>*>,
           "Cannot create GC object from type.");
+
+        return {};    // unreachable
     }
 };
 
