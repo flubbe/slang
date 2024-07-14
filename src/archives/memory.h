@@ -45,7 +45,7 @@ public:
      * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
-    memory_write_archive(bool persistent, endian byte_order = endian::little)
+    memory_write_archive(bool persistent, endian byte_order = endian::native)
     : archive{false, true, persistent, byte_order}
     {
     }
@@ -110,7 +110,7 @@ public:
      * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
-    memory_read_archive(const std::vector<std::byte>& memory_buffer, bool persistent, endian byte_order = endian::little)
+    memory_read_archive(const std::vector<std::byte>& memory_buffer, bool persistent, endian byte_order = endian::native)
     : memory_buffer{memory_buffer}
     , archive{true, false, persistent, byte_order}
     {
