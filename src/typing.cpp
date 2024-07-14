@@ -10,11 +10,40 @@
 
 #include <fmt/core.h>
 
+#include "type.h"
 #include "typing.h"
 #include "utils.h"
 
 namespace slang::typing
 {
+
+/*
+ * type implementation.
+ */
+
+bool type::operator==(const type& other) const
+{
+    if(!type_id.has_value() || !other.type_id.has_value())
+    {
+        throw type_error(fmt::format(
+          "Comparison of types '{}' ({}) and '{}' ({}).",
+          to_string(*this),
+          (type_id.has_value() ? "resolved" : "unresolved"),
+          to_string(other),
+          (other.type_id.has_value() ? "resolved" : "unresolved")));
+    }
+
+    return type_id.value() == other.type_id.value();
+}
+
+bool type::operator!=(const type& other) const
+{
+    return !(*this == other);
+}
+
+/*
+ * type to string conversions.
+ */
 
 std::string to_string(const type& t)
 {
@@ -233,6 +262,7 @@ bool context::has_type(const std::string& name) const
 type context::get_identifier_type(const token& identifier) const
 {
     // check if we're accessing a struct.
+    std::string err;
     if(struct_stack.size() > 0)
     {
         for(auto [n, t]: struct_stack.back()->members)
@@ -242,6 +272,8 @@ type context::get_identifier_type(const token& identifier) const
                 return t;
             }
         }
+
+        err = fmt::format("Name '{}' not found in struct '{}'.", identifier.s, struct_stack.back()->name.s);
     }
     else
     {
@@ -253,9 +285,11 @@ type context::get_identifier_type(const token& identifier) const
                 return *type;
             }
         }
+
+        err = fmt::format("Name '{}' not found in scope '{}'.", identifier.s, current_scope->name.s);
     }
 
-    throw type_error(identifier.location, fmt::format("Name '{}' not found in current scope.", identifier.s));
+    throw type_error(identifier.location, err);
 }
 
 void context::resolve_types()
@@ -302,6 +336,35 @@ void context::resolve_types()
     }
 
     unresolved_types.clear();
+
+    // propagate type resolutions to functions.
+    for(auto& [f, sig]: global_scope.functions)
+    {
+        for(auto& arg: sig.arg_types)
+        {
+            if(!arg.is_resolved())
+            {
+                arg.set_type_id(get_type_id(arg.get_base_type(), arg.is_array()));
+            }
+        }
+
+        if(!sig.ret_type.is_resolved())
+        {
+            sig.ret_type.set_type_id(get_type_id(sig.ret_type.get_base_type(), sig.ret_type.is_array()));
+        }
+    }
+
+    // propagate type resolutions to structs.
+    for(auto& s: global_scope.structs)
+    {
+        for(auto& [member_name, member_type]: s.second.members)
+        {
+            if(!member_type.is_resolved())
+            {
+                member_type.set_type_id(get_type_id(member_type.get_base_type(), member_type.is_array()));
+            }
+        }
+    }
 }
 
 type context::get_function_type(const token& name, const std::vector<type>& arg_types, const type& ret_type)

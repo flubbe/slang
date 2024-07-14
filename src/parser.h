@@ -240,7 +240,7 @@ public:
     /**
      * Get the AST.
      */
-    const ast::block* get_ast() const
+    ast::block* get_ast() const
     {
         return ast.get();
     }

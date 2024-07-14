@@ -2226,6 +2226,13 @@ public:
      */
 
     /**
+     * Generate an `arraylength` instruction.
+     *
+     * Reads an array reference from the stack and pushes its length as an `i32` onto the stack.
+     */
+    void generate_arraylength();
+
+    /**
      * Generate a binary operator instruction.
      *
      * Reads two values from the stack and pushes the result of the operation to the stack.

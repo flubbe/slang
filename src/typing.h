@@ -18,141 +18,10 @@
 #include <vector>
 
 #include "token.h"
+#include "type.h"
 
 namespace slang::typing
 {
-
-/** Type representation. */
-class type
-{
-    /** The base type name. */
-    token base;
-
-    /** Whether the type is an array. */
-    bool array;
-
-    /** Type id or std::nullopt for unresolved types. */
-    std::optional<std::uint64_t> type_id;
-
-    /** Whether this is a function type. */
-    bool function_type = false;
-
-public:
-    /** No default constructor. */
-    type() = delete;
-
-    /** Default copy and move constructors. */
-    type(const type&) = default;
-    type(type&&) = default;
-
-    /** Default assignment operators. */
-    type& operator=(const type&) = default;
-    type& operator=(type&&) = default;
-
-    /**
-     * Create a new type.
-     *
-     * @param base The base type name.
-     * @param array Whether the type is an array.
-     * @param type_id The type's id, or std::nullopt for an unresolved type.
-     * @param function_type Whether this type comes from a function.
-     */
-    type(token base, bool array, std::optional<std::uint64_t> type_id, bool function_type)
-    : base{std::move(base)}
-    , array{array}
-    , type_id{type_id}
-    , function_type{function_type}
-    {
-    }
-
-    /** Return if two types are equal. */
-    bool operator==(const type& other) const
-    {
-        return type_id == other.type_id;
-    }
-
-    /** Return if two types are not equal. */
-    bool operator!=(const type& other) const
-    {
-        return type_id != other.type_id;
-    }
-
-    /** Return the base type. */
-    const token& get_base_type() const
-    {
-        return base;
-    }
-
-    /** Return whether this type is an array type. */
-    bool is_array() const
-    {
-        return array;
-    }
-
-    /** Return whether this is a function type. */
-    bool is_function_type() const
-    {
-        return function_type;
-    }
-
-    /**
-     * Return the type id of this type.
-     *
-     * @note The type needs to be resolved first.
-     */
-    std::uint64_t get_type_id() const
-    {
-        return *type_id;
-    }
-
-    /** Return whether the type is resolved. */
-    bool is_resolved() const
-    {
-        return type_id.has_value();
-    }
-
-    /**
-     * Helper to create an unresolved type.
-     *
-     * @param base The base type name.
-     * @param array Whether the type is an array type.
-     * @param function_type Whether this type comes from a function.
-     */
-    static type make_unresolved(token base, bool array, bool function_type)
-    {
-        return {std::move(base), array, std::nullopt, function_type};
-    }
-};
-
-/**
- * Check whether a string represents a built-in type, that is,
- * void, i32, f32 or str.
- */
-inline bool is_builtin_type(const std::string& s)
-{
-    return s == "void" || s == "i32" || s == "f32" || s == "str";
-}
-
-/**
- * Convert a type to a string.
- *
- * @param t The type to convert.
- */
-std::string to_string(const type& t);
-
-/**
- * Convert a type to a string.
- *
- * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
- */
-std::string to_string(const std::pair<token, bool>& t);
-
-/**
- * Convert a type to a string.
- *
- * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
- */
-std::string to_string(const std::pair<std::string, bool>& t);
 
 /** Type errors. */
 class type_error : public std::runtime_error
@@ -511,6 +380,9 @@ public:
         add_base_type("i32");
         add_base_type("f32");
         add_base_type("str");
+
+        // Add array type.
+        add_struct(token{"<array>", {0, 0}}, {std::make_pair(token{"length", {0, 0}}, get_type("i32", false))});
     }
     context(const context&) = default;
     context(context&&) = default;
@@ -600,6 +472,7 @@ public:
                                    {
                                        return false;
                                    }
+
                                    return (array && t.first.is_array())
                                           || (!array && !t.first.is_array());
                                });
@@ -608,7 +481,18 @@ public:
             return it->second;
         }
 
-        throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
+        // add array types as necessary.
+        it = std::find_if(type_map.begin(), type_map.end(),
+                          [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
+                          {
+                              return name.s == t.first.get_base_type().s;
+                          });
+        if(it == type_map.end())
+        {
+            throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
+        }
+
+        return get_type(name, array).get_type_id();
     }
 
     /**

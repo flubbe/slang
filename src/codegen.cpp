@@ -290,6 +290,12 @@ void context::pop_resolution_scope()
  * Code generation.
  */
 
+void context::generate_arraylength()
+{
+    validate_insertion_point();
+    insertion_point->add_instruction(std::make_unique<instruction>("arraylength"));
+}
+
 void context::generate_binary_op(binary_op op, value op_type)
 {
     validate_insertion_point();

@@ -211,6 +211,8 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         return -static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::apop:
         return -static_cast<std::int32_t>(sizeof(void*));
+    case opcode::arraylength:
+        return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::iaload: [[fallthrough]];
     case opcode::faload:
         return -static_cast<std::int32_t>(sizeof(void*));
@@ -1172,6 +1174,19 @@ opcode context::exec(const language_module& mod,
 
             break;
         } /* opcode::newarray */
+        case opcode::arraylength:
+        {
+            // convert to any vector type.
+            // FIXME relies on implementation.
+            auto v = frame.stack.pop_addr<std::vector<std::int32_t>>();
+            if(v == nullptr)
+            {
+                throw interpreter_error("Null pointer access during arraylength.");
+            }
+            gc.remove_temporary(v);
+            frame.stack.push_i32(v->size());
+            break;
+        } /* opcode::arraylength */
         case opcode::iand:
         {
             frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());

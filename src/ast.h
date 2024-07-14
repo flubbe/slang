@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "token.h"
+#include "type.h"
 
 /*
  * Forward declarations for code generation.
@@ -85,6 +86,9 @@ protected:
 
     /** The expression's directive stack. */
     std::vector<directive> directive_stack;
+
+    /** The expression's given of inferred type. Needs to be set by `type_check`. */
+    std::optional<ty::type> expr_type;
 
 public:
     /** No default constructor. */
@@ -182,9 +186,9 @@ public:
      * @throws A type_error if a type error was found.
      *
      * @param ctx Type system context.
-     * @returns A string representation of the expression's type or std::nullopt.
+     * @returns The expression's type or std::nullopt.
      */
-    virtual std::optional<std::string> type_check(slang::typing::context& ctx) const = 0;
+    virtual std::optional<ty::type> type_check(slang::typing::context& ctx) = 0;
 
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
@@ -230,7 +234,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -273,7 +277,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -315,7 +319,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -324,6 +328,9 @@ class access_expression : public expression
 {
     /** The namespace name. */
     token name;
+
+    /** Namespace type. */
+    ty::type type;
 
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
@@ -357,7 +364,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -395,7 +402,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -447,7 +454,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -494,8 +501,14 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
+
+    /** Get the identifier name. */
+    token get_name() const
+    {
+        return name;
+    }
 };
 
 /** Variable declaration. */
@@ -547,7 +560,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 
     /** Get the variable's name. */
@@ -600,7 +613,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -644,7 +657,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -687,7 +700,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -734,7 +747,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -781,7 +794,7 @@ public:
     bool needs_pop() const override;
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -824,7 +837,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -866,7 +879,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -908,7 +921,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -964,8 +977,8 @@ public:
     slang::codegen::function* generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, slang::codegen::context& ctx) const;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const;
-    void type_check(slang::typing::context& ctx) const;
-    void finish_type_check(slang::typing::context& ctx) const;
+    void type_check(slang::typing::context& ctx);
+    void finish_type_check(slang::typing::context& ctx);
     std::string to_string() const;
 
     token get_name() const
@@ -1009,7 +1022,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1054,7 +1067,7 @@ public:
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     bool supports_directive(const std::string& s) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1105,7 +1118,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1147,7 +1160,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1195,7 +1208,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1238,7 +1251,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override;
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1272,7 +1285,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override
     {
         return std::nullopt;
     }
@@ -1313,7 +1326,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<std::string> type_check(slang::typing::context& ctx) const override
+    std::optional<ty::type> type_check(slang::typing::context& ctx) override
     {
         return std::nullopt;
     }

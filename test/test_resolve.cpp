@@ -37,7 +37,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -68,7 +68,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -99,7 +99,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;

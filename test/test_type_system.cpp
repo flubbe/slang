@@ -42,7 +42,7 @@ TEST(type_system, name_collection)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -67,7 +67,7 @@ TEST(type_system, name_collection)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -91,7 +91,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -111,7 +111,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -131,7 +131,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -151,7 +151,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -171,7 +171,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -191,7 +191,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -213,7 +213,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -235,7 +235,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -256,7 +256,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -281,7 +281,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -302,7 +302,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -323,7 +323,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -344,7 +344,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -389,7 +389,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -410,7 +410,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -431,7 +431,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -452,7 +452,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -473,7 +473,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -501,7 +501,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -523,7 +523,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -544,7 +544,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -565,7 +565,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -586,7 +586,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -613,7 +613,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -637,7 +637,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -661,7 +661,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -685,7 +685,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -709,7 +709,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -738,7 +738,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -768,7 +768,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -798,7 +798,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -828,7 +828,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -858,7 +858,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -892,7 +892,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -915,7 +915,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -937,7 +937,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -964,7 +964,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -992,7 +992,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1018,7 +1018,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1044,7 +1044,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1075,7 +1075,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1102,7 +1102,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1129,7 +1129,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1156,7 +1156,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1184,7 +1184,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1212,7 +1212,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1236,7 +1236,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1264,7 +1264,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1294,7 +1294,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1320,7 +1320,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1348,7 +1348,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1376,7 +1376,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1404,7 +1404,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1432,7 +1432,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1460,7 +1460,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1489,7 +1489,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1516,7 +1516,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1543,7 +1543,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1588,7 +1588,7 @@ TEST(type_system, native_binding)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        slang::ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;

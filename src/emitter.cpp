@@ -435,6 +435,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         emit(instruction_buffer, opcode::newarray);
         instruction_buffer & type;
     }
+    else if(name == "arraylength")
+    {
+        emit(instruction_buffer, opcode::arraylength);
+    }
     else
     {
         // TODO
