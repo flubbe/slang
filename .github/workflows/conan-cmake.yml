@@ -39,16 +39,16 @@ jobs:
 
     - name: Run tests
       run: |
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_package
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_lexer
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_parser
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_codegen
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_compile_ir
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_type_system
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_filemanager
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_serialization
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_output
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_resolve
-        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test_interpreter
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_package
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_lexer
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_parser
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_codegen
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_compile_ir
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_type_system
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_filemanager
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_serialization
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_output
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_resolve
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_interpreter
         
 
