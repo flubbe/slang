@@ -36,3 +36,19 @@ jobs:
     - name: Build
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --preset ${{env.CONAN_PRESET_NAME}}
+
+    - name: Run tests
+      run: |
+        ${{github.workspace}}/build/test_package
+        ${{github.workspace}}/build/test_lexer
+        ${{github.workspace}}/build/test_parser
+        ${{github.workspace}}/build/test_codegen
+        ${{github.workspace}}/build/test_compile_ir
+        ${{github.workspace}}/build/test_type_system
+        ${{github.workspace}}/build/test_filemanager
+        ${{github.workspace}}/build/test_serialization
+        ${{github.workspace}}/build/test_output
+        ${{github.workspace}}/build/test_resolve
+        ${{github.workspace}}/build/test_interpreter
+        
+
