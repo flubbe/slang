@@ -97,11 +97,11 @@ struct gc_object
     static gc_object from(T* obj, std::uint8_t flags = of_none)
     {
         static_assert(
-          !std::is_same_v<T, std::string*>
-            && !std::is_same_v<T, si::fixed_vector<std::int32_t>*>
-            && !std::is_same_v<T, si::fixed_vector<float>*>
-            && !std::is_same_v<T, si::fixed_vector<std::string*>*>
-            && !std::is_same_v<T, si::fixed_vector<void*>*>,
+          !std::is_same_v<T, std::string>
+            && !std::is_same_v<T, si::fixed_vector<std::int32_t>>
+            && !std::is_same_v<T, si::fixed_vector<float>>
+            && !std::is_same_v<T, si::fixed_vector<std::string*>>
+            && !std::is_same_v<T, si::fixed_vector<void*>>,
           "Cannot create GC object from type.");
 
         return {};    // unreachable
