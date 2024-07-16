@@ -20,7 +20,6 @@
 #endif
 
 namespace si = slang::interpreter;
-using generic_fixed_vector = si::fixed_vector<void*>;
 
 namespace slang::gc
 {

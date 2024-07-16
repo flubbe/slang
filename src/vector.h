@@ -79,7 +79,7 @@ private:
             return {nullptr};
         }
 
-        std::size_t byte_size = (sizeof(data_pointer) + n * sizeof(value_type));
+        std::size_t byte_size = sizeof(data_pointer) + n * sizeof(value_type);
         auto ptr = std::malloc(byte_size);
         if(ptr == nullptr)
         {

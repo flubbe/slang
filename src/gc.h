@@ -21,6 +21,15 @@ namespace slang::gc
 
 namespace si = slang::interpreter;
 
+/*
+ * Verify size assumptions for arrays.
+ */
+
+static_assert(sizeof(si::fixed_vector<std::int32_t>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<float>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<std::string*>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<void*>) == sizeof(void*));
+
 /** Garbage collection error. */
 class gc_error : public std::runtime_error
 {

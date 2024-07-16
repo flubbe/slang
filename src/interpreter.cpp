@@ -27,7 +27,14 @@
 namespace slang::interpreter
 {
 
-using generic_fixed_vector = fixed_vector<void*>;
+/*
+ * Verify size assumptions for arrays.
+ */
+
+static_assert(sizeof(fixed_vector<std::int32_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
 /**
  * Return the size of a built-in type.
@@ -1179,8 +1186,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::newarray */
         case opcode::arraylength:
         {
-            // convert to any vector type.
-            auto v = frame.stack.pop_addr<generic_fixed_vector>();
+            // convert to any fixed_vector type.
+            auto v = frame.stack.pop_addr<fixed_vector<void*>>();
             if(v == nullptr)
             {
                 throw interpreter_error("Null pointer access during arraylength.");
