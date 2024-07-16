@@ -7,6 +7,7 @@ _test_dir = (
     _module_path / Path("..") / Path("build") / Path("Debug") / Path("test")
 ).absolute()
 _tests = [
+    "test_vector",
     "test_package",
     "test_lexer",
     "test_parser",

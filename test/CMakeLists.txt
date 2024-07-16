@@ -128,3 +128,8 @@ add_executable(test_interpreter
     ../src/opcodes.cpp
 )
 target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
+
+add_executable(test_vector
+    test_vector.cpp
+)
+target_link_libraries(test_vector fmt::fmt GTest::gtest GTest::gtest_main)

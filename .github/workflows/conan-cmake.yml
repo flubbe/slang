@@ -39,6 +39,7 @@ jobs:
 
     - name: Run tests
       run: |
+        ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_vector
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_package
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_lexer
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_parser
