@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include "vector.h"
 #include "gc.h"
 
 #ifdef GC_DEBUG
@@ -17,6 +18,9 @@
 #else
 #    define GC_LOG(...)
 #endif
+
+namespace si = slang::interpreter;
+using generic_fixed_vector = si::fixed_vector<void*>;
 
 namespace slang::gc
 {
@@ -39,17 +43,9 @@ void garbage_collector::mark_object(void* obj)
     GC_LOG("mark_object {}", obj);
     obj_info.flags |= gc_object::of_reachable;
 
-    if(obj_info.type == gc_object_type::array_str)
+    if(obj_info.type == gc_object_type::array_str || obj_info.type == gc_object_type::array_aref)
     {
-        auto array = static_cast<std::vector<std::string*>*>(obj_info.addr);
-        for(std::string*& s: *array)
-        {
-            mark_object(s);
-        }
-    }
-    else if(obj_info.type == gc_object_type::array_aref)
-    {
-        auto array = static_cast<std::vector<void*>*>(obj_info.addr);
+        auto array = static_cast<si::fixed_vector<void*>*>(obj_info.addr);
         for(void*& ref: *array)
         {
             mark_object(ref);
@@ -87,19 +83,19 @@ void garbage_collector::delete_object(gc_object& obj_info)
     }
     else if(obj_info.type == gc_object_type::array_i32)
     {
-        object_deleter<std::vector<std::int32_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int32_t>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f32)
     {
-        object_deleter<std::vector<float>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<float>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_str)
     {
-        object_deleter<std::vector<std::string*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::string*>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_aref)
     {
-        object_deleter<std::vector<void*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<void*>>(obj_info.addr, allocated_bytes);
     }
     else
     {

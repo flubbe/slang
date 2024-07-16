@@ -19,6 +19,8 @@
 namespace
 {
 
+namespace si = slang::interpreter;
+
 TEST(interpreter, module_and_functions)
 {
     slang::language_module mod;
@@ -492,7 +494,7 @@ TEST(interpreter, return_arrays)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "return_array", {}));
 
-    auto v = *reinterpret_cast<std::vector<int>**>(res.get<void*>());
+    auto v = *reinterpret_cast<si::fixed_vector<int>**>(res.get<void*>());
     ASSERT_EQ(v->size(), 2);
     EXPECT_EQ((*v)[0], 1);
     EXPECT_EQ((*v)[1], 2);
@@ -583,7 +585,7 @@ TEST(interpreter, return_str_array)
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
 
     {
-        auto array = *reinterpret_cast<std::vector<std::string*>**>(res.get<void*>());
+        auto array = *reinterpret_cast<si::fixed_vector<std::string*>**>(res.get<void*>());
         ASSERT_EQ(array->size(), 3);
         EXPECT_EQ(*(*array)[0], "a");
         EXPECT_EQ(*(*array)[1], "test");

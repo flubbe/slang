@@ -10,14 +10,16 @@
 
 #pragma once
 
-#include <vector>
 #include <set>
 #include <unordered_map>
 
+#include "vector.h"
 #include "module.h"
 
 namespace slang::gc
 {
+
+namespace si = slang::interpreter;
 
 /** Garbage collection error. */
 class gc_error : public std::runtime_error
@@ -87,10 +89,10 @@ struct gc_object
     {
         static_assert(
           !std::is_same_v<T, std::string*>
-            && !std::is_same_v<T, std::vector<std::int32_t>*>
-            && !std::is_same_v<T, std::vector<float>*>
-            && !std::is_same_v<T, std::vector<std::string*>*>
-            && !std::is_same_v<T, std::vector<void*>*>,
+            && !std::is_same_v<T, si::fixed_vector<std::int32_t>*>
+            && !std::is_same_v<T, si::fixed_vector<float>*>
+            && !std::is_same_v<T, si::fixed_vector<std::string*>*>
+            && !std::is_same_v<T, si::fixed_vector<void*>*>,
           "Cannot create GC object from type.");
 
         return {};    // unreachable
@@ -105,29 +107,29 @@ inline gc_object gc_object::from<std::string>(
 }
 
 template<>
-inline gc_object gc_object::from<std::vector<std::int32_t>>(
-  std::vector<std::int32_t>* obj, std::uint8_t flags)
+inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
+  si::fixed_vector<std::int32_t>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_i32, flags, obj};
 }
 
 template<>
-inline gc_object gc_object::from<std::vector<float>>(
-  std::vector<float>* obj, std::uint8_t flags)
+inline gc_object gc_object::from<si::fixed_vector<float>>(
+  si::fixed_vector<float>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_f32, flags, obj};
 }
 
 template<>
-inline gc_object gc_object::from<std::vector<std::string*>>(
-  std::vector<std::string*>* obj, std::uint8_t flags)
+inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
+  si::fixed_vector<std::string*>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_str, flags, obj};
 }
 
 template<>
-inline gc_object gc_object::from<std::vector<void*>>(
-  std::vector<void*>* obj, std::uint8_t flags)
+inline gc_object gc_object::from<si::fixed_vector<void*>>(
+  si::fixed_vector<void*>* obj, std::uint8_t flags)
 {
     return {gc_object_type::array_aref, flags, obj};
 }
@@ -241,19 +243,19 @@ public:
      * @returns Returns a (pointer to a) garbage collected array.
      */
     template<typename T>
-    std::vector<T>* gc_new_array(std::size_t size, std::uint32_t flags = gc_object::of_none)
+    si::fixed_vector<T>* gc_new_array(std::size_t size, std::uint32_t flags = gc_object::of_none)
     {
-        auto array = new std::vector<T>();
+        auto array = new si::fixed_vector<T>(size);
+        assert(array->size() == size);
         objects.insert({array, gc_object::from(array, flags)});
 
-        allocated_bytes += sizeof(std::vector<T>);
-        array->resize(size);
+        allocated_bytes += sizeof(si::fixed_vector<T>);
 
         if(flags & gc_object::of_temporary)
         {
-            return static_cast<std::vector<T>*>(add_temporary(array));
+            return static_cast<si::fixed_vector<T>*>(add_temporary(array));
         }
-        return static_cast<std::vector<T>*>(add_root(array, flags));
+        return static_cast<si::fixed_vector<T>*>(add_root(array, flags));
     }
 
     /**

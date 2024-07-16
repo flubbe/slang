@@ -16,6 +16,7 @@
 #include "opcodes.h"
 #include "package.h"
 #include "utils.h"
+#include "vector.h"
 
 #ifdef INTERPRETER_DEBUG
 #    define DEBUG_LOG(...) fmt::print("INT: {}\n", fmt::format(__VA_ARGS__))
@@ -25,6 +26,8 @@
 
 namespace slang::interpreter
 {
+
+using generic_fixed_vector = fixed_vector<void*>;
 
 /**
  * Return the size of a built-in type.
@@ -844,7 +847,7 @@ opcode context::exec(const language_module& mod,
         case opcode::iaload:
         {
             std::int32_t array_index = frame.stack.pop_i32();
-            std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
+            fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
             gc.remove_temporary(arr);
 
@@ -859,7 +862,7 @@ opcode context::exec(const language_module& mod,
         case opcode::faload:
         {
             std::int32_t array_index = frame.stack.pop_i32();
-            std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
+            fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
             gc.remove_temporary(arr);
 
@@ -874,7 +877,7 @@ opcode context::exec(const language_module& mod,
         case opcode::saload:
         {
             std::int32_t array_index = frame.stack.pop_i32();
-            std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
+            fixed_vector<std::string*>* arr = frame.stack.pop_addr<fixed_vector<std::string*>>();
 
             gc.remove_temporary(arr);
 
@@ -893,7 +896,7 @@ opcode context::exec(const language_module& mod,
         {
             std::int32_t v = frame.stack.pop_i32();
             std::int32_t index = frame.stack.pop_i32();
-            std::vector<std::int32_t>* arr = frame.stack.pop_addr<std::vector<std::int32_t>>();
+            fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
             gc.remove_temporary(arr);
 
@@ -909,7 +912,7 @@ opcode context::exec(const language_module& mod,
         {
             float v = frame.stack.pop_f32();
             std::int32_t index = frame.stack.pop_i32();
-            std::vector<float>* arr = frame.stack.pop_addr<std::vector<float>>();
+            fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
             gc.remove_temporary(arr);
 
@@ -925,7 +928,7 @@ opcode context::exec(const language_module& mod,
         {
             std::string* s = frame.stack.pop_addr<std::string>();
             std::int32_t index = frame.stack.pop_i32();
-            std::vector<std::string*>* arr = frame.stack.pop_addr<std::vector<std::string*>>();
+            fixed_vector<std::string*>* arr = frame.stack.pop_addr<fixed_vector<std::string*>>();
 
             gc.remove_temporary(s);
             gc.remove_temporary(arr);
@@ -1177,8 +1180,7 @@ opcode context::exec(const language_module& mod,
         case opcode::arraylength:
         {
             // convert to any vector type.
-            // FIXME relies on implementation.
-            auto v = frame.stack.pop_addr<std::vector<std::int32_t>>();
+            auto v = frame.stack.pop_addr<generic_fixed_vector>();
             if(v == nullptr)
             {
                 throw interpreter_error("Null pointer access during arraylength.");
