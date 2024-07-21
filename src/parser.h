@@ -10,7 +10,10 @@
 
 #pragma once
 
+#include <functional>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 #include "ast.h"
 #include "lexer.h"

@@ -389,9 +389,9 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
             const function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
 
-            if(desc.native && !(bool)std::get<1>(desc.details).func)
+            if(desc.native && !static_cast<bool>(std::get<1>(desc.details).func))
             {
-                fmt::print("decoded invoke without function\n");
+                throw interpreter_error("Native function was null during decode.");
             }
 
             return get_stack_delta(desc.signature);
