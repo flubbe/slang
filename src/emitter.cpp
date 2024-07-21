@@ -318,9 +318,17 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed(opcode::iand);
     }
+    else if(name == "land")
+    {
+        emit_typed(opcode::land);
+    }
     else if(name == "or")
     {
         emit_typed(opcode::ior);
+    }
+    else if(name == "lor")
+    {
+        emit_typed(opcode::lor);
     }
     else if(name == "xor")
     {

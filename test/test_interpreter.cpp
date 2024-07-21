@@ -205,8 +205,24 @@ TEST(interpreter, operators)
     slang::interpreter::value res;
     ASSERT_NO_THROW(res = ctx.invoke("operators", "and", {27, 3}));
     EXPECT_EQ(*res.get<int>(), 3);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {0, 0}));
+    EXPECT_EQ(*res.get<int>(), 0);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {1, 0}));
+    EXPECT_EQ(*res.get<int>(), 0);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {0, 1}));
+    EXPECT_EQ(*res.get<int>(), 0);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {1, 1}));
+    EXPECT_EQ(*res.get<int>(), 1);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "or", {27, 4}));
     EXPECT_EQ(*res.get<int>(), 31);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {0, 0}));
+    EXPECT_EQ(*res.get<int>(), 0);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {1, 0}));
+    EXPECT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {0, 1}));
+    EXPECT_EQ(*res.get<int>(), 1);
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {1, 1}));
+    EXPECT_EQ(*res.get<int>(), 1);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "xor", {27, 3}));
     EXPECT_EQ(*res.get<int>(), 24);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "shl", {27, 3}));
@@ -640,6 +656,130 @@ TEST(interpreter, array_length)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
     ASSERT_THROW(ctx.invoke("array_length", "len2", {}), slang::interpreter::interpreter_error);
+}
+
+TEST(interpreter, array_copy)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("array_copy.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'array_copy.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    slang::interpreter::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.register_native_function("slang", "array_copy",
+                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 {
+                                                     void* to = stack.pop_addr<void*>();
+                                                     void* from = stack.pop_addr<void*>();
+
+                                                     if(to == nullptr)
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("array_copy: 'to' is null.");
+                                                     }
+                                                     if(from == nullptr)
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("array_copy: 'from' is null.");
+                                                     }
+
+                                                     auto& gc = ctx.get_gc();
+
+                                                     auto to_type = gc.get_object_type(to);
+                                                     auto from_type = gc.get_object_type(from);
+
+                                                     if(to_type != from_type)
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("array_copy: type mismatch.");
+                                                     }
+
+                                                     // copy array.
+                                                     if(to_type == slang::gc::gc_object_type::array_i32 || to_type == slang::gc::gc_object_type::array_f32)
+                                                     {
+                                                         auto from_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(from);
+                                                         auto to_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(to);
+                                                         for(std::size_t i = 0; i < from_array->size(); ++i)
+                                                         {
+                                                             to_array->at(i) = from_array->at(i);
+                                                         }
+                                                     }
+                                                     else if(to_type == slang::gc::gc_object_type::array_str)
+                                                     {
+                                                         auto from_array = reinterpret_cast<si::fixed_vector<std::string*>*>(from);
+                                                         auto to_array = reinterpret_cast<si::fixed_vector<std::string*>*>(to);
+                                                         for(std::size_t i = 0; i < from_array->size(); ++i)
+                                                         {
+                                                             to_array->at(i) = from_array->at(i);
+                                                         }
+                                                     }
+                                                     else if(to_type == slang::gc::gc_object_type::array_aref)
+                                                     {
+                                                         auto from_array = reinterpret_cast<si::fixed_vector<void*>*>(from);
+                                                         auto to_array = reinterpret_cast<si::fixed_vector<void*>*>(to);
+                                                         for(std::size_t i = 0; i < from_array->size(); ++i)
+                                                         {
+                                                             to_array->at(i) = from_array->at(i);
+                                                         }
+                                                     }
+                                                     else
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("array_copy: unsupported array type.");
+                                                     }
+
+                                                     gc.remove_temporary(from);
+                                                     gc.remove_temporary(to);
+                                                 }));
+    ASSERT_NO_THROW(ctx.register_native_function("slang", "strcmp",
+                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 {
+                                                     void* s1 = stack.pop_addr<void*>();
+                                                     void* s2 = stack.pop_addr<void*>();
+
+                                                     if(s1 == nullptr)
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("strcmp: arguments cannot be null.");
+                                                     }
+
+                                                     auto& gc = ctx.get_gc();
+
+                                                     auto s1_type = gc.get_object_type(s1);
+                                                     auto s2_type = gc.get_object_type(s2);
+
+                                                     if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
+                                                     {
+                                                         throw slang::interpreter::interpreter_error("strcmp: argument are not strings.");
+                                                     }
+
+                                                     stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
+
+                                                     gc.remove_temporary(s1);
+                                                     gc.remove_temporary(s2);
+                                                 }));
+
+    ASSERT_NO_THROW(ctx.load_module("array_copy", mod));
+
+    slang::interpreter::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("array_copy", "test_copy", {}));
+    ASSERT_EQ(*res.get<int>(), 1);
+
+    ASSERT_NO_THROW(res = ctx.invoke("array_copy", "test_copy_str", {}));
+    ASSERT_EQ(*res.get<int>(), 1);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+
+    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_none", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_type", {}), slang::interpreter::interpreter_error);
 }
 
 TEST(interpreter, operator_new)

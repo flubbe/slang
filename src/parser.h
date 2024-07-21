@@ -94,6 +94,12 @@ protected:
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
 
+    /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
+    bool parsing_native{false};
+
+    /** Directive stack with entries `(name, restore_function)`. */
+    std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
+
     /**
      * Get the next token and store it in the token buffer `current_token`.
      *
@@ -214,6 +220,12 @@ protected:
 
     /** Parse an return statement. */
     std::unique_ptr<ast::return_statement> parse_return();
+
+    /** Directive evaluation. Ignores unknown directives. */
+    void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
+
+    /** Pop last directive from directive stack. */
+    void pop_directive();
 
 public:
     /** Default constructor. */

@@ -323,6 +323,12 @@ class context
     /** The next type id to use. */
     std::uint64_t next_type_id = 0;
 
+    /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
+    bool parsing_native{false};
+
+    /** Directive stack with entries `(name, restore_function)`. */
+    std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
+
     /**
      * Generate a unique type id.
      *
@@ -637,6 +643,17 @@ public:
         unresolved_types.push_back(type::make_unresolved(std::move(name), array, function_type));
         return unresolved_types.back();
     }
+
+    /**
+     * Return whether a type is convertible into another type.
+     *
+     * @note The checked types have to be different.
+     *
+     * @param from The type to convert from.
+     * @param to The type to convert to.
+     * @returns Whether the type `from` is convertible to the type `to`.
+     */
+    bool is_convertible(const type& from, const type& to) const;
 
     /**
      * Resolve all unresolved types.

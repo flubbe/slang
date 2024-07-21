@@ -406,6 +406,11 @@ std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx,
     return ret;
 }
 
+void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+{
+    expr->collect_names(ctx, type_ctx);
+}
+
 std::optional<ty::type> directive_expression::type_check(slang::typing::context& ctx)
 {
     return expr->type_check(ctx);
@@ -1635,7 +1640,8 @@ std::optional<ty::type> call_expression::type_check(ty::context& ctx)
             throw ty::type_error(args[i]->get_location(), fmt::format("Cannot evaluate type of argument {}.", i + 1));
         }
 
-        if(sig.arg_types[i] != *arg_type)
+        if(sig.arg_types[i] != *arg_type
+           && !ctx.is_convertible(*arg_type, sig.arg_types[i]))
         {
             throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, ty::to_string(sig.arg_types[i]), ty::to_string(*arg_type)));
         }

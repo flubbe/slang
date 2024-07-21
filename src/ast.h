@@ -454,6 +454,7 @@ public:
     }
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type> type_check(slang::typing::context& ctx) override;
     std::string to_string() const override;
 };

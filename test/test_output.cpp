@@ -356,7 +356,9 @@ TEST(output, operators)
           "\treturn 0;\n"
           "}\n"
           "fn and(a: i32, b: i32) -> i32 { return a & b; }\n"
+          "fn land(a: i32, b: i32) -> i32 { return a && b; }\n"
           "fn or(a: i32, b: i32) -> i32 { return a | b; }\n"
+          "fn lor(a: i32, b: i32) -> i32 { return a || b; }\n"
           "fn xor(a: i32, b: i32) -> i32 { return a ^ b; }\n"
           "fn shl(a: i32, b: i32) -> i32 { return a << b; }\n"
           "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n"
@@ -967,6 +969,79 @@ TEST(output, arrays)
 
         slang::file_write_archive write_ar("array_length.cmod");
         EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "#[native(lib=\"slang\")]\n"
+          "fn array_copy(from: [], to: []) -> void;\n"
+          "#[native(lib=\"slang\")]\n"
+          "fn strcmp(s1: str, s2: str) -> i32;\n"    // NOTE returns 1 if the strings match
+          "fn test_copy() -> i32\n"
+          "{\n"
+          " let a: [i32] = [2, 3];\n"
+          " let b: [i32] = new i32[2];\n"
+          " array_copy(a, b);\n"
+          " return a.length == b.length && a[0] == b[0] && a[1] == b[1];\n"
+          "}\n"
+          "fn test_copy_str() -> i32\n"
+          "{\n"
+          " let a: [str] = [\"a\", \"123\"];\n"
+          " let b: [str] = new str[2];\n"
+          " array_copy(a, b);\n"
+          " return a.length == b.length && strcmp(a[0], b[0]) && strcmp(a[1], b[1]);\n"
+          "}\n"
+          "fn test_copy_fail_none() -> void\n"
+          "{\n"
+          " let a: [i32] = [2, 3];\n"
+          " let b: [i32];\n"    // no target array
+          " array_copy(a, b);\n"
+          "}\n"
+          "fn test_copy_fail_type() -> void\n"
+          "{\n"
+          " let a: [i32] = [2, 3];\n"
+          " let b: [f32] = new f32[2];\n"    // wrong type
+          " array_copy(a, b);\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        slang::ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("array_copy.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+    {
+        const std::string test_input =
+          "fn array_copy(from: [], to: []) -> void;";    // need array type.
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
     }
 }
 

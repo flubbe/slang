@@ -71,6 +71,11 @@ static std::size_t get_type_size(const std::string& type_name, bool reference)
     {
         return sizeof(void*);
     }
+    else if(type_name == "<array>")
+    {
+        // FIXME This is an address/object.
+        return sizeof(void*);
+    }
 
     throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
 }
@@ -105,6 +110,11 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
     }
     else if(name == "addr")
     {
+        return std::make_pair(opcode::aret, length);
+    }
+    else if(name == "<array>")
+    {
+        // FIXME This is an address/object.
         return std::make_pair(opcode::aret, length);
     }
 
@@ -243,7 +253,9 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     case opcode::fdiv: [[fallthrough]];
     case opcode::imod: [[fallthrough]];
     case opcode::iand: [[fallthrough]];
+    case opcode::land: [[fallthrough]];
     case opcode::ior: [[fallthrough]];
+    case opcode::lor: [[fallthrough]];
     case opcode::ixor: [[fallthrough]];
     case opcode::ishl: [[fallthrough]];
     case opcode::ishr: [[fallthrough]];
@@ -377,6 +389,11 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
             const function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
 
+            if(desc.native && !(bool)std::get<1>(desc.details).func)
+            {
+                fmt::print("decoded invoke without function\n");
+            }
+
             return get_stack_delta(desc.signature);
         }
     }
@@ -427,6 +444,25 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
     }
+}
+
+std::function<void(operand_stack&)> context::resolve_native_function(const std::string& name, const std::string& library_name) const
+{
+    auto mod_it = native_function_map.find(library_name);
+    if(mod_it == native_function_map.end())
+    {
+        throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (library not found).", name, library_name));
+    }
+
+    auto func_it = mod_it->second.find(name);
+    if(func_it == mod_it->second.end())
+    {
+        throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (function not found).", name, library_name));
+    }
+
+    DEBUG_LOG("resolved imported native function '{}.{}'.", library_name, name);
+
+    return func_it->second;
 }
 
 std::unique_ptr<language_module> context::decode(const language_module& mod)
@@ -501,19 +537,7 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
         {
             // resolve native function.
             auto& details = std::get<native_function_details>(desc.details);
-            auto mod_it = native_function_map.find(details.library_name);
-            if(mod_it == native_function_map.end())
-            {
-                throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (library not found).", exp_it->name, details.library_name));
-            }
-
-            auto func_it = mod_it->second.find(exp_it->name);
-            if(func_it == mod_it->second.end())
-            {
-                throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (function not found).", exp_it->name, details.library_name));
-            }
-
-            details.func = func_it->second;
+            details.func = resolve_native_function(exp_it->name, details.library_name);
         }
     }
 
@@ -530,6 +554,9 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
         auto& desc = std::get<function_descriptor>(it.desc);
         if(desc.native)
         {
+            // resolve native function.
+            auto& details = std::get<native_function_details>(desc.details);
+            details.func = resolve_native_function(it.name, details.library_name);
             continue;
         }
 
@@ -1201,11 +1228,27 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());
             break;
         } /* opcode::iand */
+        case opcode::land:
+        {
+            // avoid missing pop_i32 due to short-circuit evaluation.
+            std::int32_t a = (frame.stack.pop_i32() != 0);
+            std::int32_t b = (frame.stack.pop_i32() != 0);
+            frame.stack.push_i32(a && b);
+            break;
+        } /* opcode::land */
         case opcode::ior:
         {
             frame.stack.push_i32(frame.stack.pop_i32() | frame.stack.pop_i32());
             break;
         } /* opcode::ior */
+        case opcode::lor:
+        {
+            // avoid missing pop_i32 due to short-circuit evaluation.
+            std::int32_t a = (frame.stack.pop_i32() != 0);
+            std::int32_t b = (frame.stack.pop_i32() != 0);
+            frame.stack.push_i32(a || b);
+            break;
+        } /* opcode::lor */
         case opcode::ixor:
         {
             frame.stack.push_i32(frame.stack.pop_i32() ^ frame.stack.pop_i32());
@@ -1447,6 +1490,11 @@ value context::exec(const language_module& mod,
 
 void context::register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func)
 {
+    if(!func)
+    {
+        throw interpreter_error(fmt::format("Cannot register null native function '{}.{}'.", mod_name, fn_name));
+    }
+
     auto mod_it = function_map.find(mod_name);
     if(mod_it != function_map.end())
     {

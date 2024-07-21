@@ -311,6 +311,15 @@ public:
         return temporary_objects.find(obj) != temporary_objects.end();
     }
 
+    /**
+     * Return the object type.
+     *
+     * @param obj The object.
+     * @returns The object type.
+     * @throws Throws a `gc_error` if the object is not in the objects list.
+     */
+    gc_object_type get_object_type(void* obj) const;
+
     /** Get allocated object count. */
     std::size_t object_count() const
     {

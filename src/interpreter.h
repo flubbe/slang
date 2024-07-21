@@ -912,6 +912,16 @@ class context
                                     std::vector<std::byte>& code) const;
 
     /**
+     * Resolve a native function.
+     *
+     * @param name The function's name.
+     * @param library_name The function's library name.
+     * @returns Returns the resolved function.
+     * @throws Throws an `interpreter_error` if the resolution failed.
+     */
+    std::function<void(operand_stack&)> resolve_native_function(const std::string& name, const std::string& library_name) const;
+
+    /**
      * Execute a function.
      *
      * @param mod The decoded module.
@@ -970,7 +980,8 @@ public:
      * @param mod_name The name of the module to bind to.
      * @param fn_name The function's name.
      * @param func The function.
-     * @throws Throws a `codegen_error` if the function given by `mod_name` and `fn_name` is already registered.
+     * @throws Throws a `interpreter_error` if the function given by `mod_name` and `fn_name` is already registered,
+     *         or if the function `func` is `nullptr`.
      */
     void register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func);
 

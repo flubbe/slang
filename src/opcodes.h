@@ -65,7 +65,9 @@ enum class opcode : opcode_base
     sret,        /** Return a str from a function. */
     aret,        /** Return an array reference. */
     iand,        /** Bitwise and for two i32 from the stack. */
+    land,        /** Logical and for two i32 from the stack. */
     ior,         /** Bitwise or for two i32 from the stack. */
+    lor,         /** Logical or for two i32 from the stack. */
     ixor,        /** Bitwise xor for two i32 from the stack. */
     ishl,        /** Left shift for i32. */
     ishr,        /** Right shift for i32. */

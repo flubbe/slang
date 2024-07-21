@@ -312,21 +312,29 @@ std::pair<token, bool> parser::parse_type_name()
 
     if(current_token->s == "[")
     {
-        is_array_type = true;
-
         // parse array definition.
         get_next_token();
         if(current_token->type != token_type::identifier)
         {
-            throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
-        }
-        type = *current_token;
-        validate_base_type(type);
+            if(!parsing_native || current_token->s != "]")
+            {
+                throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+            }
 
-        get_next_token();
-        if(current_token->s != "]")
+            type = token{"<array>", current_token->location};
+        }
+        else
         {
-            throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+            is_array_type = true;
+
+            type = *current_token;
+            validate_base_type(type);
+
+            get_next_token();
+            if(current_token->s != "]")
+            {
+                throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+            }
         }
     }
 
@@ -491,7 +499,12 @@ std::unique_ptr<ast::directive_expression> parser::parse_directive()
     }
     get_next_token();    // skip ']'
 
-    return std::make_unique<ast::directive_expression>(std::move(name), std::move(args), parse_top_level_statement());
+    // evaluate expression within the context of this directive.
+    push_directive(name, args);
+    auto expr = std::make_unique<ast::directive_expression>(std::move(name), std::move(args), parse_top_level_statement());
+    pop_directive();
+
+    return expr;
 }
 
 // block_expr ::= '{' stmts_exprs '}'
@@ -1078,6 +1091,37 @@ std::unique_ptr<ast::return_statement> parser::parse_return()
     }
 
     return std::make_unique<ast::return_statement>(std::move(loc), std::move(expr));
+}
+
+void parser::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+{
+    if(name.s == "native")
+    {
+        directive_stack.push_back(std::make_pair(
+          name,
+          [this, parsing_native = this->parsing_native]()
+          {
+              this->parsing_native = parsing_native;
+          }));
+
+        parsing_native = true;
+    }
+    else
+    {
+        // push empty entry to stack.
+        directive_stack.push_back(std::make_pair(token{}, []() {}));
+    }
+}
+
+void parser::pop_directive()
+{
+    if(directive_stack.size() == 0)
+    {
+        throw parser_error("Cannot pop directive: empty directive stack.");
+    }
+
+    directive_stack.back().second();
+    directive_stack.pop_back();
 }
 
 void parser::parse(lexer& in_lexer)

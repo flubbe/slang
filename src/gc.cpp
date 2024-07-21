@@ -272,4 +272,17 @@ void garbage_collector::remove_temporary(void* obj)
     }
 }
 
+gc_object_type garbage_collector::get_object_type(void* obj) const
+{
+    GC_LOG("get_object_type {}", obj);
+
+    auto it = objects.find(obj);
+    if(it == objects.end())
+    {
+        throw gc_error(fmt::format("Reference at {} does not exist in the GC object list.", obj));
+    }
+
+    return it->second.type;
+}
+
 }    // namespace slang::gc
