@@ -388,7 +388,7 @@ public:
         add_base_type("str");
 
         // Add array type.
-        add_struct(token{"<array>", {0, 0}}, {std::make_pair(token{"length", {0, 0}}, get_type("i32", false))});
+        add_struct(token{"@array", {0, 0}}, {std::make_pair(token{"length", {0, 0}}, get_type("i32", false))});
     }
     context(const context&) = default;
     context(context&&) = default;

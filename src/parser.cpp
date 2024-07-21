@@ -321,7 +321,7 @@ std::pair<token, bool> parser::parse_type_name()
                 throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
             }
 
-            type = token{"<array>", current_token->location};
+            type = token{"@array", current_token->location};
         }
         else
         {

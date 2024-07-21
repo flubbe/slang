@@ -71,7 +71,7 @@ static std::size_t get_type_size(const std::string& type_name, bool reference)
     {
         return sizeof(void*);
     }
-    else if(type_name == "<array>")
+    else if(type_name == "@array")
     {
         // FIXME This is an address/object.
         return sizeof(void*);
@@ -112,7 +112,7 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
     {
         return std::make_pair(opcode::aret, length);
     }
-    else if(name == "<array>")
+    else if(name == "@array")
     {
         // FIXME This is an address/object.
         return std::make_pair(opcode::aret, length);

@@ -294,8 +294,8 @@ type context::get_identifier_type(const token& identifier) const
 
 bool context::is_convertible(const type& from, const type& to) const
 {
-    // Only conversions from array types to <array> are allowed.
-    return from.is_array() && (!to.is_array() && to.get_base_type().s == "<array>");
+    // Only conversions from array types to @array are allowed.
+    return from.is_array() && (!to.is_array() && to.get_base_type().s == "@array");
 }
 
 void context::resolve_types()

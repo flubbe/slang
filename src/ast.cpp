@@ -346,7 +346,7 @@ std::optional<ty::type> access_expression::type_check(ty::context& ctx)
     // array built-ins.
     if(type.is_array())
     {
-        const ty::struct_definition* array_struct = ctx.get_struct_definition(name.location, "<array>");
+        const ty::struct_definition* array_struct = ctx.get_struct_definition(name.location, "@array");
         ctx.push_struct_definition(array_struct);
         expr_type = expr->type_check(ctx);
         ctx.pop_struct_definition();
@@ -992,6 +992,16 @@ std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
 
         // return the restricted type.
         return ctx.get_type("i32", false);
+    }
+
+    // check lhs and rhs have supported types (i32 and f32 at the moment).
+    if(*lhs_type != ctx.get_type("i32", false) && *lhs_type != ctx.get_type("f32", false))
+    {
+        throw ty::type_error(loc, fmt::format("Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.", reduced_op, ty::to_string(*lhs_type)));
+    }
+    if(*rhs_type != ctx.get_type("i32", false) && *rhs_type != ctx.get_type("f32", false))
+    {
+        throw ty::type_error(loc, fmt::format("Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.", reduced_op, ty::to_string(*rhs_type)));
     }
 
     if(*lhs_type != *rhs_type)
