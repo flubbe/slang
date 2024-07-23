@@ -154,7 +154,7 @@ TEST(serialization, big_endian_file_archive)
         slang::vle_int vi{i};
 
         ar & bo /* 1 byte */
-          & by  /* 1 byte*/
+          & by  /* 1 byte */
           & w   /* 2 bytes */
           & dw  /* 4 bytes */
           & f   /* 4 bytes */

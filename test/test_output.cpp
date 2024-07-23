@@ -433,13 +433,13 @@ TEST(output, string_operations)
     {
         const std::string test_input =
           "#[native(lib=\"slang\")]\n"
-          "fn strcmp(s1: str, s2: str) -> i32;\n"    // NOTE returns 1 if the strings match
+          "fn string_equals(s1: str, s2: str) -> i32;\n"
           "#[native(lib=\"slang\")]\n"
-          "fn concat(s1: str, s2: str) -> str;\n"
+          "fn string_concat(s1: str, s2: str) -> str;\n"
           "fn main() -> i32\n"
           "{\n"
-          "\tlet s: str = concat(\"a\", \"b\");\n"
-          "\tif(strcmp(s, \"ab\"))\n"
+          "\tlet s: str = string_concat(\"a\", \"b\");\n"
+          "\tif(string_equals(s, \"ab\"))\n"
           "\t{\n"
           "\t\treturn 10;\n"
           "\t}\n"
@@ -1057,7 +1057,7 @@ TEST(output, arrays)
           "#[native(lib=\"slang\")]\n"
           "fn array_copy(from: [], to: []) -> void;\n"
           "#[native(lib=\"slang\")]\n"
-          "fn strcmp(s1: str, s2: str) -> i32;\n"    // NOTE returns 1 if the strings match
+          "fn string_equals(s1: str, s2: str) -> i32;\n"
           "fn test_copy() -> i32\n"
           "{\n"
           " let a: [i32] = [2, 3];\n"
@@ -1070,7 +1070,7 @@ TEST(output, arrays)
           " let a: [str] = [\"a\", \"123\"];\n"
           " let b: [str] = new str[2];\n"
           " array_copy(a, b);\n"
-          " return a.length == b.length && strcmp(a[0], b[0]) && strcmp(a[1], b[1]);\n"
+          " return a.length == b.length && string_equals(a[0], b[0]) && string_equals(a[1], b[1]);\n"
           "}\n"
           "fn test_copy_fail_none() -> void\n"
           "{\n"

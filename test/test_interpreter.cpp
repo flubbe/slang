@@ -729,7 +729,7 @@ TEST(interpreter, array_copy)
                                                      gc.remove_temporary(from);
                                                      gc.remove_temporary(to);
                                                  }));
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "strcmp",
+    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
                                                      void* s1 = stack.pop_addr<void*>();
@@ -737,7 +737,7 @@ TEST(interpreter, array_copy)
 
                                                      if(s1 == nullptr || s2 == nullptr)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("strcmp: arguments cannot be null.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: arguments cannot be null.");
                                                      }
 
                                                      auto& gc = ctx.get_gc();
@@ -747,7 +747,7 @@ TEST(interpreter, array_copy)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("strcmp: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: argument are not strings.");
                                                      }
 
                                                      stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
@@ -792,7 +792,7 @@ TEST(interpreter, string_operations)
     slang::file_manager file_mgr;
     slang::interpreter::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "strcmp",
+    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
                                                      void* s1 = stack.pop_addr<void*>();
@@ -800,7 +800,7 @@ TEST(interpreter, string_operations)
 
                                                      if(s1 == nullptr || s1 == nullptr)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("strcmp: arguments cannot be null.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: arguments cannot be null.");
                                                      }
 
                                                      auto& gc = ctx.get_gc();
@@ -810,7 +810,7 @@ TEST(interpreter, string_operations)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("strcmp: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: argument are not strings.");
                                                      }
 
                                                      stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
@@ -818,7 +818,7 @@ TEST(interpreter, string_operations)
                                                      gc.remove_temporary(s1);
                                                      gc.remove_temporary(s2);
                                                  }));
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "concat",
+    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_concat",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
                                                      std::string* s2 = stack.pop_addr<std::string>();
@@ -826,7 +826,7 @@ TEST(interpreter, string_operations)
 
                                                      if(s1 == nullptr)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("concat: arguments cannot be null.");
+                                                         throw slang::interpreter::interpreter_error("string_concat: arguments cannot be null.");
                                                      }
 
                                                      auto& gc = ctx.get_gc();
@@ -836,14 +836,14 @@ TEST(interpreter, string_operations)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("concat: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_concat: argument are not strings.");
                                                      }
 
                                                      std::string* str = gc.gc_new<std::string>(slang::gc::gc_object::of_temporary);
+                                                     *str = *s1 + *s2;
+
                                                      gc.remove_temporary(s1);
                                                      gc.remove_temporary(s2);
-
-                                                     *str = *s1 + *s2;
 
                                                      stack.push_addr<std::string>(str);
                                                  }));
