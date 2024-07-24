@@ -90,8 +90,39 @@ std::string to_string(type_cast tc)
 }
 
 /*
- * Value.
+ * value.
  */
+
+void value::validate() const
+{
+    bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
+    bool is_ref = (type == "addr");
+    if(is_builtin || is_ref)
+    {
+        if(aggregate_type.has_value())
+        {
+            throw codegen_error("Aggregate type cannot contain value for built-in types.");
+        }
+
+        return;
+    }
+
+    if(type != "aggregate")
+    {
+        throw codegen_error(fmt::format("Invalid value type '{}'.", type));
+    }
+
+    if(!aggregate_type.has_value() || aggregate_type->length() == 0)
+    {
+        throw codegen_error("Empty aggregate type.");
+    }
+
+    is_builtin = (*aggregate_type == "i32") || (*aggregate_type == "f32") || (*aggregate_type == "str");
+    if(is_builtin)
+    {
+        throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *aggregate_type));
+    }
+}
 
 std::string value::to_string() const
 {
@@ -103,7 +134,306 @@ std::string value::to_string() const
 }
 
 /*
- * Context.
+ * const_argument.
+ */
+
+std::string const_argument::to_string() const
+{
+    std::string type_name = type->get_resolved_type();
+
+    if(type_name == "i32")
+    {
+        return fmt::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());
+    }
+    else if(type_name == "f32")
+    {
+        return fmt::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());
+    }
+    else if(type_name == "str")
+    {
+        return fmt::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());
+    }
+
+    throw codegen_error(fmt::format("Unrecognized const_argument type."));
+}
+
+/*
+ * instruction.
+ */
+
+std::string instruction::to_string() const
+{
+    std::string buf;
+    if(args.size() > 0)
+    {
+        buf = " ";
+        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        {
+            buf += args[i]->to_string() + ", ";
+        }
+        buf += args.back()->to_string();
+    }
+    return fmt::format("{}{}", name, buf);
+}
+
+/*
+ * basic_block.
+ */
+
+std::string basic_block::to_string() const
+{
+    if(unreachable)
+    {
+        return fmt::format("{}:\n unreachable", label);
+    }
+
+    if(instrs.size() == 0)
+    {
+        return fmt::format("{}:", label);
+    }
+
+    std::string buf = fmt::format("{}:\n", label);
+    for(std::size_t i = 0; i < instrs.size() - 1; ++i)
+    {
+        buf += fmt::format(" {}\n", instrs[i]->to_string());
+    }
+    buf += fmt::format(" {}", instrs.back()->to_string());
+    return buf;
+}
+
+bool basic_block::is_valid() const
+{
+    std::size_t branch_return_count = 0;
+    bool last_instruction_branch_return = false;
+    for(auto& it: instrs)
+    {
+        last_instruction_branch_return = it->is_branching() || it->is_return();
+        if(last_instruction_branch_return)
+        {
+            branch_return_count += 1;
+        }
+    }
+    return branch_return_count == 1 && last_instruction_branch_return;
+}
+
+/*
+ * scope.
+ */
+
+bool scope::contains(const std::string& name) const
+{
+    if(std::find_if(args.begin(), args.end(),
+                    [&name](const std::unique_ptr<value>& v) -> bool
+                    {
+                        if(!v->has_name())
+                        {
+                            throw codegen_error("Scope contains unnamed value.");
+                        }
+
+                        return *v->get_name() == name;
+                    })
+       != args.end())
+    {
+        return true;
+    }
+
+    if(std::find_if(locals.begin(), locals.end(),
+                    [&name](const std::unique_ptr<value>& v) -> bool
+                    {
+                        if(!v->has_name())
+                        {
+                            throw codegen_error("Scope contains unnamed value.");
+                        }
+
+                        return *v->get_name() == name;
+                    })
+       != locals.end())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+value* scope::get_value(const std::string& name)
+{
+    auto it = std::find_if(args.begin(), args.end(),
+                           [&name](const std::unique_ptr<value>& v) -> bool
+                           {
+                               if(!v->has_name())
+                               {
+                                   throw codegen_error("Scope contains unnamed value.");
+                               }
+
+                               return *v->get_name() == name;
+                           });
+    if(it != args.end())
+    {
+        return it->get();
+    }
+
+    it = std::find_if(locals.begin(), locals.end(),
+                      [&name](const std::unique_ptr<value>& v) -> bool
+                      {
+                          if(!v->has_name())
+                          {
+                              throw codegen_error("Scope contains unnamed value.");
+                          }
+
+                          return *v->get_name() == name;
+                      });
+
+    if(it != locals.end())
+    {
+        return it->get();
+    }
+
+    return nullptr;
+}
+
+std::size_t scope::get_index(const std::string& name) const
+{
+    auto it = std::find_if(args.begin(), args.end(),
+                           [&name](const std::unique_ptr<value>& v) -> bool
+                           {
+                               if(!v->has_name())
+                               {
+                                   throw codegen_error("Scope contains unnamed value.");
+                               }
+
+                               return *v->get_name() == name;
+                           });
+    if(it != args.end())
+    {
+        return it - args.begin();
+    }
+
+    it = std::find_if(locals.begin(), locals.end(),
+                      [&name](const std::unique_ptr<value>& v) -> bool
+                      {
+                          if(!v->has_name())
+                          {
+                              throw codegen_error("Scope contains unnamed value.");
+                          }
+
+                          return *v->get_name() == name;
+                      });
+
+    if(it != locals.end())
+    {
+        return args.size() + (it - locals.begin());
+    }
+
+    throw codegen_error(fmt::format("Name '{}' not found in scope.", name));
+}
+
+void scope::add_argument(std::unique_ptr<value> arg)
+{
+    if(!arg->has_name())
+    {
+        throw codegen_error("Cannot add unnamed argument to scope.");
+    }
+
+    if(contains(*arg->get_name()))
+    {
+        throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
+    }
+    args.emplace_back(std::move(arg));
+}
+
+void scope::add_local(std::unique_ptr<value> arg)
+{
+    if(!arg->has_name())
+    {
+        throw codegen_error("Cannot add unnamed argument to scope.");
+    }
+
+    if(contains(*arg->get_name()))
+    {
+        throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
+    }
+    locals.emplace_back(std::move(arg));
+}
+
+void scope::add_type(std::string name, std::vector<std::pair<std::string, value>> members)
+{
+    if(types.find(name) != types.end())
+    {
+        throw codegen_error(fmt::format("Type '{}' already exists in scope.", name));
+    }
+
+    types.insert({std::move(name), std::move(members)});
+}
+
+/*
+ * function.
+ */
+
+std::string function::to_string() const
+{
+    std::string buf;
+    if(native)
+    {
+
+        buf = fmt::format("native ({}) {} @{}(", import_library, return_type.to_string(), name);
+    }
+    else
+    {
+        buf = fmt::format("define {} @{}(", return_type.to_string(), name);
+    }
+
+    const auto& args = scope.get_args();
+    if(args.size() > 0)
+    {
+        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        {
+            buf += fmt::format("{}, ", args[i]->to_string());
+        }
+        buf += fmt::format("{})", args.back()->to_string());
+    }
+    else
+    {
+        buf += ")";
+    }
+
+    if(!native)
+    {
+        buf += " {\n";
+        for(auto& v: scope.get_locals())
+        {
+            buf += fmt::format("local {}\n", v->to_string());
+        }
+        for(auto& b: instr_blocks)
+        {
+            buf += fmt::format("{}\n", b->to_string());
+        }
+        buf += "}";
+    }
+
+    return buf;
+}
+
+/*
+ * type.
+ */
+
+std::string type::to_string() const
+{
+    std::string buf = fmt::format("%{} = type {{\n", name);
+    if(members.size() > 0)
+    {
+        for(std::size_t i = 0; i < members.size() - 1; ++i)
+        {
+            buf += fmt::format(" {} %{},\n", members[i].second.get_resolved_type(), members[i].first);
+        }
+        buf += fmt::format(" {} %{},\n", members.back().second.get_resolved_type(), members.back().first);
+    }
+    buf += "}";
+    return buf;
+}
+
+/*
+ * context.
  */
 
 std::size_t context::get_import_index(symbol_type type, std::string import_path, std::string name)
@@ -508,6 +838,75 @@ std::string context::generate_label()
 {
     ++label_count;
     return fmt::format("{}", label_count - 1);
+}
+
+std::string context::to_string() const
+{
+    std::string buf;
+
+    // strings.
+    if(strings.size())
+    {
+        auto make_printable = [](const std::string& s) -> std::string
+        {
+            std::string str;
+
+            // replace non-printable characters by their character codes.
+            for(auto& c: s)
+            {
+                if(!isalnum(c) && c != ' ')
+                {
+                    str += fmt::format("\\x{:02x}", c);
+                }
+                else
+                {
+                    str += c;
+                }
+            }
+
+            return str;
+        };
+
+        for(std::size_t i = 0; i < strings.size() - 1; ++i)
+        {
+            buf += fmt::format(".string @{} \"{}\"\n", i, make_printable(strings[i]));
+        }
+        buf += fmt::format(".string @{} \"{}\"", strings.size() - 1, make_printable(strings.back()));
+
+        // don't append a newline if the string table is the only non-empty buffer.
+        if(types.size() != 0 || funcs.size() != 0)
+        {
+            buf += "\n";
+        }
+    }
+
+    // types.
+    if(types.size() != 0)
+    {
+        for(std::size_t i = 0; i < types.size() - 1; ++i)
+        {
+            buf += fmt::format("{}\n", types[i]->to_string());
+        }
+        buf += fmt::format("{}", types.back()->to_string());
+
+        // don't append a newline if there are no functions.
+        if(funcs.size() != 0)
+        {
+            buf += "\n";
+        }
+    }
+
+    // functions.
+    if(funcs.size() != 0)
+    {
+        for(std::size_t i = 0; i < funcs.size() - 1; ++i)
+        {
+            buf += fmt::format("{}\n", funcs[i]->to_string());
+        }
+        buf += fmt::format("{}", funcs.back()->to_string());
+    }
+
+    return buf;
 }
 
 }    // namespace slang::codegen
