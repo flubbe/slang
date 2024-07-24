@@ -362,15 +362,12 @@ class context
         auto it = std::find_if(type_map.begin(), type_map.end(),
                                [&name](const std::pair<type, std::uint64_t>& t) -> bool
                                {
-                                   if(name.s != t.first.get_base_type().s)
-                                   {
-                                       return false;
-                                   }
-                                   return !t.first.is_array();
+                                   const type* element_type = t.first.get_element_type();
+                                   return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
                                });
         if(it != type_map.end())
         {
-            throw type_error(fmt::format("Base type '{}' already exists.", name.s));
+            throw type_error(fmt::format("Type '{}' already exists.", name.s));
         }
 
         auto type_id = generate_type_id();
@@ -446,12 +443,20 @@ public:
     void add_struct(token name, std::vector<std::pair<token, type>> members);
 
     /**
-     * Check if the context has a specific type.
+     * Check if the context contains a specific type, given by a string.
      *
      * @param name The type's name.
      * @returns True if the type exists within the current scope.
      */
     bool has_type(const std::string& name) const;
+
+    /**
+     * Check if the context contains a specific type.
+     *
+     * @param t The type.
+     * @returns True if the type exists within the current scope.
+     */
+    bool has_type(const type& t) const;
 
     /**
      * Get the type for an identifier.
@@ -474,30 +479,39 @@ public:
         auto it = std::find_if(type_map.begin(), type_map.end(),
                                [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
                                {
-                                   if(name.s != t.first.get_base_type().s)
+                                   if(array != t.first.is_array())
                                    {
                                        return false;
                                    }
 
-                                   return (array && t.first.is_array())
-                                          || (!array && !t.first.is_array());
+                                   if(array && t.first.is_array())
+                                   {
+                                       const type* element_type = t.first.get_element_type();
+                                       return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
+                                   }
+
+                                   return name.s == slang::typing::to_string(t.first);
                                });
         if(it != type_map.end())
         {
             return it->second;
         }
 
-        // add array types as necessary.
-        it = std::find_if(type_map.begin(), type_map.end(),
-                          [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
-                          {
-                              return name.s == t.first.get_base_type().s;
-                          });
-        if(it == type_map.end())
+        // search for array base type.
+        if(array)
         {
-            throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
+            it = std::find_if(type_map.begin(), type_map.end(),
+                              [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                              {
+                                  return name.s == slang::typing::to_string(t.first);
+                              });
+            if(it == type_map.end())
+            {
+                throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
+            }
         }
 
+        // add type.
         return get_type(name, array).get_type_id();
     }
 
@@ -513,48 +527,7 @@ public:
      */
     type get_type(const token& name, bool array)
     {
-        // search for an exact match.
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
-                               {
-                                   if(name.s != t.first.get_base_type().s)
-                                   {
-                                       return false;
-                                   }
-                                   return (array && t.first.is_array())
-                                          || (!array && !t.first.is_array());
-                               });
-        if(it != type_map.end())
-        {
-            return it->first;
-        }
-
-        // for arrays, also search for the base type.
-        if(array)
-        {
-            auto it = std::find_if(type_map.begin(), type_map.end(),
-                                   [&name](const std::pair<type, std::uint64_t>& t) -> bool
-                                   {
-                                       if(name.s != t.first.get_base_type().s)
-                                       {
-                                           return false;
-                                       }
-                                       if(t.first.is_array())
-                                       {
-                                           return false;
-                                       }
-                                       return true;
-                                   });
-            if(it != type_map.end())
-            {
-                // add the array type to the type map.
-                auto type_id = generate_type_id();
-                type_map.push_back({type{name, array, type_id, false}, type_id});
-                return type_map.back().first;
-            }
-        }
-
-        throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
+        return get_type(name.s, array);
     }
 
     /**
@@ -571,12 +544,18 @@ public:
         auto it = std::find_if(type_map.begin(), type_map.end(),
                                [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
                                {
-                                   if(name != t.first.get_base_type().s)
+                                   if(array != t.first.is_array())
                                    {
                                        return false;
                                    }
-                                   return (array && t.first.is_array())
-                                          || (!array && !t.first.is_array());
+
+                                   if(array && t.first.is_array())
+                                   {
+                                       const type* element_type = t.first.get_element_type();
+                                       return element_type != nullptr && (name == slang::typing::to_string(*element_type));
+                                   }
+
+                                   return name == slang::typing::to_string(t.first);
                                });
         if(it != type_map.end())
         {
@@ -589,15 +568,12 @@ public:
             auto it = std::find_if(type_map.begin(), type_map.end(),
                                    [&name](const std::pair<type, std::uint64_t>& t) -> bool
                                    {
-                                       if(name != t.first.get_base_type().s)
-                                       {
-                                           return false;
-                                       }
                                        if(t.first.is_array())
                                        {
                                            return false;
                                        }
-                                       return true;
+
+                                       return name == slang::typing::to_string(t.first);
                                    });
             if(it != type_map.end())
             {
@@ -624,16 +600,13 @@ public:
         auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
                                [&name, &array, function_type](const type& t) -> bool
                                {
-                                   if(name.s != t.get_base_type().s)
+                                   if(array && t.is_array())
                                    {
-                                       return false;
+                                       const type* element_type = t.get_element_type();
+                                       return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
                                    }
-                                   if(function_type != t.is_function_type())
-                                   {
-                                       return false;
-                                   }
-                                   return (array && t.is_array())
-                                          || (!array && !t.is_array());
+
+                                   return name.s == slang::typing::to_string(t);
                                });
         if(it != unresolved_types.end())
         {

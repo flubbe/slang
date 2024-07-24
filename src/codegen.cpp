@@ -145,7 +145,7 @@ type* context::create_type(std::string name, std::vector<std::pair<std::string, 
         throw codegen_error(fmt::format("Type '{}' already defined.", name));
     }
 
-    return types.emplace_back(std::make_unique<type>(std::move(name), std::move(members))).get();
+    return types.emplace_back(std::make_unique<type>(name, std::move(members))).get();
 }
 
 std::size_t context::get_string(std::string str)

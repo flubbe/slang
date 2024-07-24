@@ -511,12 +511,12 @@ std::optional<ty::type> variable_reference_expression::type_check(ty::context& c
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        auto base_type = ctx.get_identifier_type(name).deref();
-        if(!base_type.has_value())
+        auto base_type = t.get_element_type();
+        if(base_type == nullptr)
         {
             throw ty::type_error(loc, fmt::format("Could not get base type for '{}'.", name.s));
         }
-        return ctx.get_type(base_type->get_base_type(), base_type->is_array());
+        return ctx.get_type(base_type->to_string(), base_type->is_array());
     }
     return ctx.get_identifier_type(name);
 }
@@ -684,7 +684,7 @@ std::optional<ty::type> array_initializer_expression::type_check(slang::typing::
         throw ty::type_error(loc, "Initializer expression has no type.");
     }
 
-    return ctx.get_type(t.value().get_base_type(), true);
+    return ctx.get_type(t->to_string(), true);
 }
 
 std::string array_initializer_expression::to_string() const
@@ -1670,7 +1670,13 @@ std::optional<ty::type> call_expression::type_check(ty::context& ctx)
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        return ctx.get_type(sig.ret_type.get_base_type(), false);
+        auto element_type = sig.ret_type.get_element_type();
+        if(element_type == nullptr)
+        {
+            throw ty::type_error(loc, "Array has no element type.");
+        }
+
+        return ctx.get_type(element_type->to_string(), false);
     }
 
     return sig.ret_type;

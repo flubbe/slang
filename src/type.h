@@ -18,11 +18,22 @@ namespace slang::typing
 /** Type representation. */
 class type
 {
-    /** The base type name. */
-    token base;
+    /** Source location of the type (if available). */
+    token_location location;
+
+    /** Optional name for this type. Only set when `array` is `false`. */
+    std::optional<std::string> name;
 
     /** Whether the type is an array. */
-    bool array;
+    bool array{false};
+
+    /**
+     * The element type for arrays.
+     *
+     * TODO Make this into a vector / type components. For functions, the
+     *      return type is at index 0, and the arguments at indices >= 1.
+     */
+    std::shared_ptr<type> element_type;
 
     /** Type id or std::nullopt for unresolved types. */
     std::optional<std::uint64_t> type_id;
@@ -43,14 +54,18 @@ public:
     /**
      * Create a new type.
      *
+     * FIXME Complicated and non-flexible member initialization.
+     *
      * @param base The base type name.
      * @param array Whether the type is an array.
      * @param type_id The type's id, or std::nullopt for an unresolved type.
      * @param function_type Whether this type comes from a function.
      */
-    type(token base, bool array, std::optional<std::uint64_t> type_id, bool function_type)
-    : base{std::move(base)}
+    type(const token& base, bool array, std::optional<std::uint64_t> type_id, bool function_type)
+    : location{base.location}
+    , name{array ? std::nullopt : std::make_optional<std::string>(base.s)}
     , array{array}
+    , element_type{array ? std::make_shared<type>(base, false, std::nullopt, false) : nullptr}
     , type_id{type_id}
     , function_type{function_type}
     {
@@ -70,20 +85,20 @@ public:
      */
     bool operator!=(const type& other) const;
 
-    /** Return the base type. */
-    const token& get_base_type() const
+    /** Get the token location. */
+    const token_location& get_location() const
     {
-        return base;
+        return location;
     }
 
-    /** Return the dereferenced type. Returns `std::nullopt` if the type is not an array. */
-    std::optional<type> deref() const
+    /** Return the element type. Returns `nullptr` if the type is not an array. */
+    const type* get_element_type() const
     {
-        if(!array)
+        if(!is_array())
         {
-            return std::nullopt;
+            return nullptr;
         }
-        return std::make_optional<type>(base, false, std::nullopt, function_type);
+        return element_type.get();
     }
 
     /** Return whether this type is an array type. */
@@ -132,6 +147,20 @@ public:
     static type make_unresolved(token base, bool array, bool function_type)
     {
         return {std::move(base), array, std::nullopt, function_type};
+    }
+
+    /**
+     * Get the string representation of this type.
+     *
+     * @return The string representation of this type.
+     */
+    std::string to_string() const
+    {
+        if(is_array())
+        {
+            return fmt::format("[{}]", get_element_type()->to_string());
+        }
+        return *name;
     }
 };
 

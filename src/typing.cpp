@@ -27,9 +27,9 @@ bool type::operator==(const type& other) const
     {
         throw type_error(fmt::format(
           "Comparison of types '{}' ({}) and '{}' ({}).",
-          to_string(*this),
+          to_string(),
           (type_id.has_value() ? "resolved" : "unresolved"),
-          to_string(other),
+          other.to_string(),
           (other.type_id.has_value() ? "resolved" : "unresolved")));
     }
 
@@ -47,11 +47,7 @@ bool type::operator!=(const type& other) const
 
 std::string to_string(const type& t)
 {
-    if(t.is_array())
-    {
-        return fmt::format("[{}]", t.get_base_type().s);
-    }
-    return t.get_base_type().s;
+    return t.to_string();
 }
 
 std::string to_string(const std::pair<token, bool>& t)
@@ -225,14 +221,16 @@ void context::add_struct(token name, std::vector<std::pair<token, type>> members
     // check if all types are known.
     for(auto& [name, type]: members)
     {
-        if(!is_builtin_type(type.get_base_type().s))
+        auto type_string = type.to_string();
+
+        if(!is_builtin_type(type_string))
         {
-            if(!has_type(type.get_base_type().s))
+            if(!has_type(type))
             {
-                throw type_error(name.location, fmt::format("Struct member has unknown base type '{}'.", type.get_base_type().s));
+                throw type_error(name.location, fmt::format("Struct member has unknown base type '{}'.", type_string));
             }
         }
-        else if(type.get_base_type().s == "void")
+        else if(type_string == "void")
         {
             throw type_error(name.location, fmt::format("Struct member '{}' cannot have type 'void'.", name.s));
         }
@@ -248,6 +246,50 @@ bool context::has_type(const std::string& name) const
         throw std::runtime_error("Typing context: No current scope.");
     }
 
+    // search type map.
+    auto it = std::find_if(type_map.begin(), type_map.end(),
+                           [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                           {
+                               return name == t.first.to_string();
+                           });
+    if(it != type_map.end())
+    {
+        return true;
+    }
+
+    // search scopes.
+    for(const scope* s = current_scope; s != nullptr; s = s->parent)
+    {
+        if(s->structs.find(name) != s->structs.end())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool context::has_type(const type& ty) const
+{
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
+
+    const std::string name = ty.to_string();
+
+    // search type map.
+    auto it = std::find_if(type_map.begin(), type_map.end(),
+                           [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                           {
+                               return name == t.first.to_string();
+                           });
+    if(it != type_map.end())
+    {
+        return true;
+    }
+
+    // search scopes.
     for(const scope* s = current_scope; s != nullptr; s = s->parent)
     {
         if(s->structs.find(name) != s->structs.end())
@@ -295,7 +337,7 @@ type context::get_identifier_type(const token& identifier) const
 bool context::is_convertible(const type& from, const type& to) const
 {
     // Only conversions from array types to @array are allowed.
-    return from.is_array() && (!to.is_array() && to.get_base_type().s == "@array");
+    return from.is_array() && (!to.is_array() && to.to_string() == "@array");
 }
 
 void context::resolve_types()
@@ -306,7 +348,7 @@ void context::resolve_types()
         auto it = std::find_if(type_map.begin(), type_map.end(),
                                [&s](const std::pair<type, std::uint64_t>& t) -> bool
                                {
-                                   if(s.first != t.first.get_base_type().s)
+                                   if(s.first != t.first.to_string())
                                    {
                                        return false;
                                    }
@@ -328,17 +370,40 @@ void context::resolve_types()
                  std::back_inserter(unresolved),
                  [](const type& t) -> bool
                  {
-                     return !is_builtin_type(t.get_base_type().s) && !t.is_function_type();
+                     return !is_builtin_type(t.to_string()) && !t.is_function_type();
                  });
     unresolved_types = std::move(unresolved);    // this clears the moved-from vector.
 
     // find all unresolved types.
     for(auto& it: unresolved_types)
     {
-        if(!has_type(it.get_base_type().s))
+        if(has_type(it))
         {
-            throw type_error(it.get_base_type().location, fmt::format("Function type resolution not implemented (type: '{}').", it.get_base_type().s));
+            continue;
         }
+
+        // resolve array types.
+        if(!it.is_array())
+        {
+            throw type_error(it.get_location(), fmt::format("Cannot resolve unknown type '{}'.", it.to_string()));
+        }
+
+        const type* t = it.get_element_type();
+        while(t != nullptr && t->is_array())
+        {
+            t = t->get_element_type();
+        }
+
+        if(t == nullptr || !has_type(*t))
+        {
+            throw type_error(it.get_location(), fmt::format("Cannot resolve unknown type '{}'.", it.to_string()));
+        }
+
+        // add the type.
+        auto type_id = generate_type_id();
+        it.set_type_id(type_id);
+
+        type_map.push_back(std::make_pair(it, type_id));
     }
 
     unresolved_types.clear();
@@ -350,13 +415,35 @@ void context::resolve_types()
         {
             if(!arg.is_resolved())
             {
-                arg.set_type_id(get_type_id(arg.get_base_type(), arg.is_array()));
+                if(arg.is_array())
+                {
+                    arg.set_type_id(get_type_id(
+                      {arg.get_element_type()->to_string(), arg.get_location()},
+                      true));
+                }
+                else
+                {
+                    arg.set_type_id(get_type_id({arg.to_string(), arg.get_location()}, false));
+                }
             }
         }
 
         if(!sig.ret_type.is_resolved())
         {
-            sig.ret_type.set_type_id(get_type_id(sig.ret_type.get_base_type(), sig.ret_type.is_array()));
+            if(sig.ret_type.is_array())
+            {
+                sig.ret_type.set_type_id(get_type_id(
+                  {sig.ret_type.get_element_type()->to_string(),
+                   sig.ret_type.get_location()},
+                  true));
+            }
+            else
+            {
+                sig.ret_type.set_type_id(get_type_id(
+                  {sig.ret_type.to_string(),
+                   sig.ret_type.get_location()},
+                  false));
+            }
         }
     }
 
@@ -367,7 +454,20 @@ void context::resolve_types()
         {
             if(!member_type.is_resolved())
             {
-                member_type.set_type_id(get_type_id(member_type.get_base_type(), member_type.is_array()));
+                if(member_type.is_array())
+                {
+                    member_type.set_type_id(get_type_id(
+                      {member_type.get_element_type()->to_string(),
+                       member_type.get_location()},
+                      true));
+                }
+                else
+                {
+                    member_type.set_type_id(get_type_id(
+                      {member_type.to_string(),
+                       member_type.get_location()},
+                      false));
+                }
             }
         }
     }
