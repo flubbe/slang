@@ -92,6 +92,16 @@ public:
     }
 
     /** Return the element type. Returns `nullptr` if the type is not an array. */
+    type* get_element_type()
+    {
+        if(!is_array())
+        {
+            return nullptr;
+        }
+        return element_type.get();
+    }
+
+    /** Return the element type. Returns `nullptr` if the type is not an array. */
     const type* get_element_type() const
     {
         if(!is_array())

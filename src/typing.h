@@ -468,54 +468,6 @@ public:
     type get_identifier_type(const token& identifier) const;
 
     /**
-     * Get the type id for a name.
-     *
-     * @param name The type name.
-     * @param array Whether this is an array type.
-     * @throws Throws a `type_error` if the type is not known.
-     */
-    std::uint64_t get_type_id(const token& name, bool array)
-    {
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
-                               {
-                                   if(array != t.first.is_array())
-                                   {
-                                       return false;
-                                   }
-
-                                   if(array && t.first.is_array())
-                                   {
-                                       const type* element_type = t.first.get_element_type();
-                                       return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
-                                   }
-
-                                   return name.s == slang::typing::to_string(t.first);
-                               });
-        if(it != type_map.end())
-        {
-            return it->second;
-        }
-
-        // search for array base type.
-        if(array)
-        {
-            it = std::find_if(type_map.begin(), type_map.end(),
-                              [&name](const std::pair<type, std::uint64_t>& t) -> bool
-                              {
-                                  return name.s == slang::typing::to_string(t.first);
-                              });
-            if(it == type_map.end())
-            {
-                throw type_error(name.location, fmt::format("Unknown type '{}'.", name.s));
-            }
-        }
-
-        // add type.
-        return get_type(name, array).get_type_id();
-    }
-
-    /**
      * Get the type for a name and an optional array length.
      *
      * Adds the array type to the type map if the base type exists.
@@ -627,6 +579,14 @@ public:
      * @returns Whether the type `from` is convertible to the type `to`.
      */
     bool is_convertible(const type& from, const type& to) const;
+
+    /**
+     * Resolve a type and set its type id.
+     *
+     * @param t The type to resolve.
+     * @throws Throws a `type_error` if type resolution failed.
+     */
+    void resolve(type& t);
 
     /**
      * Resolve all unresolved types.

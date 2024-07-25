@@ -104,7 +104,7 @@ std::string scope::to_string() const
     std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
     for(auto& [name, type]: variables)
     {
-        repr += fmt::format("[v] name: {}, type: {}\n", name, slang::typing::to_string(type.var_type));
+        repr += fmt::format("[v]  name: {}, type: {}\n", name, slang::typing::to_string(type.var_type));
     }
     for(auto& [name, sig]: functions)
     {
@@ -112,10 +112,10 @@ std::string scope::to_string() const
     }
     for(auto& [name, s]: structs)
     {
-        repr += fmt::format("[s] name: {}\n    members:\n", name);
+        repr += fmt::format("[s]  name: {}\n    members:\n", name);
         for(auto& [n, t]: s.members)
         {
-            repr += fmt::format("    - name: {}, type: {}\n", n.s, slang::typing::to_string(t));
+            repr += fmt::format("     - name: {}, type: {}\n", n.s, slang::typing::to_string(t));
         }
     }
 
@@ -340,6 +340,51 @@ bool context::is_convertible(const type& from, const type& to) const
     return from.is_array() && (!to.is_array() && to.to_string() == "@array");
 }
 
+void context::resolve(type& ty)
+{
+    if(ty.is_resolved())
+    {
+        return;
+    }
+
+    // check if array elements are resolved.
+    if(ty.is_array())
+    {
+        type* element_type = ty.get_element_type();
+        if(element_type == nullptr)
+        {
+            throw type_error(ty.get_location(), fmt::format("Invalid array type '{}': No element type.", ty.to_string()));
+        }
+
+        if(!element_type->is_resolved())
+        {
+            resolve(*element_type);
+        }
+    }
+
+    // resolve type.
+    auto it = std::find_if(type_map.begin(), type_map.end(),
+                           [&ty](const std::pair<type, std::uint64_t>& t) -> bool
+                           {
+                               return ty.to_string() == t.first.to_string();
+                           });
+    if(it == type_map.end())
+    {
+        // add array types.
+        if(ty.is_array())
+        {
+            auto type_id = generate_type_id();
+            ty.set_type_id(type_id);
+            type_map.push_back({ty, type_id});
+            return;
+        }
+
+        throw type_error(ty.get_location(), fmt::format("Cannot resolve type '{}'.", ty.to_string()));
+    }
+
+    ty.set_type_id(it->second);
+}
+
 void context::resolve_types()
 {
     // add structs to type map.
@@ -377,35 +422,8 @@ void context::resolve_types()
     // find all unresolved types.
     for(auto& it: unresolved_types)
     {
-        if(has_type(it))
-        {
-            continue;
-        }
-
-        // resolve array types.
-        if(!it.is_array())
-        {
-            throw type_error(it.get_location(), fmt::format("Cannot resolve unknown type '{}'.", it.to_string()));
-        }
-
-        const type* t = it.get_element_type();
-        while(t != nullptr && t->is_array())
-        {
-            t = t->get_element_type();
-        }
-
-        if(t == nullptr || !has_type(*t))
-        {
-            throw type_error(it.get_location(), fmt::format("Cannot resolve unknown type '{}'.", it.to_string()));
-        }
-
-        // add the type.
-        auto type_id = generate_type_id();
-        it.set_type_id(type_id);
-
-        type_map.push_back(std::make_pair(it, type_id));
+        resolve(it);
     }
-
     unresolved_types.clear();
 
     // propagate type resolutions to functions.
@@ -413,38 +431,10 @@ void context::resolve_types()
     {
         for(auto& arg: sig.arg_types)
         {
-            if(!arg.is_resolved())
-            {
-                if(arg.is_array())
-                {
-                    arg.set_type_id(get_type_id(
-                      {arg.get_element_type()->to_string(), arg.get_location()},
-                      true));
-                }
-                else
-                {
-                    arg.set_type_id(get_type_id({arg.to_string(), arg.get_location()}, false));
-                }
-            }
+            resolve(arg);
         }
 
-        if(!sig.ret_type.is_resolved())
-        {
-            if(sig.ret_type.is_array())
-            {
-                sig.ret_type.set_type_id(get_type_id(
-                  {sig.ret_type.get_element_type()->to_string(),
-                   sig.ret_type.get_location()},
-                  true));
-            }
-            else
-            {
-                sig.ret_type.set_type_id(get_type_id(
-                  {sig.ret_type.to_string(),
-                   sig.ret_type.get_location()},
-                  false));
-            }
-        }
+        resolve(sig.ret_type);
     }
 
     // propagate type resolutions to structs.
@@ -452,23 +442,7 @@ void context::resolve_types()
     {
         for(auto& [member_name, member_type]: s.second.members)
         {
-            if(!member_type.is_resolved())
-            {
-                if(member_type.is_array())
-                {
-                    member_type.set_type_id(get_type_id(
-                      {member_type.get_element_type()->to_string(),
-                       member_type.get_location()},
-                      true));
-                }
-                else
-                {
-                    member_type.set_type_id(get_type_id(
-                      {member_type.to_string(),
-                       member_type.get_location()},
-                      false));
-                }
-            }
+            resolve(member_type);
         }
     }
 }
@@ -693,6 +667,12 @@ std::string context::to_string() const
         auto transform = [](const token& t) -> std::string
         { return t.s; };
         ret += fmt::format("* {}\n", slang::utils::join(it, {transform}, "::"));
+    }
+
+    ret += "\nType map:\n";
+    for(auto& it: type_map)
+    {
+        ret += fmt::format("  {}, {}\n", it.first.to_string(), it.second);
     }
 
     return fmt::format("{}\n{}", ret, global_scope.to_string());
