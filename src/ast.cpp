@@ -512,10 +512,6 @@ std::optional<ty::type> variable_reference_expression::type_check(ty::context& c
         }
 
         auto base_type = t.get_element_type();
-        if(base_type == nullptr)
-        {
-            throw ty::type_error(loc, fmt::format("Could not get base type for '{}'.", name.s));
-        }
         return ctx.get_type(base_type->to_string(), base_type->is_array());
     }
     return ctx.get_identifier_type(name);
@@ -746,9 +742,10 @@ void struct_definition_expression::collect_names(cg::context& ctx, ty::context& 
     std::vector<std::pair<token, ty::type>> struct_members;
     for(auto& m: members)
     {
-        struct_members.emplace_back(std::make_pair(m->get_name(),
-                                                   type_ctx.get_unresolved_type(m->get_type(),
-                                                                                m->is_array(), false)));
+        struct_members.emplace_back(
+          std::make_pair(m->get_name(),
+                         type_ctx.get_unresolved_type(m->get_type(),
+                                                      m->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain)));
     }
     type_ctx.add_struct(name, std::move(struct_members));
 }
@@ -1394,9 +1391,13 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
     std::vector<ty::type> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [&type_ctx](const auto& arg) -> ty::type
-                   { return type_ctx.get_unresolved_type(std::get<1>(arg), std::get<2>(arg), false); });
+                   { return type_ctx.get_unresolved_type(
+                       std::get<1>(arg),
+                       std::get<2>(arg) ? ty::type_class::tc_array : ty::type_class::tc_plain); });
     type_ctx.add_function(name, std::move(arg_types),
-                          type_ctx.get_unresolved_type(std::get<0>(return_type), std::get<1>(return_type), false));
+                          type_ctx.get_unresolved_type(
+                            std::get<0>(return_type),
+                            std::get<1>(return_type) ? ty::type_class::tc_array : ty::type_class::tc_plain));
 }
 
 void prototype_ast::type_check(ty::context& ctx)
@@ -1670,13 +1671,7 @@ std::optional<ty::type> call_expression::type_check(ty::context& ctx)
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        auto element_type = sig.ret_type.get_element_type();
-        if(element_type == nullptr)
-        {
-            throw ty::type_error(loc, "Array has no element type.");
-        }
-
-        return ctx.get_type(element_type->to_string(), false);
+        return ctx.get_type(sig.ret_type.get_element_type()->to_string(), false);
     }
 
     return sig.ret_type;

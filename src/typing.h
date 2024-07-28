@@ -54,7 +54,7 @@ struct variable_type
     /** The variable's name. */
     token name;
 
-    /** The variable's type, given as `(base_type, optional_array_length)`. */
+    /** The variable's type. */
     type var_type;
 
     /** No default constructor. */
@@ -336,8 +336,7 @@ class context
      */
     std::uint64_t generate_type_id()
     {
-        ++next_type_id;
-        return next_type_id - 1;
+        return next_type_id++;
     }
 
     /**
@@ -346,33 +345,7 @@ class context
      * @param name The type's name.
      * @throws Throws a `type_error` if the type already exists.
      */
-    void add_base_type(std::string name)
-    {
-        add_type({std::move(name), {0, 0}});
-    }
-
-    /**
-     * Add a type to the context.
-     *
-     * @param name The type's name.
-     * @throws Throws a `type_error` if the type already exists.
-     */
-    void add_type(token name)
-    {
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name](const std::pair<type, std::uint64_t>& t) -> bool
-                               {
-                                   const type* element_type = t.first.get_element_type();
-                                   return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
-                               });
-        if(it != type_map.end())
-        {
-            throw type_error(fmt::format("Type '{}' already exists.", name.s));
-        }
-
-        auto type_id = generate_type_id();
-        type_map.push_back({type{std::move(name), false, type_id, false}, type_id});
-    }
+    void add_base_type(std::string name);
 
 public:
     /** Default constructor. */
@@ -491,83 +464,16 @@ public:
      * @param array Whether the type is an array.
      * @returns An existing type.
      */
-    type get_type(const std::string& name, bool array)
-    {
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
-                               {
-                                   if(array != t.first.is_array())
-                                   {
-                                       return false;
-                                   }
-
-                                   if(array && t.first.is_array())
-                                   {
-                                       const type* element_type = t.first.get_element_type();
-                                       return element_type != nullptr && (name == slang::typing::to_string(*element_type));
-                                   }
-
-                                   return name == slang::typing::to_string(t.first);
-                               });
-        if(it != type_map.end())
-        {
-            return it->first;
-        }
-
-        // for arrays, also search for the base type.
-        if(array)
-        {
-            auto it = std::find_if(type_map.begin(), type_map.end(),
-                                   [&name](const std::pair<type, std::uint64_t>& t) -> bool
-                                   {
-                                       if(t.first.is_array())
-                                       {
-                                           return false;
-                                       }
-
-                                       return name == slang::typing::to_string(t.first);
-                                   });
-            if(it != type_map.end())
-            {
-                // add the array type to the type map.
-                auto type_id = generate_type_id();
-                type_map.push_back({type{token{name, {0, 0}}, array, type_id, false}, type_id});
-                return type_map.back().first;
-            }
-        }
-
-        throw type_error(fmt::format("Unknown type '{}'.", name));
-    }
+    type get_type(const std::string& name, bool array);
 
     /**
      * Get a type object for an unresolved type and add mark the type for resolution.
      *
      * @param name The type name.
-     * @param array Whether the type is an array type.
-     * @param function_type Whether this type belongs to a function.
+     * @param cls The type class.
      * @returns An unresolved type.
      */
-    type get_unresolved_type(token name, bool array, bool function_type)
-    {
-        auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
-                               [&name, &array, function_type](const type& t) -> bool
-                               {
-                                   if(array && t.is_array())
-                                   {
-                                       const type* element_type = t.get_element_type();
-                                       return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
-                                   }
-
-                                   return name.s == slang::typing::to_string(t);
-                               });
-        if(it != unresolved_types.end())
-        {
-            return *it;
-        }
-
-        unresolved_types.push_back(type::make_unresolved(std::move(name), array, function_type));
-        return unresolved_types.back();
-    }
+    type get_unresolved_type(token name, type_class cls);
 
     /**
      * Return whether a type is convertible into another type.

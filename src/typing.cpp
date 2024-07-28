@@ -21,6 +21,21 @@ namespace slang::typing
  * type implementation.
  */
 
+type::type(const token& base, type_class cls, std::optional<std::uint64_t> type_id)
+: location{base.location}
+, cls{cls}
+, type_id{type_id}
+{
+    if(cls == type_class::tc_array)
+    {
+        components = {std::make_shared<type>(base, type_class::tc_plain, std::nullopt)};
+    }
+    else
+    {
+        name = std::make_optional<std::string>(base.s);
+    }
+}
+
 bool type::operator==(const type& other) const
 {
     if(!type_id.has_value() || !other.type_id.has_value())
@@ -41,6 +56,82 @@ bool type::operator!=(const type& other) const
     return !(*this == other);
 }
 
+type* type::get_element_type()
+{
+    if(!is_array())
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Cannot get element type for '{}'.", *name)
+                              : std::string{"Cannot get element type."};
+        throw type_error(location, error_string);
+    }
+
+    if(components.size() != 1)
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).", *name, components.size())
+                              : fmt::format("Inconsistent component count for array type ({} components, expected 1).", components.size());
+        throw type_error(location, error_string);
+    }
+
+    return components[0].get();
+}
+
+const type* type::get_element_type() const
+{
+    if(!is_array())
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Cannot get element type for '{}'.", *name)
+                              : std::string{"Cannot get element type."};
+        throw type_error(location, error_string);
+    }
+
+    if(components.size() != 1)
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).", *name, components.size())
+                              : fmt::format("Inconsistent component count for array type ({} components, expected 1).", components.size());
+        throw type_error(location, error_string);
+    }
+
+    return components[0].get();
+}
+
+const std::vector<std::shared_ptr<type>>& type::get_signature() const
+{
+    if(!is_function_type())
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Cannot get signature for non-function type '{}'.", *name)
+                              : std::string{"Cannot get signature for non-function type."};
+        throw type_error(location, error_string);
+    }
+
+    if(components.size() == 0)
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Inconsistent component count for function signature '{}' (0 components, expected at least 1).", *name)
+                              : std::string{"Inconsistent component count for function signature (0 components, expected at least 1)."};
+        throw type_error(location, error_string);
+    }
+
+    return components;
+}
+
+std::uint64_t type::get_type_id() const
+{
+    if(!type_id.has_value())
+    {
+        auto error_string = name.has_value()
+                              ? fmt::format("Unresolved type '{}'.", *name)
+                              : std::string{"Unresolved type."};
+        throw type_error(location, error_string);
+    }
+
+    return *type_id;
+}
+
 /*
  * type to string conversions.
  */
@@ -52,12 +143,18 @@ std::string to_string(const type& t)
 
 std::string to_string(const std::pair<token, bool>& t)
 {
-    return to_string(type{std::get<0>(t), std::get<1>(t), 0 /* unknown type id */, false});
+    return to_string(type{
+      std::get<0>(t),
+      std::get<1>(t) ? type_class::tc_array : type_class::tc_plain,
+      std::nullopt});
 }
 
 std::string to_string(const std::pair<std::string, bool>& t)
 {
-    return to_string(type{{std::get<0>(t), {0, 0}}, std::get<1>(t), 0 /* unknown type id */, false});
+    return to_string(type{
+      {std::get<0>(t), {0, 0}},
+      std::get<1>(t) ? type_class::tc_array : type_class::tc_plain,
+      std::nullopt});
 }
 
 /*
@@ -128,6 +225,22 @@ std::string scope::to_string() const
 /*
  * Typing context.
  */
+
+void context::add_base_type(std::string name)
+{
+    auto it = std::find_if(type_map.begin(), type_map.end(),
+                           [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                           {
+                               return name == slang::typing::to_string(t.first);
+                           });
+    if(it != type_map.end())
+    {
+        throw type_error(fmt::format("Type '{}' already exists.", name));
+    }
+
+    auto type_id = generate_type_id();
+    type_map.push_back({type{{std::move(name), {0, 0}}, type_class::tc_plain, type_id}, type_id});
+}
 
 void context::add_import(std::vector<token> path)
 {
@@ -334,6 +447,80 @@ type context::get_identifier_type(const token& identifier) const
     throw type_error(identifier.location, err);
 }
 
+type context::get_type(const std::string& name, bool array)
+{
+    auto it = std::find_if(type_map.begin(), type_map.end(),
+                           [&name, &array](const std::pair<type, std::uint64_t>& t) -> bool
+                           {
+                               if(array != t.first.is_array())
+                               {
+                                   return false;
+                               }
+
+                               if(array && t.first.is_array())
+                               {
+                                   const type* element_type = t.first.get_element_type();
+                                   return name == slang::typing::to_string(*element_type);
+                               }
+
+                               return name == slang::typing::to_string(t.first);
+                           });
+    if(it != type_map.end())
+    {
+        return it->first;
+    }
+
+    // for arrays, also search for the base type.
+    if(array)
+    {
+        auto it = std::find_if(type_map.begin(), type_map.end(),
+                               [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                               {
+                                   if(t.first.is_array())
+                                   {
+                                       return false;
+                                   }
+
+                                   return name == slang::typing::to_string(t.first);
+                               });
+        if(it != type_map.end())
+        {
+            // add the array type to the type map.
+            auto type_id = generate_type_id();
+            type_map.push_back({type{
+                                  token{name, {0, 0}},
+                                  array ? type_class::tc_array : type_class::tc_plain,
+                                  type_id},
+                                type_id});
+            return type_map.back().first;
+        }
+    }
+
+    throw type_error(fmt::format("Unknown type '{}'.", name));
+}
+
+type context::get_unresolved_type(token name, type_class cls)
+{
+    auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
+                           [&name, &cls](const type& t) -> bool
+                           {
+                               if(cls == type_class::tc_array && t.is_array())
+                               {
+                                   const type* element_type = t.get_element_type();
+                                   return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
+                               }
+
+                               return name.s == slang::typing::to_string(t);
+                           });
+    if(it != unresolved_types.end())
+    {
+        return *it;
+    }
+
+    unresolved_types.push_back(type::make_unresolved(std::move(name), cls));
+    return unresolved_types.back();
+}
+
 bool context::is_convertible(const type& from, const type& to) const
 {
     // Only conversions from array types to @array are allowed.
@@ -351,11 +538,6 @@ void context::resolve(type& ty)
     if(ty.is_array())
     {
         type* element_type = ty.get_element_type();
-        if(element_type == nullptr)
-        {
-            throw type_error(ty.get_location(), fmt::format("Invalid array type '{}': No element type.", ty.to_string()));
-        }
-
         if(!element_type->is_resolved())
         {
             resolve(*element_type);
@@ -402,7 +584,7 @@ void context::resolve_types()
         if(it == type_map.end())
         {
             auto type_id = generate_type_id();
-            type_map.push_back({type{s.second.name, false, type_id, false}, type_id});
+            type_map.push_back({type{s.second.name, type_class::tc_plain, type_id}, type_id});
         }
     }
 
@@ -454,7 +636,7 @@ type context::get_function_type(const token& name, const std::vector<type>& arg_
     std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
                                           slang::typing::to_string(ret_type));
 
-    return get_unresolved_type({type_string, name.location}, false, true);
+    return get_unresolved_type({type_string, name.location}, type_class::tc_function);
 }
 
 const function_signature& context::get_function_signature(const token& name) const

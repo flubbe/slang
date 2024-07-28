@@ -747,7 +747,7 @@ TEST(interpreter, array_copy)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("string_equals: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: arguments are not strings.");
                                                      }
 
                                                      stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
@@ -810,7 +810,7 @@ TEST(interpreter, string_operations)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("string_equals: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_equals: arguments are not strings.");
                                                      }
 
                                                      stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
@@ -836,7 +836,7 @@ TEST(interpreter, string_operations)
 
                                                      if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
                                                      {
-                                                         throw slang::interpreter::interpreter_error("string_concat: argument are not strings.");
+                                                         throw slang::interpreter::interpreter_error("string_concat: arguments are not strings.");
                                                      }
 
                                                      std::string* str = gc.gc_new<std::string>(slang::gc::gc_object::of_temporary);
