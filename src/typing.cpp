@@ -768,7 +768,7 @@ void context::enter_anonymous_scope(token_location loc)
 {
     token anonymous_scope;
     anonymous_scope.location = std::move(loc);
-    anonymous_scope.s = std::move(fmt::format("<anonymous@{}>", anonymous_scope_id));
+    anonymous_scope.s = fmt::format("<anonymous@{}>", anonymous_scope_id);
     ++anonymous_scope_id;
 
     // check if the scope already exists.

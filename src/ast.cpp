@@ -370,18 +370,18 @@ std::string access_expression::to_string() const
  * import_expression.
  */
 
-std::unique_ptr<cg::value> import_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     // import expressions are handled by the import resolver.
     return nullptr;
 }
 
-void import_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
     type_ctx.add_import(path);
 }
 
-std::optional<ty::type> import_expression::type_check(ty::context& ctx)
+std::optional<ty::type> import_expression::type_check([[maybe_unused]] ty::context& ctx)
 {
     return std::nullopt;
 }
@@ -606,7 +606,7 @@ std::string variable_declaration_expression::to_string() const
  * array_initializer_expression.
  */
 
-std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     std::unique_ptr<cg::value> v;
     auto array_type = ctx.get_array_type();
@@ -737,7 +737,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     return nullptr;
 }
 
-void struct_definition_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void struct_definition_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
     std::vector<std::pair<token, ty::type>> struct_members;
     for(auto& m: members)
@@ -1628,7 +1628,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
         // evaluate the index expression.
         index_expr->generate_code(ctx, memory_context::load);
         ctx.generate_load(std::make_unique<cg::type_argument>(return_type.deref()), true);
-        return std::make_unique<cg::value>(std::move(return_type.deref()));
+        return std::make_unique<cg::value>(return_type.deref());
     }
 
     return std::make_unique<cg::value>(std::move(return_type));
@@ -1956,7 +1956,7 @@ std::string while_statement::to_string() const
  * break_statement.
  */
 
-std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
@@ -1967,7 +1967,7 @@ std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, memo
  * continue_statement.
  */
 
-std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);

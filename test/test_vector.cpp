@@ -325,6 +325,7 @@ TEST(fixed_vector, size_after_type_cast)
     EXPECT_EQ(v_char_ptr->size(), v_int.size());
     EXPECT_EQ(v_short_ptr->size(), v_int.size());
     EXPECT_EQ(v_long_ptr->size(), v_int.size());
+    EXPECT_EQ(v_float_ptr->size(), v_int.size());
     EXPECT_EQ(v_double_ptr->size(), v_int.size());
     EXPECT_EQ(v_S_ptr->size(), v_int.size());
 }

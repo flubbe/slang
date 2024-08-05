@@ -94,7 +94,7 @@ struct gc_object
 
     /** Create an object from a type. */
     template<typename T>
-    static gc_object from(T* obj, std::uint8_t flags = of_none)
+    static gc_object from([[maybe_unused]] T* obj, [[maybe_unused]] std::uint8_t flags = of_none)
     {
         static_assert(
           !std::is_same_v<T, std::string>
@@ -200,10 +200,9 @@ public:
      * Add an object to the root set.
      *
      * @param obj The object.
-     * @param flags Flags.
      * @returns Returns the input object.
      */
-    void* add_root(void* obj, std::uint32_t flags = gc_object::of_none);
+    void* add_root(void* obj);
 
     /**
      * Remove an object from the root set.
@@ -238,7 +237,7 @@ public:
             {
                 return static_cast<T*>(add_temporary(obj));
             }
-            return static_cast<T*>(add_root(obj, flags));
+            return static_cast<T*>(add_root(obj));
         }
 
         return obj;
@@ -264,7 +263,7 @@ public:
         {
             return static_cast<si::fixed_vector<T>*>(add_temporary(array));
         }
-        return static_cast<si::fixed_vector<T>*>(add_root(array, flags));
+        return static_cast<si::fixed_vector<T>*>(add_root(array));
     }
 
     /**

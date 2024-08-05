@@ -442,7 +442,6 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 //        | (arg_name '=' arg_value) ',' args
 std::unique_ptr<ast::directive_expression> parser::parse_directive()
 {
-    token_location loc = current_token->location;
     get_next_token();    // skip '#'.
 
     if(current_token->s != "[")
@@ -742,7 +741,6 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 std::unique_ptr<ast::expression> parser::parse_unary()
 {
     token op = *current_token;
-    token_location loc = current_token->location;
 
     // parse the new operator.
     if(op.s == "new")
@@ -821,7 +819,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
         {
             while(true)
             {
-                args.emplace_back(std::move(parse_expression()));
+                args.emplace_back(parse_expression());
 
                 if(current_token->s == ")")
                 {
@@ -862,7 +860,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
             throw syntax_error(*current_token, "Expected <identifier>.");
         }
 
-        return std::make_unique<ast::scope_expression>(std::move(identifier), std::move(parse_identifier_expression()));
+        return std::make_unique<ast::scope_expression>(std::move(identifier), parse_identifier_expression());
     }
     else if(current_token->s == ".")    // element access
     {
@@ -873,7 +871,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
             throw syntax_error(*current_token, "Expected <identifier>.");
         }
 
-        return std::make_unique<ast::access_expression>(std::move(identifier), std::move(parse_identifier_expression()));
+        return std::make_unique<ast::access_expression>(std::move(identifier), parse_identifier_expression());
     }
     else if(current_token->s == "{")    // initializer list
     {
@@ -956,7 +954,6 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 // literal_expression ::= int_literal | fp_literal | string_literal
 std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
 {
-    token_location loc = current_token->location;
     token tok = *current_token;
     get_next_token();
 
@@ -1027,11 +1024,11 @@ std::unique_ptr<ast::if_statement> parser::parse_if()
         get_next_token();
         if(current_token->s == "if")
         {
-            else_block = std::move(parse_if());
+            else_block = parse_if();
         }
         else
         {
-            else_block = std::move(parse_block());
+            else_block = parse_block();
         }
     }
 
@@ -1093,7 +1090,7 @@ std::unique_ptr<ast::return_statement> parser::parse_return()
     return std::make_unique<ast::return_statement>(std::move(loc), std::move(expr));
 }
 
-void parser::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+void parser::push_directive(const token& name, [[maybe_unused]] const std::vector<std::pair<token, token>>& args)
 {
     if(name.s == "native")
     {
@@ -1137,7 +1134,7 @@ void parser::parse(lexer& in_lexer)
             continue;
         }
 
-        exprs.emplace_back(std::move(parse_top_level_statement()));
+        exprs.emplace_back(parse_top_level_statement());
     }
 
     if(!in_lexer.eof())

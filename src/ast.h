@@ -141,7 +141,7 @@ public:
      * @param ctx Code generation context.
      * @param type_ctx Type system context.
      */
-    virtual void collect_names(cg::context& ctx, ty::context& type_ctx) const
+    virtual void collect_names([[maybe_unused]] cg::context& ctx, [[maybe_unused]] ty::context& type_ctx) const
     {
     }
 
@@ -167,7 +167,7 @@ public:
      *
      * @returns True if the directive is supported, and false otherwise.
      */
-    virtual bool supports_directive(const std::string& s) const
+    virtual bool supports_directive([[maybe_unused]] const std::string& s) const
     {
         return false;
     }
@@ -1286,7 +1286,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<ty::type> type_check(slang::typing::context& ctx) override
+    std::optional<ty::type> type_check([[maybe_unused]] slang::typing::context& ctx) override
     {
         return std::nullopt;
     }
@@ -1327,7 +1327,7 @@ public:
 
     std::unique_ptr<slang::codegen::value> generate_code(slang::codegen::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<ty::type> type_check(slang::typing::context& ctx) override
+    std::optional<ty::type> type_check([[maybe_unused]] slang::typing::context& ctx) override
     {
         return std::nullopt;
     }

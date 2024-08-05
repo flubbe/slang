@@ -561,7 +561,7 @@ function* context::create_function(std::string name, value return_type, std::vec
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    return funcs.emplace_back(std::make_unique<function>(*this, std::move(name), std::move(return_type), std::move(args))).get();
+    return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
 }
 
 void context::create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
@@ -576,7 +576,7 @@ void context::create_native_function(std::string lib_name, std::string name, std
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    funcs.emplace_back(std::make_unique<function>(*this, std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
+    funcs.emplace_back(std::make_unique<function>(std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
 }
 
 void context::set_insertion_point(basic_block* ip)

@@ -55,7 +55,7 @@ public:
         return memory_buffer.size();
     }
 
-    std::size_t seek(std::size_t pos) override
+    std::size_t seek([[maybe_unused]] std::size_t pos) override
     {
         throw serialization_error("memory_write_archive::seek: Operation not supported by archive.");
     }
@@ -111,8 +111,8 @@ public:
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
     memory_read_archive(const std::vector<std::byte>& memory_buffer, bool persistent, endian byte_order = endian::native)
-    : memory_buffer{memory_buffer}
-    , archive{true, false, persistent, byte_order}
+    : archive{true, false, persistent, byte_order}
+    , memory_buffer{memory_buffer}
     {
     }
 

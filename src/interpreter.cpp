@@ -357,7 +357,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         if(i.i < 0)
         {
             std::int64_t import_index = -i.i - 1;    // this is bounded by 0 from below by the `if` check.
-            if(import_index >= mod.header.imports.size())
+            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
             {
                 throw interpreter_error(fmt::format("Import index {} out of range ({} >= {}).", import_index, import_index, mod.header.imports.size()));
             }
@@ -391,7 +391,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         }
         else
         {
-            if(i.i >= mod.header.exports.size())
+            if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
             {
                 throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
             }
@@ -430,7 +430,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         vle_int i;
         ar & i;
 
-        if(i.i < 0 || i.i >= details.locals.size())
+        if(i.i < 0 || static_cast<std::size_t>(i.i) >= details.locals.size())
         {
             throw interpreter_error(fmt::format("Index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
         }
@@ -631,7 +631,7 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
                 throw interpreter_error("Error during decode: Got negative stack size.");
             }
 
-            if(stack_size > max_stack_size)
+            if(static_cast<std::size_t>(stack_size) > max_stack_size)
             {
                 max_stack_size = stack_size;
             }
@@ -900,7 +900,7 @@ opcode context::exec(const language_module& mod,
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
             std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
-            if(i < 0 || i >= frame.string_table.size())
+            if(i < 0 || static_cast<std::size_t>(i) >= frame.string_table.size())
             {
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
             }
@@ -918,7 +918,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index >= arr->size())
+            if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -933,7 +933,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index >= arr->size())
+            if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -948,7 +948,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index >= arr->size())
+            if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -967,7 +967,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(index < 0 || index >= arr->size())
+            if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -983,7 +983,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(index < 0 || index >= arr->size())
+            if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -1000,7 +1000,7 @@ opcode context::exec(const language_module& mod,
             gc.remove_temporary(s);
             gc.remove_temporary(arr);
 
-            if(index < 0 || index >= arr->size())
+            if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -1183,7 +1183,7 @@ opcode context::exec(const language_module& mod,
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
 
                 // invoke function
-                auto ret_opcode = exec(mod, details.offset, details.size, details.locals, callee_frame);
+                exec(mod, details.offset, details.size, details.locals, callee_frame);
 
                 // clean up arguments in GC
                 for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)

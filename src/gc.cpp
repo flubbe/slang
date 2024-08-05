@@ -102,9 +102,9 @@ void garbage_collector::delete_object(gc_object& obj_info)
     }
 }
 
-void* garbage_collector::add_root(void* obj, std::uint32_t flags)
+void* garbage_collector::add_root(void* obj)
 {
-    GC_LOG("add root {}, flags {}", obj, flags);
+    GC_LOG("add root {}", obj);
 
     auto it = root_set.find(obj);
     if(it == root_set.end())
@@ -198,6 +198,7 @@ void garbage_collector::run()
         throw gc_error(fmt::format("Object list grew during GC run: {} -> {}", object_set_size, objects.size()));
     }
 
+#ifdef GC_DEBUG
     GC_LOG("run: {} -> {}, {} bytes allocated", object_set_size, objects.size(), allocated_bytes);
     GC_LOG("----- objects -----");
     for(auto& [obj, obj_info]: objects)
@@ -215,11 +216,14 @@ void garbage_collector::run()
         GC_LOG("     obj {}, ref_count {}", obj, ref_count);
     }
     GC_LOG("-------------------");
+#endif
 }
 
 void garbage_collector::reset()
 {
+#ifdef GC_DEBUG
     std::size_t object_count = objects.size();
+#endif
 
     root_set.clear();
     temporary_objects.clear();

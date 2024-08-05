@@ -384,7 +384,7 @@ public:
     argument& operator=(argument&&) = default;
 
     /** Register this argument in the constant table, if necessary. */
-    virtual void register_const(class context& ctx)
+    virtual void register_const([[maybe_unused]] class context& ctx)
     {
     }
 
@@ -790,9 +790,6 @@ class basic_block
 {
     friend class context;
 
-    /** The associated context. */
-    class context& ctx;
-
     /** The block's entry label. */
     std::string label;
 
@@ -818,9 +815,8 @@ class basic_block
      *
      * @param label The block's label.
      */
-    basic_block(class context& ctx, std::string label)
-    : ctx{ctx}
-    , label{std::move(label)}
+    basic_block(std::string label)
+    : label{std::move(label)}
     {
     }
 
@@ -942,9 +938,6 @@ class scope
 
     /** Variables inside the scope. */
     std::vector<std::unique_ptr<value>> locals;
-
-    /** Temporary variable counter. */
-    std::size_t temporary_count = 0;
 
     /** Types. */
     std::unordered_map<std::string, std::vector<std::pair<std::string, value>>> types;
@@ -1119,9 +1112,6 @@ class function_guard
     /** The associated context. */
     context& ctx;
 
-    /** The function. */
-    class function* fn;
-
 public:
     /** No default constructor. */
     function_guard() = delete;
@@ -1136,7 +1126,7 @@ public:
      * @param ctx The associated context.
      * @param s The scope.
      */
-    function_guard(context& ctx, function* s);
+    function_guard(context& ctx, class function* fn);
 
     /** Destructor. */
     ~function_guard();
@@ -1225,9 +1215,6 @@ public:
  */
 class function
 {
-    /** The associated context. */
-    class context& ctx;
-
     /** The function's name. */
     std::string name;
 
@@ -1255,14 +1242,12 @@ public:
     /**
      * Construct a function from name, return type and argument list.
      *
-     * @param ctx The associated context.
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(class context& ctx, std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
-    : ctx{ctx}
-    , name{name}
+    function(std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
+    : name{name}
     , native{false}
     , return_type{std::move(return_type)}
     , scope{std::move(name), std::move(args)}
@@ -1272,19 +1257,16 @@ public:
     /**
      * Construct a native function from import library name and function name.
      *
-     * @param ctx The associated context.
      * @param import_library The import library's name.
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(class context& ctx,
-             std::string import_library,
+    function(std::string import_library,
              std::string name,
              value return_type,
              std::vector<std::unique_ptr<value>> args)
-    : ctx{ctx}
-    , name{name}
+    : name{name}
     , native{true}
     , import_library{import_library}
     , return_type{std::move(return_type)}
@@ -1804,7 +1786,7 @@ public:
      *                 Defaults to `false`.
      * @return Returns the current function.
      */
-    function* get_current_function(bool validate = false)
+    function* get_current_function([[maybe_unused]] bool validate = false)
     {
         return current_function;
     }
@@ -2102,7 +2084,7 @@ inline void basic_block::set_inserting_context(context* ctx)
 
 inline basic_block* basic_block::create(context& ctx, std::string name)
 {
-    return ctx.basic_blocks.emplace_back(std::unique_ptr<basic_block>(new basic_block(ctx, name))).get();
+    return ctx.basic_blocks.emplace_back(std::unique_ptr<basic_block>(new basic_block(name))).get();
 }
 
 /*
@@ -2127,7 +2109,6 @@ inline scope_guard::~scope_guard()
 
 inline function_guard::function_guard(context& ctx, function* fn)
 : ctx{ctx}
-, fn{fn}
 {
     ctx.enter_function(fn);
 }

@@ -170,10 +170,10 @@ TEST(interpreter, hello_world)
 
     // re-defining functions should fail.
     EXPECT_THROW(ctx.register_native_function("slang", "println",    // collides with a native function name
-                                              [](slang::interpreter::operand_stack& stack) {}),
+                                              []([[maybe_unused]] slang::interpreter::operand_stack& stack) {}),
                  slang::interpreter::interpreter_error);
     EXPECT_THROW(ctx.register_native_function("hello_world", "main",    // collides with a scripted function name
-                                              [](slang::interpreter::operand_stack& stack) {}),
+                                              []([[maybe_unused]] slang::interpreter::operand_stack& stack) {}),
                  slang::interpreter::interpreter_error);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);

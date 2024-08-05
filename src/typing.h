@@ -323,9 +323,6 @@ class context
     /** The next type id to use. */
     std::uint64_t next_type_id = 0;
 
-    /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
-    bool parsing_native{false};
-
     /** Directive stack with entries `(name, restore_function)`. */
     std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
 
