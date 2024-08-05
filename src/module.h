@@ -628,10 +628,10 @@ class language_module
     /** Whether this is a decoded module. */
     bool decoded = false;
 
-    /** Jump targets as (label_id, offset). Only valid during instruction decoding. */
+    /** Jump targets as `(label_id, offset)`. Only valid during instruction decoding. */
     std::unordered_map<std::int64_t, std::size_t> jump_targets;
 
-    /** Jump origins as (offset, target_label_id). Only valid during instruction decoding. */
+    /** Jump origins as `(offset, target_label_id)`. Only valid during instruction decoding. */
     std::unordered_map<std::size_t, std::int64_t> jump_origins;
 
 public:

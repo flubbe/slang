@@ -57,7 +57,7 @@ void pkg::invoke(const std::vector<std::string>& args)
     {
         const std::vector<std::pair<std::string, std::string>> cmd_help =
           {
-            {"create pkg_name", "Ceate a new package."},
+            {"create pkg_name", "Create a new package."},
             {"info", "Output information about the current environment"},
             {"list [--all]", "Print a list of installed packages. If --all is specified, also lists sub-packages."},
             {"remove [--protected] pkg_name", "Remove a package."}};

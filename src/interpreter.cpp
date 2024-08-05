@@ -187,6 +187,10 @@ void context::decode_locals(function_descriptor& desc)
     details.locals_size = 0;
 
     std::size_t arg_count = desc.signature.arg_types.size();
+    if(arg_count > details.locals.size())
+    {
+        throw interpreter_error("Function argument count exceeds locals count.");
+    }
 
     // arguments.
     for(std::size_t i = 0; i < arg_count; ++i)
@@ -352,7 +356,13 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         // resolve to address.
         if(i.i < 0)
         {
-            auto& imp_symbol = mod.header.imports[-i.i - 1];
+            std::int64_t import_index = -i.i - 1;    // this is bounded by 0 from below by the `if` check.
+            if(import_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format("Import index {} out of range ({} >= {}).", import_index, import_index, mod.header.imports.size()));
+            }
+
+            auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != symbol_type::function)
             {
                 throw interpreter_error(fmt::format("Cannot resolve call: Import header at index {} does not refer to a function.", -i.i - 1));
@@ -366,6 +376,11 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
 
             auto& desc = std::get<function_descriptor>(exp_symbol->desc);
 
+            if(imp_symbol.package_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format("Package import index {} out of range ({} >= {}).", imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+            }
+
             const language_module* mod_ptr = std::get<const language_module*>(mod.header.imports[imp_symbol.package_index].export_reference);
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&mod_ptr), reinterpret_cast<const std::byte*>(&mod_ptr) + sizeof(mod_ptr));
 
@@ -376,6 +391,11 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
         }
         else
         {
+            if(i.i >= mod.header.exports.size())
+            {
+                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
+            }
+
             auto& exp_symbol = mod.header.exports[i.i];
             if(exp_symbol.type != symbol_type::function)
             {
@@ -696,6 +716,22 @@ public:
     }
 };
 
+/**
+ * Read a value from the binary without bounds check.
+ *
+ * @param binary The binary data.
+ * @param offset The offset into the binary to read from. Holds the new offset after the read.
+ * @returns Returns the read value.
+ */
+template<typename T>
+static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offset)
+{
+    T v = *reinterpret_cast<const T*>(&binary[offset]);
+    offset += sizeof(T);
+
+    return v;
+}
+
 opcode context::exec(const language_module& mod,
                      std::size_t entry_point,
                      std::size_t size,
@@ -856,17 +892,14 @@ opcode context::exec(const language_module& mod,
         case opcode::fconst:
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
-            std::uint32_t i_u32 = *reinterpret_cast<const std::uint32_t*>(&binary[offset]);
-            offset += sizeof(std::uint32_t);
-
+            std::uint32_t i_u32 = read_unchecked<std::uint32_t>(binary, offset);
             frame.stack.push_i32(i_u32);
             break;
         } /* opcode::iconst, opcode::fconst */
         case opcode::sconst:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::uint64_t);
-
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
             if(i < 0 || i >= frame.string_table.size())
             {
                 throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
@@ -885,7 +918,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index > arr->size())
+            if(array_index < 0 || array_index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -900,7 +933,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index > arr->size())
+            if(array_index < 0 || array_index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -915,7 +948,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(array_index < 0 || array_index > arr->size())
+            if(array_index < 0 || array_index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -934,7 +967,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(index < 0 || index > arr->size())
+            if(index < 0 || index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -950,7 +983,7 @@ opcode context::exec(const language_module& mod,
 
             gc.remove_temporary(arr);
 
-            if(index < 0 || index > arr->size())
+            if(index < 0 || index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -967,7 +1000,7 @@ opcode context::exec(const language_module& mod,
             gc.remove_temporary(s);
             gc.remove_temporary(arr);
 
-            if(index < 0 || index > arr->size())
+            if(index < 0 || index >= arr->size())
             {
                 throw interpreter_error("Out of bounds array access.");
             }
@@ -979,8 +1012,8 @@ opcode context::exec(const language_module& mod,
         case opcode::iload: [[fallthrough]];
         case opcode::fload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -997,8 +1030,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::iload, opcode::fload */
         case opcode::sload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -1017,8 +1050,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::sload */
         case opcode::aload:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -1038,8 +1071,8 @@ opcode context::exec(const language_module& mod,
         case opcode::istore: [[fallthrough]];
         case opcode::fstore:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -1056,8 +1089,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::istore, opcode::fstore */
         case opcode::sstore:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -1087,8 +1120,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::sstore */
         case opcode::astore:
         {
-            std::int64_t i = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::int64_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
 
             if(i < 0)
             {
@@ -1118,9 +1151,13 @@ opcode context::exec(const language_module& mod,
         } /* opcode::astore */
         case opcode::invoke:
         {
+            /* no out-of-bounds read possible, since this is checked during decode.
+             * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
             language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);
             offset += sizeof(callee_mod);
 
+            /* no out-of-bounds read possible, since this is checked during decode.
+             * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
             function_descriptor* const* desc_ptr = reinterpret_cast<function_descriptor* const*>(&binary[offset]);
             offset += sizeof(desc_ptr);
 
@@ -1174,8 +1211,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::invoke */
         case opcode::newarray:
         {
-            std::uint8_t type = static_cast<std::uint8_t>(binary[offset]);
-            offset += sizeof(type);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::uint8_t type = read_unchecked<std::uint8_t>(binary, offset);
 
             std::int32_t size = frame.stack.pop_i32();
             if(size < 0)
@@ -1360,10 +1397,9 @@ opcode context::exec(const language_module& mod,
         } /* opcode::fcmpne */
         case opcode::jnz:
         {
-            std::size_t then_offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::size_t);
-            std::size_t else_offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
-            offset += sizeof(std::size_t);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::size_t then_offset = read_unchecked<std::size_t>(binary, offset);
+            std::size_t else_offset = read_unchecked<std::size_t>(binary, offset);
 
             std::int32_t cond = frame.stack.pop_i32();
             if(cond != 0)
@@ -1378,7 +1414,8 @@ opcode context::exec(const language_module& mod,
         } /* opcode::jnz */
         case opcode::jmp:
         {
-            offset = *reinterpret_cast<const std::int64_t*>(&binary[offset]);
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            offset = read_unchecked<std::int64_t>(binary, offset);
             break;
         } /* opcode::jmp */
         default:
