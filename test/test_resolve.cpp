@@ -58,6 +58,7 @@ TEST(resolve, std)
           "import std;\n"
           "fn main() -> i32 {\n"
           " std::println(\"Hello, World!\");\n"
+          " return 0;\n"
           "}";
 
         slang::lexer lexer;
@@ -81,6 +82,7 @@ TEST(resolve, std)
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
