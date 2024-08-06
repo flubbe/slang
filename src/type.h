@@ -67,7 +67,6 @@ public:
      * @param base The base type name.
      * @param cls The type class.
      * @param type_id The type's id, or std::nullopt for an unresolved type.
-     * @param function_type Whether this type comes from a function.
      */
     type(const token& base, type_class cls, std::optional<std::uint64_t> type_id);
 

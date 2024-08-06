@@ -1426,6 +1426,67 @@ opcode context::exec(const language_module& mod,
     throw interpreter_error("Out of bounds code read.");
 }
 
+/** Function argument writing and destruction. */
+class argument_scope
+{
+    /** The arguments to manage. */
+    const std::vector<value>& args;
+
+    /** The locals. */
+    std::vector<std::byte>& locals;
+
+public:
+    /**
+     * Construct an argument scope. Validates the argument types and writes them
+     * into `locals`.
+     *
+     * @param args The arguments to verify and write.
+     * @param arg_types The argument types to validate against.
+     * @param locals The locals storage to write into.
+     */
+    argument_scope(const std::vector<value>& args,
+                   const std::vector<std::pair<std::string, bool>>& arg_types,
+                   std::vector<std::byte>& locals)
+    : args{args}
+    , locals{locals}
+    {
+        std::size_t offset = 0;
+        for(std::size_t i = 0; i < args.size(); ++i)
+        {
+            if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
+            {
+                throw interpreter_error(
+                  fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
+                              i, std::get<0>(arg_types[i]), std::get<0>(args[i].get_type())));
+            }
+
+            if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
+            {
+                throw interpreter_error(
+                  fmt::format("Argument {} for function has wrong array property (expected '{}', got '{}').",
+                              i, std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
+            }
+
+            if(offset + args[i].get_size() > locals.size())
+            {
+                throw interpreter_error("Stack overflow during argument allocation.");
+            }
+
+            offset += args[i].write(&locals[offset]);
+        }
+    }
+
+    /** Destructor. */
+    ~argument_scope()
+    {
+        std::size_t offset = 0;
+        for(std::size_t i = 0; i < args.size(); ++i)
+        {
+            offset += args[i].destroy(&locals[offset]);
+        }
+    }
+};
+
 value context::exec(const language_module& mod,
                     const function& f,
                     std::vector<value> args)
@@ -1441,30 +1502,7 @@ value context::exec(const language_module& mod,
         throw interpreter_error(fmt::format("Arguments for function do not match: Expected {}, got {}.", arg_types.size(), args.size()));
     }
 
-    std::size_t offset = 0;
-    for(std::size_t i = 0; i < args.size(); ++i)
-    {
-        if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
-        {
-            throw interpreter_error(
-              fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
-                          i, std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type())));
-        }
-
-        if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
-        {
-            throw interpreter_error(
-              fmt::format("Argument {} for function has wrong array property (expected '{}', got '{}').",
-                          i, std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
-        }
-
-        if(offset + args[i].get_size() > f.get_locals_size())
-        {
-            throw interpreter_error("Stack overflow during argument allocation.");
-        }
-
-        offset += args[i].write(&frame.locals[offset]);
-    }
+    argument_scope arg_scope{args, arg_types, frame.locals};
 
     /*
      * Execute the function.
@@ -1491,16 +1529,16 @@ value context::exec(const language_module& mod,
     }
     else if(ret_opcode == opcode::iret)
     {
-        ret = frame.stack.pop_i32();
+        ret = value{frame.stack.pop_i32()};
     }
     else if(ret_opcode == opcode::fret)
     {
-        ret = frame.stack.pop_f32();
+        ret = value{frame.stack.pop_f32()};
     }
     else if(ret_opcode == opcode::sret)
     {
         std::string* s = frame.stack.pop_addr<std::string>();
-        ret = std::string{*s};
+        ret = value{std::string{*s}};    // copy string
         gc.remove_temporary(s);
     }
     else if(ret_opcode == opcode::aret)

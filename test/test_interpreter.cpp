@@ -74,41 +74,41 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 2);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {15}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{15}}));
     EXPECT_EQ(*res.get<int>(), 16);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {-100}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{-100}}));
     EXPECT_EQ(*res.get<int>(), -99);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {1.0f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{1.0f}}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {-1.0f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{-1.0f}}));
     EXPECT_NEAR(*res.get<float>(), -1.0, 1e-6);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {0.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{0.f}}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {"Test"}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {si::value{"Test"}}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {0}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local", {0}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), -1);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {0}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 1);
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "local3", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
@@ -117,9 +117,9 @@ TEST(interpreter, module_and_functions)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {23}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {si::value{23}}));
     EXPECT_EQ(*res.get<float>(), 23.0);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_f2i", {92.3f}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_f2i", {si::value{92.3f}}));
     EXPECT_EQ(*res.get<int>(), 92);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
@@ -164,7 +164,7 @@ TEST(interpreter, hello_world)
                                  });
 
     ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
-    EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {"Test"}));
+    EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {si::value{"Test"}}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Hello, World!\n");
 
@@ -203,33 +203,33 @@ TEST(interpreter, operators)
     ASSERT_NO_THROW(ctx.invoke("operators", "main", {}));
 
     slang::interpreter::value res;
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "and", {27, 3}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "and", {si::value{27}, si::value{3}}));
     EXPECT_EQ(*res.get<int>(), 3);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {0, 0}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {si::value{0}, si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {1, 0}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {si::value{1}, si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {0, 1}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {si::value{0}, si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 0);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {1, 1}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {si::value{1}, si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "or", {27, 4}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "or", {si::value{27}, si::value{4}}));
     EXPECT_EQ(*res.get<int>(), 31);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {0, 0}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {si::value{0}, si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {1, 0}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {si::value{1}, si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {0, 1}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {si::value{0}, si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {1, 1}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "lor", {si::value{1}, si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "xor", {27, 3}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "xor", {si::value{27}, si::value{3}}));
     EXPECT_EQ(*res.get<int>(), 24);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "shl", {27, 3}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "shl", {si::value{27}, si::value{3}}));
     EXPECT_EQ(*res.get<int>(), 216);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "shr", {27, 3}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "shr", {si::value{27}, si::value{3}}));
     EXPECT_EQ(*res.get<int>(), 3);
-    ASSERT_NO_THROW(res = ctx.invoke("operators", "mod", {127, 23}));
+    ASSERT_NO_THROW(res = ctx.invoke("operators", "mod", {si::value{127}, si::value{23}}));
     EXPECT_EQ(*res.get<int>(), 12);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
@@ -277,12 +277,12 @@ TEST(interpreter, control_flow)
 
     slang::interpreter::value res;
 
-    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {2}));
+    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {si::value{2}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {-1}));
+    ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {si::value{-1}}));
     EXPECT_EQ(*res.get<int>(), 0);
 
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {3.f}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{3.f}}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 
@@ -290,7 +290,7 @@ TEST(interpreter, control_flow)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {2.2f}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{2.2f}}));
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf.back(), "World, hello!\n");
 
@@ -299,13 +299,13 @@ TEST(interpreter, control_flow)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
     print_buf.clear();
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {1}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {si::value{1}}));
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf[0], "a>0\n");
     EXPECT_EQ(print_buf[1], "Test\n");
 
     print_buf.clear();
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {-2}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {si::value{-2}}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Test\n");
 
@@ -547,6 +547,9 @@ TEST(interpreter, pass_array)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "pass_array", {}));
     EXPECT_EQ(*res.get<int>(), 3);
+
+    ASSERT_NO_THROW(res = ctx.invoke("return_array", "f", {si::value{std::vector<int>{1, 2}}}));
+    EXPECT_EQ(*res.get<int>(), 2);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
@@ -912,21 +915,21 @@ TEST(interpreter, prefix_postfix)
 
     slang::interpreter::value res;
 
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_i32", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_i32", {si::value{1}}));
     ASSERT_EQ(*res.get<int>(), 2);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_i32", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_i32", {si::value{1}}));
     ASSERT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_i32", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_i32", {si::value{1}}));
     ASSERT_EQ(*res.get<int>(), 0);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_i32", {1}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_i32", {si::value{1}}));
     ASSERT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_f32", {1.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_f32", {si::value{1.f}}));
     ASSERT_EQ(*res.get<float>(), 2.f);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_f32", {1.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_add_f32", {si::value{1.f}}));
     ASSERT_EQ(*res.get<float>(), 1.f);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_f32", {1.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_sub_f32", {si::value{1.f}}));
     ASSERT_EQ(*res.get<float>(), 0.f);
-    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_f32", {1.f}));
+    ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_f32", {si::value{1.f}}));
     ASSERT_EQ(*res.get<float>(), 1.f);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);

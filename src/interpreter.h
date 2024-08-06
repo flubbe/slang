@@ -52,33 +52,17 @@ class value
                  std::vector<void*>>
       v;
 
-    /** Read this value from memory. */
-    std::function<std::size_t(std::byte*, value&)> reader;
-
     /** Write this value to memory. */
-    std::function<std::size_t(std::byte*, value&)> writer;
+    std::function<std::size_t(std::byte*, const value&)> write_function;
+
+    /** Delete this value from memory. */
+    std::function<std::size_t(std::byte*)> destroy_function;
 
     /** Size of the value, in bytes. */
     std::size_t size;
 
     /** Type identifier, as `(type_name, is_array)`. */
     std::pair<std::string, bool> type;
-
-    /**
-     * Reads a primitive type into a `value`.
-     *
-     * @param memory The memory to read from.
-     * @param v The value to write the integer to.
-     * @returns Returns `sizeof(T)`.
-     */
-    template<typename T>
-    static std::size_t read_primitive_type(const std::byte* memory, value& v)
-    {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
-                      "Primitive type must be an integer or a floating point type.");
-        std::get<T>(v.v) = *reinterpret_cast<const T*>(memory);
-        return sizeof(T);
-    }
 
     /**
      * Writes a primitive type value into memory.
@@ -97,27 +81,19 @@ class value
     }
 
     /**
-     * Reads a vector of a primitive type into a `value`.
+     * Delete a primitive type value from memory. No-op.
      *
-     * @param memory The memory to read from.
-     * @param v The value to write the integer to.
+     * @param memory The memory to delete the value from. Unused.
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t read_vector_type(const std::byte* memory, value& v)
+    static std::size_t destroy_primitive_type([[maybe_unused]] std::byte* memory)
     {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
-                      "Vector type must be an integer or a floating point type.");
-        for(auto& it: std::get<std::vector<T>>(v.v))
-        {
-            it = *reinterpret_cast<const T*>(memory);
-            memory += sizeof(T);
-        }
-        return sizeof(T) * std::get<std::vector<T>>(v.v).size();
+        return sizeof(T);
     }
 
     /**
-     * Reads a vector of a primitive type into a `value`.
+     * Write a vector of a primitive type or a string into memory.
      *
      * @param memory The memory to write into.
      * @param v The value to write.
@@ -126,30 +102,42 @@ class value
     template<typename T>
     static std::size_t write_vector_type(std::byte* memory, const value& v)
     {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
-                      "Vector type must be an integer or a floating point type.");
-        for(auto& it: std::get<std::vector<T>>(v.v))
+        static_assert(std::is_integral_v<T>
+                        || std::is_floating_point_v<T>
+                        || std::is_same_v<std::remove_cv_t<T>, std::string>,
+                      "Vector type must be an integer type, a floating point type, or a string.");
+
+        auto& input_vec = std::get<std::vector<T>>(v.v);
+        auto vec = new fixed_vector<T>(input_vec.size());
+
+        for(std::size_t i = 0; i < input_vec.size(); ++i)
         {
-            *reinterpret_cast<T*>(memory) = it;
-            memory += sizeof(T);
+            (*vec)[i] = input_vec[i];
         }
-        return sizeof(T) * std::get<std::vector<T>>(v.v).size();
+
+        *reinterpret_cast<fixed_vector<T>**>(memory) = vec;
+        return sizeof(void*);
     }
 
     /**
-     * Reads a string into a `value`.
+     * Delete a vector type from memory.
      *
-     * @note This copies the string.
-     *
-     * @param memory The memory to read from.
-     * @param v The value write the string to.
-     * @returns Returns `sizeof(std::string*)`.
+     * @param memory The memory to delete the vector type from.
+     * @return Returns the pointer size `sizeof(void*)`.
      */
-    static std::size_t read_str(const std::byte* memory, value& v)
+    template<typename T>
+    static std::size_t destroy_vector_type(std::byte* memory)
     {
-        std::string* s = *reinterpret_cast<std::string* const*>(memory);
-        std::get<std::string>(v.v) = *s;
-        return sizeof(std::string*);
+        static_assert(std::is_integral_v<T>
+                        || std::is_floating_point_v<T>
+                        || std::is_same_v<std::remove_cv_t<T>, std::string>,
+                      "Vector type must be an integer type, a floating point type, or a string.");
+
+        auto vec = *reinterpret_cast<fixed_vector<T>**>(memory);
+        delete vec;
+
+        *reinterpret_cast<fixed_vector<T>**>(memory) = nullptr;
+        return sizeof(void*);
     }
 
     /**
@@ -173,56 +161,15 @@ class value
     }
 
     /**
-     * Reads a vector of strings into a `value`.
+     * Delete a string reference from memory.
      *
-     * @note This copies the strings.
-     *
-     * @param memory The memory to read from.
-     * @param v The value to read the strings into.
-     * @returns Returns `sizeof(std::string*) * length_of_v`.
+     * @param memory The memory to delete the reference from.
+     * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t read_vector_str(const std::byte* memory, value& v)
+    static std::size_t destroy_str(std::byte* memory)
     {
-        for(auto& it: std::get<std::vector<std::string>>(v.v))
-        {
-            std::string* s = *reinterpret_cast<std::string* const*>(memory);
-            it = *s;
-            memory += sizeof(std::string*);
-        }
-
-        return sizeof(std::string*) * std::get<std::vector<std::string>>(v.v).size();
-    }
-
-    /**
-     * Writes string references into memory.
-     *
-     * @note The strings are owned by `v`.
-     *
-     * @param memory The memory to write into.
-     * @param v The string values to write.
-     * @returns Returns `sizeof(std::string*) * length_of_v`.
-     */
-    static std::size_t write_vector_str(std::byte* memory, const value& v)
-    {
-        for(auto& it: std::get<std::vector<std::string>>(v.v))
-        {
-            *reinterpret_cast<const std::string**>(memory) = &it;
-            memory += sizeof(std::string*);
-        }
-        return sizeof(std::string*) * std::get<std::vector<std::string>>(v.v).size();
-    }
-
-    /**
-     * Reads an address into a `value`.
-     *
-     * @param memory The memory to read from.
-     * @param v The value write the address to.
-     * @returns Returns `sizeof(void*)`.
-     */
-    static std::size_t read_addr(const std::byte* memory, value& v)
-    {
-        std::get<void*>(v.v) = *reinterpret_cast<void* const*>(memory);
-        return sizeof(void*);
+        *reinterpret_cast<const std::string**>(memory) = nullptr;
+        return sizeof(std::string*);
     }
 
     /**
@@ -236,6 +183,18 @@ class value
     {
         const void* addr = std::get<void*>(v.v);
         *reinterpret_cast<const void**>(memory) = addr;
+        return sizeof(void*);
+    }
+
+    /**
+     * Delete an address from memory.
+     *
+     * @param memory The memory to delete the address from.
+     * @returns Returns `sizeof(void*)`.
+     */
+    static std::size_t destroy_addr(std::byte* memory)
+    {
+        *reinterpret_cast<const void**>(memory) = nullptr;
         return sizeof(void*);
     }
 
@@ -254,10 +213,10 @@ public:
      *
      * @param i The integer.
      */
-    value(int i)
+    explicit value(int i)
     : v{i}
-    , reader{read_primitive_type<std::int32_t>}
-    , writer{write_primitive_type<std::int32_t>}
+    , write_function{write_primitive_type<std::int32_t>}
+    , destroy_function{destroy_primitive_type<std::int32_t>}
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
     {
@@ -268,10 +227,10 @@ public:
      *
      * @param f The floating point value.
      */
-    value(float f)
+    explicit value(float f)
     : v{f}
-    , reader{read_primitive_type<float>}
-    , writer{write_primitive_type<float>}
+    , write_function{write_primitive_type<float>}
+    , destroy_function{destroy_primitive_type<float>}
     , size{sizeof(float)}
     , type{"f32", false}
     {
@@ -285,10 +244,10 @@ public:
      *
      * @param s The string.
      */
-    value(std::string s)
+    explicit value(std::string s)
     : v{std::move(s)}
-    , reader{read_str}
-    , writer{write_str}
+    , write_function{write_str}
+    , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
@@ -299,10 +258,10 @@ public:
      *
      * @param s The string.
      */
-    value(const char* s)
+    explicit value(const char* s)
     : v{s}
-    , reader{read_str}
-    , writer{write_str}
+    , write_function{write_str}
+    , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
@@ -313,10 +272,10 @@ public:
      *
      * @param int_vec The integers.
      */
-    value(std::vector<std::int32_t> int_vec)
+    explicit value(std::vector<std::int32_t> int_vec)
     : v{std::move(int_vec)}
-    , reader{read_vector_type<std::int32_t>}
-    , writer{write_vector_type<std::int32_t>}
+    , write_function{write_vector_type<std::int32_t>}
+    , destroy_function{destroy_vector_type<std::int32_t>}
     , type{"i32", true}
     {
         size = sizeof(std::int32_t) * std::get<std::vector<std::int32_t>>(v).size();
@@ -327,10 +286,10 @@ public:
      *
      * @param float_vec The floating point values.
      */
-    value(std::vector<float> float_vec)
+    explicit value(std::vector<float> float_vec)
     : v{std::move(float_vec)}
-    , reader{read_vector_type<float>}
-    , writer{write_vector_type<float>}
+    , write_function{write_vector_type<float>}
+    , destroy_function{destroy_vector_type<float>}
     , type{"f32", true}
     {
         size = sizeof(float) * std::get<std::vector<float>>(v).size();
@@ -344,10 +303,10 @@ public:
      *
      * @param string_vec The strings.
      */
-    value(std::vector<std::string> string_vec)
+    explicit value(std::vector<std::string> string_vec)
     : v{std::move(string_vec)}
-    , reader{read_vector_str}
-    , writer{write_vector_str}
+    , write_function{write_vector_type<std::string>}
+    , destroy_function{destroy_vector_type<std::string>}
     , type{"str", true}
     {
         size = sizeof(std::string*) * std::get<std::vector<std::string>>(v).size();
@@ -360,22 +319,11 @@ public:
      */
     explicit value(void* addr)
     : v{addr}
-    , reader{read_addr}
-    , writer{write_addr}
+    , write_function{write_addr}
+    , destroy_function{destroy_addr}
     , size{sizeof(void*)}
     , type{"addr", false}
     {
-    }
-
-    /**
-     * Read the value from memory.
-     *
-     * @param memory The memory to read from.
-     * @returns Returns the value's size in bytes.
-     */
-    std::size_t read(std::byte* memory)
-    {
-        return reader(memory, *this);
     }
 
     /**
@@ -384,9 +332,20 @@ public:
      * @param memory The memory to write to.
      * @returns Returns the value's size in bytes.
      */
-    std::size_t write(std::byte* memory)
+    std::size_t write(std::byte* memory) const
     {
-        return writer(memory, *this);
+        return write_function(memory, *this);
+    }
+
+    /**
+     * Destroy a value.
+     *
+     * @param memory The memory to delete the value from.
+     * @returns Returns the value's size in bytes.
+     */
+    std::size_t destroy(std::byte* memory) const
+    {
+        return destroy_function(memory);
     }
 
     /** Get the value's size. */
@@ -678,13 +637,13 @@ public:
 template<>
 inline value operand_stack::pop_result<int>()
 {
-    return {pop_i32()};
+    return value{pop_i32()};
 }
 
 template<>
 inline value operand_stack::pop_result<float>()
 {
-    return {pop_f32()};
+    return value{pop_f32()};
 }
 
 template<>
