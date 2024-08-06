@@ -116,7 +116,7 @@ public:
     }
 
     /** Move constructor. */
-    fixed_vector(fixed_vector&& other)
+    fixed_vector(fixed_vector&& other) noexcept
     {
         other.swap(*this);
     }
@@ -136,7 +136,7 @@ public:
     }
 
     /** Move assignment. */
-    fixed_vector& operator=(fixed_vector&& other)
+    fixed_vector& operator=(fixed_vector&& other) noexcept
     {
         other.swap(*this);
         return *this;
@@ -149,19 +149,19 @@ public:
     }
 
     /** Swaps the contents. */
-    void swap(fixed_vector& other)
+    void swap(fixed_vector& other) noexcept
     {
         std::swap(data_ptr, other.data_ptr);
     }
 
     /** Returns an iterator to the first element of the vector. */
-    iterator begin()
+    iterator begin() noexcept
     {
         return data_ptr ? data_ptr->data : nullptr;
     }
 
     /** Returns an iterator to the first element of the vector. */
-    const_iterator begin() const
+    const_iterator begin() const noexcept
     {
         return data_ptr ? data_ptr->data : nullptr;
     }
@@ -173,13 +173,13 @@ public:
     }
 
     /** Returns an iterator to the end. */
-    iterator end()
+    iterator end() noexcept
     {
         return begin() + size();
     }
 
     /** Returns an iterator to the end. */
-    const_iterator end() const
+    const_iterator end() const noexcept
     {
         return begin() + size();
     }
@@ -187,11 +187,11 @@ public:
     /** Returns an iterator to the end. */
     const_iterator cend() const noexcept
     {
-        return begin() + size();
+        return cbegin() + size();
     }
 
     /** Checks whether the container is empty. */
-    bool empty() const
+    bool empty() const noexcept
     {
         return size() == 0;
     }
@@ -202,7 +202,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned size,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t size() const
+    std::size_t size() const noexcept
     {
         return data_ptr ? data_ptr->size : 0;
     }
@@ -213,7 +213,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned max size,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t max_size() const
+    std::size_t max_size() const noexcept
     {
         return size();
     }
@@ -224,7 +224,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned capacity,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t capacity() const
+    std::size_t capacity() const noexcept
     {
         return size();
     }
@@ -292,13 +292,13 @@ public:
     }
 
     /** Returns pointer to the underlying array serving as element storage. */
-    pointer data()
+    pointer data() noexcept
     {
         return data_ptr->data;
     }
 
     /** Returns pointer to the underlying array serving as element storage. */
-    const_pointer data() const
+    const_pointer data() const noexcept
     {
         return data_ptr->data;
     }
