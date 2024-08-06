@@ -1437,8 +1437,8 @@ class argument_scope
 
 public:
     /**
-     * Construct an argument scope. Validates the argument types and writes them
-     * into `locals`.
+     * Construct an argument scope. Validates the argument types and creates
+     * them in `locals`.
      *
      * @param args The arguments to verify and write.
      * @param arg_types The argument types to validate against.
@@ -1469,14 +1469,17 @@ public:
 
             if(offset + args[i].get_size() > locals.size())
             {
-                throw interpreter_error("Stack overflow during argument allocation.");
+                throw interpreter_error(fmt::format(
+                  "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
-            offset += args[i].write(&locals[offset]);
+            offset += args[i].create(&locals[offset]);
         }
     }
 
-    /** Destructor. */
+    /**
+     * Destructor. Destroys the created arguments.
+     */
     ~argument_scope()
     {
         std::size_t offset = 0;
@@ -1538,7 +1541,7 @@ value context::exec(const language_module& mod,
     else if(ret_opcode == opcode::sret)
     {
         std::string* s = frame.stack.pop_addr<std::string>();
-        ret = value{std::string{*s}};    // copy string
+        ret = value{*s};    // copy string
         gc.remove_temporary(s);
     }
     else if(ret_opcode == opcode::aret)

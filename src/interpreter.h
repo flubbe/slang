@@ -52,10 +52,10 @@ class value
                  std::vector<void*>>
       v;
 
-    /** Write this value to memory. */
-    std::function<std::size_t(std::byte*, const value&)> write_function;
+    /** Create this value in memory. */
+    std::function<std::size_t(std::byte*, const value&)> create_function;
 
-    /** Delete this value from memory. */
+    /** Destroy this value in memory. */
     std::function<std::size_t(std::byte*)> destroy_function;
 
     /** Size of the value, in bytes. */
@@ -65,14 +65,14 @@ class value
     std::pair<std::string, bool> type;
 
     /**
-     * Writes a primitive type value into memory.
+     * Create a primitive type value in memory.
      *
      * @param memory The memory to write into.
      * @param v The value to write.
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t write_primitive_type(std::byte* memory, const value& v)
+    static std::size_t create_primitive_type(std::byte* memory, const value& v)
     {
         static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
                       "Primitive type must be an integer or a floating point type.");
@@ -93,14 +93,14 @@ class value
     }
 
     /**
-     * Write a vector of a primitive type or a string into memory.
+     * Create a vector of a primitive type or a string in memory.
      *
      * @param memory The memory to write into.
      * @param v The value to write.
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t write_vector_type(std::byte* memory, const value& v)
+    static std::size_t create_vector_type(std::byte* memory, const value& v)
     {
         static_assert(std::is_integral_v<T>
                         || std::is_floating_point_v<T>
@@ -141,7 +141,7 @@ class value
     }
 
     /**
-     * Writes a string reference into memory.
+     * Create a string reference in memory.
      *
      * @note The string is owned by `v`.
      *
@@ -149,7 +149,7 @@ class value
      * @param v The string value to write.
      * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t write_str(std::byte* memory, const value& v)
+    static std::size_t create_str(std::byte* memory, const value& v)
     {
         const std::string* s = std::get_if<std::string>(&v.v);
         if(!s)
@@ -173,13 +173,13 @@ class value
     }
 
     /**
-     * Writes an address into memory.
+     * Create an address in memory.
      *
      * @param memory The memory to write into.
      * @param v The address to write.
      * @returns Returns `sizeof(void*)`.
      */
-    static std::size_t write_addr(std::byte* memory, const value& v)
+    static std::size_t create_addr(std::byte* memory, const value& v)
     {
         const void* addr = std::get<void*>(v.v);
         *reinterpret_cast<const void**>(memory) = addr;
@@ -215,7 +215,7 @@ public:
      */
     explicit value(int i)
     : v{i}
-    , write_function{write_primitive_type<std::int32_t>}
+    , create_function{create_primitive_type<std::int32_t>}
     , destroy_function{destroy_primitive_type<std::int32_t>}
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
@@ -229,7 +229,7 @@ public:
      */
     explicit value(float f)
     : v{f}
-    , write_function{write_primitive_type<float>}
+    , create_function{create_primitive_type<float>}
     , destroy_function{destroy_primitive_type<float>}
     , size{sizeof(float)}
     , type{"f32", false}
@@ -246,7 +246,7 @@ public:
      */
     explicit value(std::string s)
     : v{std::move(s)}
-    , write_function{write_str}
+    , create_function{create_str}
     , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
     , type{"str", false}
@@ -260,7 +260,7 @@ public:
      */
     explicit value(const char* s)
     : v{s}
-    , write_function{write_str}
+    , create_function{create_str}
     , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
     , type{"str", false}
@@ -274,7 +274,7 @@ public:
      */
     explicit value(std::vector<std::int32_t> int_vec)
     : v{std::move(int_vec)}
-    , write_function{write_vector_type<std::int32_t>}
+    , create_function{create_vector_type<std::int32_t>}
     , destroy_function{destroy_vector_type<std::int32_t>}
     , type{"i32", true}
     {
@@ -288,7 +288,7 @@ public:
      */
     explicit value(std::vector<float> float_vec)
     : v{std::move(float_vec)}
-    , write_function{write_vector_type<float>}
+    , create_function{create_vector_type<float>}
     , destroy_function{destroy_vector_type<float>}
     , type{"f32", true}
     {
@@ -305,7 +305,7 @@ public:
      */
     explicit value(std::vector<std::string> string_vec)
     : v{std::move(string_vec)}
-    , write_function{write_vector_type<std::string>}
+    , create_function{create_vector_type<std::string>}
     , destroy_function{destroy_vector_type<std::string>}
     , type{"str", true}
     {
@@ -319,7 +319,7 @@ public:
      */
     explicit value(void* addr)
     : v{addr}
-    , write_function{write_addr}
+    , create_function{create_addr}
     , destroy_function{destroy_addr}
     , size{sizeof(void*)}
     , type{"addr", false}
@@ -327,14 +327,14 @@ public:
     }
 
     /**
-     * Write the value into memory.
+     * Create the value in memory.
      *
      * @param memory The memory to write to.
      * @returns Returns the value's size in bytes.
      */
-    std::size_t write(std::byte* memory) const
+    std::size_t create(std::byte* memory) const
     {
-        return write_function(memory, *this);
+        return create_function(memory, *this);
     }
 
     /**
