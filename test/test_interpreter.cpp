@@ -14,12 +14,14 @@
 #include "module.h"
 
 #include "archives/file.h"
+#include "runtime/runtime.h"
 #include "interpreter.h"
 
 namespace
 {
 
 namespace si = slang::interpreter;
+namespace rt = slang::runtime;
 
 TEST(interpreter, module_and_functions)
 {
@@ -682,81 +684,12 @@ TEST(interpreter, array_copy)
     ASSERT_NO_THROW(ctx.register_native_function("slang", "array_copy",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
-                                                     void* to = stack.pop_addr<void*>();
-                                                     void* from = stack.pop_addr<void*>();
-
-                                                     if(to == nullptr)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("array_copy: 'to' is null.");
-                                                     }
-                                                     if(from == nullptr)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("array_copy: 'from' is null.");
-                                                     }
-
-                                                     auto& gc = ctx.get_gc();
-
-                                                     auto to_type = gc.get_object_type(to);
-                                                     auto from_type = gc.get_object_type(from);
-
-                                                     if(to_type != from_type)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("array_copy: type mismatch.");
-                                                     }
-
-                                                     // copy array with bounds check.
-                                                     if(to_type == slang::gc::gc_object_type::array_i32 || to_type == slang::gc::gc_object_type::array_f32)
-                                                     {
-                                                         auto from_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(from);
-                                                         auto to_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(to);
-                                                         for(std::size_t i = 0; i < from_array->size(); ++i)
-                                                         {
-                                                             to_array->at(i) = from_array->at(i);
-                                                         }
-                                                     }
-                                                     else if(to_type == slang::gc::gc_object_type::array_str
-                                                             || to_type == slang::gc::gc_object_type::array_aref)
-                                                     {
-                                                         auto from_array = reinterpret_cast<si::fixed_vector<void*>*>(from);
-                                                         auto to_array = reinterpret_cast<si::fixed_vector<void*>*>(to);
-                                                         for(std::size_t i = 0; i < from_array->size(); ++i)
-                                                         {
-                                                             to_array->at(i) = from_array->at(i);
-                                                         }
-                                                     }
-                                                     else
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("array_copy: unsupported array type.");
-                                                     }
-
-                                                     gc.remove_temporary(from);
-                                                     gc.remove_temporary(to);
+                                                     rt::array_copy(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
-                                                     void* s1 = stack.pop_addr<void*>();
-                                                     void* s2 = stack.pop_addr<void*>();
-
-                                                     if(s1 == nullptr || s2 == nullptr)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_equals: arguments cannot be null.");
-                                                     }
-
-                                                     auto& gc = ctx.get_gc();
-
-                                                     auto s1_type = gc.get_object_type(s1);
-                                                     auto s2_type = gc.get_object_type(s2);
-
-                                                     if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_equals: arguments are not strings.");
-                                                     }
-
-                                                     stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
-
-                                                     gc.remove_temporary(s1);
-                                                     gc.remove_temporary(s2);
+                                                     rt::string_equals(ctx, stack);
                                                  }));
 
     ASSERT_NO_THROW(ctx.load_module("array_copy", mod));
@@ -798,57 +731,12 @@ TEST(interpreter, string_operations)
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
-                                                     void* s1 = stack.pop_addr<void*>();
-                                                     void* s2 = stack.pop_addr<void*>();
-
-                                                     if(s1 == nullptr || s1 == nullptr)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_equals: arguments cannot be null.");
-                                                     }
-
-                                                     auto& gc = ctx.get_gc();
-
-                                                     auto s1_type = gc.get_object_type(s1);
-                                                     auto s2_type = gc.get_object_type(s2);
-
-                                                     if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_equals: arguments are not strings.");
-                                                     }
-
-                                                     stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
-
-                                                     gc.remove_temporary(s1);
-                                                     gc.remove_temporary(s2);
+                                                     rt::string_equals(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_concat",
                                                  [&ctx](slang::interpreter::operand_stack& stack)
                                                  {
-                                                     std::string* s2 = stack.pop_addr<std::string>();
-                                                     std::string* s1 = stack.pop_addr<std::string>();
-
-                                                     if(s1 == nullptr)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_concat: arguments cannot be null.");
-                                                     }
-
-                                                     auto& gc = ctx.get_gc();
-
-                                                     auto s1_type = gc.get_object_type(s1);
-                                                     auto s2_type = gc.get_object_type(s2);
-
-                                                     if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
-                                                     {
-                                                         throw slang::interpreter::interpreter_error("string_concat: arguments are not strings.");
-                                                     }
-
-                                                     std::string* str = gc.gc_new<std::string>(slang::gc::gc_object::of_temporary);
-                                                     *str = *s1 + *s2;
-
-                                                     gc.remove_temporary(s1);
-                                                     gc.remove_temporary(s2);
-
-                                                     stack.push_addr<std::string>(str);
+                                                     rt::string_concat(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.load_module("string_operations", mod));
 

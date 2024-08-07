@@ -165,6 +165,8 @@ target_compile_options(test_filemanager PRIVATE
 add_executable(test_interpreter
     test_interpreter.cpp
     ../src/archives/file.cpp
+    ../src/runtime/arrays.cpp
+    ../src/runtime/strings.cpp
     ../src/filemanager.cpp
     ../src/gc.cpp
     ../src/interpreter.cpp

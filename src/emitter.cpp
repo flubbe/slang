@@ -22,16 +22,6 @@ namespace cg = slang::codegen;
 namespace slang
 {
 
-/** Info about a variable mapping. */
-struct variable_map_info
-{
-    /** The offset of the variable. */
-    std::size_t offset;
-
-    /** The size of the variable. */
-    std::size_t size;
-};
-
 /** Helper function for opcode emission. */
 inline void emit(archive& ar, opcode op)
 {
