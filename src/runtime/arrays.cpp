@@ -40,32 +40,44 @@ void array_copy(si::context& ctx, si::operand_stack& stack)
 
     if(to_type != from_type)
     {
-        throw slang::interpreter::interpreter_error("array_copy: type mismatch.");
+        throw si::interpreter_error("array_copy: type mismatch.");
     }
 
     // copy array with bounds check.
-    if(to_type == slang::gc::gc_object_type::array_i32 || to_type == slang::gc::gc_object_type::array_f32)
+    if(to_type == gc::gc_object_type::array_i32 || to_type == gc::gc_object_type::array_f32)
     {
         auto from_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(from);
         auto to_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(to);
+
+        if(to_array->size() < from_array->size())
+        {
+            throw si::interpreter_error("array_copy: destination array is too small.");
+        }
+
         for(std::size_t i = 0; i < from_array->size(); ++i)
         {
-            to_array->at(i) = from_array->at(i);
+            (*to_array)[i] = (*from_array)[i];
         }
     }
-    else if(to_type == slang::gc::gc_object_type::array_str
-            || to_type == slang::gc::gc_object_type::array_aref)
+    else if(to_type == gc::gc_object_type::array_str
+            || to_type == gc::gc_object_type::array_aref)
     {
         auto from_array = reinterpret_cast<si::fixed_vector<void*>*>(from);
         auto to_array = reinterpret_cast<si::fixed_vector<void*>*>(to);
+
+        if(to_array->size() < from_array->size())
+        {
+            throw si::interpreter_error("array_copy: destination array is too small.");
+        }
+
         for(std::size_t i = 0; i < from_array->size(); ++i)
         {
-            to_array->at(i) = from_array->at(i);
+            (*to_array)[i] = (*from_array)[i];
         }
     }
     else
     {
-        throw slang::interpreter::interpreter_error("array_copy: unsupported array type.");
+        throw si::interpreter_error("array_copy: unsupported type.");
     }
 }
 

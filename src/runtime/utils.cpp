@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * runtime string support.
+ * runtime utilities.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2024
