@@ -52,7 +52,7 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
 
     if(s1 == nullptr)
     {
-        throw slang::interpreter::interpreter_error("string_concat: arguments cannot be null.");
+        throw si::interpreter_error("string_concat: arguments cannot be null.");
     }
 
     auto& gc = ctx.get_gc();
@@ -60,12 +60,12 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
     auto s1_type = gc.get_object_type(s1);
     auto s2_type = gc.get_object_type(s2);
 
-    if(s1_type != slang::gc::gc_object_type::str || s2_type != slang::gc::gc_object_type::str)
+    if(s1_type != gc::gc_object_type::str || s2_type != gc::gc_object_type::str)
     {
-        throw slang::interpreter::interpreter_error("string_concat: arguments are not strings.");
+        throw si::interpreter_error("string_concat: arguments are not strings.");
     }
 
-    std::string* str = gc.gc_new<std::string>(slang::gc::gc_object::of_temporary);
+    std::string* str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
     *str = *s1 + *s2;
 
     stack.push_addr<std::string>(str);
