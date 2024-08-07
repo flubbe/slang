@@ -18,8 +18,11 @@ namespace slang::runtime
 
 void string_equals(si::context& ctx, si::operand_stack& stack)
 {
-    void* s1 = stack.pop_addr<void*>();
-    void* s2 = stack.pop_addr<void*>();
+    gc_object<std::string> s1_container = gc_pop(ctx, stack);
+    gc_object<std::string> s2_container = gc_pop(ctx, stack);
+
+    std::string* s1 = s1_container.get();
+    std::string* s2 = s1_container.get();
 
     if(s1 == nullptr || s2 == nullptr)
     {
@@ -37,15 +40,15 @@ void string_equals(si::context& ctx, si::operand_stack& stack)
     }
 
     stack.push_i32(*reinterpret_cast<std::string*>(s1) == *reinterpret_cast<std::string*>(s2));
-
-    gc.remove_temporary(s1);
-    gc.remove_temporary(s2);
 }
 
 void string_concat(si::context& ctx, si::operand_stack& stack)
 {
-    std::string* s2 = stack.pop_addr<std::string>();
-    std::string* s1 = stack.pop_addr<std::string>();
+    gc_object<std::string> s2_container = gc_pop(ctx, stack);
+    gc_object<std::string> s1_container = gc_pop(ctx, stack);
+
+    std::string* s1 = s1_container.get();
+    std::string* s2 = s2_container.get();
 
     if(s1 == nullptr)
     {
@@ -64,9 +67,6 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
 
     std::string* str = gc.gc_new<std::string>(slang::gc::gc_object::of_temporary);
     *str = *s1 + *s2;
-
-    gc.remove_temporary(s1);
-    gc.remove_temporary(s2);
 
     stack.push_addr<std::string>(str);
 }

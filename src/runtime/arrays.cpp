@@ -18,8 +18,11 @@ namespace slang::runtime
 
 void array_copy(si::context& ctx, si::operand_stack& stack)
 {
-    void* to = stack.pop_addr<void*>();
-    void* from = stack.pop_addr<void*>();
+    gc_object<void> to_container = gc_pop(ctx, stack);
+    gc_object<void> from_container = gc_pop(ctx, stack);
+
+    void* to = to_container.get();
+    void* from = from_container.get();
 
     if(to == nullptr)
     {
@@ -64,9 +67,6 @@ void array_copy(si::context& ctx, si::operand_stack& stack)
     {
         throw slang::interpreter::interpreter_error("array_copy: unsupported array type.");
     }
-
-    gc.remove_temporary(from);
-    gc.remove_temporary(to);
 }
 
 }    // namespace slang::runtime

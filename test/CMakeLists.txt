@@ -167,6 +167,7 @@ add_executable(test_interpreter
     ../src/archives/file.cpp
     ../src/runtime/arrays.cpp
     ../src/runtime/strings.cpp
+    ../src/runtime/utils.cpp
     ../src/filemanager.cpp
     ../src/gc.cpp
     ../src/interpreter.cpp
