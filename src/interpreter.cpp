@@ -1181,6 +1181,7 @@ opcode context::exec(const language_module& mod,
 
                 auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
+                frame.stack.discard(details.args_size);
 
                 // invoke function
                 exec(mod, details.offset, details.size, details.locals, callee_frame);
@@ -1192,13 +1193,10 @@ opcode context::exec(const language_module& mod,
 
                     if(arg.array || arg.reference)
                     {
-                        void* addr = *reinterpret_cast<void**>(&frame.locals[arg.offset]);
+                        void* addr = *reinterpret_cast<void**>(&callee_frame.locals[arg.offset]);
                         gc.remove_temporary(addr);
                     }
                 }
-
-                // clean up stack
-                frame.stack.discard(details.args_size);
 
                 // store return value
                 if(callee_frame.stack.size() != details.return_size)
