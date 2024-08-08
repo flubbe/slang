@@ -463,21 +463,16 @@ void instruction_emitter::run()
 
     for(auto& f: ctx.funcs)
     {
-        if(f->is_native())
-        {
-            // verify that no entry point for a native function exists.
-            if(func_details.find(f->get_name()) != func_details.end())
-            {
-                throw emitter_error(fmt::format("Function '{}' already has an entry point.", f->get_name()));
-            }
-
-            continue;
-        }
-
-        // verify that an entry point for the function exists.
+        // verify that no entry point for the function exists.
         if(func_details.find(f->get_name()) != func_details.end())
         {
             throw emitter_error(fmt::format("Function '{}' already has an entry point.", f->get_name()));
+        }
+
+        // skip native functions.
+        if(f->is_native())
+        {
+            continue;
         }
 
         /*
@@ -507,7 +502,7 @@ void instruction_emitter::run()
             std::size_t index = s->get_index(*it->get_name());
             if(unset_indices.find(index) == unset_indices.end())
             {
-                throw emitter_error(fmt::format("Tried to local '{}' with index '{}' multiple times.", *name, index));
+                throw emitter_error(fmt::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
             }
             unset_indices.erase(index);
 
@@ -525,7 +520,7 @@ void instruction_emitter::run()
             std::size_t index = s->get_index(*it->get_name());
             if(unset_indices.find(index) == unset_indices.end())
             {
-                throw emitter_error(fmt::format("Tried to local '{}' with index '{}' multiple times.", *name, index));
+                throw emitter_error(fmt::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
             }
             unset_indices.erase(index);
 
@@ -547,13 +542,13 @@ void instruction_emitter::run()
                 if(instr->get_name() == "jnz")
                 {
                     auto& args = instr->get_args();
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args[0].get())->get_label());
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args[1].get())->get_label());
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(1).get())->get_label());
                 }
                 else if(instr->get_name() == "jmp")
                 {
                     auto& args = instr->get_args();
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args[0].get())->get_label());
+                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
                 }
             }
         }
