@@ -29,6 +29,8 @@ class context;
 namespace slang
 {
 
+namespace si = slang::interpreter;
+
 /** A module error. */
 class module_error : public std::runtime_error
 {
@@ -257,7 +259,7 @@ struct native_function_details
     std::string library_name;
 
     /** The resolved function. Not serialized. */
-    std::function<void(slang::interpreter::operand_stack&)> func;
+    std::function<void(si::operand_stack&)> func;
 
     /** Default constructors. */
     native_function_details() = default;
@@ -742,7 +744,7 @@ public:
     }
 
     friend archive& operator&(archive& ar, language_module& mod);
-    friend class slang::interpreter::context;
+    friend class si::context;
 };
 
 /**

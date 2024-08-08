@@ -11,8 +11,6 @@
 #include "interpreter.h"
 #include "runtime/runtime.h"
 
-namespace gc = slang::gc;
-
 namespace slang::runtime
 {
 
@@ -26,11 +24,11 @@ void array_copy(si::context& ctx, si::operand_stack& stack)
 
     if(to == nullptr)
     {
-        throw slang::interpreter::interpreter_error("array_copy: 'to' is null.");
+        throw si::interpreter_error("array_copy: 'to' is null.");
     }
     if(from == nullptr)
     {
-        throw slang::interpreter::interpreter_error("array_copy: 'from' is null.");
+        throw si::interpreter_error("array_copy: 'from' is null.");
     }
 
     auto& gc = ctx.get_gc();

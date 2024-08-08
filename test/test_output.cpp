@@ -22,6 +22,7 @@
 
 #include "archives/file.h"
 
+namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
 namespace rs = slang::resolve;
@@ -57,7 +58,7 @@ TEST(output, native_binding)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -222,7 +223,7 @@ TEST(output, emitter)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -270,7 +271,7 @@ TEST(output, hello_world)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -311,7 +312,7 @@ TEST(output, hello_world)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -372,7 +373,7 @@ TEST(output, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -410,7 +411,7 @@ TEST(output, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -454,7 +455,7 @@ TEST(output, string_operations)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -492,7 +493,7 @@ TEST(output, string_operations)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -555,7 +556,7 @@ TEST(output, prefix_postfix)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -623,7 +624,7 @@ TEST(output, control_flow)
 
     EXPECT_TRUE(lexer.eof());
 
-    slang::ast::block* ast = parser.get_ast();
+    ast::block* ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     slang::file_manager mgr;
@@ -671,7 +672,7 @@ TEST(output, loops)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -728,7 +729,7 @@ TEST(output, loops)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -770,7 +771,7 @@ TEST(output, infinite_recursion)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -818,7 +819,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -894,7 +895,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -932,7 +933,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -963,7 +964,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -994,7 +995,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1030,7 +1031,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1093,7 +1094,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1148,7 +1149,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1203,7 +1204,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1245,7 +1246,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1286,7 +1287,7 @@ TEST(output, missing_return)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -1325,7 +1326,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;

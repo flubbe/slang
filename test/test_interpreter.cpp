@@ -39,10 +39,10 @@ TEST(interpreter, module_and_functions)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
     ASSERT_NO_THROW(ctx.load_module("test_output", mod));
 
-    slang::interpreter::value res;
+    si::value res;
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
@@ -146,19 +146,19 @@ TEST(interpreter, hello_world)
 
     slang::file_manager file_mgr;
     file_mgr.add_search_path("src/lang");
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
@@ -172,11 +172,11 @@ TEST(interpreter, hello_world)
 
     // re-defining functions should fail.
     EXPECT_THROW(ctx.register_native_function("slang", "println",    // collides with a native function name
-                                              []([[maybe_unused]] slang::interpreter::operand_stack& stack) {}),
-                 slang::interpreter::interpreter_error);
+                                              []([[maybe_unused]] si::operand_stack& stack) {}),
+                 si::interpreter_error);
     EXPECT_THROW(ctx.register_native_function("hello_world", "main",    // collides with a scripted function name
-                                              []([[maybe_unused]] slang::interpreter::operand_stack& stack) {}),
-                 slang::interpreter::interpreter_error);
+                                              []([[maybe_unused]] si::operand_stack& stack) {}),
+                 si::interpreter_error);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
@@ -199,12 +199,12 @@ TEST(interpreter, operators)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("operators", mod));
     ASSERT_NO_THROW(ctx.invoke("operators", "main", {}));
 
-    slang::interpreter::value res;
+    si::value res;
     ASSERT_NO_THROW(res = ctx.invoke("operators", "and", {si::value{27}, si::value{3}}));
     EXPECT_EQ(*res.get<int>(), 3);
     ASSERT_NO_THROW(res = ctx.invoke("operators", "land", {si::value{0}, si::value{0}}));
@@ -256,19 +256,19 @@ TEST(interpreter, control_flow)
 
     slang::file_manager file_mgr;
     file_mgr.add_search_path("src/lang");
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
@@ -277,7 +277,7 @@ TEST(interpreter, control_flow)
 
     ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {si::value{2}}));
     EXPECT_EQ(*res.get<int>(), 1);
@@ -333,19 +333,19 @@ TEST(interpreter, loops)
 
     slang::file_manager file_mgr;
     file_mgr.add_search_path("src/lang");
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
@@ -354,7 +354,7 @@ TEST(interpreter, loops)
 
     ASSERT_NO_THROW(ctx.load_module("loops", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("loops", "main", {}));
     EXPECT_EQ(print_buf.size(), 10);
@@ -385,19 +385,19 @@ TEST(interpreter, loop_break_continue)
 
     slang::file_manager file_mgr;
     file_mgr.add_search_path("src/lang");
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
 
     ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](slang::interpreter::operand_stack& stack)
+                                 [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      std::string* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
@@ -406,7 +406,7 @@ TEST(interpreter, loop_break_continue)
 
     ASSERT_NO_THROW(ctx.load_module("loops_bc", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("loops_bc", "main_b", {}));
     ASSERT_EQ(print_buf.size(), 1);
@@ -438,13 +438,13 @@ TEST(interpreter, infinite_recursion)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("inf_recursion", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
-    ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), si::interpreter_error);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
@@ -467,11 +467,11 @@ TEST(interpreter, arrays)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("arrays", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "f", {}));
     EXPECT_EQ(*res.get<int>(), 2);
@@ -504,11 +504,11 @@ TEST(interpreter, return_arrays)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_array", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "return_array", {}));
 
@@ -541,11 +541,11 @@ TEST(interpreter, pass_array)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_array", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "pass_array", {}));
     EXPECT_EQ(*res.get<int>(), 3);
@@ -574,11 +574,11 @@ TEST(interpreter, invalid_index)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_array", mod));
 
-    ASSERT_THROW(ctx.invoke("return_array", "invalid_index", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(ctx.invoke("return_array", "invalid_index", {}), si::interpreter_error);
 }
 
 TEST(interpreter, return_str_array)
@@ -597,11 +597,11 @@ TEST(interpreter, return_str_array)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_array", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
 
@@ -647,11 +647,11 @@ TEST(interpreter, array_length)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("array_length", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("array_length", "len", {}));
     EXPECT_EQ(*res.get<int>(), 2);
@@ -660,7 +660,7 @@ TEST(interpreter, array_length)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_THROW(ctx.invoke("array_length", "len2", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(ctx.invoke("array_length", "len2", {}), si::interpreter_error);
 }
 
 TEST(interpreter, array_copy)
@@ -679,22 +679,22 @@ TEST(interpreter, array_copy)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.register_native_function("slang", "array_copy",
-                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 [&ctx](si::operand_stack& stack)
                                                  {
                                                      rt::array_copy(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
-                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 [&ctx](si::operand_stack& stack)
                                                  {
                                                      rt::string_equals(ctx, stack);
                                                  }));
 
     ASSERT_NO_THROW(ctx.load_module("array_copy", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("array_copy", "test_copy", {}));
     ASSERT_EQ(*res.get<int>(), 1);
@@ -706,8 +706,8 @@ TEST(interpreter, array_copy)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_none", {}), slang::interpreter::interpreter_error);
-    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_type", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_none", {}), si::interpreter_error);
+    ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_type", {}), si::interpreter_error);
 }
 
 TEST(interpreter, string_operations)
@@ -726,21 +726,21 @@ TEST(interpreter, string_operations)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
-                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 [&ctx](si::operand_stack& stack)
                                                  {
                                                      rt::string_equals(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.register_native_function("slang", "string_concat",
-                                                 [&ctx](slang::interpreter::operand_stack& stack)
+                                                 [&ctx](si::operand_stack& stack)
                                                  {
                                                      rt::string_concat(ctx, stack);
                                                  }));
     ASSERT_NO_THROW(ctx.load_module("string_operations", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("string_operations", "main", {}));
     ASSERT_EQ(*res.get<int>(), 10);
@@ -766,11 +766,11 @@ TEST(interpreter, operator_new)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_array", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "new_array", {}));
 
@@ -778,7 +778,7 @@ TEST(interpreter, operator_new)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_THROW(ctx.invoke("return_array", "new_array_invalid_size", {}), slang::interpreter::interpreter_error);
+    ASSERT_THROW(ctx.invoke("return_array", "new_array_invalid_size", {}), si::interpreter_error);
 }
 
 TEST(interpreter, prefix_postfix)
@@ -797,11 +797,11 @@ TEST(interpreter, prefix_postfix)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("prefix_postfix", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "prefix_add_i32", {si::value{1}}));
     ASSERT_EQ(*res.get<int>(), 2);
@@ -841,11 +841,11 @@ TEST(interpreter, return_discard)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_discard", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard", "f", {}));
 
@@ -870,11 +870,11 @@ TEST(interpreter, return_discard_array)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_discard_array", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_array", "f", {}));
 
@@ -899,11 +899,11 @@ TEST(interpreter, return_discard_strings)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("return_discard_strings", mod));
 
-    slang::interpreter::value res;
+    si::value res;
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_strings", "f", {}));
 
@@ -953,7 +953,7 @@ TEST(interpreter, structs)
     }
 
     slang::file_manager file_mgr;
-    slang::interpreter::context ctx{file_mgr};
+    si::context ctx{file_mgr};
 
     ASSERT_NO_THROW(ctx.load_module("structs", mod));
 

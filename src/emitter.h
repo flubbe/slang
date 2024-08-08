@@ -27,6 +27,8 @@ class function;
 namespace slang
 {
 
+namespace cg = slang::codegen;
+
 /** An error during instruction emission. */
 class emitter_error : public std::runtime_error
 {
@@ -45,7 +47,7 @@ public:
 class instruction_emitter
 {
     /** The associated codegen context. */
-    slang::codegen::context& ctx;
+    cg::context& ctx;
 
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
@@ -63,7 +65,7 @@ protected:
      * @param func The current function.
      * @param instr The instruction to emit.
      */
-    void emit_instruction(const std::unique_ptr<slang::codegen::function>& func, const std::unique_ptr<slang::codegen::instruction>& instr);
+    void emit_instruction(const std::unique_ptr<cg::function>& func, const std::unique_ptr<cg::instruction>& instr);
 
 public:
     /** Delete constructors. */
@@ -80,7 +82,7 @@ public:
      *
      * @param ctx A codegen context.
      */
-    instruction_emitter(slang::codegen::context& ctx)
+    instruction_emitter(cg::context& ctx)
     : ctx{ctx}
     , instruction_buffer{false, slang::endian::little}
     {

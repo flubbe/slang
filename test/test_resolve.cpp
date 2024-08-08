@@ -16,6 +16,7 @@
 #include "resolve.h"
 #include "typing.h"
 
+namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
 namespace rs = slang::resolve;
@@ -37,7 +38,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -69,7 +70,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
@@ -101,7 +102,7 @@ TEST(resolve, std)
 
         EXPECT_TRUE(lexer.eof());
 
-        slang::ast::block* ast = parser.get_ast();
+        ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;

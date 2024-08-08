@@ -411,7 +411,7 @@ void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx
     expr->collect_names(ctx, type_ctx);
 }
 
-std::optional<ty::type> directive_expression::type_check(slang::typing::context& ctx)
+std::optional<ty::type> directive_expression::type_check(ty::context& ctx)
 {
     return expr->type_check(ctx);
 }
@@ -650,7 +650,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
     return v;
 }
 
-std::optional<ty::type> array_initializer_expression::type_check(slang::typing::context& ctx)
+std::optional<ty::type> array_initializer_expression::type_check(ty::context& ctx)
 {
     std::optional<ty::type> t;
     for(auto& it: exprs)
@@ -1134,7 +1134,7 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
     throw std::runtime_error(fmt::format("{}: Code generation for unary operator '{}' not implemented.", slang::to_string(loc), op.s));
 }
 
-std::optional<ty::type> unary_ast::type_check(slang::typing::context& ctx)
+std::optional<ty::type> unary_ast::type_check(ty::context& ctx)
 {
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
       {"++", {"i32", "f32"}},
@@ -1174,7 +1174,7 @@ std::string unary_ast::to_string() const
  * new_expression.
  */
 
-std::unique_ptr<slang::codegen::value> new_expression::generate_code(slang::codegen::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -1206,7 +1206,7 @@ std::unique_ptr<slang::codegen::value> new_expression::generate_code(slang::code
       std::make_optional<std::size_t>(0));
 }
 
-std::optional<ty::type> new_expression::type_check(slang::typing::context& ctx)
+std::optional<ty::type> new_expression::type_check(ty::context& ctx)
 {
     auto expr_type = expr->type_check(ctx);
     if(expr_type == std::nullopt)
@@ -1240,7 +1240,7 @@ std::string new_expression::to_string() const
  * postfix_expression.
  */
 
-std::unique_ptr<cg::value> postfix_expression::generate_code(slang::codegen::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -1291,7 +1291,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(slang::codegen::con
     return v;
 }
 
-std::optional<ty::type> postfix_expression::type_check(slang::typing::context& ctx)
+std::optional<ty::type> postfix_expression::type_check(ty::context& ctx)
 {
     auto identifier_type = identifier->type_check(ctx);
     if(identifier_type == std::nullopt)

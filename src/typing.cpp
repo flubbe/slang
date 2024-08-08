@@ -14,6 +14,8 @@
 #include "typing.h"
 #include "utils.h"
 
+namespace ty = slang::typing;
+
 namespace slang::typing
 {
 
@@ -174,12 +176,12 @@ std::string function_signature::to_string() const
 {
     auto transform = [](const type& t)
     {
-        return slang::typing::to_string(t);
+        return ty::to_string(t);
     };
     return fmt::format("fn {}({}) -> {}",
                        name.s,
                        slang::utils::join(arg_types, {transform}, ", "),
-                       slang::typing::to_string(ret_type));
+                       ty::to_string(ret_type));
 }
 
 /*
@@ -201,7 +203,7 @@ std::string scope::to_string() const
     std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
     for(auto& [name, type]: variables)
     {
-        repr += fmt::format("[v]  name: {}, type: {}\n", name, slang::typing::to_string(type.var_type));
+        repr += fmt::format("[v]  name: {}, type: {}\n", name, ty::to_string(type.var_type));
     }
     for(auto& [name, sig]: functions)
     {
@@ -212,7 +214,7 @@ std::string scope::to_string() const
         repr += fmt::format("[s]  name: {}\n    members:\n", name);
         for(auto& [n, t]: s.members)
         {
-            repr += fmt::format("     - name: {}, type: {}\n", n.s, slang::typing::to_string(t));
+            repr += fmt::format("     - name: {}, type: {}\n", n.s, ty::to_string(t));
         }
     }
 
@@ -231,7 +233,7 @@ void context::add_base_type(std::string name)
     auto it = std::find_if(type_map.begin(), type_map.end(),
                            [&name](const std::pair<type, std::uint64_t>& t) -> bool
                            {
-                               return name == slang::typing::to_string(t.first);
+                               return name == ty::to_string(t.first);
                            });
     if(it != type_map.end())
     {
@@ -460,10 +462,10 @@ type context::get_type(const std::string& name, bool array)
                                if(array && t.first.is_array())
                                {
                                    const type* element_type = t.first.get_element_type();
-                                   return name == slang::typing::to_string(*element_type);
+                                   return name == ty::to_string(*element_type);
                                }
 
-                               return name == slang::typing::to_string(t.first);
+                               return name == ty::to_string(t.first);
                            });
     if(it != type_map.end())
     {
@@ -481,7 +483,7 @@ type context::get_type(const std::string& name, bool array)
                                        return false;
                                    }
 
-                                   return name == slang::typing::to_string(t.first);
+                                   return name == ty::to_string(t.first);
                                });
         if(it != type_map.end())
         {
@@ -507,10 +509,10 @@ type context::get_unresolved_type(token name, type_class cls)
                                if(cls == type_class::tc_array && t.is_array())
                                {
                                    const type* element_type = t.get_element_type();
-                                   return element_type != nullptr && (name.s == slang::typing::to_string(*element_type));
+                                   return element_type != nullptr && (name.s == ty::to_string(*element_type));
                                }
 
-                               return name.s == slang::typing::to_string(t);
+                               return name.s == ty::to_string(t);
                            });
     if(it != unresolved_types.end())
     {
@@ -632,9 +634,9 @@ void context::resolve_types()
 type context::get_function_type(const token& name, const std::vector<type>& arg_types, const type& ret_type)
 {
     auto transform = [](const type& t) -> std::string
-    { return slang::typing::to_string(t); };
+    { return ty::to_string(t); };
     std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
-                                          slang::typing::to_string(ret_type));
+                                          ty::to_string(ret_type));
 
     return get_unresolved_type({type_string, name.location}, type_class::tc_function);
 }

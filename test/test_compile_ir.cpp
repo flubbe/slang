@@ -17,6 +17,7 @@
 #include "codegen.h"
 #include "typing.h"
 
+namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
 
@@ -35,7 +36,7 @@ TEST(compile_ir, empty)
 
     EXPECT_TRUE(lexer.eof());
 
-    const slang::ast::block* ast = parser.get_ast();
+    const ast::block* ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -59,7 +60,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -81,7 +82,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -104,7 +105,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -127,7 +128,7 @@ TEST(compile_ir, empty_function)
 
     EXPECT_TRUE(lexer.eof());
 
-    const slang::ast::block* ast = parser.get_ast();
+    const ast::block* ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -157,7 +158,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -185,7 +186,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -213,7 +214,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -245,7 +246,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -273,7 +274,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -305,7 +306,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -337,7 +338,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -368,7 +369,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -404,7 +405,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -444,7 +445,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -487,7 +488,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -576,7 +577,7 @@ TEST(compile_ir, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -610,7 +611,7 @@ TEST(compile_ir, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -650,7 +651,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -686,7 +687,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -722,7 +723,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -758,7 +759,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -798,7 +799,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -838,7 +839,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -881,7 +882,7 @@ TEST(compile_ir, postfix_operators)
 
     EXPECT_TRUE(lexer.eof());
 
-    const slang::ast::block* ast = parser.get_ast();
+    const ast::block* ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -921,7 +922,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -959,7 +960,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1004,7 +1005,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1047,7 +1048,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1074,7 +1075,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1113,7 +1114,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1159,7 +1160,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1201,7 +1202,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1235,7 +1236,7 @@ TEST(compile_ir, if_statement)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1281,7 +1282,7 @@ TEST(compile_ir, break_fail)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1308,7 +1309,7 @@ TEST(compile_ir, continue_fail)
 
         EXPECT_TRUE(lexer.eof());
 
-        const slang::ast::block* ast = parser.get_ast();
+        const ast::block* ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;

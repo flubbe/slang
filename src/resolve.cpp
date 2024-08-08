@@ -17,6 +17,7 @@
 #include "typing.h"
 #include "utils.h"
 
+namespace cg = slang::codegen;
 namespace ty = slang::typing;
 
 namespace slang::resolve
@@ -35,7 +36,7 @@ resolve_error::resolve_error(const token_location& loc, const std::string& messa
  * resolver context.
  */
 
-void context::resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx)
+void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
     const std::vector<std::vector<token>>& imports = type_ctx.get_imports();
 
@@ -66,19 +67,19 @@ void context::resolve_imports(slang::codegen::context& ctx, slang::typing::conte
             {
                 auto& desc = std::get<function_descriptor>(exp.desc);
 
-                std::vector<slang::codegen::value> prototype_arg_types;
+                std::vector<cg::value> prototype_arg_types;
                 std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
                                [](const auto& arg)
                                {
                                    if(ty::is_builtin_type(std::get<0>(arg)))
                                    {
-                                       return slang::codegen::value{std::get<0>(arg), std::nullopt, std::nullopt, std::get<1>(arg)};
+                                       return cg::value{std::get<0>(arg), std::nullopt, std::nullopt, std::get<1>(arg)};
                                    }
 
-                                   return slang::codegen::value{"aggregate", std::get<0>(arg), std::nullopt, std::get<1>(arg)};
+                                   return cg::value{"aggregate", std::get<0>(arg), std::nullopt, std::get<1>(arg)};
                                });
 
-                slang::codegen::value return_type;
+                cg::value return_type;
                 if(ty::is_builtin_type(std::get<0>(desc.signature.return_type)))
                 {
                     return_type = {std::get<0>(desc.signature.return_type), std::nullopt, std::nullopt, std::get<1>(desc.signature.return_type)};
