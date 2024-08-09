@@ -197,12 +197,12 @@ void context::decode_locals(function_descriptor& desc)
     {
         auto& v = details.locals[i];
 
-        v.offset = details.locals_size;
+        v.offset = details.args_size;
         v.size = get_type_size(v.type, v.array);
 
-        details.locals_size += v.size;
         details.args_size += v.size;
     }
+    details.locals_size = details.args_size;
 
     // locals.
     for(std::size_t i = arg_count; i < details.locals.size(); ++i)

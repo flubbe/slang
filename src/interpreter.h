@@ -74,7 +74,8 @@ class value
     template<typename T>
     static std::size_t create_primitive_type(std::byte* memory, const value& v)
     {
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>,
+        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
                       "Primitive type must be an integer or a floating point type.");
         *reinterpret_cast<T*>(memory) = std::get<T>(v.v);
         return sizeof(T);
@@ -102,9 +103,9 @@ class value
     template<typename T>
     static std::size_t create_vector_type(std::byte* memory, const value& v)
     {
-        static_assert(std::is_integral_v<T>
-                        || std::is_floating_point_v<T>
-                        || std::is_same_v<std::remove_cv_t<T>, std::string>,
+        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                        || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
         auto& input_vec = std::get<std::vector<T>>(v.v);
@@ -128,9 +129,9 @@ class value
     template<typename T>
     static std::size_t destroy_vector_type(std::byte* memory)
     {
-        static_assert(std::is_integral_v<T>
-                        || std::is_floating_point_v<T>
-                        || std::is_same_v<std::remove_cv_t<T>, std::string>,
+        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                        || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
         auto vec = *reinterpret_cast<fixed_vector<T>**>(memory);
