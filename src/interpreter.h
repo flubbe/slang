@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <any>
 #include <functional>
 #include <stdexcept>
 #include <unordered_map>
@@ -42,15 +43,7 @@ public:
 class value
 {
     /** The stored value. */
-    std::variant<int,
-                 float,
-                 std::string,
-                 void*,
-                 std::vector<int>,
-                 std::vector<float>,
-                 std::vector<std::string>,
-                 std::vector<void*>>
-      v;
+    std::any data;
 
     /** Create this value in memory. */
     std::function<std::size_t(std::byte*, const value&)> create_function;
@@ -77,7 +70,7 @@ class value
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
                       "Primitive type must be an integer or a floating point type.");
-        *reinterpret_cast<T*>(memory) = std::get<T>(v.v);
+        *reinterpret_cast<T*>(memory) = std::any_cast<T>(v.data);
         return sizeof(T);
     }
 
@@ -108,12 +101,12 @@ class value
                         || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
-        auto& input_vec = std::get<std::vector<T>>(v.v);
-        auto vec = new fixed_vector<T>(input_vec.size());
+        auto input_vec = std::any_cast<std::vector<T>>(&v.data);
+        auto vec = new fixed_vector<T>(input_vec->size());
 
-        for(std::size_t i = 0; i < input_vec.size(); ++i)
+        for(std::size_t i = 0; i < input_vec->size(); ++i)
         {
-            (*vec)[i] = input_vec[i];
+            (*vec)[i] = (*input_vec)[i];
         }
 
         *reinterpret_cast<fixed_vector<T>**>(memory) = vec;
@@ -152,10 +145,10 @@ class value
      */
     static std::size_t create_str(std::byte* memory, const value& v)
     {
-        const std::string* s = std::get_if<std::string>(&v.v);
+        const std::string* s = std::any_cast<std::string>(&v.data);
         if(!s)
         {
-            throw std::bad_variant_access();
+            throw std::bad_any_cast();
         }
         *reinterpret_cast<const std::string**>(memory) = s;
         return sizeof(std::string*);
@@ -182,7 +175,7 @@ class value
      */
     static std::size_t create_addr(std::byte* memory, const value& v)
     {
-        const void* addr = std::get<void*>(v.v);
+        const void* addr = std::any_cast<void*>(v.data);
         *reinterpret_cast<const void**>(memory) = addr;
         return sizeof(void*);
     }
@@ -215,7 +208,7 @@ public:
      * @param i The integer.
      */
     explicit value(int i)
-    : v{i}
+    : data{i}
     , create_function{create_primitive_type<std::int32_t>}
     , destroy_function{destroy_primitive_type<std::int32_t>}
     , size{sizeof(std::int32_t)}
@@ -229,7 +222,7 @@ public:
      * @param f The floating point value.
      */
     explicit value(float f)
-    : v{f}
+    : data{f}
     , create_function{create_primitive_type<float>}
     , destroy_function{destroy_primitive_type<float>}
     , size{sizeof(float)}
@@ -246,7 +239,7 @@ public:
      * @param s The string.
      */
     explicit value(std::string s)
-    : v{std::move(s)}
+    : data{std::move(s)}
     , create_function{create_str}
     , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
@@ -260,7 +253,7 @@ public:
      * @param s The string.
      */
     explicit value(const char* s)
-    : v{s}
+    : data{std::string{s}}
     , create_function{create_str}
     , destroy_function{destroy_str}
     , size{sizeof(std::string*)}
@@ -274,12 +267,12 @@ public:
      * @param int_vec The integers.
      */
     explicit value(std::vector<std::int32_t> int_vec)
-    : v{std::move(int_vec)}
+    : data{std::move(int_vec)}
     , create_function{create_vector_type<std::int32_t>}
     , destroy_function{destroy_vector_type<std::int32_t>}
     , type{"i32", true}
     {
-        size = sizeof(std::int32_t) * std::get<std::vector<std::int32_t>>(v).size();
+        size = sizeof(std::int32_t) * std::any_cast<std::vector<std::int32_t>>(data).size();
     }
 
     /**
@@ -288,12 +281,12 @@ public:
      * @param float_vec The floating point values.
      */
     explicit value(std::vector<float> float_vec)
-    : v{std::move(float_vec)}
+    : data{std::move(float_vec)}
     , create_function{create_vector_type<float>}
     , destroy_function{destroy_vector_type<float>}
     , type{"f32", true}
     {
-        size = sizeof(float) * std::get<std::vector<float>>(v).size();
+        size = sizeof(float) * std::any_cast<std::vector<float>>(data).size();
     }
 
     /**
@@ -305,12 +298,12 @@ public:
      * @param string_vec The strings.
      */
     explicit value(std::vector<std::string> string_vec)
-    : v{std::move(string_vec)}
+    : data{std::move(string_vec)}
     , create_function{create_vector_type<std::string>}
     , destroy_function{destroy_vector_type<std::string>}
     , type{"str", true}
     {
-        size = sizeof(std::string*) * std::get<std::vector<std::string>>(v).size();
+        size = sizeof(std::string*) * std::any_cast<std::vector<std::string>>(data).size();
     }
 
     /**
@@ -319,7 +312,7 @@ public:
      * @param addr The address.
      */
     explicit value(void* addr)
-    : v{addr}
+    : data{addr}
     , create_function{create_addr}
     , destroy_function{destroy_addr}
     , size{sizeof(void*)}
@@ -363,33 +356,9 @@ public:
 
     /** Access the underlying value. */
     template<typename T>
-    T* get()
-    {
-        T* v_ptr = std::get_if<T>(&v);
-        if(!v_ptr)
-        {
-            throw std::bad_variant_access();
-        }
-        return v_ptr;
-    }
-
-    /** Access the underlying value. */
-    template<typename T>
     const T* get() const
     {
-        T* v_ptr = std::get_if<T>(&v);
-        if(!v_ptr)
-        {
-            throw std::bad_variant_access();
-        }
-        return v_ptr;
-    }
-
-    /** Check if the value holds a given type. */
-    template<typename T>
-    bool holds_type() const
-    {
-        return std::holds_alternative<T>(v);
+        return std::any_cast<T>(&data);
     }
 };
 
