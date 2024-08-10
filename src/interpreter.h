@@ -46,7 +46,7 @@ class value
     std::any data;
 
     /** Create this value in memory. */
-    std::function<std::size_t(std::byte*, const value&)> create_function;
+    std::function<std::size_t(std::byte*)> create_function;
 
     /** Destroy this value in memory. */
     std::function<std::size_t(std::byte*)> destroy_function;
@@ -61,16 +61,15 @@ class value
      * Create a primitive type value in memory.
      *
      * @param memory The memory to write into.
-     * @param v The value to write.
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t create_primitive_type(std::byte* memory, const value& v)
+    std::size_t create_primitive_type(std::byte* memory) const
     {
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
                       "Primitive type must be an integer or a floating point type.");
-        *reinterpret_cast<T*>(memory) = std::any_cast<T>(v.data);
+        *reinterpret_cast<T*>(memory) = std::any_cast<T>(data);
         return sizeof(T);
     }
 
@@ -81,7 +80,7 @@ class value
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t destroy_primitive_type([[maybe_unused]] std::byte* memory)
+    std::size_t destroy_primitive_type([[maybe_unused]] std::byte* memory) const
     {
         return sizeof(T);
     }
@@ -90,18 +89,17 @@ class value
      * Create a vector of a primitive type or a string in memory.
      *
      * @param memory The memory to write into.
-     * @param v The value to write.
      * @returns Returns `sizeof(T)`.
      */
     template<typename T>
-    static std::size_t create_vector_type(std::byte* memory, const value& v)
+    std::size_t create_vector_type(std::byte* memory) const
     {
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
-        auto input_vec = std::any_cast<std::vector<T>>(&v.data);
+        auto input_vec = std::any_cast<std::vector<T>>(&data);
         auto vec = new fixed_vector<T>(input_vec->size());
 
         for(std::size_t i = 0; i < input_vec->size(); ++i)
@@ -120,7 +118,7 @@ class value
      * @return Returns the pointer size `sizeof(void*)`.
      */
     template<typename T>
-    static std::size_t destroy_vector_type(std::byte* memory)
+    std::size_t destroy_vector_type(std::byte* memory) const
     {
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
@@ -140,12 +138,11 @@ class value
      * @note The string is owned by `v`.
      *
      * @param memory The memory to write into.
-     * @param v The string value to write.
      * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t create_str(std::byte* memory, const value& v)
+    std::size_t create_str(std::byte* memory) const
     {
-        const std::string* s = std::any_cast<std::string>(&v.data);
+        const std::string* s = std::any_cast<std::string>(&data);
         if(!s)
         {
             throw std::bad_any_cast();
@@ -160,7 +157,7 @@ class value
      * @param memory The memory to delete the reference from.
      * @returns Returns `sizeof(std::string*)`.
      */
-    static std::size_t destroy_str(std::byte* memory)
+    std::size_t destroy_str(std::byte* memory) const
     {
         *reinterpret_cast<const std::string**>(memory) = nullptr;
         return sizeof(std::string*);
@@ -170,12 +167,11 @@ class value
      * Create an address in memory.
      *
      * @param memory The memory to write into.
-     * @param v The address to write.
      * @returns Returns `sizeof(void*)`.
      */
-    static std::size_t create_addr(std::byte* memory, const value& v)
+    std::size_t create_addr(std::byte* memory) const
     {
-        const void* addr = std::any_cast<void*>(v.data);
+        const void* addr = std::any_cast<void*>(data);
         *reinterpret_cast<const void**>(memory) = addr;
         return sizeof(void*);
     }
@@ -186,7 +182,7 @@ class value
      * @param memory The memory to delete the address from.
      * @returns Returns `sizeof(void*)`.
      */
-    static std::size_t destroy_addr(std::byte* memory)
+    std::size_t destroy_addr(std::byte* memory) const
     {
         *reinterpret_cast<const void**>(memory) = nullptr;
         return sizeof(void*);
@@ -209,8 +205,8 @@ public:
      */
     explicit value(int i)
     : data{i}
-    , create_function{create_primitive_type<std::int32_t>}
-    , destroy_function{destroy_primitive_type<std::int32_t>}
+    , create_function{std::bind(&value::create_primitive_type<std::int32_t>, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_primitive_type<std::int32_t>, this, std::placeholders::_1)}
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
     {
@@ -223,8 +219,8 @@ public:
      */
     explicit value(float f)
     : data{f}
-    , create_function{create_primitive_type<float>}
-    , destroy_function{destroy_primitive_type<float>}
+    , create_function{std::bind(&value::create_primitive_type<float>, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_primitive_type<float>, this, std::placeholders::_1)}
     , size{sizeof(float)}
     , type{"f32", false}
     {
@@ -240,8 +236,8 @@ public:
      */
     explicit value(std::string s)
     : data{std::move(s)}
-    , create_function{create_str}
-    , destroy_function{destroy_str}
+    , create_function{std::bind(&value::create_str, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_str, this, std::placeholders::_1)}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
@@ -254,8 +250,8 @@ public:
      */
     explicit value(const char* s)
     : data{std::string{s}}
-    , create_function{create_str}
-    , destroy_function{destroy_str}
+    , create_function{std::bind(&value::create_str, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_str, this, std::placeholders::_1)}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
@@ -268,8 +264,8 @@ public:
      */
     explicit value(std::vector<std::int32_t> int_vec)
     : data{std::move(int_vec)}
-    , create_function{create_vector_type<std::int32_t>}
-    , destroy_function{destroy_vector_type<std::int32_t>}
+    , create_function{std::bind(&value::create_vector_type<std::int32_t>, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_vector_type<std::int32_t>, this, std::placeholders::_1)}
     , type{"i32", true}
     {
         size = sizeof(std::int32_t) * std::any_cast<std::vector<std::int32_t>>(data).size();
@@ -282,8 +278,8 @@ public:
      */
     explicit value(std::vector<float> float_vec)
     : data{std::move(float_vec)}
-    , create_function{create_vector_type<float>}
-    , destroy_function{destroy_vector_type<float>}
+    , create_function{std::bind(&value::create_vector_type<float>, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_vector_type<float>, this, std::placeholders::_1)}
     , type{"f32", true}
     {
         size = sizeof(float) * std::any_cast<std::vector<float>>(data).size();
@@ -299,8 +295,8 @@ public:
      */
     explicit value(std::vector<std::string> string_vec)
     : data{std::move(string_vec)}
-    , create_function{create_vector_type<std::string>}
-    , destroy_function{destroy_vector_type<std::string>}
+    , create_function{std::bind(&value::create_vector_type<std::string>, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_vector_type<std::string>, this, std::placeholders::_1)}
     , type{"str", true}
     {
         size = sizeof(std::string*) * std::any_cast<std::vector<std::string>>(data).size();
@@ -313,8 +309,8 @@ public:
      */
     explicit value(void* addr)
     : data{addr}
-    , create_function{create_addr}
-    , destroy_function{destroy_addr}
+    , create_function{std::bind(&value::create_addr, this, std::placeholders::_1)}
+    , destroy_function{std::bind(&value::destroy_addr, this, std::placeholders::_1)}
     , size{sizeof(void*)}
     , type{"addr", false}
     {
@@ -328,7 +324,7 @@ public:
      */
     std::size_t create(std::byte* memory) const
     {
-        return create_function(memory, *this);
+        return create_function(memory);
     }
 
     /**
