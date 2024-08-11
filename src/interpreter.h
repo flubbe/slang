@@ -39,7 +39,13 @@ public:
     }
 };
 
-/** Result and argument type. */
+/**
+ * Result and argument type.
+ *
+ * @note A `value` is implemented using `std::any`. This means methods accessing
+ * the data potentially throw a `std::bad_any_cast` (that is, all methods except
+ * `value::get_size` and `value::get_type`).
+ */
 class value
 {
     /** The stored value. */
@@ -68,17 +74,9 @@ class value
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
                         || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
                       "Primitive type must be an integer or a floating point type.");
-        *reinterpret_cast<T*>(memory) = std::any_cast<T>(data);
-    }
 
-    /**
-     * Delete a primitive type value from memory. No-op.
-     *
-     * @param memory The memory to delete the value from. Unused.
-     */
-    template<typename T>
-    void destroy_primitive_type([[maybe_unused]] std::byte* memory) const
-    {
+        // we can just copy the value.
+        *reinterpret_cast<T*>(memory) = std::any_cast<T>(data);
     }
 
     /**
@@ -94,6 +92,7 @@ class value
                         || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
+        // we need to convert `std::vector` to a `fixed_vector<T>*`.
         auto input_vec = std::any_cast<std::vector<T>>(&data);
         auto vec = new fixed_vector<T>(input_vec->size());
 
@@ -102,7 +101,7 @@ class value
             (*vec)[i] = (*input_vec)[i];
         }
 
-        *reinterpret_cast<fixed_vector<T>**>(memory) = vec;
+        *reinterpret_cast<const fixed_vector<T>**>(memory) = vec;
     }
 
     /**
@@ -121,7 +120,7 @@ class value
         auto vec = *reinterpret_cast<fixed_vector<T>**>(memory);
         delete vec;
 
-        *reinterpret_cast<fixed_vector<T>**>(memory) = nullptr;
+        *reinterpret_cast<const fixed_vector<T>**>(memory) = nullptr;
     }
 
     /**
@@ -133,6 +132,7 @@ class value
      */
     void create_str(std::byte* memory) const
     {
+        // we can re-use the string memory managed by this class.
         const std::string* s = std::any_cast<std::string>(&data);
         if(!s)
         {
@@ -158,8 +158,8 @@ class value
      */
     void create_addr(std::byte* memory) const
     {
-        const void* addr = std::any_cast<void*>(data);
-        *reinterpret_cast<const void**>(memory) = addr;
+        // we can just copy the value.
+        *reinterpret_cast<const void**>(memory) = std::any_cast<void*>(data);
     }
 
     /**
@@ -191,7 +191,7 @@ public:
     explicit value(int i)
     : data{i}
     , create_function{std::bind(&value::create_primitive_type<std::int32_t>, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_primitive_type<std::int32_t>, this, std::placeholders::_1)}
+    , destroy_function{[](std::byte*) {}} /* no-op */
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
     {
@@ -205,7 +205,7 @@ public:
     explicit value(float f)
     : data{f}
     , create_function{std::bind(&value::create_primitive_type<float>, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_primitive_type<float>, this, std::placeholders::_1)}
+    , destroy_function{[](std::byte*) {}} /* no-op */
     , size{sizeof(float)}
     , type{"f32", false}
     {
@@ -310,7 +310,7 @@ public:
     std::size_t create(std::byte* memory) const
     {
         create_function(memory);
-        return get_size();
+        return size;
     }
 
     /**
@@ -322,7 +322,7 @@ public:
     std::size_t destroy(std::byte* memory) const
     {
         destroy_function(memory);
-        return get_size();
+        return size;
     }
 
     /** Get the value's size. */
@@ -337,7 +337,7 @@ public:
         return type;
     }
 
-    /** Access the underlying value. */
+    /** Access the data. */
     template<typename T>
     const T* get() const
     {

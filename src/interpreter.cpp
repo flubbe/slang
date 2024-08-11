@@ -46,7 +46,7 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  */
 static std::size_t get_type_size(const std::string& type_name, bool reference)
 {
-    if(reference)
+    if(reference || type_name == "addr" || type_name == "@array")
     {
         return sizeof(void*);
     }
@@ -66,15 +66,6 @@ static std::size_t get_type_size(const std::string& type_name, bool reference)
     else if(type_name == "str")
     {
         return sizeof(std::string*);
-    }
-    else if(type_name == "addr")
-    {
-        return sizeof(void*);
-    }
-    else if(type_name == "@array")
-    {
-        // FIXME This is an address/object.
-        return sizeof(void*);
     }
 
     throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
@@ -108,13 +99,8 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
     {
         return std::make_pair(opcode::sret, length);
     }
-    else if(name == "addr")
+    else if(name == "addr" || name == "@array")
     {
-        return std::make_pair(opcode::aret, length);
-    }
-    else if(name == "@array")
-    {
-        // FIXME This is an address/object.
         return std::make_pair(opcode::aret, length);
     }
 
@@ -659,16 +645,30 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
 }
 
 /** Handle local variable construction and destruction. */
-class local_construction_scope
+class locals_scope
 {
+    /** The associated interpreter context. */
     context& ctx;
+
+    /** Locals. */
     const std::vector<variable>& locals;
+
+    /** The function's stack frame. */
     stack_frame& frame;
 
-    bool run_destructor{true};
+    /** Whether to destruct the locals. */
+    bool needs_destruct{true};
 
 public:
-    local_construction_scope(context& ctx, const std::vector<variable>& locals, stack_frame& frame)
+    /**
+     * Create a scope for creating/destroying variables. If needed, adds the locals as
+     * roots to the garbage collector.
+     *
+     * @param ctx The interpreter context.
+     * @param locals The locals.
+     * @param frame The stack frame.
+     */
+    locals_scope(context& ctx, const std::vector<variable>& locals, stack_frame& frame)
     : ctx{ctx}
     , locals{locals}
     , frame{frame}
@@ -686,21 +686,27 @@ public:
         }
     }
 
-    ~local_construction_scope()
+    /** Destructor. Calls `destruct`, if needed. */
+    ~locals_scope()
     {
-        if(run_destructor)
+        if(needs_destruct)
         {
             destruct();
         }
     }
 
+    /**
+     * Remove locals from the garbage collector, if needed.
+     *
+     * @throws Throws `interpreter_error` if the caller tried to destruct the locals more than once.
+     */
     void destruct()
     {
-        if(!run_destructor)
+        if(!needs_destruct)
         {
             throw interpreter_error("Local destructors called multiple times.");
         }
-        run_destructor = false;
+        needs_destruct = false;
 
         for(auto& local: locals)
         {
@@ -757,7 +763,7 @@ opcode context::exec(const language_module& mod,
         throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
     }
 
-    local_construction_scope lcs{*this, locals, frame};
+    locals_scope ls{*this, locals, frame};
 
     const std::size_t function_end = offset + size;
     while(offset < function_end)
@@ -768,7 +774,8 @@ opcode context::exec(const language_module& mod,
         // return.
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
         {
-            lcs.destruct();
+            // destruct the locals here for the GC to clean them up.
+            ls.destruct();
 
             // run garbage collector.
             gc.run();
@@ -1425,7 +1432,7 @@ opcode context::exec(const language_module& mod,
 }
 
 /** Function argument writing and destruction. */
-class argument_scope
+class arguments_scope
 {
     /** The arguments to manage. */
     const std::vector<value>& args;
@@ -1442,9 +1449,9 @@ public:
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
-    argument_scope(const std::vector<value>& args,
-                   const std::vector<std::pair<std::string, bool>>& arg_types,
-                   std::vector<std::byte>& locals)
+    arguments_scope(const std::vector<value>& args,
+                    const std::vector<std::pair<std::string, bool>>& arg_types,
+                    std::vector<std::byte>& locals)
     : args{args}
     , locals{locals}
     {
@@ -1475,14 +1482,20 @@ public:
         }
     }
 
-    /**
-     * Destructor. Destroys the created arguments.
-     */
-    ~argument_scope()
+    /** Destructor. Destroys the created arguments. */
+    ~arguments_scope()
     {
         std::size_t offset = 0;
         for(std::size_t i = 0; i < args.size(); ++i)
         {
+            if(offset + args[i].get_size() > locals.size())
+            {
+                DEBUG_LOG("Stack overflow during argument destruction while processing argument {}.", i);
+
+                // FIXME This is an error, but destructors cannot throw.
+                return;
+            }
+
             offset += args[i].destroy(&locals[offset]);
         }
     }
@@ -1503,7 +1516,7 @@ value context::exec(const language_module& mod,
         throw interpreter_error(fmt::format("Arguments for function do not match: Expected {}, got {}.", arg_types.size(), args.size()));
     }
 
-    argument_scope arg_scope{args, arg_types, frame.locals};
+    arguments_scope arg_scope{args, arg_types, frame.locals};
 
     /*
      * Execute the function.
@@ -1546,6 +1559,7 @@ value context::exec(const language_module& mod,
     {
         void* addr = frame.stack.pop_addr<void>();
         ret = value{addr};
+        // FIXME The caller is responsible for calling `gc.remove_temporary(addr)`.
     }
     else
     {

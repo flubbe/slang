@@ -83,7 +83,8 @@ enum class associativity
 };
 
 /**
- * The parser class. Uses a lexer to turn tokens into an abstract syntax tree.
+ * This class implements a recursive descent LL(1) parser.
+ * It uses a lexer to turn tokens into an abstract syntax tree.
  */
 class parser
 {
