@@ -203,7 +203,7 @@ std::optional<token> lexer::next()
                 }
             }
 
-            // clear token here, since the outer loop condition might not be satsified anymore.
+            // clear token here, since the outer loop condition might not be satisfied anymore.
             current_token.clear();
             continue;
         }
@@ -220,7 +220,7 @@ std::optional<token> lexer::next()
                 }
             }
 
-            // clear token here, since the outer loop condition might not be satsified anymore.
+            // clear token here, since the outer loop condition might not be satisfied anymore.
             current_token.clear();
             continue;
         }

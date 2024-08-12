@@ -82,11 +82,19 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 cg::value return_type;
                 if(ty::is_builtin_type(std::get<0>(desc.signature.return_type)))
                 {
-                    return_type = {std::get<0>(desc.signature.return_type), std::nullopt, std::nullopt, std::get<1>(desc.signature.return_type)};
+                    return_type = {std::get<0>(desc.signature.return_type),
+                                   std::nullopt,
+                                   std::nullopt,
+                                   desc.signature.return_type.second ? std::make_optional(std::get<1>(desc.signature.return_type))
+                                                                     : std::nullopt};
                 }
                 else
                 {
-                    return_type = {"aggregate", std::get<0>(desc.signature.return_type), std::nullopt, std::get<1>(desc.signature.return_type)};
+                    return_type = {"aggregate",
+                                   std::get<0>(desc.signature.return_type),
+                                   std::nullopt,
+                                   desc.signature.return_type.second ? std::make_optional(std::get<1>(desc.signature.return_type))
+                                                                     : std::nullopt};
                 }
 
                 ctx.add_prototype(exp.name, return_type, prototype_arg_types, import_path);

@@ -373,6 +373,11 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
             const function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
 
+            if(mod_ptr == nullptr)
+            {
+                throw interpreter_error(fmt::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
+            }
+
             return get_stack_delta(desc.signature);
         }
         else
@@ -512,7 +517,11 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
         language_module import_mod;
         (*ar) & import_mod;
 
-        load_module(import_name, import_mod);
+        if(module_map.find(import_name) == module_map.end())
+        {
+            load_module(import_name, import_mod);
+            header.imports[it.package_index].export_reference = module_map[import_name].get();
+        }
 
         // find the imported symbol.
         module_header& import_header = module_map[import_name]->header;
@@ -1191,7 +1200,7 @@ opcode context::exec(const language_module& mod,
                 frame.stack.discard(details.args_size);
 
                 // invoke function
-                exec(mod, details.offset, details.size, details.locals, callee_frame);
+                exec(**callee_mod, details.offset, details.size, details.locals, callee_frame);
 
                 // clean up arguments in GC
                 for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
@@ -1612,6 +1621,8 @@ void context::register_native_function(const std::string& mod_name, std::string 
 
 void context::load_module(const std::string& name, const language_module& mod)
 {
+    DEBUG_LOG("load_module: {}", name);
+
     if(module_map.find(name) != module_map.end())
     {
         throw interpreter_error(fmt::format("Module '{}' already loaded.", name));

@@ -962,4 +962,36 @@ TEST(interpreter, structs)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
+TEST(interpreter, multiple_modules)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("mod3.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'mod3.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
+    si::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("mod3", mod));
+
+    si::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("mod3", "f", {si::value{1.0f}}));
+    EXPECT_EQ(*res.get<int>(), 4);
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+}
+
 }    // namespace

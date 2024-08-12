@@ -1349,4 +1349,54 @@ TEST(output, structs)
         EXPECT_NO_THROW(write_ar & mod);
     }
 }
+
+TEST(output, multiple_modules)
+{
+    {
+        const std::pair<std::string, std::string> module_inputs[] = {
+          {"mod1",
+           "fn f() -> i32 { return 2; }"},
+          {"mod2",
+           "import mod1;\n"
+           "fn f(x: i32) -> f32 { return (mod1::f() * x) as f32; }\n"},
+          {"mod3",
+           "import mod2;\n"
+           "fn f(x: f32) -> i32 { return (mod2::f(x as i32) * 2.0) as i32; }\n"}};
+
+        for(auto& s: module_inputs)
+        {
+            slang::lexer lexer;
+            slang::parser parser;
+
+            lexer.set_input(s.second);
+            parser.parse(lexer);
+
+            EXPECT_TRUE(lexer.eof());
+
+            ast::block* ast = parser.get_ast();
+            ASSERT_NE(ast, nullptr);
+
+            slang::file_manager mgr;
+            mgr.add_search_path(".");
+
+            ty::context type_ctx;
+            rs::context resolve_ctx{mgr};
+            cg::context codegen_ctx;
+            slang::instruction_emitter emitter{codegen_ctx};
+
+            ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+            ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+            ASSERT_NO_THROW(type_ctx.resolve_types());
+            ASSERT_NO_THROW(ast->type_check(type_ctx));
+            ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+            ASSERT_NO_THROW(emitter.run());
+
+            slang::language_module mod = emitter.to_module();
+
+            slang::file_write_archive write_ar(fmt::format("{}.cmod", s.first));
+            EXPECT_NO_THROW(write_ar & mod);
+        }
+    }
+}
+
 }    // namespace

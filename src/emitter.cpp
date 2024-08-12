@@ -253,24 +253,24 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         cg::function_argument* arg = static_cast<cg::function_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
 
-        // resolve inside this module.
-        auto it = std::find_if(ctx.funcs.begin(), ctx.funcs.end(),
-                               [&v](const std::unique_ptr<cg::function>& f) -> bool
-                               {
-                                   return f->get_name() == *v->get_name();
-                               });
-        if(it != ctx.funcs.end())
+        auto& import_path = arg->get_import_path();
+        if(!import_path.has_value())
         {
+            // resolve module-local functions.
+            auto it = std::find_if(ctx.funcs.begin(), ctx.funcs.end(),
+                                   [&v](const std::unique_ptr<cg::function>& f) -> bool
+                                   {
+                                       return f->get_name() == *v->get_name();
+                                   });
+            if(it == ctx.funcs.end())
+            {
+                throw emitter_error(fmt::format("Could not resolve module-local function '{}'.", *v->get_name()));
+            }
+
             vle_int index = it - ctx.funcs.begin();
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;
-        }
-
-        auto& import_path = arg->get_import_path();
-        if(!import_path.has_value())
-        {
-            throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
         }
 
         // resolve imports.
