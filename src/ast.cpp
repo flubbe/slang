@@ -825,6 +825,7 @@ std::optional<ty::type> struct_named_initializer_expression::type_check(ty::cont
         throw ty::type_error(name.location, fmt::format("Struct '{}' has {} members, but {} are initialized.", name.s, struct_def->members.size(), member_names.size()));
     }
 
+    std::vector<std::string> initialized_member_names;
     for(std::size_t i = 0; i < member_names.size(); ++i)
     {
         const auto& member_name = member_names[i];
@@ -832,6 +833,18 @@ std::optional<ty::type> struct_named_initializer_expression::type_check(ty::cont
 
         // FIXME This cast needs to be checked / validated.
         auto member_name_expr = static_cast<ast::variable_reference_expression*>(member_name.get());
+
+        if(std::find_if(initialized_member_names.begin(), initialized_member_names.end(),
+                        [&member_name_expr](auto& name) -> bool
+                        { return name == member_name_expr->get_name().s; })
+           != initialized_member_names.end())
+        {
+            throw ty::type_error(name.location,
+                                 fmt::format("Multiple initializations of struct member '{}::{}'.",
+                                             name.s, member_name_expr->get_name().s));
+        }
+        initialized_member_names.push_back(member_name_expr->get_name().s);
+
         if(member_name_expr->is_member_access())    // this is an array access.
         {
             throw ty::type_error(name.location, fmt::format("Cannot access array elements in struct initializer."));
