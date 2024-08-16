@@ -589,53 +589,10 @@ TEST(codegen, aggregate_data)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
 
-        auto fn_f = ctx.create_function("f", {"i32"}, std::move(args));
-        ASSERT_NE(fn_f, nullptr);
-        EXPECT_EQ(fn_f->get_name(), "f");
-
-        fn_f->create_local(std::make_unique<cg::value>("aggregate", "S", "s"));
-
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
-        fn_f->append_basic_block(block);
-        ASSERT_NE(block, nullptr);
-        EXPECT_EQ(block->get_inserting_context(), nullptr);
-        EXPECT_EQ(block->get_label(), "entry");
-
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
-
-        ctx.generate_const({"i32"}, 1);
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", std::nullopt, "s"}));
-        ctx.generate_store_element({0});
-
-        ctx.generate_const({"i32"}, 2);
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", std::nullopt, "s"}));
-        ctx.generate_store_element({1});
-
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", std::nullopt, "s"}));
-        ctx.generate_load_element({0});
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
-
-        EXPECT_TRUE(block->is_valid());
-
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %a,\n"
                   " i32 %b,\n"
-                  "}\n"
-                  "define i32 @f(i32 %a) {\n"
-                  "local S %s\n"
-                  "entry:\n"
-                  " const i32 1\n"
-                  " load addr %s\n"
-                  " store_element i32 0\n"
-                  " const i32 2\n"
-                  " load addr %s\n"
-                  " store_element i32 1\n"
-                  " load addr %s\n"
-                  " load_element i32 0\n"
-                  " ret i32\n"
                   "}");
     }
 }

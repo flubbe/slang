@@ -709,6 +709,63 @@ public:
 };
 
 /**
+ * Field access argument.
+ */
+class field_access_argument : public argument
+{
+    /** The field's name. */
+    std::string field_name;
+
+    /** The field's member. */
+    value member;
+
+public:
+    /** Default constructors. */
+    field_access_argument() = default;
+    field_access_argument(const field_access_argument&) = delete;
+    field_access_argument(field_access_argument&&) = default;
+
+    /** Default assignments. */
+    field_access_argument& operator=(const field_access_argument&) = delete;
+    field_access_argument& operator=(field_access_argument&&) = default;
+
+    /**
+     * Construct a field access.
+     *
+     * @param field_name Name of the field.
+     * @param member_type The field's accessed member.
+     */
+    field_access_argument(std::string field_name, value member)
+    : argument()
+    , field_name{std::move(field_name)}
+    , member{std::move(member)}
+    {
+    }
+
+    /** Return the field name. */
+    std::string get_field_name() const
+    {
+        return field_name;
+    }
+
+    /** Return the field's member. */
+    value get_member() const
+    {
+        return member;
+    }
+
+    std::string to_string() const override
+    {
+        return fmt::format("%{}, {}", field_name, member.to_string());
+    }
+
+    const value* get_value() const override
+    {
+        return nullptr;
+    }
+};
+
+/**
  * Instruction base class.
  */
 class instruction
@@ -1044,6 +1101,9 @@ public:
     {
         return locals;
     }
+
+    /** Get the type in this scope. */
+    const std::vector<std::pair<std::string, value>>& get_type(const std::string& name) const;
 
     /** Get the outer scope. */
     scope* get_outer()
@@ -1742,6 +1802,12 @@ public:
         return global_scope.get();
     }
 
+    /** Get the global scope. */
+    scope* get_global_scope()
+    {
+        return global_scope.get();
+    }
+
     /** Return whether a given scope is the global scope. */
     bool is_global_scope(const scope* s) const
     {
@@ -1984,14 +2050,11 @@ public:
     void generate_load(std::unique_ptr<argument> arg, bool load_element = false);
 
     /**
-     * Load an element from a structure onto the stack.
+     * Create a new instance of a type.
      *
-     * @note indices is a vector of `int`'s, since currently constant instruction arguments
-     *      are `i32`, `f32` or `str`.
-     *
-     * @param indices Indices into a (possibly nested) structure.
+     * @param vt The type.
      */
-    void generate_load_element(std::vector<int> indices);
+    void generate_new(value vt);
 
     /**
      * Create a new array of the given type.
@@ -2015,22 +2078,19 @@ public:
     void generate_ret(std::optional<value> arg = std::nullopt);
 
     /**
-     * Store the top of the stack into an array element.
+     * Store the top of the stack into a field of a struct instance on the stack.
+     *
+     * @param arg The field access details.
+     */
+    void generate_set_field(std::unique_ptr<field_access_argument> arg);
+
+    /**
+     * Store the top of the stack into a variable or an array element.
      *
      * @param arg The variable to store into.
      * @param store_element Whether we are storing an element into an array.
      */
     void generate_store(std::unique_ptr<argument> arg, bool store_element = false);
-
-    /**
-     * Store the top of the stack into a structure.
-     *
-     * @note indices is a vector of `int`'s, since currently constant instruction arguments
-     *      are `i32`, `f32` or `str`.
-     *
-     * @param indices Indices into a (possibly nested) structure.
-     */
-    void generate_store_element(std::vector<int> indices);
 
     /**
      * Generate a label to be used by branches and jump instructions.

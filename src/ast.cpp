@@ -812,8 +812,41 @@ std::string struct_anonymous_initializer_expression::to_string() const
 
 std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: struct_named_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
+    }
+
+    ctx.generate_new(cg::value{"aggregate", name.s, std::nullopt, std::nullopt});
+
+    cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
+    auto& t = s->get_type(name.s);
+
+    for(std::size_t i = 0; i < t.size(); ++i)
+    {
+        const auto& [member_name, member_type] = t[i];
+        const auto& initializer = initializers[i];
+
+        ctx.generate_dup(cg::value{"aggregate", name.s, std::nullopt, std::nullopt});
+
+        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        if(!initializer_value)
+        {
+            throw cg::codegen_error(loc,
+                                    fmt::format("Code generation for '{}.{}' initialization returned no type.",
+                                                name.s, member_name));
+        }
+        if(initializer_value->get_type() != member_type.get_type())
+        {
+            throw cg::codegen_error(loc,
+                                    fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                                                name.s, member_name, initializer_value->get_type(), member_type.get_type()));
+        }
+
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(name.s, member_type));
+    }
+
+    return std::make_unique<cg::value>("aggregate", name.s, std::nullopt, std::nullopt);
 }
 
 std::optional<ty::type> struct_named_initializer_expression::type_check(ty::context& ctx)

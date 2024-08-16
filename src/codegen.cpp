@@ -365,6 +365,16 @@ void scope::add_type(std::string name, std::vector<std::pair<std::string, value>
     types.insert({std::move(name), std::move(members)});
 }
 
+const std::vector<std::pair<std::string, value>>& scope::get_type(const std::string& name) const
+{
+    auto it = types.find(name);
+    if(it == types.end())
+    {
+        throw codegen_error(fmt::format("Type '{}' not found in scope.", name));
+    }
+    return it->second;
+}
+
 /*
  * function.
  */
@@ -757,15 +767,12 @@ void context::generate_load(std::unique_ptr<argument> arg, bool load_element)
     }
 }
 
-void context::generate_load_element(std::vector<int> indices)
+void context::generate_new(value vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    for(auto i: indices)
-    {
-        args.emplace_back(std::make_unique<const_argument>(i));
-    }
-    insertion_point->add_instruction(std::make_unique<instruction>("load_element", std::move(args)));
+    args.emplace_back(std::make_unique<type_argument>(vt));
+    insertion_point->add_instruction(std::make_unique<instruction>("new", std::move(args)));
 }
 
 void context::generate_newarray(value vt)
@@ -806,6 +813,16 @@ void context::generate_ret(std::optional<value> arg)
     insertion_point->add_instruction(std::make_unique<instruction>("ret", std::move(args)));
 }
 
+void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
+{
+    validate_insertion_point();
+
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::move(arg));
+
+    insertion_point->add_instruction(std::make_unique<instruction>("set_field", std::move(args)));
+}
+
 void context::generate_store(std::unique_ptr<argument> arg, bool store_element)
 {
     validate_insertion_point();
@@ -821,17 +838,6 @@ void context::generate_store(std::unique_ptr<argument> arg, bool store_element)
     {
         insertion_point->add_instruction(std::make_unique<instruction>("store", std::move(args)));
     }
-}
-
-void context::generate_store_element(std::vector<int> indices)
-{
-    validate_insertion_point();
-    std::vector<std::unique_ptr<argument>> args;
-    for(auto i: indices)
-    {
-        args.emplace_back(std::make_unique<const_argument>(i));
-    }
-    insertion_point->add_instruction(std::make_unique<instruction>("store_element", std::move(args)));
 }
 
 std::string context::generate_label()
