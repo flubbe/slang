@@ -61,7 +61,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         opcode i32_opcode,
                         std::optional<opcode> f32_opcode = std::nullopt,
                         std::optional<opcode> str_opcode = std::nullopt,
-                        std::optional<opcode> array_opcode = std::nullopt)
+                        std::optional<opcode> array_opcode = std::nullopt,
+                        std::optional<opcode> ref_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
@@ -96,6 +97,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             }
 
             emit(instruction_buffer, *str_opcode);
+        }
+        else if(type == "addr")
+        {
+            if(!ref_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
+
+            emit(instruction_buffer, *ref_opcode);
         }
         else
         {
@@ -134,7 +144,13 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
     };
 
-    auto emit_typed_one_var_arg = [this, &name, &args, &func, expect_arg_size](opcode i32_opcode, opcode f32_opcode, std::optional<opcode> str_opcode = std::nullopt, std::optional<opcode> array_opcode = std::nullopt)
+    auto emit_typed_one_var_arg =
+      [this, &name, &args, &func, expect_arg_size](
+        opcode i32_opcode,
+        opcode f32_opcode,
+        std::optional<opcode> str_opcode = std::nullopt,
+        std::optional<opcode> array_opcode = std::nullopt,
+        std::optional<opcode> ref_opcode = std::nullopt)
     {
         expect_arg_size(1);
 
@@ -174,6 +190,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
             emit(instruction_buffer, *str_opcode);
         }
+        else if(type == "addr")
+        {
+            if(!str_opcode.has_value())
+            {
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            }
+
+            emit(instruction_buffer, *ref_opcode);
+        }
         else
         {
             throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
@@ -212,7 +237,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "store")
     {
-        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore, opcode::astore);
+        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore, opcode::astore, opcode::astore);
     }
     else if(name == "load_element")
     {
@@ -224,7 +249,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "dup")
     {
-        emit_typed(opcode::idup, opcode::fdup, std::nullopt, opcode::adup);
+        emit_typed(opcode::idup, opcode::fdup, std::nullopt, opcode::adup, opcode::adup);
     }
     else if(name == "pop")
     {
@@ -303,6 +328,46 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             emit_typed(opcode::iret, opcode::fret, opcode::sret, opcode::aret);
         }
+    }
+    else if(name == "set_field")
+    {
+        expect_arg_size(1);
+
+        cg::field_access_argument* arg = static_cast<cg::field_access_argument*>(args[0].get());
+
+        // resolve references to struct and field name.
+        vle_int struct_index = 0;
+        vle_int field_index = 0;
+
+        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                                      [arg](const std::unique_ptr<cg::type>& t) -> bool
+                                      {
+                                          return t->get_name() == arg->get_struct_name();
+                                      });
+        if(struct_it != ctx.types.end())
+        {
+            struct_index = std::distance(ctx.types.begin(), struct_it);
+        }
+        else
+        {
+            // TODO search imported symbols. The type should have `import_path` set in this case.
+            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", arg->get_struct_name()));
+        }
+
+        auto& members = struct_it->get()->get_members();
+        auto field_it = std::find_if(members.begin(), members.end(),
+                                     [arg](const std::pair<std::string, cg::value>& m) -> bool
+                                     {
+                                         return m.first == *arg->get_member().get_name();
+                                     });
+        if(field_it == members.end())
+        {
+            throw emitter_error(fmt::format("Could not resolve field '{}' in struct '{}'.", *arg->get_member().get_name(), arg->get_struct_name()));
+        }
+
+        emit(instruction_buffer, opcode::setfield);
+        instruction_buffer & struct_index;
+        instruction_buffer & field_index;
     }
     else if(name == "and")
     {
@@ -401,6 +466,34 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         emit(instruction_buffer, opcode::jmp);
         instruction_buffer & index;
     }
+    else if(name == "new")
+    {
+        expect_arg_size(1);
+
+        auto& args = instr->get_args();
+        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_resolved_type();
+
+        // resolve type to index. first check local types, then imported types.
+        vle_int index = 0;
+
+        auto it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                               [&type_str](const std::unique_ptr<cg::type>& t) -> bool
+                               {
+                                   return t->get_name() == type_str;
+                               });
+        if(it != ctx.types.end())
+        {
+            index = std::distance(ctx.types.begin(), it);
+        }
+        else
+        {
+            // TODO search imported symbols. The type should have `import_path` set in this case.
+            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", type_str));
+        }
+
+        emit(instruction_buffer, opcode::new_);
+        instruction_buffer & index;
+    }
     else if(name == "newarray")
     {
         expect_arg_size(1);
@@ -421,7 +514,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             type = array_type::str;
         }
-        else if(type_str == "addr")
+        else if(type_str == "aggregate")
         {
             type = array_type::ref;
         }

@@ -713,8 +713,8 @@ public:
  */
 class field_access_argument : public argument
 {
-    /** The field's name. */
-    std::string field_name;
+    /** The struct name. */
+    std::string struct_name;
 
     /** The field's member. */
     value member;
@@ -732,20 +732,20 @@ public:
     /**
      * Construct a field access.
      *
-     * @param field_name Name of the field.
+     * @param struct_name Name of the struct.
      * @param member_type The field's accessed member.
      */
     field_access_argument(std::string field_name, value member)
     : argument()
-    , field_name{std::move(field_name)}
+    , struct_name{std::move(field_name)}
     , member{std::move(member)}
     {
     }
 
-    /** Return the field name. */
-    std::string get_field_name() const
+    /** Return the struct name. */
+    std::string get_struct_name() const
     {
-        return field_name;
+        return struct_name;
     }
 
     /** Return the field's member. */
@@ -756,7 +756,7 @@ public:
 
     std::string to_string() const override
     {
-        return fmt::format("%{}, {}", field_name, member.to_string());
+        return fmt::format("%{}, {}", struct_name, member.to_string());
     }
 
     const value* get_value() const override

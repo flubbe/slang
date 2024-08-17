@@ -1357,14 +1357,14 @@ TEST(compile_ir, structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"
-                  " dup S\n"
+                  " dup addr\n"
                   " const i32 2\n"
                   " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " dup addr\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " store addr %s\n"
                   " ret void\n"
                   "}");
     }

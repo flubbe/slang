@@ -56,14 +56,15 @@ enum class opcode : opcode_base
     i2f,         /** Convert a i32 into an f32. */
     f2i,         /** Convert a f32 into an i32. */
     invoke,      /** Invoke a function. */
-    newstruct,   /** Create a new struct. */
-    newarray,    /** Create a new array if type i32, f32 or references */
+    new_,        /** Create a new struct. */
+    newarray,    /** Create a new array for i32, f32 or references. */
     arraylength, /** Return the length of an array. */
     ret,         /** Return void from a function. */
     iret,        /** Return an i32 from a function. */
     fret,        /** Return an f32 from a function. */
     sret,        /** Return a str from a function. */
     aret,        /** Return an array reference. */
+    setfield,    /** Set a field in a struct. */
     iand,        /** Bitwise and for two i32 from the stack. */
     land,        /** Logical and for two i32 from the stack. */
     ior,         /** Bitwise or for two i32 from the stack. */

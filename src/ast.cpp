@@ -547,13 +547,13 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     if(ty::is_builtin_type(type.s))
     {
         v = {type.s, std::nullopt, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt};
+        s->add_local(std::make_unique<cg::value>(v));
     }
     else
     {
-        v = {"aggregate", type.s, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt};
+        s->add_local(std::make_unique<cg::value>(cg::value{"aggregate", type.s, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt}));
+        v = {"addr", std::nullopt, name.s, std::nullopt};
     }
-
-    s->add_local(std::make_unique<cg::value>(v));
 
     if(is_array())
     {
@@ -827,7 +827,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         const auto& [member_name, member_type] = t[i];
         const auto& initializer = initializers[i];
 
-        ctx.generate_dup(cg::value{"aggregate", name.s, std::nullopt, std::nullopt});
+        ctx.generate_dup(cg::value{"addr", std::nullopt, std::nullopt, std::nullopt});
 
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)

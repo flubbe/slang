@@ -53,7 +53,7 @@ std::string to_string(opcode op)
     case opcode::spop: return "spop";
     case opcode::apop: return "apop";
     case opcode::invoke: return "invoke";
-    case opcode::newstruct: return "newstruct";
+    case opcode::new_: return "new";
     case opcode::newarray: return "newarray";
     case opcode::arraylength: return "arraylength";
     case opcode::ret: return "ret";
@@ -61,6 +61,7 @@ std::string to_string(opcode op)
     case opcode::fret: return "fret";
     case opcode::sret: return "sret";
     case opcode::aret: return "aret";
+    case opcode::setfield: return "setfield";
     case opcode::iand: return "iand";
     case opcode::land: return "land";
     case opcode::ior: return "ior";
