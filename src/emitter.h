@@ -60,6 +60,13 @@ class instruction_emitter
 
 protected:
     /**
+     * Collect all jump targets.
+     *
+     * @return The jump target labels.
+     */
+    std::set<std::string> collect_jump_targets() const;
+
+    /**
      * Emit an instruction.
      *
      * @param func The current function.

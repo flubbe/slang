@@ -36,6 +36,34 @@ void emit(archive& ar, opcode op, T arg)
     ar & arg;
 }
 
+std::set<std::string> instruction_emitter::collect_jump_targets() const
+{
+    std::set<std::string> targets;
+
+    for(auto& f: ctx.funcs)
+    {
+        for(auto& it: f->get_basic_blocks())
+        {
+            for(auto& instr: it->get_instructions())
+            {
+                if(instr->get_name() == "jnz")
+                {
+                    auto& args = instr->get_args();
+                    targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
+                    targets.emplace(static_cast<cg::label_argument*>(args.at(1).get())->get_label());
+                }
+                else if(instr->get_name() == "jmp")
+                {
+                    auto& args = instr->get_args();
+                    targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
+                }
+            }
+        }
+    }
+
+    return targets;
+}
+
 void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& func, const std::unique_ptr<cg::instruction>& instr)
 {
     auto& name = instr->get_name();
@@ -554,6 +582,12 @@ void instruction_emitter::run()
         throw emitter_error("Jump targets not empty.");
     }
 
+    // collect jump targets.
+    jump_targets = collect_jump_targets();
+
+    /*
+     * generate bytecode.
+     */
     for(auto& f: ctx.funcs)
     {
         // verify that no entry point for the function exists.
@@ -623,27 +657,6 @@ void instruction_emitter::run()
         if(unset_indices.size() != 0)
         {
             throw emitter_error(fmt::format("Inconsistent local count for function '{}'.", f->get_name()));
-        }
-
-        /*
-         * collect jump targets.
-         */
-        for(auto& it: f->get_basic_blocks())
-        {
-            for(auto& instr: it->get_instructions())
-            {
-                if(instr->get_name() == "jnz")
-                {
-                    auto& args = instr->get_args();
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(1).get())->get_label());
-                }
-                else if(instr->get_name() == "jmp")
-                {
-                    auto& args = instr->get_args();
-                    jump_targets.emplace(static_cast<cg::label_argument*>(args.at(0).get())->get_label());
-                }
-            }
         }
 
         /*
