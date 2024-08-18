@@ -1648,15 +1648,26 @@ public:
     context& operator=(context&&) = default;
 
     /**
+     * Add a symbol to the import table. No-op if the symbol already exists.
+     *
+     * @param type The symbol type.
+     * @param import_path Path of the module that exports the symbol.
+     * @param name The symbol's name.
+     * @throws Throws a `codegen_error` if the symbol already exists but the symbol type does not match.
+     */
+    void add_import(symbol_type type, std::string import_path, std::string name);
+
+    /**
      * Get the import index of a symbol. If the symbol is not found in the imports,
-     * it is added.
+     * a `codegen_error` is thrown.
      *
      * @param type The symbol type.
      * @param import_path Path of the module that exports the symbol.
      * @param name The symbol's name.
      * @return The symbol's index in the import table.
+     * @throws Throws a `codegen_error` if the symbol is not found.
      */
-    std::size_t get_import_index(symbol_type type, std::string import_path, std::string name);
+    std::size_t get_import_index(symbol_type type, std::string import_path, std::string name) const;
 
     /**
      * Create a type.

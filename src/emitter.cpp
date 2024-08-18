@@ -64,35 +64,6 @@ std::set<std::string> instruction_emitter::collect_jump_targets() const
     return targets;
 }
 
-/**
- * Get the import index of a function.
- *
- * @param ctx The code generation context.
- * @param protoypes A reference to the prototypes of the code generation context.
- * @param import_path The import path of the function.
- * @param name The name of the function.
- * @return Returns the import index of the function.
- * @throw Throws a `emitter_error` if the function could not be resolved.
- */
-static std::size_t get_function_import_index(cg::context& ctx,
-                                             const std::vector<std::unique_ptr<cg::prototype>>& prototypes,
-                                             const std::string& import_path,
-                                             const std::string& name)
-{
-    auto import_it = std::find_if(prototypes.begin(), prototypes.end(),
-                                  [name, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
-                                  {
-                                      return p->is_import() && *p->get_import_path() == import_path
-                                             && p->get_name() == name;
-                                  });
-    if(import_it == prototypes.end())
-    {
-        throw emitter_error(fmt::format("Could not resolve imported function '{}'.", name));
-    }
-
-    return ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
-}
-
 void instruction_emitter::collect_imports()
 {
     for(auto& f: ctx.funcs)
@@ -112,7 +83,18 @@ void instruction_emitter::collect_imports()
                     auto& import_path = arg->get_import_path();
                     if(import_path.has_value())
                     {
-                        get_function_import_index(ctx, ctx.prototypes, *import_path, *arg->get_value()->get_name());
+                        auto import_it = std::find_if(ctx.prototypes.begin(), ctx.prototypes.end(),
+                                                      [arg, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
+                                                      {
+                                                          return p->is_import() && *p->get_import_path() == import_path
+                                                                 && p->get_name() == *arg->get_value()->get_name();
+                                                      });
+                        if(import_it == ctx.prototypes.end())
+                        {
+                            throw emitter_error(fmt::format("Could not resolve imported function '{}'.", *arg->get_value()->get_name()));
+                        }
+
+                        ctx.add_import(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
                     }
                 }
                 else if(instr->get_name() == "new")
@@ -387,7 +369,18 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
 
         // resolve imports.
-        vle_int index = -get_function_import_index(ctx, ctx.prototypes, *import_path, *v->get_name()) - 1;
+        auto import_it = std::find_if(ctx.prototypes.begin(), ctx.prototypes.end(),
+                                      [arg, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
+                                      {
+                                          return p->is_import() && *p->get_import_path() == import_path
+                                                 && p->get_name() == *arg->get_value()->get_name();
+                                      });
+        if(import_it == ctx.prototypes.end())
+        {
+            throw emitter_error(fmt::format("Could not resolve imported function '{}'.", *arg->get_value()->get_name()));
+        }
+
+        vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name()) - 1;
         emit(instruction_buffer, opcode::invoke);
         instruction_buffer & index;
     }

@@ -446,7 +446,34 @@ std::string type::to_string() const
  * context.
  */
 
-std::size_t context::get_import_index(symbol_type type, std::string import_path, std::string name)
+void context::add_import(symbol_type type, std::string import_path, std::string name)
+{
+    auto it = std::find_if(imports.begin(), imports.end(),
+                           [&name](const imported_symbol& s) -> bool
+                           {
+                               return name == s.name;
+                           });
+    if(it != imports.end())
+    {
+        // check whether the imports match.
+        if(import_path != it->import_path)
+        {
+            throw codegen_error(fmt::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
+        }
+
+        if(it->type != type)
+        {
+            throw codegen_error(fmt::format("Found different symbol types for import '{}': '{}' and '{}'.", name, slang::to_string(it->type), slang::to_string(type)));
+        }
+    }
+    else
+    {
+        // add the import.
+        imports.emplace_back(type, std::move(name), std::move(import_path));
+    }
+}
+
+std::size_t context::get_import_index(symbol_type type, std::string import_path, std::string name) const
 {
     auto it = std::find_if(imports.begin(), imports.end(),
                            [&name](const imported_symbol& s) -> bool
@@ -468,9 +495,7 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
         return std::distance(imports.begin(), it);
     }
 
-    // add the import.
-    imports.emplace_back(type, std::move(name), std::move(import_path));
-    return imports.size() - 1;
+    throw codegen_error(fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.", name, slang::to_string(type), import_path));
 }
 
 type* context::create_type(std::string name, std::vector<std::pair<std::string, value>> members)
