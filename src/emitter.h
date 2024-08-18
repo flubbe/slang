@@ -67,6 +67,11 @@ protected:
     std::set<std::string> collect_jump_targets() const;
 
     /**
+     * Collect imports by inspecting the instructions `invoke` and `new`.
+     */
+    void collect_imports();
+
+    /**
      * Emit an instruction.
      *
      * @param func The current function.

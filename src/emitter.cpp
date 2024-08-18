@@ -64,6 +64,66 @@ std::set<std::string> instruction_emitter::collect_jump_targets() const
     return targets;
 }
 
+/**
+ * Get the import index of a function.
+ *
+ * @param ctx The code generation context.
+ * @param protoypes A reference to the prototypes of the code generation context.
+ * @param import_path The import path of the function.
+ * @param name The name of the function.
+ * @return Returns the import index of the function.
+ * @throw Throws a `emitter_error` if the function could not be resolved.
+ */
+static std::size_t get_function_import_index(cg::context& ctx,
+                                             const std::vector<std::unique_ptr<cg::prototype>>& prototypes,
+                                             const std::string& import_path,
+                                             const std::string& name)
+{
+    auto import_it = std::find_if(prototypes.begin(), prototypes.end(),
+                                  [name, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
+                                  {
+                                      return p->is_import() && *p->get_import_path() == import_path
+                                             && p->get_name() == name;
+                                  });
+    if(import_it == prototypes.end())
+    {
+        throw emitter_error(fmt::format("Could not resolve imported function '{}'.", name));
+    }
+
+    return ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
+}
+
+void instruction_emitter::collect_imports()
+{
+    for(auto& f: ctx.funcs)
+    {
+        for(auto& it: f->get_basic_blocks())
+        {
+            for(auto& instr: it->get_instructions())
+            {
+                if(instr->get_name() == "invoke")
+                {
+                    if(instr->get_args().size() != 1)
+                    {
+                        throw emitter_error(fmt::format("Expected 1 argument for 'invoke', got {}.", instr->get_args().size()));
+                    }
+
+                    cg::function_argument* arg = static_cast<cg::function_argument*>(instr->get_args()[0].get());
+                    auto& import_path = arg->get_import_path();
+                    if(import_path.has_value())
+                    {
+                        get_function_import_index(ctx, ctx.prototypes, *import_path, *arg->get_value()->get_name());
+                    }
+                }
+                else if(instr->get_name() == "new")
+                {
+                    // TODO
+                }
+            }
+        }
+    }
+}
+
 void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& func, const std::unique_ptr<cg::instruction>& instr)
 {
     auto& name = instr->get_name();
@@ -75,12 +135,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             if(!s2.has_value())
             {
-                throw emitter_error(fmt::format("Expected {} arguments for '{}', got {}.", s1, name, args.size()));
+                throw emitter_error(fmt::format("Expected {} argument(s) for '{}', got {}.", s1, name, args.size()));
             }
 
             if(args.size() != *s2)
             {
-                throw emitter_error(fmt::format("Expected {} or {} arguments for '{}', got {}.", s1, *s2, name, args.size()));
+                throw emitter_error(fmt::format("Expected {} or {} argument(s) for '{}', got {}.", s1, *s2, name, args.size()));
             }
         }
     };
@@ -327,21 +387,9 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
 
         // resolve imports.
-        auto import_it = std::find_if(ctx.prototypes.begin(), ctx.prototypes.end(),
-                                      [&v, &import_path](const std::unique_ptr<cg::prototype>& p) -> bool
-                                      {
-                                          return p->is_import() && *p->get_import_path() == *import_path
-                                                 && p->get_name() == *v->get_name();
-                                      });
-        if(import_it != ctx.prototypes.end())
-        {
-            vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name()) - 1;
-            emit(instruction_buffer, opcode::invoke);
-            instruction_buffer & index;
-            return;
-        }
-
-        throw emitter_error(fmt::format("Could not resolve function '{}'.", *v->get_name()));
+        vle_int index = -get_function_import_index(ctx, ctx.prototypes, *import_path, *v->get_name()) - 1;
+        emit(instruction_buffer, opcode::invoke);
+        instruction_buffer & index;
     }
     else if(name == "ret")
     {
@@ -585,6 +633,12 @@ void instruction_emitter::run()
     // collect jump targets.
     jump_targets = collect_jump_targets();
 
+    // collect imports.
+    collect_imports();
+
+    // the import count is not allowed to change, so store it here and check later.
+    std::size_t import_count = ctx.imports.size();
+
     /*
      * generate bytecode.
      */
@@ -685,6 +739,12 @@ void instruction_emitter::run()
          */
         std::size_t size = instruction_buffer.tell() - entry_point;
         func_details.insert({f->get_name(), {size, entry_point, locals}});
+    }
+
+    // check that the import count did not change
+    if(import_count != ctx.imports.size())
+    {
+        throw emitter_error(fmt::format("Import count changed during instruction emission ({} -> {}).", import_count, ctx.imports.size()));
     }
 }
 
