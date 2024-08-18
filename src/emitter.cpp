@@ -714,23 +714,23 @@ language_module instruction_emitter::to_module() const
     {
         std::uint32_t package_index = 0;
 
-        auto p_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                 [&it](auto& s) -> bool
-                                 {
-                                     return s.type == symbol_type::package && s.name == it.import_path;
-                                 });
-        if(p_it != ctx.imports.end())
+        auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                      [&it](auto& s) -> bool
+                                      {
+                                          return s.type == symbol_type::package && s.name == it.import_path;
+                                      });
+        if(import_it != ctx.imports.end())
         {
-            package_index = p_it - ctx.imports.begin();
+            package_index = std::distance(ctx.imports.begin(), import_it);
         }
         else
         {
-            auto p_it = std::find(packages.begin(), packages.end(), it.import_path);
-            if(p_it == packages.end())
+            auto package_it = std::find(packages.begin(), packages.end(), it.import_path);
+            if(package_it == packages.end())
             {
                 throw std::runtime_error(fmt::format("Package '{}' not found in package table.", it.import_path));
             }
-            package_index = ctx.imports.size() + p_it - packages.begin();
+            package_index = ctx.imports.size() + std::distance(packages.begin(), package_it);
         }
 
         mod.add_import(it.type, it.name, package_index);
