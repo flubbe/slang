@@ -294,13 +294,13 @@ public:
     /** Returns pointer to the underlying array serving as element storage. */
     pointer data() noexcept
     {
-        return data_ptr->data;
+        return data_ptr ? data_ptr->data : nullptr;
     }
 
     /** Returns pointer to the underlying array serving as element storage. */
     const_pointer data() const noexcept
     {
-        return data_ptr->data;
+        return data_ptr ? data_ptr->data : nullptr;
     }
 };
 
