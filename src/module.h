@@ -429,11 +429,67 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
     return ar;
 }
 
+/** Type information of a variable. */
+struct type_info
+{
+    /** The field's base type: i32, f32, str, or a struct name. */
+    std::string base_type;
+
+    /** Whether this is an array. */
+    bool array{false};
+
+    /** Default constructors. */
+    type_info() = default;
+    type_info(const type_info&) = default;
+    type_info(type_info&&) = default;
+
+    /** Default assignments. */
+    type_info& operator=(const type_info&) = default;
+    type_info& operator=(type_info&&) = default;
+
+    /**
+     * Create a new `type_info`.
+     *
+     * @param base_type The type's base type.
+     * @param array Whether the type is an array type.
+     */
+    type_info(std::string base_type, bool array)
+    : base_type{std::move(base_type)}
+    , array{array}
+    {
+    }
+
+    /** Type comparison. */
+    bool operator==(const type_info& other) const
+    {
+        return base_type == other.base_type && array == other.array;
+    }
+
+    /** Type comparison. */
+    bool operator!=(const type_info& other) const
+    {
+        return !(*this == other);
+    }
+};
+
+/**
+ * Serializer for type info.
+ *
+ * @param ar The archive to use for serialization.
+ * @param info The type descriptor.
+ */
+inline archive& operator&(archive& ar, type_info& info)
+{
+    ar & info.base_type;
+    ar & info.array;
+    return ar;
+}
+
 /** Type descriptor. */
 struct type_descriptor
 {
     /** Members as (name, type). */
-    std::vector<std::pair<std::string, std::string>> member_types;
+    std::vector<std::pair<std::string, type_info>> member_types;
 };
 
 /**
@@ -703,7 +759,7 @@ public:
      * @param name The type's name.
      * @param members The type's members as `(name, type)`.
      */
-    void add_type(std::string name, std::vector<std::pair<std::string, std::string>> members);
+    void add_type(std::string name, std::vector<std::pair<std::string, type_info>> members);
 
     /**
      * Set the string table.

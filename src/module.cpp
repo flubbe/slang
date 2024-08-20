@@ -75,7 +75,7 @@ void language_module::add_native_function(std::string name,
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
-void language_module::add_type(std::string name, std::vector<std::pair<std::string, std::string>> members)
+void language_module::add_type(std::string name, std::vector<std::pair<std::string, type_info>> members)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool

@@ -938,18 +938,18 @@ TEST(interpreter, structs)
         auto& desc = std::get<slang::type_descriptor>(header.exports[0].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "i");
-        EXPECT_EQ(desc.member_types[0].second, "i32");
+        EXPECT_EQ(desc.member_types[0].second, slang::type_info("i32", false));
         EXPECT_EQ(desc.member_types[1].first, "j");
-        EXPECT_EQ(desc.member_types[1].second, "f32");
+        EXPECT_EQ(desc.member_types[1].second, slang::type_info("f32", false));
     }
 
     {
         auto& desc = std::get<slang::type_descriptor>(header.exports[1].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "s");
-        EXPECT_EQ(desc.member_types[0].second, "S");
+        EXPECT_EQ(desc.member_types[0].second, slang::type_info("S", false));
         EXPECT_EQ(desc.member_types[1].first, "t");
-        EXPECT_EQ(desc.member_types[1].second, "str");
+        EXPECT_EQ(desc.member_types[1].second, slang::type_info("str", false));
     }
 
     slang::file_manager file_mgr;

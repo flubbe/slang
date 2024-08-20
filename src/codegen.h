@@ -529,6 +529,9 @@ class type_argument : public argument
     /** The type. */
     value vt;
 
+    /** An optional import path for the function. */
+    std::optional<std::string> import_path = std::nullopt;
+
 public:
     /** Default constructors. */
     type_argument() = default;
@@ -550,8 +553,29 @@ public:
     {
     }
 
+    /**
+     * Set the import path.
+     *
+     * @param path The import path, or `std::nullopt`.
+     */
+    void set_import_path(std::optional<std::string> import_path)
+    {
+        this->import_path = std::move(import_path);
+    }
+
+    /** Get the import path. */
+    const std::optional<std::string>& get_import_path() const
+    {
+        return import_path;
+    }
+
     std::string to_string() const override
     {
+        if(import_path.has_value())
+        {
+            return fmt::format("{}::{}", *import_path, vt.to_string());
+        }
+
         return vt.to_string();
     }
 
@@ -1210,7 +1234,7 @@ class prototype
     /** The argument types. */
     std::vector<value> arg_types;
 
-    /** The module path for imported functions and std::nullopt for prototypes within the current module. */
+    /** The module path for imported functions and `std::nullopt` for prototypes within the current module. */
     std::optional<std::string> import_path;
 
 public:
@@ -1444,6 +1468,9 @@ class type
     /** The type's members as pairs `(name, type)`. */
     std::vector<std::pair<std::string, value>> members;
 
+    /** The module path for imported types and `std::nullopt` for types within the current module. */
+    std::optional<std::string> import_path;
+
 public:
     /** Default constructors. */
     type() = default;
@@ -1462,10 +1489,12 @@ public:
      *
      * @param name The type's name.
      * @param members The type's members.
+     * @param import_path The import path of the module for imported types.
      */
-    type(std::string name, std::vector<std::pair<std::string, value>> members)
+    type(std::string name, std::vector<std::pair<std::string, value>> members, std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
+    , import_path{std::move(import_path)}
     {
     }
 
@@ -1479,6 +1508,18 @@ public:
     const std::vector<std::pair<std::string, value>>& get_members() const
     {
         return members;
+    }
+
+    /** Return whether this is an imported type. */
+    bool is_import() const
+    {
+        return import_path.has_value();
+    }
+
+    /** Return the import path. */
+    const std::optional<std::string>& get_import_path() const
+    {
+        return import_path;
     }
 
     /** String representation of a type. */

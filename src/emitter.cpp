@@ -99,7 +99,28 @@ void instruction_emitter::collect_imports()
                 }
                 else if(instr->get_name() == "new")
                 {
-                    // TODO
+                    if(instr->get_args().size() != 1)
+                    {
+                        throw emitter_error(fmt::format("Expected 1 argument for 'new', got {}.", instr->get_args().size()));
+                    }
+
+                    cg::type_argument* arg = static_cast<cg::type_argument*>(instr->get_args()[0].get());
+                    auto& import_path = arg->get_import_path();
+                    if(import_path.has_value())
+                    {
+                        auto import_it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                                                      [arg, import_path](const std::unique_ptr<cg::type>& p) -> bool
+                                                      {
+                                                          return p->is_import() && *p->get_import_path() == import_path
+                                                                 && p->get_name() == *arg->get_value()->get_name();
+                                                      });
+                        if(import_it == ctx.types.end())
+                        {
+                            throw emitter_error(fmt::format("Could not resolve imported type '{}'.", *arg->get_value()->get_name()));
+                        }
+
+                        ctx.add_import(symbol_type::type, *(*import_it)->get_import_path(), (*import_it)->get_name());
+                    }
                 }
             }
         }
@@ -813,13 +834,13 @@ language_module instruction_emitter::to_module() const
     for(auto& it: ctx.types)
     {
         auto members = it->get_members();
-        std::vector<std::pair<std::string, std::string>> transformed_members;
+        std::vector<std::pair<std::string, type_info>> transformed_members;
 
         std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [](const std::pair<std::string, cg::value>& m)
+                       [](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
                        {
-                           // FIXME misses array type/length.
-                           return std::make_pair(std::get<0>(m), std::get<1>(m).get_resolved_type());
+                           const auto& t = std::get<1>(m);
+                           return std::make_pair(std::get<0>(m), type_info{t.get_resolved_type(), t.is_array()});
                        });
 
         mod.add_type(it->get_name(), std::move(transformed_members));
