@@ -37,41 +37,6 @@ static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
 /**
- * Return the size of a built-in type.
- *
- * @param type_name The base type name.
- * @param reference Whether this is a reference. Note that arrays are references.
- * @return Returns the type size.
- * @throws Throws an `interpreter_error` if the type is not known.
- */
-static std::size_t get_type_size(const std::string& type_name, bool reference)
-{
-    if(reference || type_name == "addr" || type_name == "@array")
-    {
-        return sizeof(void*);
-    }
-
-    if(type_name == "void")
-    {
-        return 0;
-    }
-    else if(type_name == "i32")
-    {
-        return sizeof(std::int32_t);
-    }
-    else if(type_name == "f32")
-    {
-        return sizeof(float);
-    }
-    else if(type_name == "str")
-    {
-        return sizeof(std::string*);
-    }
-
-    throw interpreter_error(fmt::format("Size resolution not implemented for type '{}'.", type_name));
-}
-
-/**
  * Generate the return opcode from the signature's return type for native functions.
  *
  * @param return_type The return type.
@@ -105,23 +70,6 @@ static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::st
     }
 
     throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
-}
-
-/**
- * Calculate the stack size delta from a function's signature.
- *
- * @param s The signature.
- * @returns The stack size delta.
- */
-static int32_t get_stack_delta(const function_signature& s)
-{
-    std::int32_t return_type_size = get_type_size(s.return_type.first, s.return_type.second);
-    std::int32_t arg_size = 0;
-    for(auto& it: s.arg_types)
-    {
-        arg_size += get_type_size(it.first, it.second);
-    }
-    return return_type_size - arg_size;
 }
 
 /*
@@ -161,7 +109,84 @@ function::function(function_signature signature, std::function<void(operand_stac
  * context implementation.
  */
 
-void context::decode_locals(function_descriptor& desc)
+/** Byte sizes and alignments for built-in types. */
+static const std::unordered_map<std::string, std::pair<std::uint8_t, std::uint8_t>> type_properties_map = {
+  {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
+  {"f32", {sizeof(float), std::alignment_of_v<float>}},
+  {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
+  {"addr", {sizeof(void*), std::alignment_of_v<void*>}},
+  {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
+
+std::pair<std::uint8_t, std::uint8_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                                   const std::string& type_name, bool reference) const
+{
+    // references.
+    if(reference)
+    {
+        return std::make_pair<std::uint8_t, std::uint8_t>(sizeof(void*), std::alignment_of_v<void*>);
+    }
+
+    // built-in types.
+    if(type_name == "void")
+    {
+        return std::make_pair<std::uint8_t, std::uint8_t>(0, 0);
+    }
+
+    auto built_in_it = type_properties_map.find(type_name);
+    if(built_in_it != type_properties_map.end())
+    {
+        return built_in_it->second;
+    }
+
+    // structs.
+    auto type_it = type_map.find(type_name);
+    if(type_it == type_map.end())
+    {
+        throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
+    }
+
+    std::size_t type_size = 0;
+    std::uint8_t struct_align = 0;
+    for(auto& [member_name, member_type]: type_it->second.member_types)
+    {
+        auto [size, alignment] = get_type_properties(type_map, member_type.base_type, member_type.array);
+        type_size += size;
+
+        // member alignment.
+        if(member_type.array)
+        {
+            type_size = (type_size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+        }
+        else
+        {
+            type_size = (type_size + (alignment - 1)) & ~(alignment - 1);
+        }
+        struct_align = std::max(struct_align, alignment);
+    }
+
+    // trailing padding.
+    type_size = (type_size + (struct_align - 1)) & ~(struct_align - 1);
+
+    // TODO store/look up type size for struct.
+
+    return std::make_pair(type_size, struct_align);
+}
+
+std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                      const function_signature& s) const
+{
+    auto [return_type_size, return_type_alignment] = get_type_properties(type_map, s.return_type.first, s.return_type.second);
+    std::int32_t arg_size = 0;
+    for(auto& it: s.arg_types)
+    {
+        auto [size, align] = get_type_properties(type_map, it.first, it.second);
+        arg_size += size;
+        arg_size = (arg_size + (align - 1)) & ~(align - 1);
+    }
+    return return_type_size - arg_size;
+}
+
+void context::decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map, function_descriptor& desc)
 {
     if(desc.native)
     {
@@ -184,9 +209,12 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.args_size;
-        v.size = get_type_size(v.type, v.array);
+
+        auto [size, align] = get_type_properties(type_map, v.type, v.array);
+        v.size = size;
 
         details.args_size += v.size;
+        details.args_size = (details.args_size + (align - 1)) & ~(align - 1);
     }
     details.locals_size = details.args_size;
 
@@ -196,16 +224,24 @@ void context::decode_locals(function_descriptor& desc)
         auto& v = details.locals[i];
 
         v.offset = details.locals_size;
-        v.size = get_type_size(v.type, v.array);
+
+        auto [size, align] = get_type_properties(type_map, v.type, v.array);
+        v.size = size;
 
         details.locals_size += v.size;
+        details.locals_size = (details.locals_size + (align - 1)) & ~(align - 1);
     }
 
     // return type
-    details.return_size = get_type_size(desc.signature.return_type.first, desc.signature.return_type.second);
+    details.return_size = get_type_properties(type_map, desc.signature.return_type.first, desc.signature.return_type.second).first;
 }
 
-std::int32_t context::decode_instruction(language_module& mod, archive& ar, std::byte instr, const function_details& details, std::vector<std::byte>& code) const
+std::int32_t context::decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                         language_module& mod,
+                                         archive& ar,
+                                         std::byte instr,
+                                         const function_details& details,
+                                         std::vector<std::byte>& code) const
 {
     switch(static_cast<opcode>(instr))
     {
@@ -378,7 +414,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
                 throw interpreter_error(fmt::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
             }
 
-            return get_stack_delta(desc.signature);
+            return get_stack_delta(type_map, desc.signature);
         }
         else
         {
@@ -405,7 +441,7 @@ std::int32_t context::decode_instruction(language_module& mod, archive& ar, std:
                 throw interpreter_error("Native function was null during decode.");
             }
 
-            return get_stack_delta(desc.signature);
+            return get_stack_delta(type_map, desc.signature);
         }
     }
     /* opcodes that need to resolve a variable. */
@@ -476,7 +512,8 @@ std::function<void(operand_stack&)> context::resolve_native_function(const std::
     return func_it->second;
 }
 
-std::unique_ptr<language_module> context::decode(const language_module& mod)
+std::unique_ptr<language_module> context::decode(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                 const language_module& mod)
 {
     if(mod.is_decoded())
     {
@@ -575,7 +612,7 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
             continue;
         }
 
-        decode_locals(desc);
+        decode_locals(type_map, desc);
     }
 
     // store header in decoded module.
@@ -620,7 +657,7 @@ std::unique_ptr<language_module> context::decode(const language_module& mod)
                 code.push_back(instr);
             }
 
-            stack_size += decode_instruction(*decoded_module, ar, instr, details, code);
+            stack_size += decode_instruction(type_map, *decoded_module, ar, instr, details, code);
             if(stack_size < 0)
             {
                 throw interpreter_error("Error during decode: Got negative stack size.");
@@ -1628,10 +1665,27 @@ void context::load_module(const std::string& name, const language_module& mod)
         throw interpreter_error(fmt::format("Module '{}' already loaded.", name));
     }
 
-    module_map.insert({name, decode(mod)});
-    module_header& decoded_header = module_map[name]->header;
+    // populate type map before decoding the module.
+    std::unordered_map<std::string, type_descriptor> tmap;
+    for(auto& it: mod.header.exports)
+    {
+        if(it.type != symbol_type::type)
+        {
+            continue;
+        }
 
-    // TODO populate type map.
+        if(tmap.find(it.name) != tmap.end())
+        {
+            throw interpreter_error(fmt::format("Type '{}' already exists in exports.", it.name));
+        }
+
+        tmap.insert({it.name, std::get<type_descriptor>(it.desc)});
+    }
+    type_map.insert({name, std::move(tmap)});
+
+    // decode the module.
+    module_map.insert({name, decode(type_map[name], mod)});
+    module_header& decoded_header = module_map[name]->header;
 
     // populate function map.
     std::unordered_map<std::string, function> fmap;
@@ -1644,7 +1698,7 @@ void context::load_module(const std::string& name, const language_module& mod)
 
         if(fmap.find(it.name) != fmap.end())
         {
-            throw interpreter_error(fmt::format("Function '{}' already exists in export map.", it.name));
+            throw interpreter_error(fmt::format("Function '{}' already exists in exports.", it.name));
         }
 
         auto& desc = std::get<function_descriptor>(it.desc);

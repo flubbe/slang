@@ -774,6 +774,9 @@ class context
     /** Loaded modules as `(name, decoded_module)`. */
     std::unordered_map<std::string, std::unique_ptr<language_module>> module_map;
 
+    /** Types, ordered by module and name. */
+    std::unordered_map<std::string, std::unordered_map<std::string, type_descriptor>> type_map;
+
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
 
@@ -793,23 +796,51 @@ class context
     gc::garbage_collector gc;
 
     /**
+     * Get the byte size and alignment of a type.
+     *
+     * @param type_map The type map.
+     * @param type_name The base type name.
+     * @param reference Whether this is a reference. Note that arrays are references.
+     * @return Returns a pair `(size, alignment)`.
+     * @throws Throws an `interpreter_error` if the type is not known.
+     */
+    std::pair<std::uint8_t, std::uint8_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                              const std::string& type_name,
+                                                              bool reference) const;
+
+    /**
+     * Calculate the stack size delta from a function's signature.
+     *
+     * @param type_map The type map.
+     * @param s The signature.
+     * @returns The stack size delta.
+     */
+    std::int32_t get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                 const function_signature& s) const;
+
+    /**
      * Decode a module.
      *
+     * @param type_map The type map.
      * @param mod The module.
      * @returns The decoded module.
      */
-    std::unique_ptr<language_module> decode(const language_module& mod);
+    std::unique_ptr<language_module> decode(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                            const language_module& mod);
 
     /**
      * Decode the function's arguments and locals.
      *
+     * @param type_map The type map.
      * @param desc The function descriptor.
      */
-    void decode_locals(function_descriptor& desc);
+    void decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map,
+                       function_descriptor& desc);
 
     /**
      * Decode an instruction.
      *
+     * @param type_map The type map.
      * @param mod The decoded module.
      * @param ar The archive to read from.
      * @param instr The instruction to decode.
@@ -817,7 +848,8 @@ class context
      * @param code Buffer to write the decoded bytes into.
      * @return Delta (in bytes) by which the instruction changes the stack size.
      */
-    std::int32_t decode_instruction(language_module& mod,
+    std::int32_t decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                    language_module& mod,
                                     archive& ar,
                                     std::byte instr,
                                     const function_details& details,

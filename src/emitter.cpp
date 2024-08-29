@@ -589,7 +589,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         expect_arg_size(1);
 
         auto& args = instr->get_args();
-        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();
+        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_resolved_type();
 
         array_type type;
         if(type_str == "i32")
@@ -701,7 +701,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_type(), it->is_array()};
+            locals[index] = {it->get_resolved_type(), it->is_array()};
         }
 
         for(auto& it: func_locals)
@@ -719,7 +719,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_type(), it->is_array()};
+            locals[index] = {it->get_resolved_type(), it->is_array()};
         }
 
         if(unset_indices.size() != 0)
