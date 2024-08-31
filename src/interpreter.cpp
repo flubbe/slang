@@ -117,8 +117,8 @@ static const std::unordered_map<std::string, std::pair<std::uint8_t, std::uint8_
   {"addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
-std::pair<std::uint8_t, std::uint8_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                                   const std::string& type_name, bool reference) const
+std::pair<std::size_t, std::uint8_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                                  const std::string& type_name, bool reference) const
 {
     // references.
     if(reference)
@@ -146,22 +146,46 @@ std::pair<std::uint8_t, std::uint8_t> context::get_type_properties(const std::un
     }
 
     std::size_t type_size = 0;
-    std::uint8_t struct_align = 0;
+    std::size_t struct_align = 0;
     for(auto& [member_name, member_type]: type_it->second.member_types)
     {
-        auto [size, alignment] = get_type_properties(type_map, member_type.base_type, member_type.array);
-        type_size += size;
+        // check that the type exists and get its properties.
+        std::size_t base_size = 0;
+        std::size_t base_alignment = 0;
 
-        // member alignment.
-        if(member_type.array)
+        built_in_it = type_properties_map.find(member_type.base_type);
+        if(built_in_it != type_properties_map.end())
         {
-            type_size = (type_size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+            base_size = built_in_it->second.first;
+            base_alignment = built_in_it->second.second;
         }
         else
         {
-            type_size = (type_size + (alignment - 1)) & ~(alignment - 1);
+            if(type_map.find(member_type.base_type) == type_map.end())
+            {
+                throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
+            }
+
+            base_size = sizeof(void*);
+            base_alignment = std::alignment_of_v<void*>;
         }
-        struct_align = std::max(struct_align, alignment);
+
+        if(!member_type.array)
+        {
+            // non-array types (might be pointers).
+            type_size += base_size;
+            type_size = (type_size + (base_alignment - 1)) & ~(base_alignment - 1);
+
+            struct_align = std::max(struct_align, base_alignment);
+        }
+        else
+        {
+            // array types.
+            type_size += sizeof(void*);
+            type_size = (type_size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+
+            struct_align = std::max(struct_align, std::alignment_of_v<void*>);
+        }
     }
 
     // trailing padding.

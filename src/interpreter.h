@@ -804,9 +804,9 @@ class context
      * @return Returns a pair `(size, alignment)`.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
-    std::pair<std::uint8_t, std::uint8_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                              const std::string& type_name,
-                                                              bool reference) const;
+    std::pair<std::size_t, std::uint8_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                             const std::string& type_name,
+                                                             bool reference) const;
 
     /**
      * Calculate the stack size delta from a function's signature.
