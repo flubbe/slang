@@ -80,6 +80,16 @@ void garbage_collector::delete_object(gc_object& obj_info)
     {
         object_deleter<std::string>(obj_info.addr, allocated_bytes);
     }
+    else if(obj_info.type == gc_object_type::obj)
+    {
+        ::operator delete(obj_info.addr, std::align_val_t{obj_info.alignment});
+
+        if(obj_info.size > allocated_bytes)
+        {
+            throw gc_error("Inconsistent allocation stats: obj_info.size > allocated_bytes");
+        }
+        allocated_bytes -= obj_info.size;
+    }
     else if(obj_info.type == gc_object_type::array_i32)
     {
         object_deleter<si::fixed_vector<std::int32_t>>(obj_info.addr, allocated_bytes);

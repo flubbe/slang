@@ -51,6 +51,7 @@ public:
 enum class gc_object_type : std::uint8_t
 {
     str,
+    obj,
     array_i32,
     array_f32,
     array_str,
@@ -63,6 +64,7 @@ inline std::string to_string(gc_object_type type)
     switch(type)
     {
     case gc_object_type::str: return "str";
+    case gc_object_type::obj: return "obj";
     case gc_object_type::array_i32: return "array_i32";
     case gc_object_type::array_f32: return "array_f32";
     case gc_object_type::array_str: return "array_str";
@@ -86,6 +88,12 @@ struct gc_object
     /** Object type. */
     gc_object_type type;
 
+    /** Object size. */
+    std::size_t size;
+
+    /** Memory alignment. */
+    std::size_t alignment;
+
     /** Flags. */
     std::uint8_t flags{of_none};
 
@@ -97,14 +105,20 @@ struct gc_object
     static gc_object from([[maybe_unused]] T* obj, [[maybe_unused]] std::uint8_t flags = of_none)
     {
         static_assert(
-          !std::is_same_v<T, std::string>
-            && !std::is_same_v<T, si::fixed_vector<std::int32_t>>
-            && !std::is_same_v<T, si::fixed_vector<float>>
-            && !std::is_same_v<T, si::fixed_vector<std::string*>>
-            && !std::is_same_v<T, si::fixed_vector<void*>>,
+          std::is_same_v<T, std::string>
+            || std::is_same_v<T, si::fixed_vector<std::int32_t>>
+            || std::is_same_v<T, si::fixed_vector<float>>
+            || std::is_same_v<T, si::fixed_vector<std::string*>>
+            || std::is_same_v<T, si::fixed_vector<void*>>,
           "Cannot create GC object from type.");
 
         return {};    // unreachable
+    }
+
+    /** Create an object with a given size. */
+    static gc_object from(void* obj, std::size_t size, std::size_t alignment, std::uint8_t flags = of_none)
+    {
+        return {gc_object_type::obj, size, alignment, flags, obj};
     }
 };
 
@@ -112,35 +126,50 @@ template<>
 inline gc_object gc_object::from<std::string>(
   std::string* obj, std::uint8_t flags)
 {
-    return {gc_object_type::str, flags, obj};
+    return {gc_object_type::str,
+            sizeof(std::string),
+            std::alignment_of_v<std::string>,
+            flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
   si::fixed_vector<std::int32_t>* obj, std::uint8_t flags)
 {
-    return {gc_object_type::array_i32, flags, obj};
+    return {gc_object_type::array_i32,
+            sizeof(si::fixed_vector<std::int32_t>),
+            std::alignment_of_v<si::fixed_vector<std::int32_t>>,
+            flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<float>>(
   si::fixed_vector<float>* obj, std::uint8_t flags)
 {
-    return {gc_object_type::array_f32, flags, obj};
+    return {gc_object_type::array_f32,
+            sizeof(si::fixed_vector<float>),
+            std::alignment_of_v<si::fixed_vector<float>>,
+            flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
   si::fixed_vector<std::string*>* obj, std::uint8_t flags)
 {
-    return {gc_object_type::array_str, flags, obj};
+    return {gc_object_type::array_str,
+            sizeof(si::fixed_vector<std::string*>),
+            std::alignment_of_v<si::fixed_vector<std::string*>>,
+            flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<void*>>(
   si::fixed_vector<void*>* obj, std::uint8_t flags)
 {
-    return {gc_object_type::array_aref, flags, obj};
+    return {gc_object_type::array_aref,
+            sizeof(si::fixed_vector<void*>),
+            std::alignment_of_v<si::fixed_vector<void*>>,
+            flags, obj};
 }
 
 /** Garbage collector. */
@@ -238,6 +267,39 @@ public:
                 return static_cast<T*>(add_temporary(obj));
             }
             return static_cast<T*>(add_root(obj));
+        }
+
+        return obj;
+    }
+
+    /**
+     * Allocate a new garbage collected variable of a given size and alignment,
+     * and optionally add it to the root set or temporary set.
+     *
+     * @param size Size of the object, in bytes.
+     * @param alignment Byte-alignment of the object.
+     * @param flags Flags.
+     * @param add Whether to add the object to the root set or temporary set (depending on the flags).
+     * @returns Returns a (pointer to a) garbage collected variable.
+     */
+    void* gc_new(std::size_t size, std::uint8_t alignment, std::uint32_t flags = gc_object::of_none, bool add = true)
+    {
+        allocated_bytes += size;
+
+        void* obj = new(std::align_val_t{alignment}) std::byte[size]();    // This also performs zero-initialization.
+        if(objects.find(obj) != objects.end())
+        {
+            throw gc_error("Allocated object already exists.");
+        }
+        objects.insert({obj, gc_object::from(obj, size, alignment, flags)});
+
+        if(add)
+        {
+            if(flags & gc_object::of_temporary)
+            {
+                return add_temporary(obj);
+            }
+            return add_root(obj);
         }
 
         return obj;

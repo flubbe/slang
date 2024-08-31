@@ -383,7 +383,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 throw emitter_error(fmt::format("Could not resolve module-local function '{}'.", *v->get_name()));
             }
 
-            vle_int index = it - ctx.funcs.begin();
+            /*
+             * FIXME The types are stored before the functions when constructing the header later.
+             *       It would be better to have a single point that controls export table construction
+             *       and export index requests (instead of manually adding ctx.types.size()).
+             */
+            vle_int index = std::distance(ctx.funcs.begin(), it) + ctx.types.size();
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;
@@ -436,6 +441,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                                       });
         if(struct_it != ctx.types.end())
         {
+            /*
+             * FIXME The types are stored first in the export table when constructing the header later.
+             *       It would be better to have a single point that controls export table construction
+             *       and export index requests.
+             */
             struct_index = std::distance(ctx.types.begin(), struct_it);
         }
         else
@@ -573,6 +583,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                                });
         if(it != ctx.types.end())
         {
+            /*
+             * FIXME The types are stored first in the export table when constructing the header later.
+             *       It would be better to have a single point that controls export table construction
+             *       and export index requests.
+             */
             index = std::distance(ctx.types.begin(), it);
         }
         else

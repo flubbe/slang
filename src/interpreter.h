@@ -809,6 +809,19 @@ class context
                                                              bool reference) const;
 
     /**
+     * Get the byte size and offset of a field.
+     *
+     * @param type_map The type map.
+     * @param type_name The base type name.
+     * @param field_index The field index.
+     * @return Returns a pair `(size, offset)`.
+     * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
+     */
+    std::pair<std::size_t, std::size_t> get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                             const std::string& type_name,
+                                                             std::size_t field_index) const;
+
+    /**
      * Calculate the stack size delta from a function's signature.
      *
      * @param type_map The type map.

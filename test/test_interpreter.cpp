@@ -962,6 +962,33 @@ TEST(interpreter, structs)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
+TEST(interpreter, structs_access)
+{
+    slang::language_module mod;
+
+    try
+    {
+        slang::file_read_archive read_ar("structs_access.cmod");
+        EXPECT_NO_THROW(read_ar & mod);
+    }
+    catch(const std::runtime_error& e)
+    {
+        fmt::print("Error loading 'structs_access.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        throw e;
+    }
+
+    slang::file_manager file_mgr;
+    si::context ctx{file_mgr};
+
+    ASSERT_NO_THROW(ctx.load_module("structs_access", mod));
+
+    ASSERT_NO_THROW(ctx.invoke("structs_access", "test", {}));
+
+    EXPECT_EQ(ctx.get_gc().object_count(), 0);
+    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+}
+
 TEST(interpreter, multiple_modules)
 {
     slang::language_module mod;

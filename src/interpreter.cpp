@@ -191,9 +191,86 @@ std::pair<std::size_t, std::uint8_t> context::get_type_properties(const std::uno
     // trailing padding.
     type_size = (type_size + (struct_align - 1)) & ~(struct_align - 1);
 
-    // TODO store/look up type size for struct.
+    // TODO store/look up type sizes and member offsets for struct.
 
     return std::make_pair(type_size, struct_align);
+}
+
+std::pair<std::size_t, std::size_t> context::get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                                  const std::string& type_name,
+                                                                  std::size_t field_index) const
+{
+    // built-in types.
+    if(type_name == "void")
+    {
+        throw interpreter_error("Invalid struct type name 'void'.");
+    }
+
+    auto built_in_it = type_properties_map.find(type_name);
+    if(built_in_it != type_properties_map.end())
+    {
+        throw interpreter_error(fmt::format("Invalid struct type name '{}'.", type_name));
+    }
+
+    // structs.
+    auto type_it = type_map.find(type_name);
+    if(type_it == type_map.end())
+    {
+        throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
+    }
+
+    std::size_t offset = 0;
+    for(auto& [member_name, member_type]: type_it->second.member_types)
+    {
+        // check that the type exists and get its properties.
+        std::size_t base_size = 0;
+        std::size_t base_alignment = 0;
+
+        built_in_it = type_properties_map.find(member_type.base_type);
+        if(built_in_it != type_properties_map.end())
+        {
+            base_size = built_in_it->second.first;
+            base_alignment = built_in_it->second.second;
+        }
+        else
+        {
+            if(type_map.find(member_type.base_type) == type_map.end())
+            {
+                throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
+            }
+
+            base_size = sizeof(void*);
+            base_alignment = std::alignment_of_v<void*>;
+        }
+
+        if(!member_type.array)
+        {
+            // non-array types (might be pointers).
+            if(!field_index)
+            {
+                return std::make_pair(base_size, offset);
+            }
+
+            offset += base_size;
+            offset = (offset + (base_alignment - 1)) & ~(base_alignment - 1);
+        }
+        else
+        {
+            // array types.
+            if(!field_index)
+            {
+                return std::make_pair(sizeof(void*), offset);
+            }
+
+            offset += sizeof(void*);
+            offset = (offset + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+        }
+
+        --field_index;
+    }
+
+    // Should be unreachable.
+    throw interpreter_error(fmt::format("Field index not in type '{}'.", type_name));
 }
 
 std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -393,7 +470,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     }
-    /** invoke. */
+    /* invoke. */
     case opcode::invoke:
     {
         vle_int i;
@@ -511,6 +588,64 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         {
             return is_store ? -static_cast<std::int32_t>(sizeof(std::uint32_t)) : sizeof(std::uint32_t);    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
         }
+    }
+    /* new. */
+    case opcode::new_:
+    {
+        vle_int i;
+        ar & i;
+
+        if(static_cast<std::size_t>(i.i) < 0)
+        {
+            // TODO implement for imported types.
+            throw interpreter_error("Decode of opcode 'new' not implemented for imported types.");
+        }
+
+        if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
+        {
+            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
+        }
+
+        auto& exp_symbol = mod.header.exports[i.i];
+        if(exp_symbol.type != symbol_type::type)
+        {
+            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", i.i));
+        }
+
+        auto [size, alignment] = get_type_properties(type_map, exp_symbol.name, false);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&alignment), reinterpret_cast<std::byte*>(&alignment) + sizeof(alignment));
+
+        return static_cast<std::int32_t>(sizeof(void*));
+    }
+    /* setfield. */
+    case opcode::setfield:
+    {
+        vle_int struct_index, field_index;
+        ar & struct_index & field_index;
+
+        if(static_cast<std::size_t>(struct_index.i) < 0)
+        {
+            // TODO implement for imported types.
+            throw interpreter_error("Decode of opcode 'setfield' not implemented for imported types.");
+        }
+
+        if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
+        {
+            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
+        }
+
+        auto& exp_symbol = mod.header.exports[struct_index.i];
+        if(exp_symbol.type != symbol_type::type)
+        {
+            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+        }
+
+        auto [size, offset] = get_field_properties(type_map, exp_symbol.name, field_index.i);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(size);
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
@@ -1284,6 +1419,16 @@ opcode context::exec(const language_module& mod,
             }
             break;
         } /* opcode::invoke */
+        case opcode::new_:
+        {
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::size_t size = read_unchecked<std::size_t>(binary, offset);
+            std::uint8_t alignment = read_unchecked<std::uint8_t>(binary, offset);
+
+            frame.stack.push_addr(gc.gc_new(size, alignment, gc::gc_object::of_temporary));
+
+            break;
+        } /* opcode::new_ */
         case opcode::newarray:
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
@@ -1335,6 +1480,43 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(v->size());
             break;
         } /* opcode::arraylength */
+        case opcode::setfield:
+        {
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
+            std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+
+            if(field_size == sizeof(std::int32_t))
+            {
+                std::uint32_t v = frame.stack.pop_i32();
+                void* type_ref = frame.stack.pop_addr<void*>();
+                if(type_ref == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during setfield.");
+                }
+                gc.remove_temporary(type_ref);
+
+                *reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::byte*>(type_ref) + field_offset) = v;
+            }
+            else if(field_size == sizeof(void*))
+            {
+                void* v = frame.stack.pop_addr<void>();
+                void* type_ref = frame.stack.pop_addr<void*>();
+                if(type_ref == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during setfield.");
+                }
+                gc.remove_temporary(type_ref);
+
+                *reinterpret_cast<void**>(reinterpret_cast<std::byte*>(type_ref) + field_offset) = v;
+            }
+            else
+            {
+                throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
+            }
+
+            break;
+        } /* opcode::setfield */
         case opcode::iand:
         {
             frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());
