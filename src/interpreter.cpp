@@ -591,8 +591,16 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
             auto built_in_it = type_properties_map.find(member_type.base_type);
             if(built_in_it != type_properties_map.end())
             {
-                member_type.size = built_in_it->second.first;
-                member_type.alignment = built_in_it->second.second;
+                if(!member_type.array)
+                {
+                    member_type.size = built_in_it->second.first;
+                    member_type.alignment = built_in_it->second.second;
+                }
+                else
+                {
+                    member_type.size = sizeof(void*);
+                    member_type.alignment = std::alignment_of_v<void*>;
+                }
             }
             else
             {
@@ -601,31 +609,21 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
                     throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
                 }
 
+                // size and alignment are the same for both array and non-array types.
                 member_type.size = sizeof(void*);
                 member_type.alignment = std::alignment_of_v<void*>;
             }
 
-            // calculate offset as `size_after - size_before`.
+            // calculate member offset as `size_after - size_before`.
             offset -= size;
 
-            if(!member_type.array)
-            {
-                // non-array types (might be pointers).
-                size += member_type.size;
-                size = (size + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
+            // update struct size and alignment.
+            size += member_type.size;
+            size = (size + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
 
-                alignment = std::max(alignment, member_type.alignment);
-            }
-            else
-            {
-                // array types.
-                size += sizeof(void*);
-                size = (size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+            alignment = std::max(alignment, member_type.alignment);
 
-                alignment = std::max(alignment, std::alignment_of_v<void*>);
-            }
-
-            // calculate offset as `size_after - size_before`.
+            // calculate member offset as `size_after - size_before`.
             offset += size;
         }
 
