@@ -438,6 +438,15 @@ struct type_info
     /** Whether this is an array. */
     bool array{false};
 
+    /** Type size (not serialized). */
+    std::size_t size;
+
+    /** Type alignment (not serialized). */
+    std::size_t alignment;
+
+    /** Offset (not serialized). */
+    std::size_t offset;
+
     /** Default constructors. */
     type_info() = default;
     type_info(const type_info&) = default;
@@ -490,6 +499,12 @@ struct type_descriptor
 {
     /** Members as (name, type). */
     std::vector<std::pair<std::string, type_info>> member_types;
+
+    /** Type size (not serialized). */
+    std::size_t size{0};
+
+    /** Type alignment (not serialized). */
+    std::size_t alignment{0};
 };
 
 /**

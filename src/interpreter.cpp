@@ -145,55 +145,7 @@ std::pair<std::size_t, std::uint8_t> context::get_type_properties(const std::uno
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
     }
 
-    std::size_t type_size = 0;
-    std::size_t struct_align = 0;
-    for(auto& [member_name, member_type]: type_it->second.member_types)
-    {
-        // check that the type exists and get its properties.
-        std::size_t base_size = 0;
-        std::size_t base_alignment = 0;
-
-        built_in_it = type_properties_map.find(member_type.base_type);
-        if(built_in_it != type_properties_map.end())
-        {
-            base_size = built_in_it->second.first;
-            base_alignment = built_in_it->second.second;
-        }
-        else
-        {
-            if(type_map.find(member_type.base_type) == type_map.end())
-            {
-                throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
-            }
-
-            base_size = sizeof(void*);
-            base_alignment = std::alignment_of_v<void*>;
-        }
-
-        if(!member_type.array)
-        {
-            // non-array types (might be pointers).
-            type_size += base_size;
-            type_size = (type_size + (base_alignment - 1)) & ~(base_alignment - 1);
-
-            struct_align = std::max(struct_align, base_alignment);
-        }
-        else
-        {
-            // array types.
-            type_size += sizeof(void*);
-            type_size = (type_size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
-
-            struct_align = std::max(struct_align, std::alignment_of_v<void*>);
-        }
-    }
-
-    // trailing padding.
-    type_size = (type_size + (struct_align - 1)) & ~(struct_align - 1);
-
-    // TODO store/look up type sizes and member offsets for struct.
-
-    return std::make_pair(type_size, struct_align);
+    return std::make_pair(type_it->second.size, type_it->second.alignment);
 }
 
 std::pair<std::size_t, std::size_t> context::get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -219,58 +171,8 @@ std::pair<std::size_t, std::size_t> context::get_field_properties(const std::uno
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
     }
 
-    std::size_t offset = 0;
-    for(auto& [member_name, member_type]: type_it->second.member_types)
-    {
-        // check that the type exists and get its properties.
-        std::size_t base_size = 0;
-        std::size_t base_alignment = 0;
-
-        built_in_it = type_properties_map.find(member_type.base_type);
-        if(built_in_it != type_properties_map.end())
-        {
-            base_size = built_in_it->second.first;
-            base_alignment = built_in_it->second.second;
-        }
-        else
-        {
-            if(type_map.find(member_type.base_type) == type_map.end())
-            {
-                throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
-            }
-
-            base_size = sizeof(void*);
-            base_alignment = std::alignment_of_v<void*>;
-        }
-
-        if(!member_type.array)
-        {
-            // non-array types (might be pointers).
-            if(!field_index)
-            {
-                return std::make_pair(base_size, offset);
-            }
-
-            offset += base_size;
-            offset = (offset + (base_alignment - 1)) & ~(base_alignment - 1);
-        }
-        else
-        {
-            // array types.
-            if(!field_index)
-            {
-                return std::make_pair(sizeof(void*), offset);
-            }
-
-            offset += sizeof(void*);
-            offset = (offset + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
-        }
-
-        --field_index;
-    }
-
-    // Should be unreachable.
-    throw interpreter_error(fmt::format("Field index not in type '{}'.", type_name));
+    auto field_info = type_it->second.member_types.at(field_index);
+    return std::make_pair(field_info.second.size, field_info.second.offset);
 }
 
 std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -669,6 +571,71 @@ std::function<void(operand_stack&)> context::resolve_native_function(const std::
     DEBUG_LOG("resolved imported native function '{}.{}'.", library_name, name);
 
     return func_it->second;
+}
+
+void context::decode_types(std::unordered_map<std::string, type_descriptor>& type_map,
+                           const language_module& mod)
+{
+    for(auto& [name, desc]: type_map)
+    {
+        std::size_t size = 0;
+        std::size_t alignment = 0;
+        int offset = 0;
+
+        for(auto& [member_name, member_type]: desc.member_types)
+        {
+            // store offset. this is updated after the type size and alignment calculation below.
+            member_type.offset = static_cast<std::size_t>(offset);
+
+            // check that the type exists and get its properties.
+            auto built_in_it = type_properties_map.find(member_type.base_type);
+            if(built_in_it != type_properties_map.end())
+            {
+                member_type.size = built_in_it->second.first;
+                member_type.alignment = built_in_it->second.second;
+            }
+            else
+            {
+                if(type_map.find(member_type.base_type) == type_map.end())
+                {
+                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
+                }
+
+                member_type.size = sizeof(void*);
+                member_type.alignment = std::alignment_of_v<void*>;
+            }
+
+            // calculate offset as `size_after - size_before`.
+            offset -= size;
+
+            if(!member_type.array)
+            {
+                // non-array types (might be pointers).
+                size += member_type.size;
+                size = (size + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
+
+                alignment = std::max(alignment, member_type.alignment);
+            }
+            else
+            {
+                // array types.
+                size += sizeof(void*);
+                size = (size + (std::alignment_of_v<void*> - 1)) & ~(std::alignment_of_v<void*> - 1);
+
+                alignment = std::max(alignment, std::alignment_of_v<void*>);
+            }
+
+            // calculate offset as `size_after - size_before`.
+            offset += size;
+        }
+
+        // trailing padding.
+        size = (size + (alignment - 1)) & ~(alignment - 1);
+
+        // store type size and alignment.
+        desc.size = size;
+        desc.alignment = alignment;
+    }
 }
 
 std::unique_ptr<language_module> context::decode(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -1887,6 +1854,8 @@ void context::load_module(const std::string& name, const language_module& mod)
 
         tmap.insert({it.name, std::get<type_descriptor>(it.desc)});
     }
+
+    decode_types(tmap, mod);
     type_map.insert({name, std::move(tmap)});
 
     // decode the module.

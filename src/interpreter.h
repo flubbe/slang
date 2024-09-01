@@ -832,6 +832,15 @@ class context
                                  const function_signature& s) const;
 
     /**
+     * Decode the types. Set types sizes, alignments and offsets.
+     *
+     * @param type_map The type map.
+     * @param mod The module, used for import resolution.
+     */
+    void decode_types(std::unordered_map<std::string, type_descriptor>& type_map,
+                      const language_module& mod);    // FIXME Will this be used?
+
+    /**
      * Decode a module.
      *
      * @param type_map The type map.
