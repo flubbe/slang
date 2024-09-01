@@ -182,9 +182,9 @@ std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        auto [size, align] = get_type_properties(type_map, it.first, it.second);
+        auto [size, alignment] = get_type_properties(type_map, it.first, it.second);
         arg_size += size;
-        arg_size = (arg_size + (align - 1)) & ~(align - 1);
+        arg_size = (arg_size + (alignment - 1)) & ~(alignment - 1);
     }
     return return_type_size - arg_size;
 }
@@ -210,14 +210,13 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = 0; i < arg_count; ++i)
     {
         auto& v = details.locals[i];
+        auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
 
-        v.offset = details.args_size;
-
-        auto [size, align] = get_type_properties(type_map, v.type, v.array);
+        v.offset = (details.args_size + (alignment - 1)) & ~(alignment - 1);
         v.size = size;
 
         details.args_size += v.size;
-        details.args_size = (details.args_size + (align - 1)) & ~(align - 1);
+        details.args_size = (details.args_size + (alignment - 1)) & ~(alignment - 1);
     }
     details.locals_size = details.args_size;
 
@@ -225,14 +224,13 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = arg_count; i < details.locals.size(); ++i)
     {
         auto& v = details.locals[i];
+        auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
 
-        v.offset = details.locals_size;
-
-        auto [size, align] = get_type_properties(type_map, v.type, v.array);
+        v.offset = (details.locals_size + (alignment - 1)) & ~(alignment - 1);
         v.size = size;
 
         details.locals_size += v.size;
-        details.locals_size = (details.locals_size + (align - 1)) & ~(align - 1);
+        details.locals_size = (details.locals_size + (alignment - 1)) & ~(alignment - 1);
     }
 
     // return type
@@ -584,9 +582,6 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
-            // store offset. this is updated after the type size and alignment calculation below.
-            member_type.offset = static_cast<std::size_t>(offset);
-
             // check that the type exists and get its properties.
             auto built_in_it = type_properties_map.find(member_type.base_type);
             if(built_in_it != type_properties_map.end())
@@ -613,6 +608,9 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
                 member_type.size = sizeof(void*);
                 member_type.alignment = std::alignment_of_v<void*>;
             }
+
+            // store offset.
+            member_type.offset = (static_cast<std::size_t>(offset) + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
 
             // calculate member offset as `size_after - size_before`.
             offset -= size;
