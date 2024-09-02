@@ -1079,6 +1079,12 @@ std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
         return ctx.get_type("i32", false);
     }
 
+    // string assignments.
+    if(op.s == "=" && *lhs_type == ctx.get_type("str", false) && *rhs_type == ctx.get_type("str", false))
+    {
+        return lhs_type;
+    }
+
     // check lhs and rhs have supported types (i32 and f32 at the moment).
     if(*lhs_type != ctx.get_type("i32", false) && *lhs_type != ctx.get_type("f32", false))
     {
