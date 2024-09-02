@@ -802,7 +802,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
             {
                 throw interpreter_error(fmt::format("Unable to resolve jump target for label '{}'.", id));
             }
-            *reinterpret_cast<std::size_t*>(&code[origin]) = target_it->second;
+            std::memcpy(&code[origin], &target_it->second, sizeof(std::size_t));
         }
     }
 
@@ -845,7 +845,8 @@ public:
         {
             if(local.array || local.reference)
             {
-                void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
+                void* addr;
+                std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
                     ctx.get_gc().add_root(addr);
@@ -880,7 +881,8 @@ public:
         {
             if(local.array || local.reference)
             {
-                void* addr = *reinterpret_cast<void**>(&frame.locals[local.offset]);
+                void* addr;
+                std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
                     ctx.get_gc().remove_root(addr);
@@ -900,9 +902,9 @@ public:
 template<typename T>
 static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offset)
 {
-    T v = *reinterpret_cast<const T*>(&binary[offset]);
+    T v;
+    std::memcpy(&v, &binary[offset], sizeof(T));
     offset += sizeof(T);
-
     return v;
 }
 
@@ -968,7 +970,9 @@ opcode context::exec(const language_module& mod,
         case opcode::adup:
         {
             frame.stack.dup_addr();
-            gc.add_temporary(*reinterpret_cast<void**>(frame.stack.end(sizeof(void*))));
+            void* addr;
+            std::memcpy(&addr, frame.stack.end(sizeof(void*)), sizeof(void*));
+            gc.add_temporary(addr);
             break;
         } /* opcode::adup */
         case opcode::pop:
@@ -1200,7 +1204,9 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Invalid memory access.");
             }
 
-            frame.stack.push_i32(*reinterpret_cast<std::uint32_t*>(&frame.locals[i]));
+            std::uint32_t v;
+            std::memcpy(&v, &frame.locals[i], sizeof(v));
+            frame.stack.push_i32(v);
             break;
         } /* opcode::iload, opcode::fload */
         case opcode::sload:
@@ -1218,7 +1224,8 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Invalid memory access.");
             }
 
-            auto s = *reinterpret_cast<std::string**>(&frame.locals[i]);
+            std::string* s;
+            std::memcpy(&s, &frame.locals[i], sizeof(s));
             gc.add_temporary(s);
             frame.stack.push_addr(s);
             break;
@@ -1238,7 +1245,8 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Invalid memory access.");
             }
 
-            auto addr = *reinterpret_cast<void**>(&frame.locals[i]);
+            void* addr;
+            std::memcpy(&addr, &frame.locals[i], sizeof(addr));
             gc.add_temporary(addr);
             frame.stack.push_addr(addr);
             break;
@@ -1259,7 +1267,8 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error("Stack overflow.");
             }
 
-            *reinterpret_cast<std::uint32_t*>(&frame.locals[i]) = frame.stack.pop_i32();
+            std::int32_t v = frame.stack.pop_i32();
+            std::memcpy(&frame.locals[i], &v, sizeof(v));
             break;
         } /* opcode::istore, opcode::fstore */
         case opcode::sstore:
@@ -1280,7 +1289,8 @@ opcode context::exec(const language_module& mod,
             auto s = frame.stack.pop_addr<std::string>();
             gc.remove_temporary(s);
 
-            auto prev = *reinterpret_cast<std::string**>(&frame.locals[i]);
+            std::string* prev;
+            std::memcpy(&prev, &frame.locals[i], sizeof(prev));
             if(s != prev)
             {
                 if(prev != nullptr)
@@ -1290,7 +1300,7 @@ opcode context::exec(const language_module& mod,
                 gc.add_root(s);
             }
 
-            *reinterpret_cast<std::string**>(&frame.locals[i]) = s;
+            std::memcpy(&frame.locals[i], &s, sizeof(s));
             break;
         } /* opcode::sstore */
         case opcode::astore:
@@ -1311,7 +1321,8 @@ opcode context::exec(const language_module& mod,
             auto obj = frame.stack.pop_addr<void>();
             gc.remove_temporary(obj);
 
-            auto prev = *reinterpret_cast<void**>(&frame.locals[i]);
+            void* prev;
+            std::memcpy(&prev, &frame.locals[i], sizeof(prev));
             if(obj != prev)
             {
                 if(prev != nullptr)
@@ -1321,22 +1332,23 @@ opcode context::exec(const language_module& mod,
                 gc.add_root(obj);
             }
 
-            *reinterpret_cast<void**>(&frame.locals[i]) = obj;
+            std::memcpy(&frame.locals[i], &obj, sizeof(obj));
             break;
         } /* opcode::astore */
         case opcode::invoke:
         {
             /* no out-of-bounds read possible, since this is checked during decode.
              * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-            language_module* const* callee_mod = reinterpret_cast<language_module* const*>(&binary[offset]);
+            language_module const* callee_mod;
+            std::memcpy(&callee_mod, &binary[offset], sizeof(callee_mod));
             offset += sizeof(callee_mod);
 
             /* no out-of-bounds read possible, since this is checked during decode.
              * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-            function_descriptor* const* desc_ptr = reinterpret_cast<function_descriptor* const*>(&binary[offset]);
-            offset += sizeof(desc_ptr);
+            function_descriptor const* desc;
+            std::memcpy(&desc, &binary[offset], sizeof(desc));
+            offset += sizeof(desc);
 
-            const function_descriptor* desc = *desc_ptr;
             if(desc->native)
             {
                 auto& details = std::get<native_function_details>(desc->details);
@@ -1359,7 +1371,7 @@ opcode context::exec(const language_module& mod,
                 frame.stack.discard(details.args_size);
 
                 // invoke function
-                exec(**callee_mod, details.offset, details.size, details.locals, callee_frame);
+                exec(*callee_mod, details.offset, details.size, details.locals, callee_frame);
 
                 // clean up arguments in GC
                 for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
@@ -1368,7 +1380,8 @@ opcode context::exec(const language_module& mod,
 
                     if(arg.array || arg.reference)
                     {
-                        void* addr = *reinterpret_cast<void**>(&callee_frame.locals[arg.offset]);
+                        void* addr;
+                        std::memcpy(&addr, &callee_frame.locals[arg.offset], sizeof(addr));
                         gc.remove_temporary(addr);
                     }
                 }
@@ -1459,7 +1472,7 @@ opcode context::exec(const language_module& mod,
                 }
                 gc.remove_temporary(type_ref);
 
-                *reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::byte*>(type_ref) + field_offset) = v;
+                std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
             }
             else if(field_size == sizeof(void*))
             {
@@ -1471,7 +1484,7 @@ opcode context::exec(const language_module& mod,
                 }
                 gc.remove_temporary(type_ref);
 
-                *reinterpret_cast<void**>(reinterpret_cast<std::byte*>(type_ref) + field_offset) = v;
+                std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
             }
             else
             {

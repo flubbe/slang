@@ -190,6 +190,10 @@ TEST(output, emitter)
           "fn sid(a: str) -> str {\n"
           " return a;\n"
           "}\n"
+          "fn arg3(a: f32, s: str) -> f32 {\n"
+          " s = \"Test\";\n"
+          " return 2.0 + a;\n"
+          "}\n"
           /* function calls */
           "fn call(a: i32) -> i32 {\n"
           " return arg(a) - 1;\n"

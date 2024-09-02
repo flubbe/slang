@@ -101,6 +101,9 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {si::value{"Test"}}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
+    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg3", {si::value(1.0f), si::value{"Test"}}));
+    EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
+
     ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
 

@@ -76,7 +76,7 @@ class value
                       "Primitive type must be an integer or a floating point type.");
 
         // we can just copy the value.
-        *reinterpret_cast<T*>(memory) = std::any_cast<T>(data);
+        std::memcpy(memory, std::any_cast<T>(&data), sizeof(T));
     }
 
     /**
@@ -101,7 +101,7 @@ class value
             (*vec)[i] = (*input_vec)[i];
         }
 
-        *reinterpret_cast<const fixed_vector<T>**>(memory) = vec;
+        std::memcpy(memory, &vec, sizeof(fixed_vector<T>*));
     }
 
     /**
@@ -117,10 +117,11 @@ class value
                         || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
                       "Vector type must be an integer type, a floating point type, or a string.");
 
-        auto vec = *reinterpret_cast<fixed_vector<T>**>(memory);
+        fixed_vector<T>* vec;
+        std::memcpy(&vec, memory, sizeof(fixed_vector<T>*));
         delete vec;
 
-        *reinterpret_cast<const fixed_vector<T>**>(memory) = nullptr;
+        std::memset(memory, 0, sizeof(fixed_vector<T>*));
     }
 
     /**
@@ -138,7 +139,7 @@ class value
         {
             throw std::bad_any_cast();
         }
-        *reinterpret_cast<const std::string**>(memory) = s;
+        std::memcpy(memory, &s, sizeof(std::string*));
     }
 
     /**
@@ -148,7 +149,7 @@ class value
      */
     void destroy_str(std::byte* memory) const
     {
-        *reinterpret_cast<const std::string**>(memory) = nullptr;
+        std::memset(memory, 0, sizeof(std::string*));
     }
 
     /**
@@ -159,7 +160,7 @@ class value
     void create_addr(std::byte* memory) const
     {
         // we can just copy the value.
-        *reinterpret_cast<const void**>(memory) = std::any_cast<void*>(data);
+        std::memcpy(memory, std::any_cast<void*>(&data), sizeof(void*));
     }
 
     /**
@@ -170,7 +171,7 @@ class value
      */
     void destroy_addr(std::byte* memory) const
     {
-        *reinterpret_cast<const void**>(memory) = nullptr;
+        std::memset(memory, 0, sizeof(void*));
     }
 
 public:
@@ -302,7 +303,7 @@ public:
     }
 
     /**
-     * Create the value in memory.
+     * Create the value in memory. The memory has to respect the value's alignment.
      *
      * @param memory The memory to write to.
      * @returns Returns the value's size in bytes.
@@ -507,7 +508,8 @@ public:
             throw interpreter_error("Stack underflow.");
         }
 
-        std::int32_t i = *reinterpret_cast<std::int32_t*>(&stack[stack.size() - 4]);
+        std::int32_t i;
+        std::memcpy(&i, &stack[stack.size() - 4], 4);
         stack.resize(stack.size() - 4);
         return i;
     }
@@ -520,7 +522,8 @@ public:
             throw interpreter_error("Stack underflow.");
         }
 
-        float f = *reinterpret_cast<float*>(&stack[stack.size() - 4]);
+        float f;
+        std::memcpy(&f, &stack[stack.size() - 4], 4);
         stack.resize(stack.size() - 4);
         return f;
     }
@@ -534,7 +537,8 @@ public:
             throw interpreter_error("Stack underflow.");
         }
 
-        T* addr = *reinterpret_cast<T**>(&stack[stack.size() - sizeof(T*)]);
+        T* addr;
+        std::memcpy(&addr, &stack[stack.size() - sizeof(T*)], sizeof(T*));
         stack.resize(stack.size() - sizeof(T*));
         return addr;
     }
