@@ -495,7 +495,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         vle_int i;
         ar & i;
 
-        if(static_cast<std::size_t>(i.i) < 0)
+        if(i.i < 0)
         {
             // TODO implement for imported types.
             throw interpreter_error("Decode of opcode 'new' not implemented for imported types.");
@@ -524,7 +524,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         vle_int struct_index, field_index;
         ar & struct_index & field_index;
 
-        if(static_cast<std::size_t>(struct_index.i) < 0)
+        if(struct_index.i < 0)
         {
             // TODO implement for imported types.
             throw interpreter_error("Decode of opcode 'setfield' not implemented for imported types.");

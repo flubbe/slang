@@ -515,7 +515,10 @@ TEST(interpreter, return_arrays)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "return_array", {}));
 
-    auto v = *reinterpret_cast<si::fixed_vector<int>* const*>(res.get<void*>());
+    auto v_ptr = reinterpret_cast<si::fixed_vector<int>* const*>(res.get<void*>());
+    ASSERT_NE(v_ptr, nullptr);
+
+    auto v = *v_ptr;
     ASSERT_EQ(v->size(), 2);
     EXPECT_EQ((*v)[0], 1);
     EXPECT_EQ((*v)[1], 2);
@@ -609,7 +612,10 @@ TEST(interpreter, return_str_array)
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
 
     {
-        auto array = *reinterpret_cast<si::fixed_vector<std::string*>* const*>(res.get<void*>());
+        auto array_ptr = reinterpret_cast<si::fixed_vector<std::string*>* const*>(res.get<void*>());
+        ASSERT_NE(array_ptr, nullptr);
+
+        auto array = *array_ptr;
         ASSERT_EQ(array->size(), 3);
         EXPECT_EQ(*(*array)[0], "a");
         EXPECT_EQ(*(*array)[1], "test");

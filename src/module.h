@@ -300,16 +300,16 @@ struct function_details : public symbol
     std::vector<variable> locals;
 
     /** Decoded arguments size. Not serialized. */
-    std::size_t args_size;
+    std::size_t args_size{0};
 
     /** Decoded size of locals. Not serialized. */
-    std::size_t locals_size;
+    std::size_t locals_size{0};
 
     /** Decoded return type size. Not serialized. */
-    std::size_t return_size;
+    std::size_t return_size{0};
 
     /** Operand stack size needed for this function. Not serialized. */
-    std::size_t stack_size;
+    std::size_t stack_size{0};
 
     /** Default constructors. */
     function_details() = default;
@@ -439,13 +439,13 @@ struct type_info
     bool array{false};
 
     /** Type size (not serialized). */
-    std::size_t size;
+    std::size_t size{0};
 
     /** Type alignment (not serialized). */
-    std::size_t alignment;
+    std::size_t alignment{0};
 
     /** Offset (not serialized). */
-    std::size_t offset;
+    std::size_t offset{0};
 
     /** Default constructors. */
     type_info() = default;
