@@ -184,7 +184,7 @@ std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type
     {
         auto [size, alignment] = get_type_properties(type_map, it.first, it.second);
         arg_size += size;
-        arg_size = (arg_size + (alignment - 1)) & ~(alignment - 1);
+        // NOTE stack contents are not aligned.
     }
     return return_type_size - arg_size;
 }
@@ -212,11 +212,11 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
         auto& v = details.locals[i];
         auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
 
-        v.offset = (details.args_size + (alignment - 1)) & ~(alignment - 1);
+        v.offset = details.args_size;    // NOTE offsets are not aligned.
         v.size = size;
 
         details.args_size += v.size;
-        details.args_size = (details.args_size + (alignment - 1)) & ~(alignment - 1);
+        details.args_size = details.args_size;    // NOTE sizes are not aligned.
     }
     details.locals_size = details.args_size;
 
@@ -226,11 +226,11 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
         auto& v = details.locals[i];
         auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
 
-        v.offset = (details.locals_size + (alignment - 1)) & ~(alignment - 1);
+        v.offset = details.locals_size;    // NOTE offsets are not aligned.
         v.size = size;
 
         details.locals_size += v.size;
-        details.locals_size = (details.locals_size + (alignment - 1)) & ~(alignment - 1);
+        details.locals_size = details.locals_size;    // NOTE sizes are not aligned.
     }
 
     // return type

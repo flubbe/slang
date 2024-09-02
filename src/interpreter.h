@@ -304,7 +304,7 @@ public:
     }
 
     /**
-     * Create the value in memory. The memory has to respect the value's alignment.
+     * Create the value in memory.
      *
      * @param memory The memory to write to.
      * @returns Returns the value's size in bytes.
