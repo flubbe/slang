@@ -65,7 +65,7 @@ std::string to_string(binary_op op)
       "lor"};
 
     std::size_t idx = static_cast<std::size_t>(op);
-    if(idx < 0 || idx >= strs.size())
+    if(idx >= strs.size())
     {
         throw codegen_error("Invalid operator index in to_string(binary_op).");
     }
@@ -76,12 +76,13 @@ std::string to_string(binary_op op)
 /*
  * Type casts.
  */
+
 std::string to_string(type_cast tc)
 {
     std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
 
     std::size_t idx = static_cast<std::size_t>(tc);
-    if(idx < 0 || idx > strs.size())
+    if(idx > strs.size())
     {
         throw codegen_error("Invalid type cast index in to_string(type_cast).");
     }

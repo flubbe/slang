@@ -8,12 +8,13 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "archives/archive.h"
-#include "archives/file.h"
+#include <cstring>
 
 #include <fmt/core.h>
-
 #include <gtest/gtest.h>
+
+#include "archives/archive.h"
+#include "archives/file.h"
 
 namespace
 {
@@ -68,14 +69,16 @@ std::vector<std::uint8_t> to_little_endian(std::int64_t i)
 std::vector<std::uint8_t> to_little_endian(float f)
 {
     static_assert(sizeof(float) == sizeof(std::uint32_t), "Float has to be the same size as std::uint32_t.");
-    uint32_t i = *reinterpret_cast<std::uint32_t*>(&f);
+    uint32_t i;
+    std::memcpy(&i, &f, sizeof(i));
     return to_little_endian(i);
 }
 
 std::vector<std::uint8_t> to_little_endian(double d)
 {
-    uint64_t i = *reinterpret_cast<std::uint64_t*>(&d);
     static_assert(sizeof(double) == sizeof(std::uint64_t), "Double has to be the same size as std::uint64_t.");
+    uint64_t i;
+    std::memcpy(&i, &d, sizeof(i));
     return to_little_endian(i);
 }
 
@@ -129,14 +132,16 @@ std::vector<std::uint8_t> to_big_endian(std::int64_t i)
 std::vector<std::uint8_t> to_big_endian(float f)
 {
     static_assert(sizeof(float) == sizeof(std::uint32_t), "Float has to be the same size as std::uint32_t.");
-    uint32_t i = *reinterpret_cast<std::uint32_t*>(&f);
+    uint32_t i;
+    std::memcpy(&i, &f, sizeof(i));
     return to_big_endian(i);
 }
 
 std::vector<std::uint8_t> to_big_endian(double d)
 {
-    uint64_t i = *reinterpret_cast<std::uint64_t*>(&d);
     static_assert(sizeof(double) == sizeof(std::uint64_t), "Double has to be the same size as std::uint64_t.");
+    uint64_t i;
+    std::memcpy(&i, &d, sizeof(d));
     return to_big_endian(i);
 }
 
