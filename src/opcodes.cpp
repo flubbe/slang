@@ -62,6 +62,7 @@ std::string to_string(opcode op)
     case opcode::sret: return "sret";
     case opcode::aret: return "aret";
     case opcode::setfield: return "setfield";
+    case opcode::getfield: return "getfield";
     case opcode::iand: return "iand";
     case opcode::land: return "land";
     case opcode::ior: return "ior";

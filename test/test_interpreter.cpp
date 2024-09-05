@@ -991,7 +991,10 @@ TEST(interpreter, structs_access)
 
     ASSERT_NO_THROW(ctx.load_module("structs_access", mod));
 
-    ASSERT_NO_THROW(ctx.invoke("structs_access", "test", {}));
+    si::value res;
+
+    ASSERT_NO_THROW(res = ctx.invoke("structs_access", "test", {}));
+    EXPECT_EQ(*res.get<int>(), 4);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);

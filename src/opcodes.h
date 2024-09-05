@@ -65,6 +65,7 @@ enum class opcode : opcode_base
     sret,        /** Return a str from a function. */
     aret,        /** Return an array reference. */
     setfield,    /** Set a field in a struct. */
+    getfield,    /** Get a field from a struct. */
     iand,        /** Bitwise and for two i32 from the stack. */
     land,        /** Logical and for two i32 from the stack. */
     ior,         /** Bitwise or for two i32 from the stack. */

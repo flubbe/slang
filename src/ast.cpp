@@ -292,32 +292,32 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         throw cg::codegen_error(loc, "Access expression has no type.");
     }
 
-    if(type.is_array())
+    auto* s = ctx.get_scope();
+    if(s == nullptr)
     {
-        auto* s = ctx.get_scope();
-        if(s == nullptr)
+        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
+    }
+
+    const cg::value* var{nullptr};
+    while(s != nullptr)
+    {
+        if((var = s->get_value(name.s)) != nullptr)
         {
-            throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
+            break;
         }
+        s = s->get_outer();
+    }
 
-        const cg::value* var{nullptr};
-        while(s != nullptr)
-        {
-            if((var = s->get_value(name.s)) != nullptr)
-            {
-                break;
-            }
-            s = s->get_outer();
-        }
+    if(s == nullptr)
+    {
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+    }
 
-        if(s == nullptr)
-        {
-            throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
-        }
+    // This cast is (implicitly) validated during type checking.
+    auto identifier_expr = reinterpret_cast<variable_reference_expression*>(expr.get());
 
-        // This cast is (implicitly) validated during type checking.
-        auto identifier_expr = reinterpret_cast<variable_reference_expression*>(expr.get());
-
+    if(var->is_array())
+    {
         if(identifier_expr->get_name().s == "length")
         {
             if(mc == memory_context::store)
@@ -335,13 +335,45 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         }
     }
 
-    // TODO
-    throw std::runtime_error(fmt::format("{}: access_expression::generate_code not implemented.", slang::to_string(loc)));
+    // structs.
+    auto& members = ctx.get_global_scope()->get_type(var->get_resolved_type());
+    auto it = std::find_if(members.begin(), members.end(),
+                           [&identifier_expr](const std::pair<std::string, cg::value>& v)
+                           {
+                               // This cast is (implicitly) validated during type checking.
+                               return v.first == identifier_expr->get_name().s;
+                           });
+    if(it == members.end())
+    {
+        throw cg::codegen_error(identifier_expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var->get_resolved_type(), identifier_expr->get_name().s));
+    }
+
+    /*
+     * FIXME This seems to be a hack.
+     *       - memory_context::none: Only load the struct's address.
+     *       - memory_context::load: Load struct's address and the field.
+     *       - memory_context::store: Only store the field.
+     */
+    if(mc == memory_context::none || mc == memory_context::load)
+    {
+        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var->get_resolved_type(), name.s, std::nullopt}));
+    }
+
+    if(mc == memory_context::load)
+    {
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_resolved_type(), it->second));
+    }
+    else if(mc == memory_context::store)
+    {
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(var->get_resolved_type(), it->second));
+    }
+
+    return std::make_unique<cg::value>(it->second);
 }
 
 std::optional<ty::type> access_expression::type_check(ty::context& ctx)
 {
-    type = ctx.get_identifier_type(name);
+    auto type = ctx.get_identifier_type(name);
 
     // array built-ins.
     if(type.is_array())
@@ -878,7 +910,7 @@ std::optional<ty::type> struct_named_initializer_expression::type_check(ty::cont
         }
         initialized_member_names.push_back(member_name_expr->get_name().s);
 
-        if(member_name_expr->is_member_access())    // this is an array access.
+        if(member_name_expr->is_array_element_access())    // this is an array access.
         {
             throw ty::type_error(name.location, fmt::format("Cannot access array elements in struct initializer."));
         }
@@ -1036,17 +1068,35 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             throw cg::codegen_error(loc, "Invalid memory context for assignment.");
         }
 
-        auto lhs_value = lhs->generate_code(ctx, memory_context::none);
-        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
-
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*lhs_value), lhs->is_member_access());
-
-        if(mc == memory_context::load)
+        if(lhs->is_struct_member_access())
         {
-            lhs_value = lhs->generate_code(ctx, memory_context::load);
-        }
+            lhs->generate_code(ctx, memory_context::none);    // FIXME generates the address of the struct.
+            auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
-        return lhs_value;
+            // we might need to duplicate the value for chained assignments.
+            if(mc == memory_context::load)
+            {
+                ctx.generate_dup(*rhs_value);
+            }
+
+            auto lhs_value = lhs->generate_code(ctx, memory_context::store);    // FIXME assumes the address of the struct is already on the stack.
+            return lhs_value;
+        }
+        else
+        {
+            auto lhs_value = lhs->generate_code(ctx, memory_context::none);
+            auto rhs_value = rhs->generate_code(ctx, memory_context::load);
+
+            // we might need to duplicate the value for chained assignments.
+            if(mc == memory_context::load)
+            {
+                ctx.generate_dup(*rhs_value);
+            }
+
+            ctx.generate_store(std::make_unique<cg::variable_argument>(*lhs_value), lhs->is_array_element_access());
+
+            return lhs_value;
+        }
     }
 
     throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op.s));

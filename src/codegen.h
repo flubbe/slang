@@ -2086,6 +2086,13 @@ public:
     void generate_dup(value vt);
 
     /**
+     * Load a field of a struct instance onto the stack.
+     *
+     * @param arg The field access details.
+     */
+    void generate_get_field(std::unique_ptr<field_access_argument> arg);
+
+    /**
      * Statically or dynamically invoke a function. If the invokation
      * is dynamic, the function is loaded from the stack.
      *

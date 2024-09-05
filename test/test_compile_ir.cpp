@@ -379,8 +379,8 @@ TEST(compile_ir, function_arguments_and_locals)
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "entry:\n"
                   " const i32 3\n"
+                  " dup i32\n"
                   " store i32 %j\n"
-                  " load i32 %j\n"
                   " store i32 %i\n"
                   " load i32 %j\n"
                   " ret i32\n"
@@ -1366,6 +1366,67 @@ TEST(compile_ir, structs)
                   " set_field %S, f32 %j\n"
                   " store addr %s\n"
                   " ret void\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " j: f32\n"
+          "};\n"
+          "fn test() -> i32\n"
+          "{\n"
+          " let s: S = S{ i: 2, j: 3 as f32 };\n"
+          " s.i = 1;\n"
+          " return s.i + s.j as i32;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  " f32 %j,\n"
+                  "}\n"
+                  "define i32 @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"
+                  " dup addr\n"
+                  " const i32 2\n"
+                  " set_field %S, i32 %i\n"
+                  " dup addr\n"
+                  " const i32 3\n"
+                  " cast i32_to_f32\n"
+                  " set_field %S, f32 %j\n"
+                  " store addr %s\n"
+                  " load addr %s\n"
+                  " const i32 1\n"
+                  " set_field %S, i32 %i\n"
+                  " load addr %s\n"
+                  " get_field %S, i32 %i\n"
+                  " load addr %s\n"
+                  " get_field %S, f32 %j\n"
+                  " cast f32_to_i32\n"
+                  " add i32\n"
+                  " ret i32\n"
                   "}");
     }
 }

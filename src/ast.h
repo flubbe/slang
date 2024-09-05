@@ -121,8 +121,14 @@ public:
         return false;
     }
 
-    /** Whether this expression is a member access of an array or struct. */
-    virtual bool is_member_access() const
+    /** Whether this expression is an access of an array element. */
+    virtual bool is_array_element_access() const
+    {
+        return false;
+    }
+
+    /** Whether this expression is a struct member access. */
+    virtual bool is_struct_member_access() const
     {
         return false;
     }
@@ -329,9 +335,6 @@ class access_expression : public expression
     /** The namespace name. */
     token name;
 
-    /** Namespace type. */
-    ty::type type;
-
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
 
@@ -361,6 +364,11 @@ public:
     , name{std::move(identifier)}
     , expr{std::move(expr)}
     {
+    }
+
+    bool is_struct_member_access() const override
+    {
+        return true;
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -496,7 +504,7 @@ public:
     {
     }
 
-    bool is_member_access() const override
+    bool is_array_element_access() const override
     {
         return static_cast<bool>(element_expr);
     }

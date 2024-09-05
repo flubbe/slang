@@ -1358,9 +1358,11 @@ TEST(output, structs)
           " i: i32,\n"
           " j: f32\n"
           "};\n"
-          "fn test() -> void\n"
+          "fn test() -> i32\n"
           "{\n"
           " let s: S = S{ i: 2, j: 3 as f32 };\n"
+          " s.i = 1;\n"
+          " return s.i + s.j as i32;\n"
           "}\n";
 
         slang::lexer lexer;

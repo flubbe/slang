@@ -283,7 +283,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(type == "addr")
         {
-            if(!str_opcode.has_value())
+            if(!ref_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
             }
@@ -324,7 +324,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "load")
     {
-        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload, opcode::aload);
+        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload, opcode::aload, opcode::aload);
     }
     else if(name == "store")
     {
@@ -464,8 +464,55 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         {
             throw emitter_error(fmt::format("Could not resolve field '{}' in struct '{}'.", *arg->get_member().get_name(), arg->get_struct_name()));
         }
+        field_index = std::distance(members.begin(), field_it);
 
         emit(instruction_buffer, opcode::setfield);
+        instruction_buffer & struct_index;
+        instruction_buffer & field_index;
+    }
+    else if(name == "get_field")
+    {
+        expect_arg_size(1);
+
+        cg::field_access_argument* arg = static_cast<cg::field_access_argument*>(args[0].get());
+
+        // resolve references to struct and field name.
+        vle_int struct_index = 0;
+        vle_int field_index = 0;
+
+        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                                      [arg](const std::unique_ptr<cg::type>& t) -> bool
+                                      {
+                                          return t->get_name() == arg->get_struct_name();
+                                      });
+        if(struct_it != ctx.types.end())
+        {
+            /*
+             * FIXME The types are stored first in the export table when constructing the header later.
+             *       It would be better to have a single point that controls export table construction
+             *       and export index requests.
+             */
+            struct_index = std::distance(ctx.types.begin(), struct_it);
+        }
+        else
+        {
+            // TODO search imported symbols. The type should have `import_path` set in this case.
+            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", arg->get_struct_name()));
+        }
+
+        auto& members = struct_it->get()->get_members();
+        auto field_it = std::find_if(members.begin(), members.end(),
+                                     [arg](const std::pair<std::string, cg::value>& m) -> bool
+                                     {
+                                         return m.first == *arg->get_member().get_name();
+                                     });
+        if(field_it == members.end())
+        {
+            throw emitter_error(fmt::format("Could not resolve field '{}' in struct '{}'.", *arg->get_member().get_name(), arg->get_struct_name()));
+        }
+        field_index = std::distance(members.begin(), field_it);
+
+        emit(instruction_buffer, opcode::getfield);
         instruction_buffer & struct_index;
         instruction_buffer & field_index;
     }

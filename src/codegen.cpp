@@ -98,13 +98,17 @@ void value::validate() const
 {
     bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
     bool is_ref = (type == "addr");
-    if(is_builtin || is_ref)
+    if(is_builtin)
     {
         if(aggregate_type.has_value())
         {
-            throw codegen_error("Aggregate type cannot contain value for built-in types.");
+            throw codegen_error("Value cannot be both: aggregate and reference.");
         }
+        return;
+    }
 
+    if(is_ref)
+    {
         return;
     }
 
@@ -753,6 +757,16 @@ void context::generate_dup(value vt)
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(std::move(vt)));
     insertion_point->add_instruction(std::make_unique<instruction>("dup", std::move(args)));
+}
+
+void context::generate_get_field(std::unique_ptr<field_access_argument> arg)
+{
+    validate_insertion_point();
+
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::move(arg));
+
+    insertion_point->add_instruction(std::make_unique<instruction>("get_field", std::move(args)));
 }
 
 void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> name)

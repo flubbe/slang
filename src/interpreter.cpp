@@ -527,7 +527,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         if(struct_index.i < 0)
         {
             // TODO implement for imported types.
-            throw interpreter_error("Decode of opcode 'setfield' not implemented for imported types.");
+            throw interpreter_error("Decode of opcodes 'setfield' not implemented for imported types.");
         }
 
         if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
@@ -546,6 +546,35 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
 
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(size);
+    }
+    /* getfield. */
+    case opcode::getfield:
+    {
+        vle_int struct_index, field_index;
+        ar & struct_index & field_index;
+
+        if(struct_index.i < 0)
+        {
+            // TODO implement for imported types.
+            throw interpreter_error("Decode of opcodes 'getfield' not implemented for imported types.");
+        }
+
+        if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
+        {
+            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
+        }
+
+        auto& exp_symbol = mod.header.exports[struct_index.i];
+        if(exp_symbol.type != symbol_type::type)
+        {
+            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+        }
+
+        auto [size, offset] = get_field_properties(type_map, exp_symbol.name, field_index.i);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+
+        return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(size);
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
@@ -1464,7 +1493,7 @@ opcode context::exec(const language_module& mod,
 
             if(field_size == sizeof(std::int32_t))
             {
-                std::uint32_t v = frame.stack.pop_i32();
+                std::int32_t v = frame.stack.pop_i32();
                 void* type_ref = frame.stack.pop_addr<void*>();
                 if(type_ref == nullptr)
                 {
@@ -1493,6 +1522,45 @@ opcode context::exec(const language_module& mod,
 
             break;
         } /* opcode::setfield */
+        case opcode::getfield:
+        {
+            /* no out-of-bounds read possible, since this is checked during decode. */
+            std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
+            std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+
+            if(field_size == sizeof(std::int32_t))
+            {
+                void* type_ref = frame.stack.pop_addr<void*>();
+                if(type_ref == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during setfield.");
+                }
+                gc.remove_temporary(type_ref);
+
+                std::int32_t v;
+                std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
+                frame.stack.push_i32(v);
+            }
+            else if(field_size == sizeof(void*))
+            {
+                void* type_ref = frame.stack.pop_addr<void*>();
+                if(type_ref == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during setfield.");
+                }
+                gc.remove_temporary(type_ref);
+
+                void* v = frame.stack.pop_addr<void>();
+                std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
+                frame.stack.push_addr(v);
+            }
+            else
+            {
+                throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
+            }
+
+            break;
+        } /* opcode::getfield */
         case opcode::iand:
         {
             frame.stack.push_i32(frame.stack.pop_i32() & frame.stack.pop_i32());
