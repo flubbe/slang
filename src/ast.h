@@ -133,6 +133,12 @@ public:
         return false;
     }
 
+    /** Whether this expression is a `named_expression`. */
+    virtual bool is_named_expression() const
+    {
+        return false;
+    }
+
     /**
      * Generate IR.
      *
@@ -203,6 +209,52 @@ public:
     const token_location& get_location() const
     {
         return loc;
+    }
+};
+
+/** Any expression with a name. */
+class named_expression : public expression
+{
+protected:
+    /** The expression name. */
+    token name;
+
+public:
+    /** No default constructor. */
+    named_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~named_expression() = default;
+
+    /** Default copy and move constructors. */
+    named_expression(const named_expression&) = default;
+    named_expression(named_expression&&) = default;
+
+    /** Default assignment operators. */
+    named_expression& operator=(const named_expression&) = default;
+    named_expression& operator=(named_expression&&) = default;
+
+    /**
+     * Construct a named expression.
+     *
+     * @param loc The location.
+     * @param tok The name token.
+     */
+    named_expression(token_location loc, token name)
+    : expression{std::move(loc)}
+    , name{std::move(name)}
+    {
+    }
+
+    bool is_named_expression() const override
+    {
+        return true;
+    }
+
+    /** Get the name. */
+    token get_name() const
+    {
+        return name;
     }
 };
 
@@ -330,11 +382,8 @@ public:
 };
 
 /** Access expression. */
-class access_expression : public expression
+class access_expression : public named_expression
 {
-    /** The namespace name. */
-    token name;
-
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
 
@@ -360,8 +409,7 @@ public:
      * @param expr An identifier expression.
      */
     access_expression(token identifier, std::unique_ptr<expression> expr)
-    : expression{identifier.location}
-    , name{std::move(identifier)}
+    : named_expression{identifier.location, std::move(identifier)}
     , expr{std::move(expr)}
     {
     }
@@ -430,11 +478,8 @@ public:
 };
 
 /** Directives. Directives have names and contain a list of key-value pairs as arguments. */
-class directive_expression : public expression
+class directive_expression : public named_expression
 {
-    /** The name. */
-    token name;
-
     /** Key-value pairs. */
     std::vector<std::pair<token, token>> args;
 
@@ -464,8 +509,7 @@ public:
      * @param expr The expression the directive applies to.
      */
     directive_expression(token name, std::vector<std::pair<token, token>> args, std::unique_ptr<expression> expr)
-    : expression{name.location}
-    , name{std::move(name)}
+    : named_expression{name.location, std::move(name)}
     , args{std::move(args)}
     , expr{std::move(expr)}
     {
@@ -483,11 +527,8 @@ public:
 };
 
 /** Variable references. */
-class variable_reference_expression : public expression
+class variable_reference_expression : public named_expression
 {
-    /** The variable name. */
-    token name;
-
     /** An optional expression for element access. */
     std::unique_ptr<expression> element_expr;
 
@@ -513,8 +554,7 @@ public:
      * @param element_expr An optional expression for array element access.
      */
     variable_reference_expression(token name, std::unique_ptr<expression> element_expr = nullptr)
-    : expression{name.location}
-    , name{std::move(name)}
+    : named_expression{name.location, std::move(name)}
     , element_expr{std::move(element_expr)}
     {
     }
@@ -527,20 +567,11 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    /** Get the identifier name. */
-    token get_name() const
-    {
-        return name;
-    }
 };
 
 /** Variable declaration. */
-class variable_declaration_expression : public expression
+class variable_declaration_expression : public named_expression
 {
-    /** The variable name. */
-    token name;
-
     /** The variable's type. */
     token type;
 
@@ -575,8 +606,7 @@ public:
      * @param expr An optional initializer expression.
      */
     variable_declaration_expression(token_location loc, token name, token type, bool array, std::unique_ptr<ast::expression> expr)
-    : expression{std::move(loc)}
-    , name{std::move(name)}
+    : named_expression{std::move(loc), std::move(name)}
     , type{std::move(type)}
     , array{array}
     , expr{std::move(expr)}
@@ -586,12 +616,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    /** Get the variable's name. */
-    const token& get_name() const
-    {
-        return name;
-    }
 
     /** Get the variable's type. */
     const token& get_type() const
@@ -642,11 +666,8 @@ public:
 };
 
 /** Struct definition. */
-class struct_definition_expression : public expression
+class struct_definition_expression : public named_expression
 {
-    /** The struct's name. */
-    token name;
-
     /** The struct's members. */
     std::vector<std::unique_ptr<variable_declaration_expression>> members;
 
@@ -673,8 +694,7 @@ public:
      * @param members The struct's members.
      */
     struct_definition_expression(token_location loc, token name, std::vector<std::unique_ptr<variable_declaration_expression>> members)
-    : expression{std::move(loc)}
-    , name{std::move(name)}
+    : named_expression{std::move(loc), std::move(name)}
     , members{std::move(members)}
     {
     }
@@ -686,11 +706,8 @@ public:
 };
 
 /** Anonymous struct initialization. */
-class struct_anonymous_initializer_expression : public expression
+class struct_anonymous_initializer_expression : public named_expression
 {
-    /** The struct's name. */
-    token name;
-
     /** Anonymous initializers. */
     std::vector<std::unique_ptr<expression>> initializers;
 
@@ -717,8 +734,7 @@ public:
      * @param members The struct's members.
      */
     struct_anonymous_initializer_expression(token name, std::vector<std::unique_ptr<expression>> initializers)
-    : expression{name.location}
-    , name{std::move(name)}
+    : named_expression{name.location, std::move(name)}
     , initializers{std::move(initializers)}
     {
     }
@@ -729,11 +745,8 @@ public:
 };
 
 /** Named struct initialization. */
-class struct_named_initializer_expression : public expression
+class struct_named_initializer_expression : public named_expression
 {
-    /** The struct's name. */
-    token name;
-
     /** Initialized member names. */
     std::vector<std::unique_ptr<expression>> member_names;
 
@@ -763,8 +776,7 @@ public:
      * @param members The struct's members.
      */
     struct_named_initializer_expression(token name, std::vector<std::unique_ptr<expression>> member_names, std::vector<std::unique_ptr<expression>> initializers)
-    : expression{name.location}
-    , name{std::move(name)}
+    : named_expression{name.location, std::move(name)}
     , member_names{std::move(member_names)}
     , initializers{std::move(initializers)}
     {

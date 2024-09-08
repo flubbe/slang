@@ -313,8 +313,12 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
     }
 
-    // This cast is (implicitly) validated during type checking.
-    auto identifier_expr = reinterpret_cast<variable_reference_expression*>(expr.get());
+    if(!expr->is_named_expression())
+    {
+        throw cg::codegen_error(loc, fmt::format("Could not find name for element access in access expression."));
+    }
+
+    auto identifier_expr = reinterpret_cast<named_expression*>(expr.get());
 
     if(var->is_array())
     {
@@ -1168,9 +1172,16 @@ std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
         return ctx.get_type("i32", false);
     }
 
-    // string assignments.
-    if(op.s == "=" && *lhs_type == ctx.get_type("str", false) && *rhs_type == ctx.get_type("str", false))
+    // assignments.
+    if(op.s == "=")
     {
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(*lhs_type != *rhs_type
+           && !(ctx.is_reference_type(*lhs_type) && *rhs_type == ctx.get_type("@null", false)))
+        {
+            throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", ty::to_string(*lhs_type), reduced_op, ty::to_string(*rhs_type)));
+        }
+
         return lhs_type;
     }
 
