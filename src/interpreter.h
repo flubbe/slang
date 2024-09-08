@@ -640,9 +640,6 @@ class function
     /** Return opcode. */
     opcode ret_opcode;
 
-    /** Returned array length. A length of `0` means "no array". */
-    std::int64_t ret_array_length = 0;
-
     /** Locals. Not serialized. */
     std::vector<variable> locals;
 
@@ -734,18 +731,6 @@ public:
     opcode get_return_opcode() const
     {
         return ret_opcode;
-    }
-
-    /** Return whether the returned value is an array. */
-    bool returns_array() const
-    {
-        return ret_array_length != 0;
-    }
-
-    /** Get the returned array's length. */
-    std::int64_t get_returned_array_length() const
-    {
-        return ret_array_length;
     }
 };
 

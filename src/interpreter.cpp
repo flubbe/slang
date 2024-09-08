@@ -40,33 +40,37 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * Generate the return opcode from the signature's return type for native functions.
  *
  * @param return_type The return type.
- * @returns A return opcode, together with an array size. An array size of 0 indicates "no array".
+ * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static std::pair<opcode, std::int64_t> get_return_opcode(const std::pair<std::string, std::optional<std::size_t>>& return_type)
+static opcode get_return_opcode(const std::pair<std::string, bool>& return_type)
 {
     auto& name = std::get<0>(return_type);
-    std::size_t length = std::get<1>(return_type).has_value() ? *std::get<1>(return_type) : 0;
+
+    if(std::get<1>(return_type))
+    {
+        return opcode::aret;
+    }
 
     if(name == "void")
     {
-        return std::make_pair(opcode::ret, 0);
+        return opcode::ret;
     }
     else if(name == "i32")
     {
-        return std::make_pair(opcode::iret, length);
+        return opcode::iret;
     }
     else if(name == "f32")
     {
-        return std::make_pair(opcode::fret, length);
+        return opcode::fret;
     }
     else if(name == "str")
     {
-        return std::make_pair(opcode::sret, length);
+        return opcode::sret;
     }
     else if(name == "addr" || name == "@array")
     {
-        return std::make_pair(opcode::aret, length);
+        return opcode::aret;
     }
 
     throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
@@ -90,9 +94,7 @@ function::function(function_signature signature,
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
-    auto [oc, length] = ::slang::interpreter::get_return_opcode(this->signature.return_type);
-    ret_opcode = oc;
-    ret_array_length = length;
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 function::function(function_signature signature, std::function<void(operand_stack&)> func)
@@ -100,9 +102,7 @@ function::function(function_signature signature, std::function<void(operand_stac
 , native{true}
 , entry_point_or_function{std::move(func)}
 {
-    auto [oc, length] = ::slang::interpreter::get_return_opcode(this->signature.return_type);
-    ret_opcode = oc;
-    ret_array_length = length;
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 /*
