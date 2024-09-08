@@ -228,7 +228,7 @@ std::string scope::to_string() const
  * Typing context.
  */
 
-void context::add_base_type(std::string name)
+void context::add_base_type(std::string name, bool is_reference_type)
 {
     auto it = std::find_if(type_map.begin(), type_map.end(),
                            [&name](const std::pair<type, std::uint64_t>& t) -> bool
@@ -240,8 +240,18 @@ void context::add_base_type(std::string name)
         throw type_error(fmt::format("Type '{}' already exists.", name));
     }
 
+    if(std::find_if(base_types.begin(), base_types.end(),
+                    [&name](const std::pair<std::string, bool>& v) -> bool
+                    { return v.first == name; })
+       != base_types.end())
+    {
+        throw type_error(fmt::format("Inconsistent type context: Type '{}' exists in base types, but not in type map.", name));
+    }
+
     auto type_id = generate_type_id();
-    type_map.push_back({type{{std::move(name), {0, 0}}, type_class::tc_plain, type_id}, type_id});
+    type_map.push_back({type{{name, {0, 0}}, type_class::tc_plain, type_id}, type_id});
+
+    base_types.push_back(std::make_pair(std::move(name), is_reference_type));
 }
 
 void context::add_import(std::vector<token> path)
@@ -334,20 +344,22 @@ void context::add_struct(token name, std::vector<std::pair<token, type>> members
     }
 
     // check if all types are known.
-    for(auto& [name, type]: members)
+    for(auto& [member_name, member_type]: members)
     {
-        auto type_string = type.to_string();
+        auto type_string = member_type.to_string();
 
         if(!is_builtin_type(type_string))
         {
-            if(!has_type(type))
+            if(!has_type(member_type)   /* custom types */
+               && type_string != name.s /* currently declared type*/
+            )
             {
-                throw type_error(name.location, fmt::format("Struct member has unknown base type '{}'.", type_string));
+                throw type_error(member_name.location, fmt::format("Struct member has unknown base type '{}'.", type_string));
             }
         }
         else if(type_string == "void")
         {
-            throw type_error(name.location, fmt::format("Struct member '{}' cannot have type 'void'.", name.s));
+            throw type_error(member_name.location, fmt::format("Struct member '{}' cannot have type 'void'.", member_name.s));
         }
     }
 
@@ -386,34 +398,30 @@ bool context::has_type(const std::string& name) const
 
 bool context::has_type(const type& ty) const
 {
-    if(current_scope == nullptr)
+    return has_type(ty.to_string());
+}
+
+bool context::is_reference_type(const std::string& name) const
+{
+    // check base types.
+    auto base_it = std::find_if(base_types.begin(), base_types.end(),
+                                [&name](const std::pair<std::string, bool>& v) -> bool
+                                {
+                                    return v.first == name;
+                                });
+    if(base_it != base_types.end())
     {
-        throw std::runtime_error("Typing context: No current scope.");
+        return base_it->second;
     }
 
-    const std::string name = ty.to_string();
+    // all other types are references.
+    // FIXME This checks the base types twice.
+    return has_type(name);
+}
 
-    // search type map.
-    auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name](const std::pair<type, std::uint64_t>& t) -> bool
-                           {
-                               return name == t.first.to_string();
-                           });
-    if(it != type_map.end())
-    {
-        return true;
-    }
-
-    // search scopes.
-    for(const scope* s = current_scope; s != nullptr; s = s->parent)
-    {
-        if(s->structs.find(name) != s->structs.end())
-        {
-            return true;
-        }
-    }
-
-    return false;
+bool context::is_reference_type(const type& t) const
+{
+    return is_reference_type(t.to_string());
 }
 
 type context::get_identifier_type(const token& identifier) const

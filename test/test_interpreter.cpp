@@ -1057,6 +1057,56 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
+    {
+        slang::language_module mod;
+
+        try
+        {
+            slang::file_read_archive read_ar("structs_references.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'structs_references.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
+
+        slang::file_manager file_mgr;
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.load_module("structs_references", mod));
+
+        ASSERT_NO_THROW(ctx.invoke("structs_references", "test", {}));
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+    {
+        slang::language_module mod;
+
+        try
+        {
+            slang::file_read_archive read_ar("null_dereference.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'null_dereference.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
+
+        slang::file_manager file_mgr;
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.load_module("null_dereference", mod));
+
+        ASSERT_THROW(ctx.invoke("null_dereference", "test", {}), si::interpreter_error);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
 }
 
 TEST(interpreter, multiple_modules)

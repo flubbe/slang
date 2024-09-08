@@ -401,12 +401,12 @@ public:
     {
         if(stack.size() < 4)
         {
-            throw interpreter_error("Stack underflow");
+            throw interpreter_error("Stack underflow.");
         }
 
         if(stack.size() + 4 > max_size)
         {
-            throw interpreter_error("Stack overflow");
+            throw interpreter_error("Stack overflow.");
         }
 
         stack.insert(stack.end(), stack.end() - 4, stack.end());
@@ -417,12 +417,12 @@ public:
     {
         if(stack.size() < 4)
         {
-            throw interpreter_error("Stack underflow");
+            throw interpreter_error("Stack underflow.");
         }
 
         if(stack.size() + 4 > max_size)
         {
-            throw interpreter_error("Stack overflow");
+            throw interpreter_error("Stack overflow.");
         }
 
         stack.insert(stack.end(), stack.end() - 4, stack.end());
@@ -433,12 +433,12 @@ public:
     {
         if(stack.size() < sizeof(void*))
         {
-            throw interpreter_error("Stack underflow");
+            throw interpreter_error("Stack underflow.");
         }
 
         if(stack.size() + sizeof(void*) > max_size)
         {
-            throw interpreter_error("Stack overflow");
+            throw interpreter_error("Stack overflow.");
         }
 
         stack.insert(stack.end(), stack.end() - sizeof(void*), stack.end());
@@ -449,7 +449,7 @@ public:
     {
         if(stack.size() < size1 + size2)
         {
-            throw interpreter_error("Invalid stack access");
+            throw interpreter_error("Invalid stack access.");
         }
 
         std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
@@ -806,9 +806,9 @@ class context
      * @return Returns a pair `(size, alignment)`.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
-    std::pair<std::size_t, std::uint8_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                             const std::string& type_name,
-                                                             bool reference) const;
+    std::pair<std::size_t, std::size_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                            const std::string& type_name,
+                                                            bool reference) const;
 
     /**
      * Get the byte size and offset of a field.

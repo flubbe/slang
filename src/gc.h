@@ -282,7 +282,7 @@ public:
      * @param add Whether to add the object to the root set or temporary set (depending on the flags).
      * @returns Returns a (pointer to a) garbage collected variable.
      */
-    void* gc_new(std::size_t size, std::uint8_t alignment, std::uint32_t flags = gc_object::of_none, bool add = true)
+    void* gc_new(std::size_t size, std::size_t alignment, std::uint32_t flags = gc_object::of_none, bool add = true)
     {
         allocated_bytes += size;
 
@@ -342,8 +342,9 @@ public:
      * Remove a temporary object (or decrease it's reference count).
      *
      * @note This needs to be called on `string` and `array` types, that are
-     * 1. passed to native functions, or
-     * 2. returned from `invoke` to native code.
+     *     1. passed to native functions, or
+     *     2. returned from `invoke` to native code.
+     * @note If `nullptr` is passed, the function is a no-op.
      *
      * @param obj The object.
      * @throws Throws a `gc_error` if the object is not found in the object list.

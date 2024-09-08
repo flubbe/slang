@@ -268,10 +268,15 @@ void garbage_collector::remove_temporary(void* obj)
 {
     GC_LOG("remove_temporary {}", obj);
 
+    if(obj == nullptr)
+    {
+        return;
+    }
+
     auto it = temporary_objects.find(obj);
     if(it == temporary_objects.end())
     {
-        throw gc_error(fmt::format("Reference at {} does not exists in GC temporary object set.", obj));
+        throw gc_error(fmt::format("Reference at {} does not exist in GC temporary object set.", obj));
     }
 
     if(it->second == 0)

@@ -98,7 +98,9 @@ void value::validate() const
 {
     bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
     bool is_ref = (type == "addr");
-    if(is_builtin)
+    bool is_null = (type == "@null");
+
+    if(is_builtin || is_null)
     {
         if(aggregate_type.has_value())
         {
@@ -749,6 +751,12 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
         throw codegen_error("Invalid value type for constant.");
     }
     insertion_point->add_instruction(std::make_unique<instruction>("const", std::move(args)));
+}
+
+void context::generate_const_null()
+{
+    validate_insertion_point();
+    insertion_point->add_instruction(std::make_unique<instruction>("const_null", std::vector<std::unique_ptr<argument>>{}));
 }
 
 void context::generate_dup(value vt, std::vector<value> vals)

@@ -27,7 +27,7 @@ static std::set<std::string> keywords = {
   "i32", "f32", "str", 
   "void", 
   "as", 
-  "struct", 
+  "struct", "null",
   "fn", "return", 
   "if", "else", 
   "while", "break", "continue"
@@ -428,7 +428,7 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
         }
         else if(current_token->s != ",")
         {
-            throw syntax_error(*current_token, fmt::format("Expected '}}' or ',', got '{}'.", current_token->s));
+            throw syntax_error(*current_token, fmt::format("Expected '}' or ',', got '{}'.", current_token->s));
         }
         get_next_token();    // skip ','.
     }
@@ -738,17 +738,24 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 // unary ::= primary
 //         | ('++' | '--' | '-' | '+' | '~' | '!') primary
 //         | 'new' primary
+//         | 'null'
 std::unique_ptr<ast::expression> parser::parse_unary()
 {
-    token op = *current_token;
-
     // parse the new operator.
-    if(op.s == "new")
+    if(current_token->s == "new")
     {
         return parse_new();
     }
 
+    // parse 'null'.
+    if(current_token->s == "null")
+    {
+        get_next_token();
+        return std::make_unique<ast::null_expression>(current_token->location);
+    }
+
     // if we're not parsing a unary operator, it must be a primary expression.
+    token op = *current_token;
     if(op.s != "++" && op.s != "--" && op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
     {
         return parse_primary();
@@ -917,7 +924,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
                 }
                 else if(current_token->s != ",")
                 {
-                    throw syntax_error(*current_token, "Expected '}}' or ','.");
+                    throw syntax_error(*current_token, "Expected '}' or ','.");
                 }
                 get_next_token();
             }

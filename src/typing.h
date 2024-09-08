@@ -320,6 +320,9 @@ class context
     /** Map of types to type ids. */
     std::vector<std::pair<type, std::uint64_t>> type_map;
 
+    /** Base types, stored as `(name, is_reference_type)`. */
+    std::vector<std::pair<std::string, bool>> base_types;
+
     /** The next type id to use. */
     std::uint64_t next_type_id = 0;
 
@@ -340,19 +343,23 @@ class context
      * Add a base type.
      *
      * @param name The type's name.
+     * @param is_reference_type Whether the given type is a reference type.
      * @throws Throws a `type_error` if the type already exists.
      */
-    void add_base_type(std::string name);
+    void add_base_type(std::string name, bool is_reference_type);
 
 public:
     /** Default constructor. */
     context()
     {
+        // Add null type.
+        add_base_type("@null", true);
+
         //  Initialize the default types `void`, `i32`, `f32`, `str`.
-        add_base_type("void");
-        add_base_type("i32");
-        add_base_type("f32");
-        add_base_type("str");
+        add_base_type("void", false);
+        add_base_type("i32", false);
+        add_base_type("f32", false);
+        add_base_type("str", true);
 
         // Add array type.
         add_struct(token{"@array", {0, 0}}, {std::make_pair(token{"length", {0, 0}}, get_type("i32", false))});
@@ -427,6 +434,26 @@ public:
      * @returns True if the type exists within the current scope.
      */
     bool has_type(const type& t) const;
+
+    /**
+     * Check if given string is a reference type within the context.
+     *
+     * @note Returns `false` if the type is unknown.
+     *
+     * @param name The type name.
+     * @returns Whether the type is a reference type.
+     */
+    bool is_reference_type(const std::string& name) const;
+
+    /**
+     * Check if given string is a reference type within the context.
+     *
+     * @note Returns `false` if the type is unknown.
+     *
+     * @param t The type.
+     * @returns Whether the type is a reference type.
+     */
+    bool is_reference_type(const type& t) const;
 
     /**
      * Get the type for an identifier.

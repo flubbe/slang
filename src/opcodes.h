@@ -21,6 +21,7 @@ using opcode_base = std::uint8_t;
 /** Instruction opcodes. */
 enum class opcode : opcode_base
 {
+    aconst_null, /** Load a null reference onto the stack. */
     iconst,      /** Load i32 constant onto stack. */
     fconst,      /** Load f32 constant onto stack. */
     sconst,      /** Load str constant onto stack. */

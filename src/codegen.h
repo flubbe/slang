@@ -2078,6 +2078,9 @@ public:
      */
     void generate_const(value vt, std::variant<int, float, std::string> val);
 
+    /** Load 'null' onto the stack. */
+    void generate_const_null();
+
     /**
      * Duplicate the top stack value.
      *

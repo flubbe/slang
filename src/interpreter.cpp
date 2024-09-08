@@ -110,26 +110,46 @@ function::function(function_signature signature, std::function<void(operand_stac
  */
 
 /** Byte sizes and alignments for built-in types. */
-static const std::unordered_map<std::string, std::pair<std::uint8_t, std::uint8_t>> type_properties_map = {
+static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
   {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
   {"f32", {sizeof(float), std::alignment_of_v<float>}},
   {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
   {"addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
-std::pair<std::size_t, std::uint8_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                                  const std::string& type_name, bool reference) const
+/** Get the type size (for built-in types) or the size of a type reference (for custom types). */
+static std::size_t get_type_or_reference_size(const std::unordered_map<std::string, type_descriptor>& type_map, const std::string& type_name, bool reference)
+{
+    auto built_in_it = type_properties_map.find(type_name);
+    if(built_in_it != type_properties_map.end())
+    {
+        return reference ? sizeof(void*) : built_in_it->second.first;
+    }
+
+    // structs.
+    // check if the type exists and return the size of a pointer.
+    auto type_it = type_map.find(type_name);
+    if(type_it == type_map.end())
+    {
+        throw interpreter_error(fmt::format("Unable to determine reference size: Type '{}' not found.", type_name));
+    }
+    return sizeof(void*);
+}
+
+std::pair<std::size_t, std::size_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                                                 const std::string& type_name, bool reference) const
 {
     // references.
     if(reference)
     {
-        return std::make_pair<std::uint8_t, std::uint8_t>(sizeof(void*), std::alignment_of_v<void*>);
+        // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
+        return std::make_pair<std::size_t, std::size_t>(sizeof(void*), std::size_t(std::alignment_of_v<void*>));
     }
 
     // built-in types.
     if(type_name == "void")
     {
-        return std::make_pair<std::uint8_t, std::uint8_t>(0, 0);
+        return std::make_pair<std::size_t, std::size_t>(0, 0);
     }
 
     auto built_in_it = type_properties_map.find(type_name);
@@ -210,7 +230,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = 0; i < arg_count; ++i)
     {
         auto& v = details.locals[i];
-        auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
+        std::size_t size = get_type_or_reference_size(type_map, v.type, v.array);
 
         v.offset = details.args_size;    // NOTE offsets are not aligned.
         v.size = size;
@@ -224,7 +244,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = arg_count; i < details.locals.size(); ++i)
     {
         auto& v = details.locals[i];
-        auto [size, alignment] = get_type_properties(type_map, v.type, v.array);
+        std::size_t size = get_type_or_reference_size(type_map, v.type, v.array);
 
         v.offset = details.locals_size;    // NOTE offsets are not aligned.
         v.size = size;
@@ -247,11 +267,12 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
     switch(static_cast<opcode>(instr))
     {
     /* opcodes without arguments. */
+    case opcode::aconst_null: [[fallthrough]];
+    case opcode::adup:
+        return static_cast<std::int32_t>(sizeof(void*));
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
         return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
-    case opcode::adup:
-        return static_cast<std::int32_t>(sizeof(void*));
     case opcode::pop:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::apop:
@@ -1129,6 +1150,11 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(frame.stack.pop_f32());
             break;
         } /* opcode::f2i */
+        case opcode::aconst_null:
+        {
+            frame.stack.push_addr<void>(nullptr);
+            break;
+        } /* opcode::aconst_null */
         case opcode::iconst: [[fallthrough]];
         case opcode::fconst:
         {
@@ -1461,7 +1487,7 @@ opcode context::exec(const language_module& mod,
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
             std::size_t size = read_unchecked<std::size_t>(binary, offset);
-            std::uint8_t alignment = read_unchecked<std::uint8_t>(binary, offset);
+            std::size_t alignment = read_unchecked<std::size_t>(binary, offset);
 
             frame.stack.push_addr(gc.gc_new(size, alignment, gc::gc_object::of_temporary));
 

@@ -650,7 +650,9 @@ std::optional<ty::type> variable_declaration_expression::type_check(ty::context&
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
         }
 
-        if(*rhs != var_type)
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(*rhs != var_type
+           && !(ctx.is_reference_type(var_type) && *rhs == ctx.get_type("@null", false)))
         {
             throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", ty::to_string(*rhs), ty::to_string(var_type)));
         }
@@ -898,11 +900,12 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                                     fmt::format("Code generation for '{}.{}' initialization returned no type.",
                                                 name.s, member_name));
         }
-        if(initializer_value->get_type() != member_type.get_type())
+        if(initializer_value->get_resolved_type() != "@null"
+           && initializer_value->get_resolved_type() != member_type.get_resolved_type())
         {
             throw cg::codegen_error(loc,
                                     fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                                                name.s, member_name, initializer_value->get_type(), member_type.get_type()));
+                                                name.s, member_name, initializer_value->get_resolved_type(), member_type.get_resolved_type()));
         }
 
         ctx.generate_set_field(std::make_unique<cg::field_access_argument>(name.s, member_type));
@@ -960,10 +963,13 @@ std::optional<ty::type> struct_named_initializer_expression::type_check(ty::cont
                                  fmt::format("Initializer expression for struct member '{}.{}' has no type.",
                                              name.s, member_name_expr->get_name().s));
         }
-        if(it->second != initializer_type)
+
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(it->second != initializer_type
+           && !(ctx.is_reference_type(it->second) && initializer_type == ctx.get_type("@null", false)))
         {
             throw ty::type_error(name.location,
-                                 fmt::format("Struct member '{}.{}' as type '{}', but initializer has type '{}'.",
+                                 fmt::format("Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
                                              name.s, member_name_expr->get_name().s,
                                              it->second.to_string(), initializer_type->to_string()));
         }
@@ -1411,6 +1417,32 @@ std::optional<ty::type> new_expression::type_check(ty::context& ctx)
 std::string new_expression::to_string() const
 {
     return fmt::format("NewExpression(type={}, expr={})", type.s, expr->to_string());
+}
+
+/*
+ * null_expression.
+ */
+
+std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memory_context mc) const
+{
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Cannot store into null expression.");
+    }
+
+    ctx.generate_const_null();
+
+    return std::make_unique<cg::value>("@null", std::nullopt, std::nullopt, std::nullopt);
+}
+
+std::optional<ty::type> null_expression::type_check(ty::context& ctx)
+{
+    return ctx.get_type("@null", false);
+}
+
+std::string null_expression::to_string() const
+{
+    return "NullExpression()";
 }
 
 /*

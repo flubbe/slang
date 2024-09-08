@@ -19,6 +19,7 @@ std::string to_string(opcode op)
 {
     switch(op)
     {
+    case opcode::aconst_null: return "aconst_null";
     case opcode::iconst: return "iconst";
     case opcode::fconst: return "fconst";
     case opcode::sconst: return "sconst";

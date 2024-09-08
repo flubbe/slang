@@ -889,7 +889,7 @@ public:
     new_expression& operator=(new_expression&&) = default;
 
     /**
-     * Construct a unary expression.
+     * Construct a 'new' expression.
      *
      * @param loc The location.
      * @param type The type to be allocated.
@@ -899,6 +899,39 @@ public:
     : expression{std::move(loc)}
     , type{std::move(type)}
     , expr{std::move(expr)}
+    {
+    }
+
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::string to_string() const override;
+};
+
+/** 'null' expression. */
+class null_expression : public expression
+{
+public:
+    /** No default constructor. */
+    null_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~null_expression() = default;
+
+    /** Copy and move constructors. */
+    null_expression(const null_expression&) = delete;
+    null_expression(null_expression&&) = default;
+
+    /** Assignment operators. */
+    null_expression& operator=(const null_expression&) = delete;
+    null_expression& operator=(null_expression&&) = default;
+
+    /**
+     * Construct a 'null' expression.
+     *
+     * @param loc The location.
+     */
+    null_expression(token_location loc)
+    : expression{std::move(loc)}
     {
     }
 

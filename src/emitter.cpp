@@ -318,6 +318,10 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         emit_typed(opcode::imod);
     }
+    else if(name == "const_null")
+    {
+        emit(instruction_buffer, opcode::aconst_null);
+    }
     else if(name == "const")
     {
         emit_typed_one_arg(opcode::iconst, opcode::fconst, opcode::sconst);

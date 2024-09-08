@@ -1079,6 +1079,45 @@ TEST(parser, struct_member_access)
     }
 }
 
+TEST(parser, null)
+{
+    {
+        const std::string test_input =
+          "let s: S = null;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+    }
+    {
+        const std::string test_input =
+          "fn test() -> void\n"
+          "{\n"
+          " let null: i32 = 1;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "struct null {\n"
+          " i: i32\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+}
+
 TEST(parser, directives)
 {
     {
