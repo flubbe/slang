@@ -340,11 +340,36 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "dup")
     {
-        emit_typed(opcode::idup, opcode::fdup, std::nullopt, opcode::adup, opcode::adup);
+        if(args.size() == 1)
+        {
+            emit_typed(opcode::idup, opcode::fdup, std::nullopt, opcode::adup, opcode::adup);
+        }
+        else if(args.size() == 2)
+        {
+            // We intentionally do not resolve the types for the instruction, since
+            // we only need to know if it is a built-in type or an address.
+
+            // get the duplicated value.
+            cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
+            const cg::value* v = v_arg->get_value();
+            std::string v_type = v->get_type();
+
+            // get the stack arguments.
+            cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
+            std::string s_type = stack_arg->get_value()->get_type();
+
+            // emit instruction.
+            emit(instruction_buffer, opcode::dup_x1);
+            instruction_buffer & v_type & s_type;
+        }
+        else
+        {
+            throw emitter_error(fmt::format("Unexpected argument count ({}) for 'dup'.", args.size()));
+        }
     }
     else if(name == "pop")
     {
-        emit_typed(opcode::pop, opcode::pop, opcode::spop, opcode::apop);    // same instruction for i32 and f32.
+        emit_typed(opcode::pop, opcode::pop, opcode::apop, opcode::apop);    // same instruction for i32 and f32.
     }
     else if(name == "cast")
     {

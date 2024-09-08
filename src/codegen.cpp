@@ -751,11 +751,20 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
     insertion_point->add_instruction(std::make_unique<instruction>("const", std::move(args)));
 }
 
-void context::generate_dup(value vt)
+void context::generate_dup(value vt, std::vector<value> vals)
 {
+    if(vals.size() >= std::numeric_limits<std::int32_t>::max())
+    {
+        throw codegen_error(fmt::format("Depth in dup instruction exceeds maximum value ({} >= {}).", vals.size(), std::numeric_limits<std::int32_t>::max()));
+    }
+
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(std::move(vt)));
+    for(auto& v: vals)
+    {
+        args.emplace_back(std::make_unique<type_argument>(std::move(v)));
+    }
     insertion_point->add_instruction(std::make_unique<instruction>("dup", std::move(args)));
 }
 

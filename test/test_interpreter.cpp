@@ -973,32 +973,90 @@ TEST(interpreter, structs)
 
 TEST(interpreter, structs_access)
 {
-    slang::language_module mod;
-
-    try
     {
-        slang::file_read_archive read_ar("structs_access.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
+        slang::language_module mod;
+
+        try
+        {
+            slang::file_read_archive read_ar("structs_access.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'structs_access.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
+
+        slang::file_manager file_mgr;
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.load_module("structs_access", mod));
+
+        si::value res;
+
+        ASSERT_NO_THROW(res = ctx.invoke("structs_access", "test", {}));
+        EXPECT_EQ(*res.get<int>(), 4);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
-    catch(const std::runtime_error& e)
     {
-        fmt::print("Error loading 'structs_access.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
+        slang::language_module mod;
+
+        try
+        {
+            slang::file_read_archive read_ar("structs_access2.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'structs_access2.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
+
+        slang::file_manager file_mgr;
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.load_module("structs_access2", mod));
+
+        si::value res;
+
+        ASSERT_NO_THROW(res = ctx.invoke("structs_access2", "test", {}));
+        EXPECT_EQ(*res.get<int>(), 2);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
+    {
+        slang::language_module mod;
 
-    slang::file_manager file_mgr;
-    si::context ctx{file_mgr};
+        try
+        {
+            slang::file_read_archive read_ar("structs_access2.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'structs_access2.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
 
-    ASSERT_NO_THROW(ctx.load_module("structs_access", mod));
+        slang::file_manager file_mgr;
+        si::context ctx{file_mgr};
 
-    si::value res;
+        ASSERT_NO_THROW(ctx.load_module("structs_access2", mod));
 
-    ASSERT_NO_THROW(res = ctx.invoke("structs_access", "test", {}));
-    EXPECT_EQ(*res.get<int>(), 4);
+        si::value res;
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        ASSERT_NO_THROW(res = ctx.invoke("structs_access2", "test_local", {}));
+        EXPECT_EQ(*res.get<int>(), 4);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
 }
 
 TEST(interpreter, multiple_modules)

@@ -371,9 +371,24 @@ public:
         return true;
     }
 
+    /**
+     * Generate IR.
+     *
+     * @param ctx The context to use for code generation.
+     * @returns The value of this expression or nullptr.
+     * @note When called with `memory_context::store`, the object must be loaded onto the stack by
+     *       calling `generate_object_load` beforehand.
+     */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    /**
+     * Generate IR to load the associated object onto the stack (without loading the field).
+     *
+     * @param ctx The context to use for code generation.
+     */
+    void generate_object_load(cg::context& ctx);
 };
 
 /** Import statements. */

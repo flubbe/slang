@@ -2082,8 +2082,9 @@ public:
      * Duplicate the top stack value.
      *
      * @param vt The value type.
+     * @param vals The values to skip on the stack before insertion.
      */
-    void generate_dup(value vt);
+    void generate_dup(value vt, std::vector<value> vals = {});
 
     /**
      * Load a field of a struct instance onto the stack.

@@ -348,12 +348,6 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         throw cg::codegen_error(identifier_expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var->get_resolved_type(), identifier_expr->get_name().s));
     }
 
-    /*
-     * FIXME This seems to be a hack.
-     *       - memory_context::none: Only load the struct's address.
-     *       - memory_context::load: Load struct's address and the field.
-     *       - memory_context::store: Only store the field.
-     */
     if(mc == memory_context::none || mc == memory_context::load)
     {
         ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var->get_resolved_type(), name.s, std::nullopt}));
@@ -396,6 +390,42 @@ std::optional<ty::type> access_expression::type_check(ty::context& ctx)
 std::string access_expression::to_string() const
 {
     return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
+}
+
+void access_expression::generate_object_load(cg::context& ctx)
+{
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Access expression has no type.");
+    }
+
+    auto* s = ctx.get_scope();
+    if(s == nullptr)
+    {
+        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
+    }
+
+    const cg::value* var{nullptr};
+    while(s != nullptr)
+    {
+        if((var = s->get_value(name.s)) != nullptr)
+        {
+            break;
+        }
+        s = s->get_outer();
+    }
+
+    if(s == nullptr)
+    {
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+    }
+
+    if(var->is_array())
+    {
+        throw cg::codegen_error(loc, fmt::format("Cannot load array '{}' as an object.", name.s));
+    }
+
+    ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var->get_resolved_type(), name.s, std::nullopt}));
 }
 
 /*
@@ -1070,16 +1100,19 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
         if(lhs->is_struct_member_access())
         {
-            lhs->generate_code(ctx, memory_context::none);    // FIXME generates the address of the struct.
+            // by the above check, lhs is an access_expression.
+            access_expression* ae_lhs = static_cast<access_expression*>(lhs.get());
+
+            ae_lhs->generate_object_load(ctx);
             auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
             // we might need to duplicate the value for chained assignments.
             if(mc == memory_context::load)
             {
-                ctx.generate_dup(*rhs_value);
+                ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt, std::nullopt}});
             }
 
-            auto lhs_value = lhs->generate_code(ctx, memory_context::store);    // FIXME assumes the address of the struct is already on the stack.
+            auto lhs_value = ae_lhs->generate_code(ctx, memory_context::store);
             return lhs_value;
         }
         else

@@ -49,8 +49,8 @@ std::string to_string(opcode op)
     case opcode::idup: return "idup";
     case opcode::fdup: return "fdup";
     case opcode::adup: return "adup";
+    case opcode::dup_x1: return "dup_x1";
     case opcode::pop: return "pop";
-    case opcode::spop: return "spop";
     case opcode::apop: return "apop";
     case opcode::invoke: return "invoke";
     case opcode::new_: return "new";

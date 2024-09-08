@@ -1396,6 +1396,56 @@ TEST(output, structs)
         slang::file_write_archive write_ar("structs_access.cmod");
         EXPECT_NO_THROW(write_ar & mod);
     }
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " j: i32\n"
+          "};\n"
+          "fn test() -> i32\n"
+          "{\n"
+          " let s: S = S{ i: 2, j: 3 };\n"
+          " s.i = s.j = 1;\n"
+          " return s.i + s.j;\n"
+          "}\n"
+          "fn test_local() -> i32\n"
+          "{\n"
+          " let s: S = S{ i: 2, j: 3 };\n"
+          " let i: i32 = s.j = 1;\n"
+          " return i + s.i + s.j;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("structs_access2.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
 }
 
 TEST(output, multiple_modules)

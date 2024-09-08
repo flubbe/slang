@@ -444,6 +444,18 @@ public:
         stack.insert(stack.end(), stack.end() - sizeof(void*), stack.end());
     }
 
+    /** Duplicate a memory block of size `size1` and insert it at `size1 + size2` from the top. */
+    void dup_x1(std::size_t size1, std::size_t size2)
+    {
+        if(stack.size() < size1 + size2)
+        {
+            throw interpreter_error("Invalid stack access");
+        }
+
+        std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
+        stack.insert(stack.end() - size1 - size2, copy.begin(), copy.end());
+    }
+
     /**
      * Push an i32 onto the stack.
      *

@@ -27,7 +27,7 @@ enum class opcode : opcode_base
     iload,       /** Load element at index 0 from i32 array onto stack. */
     fload,       /** Load element at index 0 from f32 array onto stack. */
     sload,       /** Load element at index 0 from str array onto stack. */
-    aload,       /** Load array onto stack. */
+    aload,       /** Load address onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
     saload,      /** Load str from array onto stack. */
@@ -38,11 +38,11 @@ enum class opcode : opcode_base
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */
     sastore,     /** Store str from stack into array. */
-    idup,        /** Duplicate top i32 on stack. */
-    fdup,        /** Duplicate top f32 on stack. */
-    adup,        /** Duplicate top array on stack. */
+    idup,        /** Duplicate top i32 at a given depth in the stack. */
+    fdup,        /** Duplicate top f32 at a given depth in the stack. */
+    adup,        /** Duplicate top address at a given depth in the stack. */
+    dup_x1,      /** Duplicate top stack element and push it 2 down the stack. */
     pop,         /** Pop-discard a 4-byte value from the stack. */
-    spop,        /** Pop-discard a string from the stack. */
     apop,        /** Pop-discard a reference from the stack. */
     iadd,        /** Add two i32 from the stack. */
     fadd,        /** Add two f32 from the stack. */
@@ -63,7 +63,7 @@ enum class opcode : opcode_base
     iret,        /** Return an i32 from a function. */
     fret,        /** Return an f32 from a function. */
     sret,        /** Return a str from a function. */
-    aret,        /** Return an array reference. */
+    aret,        /** Return an address. */
     setfield,    /** Set a field in a struct. */
     getfield,    /** Get a field from a struct. */
     iand,        /** Bitwise and for two i32 from the stack. */

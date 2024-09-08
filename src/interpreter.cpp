@@ -254,8 +254,6 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         return static_cast<std::int32_t>(sizeof(void*));
     case opcode::pop:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
-    case opcode::spop:
-        return -static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::apop:
         return -static_cast<std::int32_t>(sizeof(void*));
     case opcode::arraylength:
@@ -369,6 +367,31 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         mod.jump_origins.insert({code.size(), i2.i});
         code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
+    }
+    /* dup_x1. */
+    case opcode::dup_x1:
+    {
+        // type arguments.
+        std::string t1, t2;
+        ar & t1 & t2;
+
+        // "void" is not allowed.
+        if(t1 == "void" || t2 == "void")
+        {
+            throw interpreter_error("Error decoding dup_x1 instruction: Invalid argument type 'void'.");
+        }
+
+        // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
+        auto [size1, alignment1] = get_type_properties({}, t1, false);
+        auto [size2, alignment2] = get_type_properties({}, t2, false);
+
+        // check if the type needs garbage collection.
+        std::uint8_t needs_gc = (t1 == "str") || (t1 == "addr") || (t1 == "@array");
+
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&size1), reinterpret_cast<std::byte*>(&size1) + sizeof(size1));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&size2), reinterpret_cast<std::byte*>(&size2) + sizeof(size2));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
+        return static_cast<std::int32_t>(size1);
     }
     /* invoke. */
     case opcode::invoke:
@@ -1004,16 +1027,26 @@ opcode context::exec(const language_module& mod,
             gc.add_temporary(addr);
             break;
         } /* opcode::adup */
+        case opcode::dup_x1:
+        {
+            std::size_t size1 = read_unchecked<std::size_t>(binary, offset);
+            std::size_t size2 = read_unchecked<std::size_t>(binary, offset);
+            std::uint8_t needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+            frame.stack.dup_x1(size1, size2);
+
+            if(needs_gc)
+            {
+                void* addr;
+                std::memcpy(&addr, frame.stack.end(2 * size1 + size2), size1);
+                gc.add_temporary(addr);
+            }
+            break;
+        } /* opcode::dup_x1 */
         case opcode::pop:
         {
             frame.stack.pop_i32();
             break;
         } /* opcode::pop */
-        case opcode::spop:
-        {
-            gc.remove_temporary(frame.stack.pop_addr<std::string>());
-            break;
-        } /* opcode::spop */
         case opcode::apop:
         {
             gc.remove_temporary(frame.stack.pop_addr<void>());
