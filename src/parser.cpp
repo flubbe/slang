@@ -194,7 +194,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     }
 
     get_next_token();
-    std::vector<std::tuple<token, token, bool>> args;
+    std::vector<std::pair<token, std::unique_ptr<ast::type_expression>>> args;
     while(true)
     {
         if(current_token->type != token_type::identifier)
@@ -213,10 +213,9 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
 
         get_next_token();
 
-        auto [arg_type, is_array_type] = parse_type_name();
-        args.emplace_back(std::make_tuple(std::move(arg_name), std::move(arg_type), is_array_type));
+        auto arg_type = parse_type();
+        args.emplace_back(std::make_tuple(std::move(arg_name), std::move(arg_type)));
 
-        get_next_token();
         if(current_token->s != ",")
         {
             break;
@@ -237,9 +236,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     }
     get_next_token();    // skip '->'
 
-    auto return_type = parse_type_name();
-    get_next_token();
-
+    auto return_type = parse_type();
     return std::make_unique<ast::prototype_ast>(std::move(loc), std::move(name), std::move(args), std::move(return_type));
 }
 
@@ -289,56 +286,84 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
         throw syntax_error(*current_token, fmt::format("Expected '<identifier>' or '[<identifier>; <length>]', got '{}'.", current_token->s));
     }
 
-    auto [type, array] = parse_type_name();
-    get_next_token();
-
+    auto type = parse_type();
     if(current_token->s == ";")
     {
-        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), array, nullptr);
+        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), nullptr);
     }
     else if(current_token->s == "=")
     {
         get_next_token();    // skip '='.
-        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), array, parse_expression());
+        return std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(name), std::move(type), parse_expression());
     }
 
     throw syntax_error(*current_token, fmt::format("Expected '=', got '{}'.", current_token->s));
 }
 
-std::pair<token, bool> parser::parse_type_name()
+std::unique_ptr<ast::type_expression> parser::parse_type()
 {
-    token type = *current_token;
     bool is_array_type{false};
 
     if(current_token->s == "[")
     {
         // parse array definition.
         get_next_token();
-        if(current_token->type != token_type::identifier)
+        is_array_type = true;
+    }
+
+    if(current_token->type != token_type::identifier)
+    {
+        if(!parsing_native || current_token->s != "]")
         {
-            if(!parsing_native || current_token->s != "]")
+            throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+        }
+
+        get_next_token();    // skip ']'.
+
+        return std::make_unique<ast::type_expression>(
+          current_token->location,
+          token{"@array", current_token->location},
+          std::vector<token>{},
+          false);
+    }
+    else
+    {
+        std::vector<token> components;
+        while(true)
+        {
+            if(current_token->type != token_type::identifier)
             {
                 throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
             }
 
-            type = token{"@array", current_token->location};
-        }
-        else
-        {
-            is_array_type = true;
+            components.emplace_back(*current_token);
+            get_next_token();
 
-            type = *current_token;
-            validate_base_type(type);
+            if(current_token->s != "::")
+            {
+                break;
+            }
 
             get_next_token();
-            if(current_token->s != "]")
+        }
+
+        if(current_token->s == "]")
+        {
+            if(!is_array_type)
             {
                 throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
             }
-        }
-    }
 
-    return std::make_pair(type, is_array_type);
+            get_next_token();
+        }
+
+        validate_base_type(components.back());
+
+        token type = components.back();
+        components.pop_back();
+
+        return std::make_unique<ast::type_expression>(current_token->location, std::move(type), std::move(components), is_array_type);
+    }
 }
 
 // array_initializer_expr ::= '[' exprs ']'
@@ -416,10 +441,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
                 throw syntax_error(*current_token, fmt::format("Expected '<identifier>' or '[<identifier>; <length>]', got '{}'.", current_token->s));
             }
 
-            auto [member_type, is_array_type] = parse_type_name();
-            get_next_token();
-
-            members.emplace_back(std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(member_name), std::move(member_type), is_array_type, nullptr));
+            auto member_type = parse_type();
+            members.emplace_back(std::make_unique<ast::variable_declaration_expression>(std::move(loc), std::move(member_name), std::move(member_type), nullptr));
         }
 
         if(current_token->s == "}")

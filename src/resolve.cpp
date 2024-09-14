@@ -111,12 +111,36 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 type_ctx.add_function({exp.name, reference_location},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);
             }
+            else if(exp.type == symbol_type::type)
+            {
+                auto& desc = std::get<type_descriptor>(exp.desc);
+
+                std::vector<std::pair<token, ty::type>> members;
+                for(auto& [member_name, member_type]: desc.member_types)
+                {
+                    ty::type resolved_member_type = type_ctx.get_unresolved_type(
+                      {member_type.base_type, reference_location},
+                      ty::is_builtin_type(member_type.base_type)
+                        ? typing::type_class::tc_plain
+                        : typing::type_class::tc_struct);
+
+                    members.push_back(std::make_pair<token, ty::type>(
+                      {member_name, reference_location},
+                      std::move(resolved_member_type)));
+                }
+
+                // TODO Add type to `ctx`.
+
+                type_ctx.add_struct({exp.name, reference_location}, std::move(members));
+            }
             else
             {
-                throw std::runtime_error(fmt::format("Import resolution not implemented for non-function symbol '{}'.", exp.name));
+                throw std::runtime_error(fmt::format("Import resolution not implemented for symbol '{}'.", exp.name));
             }
         }
     }
+
+    // TODO resolve imported types.
 }
 
 }    // namespace slang::resolve

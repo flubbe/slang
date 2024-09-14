@@ -669,6 +669,25 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
 }
 
 /*
+ * type_expression.
+ */
+
+std::string type_expression::to_string() const
+{
+    std::string scope_string;
+    if(scopes.size() > 0)
+    {
+        for(std::size_t i = 0; i < scopes.size() - 1; ++i)
+        {
+            scope_string += fmt::format("{}, ", scopes[i].s);
+        }
+        scope_string += scopes.back().s;
+    }
+
+    return fmt::format("TypeExpression(name={}, scopes=({}), array={})", get_name().s, scope_string, is_array());
+}
+
+/*
  * variable_declaration_expression.
  */
 
@@ -686,14 +705,15 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     }
 
     cg::value v;
-    if(ty::is_builtin_type(type.s))
+    if(ty::is_builtin_type(type->get_name().s))
     {
-        v = {type.s, std::nullopt, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt};
+        v = {type->get_name().s, std::nullopt, name.s, type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
         s->add_local(std::make_unique<cg::value>(v));
     }
     else
     {
-        s->add_local(std::make_unique<cg::value>(cg::value{"aggregate", type.s, name.s, array ? std::make_optional<std::size_t>(0) : std::nullopt}));
+        s->add_local(std::make_unique<cg::value>(cg::value{
+          "aggregate", type->get_name().s, name.s, type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}));
         v = {"addr", std::nullopt, name.s, std::nullopt};
     }
 
@@ -718,7 +738,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<ty::type> variable_declaration_expression::type_check(ty::context& ctx)
 {
-    auto var_type = ctx.get_type(type, array);
+    auto var_type = ctx.get_type(type->get_name(), is_array());
     ctx.add_variable(name, var_type);
 
     if(expr)
@@ -743,7 +763,11 @@ std::optional<ty::type> variable_declaration_expression::type_check(ty::context&
 
 std::string variable_declaration_expression::to_string() const
 {
-    return fmt::format("VariableDeclaration(name={}, type={}, array={}, expr={})", name.s, type.s, array, expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format(
+      "VariableDeclaration(name={}, type={}, expr={})",
+      name.s,
+      type->to_string(),
+      expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -863,13 +887,13 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
         std::optional<std::size_t> array_indicator = m->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt;
 
         cg::value v;
-        if(ty::is_builtin_type(m->get_type().s))
+        if(ty::is_builtin_type(m->get_type()->get_name().s))
         {
-            v = {m->get_type().s, std::nullopt, m->get_name().s, array_indicator};
+            v = {m->get_type()->get_name().s, std::nullopt, m->get_name().s, array_indicator};
         }
         else
         {
-            v = {"aggregate", m->get_type().s, m->get_name().s, array_indicator};
+            v = {"aggregate", m->get_type()->get_name().s, m->get_name().s, array_indicator};
         }
 
         struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
@@ -888,7 +912,7 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
     {
         struct_members.emplace_back(
           std::make_pair(m->get_name(),
-                         type_ctx.get_unresolved_type(m->get_type(),
+                         type_ctx.get_unresolved_type(m->get_type()->get_name(),
                                                       m->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain)));
     }
     type_ctx.add_struct(name, std::move(struct_members));
@@ -1621,27 +1645,27 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
     std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
-        if(ty::is_builtin_type(std::get<1>(a).s))
+        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
         {
             function_args.emplace_back(std::make_unique<cg::value>(
-              std::get<1>(a).s,
+              std::get<1>(a)->get_name().s,
               std::nullopt,
               std::get<0>(a).s,
-              std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
+              std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
         else
         {
             function_args.emplace_back(std::make_unique<cg::value>(
               "aggregate",
-              std::get<1>(a).s,
+              std::get<1>(a)->get_name().s,
               std::get<0>(a).s,
-              std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
+              std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
     }
 
-    cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
-                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt}
-                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt};
+    cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
+                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}
+                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
 
     return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
 }
@@ -1651,17 +1675,17 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     std::vector<std::unique_ptr<cg::value>> function_args;
     for(auto& a: args)
     {
-        if(ty::is_builtin_type(std::get<1>(a).s))
+        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a).s, std::nullopt, std::get<0>(a).s, std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
+            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a)->get_name().s, std::nullopt, std::get<0>(a).s, std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a).s, std::get<0>(a).s, std::get<2>(a) ? std::make_optional<std::size_t>(0) : std::nullopt));
+            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a)->get_name().s, std::get<0>(a).s, std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
         }
     }
 
-    ctx.create_native_function(lib_name, name.s, std::get<0>(return_type).s, std::move(function_args));
+    ctx.create_native_function(lib_name, name.s, return_type->get_name().s, std::move(function_args));
 }
 
 void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -1670,17 +1694,17 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
     std::transform(args.cbegin(), args.cend(), std::back_inserter(prototype_arg_types),
                    [](const auto& arg)
                    {
-                       if(ty::is_builtin_type(std::get<1>(arg).s))
+                       if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
                        {
-                           return cg::value{std::get<1>(arg).s, std::nullopt, std::nullopt, std::get<2>(arg)};
+                           return cg::value{std::get<1>(arg)->get_name().s, std::nullopt, std::nullopt, std::get<1>(arg)->is_array()};
                        }
 
-                       return cg::value{"aggregate", std::get<1>(arg).s, std::nullopt, std::get<2>(arg)};
+                       return cg::value{"aggregate", std::get<1>(arg)->get_name().s, std::nullopt, std::get<1>(arg)->is_array()};
                    });
 
-    cg::value ret_val = ty::is_builtin_type(std::get<0>(return_type).s)
-                          ? cg::value{std::get<0>(return_type).s, std::nullopt, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt}
-                          : cg::value{"aggregate", std::get<0>(return_type).s, std::nullopt, std::get<1>(return_type) ? std::make_optional<std::size_t>(0) : std::nullopt};
+    cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
+                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}
+                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 
@@ -1688,12 +1712,12 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
                    [&type_ctx](const auto& arg) -> ty::type
                    { return type_ctx.get_unresolved_type(
-                       std::get<1>(arg),
-                       std::get<2>(arg) ? ty::type_class::tc_array : ty::type_class::tc_plain); });
+                       std::get<1>(arg)->get_name(),
+                       std::get<1>(arg)->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain); });
     type_ctx.add_function(name, std::move(arg_types),
                           type_ctx.get_unresolved_type(
-                            std::get<0>(return_type),
-                            std::get<1>(return_type) ? ty::type_class::tc_array : ty::type_class::tc_plain));
+                            return_type->get_name(),
+                            return_type->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain));
 }
 
 void prototype_ast::type_check(ty::context& ctx)
@@ -1702,15 +1726,15 @@ void prototype_ast::type_check(ty::context& ctx)
     ctx.enter_function_scope(name);
 
     // add the arguments to the current scope.
-    for(auto arg: args)
+    for(const auto& arg: args)
     {
-        ctx.add_variable(std::get<0>(arg), ctx.get_type(std::get<1>(arg), std::get<2>(arg)));
+        ctx.add_variable(std::get<0>(arg), ctx.get_type(std::get<1>(arg)->get_name(), std::get<1>(arg)->is_array()));
     }
 
     // check the return type.
-    if(!ty::is_builtin_type(std::get<0>(return_type).s) && !ctx.has_type(std::get<0>(return_type).s))
+    if(!ty::is_builtin_type(return_type->get_name().s) && !ctx.has_type(return_type->get_name().s))
     {
-        throw ty::type_error(std::get<0>(return_type).location, fmt::format("Unknown return type '{}'.", std::get<0>(return_type).s));
+        throw ty::type_error(return_type->get_location(), fmt::format("Unknown return type '{}'.", return_type->get_name().s));
     }
 }
 
@@ -1722,16 +1746,16 @@ void prototype_ast::finish_type_check(ty::context& ctx)
 
 std::string prototype_ast::to_string() const
 {
-    std::string ret_type_str = ty::to_string(return_type);
+    std::string ret_type_str = return_type->to_string();
     std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, ret_type_str);
     if(args.size() > 0)
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            std::string arg_type_str = ty::to_string({std::get<1>(args[i]), std::get<2>(args[i])});
+            std::string arg_type_str = std::get<1>(args[i])->to_string();
             ret += fmt::format("(name={}, type={}), ", std::get<0>(args[i]).s, arg_type_str);
         }
-        std::string arg_type_str = ty::to_string({std::get<1>(args.back()), std::get<2>(args.back())});
+        std::string arg_type_str = std::get<1>(args.back())->to_string();
         ret += fmt::format("(name={}, type={})", std::get<0>(args.back()).s, arg_type_str);
     }
     ret += "))";

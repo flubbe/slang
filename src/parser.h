@@ -158,11 +158,11 @@ protected:
     std::unique_ptr<ast::variable_declaration_expression> parse_variable();
 
     /**
-     * Parse a type name.
+     * Parse a type.
      *
-     * @return Returns the type name as a pair `(token, is_array_type)`.
+     * @return Returns a type expression.
      * */
-    std::pair<token, bool> parse_type_name();
+    std::unique_ptr<ast::type_expression> parse_type();
 
     /** Parse an array initializer expression. */
     std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();

@@ -579,14 +579,74 @@ public:
     cg::value get_value(cg::context& ctx) const;
 };
 
+/** A type expression. */
+class type_expression
+{
+    /** Location. */
+    token_location loc;
+
+    /** The type name. */
+    token type_name;
+
+    /** Scopes. */
+    std::vector<token> scopes;
+
+    /** Whether the type is an array type. */
+    bool array{false};
+
+public:
+    /** Default and deleted constructors. */
+    type_expression() = delete;
+    type_expression(const type_expression&) = default;
+    type_expression(type_expression&&) = default;
+
+    /** Default assignments. */
+    type_expression& operator=(const type_expression&) = default;
+    type_expression& operator=(type_expression&&) = default;
+
+    /**
+     * Construct a `type_expression`.
+     *
+     * @param loc The location.
+     * @param type_name The (unqualified) type name.
+     * @param scopes Scopes for type resolution.
+     * @param is_array Whether the type is an array type.
+     */
+    type_expression(token_location loc, token type_name, std::vector<token> scopes, bool is_array)
+    : loc{std::move(loc)}
+    , type_name{std::move(type_name)}
+    , scopes{std::move(scopes)}
+    , array{is_array}
+    {
+    }
+
+    /** Get the location. */
+    token_location get_location() const
+    {
+        return loc;
+    }
+
+    /** Returns the type name. */
+    token get_name() const
+    {
+        return type_name;
+    }
+
+    /** Return a readable representation of the type. */
+    std::string to_string() const;
+
+    /** Return whether the type is an array. */
+    bool is_array() const
+    {
+        return array;
+    }
+};
+
 /** Variable declaration. */
 class variable_declaration_expression : public named_expression
 {
     /** The variable's type. */
-    token type;
-
-    /** Whether the variable is an array. */
-    bool array;
+    std::unique_ptr<ast::type_expression> type;
 
     /** An optional initializer expression. */
     std::unique_ptr<ast::expression> expr;
@@ -612,13 +672,11 @@ public:
      * @param loc The location.
      * @param name The variable's name.
      * @param type The variable's type.
-     * @param array Whether the variable is an array.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, token name, token type, bool array, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(token_location loc, token name, std::unique_ptr<ast::type_expression> type, std::unique_ptr<ast::expression> expr)
     : named_expression{std::move(loc), std::move(name)}
     , type{std::move(type)}
-    , array{array}
     , expr{std::move(expr)}
     {
     }
@@ -628,7 +686,7 @@ public:
     std::string to_string() const override;
 
     /** Get the variable's type. */
-    const token& get_type() const
+    const std::unique_ptr<ast::type_expression>& get_type() const
     {
         return type;
     }
@@ -636,7 +694,7 @@ public:
     /** Whether this variable is an array. */
     bool is_array() const
     {
-        return array;
+        return type->is_array();
     }
 };
 
@@ -1013,11 +1071,11 @@ class prototype_ast
     /** The function name. */
     token name;
 
-    /** The function's arguments as tuples `(name, type, is_array)`. */
-    std::vector<std::tuple<token, token, bool>> args;
+    /** The function's arguments as tuples `(name, type)`. */
+    std::vector<std::pair<token, std::unique_ptr<type_expression>>> args;
 
-    /** The function's return type as a pair `(type, is_array)`. */
-    std::pair<token, bool> return_type;
+    /** The function's return type as a pair. */
+    std::unique_ptr<type_expression> return_type;
 
 public:
     /** No default constructor. */
@@ -1027,11 +1085,11 @@ public:
     virtual ~prototype_ast() = default;
 
     /** Default copy and move constructors. */
-    prototype_ast(const prototype_ast&) = default;
+    prototype_ast(const prototype_ast&) = delete;
     prototype_ast(prototype_ast&&) = default;
 
     /** Default assignment operators. */
-    prototype_ast& operator=(const prototype_ast&) = default;
+    prototype_ast& operator=(const prototype_ast&) = delete;
     prototype_ast& operator=(prototype_ast&&) = default;
 
     /**
@@ -1039,13 +1097,13 @@ public:
      *
      * @param loc The location.
      * @param name The function's name.
-     * @param args The function's arguments as a vector of tuples `(name, type, is_array)`.
+     * @param args The function's arguments as a vector of tuples `(name, type)`.
      * @param return_type The function's return type.
      */
     prototype_ast(token_location loc,
                   token name,
-                  std::vector<std::tuple<token, token, bool>> args,
-                  std::pair<token, bool> return_type)
+                  std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
+                  std::unique_ptr<type_expression> return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}
