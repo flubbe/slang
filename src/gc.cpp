@@ -50,8 +50,13 @@ void garbage_collector::mark_object(void* obj)
             mark_object(ref);
         }
     }
-    else if(obj_info.type == gc_object_type::obj && obj_info.layout)
+    else if(obj_info.type == gc_object_type::obj)
     {
+        if(obj_info.layout == nullptr)
+        {
+            throw gc_error("Cannot mark object: Missing layout information.");
+        }
+
         for(auto offset: *obj_info.layout)
         {
             auto obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);
