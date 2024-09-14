@@ -214,7 +214,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         get_next_token();
 
         auto arg_type = parse_type();
-        args.emplace_back(std::make_tuple(std::move(arg_name), std::move(arg_type)));
+        args.emplace_back(std::make_pair(std::move(arg_name), std::move(arg_type)));
 
         if(current_token->s != ",")
         {

@@ -12,7 +12,6 @@
 
 #include <optional>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -1071,7 +1070,7 @@ class prototype_ast
     /** The function name. */
     token name;
 
-    /** The function's arguments as tuples `(name, type)`. */
+    /** The function's arguments as pairs `(name, type)`. */
     std::vector<std::pair<token, std::unique_ptr<type_expression>>> args;
 
     /** The function's return type as a pair. */
@@ -1097,7 +1096,7 @@ public:
      *
      * @param loc The location.
      * @param name The function's name.
-     * @param args The function's arguments as a vector of tuples `(name, type)`.
+     * @param args The function's arguments as a vector of pairs `(name, type)`.
      * @param return_type The function's return type.
      */
     prototype_ast(token_location loc,
