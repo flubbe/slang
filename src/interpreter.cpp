@@ -136,26 +136,26 @@ static std::size_t get_type_or_reference_size(const std::unordered_map<std::stri
     return sizeof(void*);
 }
 
-std::pair<std::size_t, std::size_t> context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                                 const std::string& type_name, bool reference) const
+type_properties context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                             const std::string& type_name, bool reference) const
 {
     // references.
     if(reference)
     {
         // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
-        return std::make_pair<std::size_t, std::size_t>(sizeof(void*), std::size_t(std::alignment_of_v<void*>));
+        return {sizeof(void*), std::size_t(std::alignment_of_v<void*>), 0};
     }
 
     // built-in types.
     if(type_name == "void")
     {
-        return std::make_pair<std::size_t, std::size_t>(0, 0);
+        return {0, 0, 0};
     }
 
     auto built_in_it = type_properties_map.find(type_name);
     if(built_in_it != type_properties_map.end())
     {
-        return built_in_it->second;
+        return {built_in_it->second.first, built_in_it->second.second, 0};
     }
 
     // structs.
@@ -165,12 +165,12 @@ std::pair<std::size_t, std::size_t> context::get_type_properties(const std::unor
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
     }
 
-    return std::make_pair(type_it->second.size, type_it->second.alignment);
+    return {type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
 }
 
-std::pair<std::size_t, std::size_t> context::get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                                  const std::string& type_name,
-                                                                  std::size_t field_index) const
+field_properties context::get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                               const std::string& type_name,
+                                               std::size_t field_index) const
 {
     // built-in types.
     if(type_name == "void")
@@ -192,21 +192,22 @@ std::pair<std::size_t, std::size_t> context::get_field_properties(const std::uno
     }
 
     auto field_info = type_it->second.member_types.at(field_index);
-    return std::make_pair(field_info.second.size, field_info.second.offset);
+    bool needs_gc = (type_name != "i32") && (type_name != "f32");
+    return {field_info.second.size, field_info.second.offset, needs_gc};
 }
 
 std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
                                       const function_signature& s) const
 {
-    auto [return_type_size, return_type_alignment] = get_type_properties(type_map, s.return_type.first, s.return_type.second);
+    auto return_type_properties = get_type_properties(type_map, s.return_type.first, s.return_type.second);
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        auto [size, alignment] = get_type_properties(type_map, it.first, it.second);
-        arg_size += size;
+        auto properties = get_type_properties(type_map, it.first, it.second);
+        arg_size += properties.size;
         // NOTE stack contents are not aligned.
     }
-    return return_type_size - arg_size;
+    return return_type_properties.size - arg_size;
 }
 
 void context::decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map, function_descriptor& desc)
@@ -254,7 +255,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     }
 
     // return type
-    details.return_size = get_type_properties(type_map, desc.signature.return_type.first, desc.signature.return_type.second).first;
+    details.return_size = get_type_properties(type_map, desc.signature.return_type.first, desc.signature.return_type.second).size;
 }
 
 std::int32_t context::decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -403,16 +404,16 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         }
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto [size1, alignment1] = get_type_properties({}, t1, false);
-        auto [size2, alignment2] = get_type_properties({}, t2, false);
+        auto properties1 = get_type_properties({}, t1, false);
+        auto properties2 = get_type_properties({}, t2, false);
 
         // check if the type needs garbage collection.
         std::uint8_t needs_gc = (t1 == "str") || (t1 == "addr") || (t1 == "@array");
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&size1), reinterpret_cast<std::byte*>(&size1) + sizeof(size1));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&size2), reinterpret_cast<std::byte*>(&size2) + sizeof(size2));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
         code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
-        return static_cast<std::int32_t>(size1);
+        return static_cast<std::int32_t>(properties1.size);
     }
     /* invoke. */
     case opcode::invoke:
@@ -556,9 +557,10 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", i.i));
         }
 
-        auto [size, alignment] = get_type_properties(type_map, exp_symbol.name, false);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&alignment), reinterpret_cast<std::byte*>(&alignment) + sizeof(alignment));
+        auto properties = get_type_properties(type_map, exp_symbol.name, false);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
 
         return static_cast<std::int32_t>(sizeof(void*));
     }
@@ -585,11 +587,12 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
         }
 
-        auto [size, offset] = get_field_properties(type_map, exp_symbol.name, field_index.i);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+        auto properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
 
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(size);
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(properties.size);
     }
     /* getfield. */
     case opcode::getfield:
@@ -614,11 +617,12 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
         }
 
-        auto [size, offset] = get_field_properties(type_map, exp_symbol.name, field_index.i);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&size), reinterpret_cast<std::byte*>(&size) + sizeof(size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+        auto properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
 
-        return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(size);
+        return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
@@ -651,10 +655,13 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
     {
         std::size_t size = 0;
         std::size_t alignment = 0;
+        std::vector<std::size_t> layout;
         int offset = 0;
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
+            bool add_to_layout = false;
+
             // check that the type exists and get its properties.
             auto built_in_it = type_properties_map.find(member_type.base_type);
             if(built_in_it != type_properties_map.end())
@@ -668,6 +675,8 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
                 {
                     member_type.size = sizeof(void*);
                     member_type.alignment = std::alignment_of_v<void*>;
+
+                    add_to_layout = true;
                 }
             }
             else
@@ -680,6 +689,8 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
                 // size and alignment are the same for both array and non-array types.
                 member_type.size = sizeof(void*);
                 member_type.alignment = std::alignment_of_v<void*>;
+
+                add_to_layout = true;
             }
 
             // store offset.
@@ -696,6 +707,12 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
 
             // calculate member offset as `size_after - size_before`.
             offset += size;
+
+            // update type layout.
+            if(add_to_layout)
+            {
+                layout.push_back(member_type.offset);
+            }
         }
 
         // trailing padding.
@@ -704,6 +721,9 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
         // store type size and alignment.
         desc.size = size;
         desc.alignment = alignment;
+
+        // store layout.
+        desc.layout_id = gc.register_type_layout(std::move(layout));
     }
 }
 
@@ -1488,8 +1508,9 @@ opcode context::exec(const language_module& mod,
             /* no out-of-bounds read possible, since this is checked during decode. */
             std::size_t size = read_unchecked<std::size_t>(binary, offset);
             std::size_t alignment = read_unchecked<std::size_t>(binary, offset);
+            std::size_t layout_id = read_unchecked<std::size_t>(binary, offset);
 
-            frame.stack.push_addr(gc.gc_new(size, alignment, gc::gc_object::of_temporary));
+            frame.stack.push_addr(gc.gc_new(layout_id, size, alignment, gc::gc_object::of_temporary));
 
             break;
         } /* opcode::new_ */
@@ -1549,6 +1570,7 @@ opcode context::exec(const language_module& mod,
             /* no out-of-bounds read possible, since this is checked during decode. */
             std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
             std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+            bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
             if(field_size == sizeof(std::int32_t))
             {
@@ -1572,6 +1594,11 @@ opcode context::exec(const language_module& mod,
                 }
                 gc.remove_temporary(type_ref);
 
+                if(field_needs_gc)
+                {
+                    gc.remove_temporary(v);
+                }
+
                 std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
             }
             else
@@ -1586,6 +1613,7 @@ opcode context::exec(const language_module& mod,
             /* no out-of-bounds read possible, since this is checked during decode. */
             std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
             std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+            bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
             if(field_size == sizeof(std::int32_t))
             {
@@ -1609,9 +1637,14 @@ opcode context::exec(const language_module& mod,
                 }
                 gc.remove_temporary(type_ref);
 
-                void* v = frame.stack.pop_addr<void>();
+                void* v;
                 std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
                 frame.stack.push_addr(v);
+
+                if(field_needs_gc)
+                {
+                    gc.add_temporary(v);
+                }
             }
             else
             {

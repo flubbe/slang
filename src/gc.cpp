@@ -50,6 +50,14 @@ void garbage_collector::mark_object(void* obj)
             mark_object(ref);
         }
     }
+    else if(obj_info.type == gc_object_type::obj && obj_info.layout)
+    {
+        for(auto offset: *obj_info.layout)
+        {
+            auto obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);
+            mark_object(obj);
+        }
+    }
 }
 
 /**
@@ -302,6 +310,26 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
     }
 
     return it->second.type;
+}
+
+std::size_t garbage_collector::register_type_layout(std::vector<std::size_t> layout)
+{
+    // find the first free identifier.
+    std::size_t id = 0;
+    for(; id < type_layouts.size(); ++id)
+    {
+        if(type_layouts.find(id) == type_layouts.end())
+        {
+            break;
+        }
+    }
+    if(type_layouts.find(id) != type_layouts.end())
+    {
+        id += 1;
+    }
+
+    type_layouts.insert({id, std::move(layout)});
+    return id;
 }
 
 }    // namespace slang::gc

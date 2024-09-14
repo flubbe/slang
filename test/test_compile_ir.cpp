@@ -1682,6 +1682,63 @@ TEST(compile_ir, nested_structs)
                   " ret i32\n"
                   "}");
     }
+    {
+        const std::string test_input =
+          "struct Link {\n"
+          " next: Link\n"
+          "};\n"
+          "fn test() -> void\n"
+          "{\n"
+          " let root: Link = Link{next: Link{next: null}};\n"
+          " root.next.next = root;\n"
+          " root.next.next = null;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
+                  "%Link = type {\n"
+                  " Link %next,\n"
+                  "}\n"
+                  "define void @test() {\n"
+                  "local Link %root\n"
+                  "entry:\n"
+                  " new Link\n"                       // [addr1]
+                  " dup addr\n"                       // [addr1, addr1]
+                  " new Link\n"                       // [addr1, addr1, addr2]
+                  " dup addr\n"                       // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                     // [addr1, addr1, addr2, addr2, null]
+                  " set_field %Link, Link %next\n"    // [addr1, addr1, addr2]                   addr2.next = null
+                  " set_field %Link, Link %next\n"    // [addr1]                                 addr1.next = addr2
+                  " store addr %root\n"               // []                                      root = addr1
+                  " load addr %root\n"                // [root]
+                  " get_field %Link, Link %next\n"    // [root.next]
+                  " load addr %root\n"                // [root.next, root]
+                  " set_field %Link, Link %next\n"    // []                                      root.next.next = root
+                  " load addr %root\n"                // [root]
+                  " get_field %Link, Link %next\n"    // [root.next]
+                  " const_null\n"                     // [root.next, null]
+                  " set_field %Link, Link %next\n"    // []                                      root.next.next = null
+                  " ret void\n"
+                  "}");
+    }
 }
 
 }    // namespace

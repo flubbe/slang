@@ -505,6 +505,9 @@ struct type_descriptor
 
     /** Type alignment (not serialized). */
     std::size_t alignment{0};
+
+    /** Type layout id (not serialized). */
+    std::size_t layout_id{0};
 };
 
 /**

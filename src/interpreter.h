@@ -770,6 +770,50 @@ struct stack_frame
     }
 };
 
+/** Type properties. */
+struct type_properties
+{
+    /** Type size. */
+    std::size_t size{0};
+
+    /** Type alignment. */
+    std::size_t alignment{0};
+
+    /** Type layout id (always `0` for non-struct types). */
+    std::size_t layout_id{0};
+
+    /** Default constructors. */
+    type_properties() = default;
+    type_properties(const type_properties&) = default;
+    type_properties(type_properties&&) = default;
+
+    /** Default assignments. */
+    type_properties& operator=(const type_properties&) = default;
+    type_properties& operator=(type_properties&&) = default;
+};
+
+/** Type properties. */
+struct field_properties
+{
+    /** Field size. */
+    std::size_t size{0};
+
+    /** Field offset. */
+    std::size_t offset{0};
+
+    /** Whether this is a garbage collected field. */
+    bool needs_gc{false};
+
+    /** Default constructors. */
+    field_properties() = default;
+    field_properties(const field_properties&) = default;
+    field_properties(field_properties&&) = default;
+
+    /** Default assignments. */
+    field_properties& operator=(const field_properties&) = default;
+    field_properties& operator=(field_properties&&) = default;
+};
+
 /** Interpreter context. */
 class context
 {
@@ -803,12 +847,12 @@ class context
      * @param type_map The type map.
      * @param type_name The base type name.
      * @param reference Whether this is a reference. Note that arrays are references.
-     * @return Returns a pair `(size, alignment)`.
+     * @return Returns the type properties.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
-    std::pair<std::size_t, std::size_t> get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                            const std::string& type_name,
-                                                            bool reference) const;
+    type_properties get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                        const std::string& type_name,
+                                        bool reference) const;
 
     /**
      * Get the byte size and offset of a field.
@@ -816,12 +860,12 @@ class context
      * @param type_map The type map.
      * @param type_name The base type name.
      * @param field_index The field index.
-     * @return Returns a pair `(size, offset)`.
+     * @return Returns the field properties.
      * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
      */
-    std::pair<std::size_t, std::size_t> get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                             const std::string& type_name,
-                                                             std::size_t field_index) const;
+    field_properties get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+                                          const std::string& type_name,
+                                          std::size_t field_index) const;
 
     /**
      * Calculate the stack size delta from a function's signature.
