@@ -285,93 +285,92 @@ std::string scope_expression::to_string() const
  * access_expression.
  */
 
+class access_guard
+{
+    /** The associated context. */
+    cg::context& ctx;
+
+public:
+    /** Deleted constructors. */
+    access_guard() = delete;
+    access_guard(const access_guard&) = delete;
+    access_guard(access_guard&&) = delete;
+
+    /** Deleted assignments. */
+    access_guard& operator=(const access_guard&) = delete;
+    access_guard& operator=(access_guard&&) = delete;
+
+    /**
+     * Access guard for a struct.
+     *
+     * @param ctx Code generation context.
+     * @param name The struct's name.
+     */
+    access_guard(cg::context& ctx, std::string name)
+    : ctx{ctx}
+    {
+        ctx.push_struct_access(std::move(name));
+    }
+
+    /** Destructor. */
+    ~access_guard()
+    {
+        ctx.pop_struct_access();
+    }
+};
+
 std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // validate expression.
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(loc, "Access expression has no type.");
     }
-
-    auto* s = ctx.get_scope();
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
-    }
-
-    const cg::value* var{nullptr};
-    while(s != nullptr)
-    {
-        if((var = s->get_value(name.s)) != nullptr)
-        {
-            break;
-        }
-        s = s->get_outer();
-    }
-
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
-    }
-
     if(!expr->is_named_expression())
     {
         throw cg::codegen_error(loc, fmt::format("Could not find name for element access in access expression."));
     }
-
     auto identifier_expr = reinterpret_cast<named_expression*>(expr.get());
 
-    if(var->is_array())
+    cg::value var = get_value(ctx);
+
+    // arrays.
+    if(var.is_array())
     {
         if(identifier_expr->get_name().s == "length")
         {
             if(mc == memory_context::store)
             {
-                throw cg::codegen_error(identifier_expr->get_location(), "Array length is read only.");
+                throw cg::codegen_error(expr->get_location(), "Array length is read only.");
             }
 
-            ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(var));
             ctx.generate_arraylength();
             return std::make_unique<cg::value>("i32");
         }
         else
         {
-            throw cg::codegen_error(identifier_expr->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
+            throw cg::codegen_error(expr->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
         }
     }
 
     // structs.
-    auto& members = ctx.get_global_scope()->get_type(var->get_resolved_type());
-    auto it = std::find_if(members.begin(), members.end(),
-                           [&identifier_expr](const std::pair<std::string, cg::value>& v)
-                           {
-                               // This cast is (implicitly) validated during type checking.
-                               return v.first == identifier_expr->get_name().s;
-                           });
-    if(it == members.end())
+    auto [struct_name, member] = generate_object_load(ctx);
+    if(mc != memory_context::store)
     {
-        throw cg::codegen_error(identifier_expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var->get_resolved_type(), identifier_expr->get_name().s));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_name, member));
+    }
+    else
+    {
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_name, member));
     }
 
-    if(mc == memory_context::none || mc == memory_context::load)
-    {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var->get_resolved_type(), name.s, std::nullopt}));
-    }
-
-    if(mc == memory_context::load)
-    {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_resolved_type(), it->second));
-    }
-    else if(mc == memory_context::store)
-    {
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(var->get_resolved_type(), it->second));
-    }
-
-    return std::make_unique<cg::value>(it->second);
+    return std::make_unique<cg::value>(member);
 }
 
 std::optional<ty::type> access_expression::type_check(ty::context& ctx)
 {
-    auto type = ctx.get_identifier_type(name);
+    type = ctx.get_identifier_type(name);
 
     // array built-ins.
     if(type.is_array())
@@ -396,40 +395,94 @@ std::string access_expression::to_string() const
     return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
-void access_expression::generate_object_load(cg::context& ctx)
+std::pair<std::string, cg::value> access_expression::generate_object_load(cg::context& ctx) const
 {
-    if(!expr_type.has_value())
+    // validate expression.
+    if(!expr)
     {
-        throw cg::codegen_error(loc, "Access expression has no type.");
+        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
+    }
+    if(!expr->is_named_expression())
+    {
+        throw cg::codegen_error(loc, fmt::format("Could not find name for element access in access expression."));
     }
 
-    auto* s = ctx.get_scope();
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
-    }
-
-    const cg::value* var{nullptr};
-    while(s != nullptr)
-    {
-        if((var = s->get_value(name.s)) != nullptr)
-        {
-            break;
-        }
-        s = s->get_outer();
-    }
-
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
-    }
-
-    if(var->is_array())
+    // get lhs object value.
+    cg::value var = get_value(ctx);
+    if(var.is_array())
     {
         throw cg::codegen_error(loc, fmt::format("Cannot load array '{}' as an object.", name.s));
     }
 
-    ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var->get_resolved_type(), name.s, std::nullopt}));
+    // get rhs.
+    std::string expr_name = static_cast<named_expression*>(expr.get())->get_name().s;
+
+    auto& members = ctx.get_global_scope()->get_type(var.get_resolved_type());
+    auto it = std::find_if(members.begin(), members.end(),
+                           [&expr_name](const std::pair<std::string, cg::value>& v)
+                           {
+                               return v.first == expr_name;
+                           });
+    if(it == members.end())
+    {
+        throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var.get_resolved_type(), expr_name));
+    }
+
+    // check if we need to load the base object.
+    if(!ctx.is_struct_access())
+    {
+        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var.get_resolved_type(), name.s, std::nullopt}));
+    }
+
+    // load the expression, if needed.
+    if(expr->is_struct_member_access())
+    {
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var.get_resolved_type(), it->second));
+
+        access_guard ag{ctx, var.get_resolved_type()};
+        return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
+    }
+
+    return std::make_pair(var.get_resolved_type(), it->second);
+}
+
+cg::value access_expression::get_value(cg::context& ctx) const
+{
+    if(!ctx.is_struct_access())
+    {
+        auto* scope = ctx.get_scope();
+        if(scope == nullptr)
+        {
+            throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
+        }
+
+        while(scope != nullptr)
+        {
+            cg::value* v = scope->get_value(name.s);
+            if(v != nullptr)
+            {
+                return *v;
+            }
+            scope = scope->get_outer();
+        }
+
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+    }
+    else
+    {
+        auto& members = ctx.get_global_scope()->get_type(ctx.get_struct_access_name());
+        auto it = std::find_if(members.begin(), members.end(),
+                               [this](const std::pair<std::string, cg::value>& v)
+                               {
+                                   return v.first == get_name().s;
+                               });
+        if(it == members.end())
+        {
+            throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", ctx.get_struct_access_name(), get_name().s));
+        }
+
+        return it->second;
+    }
 }
 
 /*
@@ -496,57 +549,41 @@ std::string directive_expression::to_string() const
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto* s = ctx.get_scope();
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
-    }
+    cg::value v = get_value(ctx);
 
-    const cg::value* var{nullptr};
-    while(s != nullptr)
-    {
-        if((var = s->get_value(name.s)) != nullptr)
-        {
-            break;
-        }
-        s = s->get_outer();
-    }
-
-    if(s == nullptr)
-    {
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
-    }
+    // FIXME We lose type information here.
+    v = ty::is_builtin_type(v.get_resolved_type()) ? v : cg::value{"addr", std::nullopt, v.get_name(), std::nullopt};
 
     if(mc == memory_context::none)
     {
         // load arrays for assignments.
         if(element_expr)
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(v));
             element_expr->generate_code(ctx, memory_context::load);
         }
     }
     else if(mc == memory_context::load)
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(v));
 
         if(element_expr)
         {
             element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_load(std::make_unique<cg::type_argument>(var->deref()), true);
+            ctx.generate_load(std::make_unique<cg::type_argument>(v.deref()), true);
         }
     }
     else if(mc == memory_context::store)
     {
         if(element_expr)
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(*var));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(v));
             element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_store(std::make_unique<cg::type_argument>(var->deref()), true);
+            ctx.generate_store(std::make_unique<cg::type_argument>(v.deref()), true);
         }
         else
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(*var));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(v));
         }
     }
     else
@@ -556,9 +593,9 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(element_expr)
     {
-        return std::make_unique<cg::value>(var->deref());
+        return std::make_unique<cg::value>(v.deref());
     }
-    return std::make_unique<cg::value>(*var);
+    return std::make_unique<cg::value>(v);
 }
 
 std::optional<ty::type> variable_reference_expression::type_check(ty::context& ctx)
@@ -590,6 +627,45 @@ std::string variable_reference_expression::to_string() const
         return fmt::format("VariableReference(name={}, element_expr={})", name.s, element_expr->to_string());
     }
     return fmt::format("VariableReference(name={})", name.s);
+}
+
+cg::value variable_reference_expression::get_value(cg::context& ctx) const
+{
+    if(!ctx.is_struct_access())
+    {
+        auto* scope = ctx.get_scope();
+        if(scope == nullptr)
+        {
+            throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
+        }
+
+        while(scope != nullptr)
+        {
+            cg::value* v = scope->get_value(name.s);
+            if(v != nullptr)
+            {
+                return *v;
+            }
+            scope = scope->get_outer();
+        }
+
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+    }
+    else
+    {
+        auto& members = ctx.get_global_scope()->get_type(ctx.get_struct_access_name());
+        auto it = std::find_if(members.begin(), members.end(),
+                               [this](const std::pair<std::string, cg::value>& v)
+                               {
+                                   return v.first == get_name().s;
+                               });
+        if(it == members.end())
+        {
+            throw cg::codegen_error(loc, fmt::format("Struct '{}' does not contain a field with name '{}'.", ctx.get_struct_access_name(), get_name().s));
+        }
+
+        return it->second;
+    }
 }
 
 /*
@@ -1113,7 +1189,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             // by the above check, lhs is an access_expression.
             access_expression* ae_lhs = static_cast<access_expression*>(lhs.get());
 
-            ae_lhs->generate_object_load(ctx);
+            auto [struct_name, member] = ae_lhs->generate_object_load(ctx);
             auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
             // we might need to duplicate the value for chained assignments.
@@ -1122,8 +1198,8 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt, std::nullopt}});
             }
 
-            auto lhs_value = ae_lhs->generate_code(ctx, memory_context::store);
-            return lhs_value;
+            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_name, member));
+            return rhs_value;
         }
         else
         {

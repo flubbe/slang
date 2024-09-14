@@ -387,6 +387,9 @@ class access_expression : public named_expression
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
 
+    /** Identifyer type. Set during type checking. */
+    ty::type type;
+
 public:
     /** No default constructor. */
     access_expression() = delete;
@@ -435,8 +438,12 @@ public:
      * Generate IR to load the associated object onto the stack (without loading the field).
      *
      * @param ctx The context to use for code generation.
+     * @returns A pair of the loaded `(struct_name, value)`.
      */
-    void generate_object_load(cg::context& ctx);
+    std::pair<std::string, cg::value> generate_object_load(cg::context& ctx) const;
+
+    /** Get the value of the object. */
+    cg::value get_value(cg::context& ctx) const;
 };
 
 /** Import statements. */
@@ -567,6 +574,9 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    /** Get the value of the object. */
+    cg::value get_value(cg::context& ctx) const;
 };
 
 /** Variable declaration. */

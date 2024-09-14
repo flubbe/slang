@@ -22,7 +22,7 @@ namespace
 
 TEST(codegen, initialize_context)
 {
-    cg::context ctx = cg::context();
+    ASSERT_NO_THROW(cg::context ctx = cg::context());
 }
 
 TEST(codegen, create_function)
@@ -570,7 +570,6 @@ TEST(codegen, aggregate_data)
         cg::context ctx = cg::context();
 
         /*
-         *
          * struct S
          * {
          *     a: i32,

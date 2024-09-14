@@ -1631,6 +1631,9 @@ class context
     /** Scope name stack for name resolution. */
     std::vector<std::string> resolution_scopes;
 
+    /** Struct name stack for access resolution. */
+    std::vector<std::string> struct_access;
+
     /** List of function prototypes. */
     std::vector<std::unique_ptr<prototype>> prototypes;
 
@@ -1865,6 +1868,29 @@ public:
     {
         return s == global_scope.get();
     }
+
+    /**
+     * Push a name onto the struct access resolution stack.
+     *
+     * @param name The struct name.
+     */
+    void push_struct_access(std::string name);
+
+    /** Pop a name from the struct access resolution stack. */
+    void pop_struct_access();
+
+    /** Whether we are accessing a struct. */
+    bool is_struct_access() const
+    {
+        return struct_access.size() != 0;
+    }
+
+    /**
+     * Get the currently accessed struct's name.
+     *
+     * @throws Throws a `codegen_error` if no struct is accessed.
+     */
+    std::string get_struct_access_name() const;
 
     /**
      * Enter a function. Only one function can be entered at a time.

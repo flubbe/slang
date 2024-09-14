@@ -1493,4 +1493,195 @@ TEST(compile_ir, structs)
     }
 }
 
+TEST(compile_ir, nested_structs)
+{
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " next: S\n"
+          "};\n"
+          "fn test() -> void\n"
+          "{\n"
+          " let s: S = S{ i: 1, next: S{i: 3, next: null} };\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  " S %next,\n"
+                  "}\n"
+                  "define void @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"                    // [addr1]
+                  " dup addr\n"                 // [addr1, addr1]
+                  " const i32 1\n"              // [addr1, addr1, 1]
+                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
+                  " dup addr\n"                 // [addr1, addr1]
+                  " new S\n"                    // [addr1, addr1, addr2]
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
+                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
+                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
+                  " store addr %s\n"            // []                                   s = addr1
+                  " ret void\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " next: S\n"
+          "};\n"
+          "fn test() -> i32\n"
+          "{\n"
+          " let s: S = S{ i: 1, next: S{i: 3, next: null} };\n"
+          " return s.next.i;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  " S %next,\n"
+                  "}\n"
+                  "define i32 @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"                    // [addr1]
+                  " dup addr\n"                 // [addr1, addr1]
+                  " const i32 1\n"              // [addr1, addr1, 1]
+                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
+                  " dup addr\n"                 // [addr1, addr1]
+                  " new S\n"                    // [addr1, addr1, addr2]
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
+                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
+                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
+                  " store addr %s\n"            // []                                   s = addr1
+                  " load addr %s\n"             // [s]
+                  " get_field %S, S %next\n"    // [s.next]
+                  " get_field %S, i32 %i\n"     // [i]
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " next: S\n"
+          "};\n"
+          "fn test() -> i32\n"
+          "{\n"
+          " let s: S = S{ i: 1, next: S{i: 3, next: null} };\n"
+          " s.next.next = s;\n"
+          " s.next.next.i = 2;\n"
+          " return s.i + s.next.i;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        ty::context type_ctx;
+        cg::context codegen_ctx;
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  " S %next,\n"
+                  "}\n"
+                  "define i32 @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"                    // [addr1]
+                  " dup addr\n"                 // [addr1, addr1]
+                  " const i32 1\n"              // [addr1, addr1, 1]
+                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
+                  " dup addr\n"                 // [addr1, addr1]
+                  " new S\n"                    // [addr1, addr1, addr2]
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
+                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
+                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
+                  " store addr %s\n"            // []                                   s = addr1
+                  " load addr %s\n"             // [s]
+                  " get_field %S, S %next\n"    // [s.next]
+                  " load addr %s\n"             // [s.next, s]
+                  " set_field %S, S %next\n"    // []                                   s.next.next = s
+                  " load addr %s\n"             // [s]
+                  " get_field %S, S %next\n"    // [s.next]
+                  " get_field %S, S %next\n"    // [s.next.next]
+                  " const i32 2\n"              // [s.next.next, 2]
+                  " set_field %S, i32 %i\n"     // []                                   s.next.next.i = 2
+                  " load addr %s\n"             // [s]
+                  " get_field %S, i32 %i\n"     // [i]
+                  " load addr %s\n"             // [i, s]
+                  " get_field %S, S %next\n"    // [i, s.next]
+                  " get_field %S, i32 %i\n"     // [i, s.next.i]
+                  " add i32\n"                  // [i + s.next.i]
+                  " ret i32\n"
+                  "}");
+    }
+}
+
 }    // namespace

@@ -659,6 +659,37 @@ void context::pop_resolution_scope()
 }
 
 /*
+ * Struct access.
+ */
+
+void context::push_struct_access(std::string name)
+{
+    struct_access.push_back(std::move(name));
+}
+
+void context::pop_struct_access()
+{
+    if(struct_access.size() > 0)
+    {
+        struct_access.pop_back();
+    }
+    else
+    {
+        throw codegen_error("Cannot pop struct from access stack: The stack is empty.");
+    }
+}
+
+std::string context::get_struct_access_name() const
+{
+    if(struct_access.size() == 0)
+    {
+        throw codegen_error("Cannot get struct access name: No struct accessed.");
+    }
+
+    return struct_access.back();
+}
+
+/*
  * Code generation.
  */
 
