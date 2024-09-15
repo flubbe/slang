@@ -246,23 +246,52 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             {
                 auto& desc = it.second;
 
-                std::vector<std::pair<token, ty::type>> members;
-                for(auto& [member_name, member_type]: desc.member_types)
+                // Add type to code generation context.
                 {
-                    ty::type resolved_member_type = type_ctx.get_unresolved_type(
-                      {member_type.base_type, reference_location},
-                      ty::is_builtin_type(member_type.base_type)
-                        ? typing::type_class::tc_plain
-                        : typing::type_class::tc_struct);
+                    std::vector<std::pair<std::string, cg::value>> members;
+                    std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
+                                   [](const std::pair<std::string, type_info>& member) -> std::pair<std::string, cg::value>
+                                   {
+                                       if(ty::is_builtin_type(std::get<1>(member).base_type))
+                                       {
+                                           return {std::get<0>(member), cg::value{std::get<1>(member).base_type,
+                                                                                  std::nullopt,
+                                                                                  std::nullopt,
+                                                                                  std::get<1>(member).array
+                                                                                    ? std::make_optional<std::size_t>(0)
+                                                                                    : std::nullopt}};
+                                       }
 
-                    members.push_back(std::make_pair<token, ty::type>(
-                      {member_name, reference_location},
-                      std::move(resolved_member_type)));
+                                       return {std::get<0>(member), cg::value{
+                                                                      "aggregate",
+                                                                      std::get<1>(member).base_type,
+                                                                      std::nullopt,
+                                                                      std::get<1>(member).array
+                                                                        ? std::make_optional<std::size_t>(0)
+                                                                        : std::nullopt}};
+                                   });
+
+                    ctx.get_global_scope()->add_type(it.first, std::move(members));
                 }
 
-                // TODO Add type to `ctx`.
+                // Add type to typing context.
+                {
+                    std::vector<std::pair<token, ty::type>> members;
+                    for(auto& [member_name, member_type]: desc.member_types)
+                    {
+                        ty::type resolved_member_type = type_ctx.get_unresolved_type(
+                          {member_type.base_type, reference_location},
+                          ty::is_builtin_type(member_type.base_type)
+                            ? typing::type_class::tc_plain
+                            : typing::type_class::tc_struct);
 
-                type_ctx.add_struct({it.first, reference_location}, std::move(members));
+                        members.push_back(std::make_pair<token, ty::type>(
+                          {member_name, reference_location},
+                          std::move(resolved_member_type)));
+                    }
+
+                    type_ctx.add_struct({it.first, reference_location}, std::move(members));
+                }
             }
         }
     }
