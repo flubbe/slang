@@ -13,6 +13,7 @@
 #include <stdexcept>
 
 #include "filemanager.h"
+#include "module.h"
 #include "token.h"
 
 /*
@@ -66,6 +67,40 @@ class context
 {
     /** The associated file manager. */
     file_manager& mgr;
+
+    /** Loaded module headers, indexed by resolved import path. */
+    std::unordered_map<std::string, module_header> headers;
+
+    /** List of resolved modules and modules begin resolved, as given by their resolved import path. */
+    std::vector<std::string> resolved_modules;
+
+    /** Function imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<std::pair<std::string, function_descriptor>>>
+      imported_functions;
+
+    /** Type imports, , indexed by resolved module path, as a pair `(name, descriptor)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<std::pair<std::string, type_descriptor>>>
+      imported_types;
+
+protected:
+    /**
+     * Get a module header from a resolved path.
+     *
+     * @param resolved_path The resolved module path.
+     * @returns Returns the module header, or throws a `file_error` if the module could not be opened.
+     */
+    module_header& get_module_header(const fs::path& resolved_path);
+
+    /**
+     * Resolve imports for a given module.
+     *
+     * @param resolved_path The resolved module path.
+     */
+    void resolve_module(const fs::path& resolved_path);
 
 public:
     /** Default constructors. */

@@ -11,7 +11,6 @@
 #include <fmt/core.h>
 
 #include "codegen.h"
-#include "module.h"
 #include "package.h"
 #include "resolve.h"
 #include "typing.h"
@@ -36,6 +35,116 @@ resolve_error::resolve_error(const token_location& loc, const std::string& messa
  * resolver context.
  */
 
+module_header& context::get_module_header(const fs::path& resolved_path)
+{
+    std::string path_str = resolved_path.string();
+    auto it = headers.find(path_str);
+    if(it != headers.end())
+    {
+        return it->second;
+    }
+
+    std::unique_ptr<slang::file_archive> ar = mgr.open(resolved_path, slang::file_manager::open_mode::read);
+
+    module_header hdr;
+    (*ar) & hdr;
+
+    auto insert_it = headers.insert({path_str, std::move(hdr)});
+    return insert_it.first->second;
+}
+
+/**
+ * Convert an import name of the for `a::b::c` into a path `a/b/c`.
+ *
+ * @param import_name The improt name.
+ * @returns Returns a path for the import name.
+ */
+static fs::path import_name_to_path(std::string import_name)
+{
+    slang::utils::replace_all(import_name, package::delimiter, "/");
+    return fs::path{import_name}.replace_extension(package::module_ext);
+}
+
+void context::resolve_module(const fs::path& resolved_path)
+{
+    if(std::find(resolved_modules.begin(), resolved_modules.end(), resolved_path.string()) != resolved_modules.end())
+    {
+        return;
+    }
+    resolved_modules.push_back(resolved_path.string());
+
+    module_header& header = get_module_header(resolved_path);
+
+    for(auto& it: header.imports)
+    {
+        if(it.type == symbol_type::package)
+        {
+            // packages are loaded while resolving other symbols.
+            continue;
+        }
+
+        // resolve the symbol's package.
+        if(it.package_index >= header.imports.size())
+        {
+            throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
+        }
+        else if(header.imports[it.package_index].type != symbol_type::package)
+        {
+            throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
+        }
+
+        fs::path resolved_import_path = mgr.resolve(import_name_to_path(header.imports[it.package_index].name));
+        resolve_module(resolved_import_path);
+
+        // find the imported symbol.
+        module_header& import_header = get_module_header(resolved_import_path);
+
+        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
+                                   [&it](const exported_symbol& exp) -> bool
+                                   {
+                                       return exp.name == it.name;
+                                   });
+        if(exp_it == import_header.exports.end())
+        {
+            throw resolve_error(
+              fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.",
+                          it.name, header.imports[it.package_index].name));
+        }
+        if(exp_it->type != it.type)
+        {
+            throw resolve_error(
+              fmt::format(
+                "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
+                it.name, header.imports[it.package_index].name, slang::to_string(it.type), slang::to_string(exp_it->type)));
+        }
+    }
+
+    for(auto& it: header.exports)
+    {
+        // resolve the symbol.
+        if(it.type == symbol_type::function)
+        {
+            if(imported_functions.find(resolved_path.string()) == imported_functions.end())
+            {
+                imported_functions.insert({resolved_path.string(), {}});
+            }
+            imported_functions[resolved_path.string()].push_back({it.name, std::get<function_descriptor>(it.desc)});
+        }
+        else if(it.type == symbol_type::type)
+        {
+            if(imported_types.find(resolved_path.string()) == imported_types.end())
+            {
+                imported_types.insert({resolved_path.string(), {}});
+            }
+            imported_types[resolved_path.string()].push_back({it.name, std::get<type_descriptor>(it.desc)});
+        }
+        else
+        {
+            throw resolve_error(fmt::format("Cannot resolve symbol '{}' of type '{}'.", it.name, to_string(it.type)));
+        }
+    }
+}
+
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
     const std::vector<std::vector<token>>& imports = type_ctx.get_imports();
@@ -56,16 +165,15 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
         fs::path fs_path = fs::path{utils::join(import, {transform}, "/")}.replace_extension(package::module_ext);
         fs::path resolved_path = mgr.resolve(fs_path);
-        std::unique_ptr<slang::file_archive> ar = mgr.open(resolved_path, slang::file_manager::open_mode::read);
 
-        module_header hdr;
-        (*ar) & hdr;
+        resolve_module(resolved_path);
 
-        for(auto& exp: hdr.exports)
+        auto imported_functions_it = imported_functions.find(resolved_path.string());
+        if(imported_functions_it != imported_functions.end())
         {
-            if(exp.type == symbol_type::function)
+            for(auto& it: imported_functions_it->second)
             {
-                auto& desc = std::get<function_descriptor>(exp.desc);
+                auto& desc = it.second;
 
                 std::vector<cg::value> prototype_arg_types;
                 std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
@@ -97,7 +205,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                                      : std::nullopt};
                 }
 
-                ctx.add_prototype(exp.name, return_type, prototype_arg_types, import_path);
+                ctx.add_prototype(it.first, return_type, prototype_arg_types, import_path);
 
                 std::vector<ty::type> arg_types;
                 for(auto& arg: desc.signature.arg_types)
@@ -108,12 +216,17 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 ty::type resolved_return_type = type_ctx.get_type(return_type.get_resolved_type(),
                                                                   return_type.is_array());
 
-                type_ctx.add_function({exp.name, reference_location},
+                type_ctx.add_function({it.first, reference_location},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);
             }
-            else if(exp.type == symbol_type::type)
+        }
+
+        auto imported_types_it = imported_types.find(resolved_path.string());
+        if(imported_types_it != imported_types.end())
+        {
+            for(auto& it: imported_types_it->second)
             {
-                auto& desc = std::get<type_descriptor>(exp.desc);
+                auto& desc = it.second;
 
                 std::vector<std::pair<token, ty::type>> members;
                 for(auto& [member_name, member_type]: desc.member_types)
@@ -131,11 +244,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
                 // TODO Add type to `ctx`.
 
-                type_ctx.add_struct({exp.name, reference_location}, std::move(members));
-            }
-            else
-            {
-                throw std::runtime_error(fmt::format("Import resolution not implemented for symbol '{}'.", exp.name));
+                type_ctx.add_struct({it.first, reference_location}, std::move(members));
             }
         }
     }
