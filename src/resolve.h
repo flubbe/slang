@@ -57,9 +57,14 @@ public:
     resolve_error(const token_location& loc, const std::string& message);
 };
 
-/** An import. */
-struct import_definition
+/** A module entry in the resolver's module list. */
+struct module_entry
 {
+    /** Resolved import path of the module. */
+    std::string resolved_path;
+
+    /** Whether module resolution is completed. */
+    bool is_resolved{false};
 };
 
 /** Resolver context. */
@@ -71,8 +76,8 @@ class context
     /** Loaded module headers, indexed by resolved import path. */
     std::unordered_map<std::string, module_header> headers;
 
-    /** List of resolved modules and modules begin resolved, as given by their resolved import path. */
-    std::vector<std::string> resolved_modules;
+    /** List of modules. */
+    std::vector<module_entry> modules;
 
     /** Function imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
     std::unordered_map<

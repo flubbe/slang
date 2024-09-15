@@ -56,7 +56,7 @@ module_header& context::get_module_header(const fs::path& resolved_path)
 /**
  * Convert an import name of the for `a::b::c` into a path `a/b/c`.
  *
- * @param import_name The improt name.
+ * @param import_name The import name.
  * @returns Returns a path for the import name.
  */
 static fs::path import_name_to_path(std::string import_name)
@@ -67,11 +67,20 @@ static fs::path import_name_to_path(std::string import_name)
 
 void context::resolve_module(const fs::path& resolved_path)
 {
-    if(std::find(resolved_modules.begin(), resolved_modules.end(), resolved_path.string()) != resolved_modules.end())
+    auto mod_it = std::find_if(modules.begin(), modules.end(),
+                               [&resolved_path](const module_entry& entry) -> bool
+                               { return entry.resolved_path == resolved_path.string(); });
+    if(mod_it != modules.end())
     {
+        if(!mod_it->is_resolved)
+        {
+            throw resolve_error(fmt::format("Circular import for module '{}'.", resolved_path.string()));
+        }
+
         return;
     }
-    resolved_modules.push_back(resolved_path.string());
+
+    modules.push_back({resolved_path.string(), false});
 
     module_header& header = get_module_header(resolved_path);
 
@@ -143,6 +152,15 @@ void context::resolve_module(const fs::path& resolved_path)
             throw resolve_error(fmt::format("Cannot resolve symbol '{}' of type '{}'.", it.name, to_string(it.type)));
         }
     }
+
+    mod_it = std::find_if(modules.begin(), modules.end(),
+                          [&resolved_path](const module_entry& entry) -> bool
+                          { return entry.resolved_path == resolved_path.string(); });
+    if(mod_it == modules.end())
+    {
+        throw resolve_error(fmt::format("Internal error: Resolved module '{}' not in modules list.", resolved_path.string()));
+    }
+    mod_it->is_resolved = true;
 }
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
