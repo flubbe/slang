@@ -220,7 +220,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         return std::make_unique<cg::value>(target_type.s);
     }
 
-    return std::make_unique<cg::value>("aggregate", target_type.s);
+    throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.", v->get_resolved_type(), target_type.s));
 }
 
 std::optional<ty::type> type_cast_expression::type_check(ty::context& ctx)
@@ -258,18 +258,20 @@ std::string type_cast_expression::to_string() const
 }
 
 /*
- * scope_expression.
+ * namespace_access_expression.
  */
 
-std::unique_ptr<cg::value> scope_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    ctx.push_resolution_scope(name.s);
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+
     auto type = expr->generate_code(ctx, mc);
-    ctx.pop_resolution_scope();
     return type;
 }
 
-std::optional<ty::type> scope_expression::type_check(ty::context& ctx)
+std::optional<ty::type> namespace_access_expression::type_check(ty::context& ctx)
 {
     ctx.push_resolution_scope(name.s);
     auto type = expr->type_check(ctx);
@@ -277,7 +279,7 @@ std::optional<ty::type> scope_expression::type_check(ty::context& ctx)
     return type;
 }
 
-std::string scope_expression::to_string() const
+std::string namespace_access_expression::to_string() const
 {
     return fmt::format("Scope(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
 }
@@ -356,14 +358,14 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     }
 
     // structs.
-    auto [struct_name, member] = generate_object_load(ctx);
+    auto [struct_value, member] = generate_object_load(ctx);
     if(mc != memory_context::store)
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_name, member));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
     }
     else
     {
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_name, member));
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
     }
 
     return std::make_unique<cg::value>(member);
@@ -396,7 +398,7 @@ std::string access_expression::to_string() const
     return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
 }
 
-std::pair<std::string, cg::value> access_expression::generate_object_load(cg::context& ctx) const
+std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::context& ctx) const
 {
     // validate expression.
     if(!expr)
@@ -417,8 +419,11 @@ std::pair<std::string, cg::value> access_expression::generate_object_load(cg::co
 
     // get rhs.
     std::string expr_name = static_cast<named_expression*>(expr.get())->get_name().s;
+    std::string resolved_type = var.get_resolved_type();
 
-    auto& members = ctx.get_global_scope()->get_type(var.get_resolved_type());
+    cg::scope* s = ctx.get_global_scope();
+    auto& members = s->get_type(resolved_type);
+
     auto it = std::find_if(members.begin(), members.end(),
                            [&expr_name](const std::pair<std::string, cg::value>& v)
                            {
@@ -444,7 +449,7 @@ std::pair<std::string, cg::value> access_expression::generate_object_load(cg::co
         return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
     }
 
-    return std::make_pair(var.get_resolved_type(), it->second);
+    return std::make_pair(std::move(var), it->second);
 }
 
 cg::value access_expression::get_value(cg::context& ctx) const
@@ -673,19 +678,34 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
  * type_expression.
  */
 
-std::string type_expression::to_string() const
+std::optional<std::string> type_expression::get_namespace_path() const
 {
-    std::string scope_string;
-    if(scopes.size() > 0)
+    if(namespace_stack.size() == 0)
     {
-        for(std::size_t i = 0; i < scopes.size() - 1; ++i)
-        {
-            scope_string += fmt::format("{}, ", scopes[i].s);
-        }
-        scope_string += scopes.back().s;
+        return std::nullopt;
     }
 
-    return fmt::format("TypeExpression(name={}, scopes=({}), array={})", get_name().s, scope_string, is_array());
+    auto transform = [](const token& t) -> std::string
+    {
+        return t.s;
+    };
+
+    return slang::utils::join(namespace_stack, {transform}, "::");
+}
+
+std::string type_expression::to_string() const
+{
+    std::string namespace_string;
+    if(namespace_stack.size() > 0)
+    {
+        for(std::size_t i = 0; i < namespace_stack.size() - 1; ++i)
+        {
+            namespace_string += fmt::format("{}, ", namespace_stack[i].s);
+        }
+        namespace_string += namespace_stack.back().s;
+    }
+
+    return fmt::format("TypeExpression(name={}, namespaces=({}), array={})", get_name().s, namespace_string, is_array());
 }
 
 /*
@@ -714,7 +734,12 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     else
     {
         s->add_local(std::make_unique<cg::value>(cg::value{
-          "aggregate", type->get_name().s, name.s, type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}));
+          "aggregate",
+          type->get_name().s,
+          name.s,
+          type->is_array()
+            ? std::make_optional<std::size_t>(0)
+            : std::nullopt}));
         v = {"addr", std::nullopt, name.s, std::nullopt};
     }
 
@@ -901,7 +926,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     }
 
     s->add_type(name.s, struct_members);    // FIXME do we need this?
-    ctx.create_type(name.s, std::move(struct_members));
+    ctx.add_type(name.s, std::move(struct_members));
 
     return nullptr;
 }
@@ -989,7 +1014,9 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     ctx.generate_new(cg::value{"aggregate", name.s, std::nullopt, std::nullopt});
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
-    auto& t = s->get_type(name.s);
+    auto& t = s->contains_type(name.s)
+                ? s->get_type(name.s)
+                : ctx.get_type(name.s, get_namespace_path())->get_members();    // imported types are stored here.
 
     for(std::size_t i = 0; i < t.size(); ++i)
     {
@@ -1214,7 +1241,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             // by the above check, lhs is an access_expression.
             access_expression* ae_lhs = static_cast<access_expression*>(lhs.get());
 
-            auto [struct_name, member] = ae_lhs->generate_object_load(ctx);
+            auto [struct_value, member] = ae_lhs->generate_object_load(ctx);
             auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
             // we might need to duplicate the value for chained assignments.
@@ -1223,7 +1250,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt, std::nullopt}});
             }
 
-            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_name, member));
+            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
             return rhs_value;
         }
         else
@@ -1949,9 +1976,9 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     {
         arg->generate_code(ctx, memory_context::load);
     }
-    ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s));
+    ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s, get_namespace_path()));
 
-    auto return_type = ctx.get_prototype(callee.s).get_return_type();
+    auto return_type = ctx.get_prototype(callee.s, get_namespace_path()).get_return_type();
     if(index_expr)
     {
         // evaluate the index expression.

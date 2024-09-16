@@ -482,10 +482,12 @@ public:
      * Create a function argument.
      *
      * @param name The function name.
+     * @param import_path The import path of the function, or `std::nullopt`.
      */
-    function_argument(std::string name)
+    function_argument(std::string name, std::optional<std::string> import_path)
     : argument()
     , name{std::make_unique<value>("fn", std::nullopt, std::move(name))}
+    , import_path{std::move(import_path)}
     {
     }
 
@@ -1065,6 +1067,13 @@ public:
      * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
      */
     bool contains(const std::string& name) const;
+
+    /**
+     * Check if the scope contains a type.
+     *
+     * @returns True if the type exists.
+     */
+    bool contains_type(const std::string& name) const;
 
     /**
      * Get the variable for the given name.
@@ -1720,9 +1729,22 @@ public:
      *
      * @param name The type's name.
      * @param members The type's members as pairs `(name, type)`.
+     * @param import_path An optional import path for the type.
      * @returns A representation of the created type.
      */
-    type* create_type(std::string name, std::vector<std::pair<std::string, value>> members);
+    type* add_type(std::string name,
+                   std::vector<std::pair<std::string, value>> members,
+                   std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Get a type definition.
+     *
+     * Throws a `codegen_error` if the type is unknown.
+     *
+     * @param name The type name.
+     * @param import_path Import path.
+     */
+    type* get_type(const std::string& name, std::optional<std::string> import_path);
 
     /**
      * Get a reference to a string or create a new one if it does not exist.
@@ -1751,9 +1773,10 @@ public:
      * Throws a `codegen_error` if the prototype is not found.
      *
      * @param name The function's name.
+     * @param import_path The import path of the function, or `std::nullopt`.
      * @returns A reference the the function's prototype.
      */
-    const prototype& get_prototype(const std::string& name) const;
+    const prototype& get_prototype(const std::string& name, std::optional<std::string> import_path) const;
 
     /**
      * Add a function definition.
@@ -1801,20 +1824,6 @@ public:
         }
         return insertion_point;
     }
-
-    /**
-     * Push a scope for name resolution.
-     *
-     * @param name The scope's name.
-     */
-    void push_resolution_scope(std::string name);
-
-    /**
-     * Pop a scope from the name resolution stack.
-     *
-     * @throws Throws a `codegen_error` if the stack is empty.
-     */
-    void pop_resolution_scope();
 
     /**
      * Enter a new scope.

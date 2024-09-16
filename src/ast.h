@@ -17,6 +17,7 @@
 
 #include "token.h"
 #include "type.h"
+#include "utils.h"
 
 /*
  * Forward declarations for code generation.
@@ -86,7 +87,10 @@ protected:
     /** The expression's directive stack. */
     std::vector<directive> directive_stack;
 
-    /** The expression's given of inferred type. Needs to be set by `type_check`. */
+    /** Namespace stack for the expression. */
+    std::vector<std::string> namespace_stack;
+
+    /** The expression's given or inferred type. Needs to be set by `type_check`. */
     std::optional<ty::type> expr_type;
 
 public:
@@ -190,6 +194,33 @@ public:
      * @returns A vector of directives matching the name, or an empty vector if none are found.
      */
     std::vector<directive> get_directives(const std::string& s) const;
+
+    /**
+     * Set the namespace stack for the expression.
+     *
+     * @param stack The new namespace stack.
+     */
+    void set_namespace(std::vector<std::string> stack)
+    {
+        namespace_stack = std::move(stack);
+    }
+
+    /** Get the namespace stack. */
+    const std::vector<std::string>& get_namespace() const
+    {
+        return namespace_stack;
+    }
+
+    /** Return the namespace path, or `std::nullopt` if empty. */
+    std::optional<std::string> get_namespace_path() const
+    {
+        if(namespace_stack.size() == 0)
+        {
+            return std::nullopt;
+        }
+
+        return slang::utils::join(namespace_stack, "::");
+    }
 
     /**
      * Type checking.
@@ -339,7 +370,7 @@ public:
 };
 
 /** Scope expression. */
-class scope_expression : public expression
+class namespace_access_expression : public expression
 {
     /** The scope name. */
     token name;
@@ -349,18 +380,18 @@ class scope_expression : public expression
 
 public:
     /** No default constructor. */
-    scope_expression() = delete;
+    namespace_access_expression() = delete;
 
     /** Default destructor. */
-    virtual ~scope_expression() = default;
+    virtual ~namespace_access_expression() = default;
 
     /** Copy and move constructors. */
-    scope_expression(const scope_expression&) = delete;
-    scope_expression(scope_expression&&) = default;
+    namespace_access_expression(const namespace_access_expression&) = delete;
+    namespace_access_expression(namespace_access_expression&&) = default;
 
     /** Assignment operators. */
-    scope_expression& operator=(const scope_expression&) = delete;
-    scope_expression& operator=(scope_expression&&) = default;
+    namespace_access_expression& operator=(const namespace_access_expression&) = delete;
+    namespace_access_expression& operator=(namespace_access_expression&&) = default;
 
     /**
      * Construct a scope expression.
@@ -368,7 +399,7 @@ public:
      * @param name The scope's name.
      * @param expr An expression.
      */
-    scope_expression(token name, std::unique_ptr<expression> expr)
+    namespace_access_expression(token name, std::unique_ptr<expression> expr)
     : expression{name.location}
     , name{std::move(name)}
     , expr{std::move(expr)}
@@ -437,9 +468,9 @@ public:
      * Generate IR to load the associated object onto the stack (without loading the field).
      *
      * @param ctx The context to use for code generation.
-     * @returns A pair of the loaded `(struct_name, value)`.
+     * @returns A pair of the loaded `(struct_value, value)`.
      */
-    std::pair<std::string, cg::value> generate_object_load(cg::context& ctx) const;
+    std::pair<cg::value, cg::value> generate_object_load(cg::context& ctx) const;
 
     /** Get the value of the object. */
     cg::value get_value(cg::context& ctx) const;
@@ -587,8 +618,8 @@ class type_expression
     /** The type name. */
     token type_name;
 
-    /** Scopes. */
-    std::vector<token> scopes;
+    /** Namespaces. */
+    std::vector<token> namespace_stack;
 
     /** Whether the type is an array type. */
     bool array{false};
@@ -608,13 +639,13 @@ public:
      *
      * @param loc The location.
      * @param type_name The (unqualified) type name.
-     * @param scopes Scopes for type resolution.
+     * @param namespace_stack Namespaces for type resolution.
      * @param is_array Whether the type is an array type.
      */
-    type_expression(token_location loc, token type_name, std::vector<token> scopes, bool is_array)
+    type_expression(token_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
     : loc{std::move(loc)}
     , type_name{std::move(type_name)}
-    , scopes{std::move(scopes)}
+    , namespace_stack{std::move(namespace_stack)}
     , array{is_array}
     {
     }
@@ -630,6 +661,9 @@ public:
     {
         return type_name;
     }
+
+    /** Return the namespace path, or `std::nullopt` if empty. */
+    std::optional<std::string> get_namespace_path() const;
 
     /** Return a readable representation of the type. */
     std::string to_string() const;

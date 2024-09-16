@@ -890,7 +890,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
             throw syntax_error(*current_token, "Expected <identifier>.");
         }
 
-        return std::make_unique<ast::scope_expression>(std::move(identifier), parse_identifier_expression());
+        return std::make_unique<ast::namespace_access_expression>(std::move(identifier), parse_identifier_expression());
     }
     else if(current_token->s == ".")    // element access
     {

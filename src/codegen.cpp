@@ -262,6 +262,11 @@ bool scope::contains(const std::string& name) const
     return false;
 }
 
+bool scope::contains_type(const std::string& name) const
+{
+    return types.find(name) != types.end();
+}
+
 value* scope::get_value(const std::string& name)
 {
     auto it = std::find_if(args.begin(), args.end(),
@@ -505,7 +510,9 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
     throw codegen_error(fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.", name, slang::to_string(type), import_path));
 }
 
-type* context::create_type(std::string name, std::vector<std::pair<std::string, value>> members)
+type* context::add_type(std::string name,
+                        std::vector<std::pair<std::string, value>> members,
+                        std::optional<std::string> import_path)
 {
     if(std::find_if(types.begin(), types.end(),
                     [&name](const std::unique_ptr<type>& t) -> bool
@@ -517,7 +524,29 @@ type* context::create_type(std::string name, std::vector<std::pair<std::string, 
         throw codegen_error(fmt::format("Type '{}' already defined.", name));
     }
 
-    return types.emplace_back(std::make_unique<type>(name, std::move(members))).get();
+    return types.emplace_back(std::make_unique<type>(name, std::move(members), std::move(import_path))).get();
+}
+
+type* context::get_type(const std::string& name, std::optional<std::string> import_path)
+{
+    auto it = std::find_if(types.begin(), types.end(),
+                           [&name, &import_path](const std::unique_ptr<type>& t) -> bool
+                           {
+                               return t->get_name() == name
+                                      && ((!import_path.has_value() && !t->get_import_path().has_value())
+                                          || *import_path == *t->get_import_path());
+                           });
+    if(it == types.end())
+    {
+        if(import_path.has_value())
+        {
+            throw codegen_error(fmt::format("Type '{}' from import '{}' not found.", name, *import_path));
+        }
+
+        throw codegen_error(fmt::format("Type '{}' not found.", name));
+    }
+
+    return it->get();
 }
 
 std::size_t context::get_string(std::string str)
@@ -559,36 +588,31 @@ prototype* context::add_prototype(std::string name,
       .get();
 }
 
-const prototype& context::get_prototype(const std::string& name) const
+const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
 {
-    if(resolution_scopes.size() > 0)
-    {
-        std::string import_path = slang::utils::join(resolution_scopes, "::");
-        auto it = std::find_if(prototypes.begin(), prototypes.end(),
-                               [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+    auto it = std::find_if(prototypes.begin(), prototypes.end(),
+                           [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+                           {
+                               if(import_path.has_value())
                                {
-                                   return p->get_import_path().has_value() && *p->get_import_path() == import_path
+                                   return p->get_import_path().has_value()
+                                          && *p->get_import_path() == import_path
                                           && p->get_name() == name;
-                               });
-        if(it == prototypes.end())
-        {
-            throw codegen_error(fmt::format("Prototype '{}' not found in '{}'.", name, import_path));
-        }
-        return **it;
-    }
-    else
-    {
-        auto it = std::find_if(prototypes.begin(), prototypes.end(),
-                               [&name](const std::unique_ptr<prototype>& p) -> bool
+                               }
+                               else
                                {
-                                   return p->get_name() == name && !p->get_import_path().has_value();
-                               });
-        if(it == prototypes.end())
+                                   return !p->get_import_path().has_value() && p->get_name() == name;
+                               }
+                           });
+    if(it == prototypes.end())
+    {
+        if(import_path.has_value())
         {
-            throw codegen_error(fmt::format("Prototype '{}' not found.", name));
+            throw codegen_error(fmt::format("Prototype '{}' not found in '{}'.", name, *import_path));
         }
-        return **it;
+        throw codegen_error(fmt::format("Prototype '{}' not found.", name));
     }
+    return **it;
 }
 
 function* context::create_function(std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
@@ -634,27 +658,6 @@ void context::set_insertion_point(basic_block* ip)
     if(insertion_point != nullptr && insertion_point->get_inserting_context() != this)
     {
         insertion_point->set_inserting_context(this);
-    }
-}
-
-/*
- * Name resolution.
- */
-
-void context::push_resolution_scope(std::string name)
-{
-    resolution_scopes.emplace_back(std::move(name));
-}
-
-void context::pop_resolution_scope()
-{
-    if(resolution_scopes.size() > 0)
-    {
-        resolution_scopes.pop_back();
-    }
-    else
-    {
-        throw codegen_error("Cannot pop from name resolution stack: The stack is empty.");
     }
 }
 
@@ -823,11 +826,6 @@ void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> 
 
     if(name.has_value())
     {
-        if(resolution_scopes.size() > 0)
-        {
-            (*name)->set_import_path(slang::utils::join(resolution_scopes, "::"));
-        }
-
         std::vector<std::unique_ptr<argument>> args;
         args.emplace_back(std::move(*name));
         insertion_point->add_instruction(std::make_unique<instruction>("invoke", std::move(args)));

@@ -139,6 +139,9 @@ struct struct_definition
     /** The struct's members as `(name, type)` pairs. */
     std::vector<std::pair<token, type>> members;
 
+    /** An optional import path. */
+    std::optional<std::string> import_path;
+
     /** Default constructors. */
     struct_definition() = default;
     struct_definition(const struct_definition&) = default;
@@ -153,10 +156,14 @@ struct struct_definition
      *
      * @param name The struct's name.
      * @param members The struct's members.
+     * @param import_path An optional import path.
      */
-    struct_definition(token name, std::vector<std::pair<token, type>> members)
+    struct_definition(token name,
+                      std::vector<std::pair<token, type>> members,
+                      std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
+    , import_path{std::move(import_path)}
     {
     }
 };
@@ -416,8 +423,11 @@ public:
      *
      * @param name The name of the type.
      * @param members The members, given as pairs `(name, type)`.
+     * @param import_path The import path for the struct.
      */
-    void add_struct(token name, std::vector<std::pair<token, type>> members);
+    void add_struct(token name,
+                    std::vector<std::pair<token, type>> members,
+                    std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Check if the context contains a specific type, given by a string.

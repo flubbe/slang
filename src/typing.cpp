@@ -329,7 +329,7 @@ void context::add_function(token name,
     }
 }
 
-void context::add_struct(token name, std::vector<std::pair<token, type>> members)
+void context::add_struct(token name, std::vector<std::pair<token, type>> members, std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
     {
@@ -363,7 +363,7 @@ void context::add_struct(token name, std::vector<std::pair<token, type>> members
         }
     }
 
-    current_scope->structs[name.s] = {name, std::move(members)};
+    current_scope->structs[name.s] = {name, std::move(members), std::move(import_path)};
 }
 
 bool context::has_type(const std::string& name) const

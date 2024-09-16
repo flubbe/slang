@@ -418,7 +418,7 @@ TEST(codegen, invoke)
         ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
         ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
 
-        ctx.generate_invoke(std::make_unique<cg::function_argument>("g"));
+        ctx.generate_invoke(std::make_unique<cg::function_argument>("g", std::nullopt));
 
         ctx.generate_ret(std::make_optional<cg::value>("i32"));
 
@@ -509,7 +509,7 @@ TEST(codegen, invoke)
         ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
         ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
 
-        ctx.generate_load(std::make_unique<cg::function_argument>("g"));
+        ctx.generate_load(std::make_unique<cg::function_argument>("g", std::nullopt));
         ctx.generate_invoke();
 
         ctx.generate_ret(std::make_optional<cg::value>("i32"));
@@ -583,7 +583,7 @@ TEST(codegen, aggregate_data)
          * }
          */
 
-        ctx.create_type("S", {{"a", {"i32"}}, {"b", {"i32"}}});
+        ctx.add_type("S", {{"a", {"i32"}}, {"b", {"i32"}}});
 
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));

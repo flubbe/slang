@@ -271,7 +271,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                                         : std::nullopt}};
                                    });
 
-                    ctx.get_global_scope()->add_type(it.first, std::move(members));
+                    ctx.add_type(it.first, std::move(members), import_path);
                 }
 
                 // Add type to typing context.
@@ -290,13 +290,11 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                           std::move(resolved_member_type)));
                     }
 
-                    type_ctx.add_struct({it.first, reference_location}, std::move(members));
+                    type_ctx.add_struct({it.first, reference_location}, std::move(members), import_path);
                 }
             }
         }
     }
-
-    // TODO resolve imported types.
 }
 
 }    // namespace slang::resolve
