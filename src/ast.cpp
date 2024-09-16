@@ -437,7 +437,7 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
     // check if we need to load the base object.
     if(!ctx.is_struct_access())
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var.get_resolved_type(), name.s, std::nullopt}));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var.get_resolved_type(), name.s}));
     }
 
     // load the expression, if needed.
@@ -558,7 +558,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     cg::value v = get_value(ctx);
 
     // FIXME We lose type information here.
-    v = ty::is_builtin_type(v.get_resolved_type()) ? v : cg::value{"addr", std::nullopt, v.get_name(), std::nullopt};
+    v = ty::is_builtin_type(v.get_resolved_type()) ? v : cg::value{"addr", std::nullopt, v.get_name()};
 
     if(mc == memory_context::none)
     {
@@ -728,7 +728,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     cg::value v;
     if(ty::is_builtin_type(type->get_name().s))
     {
-        v = {type->get_name().s, std::nullopt, name.s, type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
+        v = {type->get_name().s, std::nullopt, name.s, type->is_array()};
         s->add_local(std::make_unique<cg::value>(v));
     }
     else
@@ -737,10 +737,8 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
           "aggregate",
           type->get_name().s,
           name.s,
-          type->is_array()
-            ? std::make_optional<std::size_t>(0)
-            : std::nullopt}));
-        v = {"addr", std::nullopt, name.s, std::nullopt};
+          type->is_array()}));
+        v = {"addr", std::nullopt, name.s};
     }
 
     if(is_array())
@@ -910,16 +908,14 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     std::vector<std::pair<std::string, cg::value>> struct_members;
     for(auto& m: members)
     {
-        std::optional<std::size_t> array_indicator = m->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt;
-
         cg::value v;
         if(ty::is_builtin_type(m->get_type()->get_name().s))
         {
-            v = {m->get_type()->get_name().s, std::nullopt, m->get_name().s, array_indicator};
+            v = {m->get_type()->get_name().s, std::nullopt, m->get_name().s, m->is_array()};
         }
         else
         {
-            v = {"aggregate", m->get_type()->get_name().s, m->get_name().s, array_indicator};
+            v = {"aggregate", m->get_type()->get_name().s, m->get_name().s, m->is_array()};
         }
 
         struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
@@ -1011,7 +1007,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
     }
 
-    ctx.generate_new(cg::value{"aggregate", name.s, std::nullopt, std::nullopt});
+    ctx.generate_new(cg::value{"aggregate", name.s, std::nullopt});
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
     auto& t = s->contains_type(name.s)
@@ -1023,7 +1019,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         const auto& [member_name, member_type] = t[i];
         const auto& initializer = initializers[i];
 
-        ctx.generate_dup(cg::value{"addr", std::nullopt, std::nullopt, std::nullopt});
+        ctx.generate_dup(cg::value{"addr", std::nullopt, std::nullopt});
 
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)
@@ -1043,7 +1039,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         ctx.generate_set_field(std::make_unique<cg::field_access_argument>(name.s, member_type));
     }
 
-    return std::make_unique<cg::value>("aggregate", name.s, std::nullopt, std::nullopt);
+    return std::make_unique<cg::value>("aggregate", name.s, std::nullopt);
 }
 
 std::optional<ty::type> struct_named_initializer_expression::type_check(ty::context& ctx)
@@ -1247,7 +1243,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             // we might need to duplicate the value for chained assignments.
             if(mc == memory_context::load)
             {
-                ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt, std::nullopt}});
+                ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt}});
             }
 
             ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
@@ -1518,14 +1514,14 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
         throw cg::codegen_error(loc, fmt::format("Expected <integer> as array size, got '{}'.", v->get_type()));
     }
 
-    auto array_type = cg::value{type.s, std::nullopt, std::nullopt, std::make_optional<std::size_t>(0)};
+    auto array_type = cg::value{type.s, std::nullopt, std::nullopt, true};
     ctx.generate_newarray(array_type.deref());
 
     return std::make_unique<cg::value>(
       v->get_type(),
       v->is_aggregate() ? std::make_optional(v->get_aggregate_type()) : std::nullopt,
       v->get_name(),
-      std::make_optional<std::size_t>(0));
+      true);
 }
 
 std::optional<ty::type> new_expression::type_check(ty::context& ctx)
@@ -1571,7 +1567,7 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
 
     ctx.generate_const_null();
 
-    return std::make_unique<cg::value>("@null", std::nullopt, std::nullopt, std::nullopt);
+    return std::make_unique<cg::value>("@null", std::nullopt, std::nullopt);
 }
 
 std::optional<ty::type> null_expression::type_check(ty::context& ctx)
@@ -1679,7 +1675,7 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
               std::get<1>(a)->get_name().s,
               std::nullopt,
               std::get<0>(a).s,
-              std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
+              std::get<1>(a)->is_array()));
         }
         else
         {
@@ -1687,13 +1683,13 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
               "aggregate",
               std::get<1>(a)->get_name().s,
               std::get<0>(a).s,
-              std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
+              std::get<1>(a)->is_array()));
         }
     }
 
     cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
-                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}
-                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
+                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array()}
+                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array()};
 
     return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
 }
@@ -1705,11 +1701,21 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     {
         if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
         {
-            function_args.emplace_back(std::make_unique<cg::value>(std::get<1>(a)->get_name().s, std::nullopt, std::get<0>(a).s, std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
+            function_args.emplace_back(
+              std::make_unique<cg::value>(
+                std::get<1>(a)->get_name().s,
+                std::nullopt,
+                std::get<0>(a).s,
+                std::get<1>(a)->is_array()));
         }
         else
         {
-            function_args.emplace_back(std::make_unique<cg::value>("aggregate", std::get<1>(a)->get_name().s, std::get<0>(a).s, std::get<1>(a)->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt));
+            function_args.emplace_back(
+              std::make_unique<cg::value>(
+                "aggregate",
+                std::get<1>(a)->get_name().s,
+                std::get<0>(a).s,
+                std::get<1>(a)->is_array()));
         }
     }
 
@@ -1731,8 +1737,8 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
                    });
 
     cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
-                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt}
-                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array() ? std::make_optional<std::size_t>(0) : std::nullopt};
+                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array()}
+                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array()};
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 

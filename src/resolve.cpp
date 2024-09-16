@@ -211,16 +211,14 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                     return_type = {std::get<0>(desc.signature.return_type),
                                    std::nullopt,
                                    std::nullopt,
-                                   desc.signature.return_type.second ? std::make_optional(std::get<1>(desc.signature.return_type))
-                                                                     : std::nullopt};
+                                   desc.signature.return_type.second};
                 }
                 else
                 {
                     return_type = {"aggregate",
                                    std::get<0>(desc.signature.return_type),
                                    std::nullopt,
-                                   desc.signature.return_type.second ? std::make_optional(std::get<1>(desc.signature.return_type))
-                                                                     : std::nullopt};
+                                   desc.signature.return_type.second};
                 }
 
                 ctx.add_prototype(it.first, return_type, prototype_arg_types, import_path);
@@ -257,18 +255,14 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                            return {std::get<0>(member), cg::value{std::get<1>(member).base_type,
                                                                                   std::nullopt,
                                                                                   std::nullopt,
-                                                                                  std::get<1>(member).array
-                                                                                    ? std::make_optional<std::size_t>(0)
-                                                                                    : std::nullopt}};
+                                                                                  std::get<1>(member).array}};
                                        }
 
                                        return {std::get<0>(member), cg::value{
                                                                       "aggregate",
                                                                       std::get<1>(member).base_type,
                                                                       std::nullopt,
-                                                                      std::get<1>(member).array
-                                                                        ? std::make_optional<std::size_t>(0)
-                                                                        : std::nullopt}};
+                                                                      std::get<1>(member).array}};
                                    });
 
                     ctx.add_type(it.first, std::move(members), import_path);

@@ -65,14 +65,14 @@ public:
  */
 class value
 {
-    /** An index into the array or a placeholder to indicate an array. */
-    std::optional<std::size_t> array_index_or_placeholder;
-
-    /** The value's type. Can be one of: i32, f32, str, addr, ptr, aggregate. */
+    /** The value's type. Can be one of: i32, f32, str, addr, aggregate. */
     std::string type;
 
     /** Aggregate type name. Only valid if type is "aggregate". */
     std::optional<std::string> aggregate_type;
+
+    /** Whether this is an array. */
+    bool array{false};
 
     /** An optional name for the value. */
     std::optional<std::string> name;
@@ -101,16 +101,15 @@ public:
      * @param type The value type.
      * @param aggregate_type Type name for aggregate types.
      * @param name Optional name for this value.
-     * @param array_index_or_placeholder Optional index into the array or a placeholder to mark the value as an array.
-     * Set to `std::nullopt` for non-array types.
+     * @param array Whether the value is an array.
      */
     value(std::string type,
           std::optional<std::string> aggregate_type = std::nullopt,
           std::optional<std::string> name = std::nullopt,
-          std::optional<std::size_t> array_index_or_placeholder = std::nullopt)
-    : array_index_or_placeholder{std::move(array_index_or_placeholder)}
-    , type{std::move(type)}
+          bool array = false)
+    : type{std::move(type)}
     , aggregate_type{std::move(aggregate_type)}
+    , array{array}
     , name{std::move(name)}
     {
         validate();
@@ -121,7 +120,7 @@ public:
      */
     value copy_type() const
     {
-        return {type, aggregate_type, std::nullopt, array_index_or_placeholder};
+        return {type, aggregate_type, std::nullopt, array};
     }
 
     /**
@@ -136,7 +135,7 @@ public:
             throw codegen_error("Attempted to de-reference a non-array type.");
         }
 
-        return {type, aggregate_type, std::nullopt, std::nullopt};
+        return {type, aggregate_type, std::nullopt, false};
     }
 
     /**
@@ -209,23 +208,7 @@ public:
     /** Returns whether the value is an array. */
     bool is_array() const
     {
-        return array_index_or_placeholder.has_value();
-    }
-
-    /**
-     * If used in an accessing context, returns the accessed array index.
-     *
-     * @throws Throws a `codegen_error` if used on non-array types.
-     * @returns The array size or array index.
-     */
-    std::size_t get_array_index() const
-    {
-        if(!array_index_or_placeholder.has_value())
-        {
-            throw codegen_error("Requested array size for non-array type.");
-        }
-
-        return *array_index_or_placeholder;
+        return array;
     }
 };
 
