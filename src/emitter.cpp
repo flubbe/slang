@@ -376,17 +376,17 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
         cg::cast_argument* arg = static_cast<cg::cast_argument*>(args[0].get());
-        if(arg->get_cast() == "i32_to_f32")
+        if(arg->get_cast() == cg::type_cast::i32_to_f32)
         {
             emit(instruction_buffer, opcode::i2f);
         }
-        else if(arg->get_cast() == "f32_to_i32")
+        else if(arg->get_cast() == cg::type_cast::f32_to_i32)
         {
             emit(instruction_buffer, opcode::f2i);
         }
         else
         {
-            throw emitter_error(fmt::format("Invalid cast type '{}'.", arg->get_cast()));
+            throw emitter_error(fmt::format("Invalid cast type '{}'.", ::cg::to_string(arg->get_cast())));
         }
     }
     else if(name == "invoke")

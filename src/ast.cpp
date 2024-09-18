@@ -201,11 +201,11 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
     // only cast if necessary.
     if(target_type.s != v->get_type().to_string())
     {
-        if(target_type.s == "i32" && v->get_type().to_string() == "f32")
+        if(target_type.s == "i32" && v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_cast(cg::type_cast::f32_to_i32);
         }
-        else if(target_type.s == "f32" && v->get_type().to_string() == "i32")
+        else if(target_type.s == "f32" && v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_cast(cg::type_cast::i32_to_f32);
         }
@@ -316,12 +316,12 @@ public:
      * Access guard for a struct.
      *
      * @param ctx Code generation context.
-     * @param name The struct's name.
+     * @param ty The struct.
      */
-    access_guard(cg::context& ctx, std::string name)
+    access_guard(cg::context& ctx, cg::type ty)
     : ctx{ctx}
     {
-        ctx.push_struct_access(std::move(name));
+        ctx.push_struct_access(std::move(ty));
     }
 
     /** Destructor. */
@@ -428,10 +428,10 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
 
     // get rhs.
     std::string expr_name = static_cast<named_expression*>(expr.get())->get_name().s;
-    std::string resolved_type = var->get_type().to_string();
+    cg::type ty = var->get_type();
 
     cg::scope* s = ctx.get_global_scope();
-    auto& members = s->get_type(resolved_type);
+    auto& members = s->get_struct(ty.to_string(), ty.get_import_path());
 
     auto it = std::find_if(members.begin(), members.end(),
                            [&expr_name](const std::pair<std::string, cg::value>& v)
@@ -456,7 +456,7 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
     {
         ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_type().to_string(), it->second));
 
-        access_guard ag{ctx, var->get_type().to_string()};
+        access_guard ag{ctx, var->get_type()};
         return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
     }
 
@@ -487,7 +487,8 @@ cg::value access_expression::get_value(cg::context& ctx) const
     }
     else
     {
-        auto& members = ctx.get_global_scope()->get_type(ctx.get_struct_access_name());
+        auto s = ctx.get_accessed_struct();
+        auto& members = ctx.get_global_scope()->get_struct(s.get_struct_name().value(), s.get_import_path());
         auto it = std::find_if(members.begin(), members.end(),
                                [this](const std::pair<std::string, cg::value>& v)
                                {
@@ -495,7 +496,10 @@ cg::value access_expression::get_value(cg::context& ctx) const
                                });
         if(it == members.end())
         {
-            throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", ctx.get_struct_access_name(), get_name().s));
+            throw cg::codegen_error(expr->get_location(),
+                                    fmt::format("Struct '{}' does not contain a field with name '{}'.",
+                                                ctx.get_accessed_struct().get_struct_name().value(),
+                                                get_name().s));
         }
 
         return it->second;
@@ -668,7 +672,8 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
     }
     else
     {
-        auto& members = ctx.get_global_scope()->get_type(ctx.get_struct_access_name());
+        auto s = ctx.get_accessed_struct();
+        auto& members = ctx.get_global_scope()->get_struct(s.get_struct_name().value(), s.get_import_path());
         auto it = std::find_if(members.begin(), members.end(),
                                [this](const std::pair<std::string, cg::value>& v)
                                {
@@ -676,7 +681,10 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
                                });
         if(it == members.end())
         {
-            throw cg::codegen_error(loc, fmt::format("Struct '{}' does not contain a field with name '{}'.", ctx.get_struct_access_name(), get_name().s));
+            throw cg::codegen_error(loc,
+                                    fmt::format("Struct '{}' does not contain a field with name '{}'.",
+                                                ctx.get_accessed_struct().get_struct_name().value(),
+                                                get_name().s));
         }
 
         return it->second;
@@ -748,7 +756,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         v = std::make_unique<cg::value>(
           cg::type{cg::type_class::struct_,
                    type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                   type->get_name().s},
+                   type->get_name().s, type->get_namespace_path()},
           name.s);
         s->add_local(std::make_unique<cg::value>(*v));
     }
@@ -942,7 +950,7 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
         }
     }
 
-    s->add_type(name.s, struct_members);    // FIXME do we need this?
+    s->add_struct(name.s, struct_members);    // FIXME do we need this?
     ctx.add_type(name.s, std::move(struct_members));
 
     return nullptr;
@@ -1031,8 +1039,8 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     ctx.generate_new(cg::value{cg::type{cg::type_class::struct_, 0, name.s}});
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
-    auto& t = s->contains_type(name.s)
-                ? s->get_type(name.s)
+    auto& t = s->contains_struct(name.s, get_namespace_path())
+                ? s->get_struct(name.s, get_namespace_path())
                 : ctx.get_type(name.s, get_namespace_path())->get_members();    // imported types are stored here.
 
     for(std::size_t i = 0; i < t.size(); ++i)
@@ -1381,16 +1389,17 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
     if(op.s == "++")
     {
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
+        if(v->get_type().get_type_class() != cg::type_class::i32
+           && v->get_type().get_type_class() != cg::type_class::f32)
         {
             throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
-        if(v->get_type().to_string() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_type().to_string() == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_const(*v, 1.f);
         }
@@ -1408,11 +1417,11 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
             throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
-        if(v->get_type().to_string() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_type().to_string() == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_const(*v, 1.f);
         }
@@ -1622,11 +1631,11 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     if(op.s == "++")
     {
         ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_type().to_string() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
         }
-        else if(v->get_type().to_string() == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
         }
@@ -1637,11 +1646,11 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     else if(op.s == "--")
     {
         ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_type().to_string() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
         }
-        else if(v->get_type().to_string() == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
         }

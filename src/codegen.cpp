@@ -120,7 +120,6 @@ std::string type::to_string() const
       {type_class::f32, "f32"},
       {type_class::str, "str"},
       {type_class::addr, "addr"},
-      {type_class::array, "array"},
       {type_class::fn, "fn"}};
 
     auto it = map.find(ty);
@@ -162,12 +161,16 @@ void value::validate() const
     {
         if(ty.is_struct())
         {
-            throw codegen_error("Value cannot be both: struct and reference.");
+            throw codegen_error("Type cannot be both: struct and reference.");
+        }
+        else if(ty.is_void() && ty.is_array())
+        {
+            throw codegen_error("Type cannot be both: void and array.");
         }
         return;
     }
 
-    if(ty.get_type_class() == type_class::addr || ty.get_type_class() == type_class::array)
+    if(ty.get_type_class() == type_class::addr)
     {
         return;
     }
@@ -323,9 +326,15 @@ bool scope::contains(const std::string& name) const
     return false;
 }
 
-bool scope::contains_type(const std::string& name) const
+bool scope::contains_struct(const std::string& name, const std::optional<std::string>& import_path) const
 {
-    return types.find(name) != types.end();
+    auto it = std::find_if(structs.begin(), structs.end(),
+                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+                           {
+                               return p.first == name
+                                      && p.second.get_import_path() == import_path;
+                           });
+    return it != structs.end();
 }
 
 value* scope::get_value(const std::string& name)
@@ -428,24 +437,46 @@ void scope::add_local(std::unique_ptr<value> arg)
     locals.emplace_back(std::move(arg));
 }
 
-void scope::add_type(std::string name, std::vector<std::pair<std::string, value>> members)
+void scope::add_struct(std::string name,
+                       std::vector<std::pair<std::string, value>> members,
+                       std::optional<std::string> import_path)
 {
-    if(types.find(name) != types.end())
+    auto it = std::find_if(structs.begin(), structs.end(),
+                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+                           {
+                               return p.first == name
+                                      && p.second.get_import_path() == import_path;
+                           });
+    if(it != structs.end())
     {
+        if(import_path.has_value())
+        {
+            throw codegen_error(fmt::format("Type '{}' from '{}' already exists in scope.", name, import_path.value()));
+        }
         throw codegen_error(fmt::format("Type '{}' already exists in scope.", name));
     }
 
-    types.insert({std::move(name), std::move(members)});
+    std::string name_copy = name;
+    structs.insert({name, struct_{std::move(name_copy), std::move(members), import_path}});
 }
 
-const std::vector<std::pair<std::string, value>>& scope::get_type(const std::string& name) const
+const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = types.find(name);
-    if(it == types.end())
+    auto it = std::find_if(structs.begin(), structs.end(),
+                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+                           {
+                               return p.first == name
+                                      && p.second.get_import_path() == import_path;
+                           });
+    if(it == structs.end())
     {
+        if(import_path.has_value())
+        {
+            throw codegen_error(fmt::format("Type '{}' from '{}' not found in scope.", name, import_path.value()));
+        }
         throw codegen_error(fmt::format("Type '{}' not found in scope.", name));
     }
-    return it->second;
+    return it->second.get_members();
 }
 
 /*
@@ -731,9 +762,9 @@ void context::set_insertion_point(basic_block* ip)
  * Struct access.
  */
 
-void context::push_struct_access(std::string name)
+void context::push_struct_access(type ty)
 {
-    struct_access.push_back(std::move(name));
+    struct_access.push_back(std::move(ty));
 }
 
 void context::pop_struct_access()
@@ -748,7 +779,7 @@ void context::pop_struct_access()
     }
 }
 
-std::string context::get_struct_access_name() const
+type context::get_accessed_struct() const
 {
     if(struct_access.size() == 0)
     {
@@ -793,7 +824,7 @@ void context::generate_branch(basic_block* block)
 void context::generate_cast(type_cast tc)
 {
     validate_insertion_point();
-    auto arg0 = std::make_unique<cast_argument>(codegen::to_string(tc));
+    auto arg0 = std::make_unique<cast_argument>(tc);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     insertion_point->add_instruction(std::make_unique<instruction>("cast", std::move(args)));

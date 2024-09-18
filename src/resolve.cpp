@@ -281,7 +281,9 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                          std::get<0>(member)}};
                                    });
 
-                    ctx.add_type(it.first, std::move(members), import_path);
+                    // TODO members can be imported types.
+
+                    ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
                 }
 
                 // Add type to typing context.
@@ -302,6 +304,8 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
                     type_ctx.add_struct({it.first, reference_location}, std::move(members), import_path);
                 }
+
+                fmt::print("Added type '{}' from '{}'.\n", it.first, import_path);
             }
         }
     }

@@ -753,13 +753,28 @@ public:
     }
 };
 
+/** Type casts. */
+enum class type_cast
+{
+    i32_to_f32, /* i32 to f32 */
+    f32_to_i32, /* f32 to i32 */
+};
+
+/**
+ * Return a string representation of the type cast.
+ *
+ * @param tc The type cast.
+ * @returns A string representation of the type cast.
+ */
+std::string to_string(type_cast tc);
+
 /**
  * A type cast argument.
  */
 class cast_argument : public argument
 {
-    /** The type cast, as a string. */
-    std::string cast;
+    /** The type cast. */
+    type_cast cast;
 
     /** Value of the cast. */
     std::unique_ptr<value> v;
@@ -779,15 +794,15 @@ public:
      *
      * @param cast The cast type.
      */
-    cast_argument(std::string cast)
+    cast_argument(type_cast cast)
     : argument()
-    , cast{std::move(cast)}
+    , cast{cast}
     {
-        if(this->cast == "i32_to_f32")
+        if(cast == type_cast::i32_to_f32)
         {
             v = std::make_unique<value>(type{type_class::f32, 0});
         }
-        else if(this->cast == "f32_to_i32")
+        else if(cast == type_cast::f32_to_i32)
         {
             v = std::make_unique<value>(type{type_class::i32, 0});
         }
@@ -798,14 +813,14 @@ public:
     }
 
     /** Return the cast type. */
-    std::string get_cast() const
+    type_cast get_cast() const
     {
         return cast;
     }
 
     std::string to_string() const override
     {
-        return fmt::format("{}", cast);
+        return fmt::format("{}", ::slang::codegen::to_string(cast));
     }
 
     const value* get_value() const override
@@ -1102,8 +1117,8 @@ class scope
     /** Variables inside the scope. */
     std::vector<std::unique_ptr<value>> locals;
 
-    /** Types. */
-    std::unordered_map<std::string, std::vector<std::pair<std::string, value>>> types;
+    /** Structs. */
+    std::unordered_map<std::string, class struct_> structs;
 
 public:
     /** Constructors. */
@@ -1149,11 +1164,13 @@ public:
     bool contains(const std::string& name) const;
 
     /**
-     * Check if the scope contains a type.
+     * Check if the scope contains a struct.
      *
-     * @returns True if the type exists.
+     * @param name The struct's name.
+     * @param import_path An optional import path.
+     * @returns True if the struct exists.
      */
-    bool contains_type(const std::string& name) const;
+    bool contains_struct(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Get the variable for the given name.
@@ -1195,13 +1212,16 @@ public:
     void add_local(std::unique_ptr<value> arg);
 
     /**
-     * Add a type to the scope.
+     * Add a struct to the scope.
      *
-     * @param name The type's name.
-     * @param members The type's members.
+     * @param name The struct's name.
+     * @param members The struct's members.
+     * @param import_path Optional import path.
      * @throws Throws a `codegen_error` if the name is already registered as a type in this scope.
      */
-    void add_type(std::string name, std::vector<std::pair<std::string, value>> members);
+    void add_struct(std::string name,
+                    std::vector<std::pair<std::string, value>> members,
+                    std::optional<std::string> import_path = std::nullopt);
 
     /** Get the arguments for this scope. */
     const std::vector<std::unique_ptr<value>>& get_args() const
@@ -1215,8 +1235,18 @@ public:
         return locals;
     }
 
-    /** Get the type in this scope. */
-    const std::vector<std::pair<std::string, value>>& get_type(const std::string& name) const;
+    /**
+     * Get the struct in this scope.
+     *
+     * @param name The struct's name.
+     * @param import_path Optional import path of the struct. If set to `std::nullopt`, only structs within
+     *                    the current module are searched.
+     * @returns Returns the struct definition.
+     * @throws Throws a `codegen_error` if the struct is not found.
+     */
+    const std::vector<std::pair<std::string, value>>&
+      get_struct(const std::string& name,
+                 std::optional<std::string> import_path = std::nullopt) const;
 
     /** Get the outer scope. */
     scope* get_outer()
@@ -1646,21 +1676,6 @@ enum class binary_op
  */
 std::string to_string(binary_op op);
 
-/** Type casts. */
-enum class type_cast
-{
-    i32_to_f32, /* i32 to f32 */
-    f32_to_i32, /* f32 to i32 */
-};
-
-/**
- * Return a string representation of the type cast.
- *
- * @param tc The type cast.
- * @returns A string representation of the type cast.
- */
-std::string to_string(type_cast tc);
-
 /** An imported symbol. */
 struct imported_symbol
 {
@@ -1718,8 +1733,8 @@ class context
     /** Scope name stack for name resolution. */
     std::vector<std::string> resolution_scopes;
 
-    /** Struct name stack for access resolution. */
-    std::vector<std::string> struct_access;
+    /** Struct stack for access resolution. */
+    std::vector<type> struct_access;
 
     /** List of function prototypes. */
     std::vector<std::unique_ptr<prototype>> prototypes;
@@ -1959,9 +1974,9 @@ public:
     /**
      * Push a name onto the struct access resolution stack.
      *
-     * @param name The struct name.
+     * @param ty The struct.
      */
-    void push_struct_access(std::string name);
+    void push_struct_access(type ty);
 
     /** Pop a name from the struct access resolution stack. */
     void pop_struct_access();
@@ -1973,11 +1988,11 @@ public:
     }
 
     /**
-     * Get the currently accessed struct's name.
+     * Get the currently accessed struct.
      *
      * @throws Throws a `codegen_error` if no struct is accessed.
      */
-    std::string get_struct_access_name() const;
+    type get_accessed_struct() const;
 
     /**
      * Enter a function. Only one function can be entered at a time.
