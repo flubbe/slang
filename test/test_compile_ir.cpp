@@ -1357,14 +1357,14 @@ TEST(compile_ir, structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 2\n"
                   " set_field %S, i32 %i\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field %S, f32 %j\n"
-                  " store addr %s\n"
+                  " store S %s\n"
                   " ret void\n"
                   "}");
     }
@@ -1409,20 +1409,20 @@ TEST(compile_ir, structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 2\n"
                   " set_field %S, i32 %i\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field %S, f32 %j\n"
-                  " store addr %s\n"
-                  " load addr %s\n"
+                  " store S %s\n"
+                  " load S %s\n"
                   " const i32 1\n"
                   " set_field %S, i32 %i\n"
-                  " load addr %s\n"
+                  " load S %s\n"
                   " get_field %S, i32 %i\n"
-                  " load addr %s\n"
+                  " load S %s\n"
                   " get_field %S, f32 %j\n"
                   " cast f32_to_i32\n"
                   " add i32\n"
@@ -1470,22 +1470,22 @@ TEST(compile_ir, structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 2\n"
                   " set_field %S, i32 %i\n"
-                  " dup addr\n"
+                  " dup S\n"
                   " const i32 3\n"
                   " set_field %S, i32 %j\n"
-                  " store addr %s\n"
-                  " load addr %s\n"            // [addr]
-                  " load addr %s\n"            // [addr, addr]
+                  " store S %s\n"
+                  " load S %s\n"               // [addr]
+                  " load S %s\n"               // [addr, addr]
                   " const i32 1\n"             // [addr, addr, 1]
                   " dup i32, addr\n"           // [addr, 1, addr, 1]
                   " set_field %S, i32 %j\n"    // [addr, 1]
                   " set_field %S, i32 %i\n"    // []
-                  " load addr %s\n"            // [addr]
+                  " load S %s\n"               // [addr]
                   " get_field %S, i32 %i\n"    // [1]
-                  " load addr %s\n"            // [1, addr]
+                  " load S %s\n"               // [1, addr]
                   " get_field %S, i32 %j\n"    // [1, 1]
                   " add i32\n"                 // [2]
                   " ret i32\n"
@@ -1534,19 +1534,19 @@ TEST(compile_ir, nested_structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"                    // [addr1]
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " const i32 1\n"              // [addr1, addr1, 1]
                   " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " new S\n"                    // [addr1, addr1, addr2]
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
                   " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const_null\n"               // [addr1, addr1, addr2, addr2, null]
                   " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store addr %s\n"            // []                                   s = addr1
+                  " store S %s\n"               // []                                   s = addr1
                   " ret void\n"
                   "}");
     }
@@ -1590,20 +1590,20 @@ TEST(compile_ir, nested_structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"                    // [addr1]
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " const i32 1\n"              // [addr1, addr1, 1]
                   " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " new S\n"                    // [addr1, addr1, addr2]
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
                   " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const_null\n"               // [addr1, addr1, addr2, addr2, null]
                   " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store addr %s\n"            // []                                   s = addr1
-                  " load addr %s\n"             // [s]
+                  " store S %s\n"               // []                                   s = addr1
+                  " load S %s\n"                // [s]
                   " get_field %S, S %next\n"    // [s.next]
                   " get_field %S, i32 %i\n"     // [i]
                   " ret i32\n"
@@ -1651,31 +1651,31 @@ TEST(compile_ir, nested_structs)
                   "local S %s\n"
                   "entry:\n"
                   " new S\n"                    // [addr1]
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " const i32 1\n"              // [addr1, addr1, 1]
                   " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup addr\n"                 // [addr1, addr1]
+                  " dup S\n"                    // [addr1, addr1]
                   " new S\n"                    // [addr1, addr1, addr2]
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
                   " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup addr\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
                   " const_null\n"               // [addr1, addr1, addr2, addr2, null]
                   " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store addr %s\n"            // []                                   s = addr1
-                  " load addr %s\n"             // [s]
+                  " store S %s\n"               // []                                   s = addr1
+                  " load S %s\n"                // [s]
                   " get_field %S, S %next\n"    // [s.next]
-                  " load addr %s\n"             // [s.next, s]
+                  " load S %s\n"                // [s.next, s]
                   " set_field %S, S %next\n"    // []                                   s.next.next = s
-                  " load addr %s\n"             // [s]
+                  " load S %s\n"                // [s]
                   " get_field %S, S %next\n"    // [s.next]
                   " get_field %S, S %next\n"    // [s.next.next]
                   " const i32 2\n"              // [s.next.next, 2]
                   " set_field %S, i32 %i\n"     // []                                   s.next.next.i = 2
-                  " load addr %s\n"             // [s]
+                  " load S %s\n"                // [s]
                   " get_field %S, i32 %i\n"     // [i]
-                  " load addr %s\n"             // [i, s]
+                  " load S %s\n"                // [i, s]
                   " get_field %S, S %next\n"    // [i, s.next]
                   " get_field %S, i32 %i\n"     // [i, s.next.i]
                   " add i32\n"                  // [i + s.next.i]
@@ -1721,18 +1721,18 @@ TEST(compile_ir, nested_structs)
                   "local Link %root\n"
                   "entry:\n"
                   " new Link\n"                       // [addr1]
-                  " dup addr\n"                       // [addr1, addr1]
+                  " dup Link\n"                       // [addr1, addr1]
                   " new Link\n"                       // [addr1, addr1, addr2]
-                  " dup addr\n"                       // [addr1, addr1, addr2, addr2]
+                  " dup Link\n"                       // [addr1, addr1, addr2, addr2]
                   " const_null\n"                     // [addr1, addr1, addr2, addr2, null]
                   " set_field %Link, Link %next\n"    // [addr1, addr1, addr2]                   addr2.next = null
                   " set_field %Link, Link %next\n"    // [addr1]                                 addr1.next = addr2
-                  " store addr %root\n"               // []                                      root = addr1
-                  " load addr %root\n"                // [root]
+                  " store Link %root\n"               // []                                      root = addr1
+                  " load Link %root\n"                // [root]
                   " get_field %Link, Link %next\n"    // [root.next]
-                  " load addr %root\n"                // [root.next, root]
+                  " load Link %root\n"                // [root.next, root]
                   " set_field %Link, Link %next\n"    // []                                      root.next.next = root
-                  " load addr %root\n"                // [root]
+                  " load Link %root\n"                // [root]
                   " get_field %Link, Link %next\n"    // [root.next]
                   " const_null\n"                     // [root.next, null]
                   " set_field %Link, Link %next\n"    // []                                      root.next.next = null

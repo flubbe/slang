@@ -91,43 +91,104 @@ std::string to_string(type_cast tc)
 }
 
 /*
+ * type.
+ */
+
+type_class to_type_class(const std::string& s)
+{
+    static const std::unordered_map<std::string, type_class> map = {
+      {"void", type_class::void_},
+      {"i32", type_class::i32},
+      {"f32", type_class::f32},
+      {"str", type_class::str}};
+
+    auto it = map.find(s);
+    if(it == map.end())
+    {
+        throw codegen_error(fmt::format("No type class for type '{}'.", s));
+    }
+
+    return it->second;
+}
+
+std::string type::to_string() const
+{
+    static const std::unordered_map<type_class, std::string> map = {
+      {type_class::void_, "void"},
+      {type_class::null, "null"},
+      {type_class::i32, "i32"},
+      {type_class::f32, "f32"},
+      {type_class::str, "str"},
+      {type_class::addr, "addr"},
+      {type_class::array, "array"},
+      {type_class::fn, "fn"}};
+
+    auto it = map.find(ty);
+    if(it != map.end())
+    {
+        if(is_array())
+        {
+            return fmt::format("[{}]", it->second);
+        }
+        return it->second;
+    }
+
+    if(ty == type_class::struct_)
+    {
+        if(is_array())
+        {
+            return fmt::format("[{}]", struct_name.value());
+        }
+        return struct_name.value();
+    }
+
+    throw std::runtime_error("Invalid type class.");
+}
+
+/*
  * value.
  */
 
 void value::validate() const
 {
-    bool is_builtin = (type == "void") || (type == "i32") || (type == "f32") || (type == "str") || (type == "fn");
-    bool is_ref = (type == "addr");
-    bool is_null = (type == "@null");
+    bool is_builtin = (ty.get_type_class() == type_class::void_)
+                      || (ty.get_type_class() == type_class::i32)
+                      || (ty.get_type_class() == type_class::f32)
+                      || (ty.get_type_class() == type_class::str)
+                      || (ty.get_type_class() == type_class::fn);
+    bool is_null = (ty.get_type_class() == type_class::null);
 
     if(is_builtin || is_null)
     {
-        if(aggregate_type.has_value())
+        if(ty.is_struct())
         {
-            throw codegen_error("Value cannot be both: aggregate and reference.");
+            throw codegen_error("Value cannot be both: struct and reference.");
         }
         return;
     }
 
-    if(is_ref)
+    if(ty.get_type_class() == type_class::addr || ty.get_type_class() == type_class::array)
     {
         return;
     }
 
-    if(type != "aggregate")
+    if(!ty.is_struct())
     {
-        throw codegen_error(fmt::format("Invalid value type '{}'.", type));
+        throw codegen_error(fmt::format("Invalid value type '{}'.", ty.to_string()));
     }
 
-    if(!aggregate_type.has_value() || aggregate_type->length() == 0)
+    if(!ty.get_struct_name().has_value() || ty.get_struct_name()->length() == 0)
     {
-        throw codegen_error("Empty aggregate type.");
+        throw codegen_error("Empty struct type.");
     }
 
-    is_builtin = (*aggregate_type == "i32") || (*aggregate_type == "f32") || (*aggregate_type == "str");
+    is_builtin = (*ty.get_struct_name() == "void")
+                 || (*ty.get_struct_name() == "i32")
+                 || (*ty.get_struct_name() == "f32")
+                 || (*ty.get_struct_name() == "str");
     if(is_builtin)
     {
-        throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *aggregate_type));
+        throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
     }
 }
 
@@ -135,9 +196,9 @@ std::string value::to_string() const
 {
     if(has_name())
     {
-        return fmt::format("{} %{}", ty::to_string({get_resolved_type(), is_array()}), *get_name());
+        return fmt::format("{} %{}", get_type().to_string(), *get_name());
     }
-    return fmt::format("{}", ty::to_string({get_resolved_type(), is_array()}));
+    return fmt::format("{}", get_type().to_string());
 }
 
 /*
@@ -146,7 +207,7 @@ std::string value::to_string() const
 
 std::string const_argument::to_string() const
 {
-    std::string type_name = type->get_resolved_type();
+    std::string type_name = type->get_type().to_string();
 
     if(type_name == "i32")
     {
@@ -397,11 +458,11 @@ std::string function::to_string() const
     if(native)
     {
 
-        buf = fmt::format("native ({}) {} @{}(", import_library, return_type.to_string(), name);
+        buf = fmt::format("native ({}) {} @{}(", import_library, return_type->to_string(), name);
     }
     else
     {
-        buf = fmt::format("define {} @{}(", return_type.to_string(), name);
+        buf = fmt::format("define {} @{}(", return_type->to_string(), name);
     }
 
     const auto& args = scope.get_args();
@@ -439,16 +500,16 @@ std::string function::to_string() const
  * type.
  */
 
-std::string type::to_string() const
+std::string struct_::to_string() const
 {
     std::string buf = fmt::format("%{} = type {{\n", name);
     if(members.size() > 0)
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
-            buf += fmt::format(" {} %{},\n", members[i].second.get_resolved_type(), members[i].first);
+            buf += fmt::format(" {} %{},\n", members[i].second.get_type().to_string(), members[i].first);
         }
-        buf += fmt::format(" {} %{},\n", members.back().second.get_resolved_type(), members.back().first);
+        buf += fmt::format(" {} %{},\n", members.back().second.get_type().to_string(), members.back().first);
     }
     buf += "}";
     return buf;
@@ -510,12 +571,12 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
     throw codegen_error(fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.", name, slang::to_string(type), import_path));
 }
 
-type* context::add_type(std::string name,
-                        std::vector<std::pair<std::string, value>> members,
-                        std::optional<std::string> import_path)
+struct_* context::add_type(std::string name,
+                           std::vector<std::pair<std::string, value>> members,
+                           std::optional<std::string> import_path)
 {
     if(std::find_if(types.begin(), types.end(),
-                    [&name](const std::unique_ptr<type>& t) -> bool
+                    [&name](const std::unique_ptr<struct_>& t) -> bool
                     {
                         return t->get_name() == name;
                     })
@@ -524,13 +585,13 @@ type* context::add_type(std::string name,
         throw codegen_error(fmt::format("Type '{}' already defined.", name));
     }
 
-    return types.emplace_back(std::make_unique<type>(name, std::move(members), std::move(import_path))).get();
+    return types.emplace_back(std::make_unique<struct_>(name, std::move(members), std::move(import_path))).get();
 }
 
-type* context::get_type(const std::string& name, std::optional<std::string> import_path)
+struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
 {
     auto it = std::find_if(types.begin(), types.end(),
-                           [&name, &import_path](const std::unique_ptr<type>& t) -> bool
+                           [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
                            {
                                return t->get_name() == name
                                       && ((!import_path.has_value() && !t->get_import_path().has_value())
@@ -615,7 +676,9 @@ const prototype& context::get_prototype(const std::string& name, std::optional<s
     return **it;
 }
 
-function* context::create_function(std::string name, value return_type, std::vector<std::unique_ptr<value>> args)
+function* context::create_function(std::string name,
+                                   std::unique_ptr<value> return_type,
+                                   std::vector<std::unique_ptr<value>> args)
 {
     if(std::find_if(funcs.begin(), funcs.end(),
                     [&name](const std::unique_ptr<function>& fn) -> bool
@@ -630,7 +693,10 @@ function* context::create_function(std::string name, value return_type, std::vec
     return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
 }
 
-void context::create_native_function(std::string lib_name, std::string name, std::string return_type, std::vector<std::unique_ptr<value>> args)
+void context::create_native_function(std::string lib_name,
+                                     std::string name,
+                                     std::unique_ptr<value> return_type,
+                                     std::vector<std::unique_ptr<value>> args)
 {
     if(std::find_if(funcs.begin(), funcs.end(),
                     [&name](const std::unique_ptr<function>& fn) -> bool
@@ -760,23 +826,23 @@ void context::generate_const(value vt, std::variant<int, float, std::string> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt.get_type() == "i32")
+    if(vt.get_type().get_type_class() == type_class::i32)
     {
         auto arg = std::make_unique<const_argument>(std::get<int>(v));
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type() == "f32")
+    else if(vt.get_type().get_type_class() == type_class::f32)
     {
         auto arg = std::make_unique<const_argument>(std::get<float>(v));
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type() == "str")
+    else if(vt.get_type().get_type_class() == type_class::str)
     {
         auto arg = std::make_unique<const_argument>(std::get<std::string>(v));
         arg->register_const(*this);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type() == "fn")
+    else if(vt.get_type().get_type_class() == type_class::fn)
     {
         // Nothing to do.
     }
@@ -875,9 +941,9 @@ void context::generate_pop(value vt)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
 
-    if(vt.is_aggregate())
+    if(vt.get_type().is_struct())
     {
-        throw codegen_error("Cannot generate pop instruction for aggregate type.");
+        throw codegen_error("Cannot generate pop instruction for struct type.");
     }
 
     args.emplace_back(std::make_unique<type_argument>(vt));
@@ -890,7 +956,7 @@ void context::generate_ret(std::optional<value> arg)
     std::vector<std::unique_ptr<argument>> args;
     if(!arg)
     {
-        args.emplace_back(std::make_unique<type_argument>(value{"void"}));
+        args.emplace_back(std::make_unique<type_argument>(value{type{type_class::void_, 0}}));
     }
     else
     {

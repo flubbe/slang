@@ -109,7 +109,7 @@ void instruction_emitter::collect_imports()
                     if(import_path.has_value())
                     {
                         auto import_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                                      [arg, import_path](const std::unique_ptr<cg::type>& p) -> bool
+                                                      [arg, import_path](const std::unique_ptr<cg::struct_>& p) -> bool
                                                       {
                                                           return p->is_import() && *p->get_import_path() == import_path
                                                                  && p->get_name() == *arg->get_value()->get_name();
@@ -160,47 +160,46 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         cg::const_argument* arg = static_cast<cg::const_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
 
-        if(array_opcode.has_value() && v->is_array())
+        if(array_opcode.has_value() && v->get_type().is_array())
         {
             emit(instruction_buffer, *array_opcode);
             return;
         }
 
-        std::string type = v->get_resolved_type();
-        if(type == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             emit(instruction_buffer, i32_opcode);
         }
-        else if(type == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             if(!f32_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid type 'f32' for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *f32_opcode);
         }
-        else if(type == "str")
+        else if(v->get_type().get_type_class() == cg::type_class::str)
         {
             if(!str_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid type 'str' for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *str_opcode);
         }
-        else if(type == "addr")
+        else if(v->get_type().is_reference())
         {
             if(!ref_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid reference type for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *ref_opcode);
         }
         else
         {
-            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
         }
     };
 
@@ -210,28 +209,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
         cg::const_argument* arg = static_cast<cg::const_argument*>(args[0].get());
         const cg::value* v = arg->get_value();
-        std::string type = v->get_resolved_type();
 
-        if(type == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             emit(instruction_buffer, i32_opcode, static_cast<std::int32_t>(static_cast<const cg::constant_int*>(v)->get_int()));
         }
-        else if(type == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             emit(instruction_buffer, f32_opcode, static_cast<const cg::constant_float*>(v)->get_float());
         }
-        else if(type == "str")
+        else if(v->get_type().get_type_class() == cg::type_class::str)
         {
             if(!str_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid type 'str' for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *str_opcode, vle_int{static_cast<const cg::constant_str*>(v)->get_constant_index()});
         }
         else
         {
-            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
         }
     };
 
@@ -250,49 +248,48 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
         if(!v->has_name())
         {
-            throw std::runtime_error(fmt::format("Cannot emit load instruction: Value has no name."));
+            throw std::runtime_error(fmt::format("Cannot emit instruction: Argument value has no name."));
         }
         vle_int index = func->get_scope()->get_index(*v->get_name());
 
-        std::string type = v->get_resolved_type();
-        if(v->is_array())
+        if(v->get_type().is_array())
         {
             if(!array_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
             }
 
             emit(instruction_buffer, *array_opcode);
         }
-        else if(type == "i32")
+        else if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             emit(instruction_buffer, i32_opcode);
         }
-        else if(type == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             emit(instruction_buffer, f32_opcode);
         }
-        else if(type == "str")
+        else if(v->get_type().get_type_class() == cg::type_class::str)
         {
             if(!str_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid type 'str' for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *str_opcode);
         }
-        else if(type == "addr")
+        else if(v->get_type().is_reference())
         {
             if(!ref_opcode.has_value())
             {
-                throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+                throw std::runtime_error(fmt::format("Invalid reference type for instruction '{}'.", name));
             }
 
             emit(instruction_buffer, *ref_opcode);
         }
         else
         {
-            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", type, name));
+            throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
         }
 
         instruction_buffer & index;
@@ -356,11 +353,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            std::string v_type = v->get_type();
+            std::string v_type = v->get_type().to_string();
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
-            std::string s_type = stack_arg->get_value()->get_type();
+            std::string s_type = stack_arg->get_value()->get_type().to_string();
 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x1);
@@ -443,7 +440,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
 
-        if(args[0]->get_value()->get_resolved_type() == "void")
+        if(args[0]->get_value()->get_type().to_string() == "void")
         {
             // return void from a function.
             emit(instruction_buffer, opcode::ret);
@@ -464,7 +461,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         vle_int field_index = 0;
 
         auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                      [arg](const std::unique_ptr<cg::type>& t) -> bool
+                                      [arg](const std::unique_ptr<cg::struct_>& t) -> bool
                                       {
                                           return t->get_name() == arg->get_struct_name();
                                       });
@@ -510,7 +507,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         vle_int field_index = 0;
 
         auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                      [arg](const std::unique_ptr<cg::type>& t) -> bool
+                                      [arg](const std::unique_ptr<cg::struct_>& t) -> bool
                                       {
                                           return t->get_name() == arg->get_struct_name();
                                       });
@@ -647,13 +644,13 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         expect_arg_size(1);
 
         auto& args = instr->get_args();
-        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_resolved_type();
+        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().to_string();
 
         // resolve type to index. first check local types, then imported types.
         vle_int index = 0;
 
         auto it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                               [&type_str](const std::unique_ptr<cg::type>& t) -> bool
+                               [&type_str](const std::unique_ptr<cg::struct_>& t) -> bool
                                {
                                    return t->get_name() == type_str;
                                });
@@ -680,28 +677,30 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         expect_arg_size(1);
 
         auto& args = instr->get_args();
-        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_resolved_type();
+        auto type_class = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().get_type_class();
 
         array_type type;
-        if(type_str == "i32")
+        if(type_class == cg::type_class::i32)
         {
             type = array_type::i32;
         }
-        else if(type_str == "f32")
+        else if(type_class == cg::type_class::f32)
         {
             type = array_type::f32;
         }
-        else if(type_str == "str")
+        else if(type_class == cg::type_class::str)
         {
             type = array_type::str;
         }
-        else if(type_str == "aggregate")
+        else if(type_class == cg::type_class::struct_)
         {
             type = array_type::ref;
         }
         else
         {
-            throw std::runtime_error(fmt::format("Unknown array type '{}' for newarray.", type_str));
+            throw std::runtime_error(fmt::format(
+              "Unknown array type '{}' for newarray.",
+              static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().to_string()));
         }
 
         emit(instruction_buffer, opcode::newarray);
@@ -792,7 +791,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_resolved_type(), it->is_array()};
+            locals[index] = {it->get_type().base_type().to_string(), it->get_type().is_array()};
         }
 
         for(auto& it: func_locals)
@@ -810,7 +809,7 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_resolved_type(), it->is_array()};
+            locals[index] = {it->get_type().base_type().to_string(), it->get_type().is_array()};
         }
 
         if(unset_indices.size() != 0)
@@ -931,7 +930,7 @@ language_module instruction_emitter::to_module() const
                        [](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
                        {
                            const auto& t = std::get<1>(m);
-                           return std::make_pair(std::get<0>(m), type_info{t.get_resolved_type(), t.is_array()});
+                           return std::make_pair(std::get<0>(m), type_info{t.get_type().base_type().to_string(), t.get_type().is_array()});
                        });
 
         mod.add_type(it->get_name(), std::move(transformed_members));

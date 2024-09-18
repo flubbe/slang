@@ -199,29 +199,41 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                {
                                    if(ty::is_builtin_type(std::get<0>(arg)))
                                    {
-                                       return cg::value{std::get<0>(arg), std::nullopt, std::nullopt, std::get<1>(arg)};
+                                       return cg::value{
+                                         cg::type{cg::to_type_class(std::get<0>(arg)),
+                                                  std::get<1>(arg)
+                                                    ? static_cast<std::size_t>(1)
+                                                    : static_cast<std::size_t>(0)}};
                                    }
 
-                                   return cg::value{"aggregate", std::get<0>(arg), std::nullopt, std::get<1>(arg)};
+                                   return cg::value{
+                                     cg::type{cg::type_class::struct_,
+                                              std::get<1>(arg)
+                                                ? static_cast<std::size_t>(1)
+                                                : static_cast<std::size_t>(0),
+                                              std::get<0>(arg)}};
                                });
 
-                cg::value return_type;
+                std::unique_ptr<cg::value> return_type;
                 if(ty::is_builtin_type(std::get<0>(desc.signature.return_type)))
                 {
-                    return_type = {std::get<0>(desc.signature.return_type),
-                                   std::nullopt,
-                                   std::nullopt,
-                                   desc.signature.return_type.second};
+                    return_type = std::make_unique<cg::value>(
+                      cg::type{cg::to_type_class(std::get<0>(desc.signature.return_type)),
+                               std::get<1>(desc.signature.return_type)
+                                 ? static_cast<std::size_t>(1)
+                                 : static_cast<std::size_t>(0)});
                 }
                 else
                 {
-                    return_type = {"aggregate",
-                                   std::get<0>(desc.signature.return_type),
-                                   std::nullopt,
-                                   desc.signature.return_type.second};
+                    return_type = std::make_unique<cg::value>(
+                      cg::type{cg::type_class::struct_,
+                               std::get<1>(desc.signature.return_type)
+                                 ? static_cast<std::size_t>(1)
+                                 : static_cast<std::size_t>(0),
+                               std::get<0>(desc.signature.return_type)});
                 }
 
-                ctx.add_prototype(it.first, return_type, prototype_arg_types, import_path);
+                ctx.add_prototype(it.first, *return_type, prototype_arg_types, import_path);
 
                 std::vector<ty::type> arg_types;
                 for(auto& arg: desc.signature.arg_types)
@@ -229,8 +241,8 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                     arg_types.emplace_back(type_ctx.get_type(std::get<0>(arg), std::get<1>(arg)));
                 }
 
-                ty::type resolved_return_type = type_ctx.get_type(return_type.get_resolved_type(),
-                                                                  return_type.is_array());
+                ty::type resolved_return_type = type_ctx.get_type(return_type->get_type().to_string(),
+                                                                  return_type->get_type().is_array());
 
                 type_ctx.add_function({it.first, reference_location},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);
@@ -252,17 +264,21 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                    {
                                        if(ty::is_builtin_type(std::get<1>(member).base_type))
                                        {
-                                           return {std::get<0>(member), cg::value{std::get<1>(member).base_type,
-                                                                                  std::nullopt,
-                                                                                  std::nullopt,
-                                                                                  std::get<1>(member).array}};
+                                           return {std::get<0>(member),
+                                                   cg::value{cg::type{cg::to_type_class(std::get<1>(member).base_type),
+                                                                      std::get<1>(member).array
+                                                                        ? static_cast<std::size_t>(1)
+                                                                        : static_cast<std::size_t>(0)},
+                                                             std::get<0>(member)}};
                                        }
 
-                                       return {std::get<0>(member), cg::value{
-                                                                      "aggregate",
-                                                                      std::get<1>(member).base_type,
-                                                                      std::nullopt,
-                                                                      std::get<1>(member).array}};
+                                       return {std::get<0>(member),
+                                               cg::value{cg::type{cg::type_class::struct_,
+                                                                  std::get<1>(member).array
+                                                                    ? static_cast<std::size_t>(1)
+                                                                    : static_cast<std::size_t>(0),
+                                                                  std::get<1>(member).base_type},
+                                                         std::get<0>(member)}};
                                    });
 
                     ctx.add_type(it.first, std::move(members), import_path);

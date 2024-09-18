@@ -28,14 +28,14 @@ TEST(codegen, initialize_context)
 TEST(codegen, create_function)
 {
     cg::context ctx = cg::context();
-    auto fn = ctx.create_function("test", {"void"}, {});
+    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
     fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
-    auto other_fn = ctx.create_function("test2", {"i32"}, {});
+    auto other_fn = ctx.create_function("test2", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {});
     ASSERT_NE(other_fn, nullptr);
     ASSERT_NE(fn, other_fn);
 
@@ -45,13 +45,13 @@ TEST(codegen, create_function)
 
     ASSERT_NE(fn_block, other_fn_block);
 
-    EXPECT_THROW(ctx.create_function("test", {"i32"}, {}), cg::codegen_error);
+    EXPECT_THROW(ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {}), cg::codegen_error);
 }
 
 TEST(codegen, insertion_points)
 {
     auto ctx = cg::context();
-    auto fn = ctx.create_function("test", {"void"}, {});
+    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
@@ -77,7 +77,7 @@ TEST(codegen, insertion_points)
 TEST(codegen, validate_basic_block)
 {
     auto ctx = cg::context();
-    auto fn = ctx.create_function("test", {"void"}, {});
+    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
@@ -110,9 +110,9 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"void"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -143,9 +143,9 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"i32"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -156,8 +156,8 @@ TEST(codegen, generate_function)
         ctx.set_insertion_point(block);
         EXPECT_EQ(ctx.get_insertion_point(), block);
 
-        ctx.generate_const({"i32"}, -31);
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -31);
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -178,9 +178,9 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"i32"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -191,8 +191,8 @@ TEST(codegen, generate_function)
         ctx.set_insertion_point(block);
         EXPECT_EQ(ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -217,9 +217,9 @@ TEST(codegen, operators)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"i32"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -232,11 +232,11 @@ TEST(codegen, operators)
         ctx.set_insertion_point(block);
         EXPECT_EQ(ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_const({"i32"}, 1);
-        ctx.generate_binary_op(cg::binary_op::op_add, {"i32"});
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
+        ctx.generate_binary_op(cg::binary_op::op_add, {cg::type{cg::type_class::i32, 0}});
 
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -267,9 +267,9 @@ TEST(codegen, conditional_branch)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"i32"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -290,21 +290,21 @@ TEST(codegen, conditional_branch)
         ctx.set_insertion_point(cond);
         EXPECT_EQ(ctx.get_insertion_point(), cond);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_const({"i32"}, 1);
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
         ctx.generate_cmp();
         ctx.generate_cond_branch(then_block, else_block);
 
         ctx.set_insertion_point(then_block);
-        ctx.generate_const({"i32"}, 1);
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         ctx.set_insertion_point(else_block);
         ctx.generate_branch(cont_block);
 
         ctx.set_insertion_point(cont_block);
-        ctx.generate_const({"i32"}, 0);
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 0);
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(then_block->is_valid());
         EXPECT_TRUE(else_block->is_valid());
@@ -341,13 +341,13 @@ TEST(codegen, locals_store)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", {"void"}, std::move(args));
+        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        fn->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
+        fn->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
         cg::basic_block* block = cg::basic_block::create(ctx, "entry");
         fn->append_basic_block(block);
@@ -358,8 +358,8 @@ TEST(codegen, locals_store)
         ctx.set_insertion_point(block);
         EXPECT_EQ(ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
 
         ctx.generate_ret();
 
@@ -394,13 +394,13 @@ TEST(codegen, invoke)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn_f = ctx.create_function("f", {"i32"}, std::move(args_f));
+        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
+        fn_f->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
         cg::basic_block* block = cg::basic_block::create(ctx, "entry");
         fn_f->append_basic_block(block);
@@ -412,23 +412,23 @@ TEST(codegen, invoke)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_const({"i32"}, -1);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -1);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
 
         ctx.generate_invoke(std::make_unique<cg::function_argument>("g", std::nullopt));
 
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
         std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
-        args_g.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "b"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
-        auto fn_g = ctx.create_function("g", {"i32"}, std::move(args_g));
+        auto fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -442,11 +442,11 @@ TEST(codegen, invoke)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
-        ctx.generate_binary_op(cg::binary_op::op_mul, {"i32"});
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{cg::type_class::i32, 0}});
 
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -485,13 +485,13 @@ TEST(codegen, invoke)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn_f = ctx.create_function("f", {"i32"}, std::move(args_f));
+        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(std::make_unique<cg::value>("i32", std::nullopt, "b"));
+        fn_f->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
         cg::basic_block* block = cg::basic_block::create(ctx, "entry");
         fn_f->append_basic_block(block);
@@ -503,24 +503,24 @@ TEST(codegen, invoke)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_const({"i32"}, -1);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -1);
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
 
         ctx.generate_load(std::make_unique<cg::function_argument>("g", std::nullopt));
         ctx.generate_invoke();
 
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
         std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
-        args_g.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "b"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
-        auto fn_g = ctx.create_function("g", {"i32"}, std::move(args_g));
+        auto fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -534,11 +534,11 @@ TEST(codegen, invoke)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "a"}));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"i32", std::nullopt, "b"}));
-        ctx.generate_binary_op(cg::binary_op::op_mul, {"i32"});
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{cg::type_class::i32, 0}});
 
-        ctx.generate_ret(std::make_optional<cg::value>("i32"));
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -564,7 +564,7 @@ TEST(codegen, invoke)
     }
 }
 
-TEST(codegen, aggregate_data)
+TEST(codegen, struct_type)
 {
     {
         cg::context ctx = cg::context();
@@ -583,10 +583,10 @@ TEST(codegen, aggregate_data)
          * }
          */
 
-        ctx.add_type("S", {{"a", {"i32"}}, {"b", {"i32"}}});
+        ctx.add_type("S", {{"a", {cg::type{cg::type_class::i32, 0}}}, {"b", {cg::type{cg::type_class::i32, 0}}}});
 
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>("i32", std::nullopt, "a"));
+        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -608,7 +608,7 @@ TEST(codegen, strings)
          * }
          */
 
-        auto fn_f = ctx.create_function("f", {"str"}, {});
+        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}), {});
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
@@ -622,8 +622,8 @@ TEST(codegen, strings)
         EXPECT_EQ(ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &ctx);
 
-        ctx.generate_const({"str"}, "\tTest\n");
-        ctx.generate_ret(std::make_optional<cg::value>("str"));
+        ctx.generate_const({cg::type{cg::type_class::str, 0}}, "\tTest\n");
+        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::str, 0}));
 
         EXPECT_TRUE(block->is_valid());
 

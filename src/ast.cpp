@@ -97,18 +97,18 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
 
     if(tok.type == token_type::int_literal)
     {
-        ctx.generate_const({"i32"}, *tok.value);
-        return std::make_unique<cg::value>("i32");
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, *tok.value);
+        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
     else if(tok.type == token_type::fp_literal)
     {
-        ctx.generate_const({"f32"}, *tok.value);
-        return std::make_unique<cg::value>("f32");
+        ctx.generate_const({cg::type{cg::type_class::f32, 0}}, *tok.value);
+        return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
     }
     else if(tok.type == token_type::str_literal)
     {
-        ctx.generate_const({"str"}, *tok.value);
-        return std::make_unique<cg::value>("str");
+        ctx.generate_const({cg::type{cg::type_class::str, 0}}, *tok.value);
+        return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
     }
     else
     {
@@ -199,28 +199,37 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
     auto v = expr->generate_code(ctx, mc);
 
     // only cast if necessary.
-    if(target_type.s != v->get_resolved_type())
+    if(target_type.s != v->get_type().to_string())
     {
-        if(target_type.s == "i32" && v->get_resolved_type() == "f32")
+        if(target_type.s == "i32" && v->get_type().to_string() == "f32")
         {
             ctx.generate_cast(cg::type_cast::f32_to_i32);
         }
-        else if(target_type.s == "f32" && v->get_resolved_type() == "i32")
+        else if(target_type.s == "f32" && v->get_type().to_string() == "i32")
         {
             ctx.generate_cast(cg::type_cast::i32_to_f32);
         }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to '{}'.", v->get_resolved_type(), target_type.s));
+            throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to '{}'.", v->get_type().to_string(), target_type.s));
+        }
+
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type.s), 0});
+    }
+    else
+    {
+        // identity transformation.
+        if(ty::is_builtin_type(target_type.s))
+        {
+            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type.s), 0});
+        }
+        else
+        {
+            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type.s});
         }
     }
 
-    if(ty::is_builtin_type(target_type.s))
-    {
-        return std::make_unique<cg::value>(target_type.s);
-    }
-
-    throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.", v->get_resolved_type(), target_type.s));
+    throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.", v->get_type().to_string(), target_type.s));
 }
 
 std::optional<ty::type> type_cast_expression::type_check(ty::context& ctx)
@@ -335,10 +344,10 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     }
     auto identifier_expr = reinterpret_cast<named_expression*>(expr.get());
 
-    cg::value var = get_value(ctx);
+    std::unique_ptr<cg::value> var = std::make_unique<cg::value>(get_value(ctx));
 
     // arrays.
-    if(var.is_array())
+    if(var->get_type().is_array())
     {
         if(identifier_expr->get_name().s == "length")
         {
@@ -347,9 +356,9 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
                 throw cg::codegen_error(expr->get_location(), "Array length is read only.");
             }
 
-            ctx.generate_load(std::make_unique<cg::variable_argument>(var));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(std::move(var)));
             ctx.generate_arraylength();
-            return std::make_unique<cg::value>("i32");
+            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
         else
         {
@@ -361,11 +370,11 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     auto [struct_value, member] = generate_object_load(ctx);
     if(mc != memory_context::store)
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
     }
     else
     {
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
     }
 
     return std::make_unique<cg::value>(member);
@@ -411,15 +420,15 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
     }
 
     // get lhs object value.
-    cg::value var = get_value(ctx);
-    if(var.is_array())
+    std::unique_ptr<cg::value> var = std::make_unique<cg::value>(get_value(ctx));
+    if(var->get_type().is_array())
     {
         throw cg::codegen_error(loc, fmt::format("Cannot load array '{}' as an object.", name.s));
     }
 
     // get rhs.
     std::string expr_name = static_cast<named_expression*>(expr.get())->get_name().s;
-    std::string resolved_type = var.get_resolved_type();
+    std::string resolved_type = var->get_type().to_string();
 
     cg::scope* s = ctx.get_global_scope();
     auto& members = s->get_type(resolved_type);
@@ -431,25 +440,27 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
                            });
     if(it == members.end())
     {
-        throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var.get_resolved_type(), expr_name));
+        throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var->get_type().to_string(), expr_name));
     }
 
     // check if we need to load the base object.
     if(!ctx.is_struct_access())
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(cg::value{"addr", var.get_resolved_type(), name.s}));
+        ctx.generate_load(
+          std::make_unique<cg::variable_argument>(
+            std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, var->get_type().to_string()}, name.s)));
     }
 
     // load the expression, if needed.
     if(expr->is_struct_member_access())
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var.get_resolved_type(), it->second));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_type().to_string(), it->second));
 
-        access_guard ag{ctx, var.get_resolved_type()};
+        access_guard ag{ctx, var->get_type().to_string()};
         return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
     }
 
-    return std::make_pair(std::move(var), it->second);
+    return std::make_pair(std::move(*var), it->second);
 }
 
 cg::value access_expression::get_value(cg::context& ctx) const
@@ -557,39 +568,37 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 {
     cg::value v = get_value(ctx);
 
-    // FIXME We lose type information here.
-    v = ty::is_builtin_type(v.get_resolved_type()) ? v : cg::value{"addr", std::nullopt, v.get_name()};
-
+    // decay type for code generation.
     if(mc == memory_context::none)
     {
         // load arrays for assignments.
         if(element_expr)
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(v));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
             element_expr->generate_code(ctx, memory_context::load);
         }
     }
     else if(mc == memory_context::load)
     {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(v));
+        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
 
         if(element_expr)
         {
             element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_load(std::make_unique<cg::type_argument>(v.deref()), true);
+            ctx.generate_load(std::make_unique<cg::type_argument>(v.get_type().deref()), true);
         }
     }
     else if(mc == memory_context::store)
     {
         if(element_expr)
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(v));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
             element_expr->generate_code(ctx, memory_context::load);
             ctx.generate_store(std::make_unique<cg::type_argument>(v.deref()), true);
         }
         else
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(v));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
         }
     }
     else
@@ -725,31 +734,34 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
         throw cg::codegen_error(loc, fmt::format("No scope available for adding locals."));
     }
 
-    cg::value v;
+    std::unique_ptr<cg::value> v;
     if(ty::is_builtin_type(type->get_name().s))
     {
-        v = {type->get_name().s, std::nullopt, name.s, type->is_array()};
-        s->add_local(std::make_unique<cg::value>(v));
+        v = std::make_unique<cg::value>(
+          cg::type{cg::to_type_class(type->get_name().s),
+                   type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)},
+          name.s);
+        s->add_local(std::make_unique<cg::value>(*v));
     }
     else
     {
-        s->add_local(std::make_unique<cg::value>(cg::value{
-          "aggregate",
-          type->get_name().s,
-          name.s,
-          type->is_array()}));
-        v = {"addr", std::nullopt, name.s};
+        v = std::make_unique<cg::value>(
+          cg::type{cg::type_class::struct_,
+                   type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
+                   type->get_name().s},
+          name.s);
+        s->add_local(std::make_unique<cg::value>(*v));
     }
 
     if(is_array())
     {
-        ctx.set_array_type(v);
+        ctx.set_array_type(*v);
     }
 
     if(expr)
     {
         expr->generate_code(ctx, memory_context::load);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(v));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::move(v)));
     }
 
     if(is_array())
@@ -808,7 +820,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
         throw cg::codegen_error(fmt::format("Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).", exprs.size(), std::numeric_limits<std::int32_t>::max()));
     }
 
-    ctx.generate_const({"i32"}, static_cast<int>(exprs.size()));
+    ctx.generate_const({cg::type{cg::type_class::i32, 0}}, static_cast<int>(exprs.size()));
     ctx.generate_newarray(array_type.deref());
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
@@ -817,13 +829,14 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
 
         // the top of the stack contains the array address.
         ctx.generate_dup(array_type);
-        ctx.generate_const({"i32"}, static_cast<std::int32_t>(i));
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, static_cast<std::int32_t>(i));
 
         auto expr_value = expr->generate_code(ctx, memory_context::load);
         if(i >= std::numeric_limits<std::int32_t>::max())
         {
             throw cg::codegen_error(loc, fmt::format("Array index exceeds max i32 size ({}).", std::numeric_limits<std::int32_t>::max()));
         }
+
         ctx.generate_store(std::make_unique<cg::type_argument>(*expr_value), true);
 
         if(!v)
@@ -832,9 +845,9 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
         }
         else
         {
-            if(v->get_resolved_type() != expr_value->get_resolved_type())
+            if(v->get_type().to_string() != expr_value->get_type().to_string())
             {
-                throw cg::codegen_error(loc, fmt::format("Inconsistent types in array initialization: '{}' and '{}'.", v->get_resolved_type(), expr_value->get_resolved_type()));
+                throw cg::codegen_error(loc, fmt::format("Inconsistent types in array initialization: '{}' and '{}'.", v->get_type().to_string(), expr_value->get_type().to_string()));
             }
         }
     }
@@ -908,17 +921,25 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     std::vector<std::pair<std::string, cg::value>> struct_members;
     for(auto& m: members)
     {
-        cg::value v;
         if(ty::is_builtin_type(m->get_type()->get_name().s))
         {
-            v = {m->get_type()->get_name().s, std::nullopt, m->get_name().s, m->is_array()};
+            cg::value v = {cg::type{
+                             cg::to_type_class(m->get_type()->get_name().s),
+                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)},
+                           m->get_name().s};
+
+            struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
         }
         else
         {
-            v = {"aggregate", m->get_type()->get_name().s, m->get_name().s, m->is_array()};
-        }
+            cg::value v = {cg::type{
+                             cg::type_class::struct_,
+                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
+                             m->get_type()->get_name().s},
+                           m->get_name().s};
 
-        struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
+            struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
+        }
     }
 
     s->add_type(name.s, struct_members);    // FIXME do we need this?
@@ -1007,7 +1028,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
     }
 
-    ctx.generate_new(cg::value{"aggregate", name.s, std::nullopt});
+    ctx.generate_new(cg::value{cg::type{cg::type_class::struct_, 0, name.s}});
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
     auto& t = s->contains_type(name.s)
@@ -1019,7 +1040,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         const auto& [member_name, member_type] = t[i];
         const auto& initializer = initializers[i];
 
-        ctx.generate_dup(cg::value{"addr", std::nullopt, std::nullopt});
+        ctx.generate_dup(cg::value{cg::type{cg::type_class::struct_, 0, name.s}});
 
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)
@@ -1028,18 +1049,18 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                                     fmt::format("Code generation for '{}.{}' initialization returned no type.",
                                                 name.s, member_name));
         }
-        if(initializer_value->get_resolved_type() != "@null"
-           && initializer_value->get_resolved_type() != member_type.get_resolved_type())
+        if(initializer_value->get_type().get_type_class() != cg::type_class::null
+           && initializer_value->get_type().to_string() != member_type.get_type().to_string())
         {
             throw cg::codegen_error(loc,
                                     fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                                                name.s, member_name, initializer_value->get_resolved_type(), member_type.get_resolved_type()));
+                                                name.s, member_name, initializer_value->get_type().to_string(), member_type.get_type().to_string()));
         }
 
         ctx.generate_set_field(std::make_unique<cg::field_access_argument>(name.s, member_type));
     }
 
-    return std::make_unique<cg::value>("aggregate", name.s, std::nullopt);
+    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
 }
 
 std::optional<ty::type> struct_named_initializer_expression::type_check(ty::context& ctx)
@@ -1172,7 +1193,10 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
         if(lhs_value->get_type() != rhs_value->get_type())
         {
-            throw cg::codegen_error(loc, fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.", lhs_value->get_type(), rhs_value->get_type()));
+            throw cg::codegen_error(loc,
+                                    fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.",
+                                                lhs_value->get_type().to_string(),
+                                                rhs_value->get_type().to_string()));
         }
 
         static const std::unordered_map<std::string, cg::binary_op> op_map = {
@@ -1212,7 +1236,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
             if(is_comparison)
             {
-                return std::make_unique<cg::value>("i32");
+                return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
             }
             else
             {
@@ -1243,10 +1267,10 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             // we might need to duplicate the value for chained assignments.
             if(mc == memory_context::load)
             {
-                ctx.generate_dup(*rhs_value, {cg::value{"addr", std::nullopt, std::nullopt}});
+                ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
             }
 
-            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_resolved_type(), member));
+            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
             return rhs_value;
         }
         else
@@ -1260,7 +1284,10 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 ctx.generate_dup(*rhs_value);
             }
 
-            ctx.generate_store(std::make_unique<cg::variable_argument>(*lhs_value), lhs->is_array_element_access());
+            ctx.generate_store(
+              std::make_unique<cg::variable_argument>(
+                std::make_unique<cg::value>(*lhs_value)),
+              lhs->is_array_element_access());
 
             return lhs_value;
         }
@@ -1354,45 +1381,45 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
     if(op.s == "++")
     {
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+        if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
         {
-            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
-        if(v->get_resolved_type() == "i32")
+        if(v->get_type().to_string() == "i32")
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_resolved_type() == "f32")
+        else if(v->get_type().to_string() == "f32")
         {
             ctx.generate_const(*v, 1.f);
         }
         ctx.generate_binary_op(cg::binary_op::op_add, *v);
 
         ctx.generate_dup(*v);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
         return v;
     }
     else if(op.s == "--")
     {
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+        if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
         {
-            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
-        if(v->get_resolved_type() == "i32")
+        if(v->get_type().to_string() == "i32")
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_resolved_type() == "f32")
+        else if(v->get_type().to_string() == "f32")
         {
             ctx.generate_const(*v, 1.f);
         }
         ctx.generate_binary_op(cg::binary_op::op_sub, *v);
 
         ctx.generate_dup(*v);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
         return v;
     }
     else if(op.s == "+")
@@ -1406,17 +1433,17 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
         auto v = operand->generate_code(ctx, mc);
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             args.emplace_back(std::make_unique<cg::const_argument>(0));
         }
-        else if(v->get_type() == "f32")
+        else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             args.emplace_back(std::make_unique<cg::const_argument>(0.f));
         }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32' or 'f32', got '{}'.", v->get_type()));
+            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32' or 'f32', got '{}'.", v->get_type().to_string()));
         }
         instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
 
@@ -1435,13 +1462,13 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
         auto v = operand->generate_code(ctx, mc);
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type() == "i32")
+        if(v->get_type().get_type_class() == cg::type_class::i32)
         {
             args.emplace_back(std::make_unique<cg::const_argument>(~0));
         }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32', got '{}'.", v->get_type()));
+            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32', got '{}'.", v->get_type().to_string()));
         }
         instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
 
@@ -1509,19 +1536,14 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
     }
 
     std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::load);
-    if(v->get_type() != "i32")
+    if(v->get_type().get_type_class() != cg::type_class::i32)
     {
-        throw cg::codegen_error(loc, fmt::format("Expected <integer> as array size, got '{}'.", v->get_type()));
+        throw cg::codegen_error(loc, fmt::format("Expected <integer> as array size, got '{}'.", v->get_type().to_string()));
     }
 
-    auto array_type = cg::value{type.s, std::nullopt, std::nullopt, true};
-    ctx.generate_newarray(array_type.deref());
+    ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type.s), 0}});
 
-    return std::make_unique<cg::value>(
-      v->get_type(),
-      v->is_aggregate() ? std::make_optional(v->get_aggregate_type()) : std::nullopt,
-      v->get_name(),
-      true);
+    return std::make_unique<cg::value>(cg::type{cg::to_type_class(type.s), 1});
 }
 
 std::optional<ty::type> new_expression::type_check(ty::context& ctx)
@@ -1567,7 +1589,7 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
 
     ctx.generate_const_null();
 
-    return std::make_unique<cg::value>("@null", std::nullopt, std::nullopt);
+    return std::make_unique<cg::value>(cg::type{cg::type_class::null, 0});
 }
 
 std::optional<ty::type> null_expression::type_check(ty::context& ctx)
@@ -1592,40 +1614,40 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     }
 
     auto v = identifier->generate_code(ctx, memory_context::load);
-    if(v->get_resolved_type() != "i32" && v->get_resolved_type() != "f32")
+    if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
     {
-        throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for postfix operator. Expected 'i32' or 'f32'.", v->get_resolved_type()));
+        throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for postfix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
     }
 
     if(op.s == "++")
     {
         ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_resolved_type() == "i32")
+        if(v->get_type().to_string() == "i32")
         {
-            ctx.generate_const({v->get_resolved_type()}, 1);
+            ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
         }
-        else if(v->get_resolved_type() == "f32")
+        else if(v->get_type().to_string() == "f32")
         {
-            ctx.generate_const({v->get_resolved_type()}, 1.f);
+            ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
         }
         ctx.generate_binary_op(cg::binary_op::op_add, *v);
 
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
     }
     else if(op.s == "--")
     {
         ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_resolved_type() == "i32")
+        if(v->get_type().to_string() == "i32")
         {
-            ctx.generate_const({v->get_resolved_type()}, 1);
+            ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
         }
-        else if(v->get_resolved_type() == "f32")
+        else if(v->get_type().to_string() == "f32")
         {
-            ctx.generate_const({v->get_resolved_type()}, 1.f);
+            ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
         }
         ctx.generate_binary_op(cg::binary_op::op_sub, *v);
 
-        ctx.generate_store(std::make_unique<cg::variable_argument>(*v));
+        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
     }
     else
     {
@@ -1672,24 +1694,34 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
         if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
         {
             function_args.emplace_back(std::make_unique<cg::value>(
-              std::get<1>(a)->get_name().s,
-              std::nullopt,
-              std::get<0>(a).s,
-              std::get<1>(a)->is_array()));
+              cg::type{cg::to_type_class(std::get<1>(a)->get_name().s),
+                       std::get<1>(a)->is_array()
+                         ? static_cast<std::size_t>(1)
+                         : static_cast<std::size_t>(0)},
+              std::get<0>(a).s));
         }
         else
         {
             function_args.emplace_back(std::make_unique<cg::value>(
-              "aggregate",
-              std::get<1>(a)->get_name().s,
-              std::get<0>(a).s,
-              std::get<1>(a)->is_array()));
+              cg::type{cg::type_class::struct_,
+                       std::get<1>(a)->is_array()
+                         ? static_cast<std::size_t>(1)
+                         : static_cast<std::size_t>(0),
+                       std::get<1>(a)->get_name().s},
+              std::get<0>(a).s));
         }
     }
 
-    cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
-                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array()}
-                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array()};
+    std::unique_ptr<cg::value> ret_val = ty::is_builtin_type(return_type->get_name().s)
+                                           ? std::make_unique<cg::value>(cg::type{cg::to_type_class(return_type->get_name().s),
+                                                                                  return_type->is_array()
+                                                                                    ? static_cast<std::size_t>(1)
+                                                                                    : static_cast<std::size_t>(0)})
+                                           : std::make_unique<cg::value>(cg::type{cg::type_class::struct_,
+                                                                                  return_type->is_array()
+                                                                                    ? static_cast<std::size_t>(1)
+                                                                                    : static_cast<std::size_t>(0),
+                                                                                  return_type->get_name().s});
 
     return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
 }
@@ -1703,42 +1735,71 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
         {
             function_args.emplace_back(
               std::make_unique<cg::value>(
-                std::get<1>(a)->get_name().s,
-                std::nullopt,
-                std::get<0>(a).s,
-                std::get<1>(a)->is_array()));
+                cg::type{cg::to_type_class(std::get<1>(a)->get_name().s),
+                         std::get<1>(a)->is_array()
+                           ? static_cast<std::size_t>(1)
+                           : static_cast<std::size_t>(0)},
+                std::get<0>(a).s));
         }
         else
         {
             function_args.emplace_back(
               std::make_unique<cg::value>(
-                "aggregate",
-                std::get<1>(a)->get_name().s,
-                std::get<0>(a).s,
-                std::get<1>(a)->is_array()));
+                cg::type{cg::type_class::struct_,
+                         std::get<1>(a)->is_array()
+                           ? static_cast<std::size_t>(1)
+                           : static_cast<std::size_t>(0),
+                         std::get<1>(a)->get_name().s},
+                std::get<0>(a).s));
         }
     }
 
-    ctx.create_native_function(lib_name, name.s, return_type->get_name().s, std::move(function_args));
+    std::unique_ptr<cg::value> ret;
+    if(ty::is_builtin_type(return_type->get_name().s))
+    {
+        ret = std::make_unique<cg::value>(
+          cg::type{cg::to_type_class(return_type->get_name().s),
+                   return_type->is_array()
+                     ? static_cast<std::size_t>(1)
+                     : static_cast<std::size_t>(0)});
+    }
+    else
+    {
+        ret = std::make_unique<cg::value>(
+          cg::type{cg::type_class::struct_,
+                   return_type->is_array()
+                     ? static_cast<std::size_t>(1)
+                     : static_cast<std::size_t>(0),
+                   return_type->get_name().s});
+    }
+
+    ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
     std::vector<cg::value> prototype_arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(prototype_arg_types),
-                   [](const auto& arg)
+                   [](const auto& arg) -> cg::value
                    {
                        if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
                        {
-                           return cg::value{std::get<1>(arg)->get_name().s, std::nullopt, std::nullopt, std::get<1>(arg)->is_array()};
+                           return cg::value{
+                             cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
+                                      std::get<1>(arg)->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)}};
                        }
 
-                       return cg::value{"aggregate", std::get<1>(arg)->get_name().s, std::nullopt, std::get<1>(arg)->is_array()};
+                       return cg::value{
+                         cg::type{cg::type_class::struct_,
+                                  std::get<1>(arg)->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
+                                  std::get<1>(arg)->get_name().s}};
                    });
 
     cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
-                          ? cg::value{return_type->get_name().s, std::nullopt, std::nullopt, return_type->is_array()}
-                          : cg::value{"aggregate", return_type->get_name().s, std::nullopt, return_type->is_array()};
+                          ? cg::value{
+                              cg::type{cg::to_type_class(return_type->get_name().s),
+                                       return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)}}
+                          : cg::value{cg::type{cg::type_class::struct_, return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0), return_type->get_name().s}};
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 
@@ -1813,7 +1874,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
         v = expr->generate_code(ctx, memory_context::none);
 
         // non-assigning expressions need cleanup.
-        if(expr->needs_pop() && v && v->get_resolved_type() != "void")
+        if(expr->needs_pop() && v && v->get_type().to_string() != "void")
         {
             ctx.generate_pop(*v);
         }
@@ -2147,9 +2208,9 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     {
         throw cg::codegen_error(loc, "Condition did not yield a type.");
     }
-    if(v->get_resolved_type() != "i32")
+    if(v->get_type().to_string() != "i32")
     {
-        throw cg::codegen_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", v->get_resolved_type()));
+        throw cg::codegen_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", v->get_type().to_string()));
     }
 
     // store where to insert the branch.
@@ -2263,9 +2324,9 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     {
         throw cg::codegen_error(loc, "Condition did not yield a type.");
     }
-    if(v->get_resolved_type() != "i32")
+    if(v->get_type().to_string() != "i32")
     {
-        throw cg::codegen_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", v->get_resolved_type()));
+        throw cg::codegen_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", v->get_type().to_string()));
     }
 
     ctx.generate_cond_branch(while_loop_basic_block, merge_basic_block);
