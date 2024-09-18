@@ -1100,6 +1100,75 @@ public:
     static basic_block* create(class context& ctx, std::string name);
 };
 
+/** A user-defined type. */
+class struct_
+{
+    /** The type's name. */
+    std::string name;
+
+    /** The type's members as pairs `(name, type)`. */
+    std::vector<std::pair<std::string, value>> members;
+
+    /** The module path for imported types and `std::nullopt` for types within the current module. */
+    std::optional<std::string> import_path;
+
+public:
+    /** Default constructors. */
+    struct_() = default;
+    struct_(const struct_&) = default;
+    struct_(struct_&&) = default;
+
+    /** Destructor. */
+    virtual ~struct_() = default;
+
+    /** Default assignment. */
+    struct_& operator=(const struct_&) = default;
+    struct_& operator=(struct_&&) = default;
+
+    /**
+     * Construct a new struct.
+     *
+     * @param name The type's name.
+     * @param members The type's members.
+     * @param import_path The import path of the module for imported types.
+     */
+    struct_(std::string name,
+            std::vector<std::pair<std::string, value>> members,
+            std::optional<std::string> import_path = std::nullopt)
+    : name{std::move(name)}
+    , members{std::move(members)}
+    , import_path{std::move(import_path)}
+    {
+    }
+
+    /** Get the type's name. */
+    std::string get_name() const
+    {
+        return name;
+    }
+
+    /** Get the type's members. */
+    const std::vector<std::pair<std::string, value>>& get_members() const
+    {
+        return members;
+    }
+
+    /** Return whether this is an imported type. */
+    bool is_import() const
+    {
+        return import_path.has_value();
+    }
+
+    /** Return the import path. */
+    const std::optional<std::string>& get_import_path() const
+    {
+        return import_path;
+    }
+
+    /** String representation of a type. */
+    std::string to_string() const;
+};
+
 /**
  * A scope has a name and holds variables.
  */
@@ -1118,7 +1187,7 @@ class scope
     std::vector<std::unique_ptr<value>> locals;
 
     /** Structs. */
-    std::unordered_map<std::string, class struct_> structs;
+    std::unordered_map<std::string, struct_> structs;
 
 public:
     /** Constructors. */
@@ -1573,73 +1642,6 @@ public:
     }
 
     /** String representation of function. */
-    std::string to_string() const;
-};
-
-/** A user-defined type. */
-class struct_
-{
-    /** The type's name. */
-    std::string name;
-
-    /** The type's members as pairs `(name, type)`. */
-    std::vector<std::pair<std::string, value>> members;
-
-    /** The module path for imported types and `std::nullopt` for types within the current module. */
-    std::optional<std::string> import_path;
-
-public:
-    /** Default constructors. */
-    struct_() = default;
-    struct_(const struct_&) = default;
-    struct_(struct_&&) = default;
-
-    /** Destructor. */
-    virtual ~struct_() = default;
-
-    /** Default assignment. */
-    struct_& operator=(const struct_&) = default;
-    struct_& operator=(struct_&&) = default;
-
-    /**
-     * Construct a new struct.
-     *
-     * @param name The type's name.
-     * @param members The type's members.
-     * @param import_path The import path of the module for imported types.
-     */
-    struct_(std::string name, std::vector<std::pair<std::string, value>> members, std::optional<std::string> import_path = std::nullopt)
-    : name{std::move(name)}
-    , members{std::move(members)}
-    , import_path{std::move(import_path)}
-    {
-    }
-
-    /** Get the type's name. */
-    std::string get_name() const
-    {
-        return name;
-    }
-
-    /** Get the type's members. */
-    const std::vector<std::pair<std::string, value>>& get_members() const
-    {
-        return members;
-    }
-
-    /** Return whether this is an imported type. */
-    bool is_import() const
-    {
-        return import_path.has_value();
-    }
-
-    /** Return the import path. */
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
-    }
-
-    /** String representation of a type. */
     std::string to_string() const;
 };
 
