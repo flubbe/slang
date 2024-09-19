@@ -23,14 +23,14 @@ namespace slang
 
 std::size_t language_module::add_import(symbol_type type, std::string name, std::uint32_t package_index)
 {
-    if(std::find_if(header.imports.begin(), header.imports.end(),
-                    [&name](const imported_symbol& s) -> bool
-                    {
-                        return s.name == name;
-                    })
-       != header.imports.end())
+    auto it = std::find_if(header.imports.begin(), header.imports.end(),
+                           [&name](const imported_symbol& s) -> bool
+                           {
+                               return s.name == name;
+                           });
+    if(it != header.imports.end())
     {
-        throw module_error(fmt::format("Cannot add import: Symbol '{}' already defined.", name));
+        return std::distance(header.imports.begin(), it);
     }
 
     header.imports.emplace_back(type, std::move(name), package_index);

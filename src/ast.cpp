@@ -1036,19 +1036,31 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
     }
 
-    ctx.generate_new(cg::value{cg::type{cg::type_class::struct_, 0, name.s}});
-
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
-    auto& t = s->contains_struct(name.s, get_namespace_path())
-                ? s->get_struct(name.s, get_namespace_path())
-                : ctx.get_type(name.s, get_namespace_path())->get_members();    // imported types are stored here.
 
-    for(std::size_t i = 0; i < t.size(); ++i)
+    cg::type struct_type{cg::type_class::struct_, 0, name.s, get_namespace_path()};
+    const std::vector<std::pair<std::string, cg::value>>* t{nullptr};
+
+    if(s->contains_struct(name.s, get_namespace_path()))
     {
-        const auto& [member_name, member_type] = t[i];
+        t = &s->get_struct(name.s, get_namespace_path());
+        ctx.generate_new(struct_type);
+    }
+    else
+    {
+        auto type = ctx.get_type(name.s, get_namespace_path());
+        struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
+
+        t = &ctx.get_type(name.s, get_namespace_path())->get_members();
+        ctx.generate_new(struct_type);
+    }
+
+    for(std::size_t i = 0; i < t->size(); ++i)
+    {
+        const auto& [member_name, member_type] = (*t)[i];
         const auto& initializer = initializers[i];
 
-        ctx.generate_dup(cg::value{cg::type{cg::type_class::struct_, 0, name.s}});
+        ctx.generate_dup(cg::value{struct_type});
 
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)

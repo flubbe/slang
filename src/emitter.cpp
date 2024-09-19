@@ -463,6 +463,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
                                       [arg](const std::unique_ptr<cg::struct_>& t) -> bool
                                       {
+                                          // FIXME No import information.
                                           return t->get_name() == arg->get_struct_name();
                                       });
         if(struct_it != ctx.types.end())
@@ -476,8 +477,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else
         {
-            // TODO search imported symbols. The type should have `import_path` set in this case.
-            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", arg->get_struct_name()));
+            throw emitter_error(fmt::format("Type '{}' not found.", arg->get_struct_name()));
         }
 
         auto& members = struct_it->get()->get_members();
@@ -509,6 +509,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
                                       [arg](const std::unique_ptr<cg::struct_>& t) -> bool
                                       {
+                                          // FIXME No import information.
                                           return t->get_name() == arg->get_struct_name();
                                       });
         if(struct_it != ctx.types.end())
@@ -522,8 +523,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else
         {
-            // TODO search imported symbols. The type should have `import_path` set in this case.
-            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", arg->get_struct_name()));
+            throw emitter_error(fmt::format("Type '{}' not found.", arg->to_string()));
         }
 
         auto& members = struct_it->get()->get_members();
@@ -644,15 +644,16 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         expect_arg_size(1);
 
         auto& args = instr->get_args();
-        auto type_str = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().to_string();
+        auto type = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();
 
         // resolve type to index. first check local types, then imported types.
         vle_int index = 0;
 
         auto it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                               [&type_str](const std::unique_ptr<cg::struct_>& t) -> bool
+                               [&type](const std::unique_ptr<cg::struct_>& t) -> bool
                                {
-                                   return t->get_name() == type_str;
+                                   return t->get_name() == type.get_struct_name()
+                                          && t->get_import_path() == type.get_import_path();
                                });
         if(it != ctx.types.end())
         {
@@ -665,8 +666,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else
         {
-            // TODO search imported symbols. The type should have `import_path` set in this case.
-            throw emitter_error(fmt::format("Type not found / type import resolution not implemented (type name: '{}').", type_str));
+            throw emitter_error(fmt::format("Type '{}' not found.", type.to_string()));
         }
 
         emit(instruction_buffer, opcode::new_);
@@ -927,10 +927,33 @@ language_module instruction_emitter::to_module() const
         std::vector<std::pair<std::string, type_info>> transformed_members;
 
         std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
+                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
                        {
                            const auto& t = std::get<1>(m);
-                           return std::make_pair(std::get<0>(m), type_info{t.get_type().base_type().to_string(), t.get_type().is_array()});
+
+                           if(t.get_type().is_external())
+                           {
+                               // find the import index.
+                               auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                                             [&t](const cg::imported_symbol& s) -> bool
+                                                             {
+                                                                 return s.type == symbol_type::type
+                                                                        && s.name == t.get_type().base_type().to_string()
+                                                                        && s.import_path == t.get_type().base_type().get_import_path();
+                                                             });
+                               if(import_it == ctx.imports.end())
+                               {
+                                   throw std::runtime_error(fmt::format(
+                                     "Type '{}' from package '{}' not found in import table.",
+                                     t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+                               }
+                           }
+
+                           return std::make_pair(
+                             std::get<0>(m),
+                             type_info{
+                               t.get_type().base_type().to_string(),
+                               t.get_type().is_array()});
                        });
 
         mod.add_type(it->get_name(), std::move(transformed_members));

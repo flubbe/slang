@@ -260,7 +260,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 {
                     std::vector<std::pair<std::string, cg::value>> members;
                     std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
-                                   [](const std::pair<std::string, type_info>& member) -> std::pair<std::string, cg::value>
+                                   [&import_path](const std::pair<std::string, type_info>& member) -> std::pair<std::string, cg::value>
                                    {
                                        if(ty::is_builtin_type(std::get<1>(member).base_type))
                                        {
@@ -277,12 +277,15 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                                   std::get<1>(member).array
                                                                     ? static_cast<std::size_t>(1)
                                                                     : static_cast<std::size_t>(0),
-                                                                  std::get<1>(member).base_type},
+                                                                  std::get<1>(member).base_type,
+                                                                  import_path},
                                                          std::get<0>(member)}};
                                    });
 
                     // TODO members can be imported types.
 
+                    ctx.add_import(symbol_type::type, import_path, it.first);
+                    ctx.add_type(it.first, members, import_path);
                     ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
                 }
 
@@ -304,8 +307,6 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
                     type_ctx.add_struct({it.first, reference_location}, std::move(members), import_path);
                 }
-
-                fmt::print("Added type '{}' from '{}'.\n", it.first, import_path);
             }
         }
     }

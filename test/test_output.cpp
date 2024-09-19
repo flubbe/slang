@@ -1630,6 +1630,54 @@ TEST(output, nested_structs)
     }
 }
 
+TEST(output, type_imports)
+{
+    {
+        const std::string test_input =
+          "import nested_structs2;\n"
+          "fn test() -> i32\n"
+          "{\n"
+          " let c: nested_structs2::Container = nested_structs2::Container{\n"
+          "  data: nested_structs2::Data{i: -1, f: 3.14, s: \"Test\", next: null},\n"
+          "  flags: 4096\n"
+          " };\n"
+          " return c.data.i + (c.data.f as i32);\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        slang::file_manager mgr;
+        mgr.add_search_path(".");
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("type_imports.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
+}
+
 TEST(output, null_assignment)
 {
     {

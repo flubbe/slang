@@ -438,6 +438,9 @@ struct type_info
     /** Whether this is an array. */
     bool array{false};
 
+    /** Index in the import table for imported types. */
+    std::optional<std::size_t> import_index;
+
     /** Type size (not serialized). */
     std::size_t size{0};
 
@@ -461,10 +464,12 @@ struct type_info
      *
      * @param base_type The type's base type.
      * @param array Whether the type is an array type.
+     * @param import_index Optional index into the import table. Only for imported types.
      */
-    type_info(std::string base_type, bool array)
+    type_info(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
     : base_type{std::move(base_type)}
     , array{array}
+    , import_index{import_index}
     {
     }
 
@@ -491,6 +496,7 @@ inline archive& operator&(archive& ar, type_info& info)
 {
     ar & info.base_type;
     ar & info.array;
+    ar & info.import_index;
     return ar;
 }
 

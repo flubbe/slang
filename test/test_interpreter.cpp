@@ -1166,6 +1166,39 @@ TEST(interpreter, nested_structs)
     }
 }
 
+TEST(interpreter, type_imports)
+{
+    {
+        slang::language_module mod;
+
+        try
+        {
+            slang::file_read_archive read_ar("type_imports.cmod");
+            EXPECT_NO_THROW(read_ar & mod);
+        }
+        catch(const std::runtime_error& e)
+        {
+            fmt::print("Error loading 'type_imports.cmod'. Make sure to run 'test_output' to generate the file.\n");
+            throw e;
+        }
+
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+
+        si::context ctx{file_mgr};
+
+        si::value res;
+        ASSERT_NO_THROW(ctx.load_module("type_imports", mod));
+        ASSERT_NO_THROW(res = ctx.invoke("type_imports", "test", {}));
+
+        EXPECT_EQ(*res.get<int>(), 2);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+}
+
 TEST(interpreter, multiple_modules)
 {
     slang::language_module mod;
