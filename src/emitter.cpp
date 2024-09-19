@@ -353,11 +353,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            std::string v_type = v->get_type().to_string();
+            type_string v_type = v->get_type().to_string();
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
-            std::string s_type = stack_arg->get_value()->get_type().to_string();
+            type_string s_type = stack_arg->get_value()->get_type().to_string();
 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x1);

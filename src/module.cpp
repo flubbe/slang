@@ -18,6 +18,75 @@ namespace slang
 {
 
 /*
+ * type encoding and decoding.
+ */
+
+std::string encode_type(const std::string& t)
+{
+    if(t == "void")
+    {
+        return "v";
+    }
+    else if(t == "i32")
+    {
+        return "i";
+    }
+    else if(t == "f32")
+    {
+        return "f";
+    }
+    else if(t == "str")
+    {
+        return "s";
+    }
+    else if(t == "addr")
+    {
+        return "a";
+    }
+
+    // assume it is a struct.
+    return fmt::format("S{};", t);
+}
+
+std::string decode_type(const std::string& t)
+{
+    if(t == "v")
+    {
+        return "void";
+    }
+    else if(t == "i")
+    {
+        return "i32";
+    }
+    else if(t == "f")
+    {
+        return "f32";
+    }
+    else if(t == "s")
+    {
+        return "str";
+    }
+    else if(t == "a")
+    {
+        return "addr";
+    }
+    else if(t.substr(0, 1) == "S")
+    {
+        if(t.length() < 3)
+        {
+            throw module_error("Cannot decode empty struct type name.");
+        }
+        if(t[t.length() - 1] != ';')
+        {
+            throw module_error("Cannot decode type with invalid name.");
+        }
+        return t.substr(1, t.length() - 2);
+    }
+
+    throw module_error(fmt::format("Cannot decode unknown type '{}'.", t));
+}
+
+/*
  * language_module implementation.
  */
 

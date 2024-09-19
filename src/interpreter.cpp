@@ -94,7 +94,7 @@ function::function(function_signature signature,
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    ret_opcode = ::slang::interpreter::get_return_opcode(std::make_pair(this->signature.return_type.first.s, this->signature.return_type.second));
 }
 
 function::function(function_signature signature, std::function<void(operand_stack&)> func)
@@ -102,7 +102,7 @@ function::function(function_signature signature, std::function<void(operand_stac
 , native{true}
 , entry_point_or_function{std::move(func)}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+    ret_opcode = ::slang::interpreter::get_return_opcode(std::make_pair(this->signature.return_type.first.s, this->signature.return_type.second));
 }
 
 /*
@@ -199,11 +199,11 @@ field_properties context::get_field_properties(const std::unordered_map<std::str
 std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
                                       const function_signature& s) const
 {
-    auto return_type_properties = get_type_properties(type_map, s.return_type.first, s.return_type.second);
+    auto return_type_properties = get_type_properties(type_map, s.return_type.first.s, s.return_type.second);
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        auto properties = get_type_properties(type_map, it.first, it.second);
+        auto properties = get_type_properties(type_map, it.first.s, it.second);
         arg_size += properties.size;
         // NOTE stack contents are not aligned.
     }
@@ -394,7 +394,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
     case opcode::dup_x1:
     {
         // type arguments.
-        std::string t1, t2;
+        type_string t1, t2;
         ar & t1 & t2;
 
         // "void" is not allowed.
@@ -683,7 +683,7 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
             {
                 if(type_map.find(member_type.base_type) == type_map.end())
                 {
-                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type));
+                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type.s));
                 }
 
                 // size and alignment are the same for both array and non-array types.
@@ -1838,7 +1838,7 @@ public:
      * @param locals The locals storage to write into.
      */
     arguments_scope(const std::vector<value>& args,
-                    const std::vector<std::pair<std::string, bool>>& arg_types,
+                    const std::vector<std::pair<type_string, bool>>& arg_types,
                     std::vector<std::byte>& locals)
     : args{args}
     , locals{locals}
@@ -1850,7 +1850,7 @@ public:
             {
                 throw interpreter_error(
                   fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
-                              i, std::get<0>(arg_types[i]), std::get<0>(args[i].get_type())));
+                              i, std::get<0>(arg_types[i]).s, std::get<0>(args[i].get_type())));
             }
 
             if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))

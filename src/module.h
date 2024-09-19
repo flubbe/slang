@@ -158,11 +158,182 @@ inline archive& operator&(archive& ar, array_type& t)
     return ar;
 }
 
+/**
+ * Encode a type given by a string.
+ *
+ * @param t The type name.
+ * @returns The encoded type string.
+ */
+std::string encode_type(const std::string& t);
+
+/**
+ * Decode a type given by a string.
+ *
+ * @param t The encoded type string.
+ * @returns The decoded type name.
+ * @throws Throws a `module_error` if the type is not known.
+ */
+std::string decode_type(const std::string& t);
+
+/** A type string that can be en-/decoded. */
+struct type_string
+{
+    /** The string. */
+    std::string s;
+
+    /** Default constructors. */
+    type_string() = default;
+    type_string(const type_string&) = default;
+    type_string(type_string&&) = default;
+
+    /** Default assignments. */
+    type_string& operator=(const type_string&) = default;
+    type_string& operator=(type_string&&) = default;
+
+    /** Initialize from a `std::string`. */
+    type_string(std::string s)
+    : s{std::move(s)}
+    {
+    }
+
+    /** String assignment. */
+    type_string& operator=(const std::string& s)
+    {
+        this->s = s;
+        return *this;
+    }
+
+    /** String assignment. */
+    type_string& operator=(std::string&& s)
+    {
+        this->s = std::move(s);
+        return *this;
+    }
+
+    /** Comparison. */
+    bool operator==(const type_string& ts) const
+    {
+        return this->s == ts.s;
+    }
+
+    /** Comparison. */
+    bool operator!=(const type_string& ts) const
+    {
+        return !(*this == ts);
+    }
+
+    /** Comparison. */
+    bool operator==(const std::string& s) const
+    {
+        return this->s == s;
+    }
+
+    /** Comparison. */
+    bool operator!=(const std::string& s) const
+    {
+        return !(*this == s);
+    }
+
+    /** Conversion to `std::string` */
+    operator std::string()
+    {
+        return s;
+    }
+
+    /** Conversion to `std::string` */
+    operator std::string() const
+    {
+        return s;
+    }
+
+    /*
+     * Encode the type string.
+     *
+     * @returns The encoded type string.
+     */
+    std::string encode() const
+    {
+        return encode_type(s);
+    }
+
+    /**
+     * Set type string from an encoded string.
+     *
+     * @param s The encoded string.
+     */
+    void decode(const std::string& s)
+    {
+        this->s = decode_type(s);
+    }
+};
+
+/**
+ * Type string serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param ts The type string.
+ */
+inline archive& operator&(archive& ar, type_string& ts)
+{
+    if(ar.is_reading())
+    {
+        std::uint8_t c;
+        std::string s;
+
+        ar & c;
+        s += c;
+        if(c == 'S')
+        {
+            do
+            {
+                ar & c;
+                s += c;
+            } while(c != ';');
+        }
+
+        ts.decode(s);
+    }
+    else if(ar.is_writing())
+    {
+        auto t = ts.encode();
+        std::uint8_t c = t[0];
+
+        ar & c;
+        if(c == 'S')
+        {
+            if(t.length() < 3)
+            {
+                throw module_error("Cannot encode empty struct type name.");
+            }
+
+            std::size_t i = 1;
+            do
+            {
+                c = t[i];
+                ++i;
+
+                ar & c;
+            } while(c != ';' && i < t.length());
+
+            if(c != ';')
+            {
+                throw module_error("Cannot encode invalid struct type name.");
+            }
+        }
+    }
+    else
+    {
+        throw module_error("Invalid archive mode.");
+    }
+
+    return ar;
+}
+
 /** A variable. */
 struct variable : public symbol
 {
     /** The variable's type. */
-    std::string type;
+    type_string type;
 
     /** Whether this is an array type. */
     bool array;
@@ -211,10 +382,10 @@ inline archive& operator&(archive& ar, variable& v)
 struct function_signature
 {
     /** Return type. */
-    std::pair<std::string, bool> return_type;
+    std::pair<type_string, bool> return_type;
 
     /** Argument type list. */
-    std::vector<std::pair<std::string, bool>> arg_types;
+    std::vector<std::pair<type_string, bool>> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -234,8 +405,12 @@ struct function_signature
     function_signature(std::pair<std::string, bool> return_type,
                        std::vector<std::pair<std::string, bool>> arg_types)
     : return_type{std::move(return_type)}
-    , arg_types{std::move(arg_types)}
     {
+        std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
+                       [](const auto& arg) -> std::pair<type_string, bool>
+                       {
+                           return {arg.first, arg.second};
+                       });
     }
 };
 
@@ -433,7 +608,7 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
 struct type_info
 {
     /** The field's base type: i32, f32, str, or a struct name. */
-    std::string base_type;
+    type_string base_type;
 
     /** Whether this is an array. */
     bool array{false};
