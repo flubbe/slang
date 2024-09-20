@@ -273,61 +273,7 @@ struct type_string
  * @param ar The archive to use for serialization.
  * @param ts The type string.
  */
-inline archive& operator&(archive& ar, type_string& ts)
-{
-    if(ar.is_reading())
-    {
-        std::uint8_t c;
-        std::string s;
-
-        ar & c;
-        s += c;
-        if(c == 'S')
-        {
-            do
-            {
-                ar & c;
-                s += c;
-            } while(c != ';');
-        }
-
-        ts.decode(s);
-    }
-    else if(ar.is_writing())
-    {
-        auto t = ts.encode();
-        std::uint8_t c = t[0];
-
-        ar & c;
-        if(c == 'S')
-        {
-            if(t.length() < 3)
-            {
-                throw module_error("Cannot encode empty struct type name.");
-            }
-
-            std::size_t i = 1;
-            do
-            {
-                c = t[i];
-                ++i;
-
-                ar & c;
-            } while(c != ';' && i < t.length());
-
-            if(c != ';')
-            {
-                throw module_error("Cannot encode invalid struct type name.");
-            }
-        }
-    }
-    else
-    {
-        throw module_error("Invalid archive mode.");
-    }
-
-    return ar;
-}
+archive& operator&(archive& ar, type_string& ts);
 
 /** A variable. */
 struct variable : public symbol

@@ -21,61 +21,43 @@ namespace slang
  * type encoding and decoding.
  */
 
+/** Type encoding pairs as `(type, encoded_type)`. */
+static std::vector<std::pair<std::string, std::string>> type_encoding = {
+  {"void", "v"},
+  {"i32", "i"},
+  {"f32", "f"},
+  {"str", "s"},
+  {"addr", "a"}};
+
+static constexpr char type_prefix = 'C';
+
 std::string encode_type(const std::string& t)
 {
-    if(t == "void")
+    auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
+                           [&t](const std::pair<std::string, std::string>& p) -> bool
+                           { return p.first == t; });
+
+    if(it != type_encoding.end())
     {
-        return "v";
-    }
-    else if(t == "i32")
-    {
-        return "i";
-    }
-    else if(t == "f32")
-    {
-        return "f";
-    }
-    else if(t == "str")
-    {
-        return "s";
-    }
-    else if(t == "addr")
-    {
-        return "a";
+        return it->second;
     }
 
     // assume it is a struct.
-    return fmt::format("S{};", t);
+    return fmt::format("{}{};", type_prefix, t);
 }
 
 std::string decode_type(const std::string& t)
 {
-    if(t == "v")
+    auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
+                           [&t](const std::pair<std::string, std::string>& p) -> bool
+                           { return p.second == t; });
+
+    if(it != type_encoding.end())
     {
-        return "void";
+        return it->first;
     }
-    else if(t == "i")
+    else if(t.length() >= 3 && t[0] == type_prefix)
     {
-        return "i32";
-    }
-    else if(t == "f")
-    {
-        return "f32";
-    }
-    else if(t == "s")
-    {
-        return "str";
-    }
-    else if(t == "a")
-    {
-        return "addr";
-    }
-    else if(t.substr(0, 1) == "S")
-    {
-        if(t.length() < 3)
-        {
-            throw module_error("Cannot decode empty struct type name.");
-        }
         if(t[t.length() - 1] != ';')
         {
             throw module_error("Cannot decode type with invalid name.");
@@ -84,6 +66,62 @@ std::string decode_type(const std::string& t)
     }
 
     throw module_error(fmt::format("Cannot decode unknown type '{}'.", t));
+}
+
+archive& operator&(archive& ar, type_string& ts)
+{
+    if(ar.is_reading())
+    {
+        std::uint8_t c;
+        std::string s;
+
+        ar & c;
+        s += c;
+        if(c == type_prefix)
+        {
+            do
+            {
+                ar & c;
+                s += c;
+            } while(c != ';');
+        }
+
+        ts.decode(s);
+    }
+    else if(ar.is_writing())
+    {
+        auto t = ts.encode();
+        std::uint8_t c = t[0];
+
+        ar & c;
+        if(c == type_prefix)
+        {
+            if(t.length() < 3)
+            {
+                throw module_error("Cannot encode empty struct type name.");
+            }
+
+            std::size_t i = 1;
+            do
+            {
+                c = t[i];
+                ++i;
+
+                ar & c;
+            } while(c != ';' && i < t.length());
+
+            if(c != ';')
+            {
+                throw module_error("Cannot encode invalid struct type name.");
+            }
+        }
+    }
+    else
+    {
+        throw module_error("Invalid archive mode.");
+    }
+
+    return ar;
 }
 
 /*
