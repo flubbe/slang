@@ -339,41 +339,21 @@ void context::add_function(token name,
 
 void context::add_struct(token name, std::vector<std::pair<token, type>> members, std::optional<std::string> import_path)
 {
-    if(current_scope == nullptr)
-    {
-        throw std::runtime_error("Typing context: No current scope.");
-    }
-
     // check for existing names.
-    auto tok = current_scope->find(name.s);
+    auto tok = global_scope.find(name.s);
     if(tok != std::nullopt)
     {
-        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+        throw type_error(name.location,
+                         fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                                     name.s, global_scope.get_qualified_name(), slang::to_string(tok->location)));
     }
 
-#if 0 /* We cannot do this, because imports are not resolved here. */
-    // check if all types are known.
-    for(auto& [member_name, member_type]: members)
-    {
-        auto type_string = member_type.to_string();
+    // add to global scope.
+    global_scope.structs[name.s] = {name, std::move(members), std::move(import_path)};
 
-        if(!is_builtin_type(type_string))
-        {
-            if(!has_type(member_type)   /* custom types */
-               && type_string != name.s /* currently declared type*/
-            )
-            {
-                throw type_error(member_name.location, fmt::format("Struct member has unknown base type '{}'.", type_string));
-            }
-        }
-        else if(type_string == "void")
-        {
-            throw type_error(member_name.location, fmt::format("Struct member '{}' cannot have type 'void'.", member_name.s));
-        }
-    }
-#endif
-
-    current_scope->structs[name.s] = {name, std::move(members), std::move(import_path)};
+    // add to type map.
+    auto type_id = generate_type_id();
+    type_map.push_back({type{{name.s, {0, 0}}, type_class::tc_plain, type_id}, type_id});
 }
 
 bool context::has_type(const std::string& name, const std::optional<std::string>& import_path) const

@@ -331,7 +331,7 @@ void compile::invoke(const std::vector<std::string>& args)
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
 
-    if(!file_mgr.exists(module_path))
+    if(!file_mgr.is_file(module_path))
     {
         throw std::runtime_error(fmt::format("Module '{}' does not exist.", module_path.string()));
     }
@@ -428,7 +428,7 @@ void exec::invoke(const std::vector<std::string>& args)
     file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
 
-    if(!file_mgr.exists(module_path))
+    if(!file_mgr.is_file(module_path))
     {
         throw std::runtime_error(fmt::format(
           "Compiled module '{}' does not exist.",

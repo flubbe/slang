@@ -132,6 +132,47 @@ TEST(interpreter, module_and_functions)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
+/**
+ * Register standard library functions.
+ *
+ * The functions `print` and `println` are redirected to a buffer.
+ *
+ * @param ctx The context to register the functions in.
+ * @param print_buf Buffer for the print functions.
+ */
+static void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
+{
+    ctx.register_native_function("slang", "print",
+                                 [&ctx, &print_buf](si::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(*s);
+                                     ctx.get_gc().remove_temporary(s);
+                                 });
+    ctx.register_native_function("slang", "println",
+                                 [&ctx, &print_buf](si::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     print_buf.push_back(fmt::format("{}\n", *s));
+                                     ctx.get_gc().remove_temporary(s);
+                                 });
+    ctx.register_native_function("slang", "array_copy",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::array_copy(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "string_equals",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_equals(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "string_concat",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_concat(ctx, stack);
+                                 });
+}
+
 TEST(interpreter, hello_world)
 {
     slang::language_module mod;
@@ -152,21 +193,7 @@ TEST(interpreter, hello_world)
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
-
-    ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(*s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(fmt::format("{}\n", *s));
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
+    register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
     EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {si::value{"Test"}}));
@@ -262,21 +289,7 @@ TEST(interpreter, control_flow)
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
-
-    ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(*s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(fmt::format("{}\n", *s));
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
+    register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
 
@@ -339,21 +352,7 @@ TEST(interpreter, loops)
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
-
-    ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(*s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(fmt::format("{}\n", *s));
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
+    register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("loops", mod));
 
@@ -391,21 +390,7 @@ TEST(interpreter, loop_break_continue)
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
-
-    ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(*s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     std::string* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(fmt::format("{}\n", *s));
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
+    register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("loops_bc", mod));
 
@@ -690,16 +675,8 @@ TEST(interpreter, array_copy)
     slang::file_manager file_mgr;
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "array_copy",
-                                                 [&ctx](si::operand_stack& stack)
-                                                 {
-                                                     rt::array_copy(ctx, stack);
-                                                 }));
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
-                                                 [&ctx](si::operand_stack& stack)
-                                                 {
-                                                     rt::string_equals(ctx, stack);
-                                                 }));
+    std::vector<std::string> print_buf;
+    register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("array_copy", mod));
 
@@ -737,16 +714,9 @@ TEST(interpreter, string_operations)
     slang::file_manager file_mgr;
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_equals",
-                                                 [&ctx](si::operand_stack& stack)
-                                                 {
-                                                     rt::string_equals(ctx, stack);
-                                                 }));
-    ASSERT_NO_THROW(ctx.register_native_function("slang", "string_concat",
-                                                 [&ctx](si::operand_stack& stack)
-                                                 {
-                                                     rt::string_concat(ctx, stack);
-                                                 }));
+    std::vector<std::string> print_buf;
+    register_std_lib(ctx, print_buf);
+
     ASSERT_NO_THROW(ctx.load_module("string_operations", mod));
 
     si::value res;

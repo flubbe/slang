@@ -413,7 +413,7 @@ public:
                       std::optional<std::string> import_path = std::nullopt);
 
     /**
-     * Add a struct to the context.
+     * Add a struct to the context in the global scope.
      *
      * @throws A type_error if the type already exists in the scope.
      * @throws A type_error if any of the supplied types are unknown.
