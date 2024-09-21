@@ -306,14 +306,11 @@ class context
     /** The current function scope. */
     std::optional<token> function_scope;
 
-    /** The scope we're resolving the names in. Clear this to use the default scope. */
-    std::vector<std::string> resolution_scope;
-
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
 
     /** Imported modules. */
-    std::vector<std::vector<token>> imports;
+    std::vector<std::string> imports;
 
     /** Imported functions, indexed by (import_path, function_name). */
     std::unordered_map<std::string, std::unordered_map<std::string, function_signature>> imported_functions;
@@ -433,9 +430,10 @@ public:
      * Check if the context contains a specific type, given by a string.
      *
      * @param name The type's name.
+     * @param import_path Optional import path.
      * @returns True if the type exists within the current scope.
      */
-    bool has_type(const std::string& name) const;
+    bool has_type(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Check if the context contains a specific type.
@@ -451,9 +449,11 @@ public:
      * @note Returns `false` if the type is unknown.
      *
      * @param name The type name.
+     * @param import_path Optional import path.
      * @returns Whether the type is a reference type.
      */
-    bool is_reference_type(const std::string& name) const;
+    bool is_reference_type(const std::string& name,
+                           const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Check if given string is a reference type within the context.
@@ -481,12 +481,15 @@ public:
      *
      * @param name The type name.
      * @param array Whether the type is an array type.
+     * @param import_path Optional import path.
      * @returns An existing type.
      * @throws A `type_error` if the type cnould not be resolved.
      */
-    type get_type(const token& name, bool array)
+    type get_type(const token& name,
+                  bool array,
+                  const std::optional<std::string>& import_path = std::nullopt)
     {
-        return get_type(name.s, array);
+        return get_type(name.s, array, import_path);
     }
 
     /**
@@ -496,18 +499,24 @@ public:
      *
      * @param name The type name.
      * @param array Whether the type is an array.
+     * @param import_path Optional import path. Ignored for built-in types.
      * @returns An existing type.
      */
-    type get_type(const std::string& name, bool array);
+    type get_type(const std::string& name,
+                  bool array,
+                  const std::optional<std::string>& import_path = std::nullopt);
 
     /**
      * Get a type object for an unresolved type and add mark the type for resolution.
      *
      * @param name The type name.
      * @param cls The type class.
+     * @param import_path Optional import path. Ignored for built-in types.
      * @returns An unresolved type.
      */
-    type get_unresolved_type(token name, type_class cls);
+    type get_unresolved_type(token name,
+                             type_class cls,
+                             std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return whether a type is convertible into another type.
@@ -551,26 +560,13 @@ public:
      * @throws A type_error if the function is not known.
      *
      * @param name The name of the function.
+     * @param import_path Optional import path of the function.
      * @returns A reference to the function signature.
      */
-    const function_signature& get_function_signature(const token& name) const;
-
-    /**
-     * Add to the scope for name resolution.
-     *
-     * @param component The scope component to add.
-     */
-    void push_resolution_scope(std::string component);
-
-    /**
-     * Clear the last scope component for name resolution.
-     *
-     * @throws Throws a `type_error` if the scope stack was empty.
-     */
-    void pop_resolution_scope();
-
-    /** Get the resolution scope. */
-    std::string get_resolution_scope() const;
+    const function_signature&
+      get_function_signature(
+        const token& name,
+        const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Enter a function's scope.
@@ -605,9 +601,12 @@ public:
      *
      * @param loc A reference location for error reporting.
      * @param name The struct's name.
+     * @param import_path Optional import path.
      * @returns A reference to the struct's definition.
      */
-    const struct_definition* get_struct_definition(token_location loc, const std::string& name) const;
+    const struct_definition* get_struct_definition(token_location loc,
+                                                   const std::string& name,
+                                                   const std::optional<std::string>& import_path = std::nullopt) const;
 
     /** Push a struct lookup. */
     void push_struct_definition(const struct_definition* s);
@@ -616,7 +615,7 @@ public:
     void pop_struct_definition();
 
     /** Get the import list. */
-    const std::vector<std::vector<token>>& get_imports() const
+    const std::vector<std::string>& get_imports() const
     {
         return imports;
     }

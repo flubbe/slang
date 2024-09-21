@@ -32,7 +32,7 @@ class type
     /** Source location of the type (if available). */
     token_location location;
 
-    /** Optional name for this type. Only set when `array` is `false`. */
+    /** Optional name for this type. Only set when `cls` is not `type_class::tc_array`. */
     std::optional<std::string> name;
 
     /** The type class. */
@@ -48,6 +48,9 @@ class type
 
     /** Type id or std::nullopt for unresolved types. */
     std::optional<std::uint64_t> type_id;
+
+    /** Optional import path. Only set when `cls` is not `type_class::tc_array`. */
+    std::optional<std::string> import_path;
 
 public:
     /** Default constructors. */
@@ -67,8 +70,12 @@ public:
      * @param base The base type name.
      * @param cls The type class.
      * @param type_id The type's id, or std::nullopt for an unresolved type.
+     * @param import_path Optional import path.
      */
-    type(const token& base, type_class cls, std::optional<std::uint64_t> type_id);
+    type(const token& base,
+         type_class cls,
+         std::optional<std::uint64_t> type_id,
+         std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return if two types are equal.
@@ -149,6 +156,12 @@ public:
         return type_id.has_value();
     }
 
+    /** Get the import path. */
+    std::optional<std::string> get_import_path() const
+    {
+        return import_path;
+    }
+
     /**
      * Get the string representation of this type.
      *
@@ -168,10 +181,11 @@ public:
      *
      * @param base The base type name.
      * @param cls The type class.
+     * @param import_path The import path, or `std::nullopt` for the current module.
      */
-    static type make_unresolved(token base, type_class cls)
+    static type make_unresolved(token base, type_class cls, std::optional<std::string> import_path)
     {
-        return {std::move(base), cls, std::nullopt};
+        return {std::move(base), cls, std::nullopt, std::move(import_path)};
     }
 };
 

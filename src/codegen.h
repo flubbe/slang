@@ -172,8 +172,8 @@ public:
         return is_array() || is_struct();
     }
 
-    /** Whether this type has an external definition. */
-    bool is_external() const
+    /** Whether this type is imported. */
+    bool is_import() const
     {
         return import_path.has_value();
     }
@@ -834,8 +834,8 @@ public:
  */
 class field_access_argument : public argument
 {
-    /** The struct name. */
-    std::string struct_name;
+    /** The struct information. */
+    type struct_type;
 
     /** The field's member. */
     value member;
@@ -853,12 +853,12 @@ public:
     /**
      * Construct a field access.
      *
-     * @param struct_name Name of the struct.
+     * @param struct_type Type information for the struct.
      * @param member_type The field's accessed member.
      */
-    field_access_argument(std::string field_name, value member)
+    field_access_argument(type struct_type, value member)
     : argument()
-    , struct_name{std::move(field_name)}
+    , struct_type{std::move(struct_type)}
     , member{std::move(member)}
     {
     }
@@ -866,7 +866,13 @@ public:
     /** Return the struct name. */
     std::string get_struct_name() const
     {
-        return struct_name;
+        return *struct_type.get_struct_name();
+    }
+
+    /** Return the struct's import path. */
+    std::optional<std::string> get_import_path() const
+    {
+        return struct_type.get_import_path();
     }
 
     /** Return the field's member. */
@@ -877,7 +883,7 @@ public:
 
     std::string to_string() const override
     {
-        return fmt::format("%{}, {}", struct_name, member.to_string());
+        return fmt::format("%{}, {}", get_struct_name(), member.to_string());
     }
 
     const value* get_value() const override

@@ -131,9 +131,9 @@ archive& operator&(archive& ar, type_string& ts)
 std::size_t language_module::add_import(symbol_type type, std::string name, std::uint32_t package_index)
 {
     auto it = std::find_if(header.imports.begin(), header.imports.end(),
-                           [&name](const imported_symbol& s) -> bool
+                           [type, &name](const imported_symbol& s) -> bool
                            {
-                               return s.name == name;
+                               return s.type == type && s.name == name;
                            });
     if(it != header.imports.end())
     {
@@ -152,7 +152,7 @@ void language_module::add_function(std::string name,
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
                     {
-                        return s.name == name;
+                        return s.type == symbol_type::function && s.name == name;
                     })
        != header.exports.end())
     {
@@ -171,11 +171,11 @@ void language_module::add_native_function(std::string name,
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
                     {
-                        return s.name == name;
+                        return s.type == symbol_type::function && s.name == name;
                     })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add native function: Symbol '{}' already defined.", name));
+        throw module_error(fmt::format("Cannot add native function: '{}' already defined.", name));
     }
 
     function_descriptor desc{{std::move(return_type), std::move(arg_types)}, true, native_function_details{std::move(lib_name)}};
@@ -187,11 +187,11 @@ void language_module::add_type(std::string name, std::vector<std::pair<std::stri
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
                     {
-                        return s.name == name;
+                        return s.type == symbol_type::type && s.name == name;
                     })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add type: Symbol '{}' already defined.", name));
+        throw module_error(fmt::format("Cannot add type: '{}' already defined.", name));
     }
 
     type_descriptor desc{std::move(members)};

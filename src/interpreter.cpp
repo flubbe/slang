@@ -118,22 +118,20 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const std::unordered_map<std::string, type_descriptor>& type_map, const std::string& type_name, bool reference)
+static std::size_t get_type_or_reference_size(const variable& v)
 {
-    auto built_in_it = type_properties_map.find(type_name);
-    if(built_in_it != type_properties_map.end())
+    if(v.array || v.reference)
     {
-        return reference ? sizeof(void*) : built_in_it->second.first;
+        return sizeof(void*);
     }
 
-    // structs.
-    // check if the type exists and return the size of a pointer.
-    auto type_it = type_map.find(type_name);
-    if(type_it == type_map.end())
+    auto built_in_it = type_properties_map.find(v.type);
+    if(built_in_it != type_properties_map.end())
     {
-        throw interpreter_error(fmt::format("Unable to determine reference size: Type '{}' not found.", type_name));
+        return built_in_it->second.first;
     }
-    return sizeof(void*);
+
+    throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", v.type.s));
 }
 
 type_properties context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -231,7 +229,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = 0; i < arg_count; ++i)
     {
         auto& v = details.locals[i];
-        std::size_t size = get_type_or_reference_size(type_map, v.type, v.array);
+        std::size_t size = get_type_or_reference_size(v);
 
         v.offset = details.args_size;    // NOTE offsets are not aligned.
         v.size = size;
@@ -245,7 +243,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     for(std::size_t i = arg_count; i < details.locals.size(); ++i)
     {
         auto& v = details.locals[i];
-        std::size_t size = get_type_or_reference_size(type_map, v.type, v.array);
+        std::size_t size = get_type_or_reference_size(v);
 
         v.offset = details.locals_size;    // NOTE offsets are not aligned.
         v.size = size;
@@ -542,87 +540,176 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
 
         if(i.i < 0)
         {
-            // TODO implement for imported types.
-            throw interpreter_error("Decode of opcode 'new' not implemented for imported types.");
-        }
+            // imported type.
+            std::size_t import_index = -i.i - 1;
+            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Import index {} out of range ({} >= {}).",
+                  import_index, import_index, mod.header.imports.size()));
+            }
 
-        if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
+            auto& imp_symbol = mod.header.imports[import_index];
+            if(imp_symbol.type != symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Import header entry at index {} is not a type.",
+                  import_index));
+            }
+
+            if(imp_symbol.package_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Package import index {} out of range ({} >= {}).",
+                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+            }
+
+            auto& imp_package = mod.header.imports[imp_symbol.package_index];
+            if(imp_package.type != symbol_type::package)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve package: Import header entry at index {} is not a package.",
+                  imp_symbol.package_index));
+            }
+
+            auto mod_it = module_map.find(imp_package.name);
+            if(mod_it == module_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Referenced module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            auto type_map_it = this->type_map.find(imp_package.name);
+            if(type_map_it == this->type_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Type map for module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            auto properties = get_type_properties(type_map_it->second, imp_symbol.name, false);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+        }
+        else
         {
-            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
-        }
+            // exported type.
 
-        auto& exp_symbol = mod.header.exports[i.i];
-        if(exp_symbol.type != symbol_type::type)
-        {
-            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", i.i));
-        }
+            if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
+            {
+                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).",
+                                                    i.i, i.i, mod.header.exports.size()));
+            }
 
-        auto properties = get_type_properties(type_map, exp_symbol.name, false);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            auto& exp_symbol = mod.header.exports[i.i];
+            if(exp_symbol.type != symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Export header entry at index {} is not a type.",
+                  i.i));
+            }
+
+            auto properties = get_type_properties(type_map, exp_symbol.name, false);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+        }
 
         return static_cast<std::int32_t>(sizeof(void*));
     }
-    /* setfield. */
-    case opcode::setfield:
-    {
-        vle_int struct_index, field_index;
-        ar & struct_index & field_index;
-
-        if(struct_index.i < 0)
-        {
-            // TODO implement for imported types.
-            throw interpreter_error("Decode of opcodes 'setfield' not implemented for imported types.");
-        }
-
-        if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
-        {
-            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
-        }
-
-        auto& exp_symbol = mod.header.exports[struct_index.i];
-        if(exp_symbol.type != symbol_type::type)
-        {
-            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
-        }
-
-        auto properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
-
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(properties.size);
-    }
-    /* getfield. */
+    /* setfield, getfield. */
+    case opcode::setfield: [[fallthrought]];
     case opcode::getfield:
     {
         vle_int struct_index, field_index;
         ar & struct_index & field_index;
 
+        field_properties properties;
+
         if(struct_index.i < 0)
         {
-            // TODO implement for imported types.
-            throw interpreter_error("Decode of opcodes 'getfield' not implemented for imported types.");
-        }
+            // imported type.
+            std::size_t import_index = -struct_index.i - 1;
+            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Import index {} out of range ({} >= {}).",
+                  import_index, import_index, mod.header.imports.size()));
+            }
 
-        if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
+            auto& imp_symbol = mod.header.imports[import_index];
+            if(imp_symbol.type != symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Import header entry at index {} is not a type.",
+                  import_index));
+            }
+
+            if(imp_symbol.package_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Package import index {} out of range ({} >= {}).",
+                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+            }
+
+            auto& imp_package = mod.header.imports[imp_symbol.package_index];
+            if(imp_package.type != symbol_type::package)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve package: Import header entry at index {} is not a package.",
+                  imp_symbol.package_index));
+            }
+
+            auto mod_it = module_map.find(imp_package.name);
+            if(mod_it == module_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Referenced module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            auto type_map_it = this->type_map.find(imp_package.name);
+            if(type_map_it == this->type_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Type map for module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            properties = get_field_properties(type_map_it->second, imp_symbol.name, field_index.i);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
+        }
+        else
         {
-            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
+            if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
+            {
+                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
+            }
+
+            auto& exp_symbol = mod.header.exports[struct_index.i];
+            if(exp_symbol.type != symbol_type::type)
+            {
+                throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+            }
+
+            properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
         }
 
-        auto& exp_symbol = mod.header.exports[struct_index.i];
-        if(exp_symbol.type != symbol_type::type)
+        if(static_cast<opcode>(instr) == opcode::setfield)
         {
-            throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+            return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(properties.size);
         }
-
-        auto properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
-
-        return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
+        else
+        {
+            return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
+        }
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));

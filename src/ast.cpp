@@ -282,9 +282,11 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
 
 std::optional<ty::type> namespace_access_expression::type_check(ty::context& ctx)
 {
-    ctx.push_resolution_scope(name.s);
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+
     auto type = expr->type_check(ctx);
-    ctx.pop_resolution_scope();
     return type;
 }
 
@@ -370,11 +372,11 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     auto [struct_value, member] = generate_object_load(ctx);
     if(mc != memory_context::store)
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
     }
     else
     {
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
     }
 
     return std::make_unique<cg::value>(member);
@@ -395,7 +397,7 @@ std::optional<ty::type> access_expression::type_check(ty::context& ctx)
     }
 
     // structs.
-    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, ty::to_string(type));
+    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, ty::to_string(type), type.get_import_path());
     ctx.push_struct_definition(struct_def);
     expr_type = expr->type_check(ctx);
     ctx.pop_struct_definition();
@@ -454,7 +456,7 @@ std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::cont
     // load the expression, if needed.
     if(expr->is_struct_member_access())
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_type().to_string(), it->second));
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_type(), it->second));
 
         access_guard ag{ctx, var->get_type()};
         return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
@@ -782,7 +784,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<ty::type> variable_declaration_expression::type_check(ty::context& ctx)
 {
-    auto var_type = ctx.get_type(type->get_name(), is_array());
+    auto var_type = ctx.get_type(type->get_name(), is_array(), type->get_namespace_path());
     ctx.add_variable(name, var_type);
 
     if(expr)
@@ -933,7 +935,8 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
         {
             cg::value v = {cg::type{
                              cg::to_type_class(m->get_type()->get_name().s),
-                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)},
+                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
+                             m->get_namespace_path()},
                            m->get_name().s};
 
             struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
@@ -943,7 +946,8 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
             cg::value v = {cg::type{
                              cg::type_class::struct_,
                              m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                             m->get_type()->get_name().s},
+                             m->get_type()->get_name().s,
+                             m->get_namespace_path()},
                            m->get_name().s};
 
             struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
@@ -964,7 +968,8 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
         struct_members.emplace_back(
           std::make_pair(m->get_name(),
                          type_ctx.get_unresolved_type(m->get_type()->get_name(),
-                                                      m->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain)));
+                                                      m->get_type()->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
+                                                      m->get_type()->get_namespace_path())));
     }
     type_ctx.add_struct(name, std::move(struct_members));
 }
@@ -1077,7 +1082,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                                                 name.s, member_name, initializer_value->get_type().to_string(), member_type.get_type().to_string()));
         }
 
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(name.s, member_type));
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
     }
 
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
@@ -1085,7 +1090,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
 
 std::optional<ty::type> struct_named_initializer_expression::type_check(ty::context& ctx)
 {
-    auto struct_def = ctx.get_struct_definition(name.location, name.s);
+    auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
     if(member_names.size() != struct_def->members.size())
     {
@@ -1144,7 +1149,7 @@ std::optional<ty::type> struct_named_initializer_expression::type_check(ty::cont
         }
     }
 
-    return ctx.get_type(name.s, false);
+    return ctx.get_type(name.s, false, get_namespace_path());
 }
 
 std::string struct_named_initializer_expression::to_string() const
@@ -1290,7 +1295,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
             }
 
-            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type().to_string(), member));
+            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
             return rhs_value;
         }
         else
@@ -1579,9 +1584,9 @@ std::optional<ty::type> new_expression::type_check(ty::context& ctx)
         throw ty::type_error(expr->get_location(), fmt::format("Expected array size of type 'i32', got '{}'.", ty::to_string(*expr_type)));
     }
 
-    if(!ty::is_builtin_type(type.s) && !ctx.has_type(type.s))
+    if(!ty::is_builtin_type(type.s))
     {
-        throw ty::type_error(type.location, fmt::format("Unknown type '{}'.", type.s));
+        throw ty::type_error(type.location, fmt::format("Invalid type '{}' for new expression.", type.s));
     }
 
     if(type.s == "void")
@@ -1826,14 +1831,16 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 
     std::vector<ty::type> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                   [&type_ctx](const auto& arg) -> ty::type
+                   [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type
                    { return type_ctx.get_unresolved_type(
                        std::get<1>(arg)->get_name(),
-                       std::get<1>(arg)->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain); });
+                       std::get<1>(arg)->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
+                       std::get<1>(arg)->get_namespace_path()); });
     type_ctx.add_function(name, std::move(arg_types),
                           type_ctx.get_unresolved_type(
                             return_type->get_name(),
-                            return_type->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain));
+                            return_type->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
+                            return_type->get_namespace_path()));
 }
 
 void prototype_ast::type_check(ty::context& ctx)
@@ -1844,7 +1851,10 @@ void prototype_ast::type_check(ty::context& ctx)
     // add the arguments to the current scope.
     for(const auto& arg: args)
     {
-        ctx.add_variable(std::get<0>(arg), ctx.get_type(std::get<1>(arg)->get_name(), std::get<1>(arg)->is_array()));
+        ctx.add_variable(std::get<0>(arg),
+                         ctx.get_type(std::get<1>(arg)->get_name(),
+                                      std::get<1>(arg)->is_array(),
+                                      std::get<1>(arg)->get_namespace_path()));
     }
 
     // check the return type.
@@ -2080,7 +2090,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
 
 std::optional<ty::type> call_expression::type_check(ty::context& ctx)
 {
-    auto sig = ctx.get_function_signature(callee);
+    auto sig = ctx.get_function_signature(callee, get_namespace_path());
 
     if(sig.arg_types.size() != args.size())
     {

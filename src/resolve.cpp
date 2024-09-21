@@ -62,7 +62,7 @@ module_header& context::get_module_header(const fs::path& resolved_path)
 static fs::path import_name_to_path(std::string import_name)
 {
     slang::utils::replace_all(import_name, package::delimiter, "/");
-    return fs::path{import_name}.replace_extension(package::module_ext);
+    return fs::path{import_name};
 }
 
 void context::resolve_module(const fs::path& resolved_path)
@@ -102,7 +102,8 @@ void context::resolve_module(const fs::path& resolved_path)
             throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
         }
 
-        fs::path resolved_import_path = mgr.resolve(import_name_to_path(header.imports[it.package_index].name));
+        fs::path resolved_import_path = mgr.resolve(
+          import_name_to_path(header.imports[it.package_index].name).replace_extension(package::module_ext));
         resolve_module(resolved_import_path);
 
         // find the imported symbol.
@@ -165,10 +166,7 @@ void context::resolve_module(const fs::path& resolved_path)
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
-    const std::vector<std::vector<token>>& imports = type_ctx.get_imports();
-
-    auto transform = [](const token& p) -> std::string
-    { return p.s; };
+    const std::vector<std::string>& imports = type_ctx.get_imports();
 
     for(auto& import: imports)
     {
@@ -177,11 +175,9 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             throw resolve_error("Cannot resolve empty import.");
         }
 
-        auto reference_location = import[0].location;
+        std::string import_path = import_name_to_path(import);
 
-        std::string import_path = utils::join(import, {transform}, package::delimiter);
-
-        fs::path fs_path = fs::path{utils::join(import, {transform}, "/")}.replace_extension(package::module_ext);
+        fs::path fs_path = fs::path{import_path}.replace_extension(package::module_ext);
         fs::path resolved_path = mgr.resolve(fs_path);
 
         resolve_module(resolved_path);
@@ -238,13 +234,15 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 std::vector<ty::type> arg_types;
                 for(auto& arg: desc.signature.arg_types)
                 {
+                    // FIXME Type should not be resolved here
                     arg_types.emplace_back(type_ctx.get_type(std::get<0>(arg), std::get<1>(arg)));
                 }
 
+                // FIXME Type should not be resolved here
                 ty::type resolved_return_type = type_ctx.get_type(return_type->get_type().to_string(),
                                                                   return_type->get_type().is_array());
 
-                type_ctx.add_function({it.first, reference_location},
+                type_ctx.add_function({it.first, {0, 0}},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);
             }
         }
@@ -278,11 +276,9 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                                     ? static_cast<std::size_t>(1)
                                                                     : static_cast<std::size_t>(0),
                                                                   std::get<1>(member).base_type,
-                                                                  import_path},
+                                                                  import_path},    // FIXME This can be an imported type
                                                          std::get<0>(member)}};
                                    });
-
-                    // TODO members can be imported types.
 
                     ctx.add_import(symbol_type::type, import_path, it.first);
                     ctx.add_type(it.first, members, import_path);
@@ -295,17 +291,18 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                     for(auto& [member_name, member_type]: desc.member_types)
                     {
                         ty::type resolved_member_type = type_ctx.get_unresolved_type(
-                          {member_type.base_type, reference_location},
+                          {member_type.base_type, {0, 0}},
                           ty::is_builtin_type(member_type.base_type)
                             ? typing::type_class::tc_plain
-                            : typing::type_class::tc_struct);
+                            : typing::type_class::tc_struct,
+                          import_path);    // FIXME This can be an imported type
 
                         members.push_back(std::make_pair<token, ty::type>(
-                          {member_name, reference_location},
+                          {member_name, {0, 0}},
                           std::move(resolved_member_type)));
                     }
 
-                    type_ctx.add_struct({it.first, reference_location}, std::move(members), import_path);
+                    type_ctx.add_struct({it.first, {0, 0}}, std::move(members), import_path);
                 }
             }
         }
