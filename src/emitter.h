@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "archives/memory.h"
 #include "module.h"
 

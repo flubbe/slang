@@ -4,8 +4,20 @@ This repository is for learning how to build a scripting language, that is, a co
 and an interpreter. It is far from complete and I am working on aspects of it every once
 in a while.
 
-Currently the only way to run anything is by writing a [test](test), as the command line interface
-(in [src/main.cpp](src/main.cpp) and [src/commandline.cpp](src/commandline.cpp)) is incomplete.
+The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline.cpp](src/commandline.cpp)) 
+is incomplete, but you can try:
+```bash
+$ slang compile lang/std/std.sl
+$ slang compile examples/hello_world.sl
+$ slang exec examples/hello_world
+```
+The last command should result in
+```
+Hello, World!
+
+Program exited with exit code 0.
+```
+Also, have a look at the [test](test) folder for more examples.
 
 ## Getting started
 
@@ -20,7 +32,6 @@ Currently the only way to run anything is by writing a [test](test), as the comm
 2. Manually:
 
     The project depends on
-    - [`boost`](https://www.boost.org/) (>=1.83.0, <2.0)
     - [`fmt`](https://github.com/fmtlib/fmt) (>=10.0.0, <11.0)
     - [GoogleTest](https://github.com/google/googletest) (>=1.14.0, <2.0)
 
@@ -29,6 +40,21 @@ Currently the only way to run anything is by writing a [test](test), as the comm
 
 ### The scripting language
 
-To see how the scripting language is intended to work, you can have a look at:
+A simple _Hello, World_ application looks like
+```
+import std;
+
+fn main(s: str) -> i32
+{
+    std::println("Hello, World!");
+    return 0;
+}
+```
+
+The language has data type support for `i32`, `f32`, `str`, and custom `struct`'s. Arrays are also supported,
+though (currently) they have to be one-dimensional.
+
+To see how the scripting language is intended to work and for further examples, you can have a look at:
 - [test/test_compile_ir.cpp](test/test_compile_ir.cpp)
 - [test/test_output.cpp](test/test_output.cpp)
+

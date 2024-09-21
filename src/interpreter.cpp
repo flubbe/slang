@@ -620,7 +620,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         return static_cast<std::int32_t>(sizeof(void*));
     }
     /* setfield, getfield. */
-    case opcode::setfield: [[fallthrought]];
+    case opcode::setfield: [[fallthrough]];
     case opcode::getfield:
     {
         vle_int struct_index, field_index;

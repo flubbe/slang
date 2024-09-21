@@ -18,14 +18,20 @@ add_executable(slang
     src/codegen.cpp
     src/commandline.cpp
     src/compiler.cpp
+    src/emitter.cpp
     src/filemanager.cpp
     src/gc.cpp
+    src/interpreter.cpp
     src/lexer.cpp
     src/main.cpp
     src/module.cpp
     src/package.cpp
     src/parser.cpp
+    src/opcodes.cpp
     src/resolve.cpp
+    src/runtime/arrays.cpp
+    src/runtime/strings.cpp
+    src/runtime/utils.cpp
     src/typing.cpp
     src/utils.cpp
 )

@@ -72,6 +72,7 @@ int main(int argc, char* argv[])
         // create command list.
         command_vector cmd_list;
         add_unique_command(cmd_list, std::make_unique<slang::commandline::build>(root_pm));
+        add_unique_command(cmd_list, std::make_unique<slang::commandline::compile>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::exec>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::pkg>(root_pm));
 

@@ -8,13 +8,27 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <array>
-
 #include <fmt/core.h>
 
+#include "archives/file.h"
+#include "codegen.h"
 #include "commandline.h"
 #include "compiler.h"
+#include "emitter.h"
+#include "interpreter.h"
+#include "module.h"
+#include "parser.h"
+#include "resolve.h"
+#include "runtime/runtime.h"
+#include "typing.h"
 #include "utils.h"
+
+namespace ast = slang::ast;
+namespace cg = slang::codegen;
+namespace ty = slang::typing;
+namespace rs = slang::resolve;
+namespace rt = slang::runtime;
+namespace si = slang::interpreter;
 
 namespace slang::commandline
 {
@@ -289,6 +303,102 @@ std::string build::get_description() const
 }
 
 /*
+ * Compile single module.
+ */
+
+compile::compile(slang::package_manager& in_manager)
+: command{"compile"}
+, manager{in_manager}
+{
+}
+
+void compile::invoke(const std::vector<std::string>& args)
+{
+    if(args.size() != 1)
+    {
+        const std::string help_text =
+          "Compile the module `mod.sl` into `mod.cmod`.";
+        slang::utils::print_usage_help("slang compile mod", help_text);
+        return;
+    }
+
+    auto module_path = fs::path(args[0]);
+    if(!module_path.has_extension())
+    {
+        module_path.replace_extension(package::source_ext);
+    }
+
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
+    if(!file_mgr.exists(module_path))
+    {
+        throw std::runtime_error(fmt::format("Module '{}' does not exist.", module_path.string()));
+    }
+
+    fmt::print("Compiling '{}'...\n", module_path.string());
+
+    std::string input_buffer;
+    {
+        auto input_ar = file_mgr.open(module_path, slang::file_manager::open_mode::read);
+        std::size_t input_size = input_ar->size();
+        if(input_size == 0)
+        {
+            fmt::print("Empty input.\n");
+            return;
+        }
+
+        input_buffer.resize(input_size);
+        input_ar->serialize(reinterpret_cast<std::byte*>(&input_buffer[0]), input_size);
+    }
+
+    slang::lexer lexer;
+    slang::parser parser;
+
+    lexer.set_input(input_buffer);
+    parser.parse(lexer);
+
+    if(!lexer.eof())
+    {
+        fmt::print("Lexer did not complete input reading.\n");
+        return;
+    }
+
+    ast::block* ast = parser.get_ast();
+    if(ast == nullptr)
+    {
+        fmt::print("No AST produced.\n");
+        return;
+    }
+
+    ty::context type_ctx;
+    rs::context resolve_ctx{file_mgr};
+    cg::context codegen_ctx;
+    slang::instruction_emitter emitter{codegen_ctx};
+
+    ast->collect_names(codegen_ctx, type_ctx);
+    resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
+    type_ctx.resolve_types();
+    ast->type_check(type_ctx);
+    ast->generate_code(codegen_ctx);
+
+    emitter.run();
+
+    slang::language_module mod = emitter.to_module();
+
+    fs::path output_file = module_path.replace_extension(package::module_ext);
+    slang::file_write_archive write_ar(output_file.string());
+    write_ar & mod;
+
+    fmt::print("Compilation finished. Output file: {}\n", output_file.string());
+}
+
+std::string compile::get_description() const
+{
+    return "Compile a module.";
+}
+
+/*
  * Package execution.
  */
 
@@ -300,13 +410,101 @@ exec::exec(slang::package_manager& in_manager)
 
 void exec::invoke(const std::vector<std::string>& args)
 {
-    // TODO implement.
-    throw std::runtime_error("exec command not implemented.");
+    if(args.size() != 1)
+    {
+        const std::string help_text =
+          "Execute the main function of the module `mod.cmod`.";
+        slang::utils::print_usage_help("slang exec mod", help_text);
+        return;
+    }
+
+    auto module_path = fs::path(args[0]);
+    if(!module_path.has_extension())
+    {
+        module_path.replace_extension(package::module_ext);
+    }
+
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+    file_mgr.add_search_path("lang");
+
+    if(!file_mgr.exists(module_path))
+    {
+        throw std::runtime_error(fmt::format(
+          "Compiled module '{}' does not exist.",
+          module_path.string()));
+    }
+
+    auto module_name = module_path.filename().stem();
+    if(module_name.string().length() == 0)
+    {
+        throw std::runtime_error(fmt::format(
+          "Trying to get module name from path '{}' produced empty string.",
+          module_path.string()));
+    }
+
+    slang::language_module mod;
+    {
+        auto read_ar = file_mgr.open(module_path, slang::file_manager::open_mode::read);
+        (*read_ar) & mod;
+    }
+
+    si::context ctx{file_mgr};
+
+    ctx.register_native_function("slang", "print",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     fmt::print("{}", *s);
+                                     ctx.get_gc().remove_temporary(s);
+                                 });
+    ctx.register_native_function("slang", "println",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     std::string* s = stack.pop_addr<std::string>();
+                                     fmt::print("{}\n", *s);
+                                     ctx.get_gc().remove_temporary(s);
+                                 });
+    ctx.register_native_function("slang", "array_copy",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::array_copy(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "string_equals",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_equals(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "string_concat",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_concat(ctx, stack);
+                                 });
+
+    ctx.load_module(module_name, mod);
+
+    si::value res = ctx.invoke(module_name, "main", {si::value{""}});    // FIXME empty argument string
+
+    fmt::print("\n");
+    fmt::print("Program exited with exit code {}.\n", *res.get<int>());
+
+    if(ctx.get_gc().object_count() != 0)
+    {
+        fmt::print("GC warning: Object count is {}.\n", ctx.get_gc().object_count());
+    }
+    if(ctx.get_gc().root_set_size() != 0)
+    {
+        fmt::print("GC warning: Root set size is {}.\n", ctx.get_gc().root_set_size());
+    }
+    if(ctx.get_gc().byte_size() != 0)
+    {
+        fmt::print("GC warning: {} bytes still allocated.\n", ctx.get_gc().byte_size());
+    }
 }
 
 std::string exec::get_description() const
 {
-    return "Execute a package.";
+    return "Execute a module.";
 }
 
 }    // namespace slang::commandline

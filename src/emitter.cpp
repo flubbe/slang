@@ -1022,7 +1022,7 @@ language_module instruction_emitter::to_module() const
         std::vector<std::pair<std::string, type_info>> transformed_members;
 
         std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [this, &it](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
+                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
                        {
                            const auto& t = std::get<1>(m);
 
