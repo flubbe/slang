@@ -8,7 +8,7 @@ fn main(s: str) -> i32 {
     let i: i32 = 0;
     while(i < strs.length) {
         std::println(strs[i]);
-        i = i + 1;
+        i++;
     }
 
     return 0;

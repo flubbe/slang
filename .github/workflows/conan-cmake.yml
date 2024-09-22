@@ -63,4 +63,7 @@ jobs:
         cd ${{github.workspace}}
         ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/array_loop
+        ./build/${{env.BUILD_TYPE}}/slang exec examples/array_loop
+
 
