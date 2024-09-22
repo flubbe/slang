@@ -972,11 +972,6 @@ void context::generate_pop(value vt)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
 
-    if(vt.get_type().is_struct())
-    {
-        throw codegen_error("Cannot generate pop instruction for struct type.");
-    }
-
     args.emplace_back(std::make_unique<type_argument>(vt));
     insertion_point->add_instruction(std::make_unique<instruction>("pop", std::move(args)));
 }

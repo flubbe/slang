@@ -21,7 +21,28 @@ _tests = [
     "test_interpreter",
 ]
 
+_lang_path = (_module_path / Path("..") / Path("lang")).absolute()
+_lang_std_module_path = (_lang_path / Path("std.cmod")).absolute()
+
 if __name__ == "__main__":
+    # generate std.cmod if necessary
+    if not _lang_std_module_path.exists():
+        if (
+            subprocess.call(
+                [
+                    "./build/Debug/slang",
+                    "compile",
+                    "src/lang/std.sl",
+                    "-o",
+                    "lang/std.cmod",
+                ],
+                cwd=_module_path.parent,
+            )
+            != 0
+        ):
+            print("Compiling lang/std failed. Exiting.")
+            exit(1)
+
     retcodes: list[int] = []
     for t in _tests:
         retcodes.append(subprocess.call(_test_dir / t, cwd=_module_path.parent))

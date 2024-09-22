@@ -26,6 +26,7 @@ namespace
 
 TEST(compile_ir, empty)
 {
+    // test: empty input
     const std::string test_input = "";
 
     slang::lexer lexer;
@@ -48,6 +49,7 @@ TEST(compile_ir, empty)
 TEST(compile_ir, double_definition)
 {
     {
+        // test: global variable redefinition
         const std::string test_input =
           "let a: i32;\n"
           "let a: f32;";
@@ -67,6 +69,7 @@ TEST(compile_ir, double_definition)
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
+        // test: local variable redefinition
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
@@ -89,6 +92,7 @@ TEST(compile_ir, double_definition)
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
+        // test: function redefinition
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
@@ -115,6 +119,7 @@ TEST(compile_ir, double_definition)
 
 TEST(compile_ir, empty_function)
 {
+    // test: code generation for empty function
     const std::string test_input =
       "fn f() -> void\n"
       "{\n"
@@ -144,6 +149,7 @@ TEST(compile_ir, empty_function)
 TEST(compile_ir, builtin_return_values)
 {
     {
+        // test: return i32 from function
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
@@ -172,6 +178,7 @@ TEST(compile_ir, builtin_return_values)
                   "}");
     }
     {
+        // test: return f32 from functino
         const std::string test_input =
           "fn f() -> f32\n"
           "{\n"
@@ -200,6 +207,7 @@ TEST(compile_ir, builtin_return_values)
                   "}");
     }
     {
+        // test: return str from function
         const std::string test_input =
           "fn f() -> str\n"
           "{\n"
@@ -233,6 +241,7 @@ TEST(compile_ir, builtin_return_values)
 TEST(compile_ir, function_arguments_and_locals)
 {
     {
+        // test: empty function with arguments
         const std::string test_input =
           "fn f(i: i32, j: str, k: f32) -> void\n"
           "{\n"
@@ -259,6 +268,7 @@ TEST(compile_ir, function_arguments_and_locals)
                   "}");
     }
     {
+        // test: function with arguments, locals and return statement
         const std::string test_input =
           "fn f(i: i32, j: str, k: f32) -> i32\n"
           "{\n"
@@ -291,6 +301,7 @@ TEST(compile_ir, function_arguments_and_locals)
                   "}");
     }
     {
+        // test: assign locals from argument and return local's value
         const std::string test_input =
           "fn f(i: i32, j: i32, k: f32) -> i32\n"
           "{\n"
@@ -323,6 +334,7 @@ TEST(compile_ir, function_arguments_and_locals)
                   "}");
     }
     {
+        // test: assign argument and return another argument's value.
         const std::string test_input =
           "fn f(i: i32, j: i32, k: f32) -> i32\n"
           "{\n"
@@ -354,6 +366,7 @@ TEST(compile_ir, function_arguments_and_locals)
                   "}");
     }
     {
+        // test: chained assignments of arguments
         const std::string test_input =
           "fn f(i: i32, j: i32, k: f32) -> i32\n"
           "{\n"
@@ -391,6 +404,7 @@ TEST(compile_ir, function_arguments_and_locals)
 TEST(compile_ir, arrays)
 {
     {
+        // test: array definition
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
@@ -430,6 +444,7 @@ TEST(compile_ir, arrays)
                   "}");
     }
     {
+        // test: array definition and read access
         const std::string test_input =
           "fn f() -> [i32]\n"
           "{\n"
@@ -471,6 +486,7 @@ TEST(compile_ir, arrays)
                   "}");
     }
     {
+        // test: array definition via new, read and write
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
@@ -512,6 +528,7 @@ TEST(compile_ir, arrays)
                   "}");
     }
     {
+        // test: invalid new operator syntax
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
@@ -528,6 +545,7 @@ TEST(compile_ir, arrays)
         EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
     }
     {
+        // test: invalid new operator syntax
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
@@ -544,6 +562,7 @@ TEST(compile_ir, arrays)
         EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
     }
     {
+        // test: invalid new operator syntax
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
@@ -1209,6 +1228,111 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+    }
+    {
+        // popping of unused return values (i32 and f32)
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          " h();\n"
+          "}\n"
+          "fn g() -> i32\n"
+          "{\n"
+          " return 0;\n"
+          "}\n"
+          "fn h() -> f32\n"
+          "{\n"
+          " return -1.0;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " invoke @g\n"
+                  " pop i32\n"
+                  " invoke @h\n"
+                  " pop f32\n"
+                  " ret void\n"
+                  "}\n"
+                  "define i32 @g() {\n"
+                  "entry:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}\n"
+                  "define f32 @h() {\n"
+                  "entry:\n"
+                  " const f32 0\n"
+                  " const f32 1\n"
+                  " sub f32\n"
+                  " ret f32\n"
+                  "}");
+    }
+    {
+        // popping of unused return values (struct)
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32\n"
+          "};\n"
+          "fn f() -> void\n"
+          "{\n"
+          " g();\n"
+          "}\n"
+          "fn g() -> S\n"
+          "{\n"
+          " return S{i: 1};\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        const ast::block* ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  "}\n"
+                  "define void @f() {\n"
+                  "entry:\n"
+                  " invoke @g\n"
+                  " pop S\n"
+                  " ret void\n"
+                  "}\n"
+                  "define S @g() {\n"
+                  "entry:\n"
+                  " new S\n"
+                  " dup S\n"
+                  " const i32 1\n"
+                  " set_field %S, i32 %i\n"
+                  " ret S\n"
+                  "}");
     }
 }
 
