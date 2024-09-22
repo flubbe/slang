@@ -1090,6 +1090,11 @@ public:
     {
     }
 
+    bool needs_pop() const override
+    {
+        return true;
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type> type_check(ty::context& ctx) override;
     std::string to_string() const override;
