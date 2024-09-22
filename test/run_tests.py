@@ -24,7 +24,7 @@ _tests = [
 if __name__ == "__main__":
     retcodes: list[int] = []
     for t in _tests:
-        retcodes.append(subprocess.call(_test_dir / t))
+        retcodes.append(subprocess.call(_test_dir / t, cwd=_module_path.parent))
 
     for i, r in enumerate(retcodes):
         if r != 0:

@@ -74,7 +74,7 @@ public:
     {
         if(std::find(search_paths.begin(), search_paths.end(), p) == search_paths.end())
         {
-            search_paths.emplace_back(std::move(p));
+            search_paths.emplace_back(fs::canonical(p));
         }
     }
 

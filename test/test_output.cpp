@@ -287,7 +287,7 @@ TEST(output, hello_world)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -308,7 +308,7 @@ TEST(output, hello_world)
     }
     {
         const std::string test_input =
-          "import lang::std;\n"
+          "import std;\n"
           "\n"
           "fn main(s: str) -> i32\n"
           "{\n"
@@ -328,7 +328,7 @@ TEST(output, hello_world)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -389,7 +389,7 @@ TEST(output, operators)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -427,7 +427,7 @@ TEST(output, operators)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -471,7 +471,7 @@ TEST(output, string_operations)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -509,7 +509,7 @@ TEST(output, string_operations)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -572,7 +572,7 @@ TEST(output, prefix_postfix)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -640,7 +640,7 @@ TEST(output, control_flow)
     ASSERT_NE(ast, nullptr);
 
     slang::file_manager mgr;
-    mgr.add_search_path("src/lang");
+    mgr.add_search_path("lang");
 
     ty::context type_ctx;
     rs::context resolve_ctx{mgr};
@@ -688,7 +688,7 @@ TEST(output, loops)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};
@@ -745,7 +745,7 @@ TEST(output, loops)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
 
         ty::context type_ctx;
         rs::context resolve_ctx{mgr};

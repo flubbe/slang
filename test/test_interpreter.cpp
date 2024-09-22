@@ -189,7 +189,7 @@ TEST(interpreter, hello_world)
     }
 
     slang::file_manager file_mgr;
-    file_mgr.add_search_path("src/lang");
+    file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
@@ -285,7 +285,7 @@ TEST(interpreter, control_flow)
     }
 
     slang::file_manager file_mgr;
-    file_mgr.add_search_path("src/lang");
+    file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
@@ -348,7 +348,7 @@ TEST(interpreter, loops)
     }
 
     slang::file_manager file_mgr;
-    file_mgr.add_search_path("src/lang");
+    file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
@@ -386,7 +386,7 @@ TEST(interpreter, loop_break_continue)
     }
 
     slang::file_manager file_mgr;
-    file_mgr.add_search_path("src/lang");
+    file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;

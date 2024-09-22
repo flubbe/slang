@@ -1578,7 +1578,7 @@ TEST(type_system, examples)
         ASSERT_NE(ast, nullptr);
 
         slang::file_manager mgr;
-        mgr.add_search_path("src/lang");
+        mgr.add_search_path("lang");
         ASSERT_TRUE(mgr.is_file("std.cmod"));
 
         ty::context type_ctx;

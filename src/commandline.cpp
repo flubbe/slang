@@ -314,18 +314,57 @@ compile::compile(slang::package_manager& in_manager)
 
 void compile::invoke(const std::vector<std::string>& args)
 {
-    if(args.size() != 1)
+    bool display_help_and_exit = false;
+    fs::path module_path;
+    fs::path output_file;
+
+    if(args.size() != 1 && args.size() != 3)
+    {
+        display_help_and_exit = true;
+    }
+
+    if(!display_help_and_exit)
+    {
+        module_path = fs::path(args[0]);
+        if(!module_path.has_extension())
+        {
+            module_path.replace_extension(package::source_ext);
+        }
+
+        if(args.size() == 1)
+        {
+            output_file = module_path;
+            output_file.replace_extension(package::module_ext);
+        }
+        else if(args.size() == 3)
+        {
+            module_path = fs::path(args[0]);
+            if(!module_path.has_extension())
+            {
+                module_path.replace_extension(package::source_ext);
+            }
+
+            if(args[1] != "-o")
+            {
+                display_help_and_exit = true;
+            }
+            else
+            {
+                output_file = args[2];
+                if(!output_file.has_extension())
+                {
+                    output_file.replace_extension(package::module_ext);
+                }
+            }
+        }
+    }
+
+    if(display_help_and_exit)
     {
         const std::string help_text =
           "Compile the module `mod.sl` into `mod.cmod`.";
         slang::utils::print_usage_help("slang compile mod", help_text);
         return;
-    }
-
-    auto module_path = fs::path(args[0]);
-    if(!module_path.has_extension())
-    {
-        module_path.replace_extension(package::source_ext);
     }
 
     slang::file_manager file_mgr;
@@ -386,7 +425,6 @@ void compile::invoke(const std::vector<std::string>& args)
 
     slang::language_module mod = emitter.to_module();
 
-    fs::path output_file = module_path.replace_extension(package::module_ext);
     slang::file_write_archive write_ar(output_file.string());
     write_ar & mod;
 

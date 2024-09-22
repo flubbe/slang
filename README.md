@@ -7,7 +7,7 @@ in a while.
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline.cpp](src/commandline.cpp)) 
 is incomplete, but you can try:
 ```bash
-$ slang compile lang/std/std.sl
+$ slang compile src/lang/std.sl -o lang/std.cmod
 $ slang compile examples/hello_world.sl
 $ slang exec examples/hello_world
 ```
