@@ -484,9 +484,16 @@ void exec::invoke(const std::vector<std::string>& args)
     ctx.load_module(module_name, mod);
 
     si::value res = ctx.invoke(module_name, "main", {si::value{""}});    // FIXME empty argument string
+    const int* return_value = res.get<int>();
 
-    fmt::print("\n");
-    fmt::print("Program exited with exit code {}.\n", *res.get<int>());
+    if(return_value == nullptr)
+    {
+        fmt::print("\nProgram did not return a valid exit code.\n");
+    }
+    else
+    {
+        fmt::print("\nProgram exited with exit code {}.\n", *return_value);
+    }
 
     if(ctx.get_gc().object_count() != 0)
     {

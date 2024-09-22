@@ -339,7 +339,11 @@ public:
         return type;
     }
 
-    /** Access the data. */
+    /**
+     * Access the data.
+     *
+     * @returns Retuens a pointer to the value. Returns `nullptr´ if the cast is invalid.
+     */
     template<typename T>
     const T* get() const
     {
