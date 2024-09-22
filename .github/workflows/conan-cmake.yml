@@ -51,5 +51,11 @@ jobs:
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_output
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_resolve
         ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test/test_interpreter
-        
+    
+    - name: Run command line tests
+      run: |
+        cd ${{github.workspace}}
+        ./build/${{env.BUILD_TYPE}}/slang compile lang/std/std.sl
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world.sl
+        ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
 
