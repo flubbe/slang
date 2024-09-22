@@ -37,7 +37,7 @@ TEST(compile_ir, empty)
 
     EXPECT_TRUE(lexer.eof());
 
-    const ast::block* ast = parser.get_ast();
+    std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -62,7 +62,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -85,7 +85,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -109,7 +109,7 @@ TEST(compile_ir, double_definition)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -133,7 +133,7 @@ TEST(compile_ir, empty_function)
 
     EXPECT_TRUE(lexer.eof());
 
-    const ast::block* ast = parser.get_ast();
+    std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -164,7 +164,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -193,7 +193,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -222,7 +222,7 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -255,7 +255,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -284,7 +284,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -317,7 +317,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -350,7 +350,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -382,7 +382,7 @@ TEST(compile_ir, function_arguments_and_locals)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -419,7 +419,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -460,7 +460,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -504,7 +504,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -596,7 +596,7 @@ TEST(compile_ir, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -630,7 +630,7 @@ TEST(compile_ir, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -670,7 +670,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -706,7 +706,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -742,7 +742,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -778,7 +778,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -818,7 +818,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -858,7 +858,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -901,7 +901,7 @@ TEST(compile_ir, postfix_operators)
 
     EXPECT_TRUE(lexer.eof());
 
-    const ast::block* ast = parser.get_ast();
+    std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
     cg::context ctx;
@@ -941,7 +941,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -979,7 +979,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1024,7 +1024,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1067,7 +1067,7 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1094,7 +1094,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1133,7 +1133,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1179,7 +1179,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1221,7 +1221,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1254,7 +1254,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1307,7 +1307,7 @@ TEST(compile_ir, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1360,7 +1360,7 @@ TEST(compile_ir, if_statement)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1406,7 +1406,7 @@ TEST(compile_ir, break_fail)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1433,7 +1433,7 @@ TEST(compile_ir, continue_fail)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1464,7 +1464,7 @@ TEST(compile_ir, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        const ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         cg::context ctx;
@@ -1513,7 +1513,7 @@ TEST(compile_ir, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1574,7 +1574,7 @@ TEST(compile_ir, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1638,7 +1638,7 @@ TEST(compile_ir, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1694,7 +1694,7 @@ TEST(compile_ir, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1755,7 +1755,7 @@ TEST(compile_ir, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;
@@ -1826,7 +1826,7 @@ TEST(compile_ir, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        ast::block* ast = parser.get_ast();
+        std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
         ty::context type_ctx;

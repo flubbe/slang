@@ -403,7 +403,7 @@ void compile::invoke(const std::vector<std::string>& args)
         return;
     }
 
-    ast::block* ast = parser.get_ast();
+    std::shared_ptr<ast::block> ast = parser.get_ast();
     if(ast == nullptr)
     {
         fmt::print("No AST produced.\n");
