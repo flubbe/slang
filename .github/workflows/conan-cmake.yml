@@ -37,6 +37,11 @@ jobs:
       # Build your program with the given configuration
       run: cmake --build ${{github.workspace}}/build --preset ${{env.CONAN_PRESET_NAME}}
 
+    - name: Build std
+      run: |
+        cd ${{github.workspace}}
+        ./build/${{env.BUILD_TYPE}}/slang compile src/lang/std -o lang/std
+
     - name: Run tests
       run: |
         cd ${{github.workspace}}
@@ -56,7 +61,6 @@ jobs:
     - name: Run command line tests
       run: |
         cd ${{github.workspace}}
-        ./build/${{env.BUILD_TYPE}}/slang compile src/lang/std -o lang/std
         ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
 
