@@ -16,16 +16,6 @@
 #include "opcodes.h"
 #include "utils.h"
 
-/*
- * Forward declarations.
- */
-namespace slang::typing
-{
-std::string to_string(const std::pair<std::string, bool>&); /* typing.h */
-};
-
-namespace ty = slang::typing;
-
 namespace slang::codegen
 {
 
