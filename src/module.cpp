@@ -27,7 +27,7 @@ static std::vector<std::pair<std::string, std::string>> type_encoding = {
   {"i32", "i"},
   {"f32", "f"},
   {"str", "s"},
-  {"addr", "a"}};
+  {"@addr", "a"}};
 
 static constexpr char type_prefix = 'C';
 

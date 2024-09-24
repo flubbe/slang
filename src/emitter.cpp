@@ -440,14 +440,14 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     {
         expect_arg_size(1);
 
-        if(args[0]->get_value()->get_type().to_string() == "void")
+        if(args[0]->get_value()->get_type().get_type_class() == cg::type_class::void_)
         {
             // return void from a function.
             emit(instruction_buffer, opcode::ret);
         }
         else
         {
-            emit_typed(opcode::iret, opcode::fret, opcode::sret, opcode::aret);
+            emit_typed(opcode::iret, opcode::fret, opcode::sret, opcode::aret, opcode::aret);
         }
     }
     else if(name == "set_field")

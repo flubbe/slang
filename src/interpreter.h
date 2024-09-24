@@ -299,7 +299,7 @@ public:
     , create_function{std::bind(&value::create_addr, this, std::placeholders::_1)}
     , destroy_function{std::bind(&value::destroy_addr, this, std::placeholders::_1)}
     , size{sizeof(void*)}
-    , type{"addr", false}
+    , type{"@addr", false}
     {
     }
 
@@ -560,19 +560,6 @@ public:
         return addr;
     }
 
-    /** Disallow popping from stack for non-(int, float, std::string) types. */
-    template<typename T>
-    value pop_result()
-    {
-        static_assert(
-          !std::is_same<T, int>::value
-            && !std::is_same<T, float>::value
-            && !std::is_same<T, std::string>::value,
-          "operand_stack::pop_result is only available for int, float and std::string.");
-
-        return {};    // unreachable
-    }
-
     /**
      * Get a pointer to the end minus an offset.
      *
@@ -603,28 +590,6 @@ public:
         stack.resize(stack.size() - byte_count);
     }
 };
-
-/*
- * pop_result specializations.
- */
-
-template<>
-inline value operand_stack::pop_result<int>()
-{
-    return value{pop_i32()};
-}
-
-template<>
-inline value operand_stack::pop_result<float>()
-{
-    return value{pop_f32()};
-}
-
-template<>
-inline value operand_stack::pop_result<std::string>()
-{
-    throw std::runtime_error("operand_stack::pop_result<std::string> not implemented.");
-}
 
 /** A function. */
 class function

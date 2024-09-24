@@ -1605,7 +1605,7 @@ TEST(compile_ir, structs)
                   " load S %s\n"               // [addr]
                   " load S %s\n"               // [addr, addr]
                   " const i32 1\n"             // [addr, addr, 1]
-                  " dup i32, addr\n"           // [addr, 1, addr, 1]
+                  " dup i32, @addr\n"          // [addr, 1, addr, 1]
                   " set_field %S, i32 %j\n"    // [addr, 1]
                   " set_field %S, i32 %i\n"    // []
                   " load S %s\n"               // [addr]

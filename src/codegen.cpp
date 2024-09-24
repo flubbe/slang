@@ -109,7 +109,7 @@ std::string type::to_string() const
       {type_class::i32, "i32"},
       {type_class::f32, "f32"},
       {type_class::str, "str"},
-      {type_class::addr, "addr"},
+      {type_class::addr, "@addr"},
       {type_class::fn, "fn"}};
 
     auto it = map.find(ty);

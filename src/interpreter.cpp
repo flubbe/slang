@@ -68,12 +68,13 @@ static opcode get_return_opcode(const std::pair<std::string, bool>& return_type)
     {
         return opcode::sret;
     }
-    else if(name == "addr" || name == "@array")
+    else if(name == "@addr" || name == "@array")
     {
         return opcode::aret;
     }
 
-    throw interpreter_error(fmt::format("Type '{}' has no return opcode.", name));
+    // All other type strings are references.
+    return opcode::aret;
 }
 
 /*
@@ -114,7 +115,7 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
   {"f32", {sizeof(float), std::alignment_of_v<float>}},
   {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
-  {"addr", {sizeof(void*), std::alignment_of_v<void*>}},
+  {"@addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
@@ -406,7 +407,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         auto properties2 = get_type_properties({}, t2, false);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = (t1 == "str") || (t1 == "addr") || (t1 == "@array");
+        std::uint8_t needs_gc = (t1 == "str") || (t1 == "@addr") || (t1 == "@array");
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
