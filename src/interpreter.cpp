@@ -1147,33 +1147,7 @@ opcode context::exec(const language_module& mod,
         // return.
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
         {
-            auto stack_size = frame.stack.size();
-
-            if(static_cast<opcode>(instr) == opcode::ret)
-            {
-                if(stack_size != 0)
-                {
-                    throw interpreter_error(fmt::format("Expected 0 bytes to be returned from function, got {}.", stack_size));
-                }
-            }
-            else if(static_cast<opcode>(instr) == opcode::iret || static_cast<opcode>(instr) == opcode::fret)
-            {
-                if(stack_size != sizeof(std::int32_t))    // same as sizeof(float)
-                {
-                    throw interpreter_error(fmt::format("Expected {} bytes to be returned from function, got {}.", sizeof(std::int32_t), stack_size));
-                }
-            }
-            else if(static_cast<opcode>(instr) == opcode::sret || static_cast<opcode>(instr) == opcode::aret)
-            {
-                if(stack_size != sizeof(void*))    // same as sizeof(std::string*)
-                {
-                    throw interpreter_error(fmt::format("Expected {} bytes to be returned from function, got {}.", sizeof(void*), stack_size));
-                }
-            }
-            else
-            {
-                throw interpreter_error("Unknown return instruction.");
-            }
+            // NOTE The stack size is validated by the caller.
 
             // destruct the locals here for the GC to clean them up.
             ls.destruct();
