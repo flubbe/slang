@@ -145,9 +145,8 @@ void value::validate() const
                       || (ty.get_type_class() == type_class::f32)
                       || (ty.get_type_class() == type_class::str)
                       || (ty.get_type_class() == type_class::fn);
-    bool is_null = (ty.get_type_class() == type_class::null);
 
-    if(is_builtin || is_null)
+    if(is_builtin || ty.is_null())
     {
         if(ty.is_struct())
         {

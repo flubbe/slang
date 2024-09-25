@@ -84,8 +84,10 @@ enum class opcode : opcode_base
     fcmpge,      /** Check if the first f32 is greater than or equal to the second f32. */
     icmpeq,      /** Check if two i32 are equal. */
     fcmpeq,      /** Check if two f32 are equal. */
-    icmpne,      /** Check if two i32 are not equal */
-    fcmpne,      /** Check if two i32 are not equal */
+    icmpne,      /** Check if two i32 are not equal. */
+    fcmpne,      /** Check if two i32 are not equal. */
+    acmpeq,      /** Check if two addresses are equal. */
+    acmpne,      /** Check if two addresses are not equal. */
     jnz,         /** Jump if not zero. */
     jmp,         /** Unconditional jump. */
     label,       /** A label. Not executable */

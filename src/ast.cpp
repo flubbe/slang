@@ -1074,7 +1074,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                                     fmt::format("Code generation for '{}.{}' initialization returned no type.",
                                                 name.s, member_name));
         }
-        if(initializer_value->get_type().get_type_class() != cg::type_class::null
+        if(!initializer_value->get_type().is_null()
            && initializer_value->get_type().to_string() != member_type.get_type().to_string())
         {
             throw cg::codegen_error(loc,
@@ -1216,7 +1216,8 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         auto lhs_value = lhs->generate_code(ctx, memory_context::load);
         auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
-        if(lhs_value->get_type() != rhs_value->get_type())
+        if(lhs_value->get_type() != rhs_value->get_type()
+           && !(is_comparison && lhs_value->get_type().is_reference() && rhs_value->get_type().is_null()))
         {
             throw cg::codegen_error(loc,
                                     fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.",
@@ -1348,8 +1349,8 @@ std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
         return ctx.get_type("i32", false);
     }
 
-    // assignments.
-    if(op.s == "=")
+    // assignments and comparisons.
+    if(op.s == "=" || op.s == "==" || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(*lhs_type != *rhs_type
@@ -1358,7 +1359,14 @@ std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
             throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", ty::to_string(*lhs_type), reduced_op, ty::to_string(*rhs_type)));
         }
 
-        return lhs_type;
+        if(op.s == "=")
+        {
+            // assignments return the type of the l.h.s.
+            return lhs_type;
+        }
+
+        // comparisons return i32.
+        return ctx.get_type("i32", false);
     }
 
     // check lhs and rhs have supported types (i32 and f32 at the moment).
@@ -2357,7 +2365,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     }
     if(v->get_type().to_string() != "i32")
     {
-        throw cg::codegen_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", v->get_type().to_string()));
+        throw cg::codegen_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}'.", v->get_type().to_string()));
     }
 
     ctx.generate_cond_branch(while_loop_basic_block, merge_basic_block);

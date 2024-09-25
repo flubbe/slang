@@ -84,6 +84,8 @@ std::string to_string(opcode op)
     case opcode::fcmpeq: return "fcmpeq";
     case opcode::icmpne: return "icmpne";
     case opcode::fcmpne: return "fcmpne";
+    case opcode::acmpeq: return "acmpeq";
+    case opcode::acmpne: return "acmpne";
     case opcode::jnz: return "jnz";
     case opcode::jmp: return "jmp";
     case opcode::label: return "label";

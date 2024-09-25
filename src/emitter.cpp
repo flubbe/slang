@@ -370,7 +370,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "pop")
     {
-        emit_typed(opcode::pop, opcode::pop, opcode::apop, opcode::apop);    // same instruction for i32 and f32.
+        emit_typed(opcode::pop, opcode::pop, opcode::apop, opcode::apop, opcode::apop);    // same instruction for i32 and f32.
     }
     else if(name == "cast")
     {
@@ -630,11 +630,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "cmpeq")
     {
-        emit_typed(opcode::icmpeq, opcode::fcmpeq);
+        emit_typed(opcode::icmpeq, opcode::fcmpeq, opcode::acmpeq, opcode::acmpeq, opcode::acmpeq);
     }
     else if(name == "cmpne")
     {
-        emit_typed(opcode::icmpne, opcode::fcmpne);
+        emit_typed(opcode::icmpne, opcode::fcmpne, opcode::acmpne, opcode::acmpne, opcode::acmpne);
     }
     else if(name == "jnz")
     {

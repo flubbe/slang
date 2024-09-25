@@ -160,6 +160,12 @@ public:
         return ty == type_class::void_;
     }
 
+    /** Return whether this is a null type. */
+    bool is_null() const
+    {
+        return ty == type_class::null;
+    }
+
     /** Return whether this is a struct type. */
     bool is_struct() const
     {

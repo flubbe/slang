@@ -73,7 +73,7 @@ static opcode get_return_opcode(const std::pair<std::string, bool>& return_type)
         return opcode::aret;
     }
 
-    // All other type strings are references.
+    // FIXME Assume all other types are references.
     return opcode::aret;
 }
 
@@ -112,6 +112,7 @@ function::function(function_signature signature, std::function<void(operand_stac
 
 /** Byte sizes and alignments for built-in types. */
 static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
+  {"void", {0, 0}},
   {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
   {"f32", {sizeof(float), std::alignment_of_v<float>}},
   {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
@@ -133,6 +134,24 @@ static std::size_t get_type_or_reference_size(const variable& v)
     }
 
     throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", v.type.s));
+}
+
+/** Get the type size (for built-in types) or the size of a type reference (for custom types). */
+static std::size_t get_type_or_reference_size(const std::pair<type_string, bool>& v)
+{
+    if(std::get<1>(v))
+    {
+        return sizeof(void*);
+    }
+
+    auto built_in_it = type_properties_map.find(std::get<0>(v));
+    if(built_in_it != type_properties_map.end())
+    {
+        return built_in_it->second.first;
+    }
+
+    // FIXME Assume all other types are references.
+    return sizeof(void*);
 }
 
 type_properties context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -195,18 +214,16 @@ field_properties context::get_field_properties(const std::unordered_map<std::str
     return {field_info.second.size, field_info.second.offset, needs_gc};
 }
 
-std::int32_t context::get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                      const function_signature& s) const
+std::int32_t context::get_stack_delta(const function_signature& s) const
 {
-    auto return_type_properties = get_type_properties(type_map, s.return_type.first.s, s.return_type.second);
+    auto return_type_size = get_type_or_reference_size(s.return_type);
     std::int32_t arg_size = 0;
     for(auto& it: s.arg_types)
     {
-        auto properties = get_type_properties(type_map, it.first.s, it.second);
-        arg_size += properties.size;
+        arg_size += get_type_or_reference_size(it);
         // NOTE stack contents are not aligned.
     }
-    return return_type_properties.size - arg_size;
+    return return_type_size - arg_size;
 }
 
 void context::decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map, function_descriptor& desc)
@@ -254,7 +271,7 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     }
 
     // return type
-    details.return_size = get_type_properties(type_map, desc.signature.return_type.first, desc.signature.return_type.second).size;
+    details.return_size = get_type_or_reference_size(desc.signature.return_type);
 }
 
 std::int32_t context::decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
@@ -318,6 +335,9 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
         return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+    case opcode::acmpeq: [[fallthrough]];
+    case opcode::acmpne:
+        return -2 * static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
@@ -459,7 +479,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
                 throw interpreter_error(fmt::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
             }
 
-            return get_stack_delta(type_map, desc.signature);
+            return get_stack_delta(desc.signature);
         }
         else
         {
@@ -486,7 +506,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
                 throw interpreter_error("Native function was null during decode.");
             }
 
-            return get_stack_delta(type_map, desc.signature);
+            return get_stack_delta(desc.signature);
         }
     }
     /* opcodes that need to resolve a variable. */
@@ -709,7 +729,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         }
         else
         {
-            return static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
+            return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
         }
     }
     default:
@@ -754,7 +774,7 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
             auto built_in_it = type_properties_map.find(member_type.base_type);
             if(built_in_it != type_properties_map.end())
             {
-                if(!member_type.array)
+                if(!member_type.array && member_type.base_type != "str")
                 {
                     member_type.size = built_in_it->second.first;
                     member_type.alignment = built_in_it->second.second;
@@ -1031,6 +1051,8 @@ public:
                 if(addr != nullptr)
                 {
                     ctx.get_gc().add_root(addr);
+                    // FIXME We (likely) want to remove the temporaries from the GC here,
+                    //       instead of at the caller (see comment there).
                 }
             }
         }
@@ -1125,6 +1147,34 @@ opcode context::exec(const language_module& mod,
         // return.
         if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
         {
+            auto stack_size = frame.stack.size();
+
+            if(static_cast<opcode>(instr) == opcode::ret)
+            {
+                if(stack_size != 0)
+                {
+                    throw interpreter_error(fmt::format("Expected 0 bytes to be returned from function, got {}.", stack_size));
+                }
+            }
+            else if(static_cast<opcode>(instr) == opcode::iret || static_cast<opcode>(instr) == opcode::fret)
+            {
+                if(stack_size != sizeof(std::int32_t))    // same as sizeof(float)
+                {
+                    throw interpreter_error(fmt::format("Expected {} bytes to be returned from function, got {}.", sizeof(std::int32_t), stack_size));
+                }
+            }
+            else if(static_cast<opcode>(instr) == opcode::sret || static_cast<opcode>(instr) == opcode::aret)
+            {
+                if(stack_size != sizeof(void*))    // same as sizeof(std::string*)
+                {
+                    throw interpreter_error(fmt::format("Expected {} bytes to be returned from function, got {}.", sizeof(void*), stack_size));
+                }
+            }
+            else
+            {
+                throw interpreter_error("Unknown return instruction.");
+            }
+
             // destruct the locals here for the GC to clean them up.
             ls.destruct();
 
@@ -1493,7 +1543,10 @@ opcode context::exec(const language_module& mod,
                 {
                     gc.remove_root(prev);
                 }
-                gc.add_root(s);
+                if(s != nullptr)
+                {
+                    gc.add_root(s);
+                }
             }
 
             std::memcpy(&frame.locals[i], &s, sizeof(s));
@@ -1525,7 +1578,10 @@ opcode context::exec(const language_module& mod,
                 {
                     gc.remove_root(prev);
                 }
-                gc.add_root(obj);
+                if(obj != nullptr)
+                {
+                    gc.add_root(obj);
+                }
             }
 
             std::memcpy(&frame.locals[i], &obj, sizeof(obj));
@@ -1566,10 +1622,8 @@ opcode context::exec(const language_module& mod,
                 std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
                 frame.stack.discard(details.args_size);
 
-                // invoke function
-                exec(*callee_mod, details.offset, details.size, details.locals, callee_frame);
-
                 // clean up arguments in GC
+                // FIXME This (likely) should be done by the callee, after making them roots.
                 for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
                 {
                     auto& arg = details.locals[i];
@@ -1581,6 +1635,9 @@ opcode context::exec(const language_module& mod,
                         gc.remove_temporary(addr);
                     }
                 }
+
+                // invoke function
+                exec(*callee_mod, details.offset, details.size, details.locals, callee_frame);
 
                 // store return value
                 if(callee_frame.stack.size() != details.return_size)
@@ -1876,6 +1933,24 @@ opcode context::exec(const language_module& mod,
             frame.stack.push_i32(b != a);
             break;
         } /* opcode::fcmpne */
+        case opcode::acmpeq:
+        {
+            void* a = frame.stack.pop_addr<void>();
+            void* b = frame.stack.pop_addr<void>();
+            gc.remove_temporary(a);
+            gc.remove_temporary(b);
+            frame.stack.push_i32(b == a);
+            break;
+        } /* opcode::acmpeq */
+        case opcode::acmpne:
+        {
+            void* a = frame.stack.pop_addr<void>();
+            void* b = frame.stack.pop_addr<void>();
+            gc.remove_temporary(a);
+            gc.remove_temporary(b);
+            frame.stack.push_i32(b != a);
+            break;
+        } /* opcode::acmpne */
         case opcode::jnz:
         {
             /* no out-of-bounds read possible, since this is checked during decode. */
@@ -1921,11 +1996,13 @@ public:
      * Construct an argument scope. Validates the argument types and creates
      * them in `locals`.
      *
+     * @param ctx The associated interpreter context.
      * @param args The arguments to verify and write.
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
-    arguments_scope(const std::vector<value>& args,
+    arguments_scope(context& ctx,
+                    const std::vector<value>& args,
                     const std::vector<std::pair<type_string, bool>>& arg_types,
                     std::vector<std::byte>& locals)
     : args{args}
@@ -1954,6 +2031,13 @@ public:
                   "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
+            bool needs_gc = ((std::get<0>(args[i].get_type()) != "i32")
+                             && (std::get<0>(args[i].get_type()) != "f32"))
+                            || std::get<1>(args[i].get_type());
+            if(needs_gc)
+            {
+                ctx.get_gc().add_temporary(&locals[offset]);
+            }
             offset += args[i].create(&locals[offset]);
         }
     }
@@ -1992,7 +2076,7 @@ value context::exec(const language_module& mod,
         throw interpreter_error(fmt::format("Arguments for function do not match: Expected {}, got {}.", arg_types.size(), args.size()));
     }
 
-    arguments_scope arg_scope{args, arg_types, frame.locals};
+    arguments_scope arg_scope{*this, args, arg_types, frame.locals};
 
     /*
      * Execute the function.

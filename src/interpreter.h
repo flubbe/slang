@@ -839,12 +839,10 @@ class context
     /**
      * Calculate the stack size delta from a function's signature.
      *
-     * @param type_map The type map.
      * @param s The signature.
      * @returns The stack size delta.
      */
-    std::int32_t get_stack_delta(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                 const function_signature& s) const;
+    std::int32_t get_stack_delta(const function_signature& s) const;
 
     /**
      * Decode the types. Set types sizes, alignments and offsets.

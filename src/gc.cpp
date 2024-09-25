@@ -57,6 +57,7 @@ void garbage_collector::mark_object(void* obj)
             throw gc_error("Cannot mark object: Missing layout information.");
         }
 
+        GC_LOG("mark_object: object layout");
         for(auto offset: *obj_info.layout)
         {
             auto obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);
@@ -87,7 +88,7 @@ void object_deleter(void* obj, std::size_t& allocated_bytes)
 
 void garbage_collector::delete_object(gc_object& obj_info)
 {
-    GC_LOG("delete_object {}", obj_info.addr);
+    GC_LOG("delete_object {} (type {})", obj_info.addr, to_string(obj_info.type));
 
     if(obj_info.type == gc_object_type::str)
     {
@@ -128,6 +129,11 @@ void garbage_collector::delete_object(gc_object& obj_info)
 void* garbage_collector::add_root(void* obj)
 {
     GC_LOG("add root {}", obj);
+
+    if(obj == nullptr)
+    {
+        throw gc_error("Cannot add nullptr to root set.");
+    }
 
     auto it = root_set.find(obj);
     if(it == root_set.end())
@@ -263,6 +269,11 @@ void garbage_collector::reset()
 void* garbage_collector::add_temporary(void* obj)
 {
     GC_LOG("add_temporary {}", obj);
+
+    if(obj == nullptr)
+    {
+        return nullptr;
+    }
 
     auto it = temporary_objects.find(obj);
     if(it == temporary_objects.end())
