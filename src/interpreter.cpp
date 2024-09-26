@@ -39,7 +39,8 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 /**
  * Generate the return opcode from the signature's return type for native functions.
  *
- * @param return_type The return type.
+ * @note Only used for preparing handover of return values to native code.
+ * @param return_type The return type, given as `(name, is_array)`.
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
@@ -75,6 +76,45 @@ static opcode get_return_opcode(const std::pair<std::string, bool>& return_type)
 
     // FIXME Assume all other types are references.
     return opcode::aret;
+}
+
+/**
+ * Check if a type is garbage collected.
+ *
+ * @param t The type string.
+ * @returns Return whether a type is garbage collected.
+ */
+static bool is_garbage_collected(const type_string& t)
+{
+    if(t == "void")
+    {
+        throw interpreter_error("Found void type in type info for garbage collector.");
+    }
+
+    // check for built-in non-gc types.
+    return (t != "i32") && (t != "f32");
+}
+
+/**
+ * Check if a type is garbage collected.
+ *
+ * @param info The type info.
+ * @returns Return whether a type is garbage collected.
+ */
+static bool is_garbage_collected(const slang::type_info& info)
+{
+    return info.array || is_garbage_collected(info.base_type);
+}
+
+/**
+ * Check if a type is garbage collected.
+ *
+ * @param info The type info, given as a pair `(base_type, is_array)`.
+ * @returns Return whether a type is garbage collected.
+ */
+static bool is_garbage_collected(const std::pair<std::string, bool>& info)
+{
+    return std::get<1>(info) || is_garbage_collected(std::get<0>(info));
 }
 
 /*
@@ -210,8 +250,7 @@ field_properties context::get_field_properties(const std::unordered_map<std::str
     }
 
     auto field_info = type_it->second.member_types.at(field_index);
-    bool needs_gc = (type_name != "i32") && (type_name != "f32");
-    return {field_info.second.size, field_info.second.offset, needs_gc};
+    return {field_info.second.size, field_info.second.offset, is_garbage_collected(type_name)};
 }
 
 std::int32_t context::get_stack_delta(const function_signature& s) const
@@ -427,7 +466,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
         auto properties2 = get_type_properties({}, t2, false);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = (t1 == "str") || (t1 == "@addr") || (t1 == "@array");
+        std::uint8_t needs_gc = is_garbage_collected(t1);
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
@@ -774,17 +813,17 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
             auto built_in_it = type_properties_map.find(member_type.base_type);
             if(built_in_it != type_properties_map.end())
             {
-                if(!member_type.array && member_type.base_type != "str")
-                {
-                    member_type.size = built_in_it->second.first;
-                    member_type.alignment = built_in_it->second.second;
-                }
-                else
+                if(is_garbage_collected(member_type))
                 {
                     member_type.size = sizeof(void*);
                     member_type.alignment = std::alignment_of_v<void*>;
 
                     add_to_layout = true;
+                }
+                else
+                {
+                    member_type.size = built_in_it->second.first;
+                    member_type.alignment = built_in_it->second.second;
                 }
             }
             else
@@ -2005,10 +2044,7 @@ public:
                   "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
-            bool needs_gc = ((std::get<0>(args[i].get_type()) != "i32")
-                             && (std::get<0>(args[i].get_type()) != "f32"))
-                            || std::get<1>(args[i].get_type());
-            if(needs_gc)
+            if(is_garbage_collected(args[i].get_type()))
             {
                 ctx.get_gc().add_temporary(&locals[offset]);
             }
