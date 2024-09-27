@@ -1246,19 +1246,23 @@ opcode context::exec(const language_module& mod,
         } /* opcode::apop */
         case opcode::iadd:
         {
-            frame.stack.push_i32(frame.stack.pop_i32() + frame.stack.pop_i32());
+            std::int32_t v = frame.stack.pop_i32();
+            frame.stack.modify_i32([v](std::int32_t i)
+                                   { return i + v; });
             break;
         } /* opcode::iadd */
         case opcode::isub:
         {
-            std::int32_t a = frame.stack.pop_i32();
-            std::int32_t b = frame.stack.pop_i32();
-            frame.stack.push_i32(b - a);
+            std::int32_t v = frame.stack.pop_i32();
+            frame.stack.modify_i32([v](std::int32_t i)
+                                   { return i - v; });
             break;
         } /* opcode::isub */
         case opcode::imul:
         {
-            frame.stack.push_i32(frame.stack.pop_i32() * frame.stack.pop_i32());
+            std::int32_t v = frame.stack.pop_i32();
+            frame.stack.modify_i32([v](std::int32_t i)
+                                   { return i * v; });
             break;
         } /* opcode::imul */
         case opcode::idiv:
@@ -1268,8 +1272,8 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            std::int32_t dividend = frame.stack.pop_i32();
-            frame.stack.push_i32(dividend / divisor);
+            frame.stack.modify_i32([divisor](std::int32_t dividend)
+                                   { return dividend / divisor; });
             break;
         } /* opcode::idiv */
         case opcode::imod:
@@ -1279,25 +1283,29 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            std::int32_t dividend = frame.stack.pop_i32();
-            frame.stack.push_i32(dividend % divisor);
+            frame.stack.modify_i32([divisor](std::int32_t dividend)
+                                   { return dividend % divisor; });
             break;
         } /* opcode::imod */
         case opcode::fadd:
         {
-            frame.stack.push_f32(frame.stack.pop_f32() + frame.stack.pop_f32());
+            float v = frame.stack.pop_f32();
+            frame.stack.modify_f32([v](float i)
+                                   { return i + v; });
             break;
         } /* opcode::fadd */
         case opcode::fsub:
         {
-            float a = frame.stack.pop_f32();
-            float b = frame.stack.pop_f32();
-            frame.stack.push_f32(b - a);
+            float v = frame.stack.pop_f32();
+            frame.stack.modify_f32([v](float i)
+                                   { return i - v; });
             break;
         } /* opcode::fsub */
         case opcode::fmul:
         {
-            frame.stack.push_f32(frame.stack.pop_f32() * frame.stack.pop_f32());
+            float v = frame.stack.pop_f32();
+            frame.stack.modify_f32([v](float i)
+                                   { return i * v; });
             break;
         } /* opcode::fmul */
         case opcode::fdiv:
@@ -1307,8 +1315,8 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            float dividend = frame.stack.pop_f32();
-            frame.stack.push_f32(dividend / divisor);
+            frame.stack.modify_f32([divisor](float dividend)
+                                   { return dividend / divisor; });
             break;
         } /* opcode::fdiv */
         case opcode::i2f:
