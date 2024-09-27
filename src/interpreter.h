@@ -573,6 +573,24 @@ public:
         std::memcpy(&stack[stack.size() - 4], &f, 4);
     }
 
+    /** Modify the top value on the stack in-place. */
+    template<typename T, typename U>
+    void modify_top(std::function<U(T)> func)
+    {
+        static_assert(sizeof(T) == sizeof(U));
+        static_assert(std::is_scalar_v<T> && std::is_scalar_v<U>);
+
+        if(stack.size() < sizeof(T))
+        {
+            throw interpreter_error("Stack underflow");
+        }
+
+        T v;
+        std::memcpy(&v, &stack[stack.size() - sizeof(T)], sizeof(T));
+        U u = func(v);
+        std::memcpy(&stack[stack.size() - sizeof(U)], &u, sizeof(U));
+    }
+
     /** Pop an address from the stack. */
     template<typename T>
     T* pop_addr()
