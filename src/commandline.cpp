@@ -369,6 +369,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
+    file_mgr.add_search_path("lang");
 
     if(!file_mgr.is_file(module_path))
     {
@@ -517,6 +518,26 @@ void exec::invoke(const std::vector<std::string>& args)
                                  [&ctx](si::operand_stack& stack)
                                  {
                                      rt::string_concat(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "i32_to_string",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::i32_to_string(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "f32_to_string",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::f32_to_string(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "parse_i32",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::parse_i32(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "parse_f32",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::parse_f32(ctx, stack);
                                  });
 
     ctx.load_module(module_name, mod);

@@ -71,5 +71,7 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/linked_list
         ./build/${{env.BUILD_TYPE}}/slang compile examples/print_args
         ./build/${{env.BUILD_TYPE}}/slang exec examples/print_args Hello World
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/string_conversion
+        ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion 3.141 a -1
 
 

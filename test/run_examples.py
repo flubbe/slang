@@ -32,6 +32,7 @@ if __name__ == "__main__":
         "structs",
         "linked_list",
         "print_args",
+        "string_conversion",
     ]
     for ex in list(_example_files):
         if (

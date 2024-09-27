@@ -63,3 +63,39 @@ fn string_concat(s1: str, s2: str) -> str;
 #[native(lib="slang")]
 fn string_equals(s1: str, s2: str) -> i32;
 
+/**
+ * Convert an i32 integer to a string.
+ *
+ * @param i An i32 integer.
+ * @return Returns the string representation of i.
+ */
+#[native(lib="slang")]
+fn i32_to_string(i: i32) -> str;
+
+/**
+ * Convert an f32 float to a string.
+ *
+ * @param f An f32 float.
+ * @return Returns the string representation of f.
+ */
+#[native(lib="slang")]
+fn f32_to_string(f: f32) -> str;
+
+/**
+ * Parse a string and return an i32 integer. 
+ *
+ * @param s The string to parse.
+ * @return Returns an integer on success, else 0.
+ */
+#[native(lib="slang")]
+fn parse_i32(s: str) -> i32;
+
+/**
+ * Parse a string and return an f32 float.
+ *
+ * @param s The string to parse.
+ * @return Returns a float on success, else 0.
+ */
+#[native(lib="slang")]
+fn parse_f32(s: str) -> f32;
+  
