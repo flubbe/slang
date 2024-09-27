@@ -104,21 +104,6 @@ class value
         std::memcpy(memory, &vec, sizeof(fixed_vector<T>*));
     }
 
-    template<>
-    void create_vector_type<std::string>(std::byte* memory) const
-    {
-        // we need to convert `std::vector` to a `fixed_vector<T>*`.
-        auto input_vec = std::any_cast<std::vector<std::string>>(&data);
-        auto vec = new fixed_vector<std::string*>(input_vec->size());
-
-        for(std::size_t i = 0; i < input_vec->size(); ++i)
-        {
-            (*vec)[i] = new std::string{(*input_vec)[i]};
-        }
-
-        std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
-    }
-
     /**
      * Delete a vector type from memory.
      *
@@ -136,21 +121,6 @@ class value
         delete vec;
 
         std::memset(memory, 0, sizeof(fixed_vector<T>*));
-    }
-
-    template<>
-    void destroy_vector_type<std::string>(std::byte* memory) const
-    {
-        fixed_vector<std::string*>* vec;
-        std::memcpy(&vec, memory, sizeof(fixed_vector<std::string*>*));
-
-        for(auto& s: *vec)
-        {
-            delete s;
-        }
-        delete vec;
-
-        std::memset(memory, 0, sizeof(fixed_vector<std::string*>*));
     }
 
     /**
@@ -277,28 +247,14 @@ public:
      *
      * @param int_vec The integers.
      */
-    explicit value(std::vector<std::int32_t> int_vec)
-    : data{std::move(int_vec)}
-    , create_function{std::bind(&value::create_vector_type<std::int32_t>, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_vector_type<std::int32_t>, this, std::placeholders::_1)}
-    , size{sizeof(void*)}
-    , type{"i32", true}
-    {
-    }
+    explicit value(std::vector<std::int32_t> int_vec);
 
     /**
      * Construct a floating point array value.
      *
      * @param float_vec The floating point values.
      */
-    explicit value(std::vector<float> float_vec)
-    : data{std::move(float_vec)}
-    , create_function{std::bind(&value::create_vector_type<float>, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_vector_type<float>, this, std::placeholders::_1)}
-    , size{sizeof(void*)}
-    , type{"f32", true}
-    {
-    }
+    explicit value(std::vector<float> float_vec);
 
     /**
      * Construct a string array value.
@@ -308,14 +264,7 @@ public:
      *
      * @param string_vec The strings.
      */
-    explicit value(std::vector<std::string> string_vec)
-    : data{std::move(string_vec)}
-    , create_function{std::bind(&value::create_vector_type<std::string>, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_vector_type<std::string>, this, std::placeholders::_1)}
-    , size{sizeof(void*)}
-    , type{"str", true}
-    {
-    }
+    explicit value(std::vector<std::string> string_vec);
 
     /**
      * Construct an address value.
@@ -378,6 +327,63 @@ public:
         return std::any_cast<T>(&data);
     }
 };
+
+template<>
+inline void value::create_vector_type<std::string>(std::byte* memory) const
+{
+    // we need to convert `std::vector` to a `fixed_vector<T>*`.
+    auto input_vec = std::any_cast<std::vector<std::string>>(&data);
+    auto vec = new fixed_vector<std::string*>(input_vec->size());
+
+    for(std::size_t i = 0; i < input_vec->size(); ++i)
+    {
+        (*vec)[i] = new std::string{(*input_vec)[i]};
+    }
+
+    std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
+}
+
+template<>
+inline void value::destroy_vector_type<std::string>(std::byte* memory) const
+{
+    fixed_vector<std::string*>* vec;
+    std::memcpy(&vec, memory, sizeof(fixed_vector<std::string*>*));
+
+    for(auto& s: *vec)
+    {
+        delete s;
+    }
+    delete vec;
+
+    std::memset(memory, 0, sizeof(fixed_vector<std::string*>*));
+}
+
+inline value::value(std::vector<std::int32_t> int_vec)
+: data{std::move(int_vec)}
+, create_function{std::bind(&value::create_vector_type<std::int32_t>, this, std::placeholders::_1)}
+, destroy_function{std::bind(&value::destroy_vector_type<std::int32_t>, this, std::placeholders::_1)}
+, size{sizeof(void*)}
+, type{"i32", true}
+{
+}
+
+inline value::value(std::vector<float> float_vec)
+: data{std::move(float_vec)}
+, create_function{std::bind(&value::create_vector_type<float>, this, std::placeholders::_1)}
+, destroy_function{std::bind(&value::destroy_vector_type<float>, this, std::placeholders::_1)}
+, size{sizeof(void*)}
+, type{"f32", true}
+{
+}
+
+inline value::value(std::vector<std::string> string_vec)
+: data{std::move(string_vec)}
+, create_function{std::bind(&value::create_vector_type<std::string>, this, std::placeholders::_1)}
+, destroy_function{std::bind(&value::destroy_vector_type<std::string>, this, std::placeholders::_1)}
+, size{sizeof(void*)}
+, type{"str", true}
+{
+}
 
 /** Operand stack. */
 class operand_stack
