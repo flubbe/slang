@@ -57,14 +57,15 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/test/test_output
         ./build/${{env.BUILD_TYPE}}/test/test_resolve
         ./build/${{env.BUILD_TYPE}}/test/test_interpreter
+
+    - name: Clean up
+      run: |
+        cd ${{github.workspace}}
+        rm *.cmod
+        rm *.bin
     
     - name: Run command line tests
       run: |
-        cd ${{github.workspace}}
-        pwd
-        ls .
-        ls lang/
-        ls examples/
         ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang compile examples/array_loop

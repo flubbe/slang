@@ -106,13 +106,13 @@ TEST(output, native_binding)
         }
 
         {
-            slang::file_write_archive write_ar("std.cmod");
+            slang::file_write_archive write_ar("native_binding.cmod");
             EXPECT_NO_THROW(write_ar & header);
         }
 
         {
             slang::module_header read_header;
-            slang::file_read_archive read_ar("std.cmod");
+            slang::file_read_archive read_ar("native_binding.cmod");
             ASSERT_NO_THROW(read_ar & read_header);
 
             EXPECT_EQ(read_header.exports.size(), header.exports.size());
