@@ -73,5 +73,9 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/print_args Hello World
         ./build/${{env.BUILD_TYPE}}/slang compile examples/string_conversion
         ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion 3.141 a -1
+        pwd
+        ls .
+        ls lang/
+        ls examples/
 
 
