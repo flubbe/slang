@@ -69,4 +69,7 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/structs
         ./build/${{env.BUILD_TYPE}}/slang compile examples/linked_list
         ./build/${{env.BUILD_TYPE}}/slang exec examples/linked_list
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/print_args
+        ./build/${{env.BUILD_TYPE}}/slang exec examples/print_args Hello World
+
 
