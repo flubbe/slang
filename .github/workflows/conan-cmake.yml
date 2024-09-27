@@ -61,6 +61,10 @@ jobs:
     - name: Run command line tests
       run: |
         cd ${{github.workspace}}
+        pwd
+        ls .
+        ls lang/
+        ls examples/
         ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang compile examples/array_loop
@@ -73,9 +77,5 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/print_args Hello World
         ./build/${{env.BUILD_TYPE}}/slang compile examples/string_conversion
         ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion 3.141 a -1
-        pwd
-        ls .
-        ls lang/
-        ls examples/
 
 
