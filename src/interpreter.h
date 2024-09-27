@@ -89,9 +89,8 @@ class value
     void create_vector_type(std::byte* memory) const
     {
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
-                      "Vector type must be an integer type, a floating point type, or a string.");
+                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
+                      "Vector type must be an integer type or a floating point type.");
 
         // we need to convert `std::vector` to a `fixed_vector<T>*`.
         auto input_vec = std::any_cast<std::vector<T>>(&data);
@@ -105,6 +104,21 @@ class value
         std::memcpy(memory, &vec, sizeof(fixed_vector<T>*));
     }
 
+    template<>
+    void create_vector_type<std::string>(std::byte* memory) const
+    {
+        // we need to convert `std::vector` to a `fixed_vector<T>*`.
+        auto input_vec = std::any_cast<std::vector<std::string>>(&data);
+        auto vec = new fixed_vector<std::string*>(input_vec->size());
+
+        for(std::size_t i = 0; i < input_vec->size(); ++i)
+        {
+            (*vec)[i] = new std::string{(*input_vec)[i]};
+        }
+
+        std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
+    }
+
     /**
      * Delete a vector type from memory.
      *
@@ -114,15 +128,29 @@ class value
     void destroy_vector_type(std::byte* memory) const
     {
         static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::string>,
-                      "Vector type must be an integer type, a floating point type, or a string.");
+                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
+                      "Vector type must be an integer type or a floating point type.");
 
         fixed_vector<T>* vec;
         std::memcpy(&vec, memory, sizeof(fixed_vector<T>*));
         delete vec;
 
         std::memset(memory, 0, sizeof(fixed_vector<T>*));
+    }
+
+    template<>
+    void destroy_vector_type<std::string>(std::byte* memory) const
+    {
+        fixed_vector<std::string*>* vec;
+        std::memcpy(&vec, memory, sizeof(fixed_vector<std::string*>*));
+
+        for(auto& s: *vec)
+        {
+            delete s;
+        }
+        delete vec;
+
+        std::memset(memory, 0, sizeof(fixed_vector<std::string*>*));
     }
 
     /**
@@ -656,7 +684,12 @@ public:
      * @param locals_size The arguments and locals size.
      * @param stack_size The operand stack size.
      */
-    function(function_signature signature, std::size_t entry_point, std::size_t size, std::vector<variable> locals, std::size_t locals_size, std::size_t stack_size);
+    function(function_signature signature,
+             std::size_t entry_point,
+             std::size_t size,
+             std::vector<variable> locals,
+             std::size_t locals_size,
+             std::size_t stack_size);
 
     /**
      * Construct a native function.

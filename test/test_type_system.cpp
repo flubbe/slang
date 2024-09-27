@@ -1560,7 +1560,7 @@ TEST(type_system, examples)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: str) -> i32\n"
+          "fn main(args: [str]) -> i32\n"
           "{\n"
           "\tstd::println(\"Hello, World!\");\n"
           "\treturn 0;\n"

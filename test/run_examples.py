@@ -26,7 +26,13 @@ if __name__ == "__main__":
             exit(1)
 
     # compile and run the examples
-    _example_files: list[str] = ["hello_world", "array_loop", "structs", "linked_list"]
+    _example_files: list[str] = [
+        "hello_world",
+        "array_loop",
+        "structs",
+        "linked_list",
+        "print_args",
+    ]
     for ex in list(_example_files):
         if (
             subprocess.call(

@@ -1,6 +1,6 @@
 import std;
 
-fn main(s: str) -> i32 {
+fn main(args: [str]) -> i32 {
     let strs: [str] = [
         "This", "is", "a", "loop!"
     ];

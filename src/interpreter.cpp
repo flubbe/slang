@@ -44,7 +44,7 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<std::string, bool>& return_type)
+static opcode get_return_opcode(const std::pair<type_string, bool>& return_type)
 {
     auto& name = std::get<0>(return_type);
 
@@ -135,7 +135,7 @@ function::function(function_signature signature,
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(std::make_pair(this->signature.return_type.first.s, this->signature.return_type.second));
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 function::function(function_signature signature, std::function<void(operand_stack&)> func)
@@ -143,7 +143,7 @@ function::function(function_signature signature, std::function<void(operand_stac
 , native{true}
 , entry_point_or_function{std::move(func)}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(std::make_pair(this->signature.return_type.first.s, this->signature.return_type.second));
+    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 /*

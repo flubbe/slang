@@ -269,7 +269,7 @@ TEST(output, hello_world)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: str) -> i32\n"
+          "fn main(args: [str]) -> i32\n"
           "{\n"
           "\tstd::println(\"Hello, World!\");\n"
           "\treturn 0;\n"
@@ -310,7 +310,7 @@ TEST(output, hello_world)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(s: str) -> i32\n"
+          "fn main(args: [str]) -> i32\n"
           "{\n"
           "\tlang::println(\"Hello, World!\");\n"    // wrong function path
           "\treturn 0;\n"

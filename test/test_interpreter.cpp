@@ -196,7 +196,7 @@ TEST(interpreter, hello_world)
     register_std_lib(ctx, print_buf);
 
     ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
-    EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {si::value{"Test"}}));
+    EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {si::value{std::vector<std::string>{"Test"}}}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Hello, World!\n");
 

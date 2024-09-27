@@ -448,7 +448,7 @@ exec::exec(slang::package_manager& in_manager)
 
 void exec::invoke(const std::vector<std::string>& args)
 {
-    if(args.size() != 1)
+    if(args.size() < 1)
     {
         const std::string help_text =
           "Execute the main function of the module `mod.cmod`.";
@@ -521,7 +521,7 @@ void exec::invoke(const std::vector<std::string>& args)
 
     ctx.load_module(module_name, mod);
 
-    si::value res = ctx.invoke(module_name, "main", {si::value{""}});    // FIXME empty argument string
+    si::value res = ctx.invoke(module_name, "main", {si::value{std::vector<std::string>{args.begin() + 1, args.end()}}});
     const int* return_value = res.get<int>();
 
     if(return_value == nullptr)
