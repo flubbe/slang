@@ -1247,22 +1247,22 @@ opcode context::exec(const language_module& mod,
         case opcode::iadd:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i + v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i + v; });
             break;
         } /* opcode::iadd */
         case opcode::isub:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i - v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i - v; });
             break;
         } /* opcode::isub */
         case opcode::imul:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i * v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i * v; });
             break;
         } /* opcode::imul */
         case opcode::idiv:
@@ -1272,8 +1272,8 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            frame.stack.modify_i32([divisor](std::int32_t dividend) -> std::int32_t
-                                   { return dividend / divisor; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([divisor](std::int32_t dividend) -> std::int32_t
+                                                               { return dividend / divisor; });
             break;
         } /* opcode::idiv */
         case opcode::imod:
@@ -1283,29 +1283,29 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            frame.stack.modify_i32([divisor](std::int32_t dividend) -> std::int32_t
-                                   { return dividend % divisor; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([divisor](std::int32_t dividend) -> std::int32_t
+                                                               { return dividend % divisor; });
             break;
         } /* opcode::imod */
         case opcode::fadd:
         {
             float v = frame.stack.pop_f32();
-            frame.stack.modify_f32([v](float i) -> float
-                                   { return i + v; });
+            frame.stack.modify_top<float, float>([v](float i) -> float
+                                                 { return i + v; });
             break;
         } /* opcode::fadd */
         case opcode::fsub:
         {
             float v = frame.stack.pop_f32();
-            frame.stack.modify_f32([v](float i) -> float
-                                   { return i - v; });
+            frame.stack.modify_top<float, float>([v](float i) -> float
+                                                 { return i - v; });
             break;
         } /* opcode::fsub */
         case opcode::fmul:
         {
             float v = frame.stack.pop_f32();
-            frame.stack.modify_f32([v](float i) -> float
-                                   { return i * v; });
+            frame.stack.modify_top<float, float>([v](float i) -> float
+                                                 { return i * v; });
             break;
         } /* opcode::fmul */
         case opcode::fdiv:
@@ -1315,8 +1315,8 @@ opcode context::exec(const language_module& mod,
             {
                 throw interpreter_error("Division by zero.");
             }
-            frame.stack.modify_f32([divisor](float dividend) -> float
-                                   { return dividend / divisor; });
+            frame.stack.modify_top<float, float>([divisor](float dividend) -> float
+                                                 { return dividend / divisor; });
             break;
         } /* opcode::fdiv */
         case opcode::i2f:
@@ -1824,36 +1824,36 @@ opcode context::exec(const language_module& mod,
         case opcode::iand:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i & v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i & v; });
             break;
         } /* opcode::iand */
         case opcode::land:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return (i != 0) && (v != 0); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return (i != 0) && (v != 0); });
             break;
         } /* opcode::land */
         case opcode::ior:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i | v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i | v; });
             break;
         } /* opcode::ior */
         case opcode::lor:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return (i != 0) || (v != 0); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return (i != 0) || (v != 0); });
             break;
         } /* opcode::lor */
         case opcode::ixor:
         {
             std::int32_t v = frame.stack.pop_i32();
-            frame.stack.modify_i32([v](std::int32_t i) -> std::int32_t
-                                   { return i ^ v; });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([v](std::int32_t i) -> std::int32_t
+                                                               { return i ^ v; });
             break;
         } /* opcode::ixor */
         case opcode::ishl:
@@ -1861,8 +1861,8 @@ opcode context::exec(const language_module& mod,
             std::int32_t a = frame.stack.pop_i32();
             std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
-            frame.stack.modify_i32([a_u32](std::int32_t s) -> std::int32_t
-                                   { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s); 
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a_u32](std::int32_t s) -> std::int32_t
+                                                               { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s); 
                                    return s_u32 << a_u32; });
             break;
         } /* opcode::ishl */
@@ -1871,93 +1871,93 @@ opcode context::exec(const language_module& mod,
             std::int32_t a = frame.stack.pop_i32();
             std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
-            frame.stack.modify_i32([a_u32](std::int32_t s) -> std::int32_t
-                                   { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a_u32](std::int32_t s) -> std::int32_t
+                                                               { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);
                                    return s_u32 >> a_u32; });
             break;
         } /* opcode::ishr */
         case opcode::icmpl:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b < a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b < a); });
             break;
         } /* opcode::icmpl */
         case opcode::fcmpl:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b < a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b < a); });
             break;
         } /* opcode::fcmpl */
         case opcode::icmple:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b <= a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b <= a); });
             break;
         } /* opcode::icmple */
         case opcode::fcmple:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b <= a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b <= a); });
             break;
         } /* opcode::fcmple */
         case opcode::icmpg:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b > a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b > a); });
             break;
         } /* opcode::icmpg */
         case opcode::fcmpg:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b > a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b > a); });
             break;
         } /* opcode::fcmpg */
         case opcode::icmpge:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b >= a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b >= a); });
             break;
         } /* opcode::icmpge */
         case opcode::fcmpge:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b >= a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b >= a); });
             break;
         } /* opcode::fcmpge */
         case opcode::icmpeq:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b == a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b == a); });
             break;
         } /* opcode::icmpeq */
         case opcode::fcmpeq:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b == a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b == a); });
             break;
         } /* opcode::fcmpeq */
         case opcode::icmpne:
         {
             std::int32_t a = frame.stack.pop_i32();
-            frame.stack.modify_i32([a](std::int32_t b) -> std::int32_t
-                                   { return (b != a); });
+            frame.stack.modify_top<std::int32_t, std::int32_t>([a](std::int32_t b) -> std::int32_t
+                                                               { return (b != a); });
             break;
         } /* opcode::icmpne */
         case opcode::fcmpne:
         {
             float a = frame.stack.pop_f32();
-            frame.stack.modify_f32([a](float b) -> float
-                                   { return (b != a); });
+            frame.stack.modify_top<float, float>([a](float b) -> float
+                                                 { return (b != a); });
             break;
         } /* opcode::fcmpne */
         case opcode::acmpeq:

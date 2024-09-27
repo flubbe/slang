@@ -531,20 +531,6 @@ public:
         return i;
     }
 
-    /** Modify the top i32 value on the stack. */
-    void modify_i32(std::function<std::int32_t(std::int32_t)> func)
-    {
-        if(stack.size() < 4)
-        {
-            throw interpreter_error("Stack underflow");
-        }
-
-        std::int32_t i;
-        std::memcpy(&i, &stack[stack.size() - 4], 4);
-        i = func(i);
-        std::memcpy(&stack[stack.size() - 4], &i, 4);
-    }
-
     /** Pop an f32 from the stack. */
     float pop_f32()
     {
@@ -557,20 +543,6 @@ public:
         std::memcpy(&f, &stack[stack.size() - 4], 4);
         stack.resize(stack.size() - 4);
         return f;
-    }
-
-    /** Modify the top f32 value on the stack. */
-    void modify_f32(std::function<float(float)> func)
-    {
-        if(stack.size() < 4)
-        {
-            throw interpreter_error("Stack underflow");
-        }
-
-        float f;
-        std::memcpy(&f, &stack[stack.size() - 4], 4);
-        f = func(f);
-        std::memcpy(&stack[stack.size() - 4], &f, 4);
     }
 
     /** Modify the top value on the stack in-place. */
