@@ -18,6 +18,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
+#include "type.h"
 
 /* Forward declarations. */
 namespace slang::interpreter
@@ -30,6 +31,7 @@ namespace slang
 {
 
 namespace si = slang::interpreter;
+namespace ty = slang::typing;
 
 /** A module error. */
 class module_error : public std::runtime_error
@@ -306,7 +308,7 @@ struct variable : public symbol
     : type{std::move(type)}
     , array{array}
     {
-        reference = type != "void" && type != "i32" && type != "f32";
+        reference = ty::is_reference_type(type);
     }
 };
 
@@ -320,7 +322,7 @@ inline archive& operator&(archive& ar, variable& v)
 {
     ar & v.type;
     ar & v.array;
-    v.reference = v.type != "void" && v.type != "i32" && v.type != "f32";
+    v.reference = ty::is_reference_type(v.type);
     return ar;
 }
 

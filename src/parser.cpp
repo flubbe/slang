@@ -12,6 +12,9 @@
 #include <set>
 
 #include "parser.h"
+#include "type.h"
+
+namespace ty = slang::typing;
 
 namespace slang
 {
@@ -74,7 +77,7 @@ static void validate_base_type(const token& tok)
     }
 
     // check built-in types.
-    if(tok.s == "void" || tok.s == "i32" || tok.s == "f32" || tok.s == "str")
+    if(ty::is_builtin_type(tok.s))
     {
         return;
     }

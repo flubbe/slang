@@ -92,7 +92,7 @@ static bool is_garbage_collected(const type_string& t)
     }
 
     // check for built-in non-gc types.
-    return (t != "i32") && (t != "f32");
+    return ty::is_reference_type(t.s);
 }
 
 /**

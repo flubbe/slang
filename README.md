@@ -17,7 +17,8 @@ Hello, World!
 
 Program exited with exit code 0.
 ```
-Also, have a look at the [test](test) folder for more examples.
+To see how the language works, have a look at the [examples](examples) and also at 
+[test/test_compile_ir.cpp](test/test_compile_ir.cpp) and [test/test_output.cpp](test/test_output.cpp).
 
 ## Getting started
 
@@ -53,8 +54,3 @@ fn main(args: [str]) -> i32
 
 The language has data type support for `i32`, `f32`, `str`, and custom `struct`'s. Arrays are also supported,
 though (currently) they have to be one-dimensional.
-
-To see how the scripting language is intended to work and for further examples, you can have a look at:
-- [test/test_compile_ir.cpp](test/test_compile_ir.cpp)
-- [test/test_output.cpp](test/test_output.cpp)
-

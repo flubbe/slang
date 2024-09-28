@@ -174,11 +174,7 @@ void value::validate() const
         throw codegen_error("Empty struct type.");
     }
 
-    is_builtin = (*ty.get_struct_name() == "void")
-                 || (*ty.get_struct_name() == "i32")
-                 || (*ty.get_struct_name() == "f32")
-                 || (*ty.get_struct_name() == "str");
-    if(is_builtin)
+    if(ty::is_builtin_type(*ty.get_struct_name()))
     {
         throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
     }
