@@ -32,7 +32,6 @@ class value;
 namespace slang::typing
 {
 class context;
-std::string to_string(const std::pair<std::string, bool>&);
 }    // namespace slang::typing
 
 namespace slang::ast
