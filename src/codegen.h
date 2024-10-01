@@ -1606,18 +1606,16 @@ public:
     }
 
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
-    std::pair<std::pair<std::string, bool>, std::vector<std::pair<std::string, bool>>>
-      get_signature() const
+    std::pair<type, std::vector<type>> get_signature() const
     {
-        std::vector<std::pair<std::string, bool>> arg_types;
+        std::vector<type> arg_types;
         auto& args = scope.get_args();
         std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                       [](const auto& arg) -> std::pair<std::string, bool>
+                       [](const auto& arg) -> type
                        {
-                           return {arg->get_type().base_type().to_string(), arg->get_type().is_array()};
+                           return arg->get_type();
                        });
-        return {{return_type->get_type().base_type().to_string(), return_type->get_type().is_array()},
-                std::move(arg_types)};
+        return {return_type->get_type(), std::move(arg_types)};
     }
 
     /** Return whether this is a native function. */

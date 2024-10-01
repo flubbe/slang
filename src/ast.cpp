@@ -1996,7 +1996,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
             auto ret_type = std::get<0>(fn->get_signature());
-            if(std::get<0>(ret_type) != "void")
+            if(!ret_type.is_void())
             {
                 throw cg::codegen_error(loc, fmt::format("Missing return statement in function '{}'.", fn->get_name()));
             }

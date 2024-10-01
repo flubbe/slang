@@ -214,14 +214,14 @@ std::string to_string(const type& t);
 /**
  * Convert a type to a string.
  *
- * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
+ * @param t The type to convert, given as a pair of `(base_type, is_array)`.
  */
 std::string to_string(const std::pair<token, bool>& t);
 
 /**
  * Convert a type to a string.
  *
- * @param t The type to convert, given as a pair of `(base_type, optional_array_length)`.
+ * @param t The type to convert, given as a pair of `(base_type, is_array)`.
  */
 std::string to_string(const std::pair<std::string, bool>& t);
 

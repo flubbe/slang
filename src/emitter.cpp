@@ -1063,7 +1063,16 @@ language_module instruction_emitter::to_module() const
 
     for(auto& it: ctx.funcs)
     {
-        auto [return_type, arg_types] = it->get_signature();
+        auto signature = it->get_signature();
+
+        std::pair<std::string, bool> return_type = {std::get<0>(signature).to_string(), std::get<0>(signature).is_array()};
+        std::vector<std::pair<std::string, bool>> arg_types;
+
+        std::transform(std::get<1>(signature).cbegin(), std::get<1>(signature).cend(), arg_types.begin(),
+                       [&arg_types](const cg::type& t) -> std::pair<std::string, bool>
+                       {
+                           return {t.to_string(), t.is_array()};
+                       });
 
         if(it->is_native())
         {
