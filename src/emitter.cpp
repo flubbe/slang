@@ -1065,13 +1065,15 @@ language_module instruction_emitter::to_module() const
     {
         auto signature = it->get_signature();
 
-        std::pair<std::string, bool> return_type = {std::get<0>(signature).to_string(), std::get<0>(signature).is_array()};
+        std::pair<std::string, bool> return_type = {
+          std::get<0>(signature).base_type().to_string(),    // FIXME Store type.
+          std::get<0>(signature).is_array()};
         std::vector<std::pair<std::string, bool>> arg_types;
 
-        std::transform(std::get<1>(signature).cbegin(), std::get<1>(signature).cend(), arg_types.begin(),
-                       [&arg_types](const cg::type& t) -> std::pair<std::string, bool>
+        std::transform(std::get<1>(signature).cbegin(), std::get<1>(signature).cend(), std::back_inserter(arg_types),
+                       [](const cg::type& t) -> std::pair<std::string, bool>
                        {
-                           return {t.to_string(), t.is_array()};
+                           return std::make_pair(t.base_type().to_string(), t.is_array());    // FIXME Store type.
                        });
 
         if(it->is_native())
