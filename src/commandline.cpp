@@ -424,7 +424,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     emitter.run();
 
-    slang::language_module mod = emitter.to_module();
+    slang::module_::language_module mod = emitter.to_module();
 
     slang::file_write_archive write_ar(output_file.string());
     write_ar & mod;
@@ -482,7 +482,7 @@ void exec::invoke(const std::vector<std::string>& args)
           module_path.string()));
     }
 
-    slang::language_module mod;
+    slang::module_::language_module mod;
     {
         auto read_ar = file_mgr.open(module_path, slang::file_manager::open_mode::read);
         (*read_ar) & mod;

@@ -74,7 +74,7 @@ class context
     file_manager& mgr;
 
     /** Loaded module headers, indexed by resolved import path. */
-    std::unordered_map<std::string, module_header> headers;
+    std::unordered_map<std::string, module_::module_header> headers;
 
     /** List of modules. */
     std::vector<module_entry> modules;
@@ -82,13 +82,13 @@ class context
     /** Function imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
     std::unordered_map<
       std::string,
-      std::vector<std::pair<std::string, function_descriptor>>>
+      std::vector<std::pair<std::string, module_::function_descriptor>>>
       imported_functions;
 
     /** Type imports, , indexed by resolved module path, as a pair `(name, descriptor)`. */
     std::unordered_map<
       std::string,
-      std::vector<std::pair<std::string, type_descriptor>>>
+      std::vector<std::pair<std::string, module_::type_descriptor>>>
       imported_types;
 
 protected:
@@ -98,7 +98,7 @@ protected:
      * @param resolved_path The resolved module path.
      * @returns Returns the module header, or throws a `file_error` if the module could not be opened.
      */
-    module_header& get_module_header(const fs::path& resolved_path);
+    module_::module_header& get_module_header(const fs::path& resolved_path);
 
     /**
      * Resolve imports for a given module.

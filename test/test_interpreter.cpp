@@ -25,7 +25,7 @@ namespace rt = slang::runtime;
 
 TEST(interpreter, module_and_functions)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -195,7 +195,7 @@ static void register_std_lib(si::context& ctx, std::vector<std::string>& print_b
 
 TEST(interpreter, hello_world)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -235,7 +235,7 @@ TEST(interpreter, hello_world)
 
 TEST(interpreter, operators)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -291,7 +291,7 @@ TEST(interpreter, operators)
 
 TEST(interpreter, control_flow)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -354,7 +354,7 @@ TEST(interpreter, control_flow)
 
 TEST(interpreter, loops)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -392,7 +392,7 @@ TEST(interpreter, loops)
 
 TEST(interpreter, loop_break_continue)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -432,7 +432,7 @@ TEST(interpreter, loop_break_continue)
 
 TEST(interpreter, infinite_recursion)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -461,7 +461,7 @@ TEST(interpreter, infinite_recursion)
 
 TEST(interpreter, arrays)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -498,7 +498,7 @@ TEST(interpreter, arrays)
 
 TEST(interpreter, return_arrays)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -538,7 +538,7 @@ TEST(interpreter, return_arrays)
 
 TEST(interpreter, pass_array)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -571,7 +571,7 @@ TEST(interpreter, pass_array)
 
 TEST(interpreter, invalid_index)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -594,7 +594,7 @@ TEST(interpreter, invalid_index)
 
 TEST(interpreter, return_str_array)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -647,7 +647,7 @@ TEST(interpreter, return_str_array)
 
 TEST(interpreter, array_length)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -679,7 +679,7 @@ TEST(interpreter, array_length)
 
 TEST(interpreter, array_copy)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -718,7 +718,7 @@ TEST(interpreter, array_copy)
 
 TEST(interpreter, string_operations)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -751,7 +751,7 @@ TEST(interpreter, string_operations)
 
 TEST(interpreter, operator_new)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -782,7 +782,7 @@ TEST(interpreter, operator_new)
 
 TEST(interpreter, prefix_postfix)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -826,7 +826,7 @@ TEST(interpreter, prefix_postfix)
 
 TEST(interpreter, return_discard)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -855,7 +855,7 @@ TEST(interpreter, return_discard)
 
 TEST(interpreter, return_discard_array)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -884,7 +884,7 @@ TEST(interpreter, return_discard_array)
 
 TEST(interpreter, return_discard_strings)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -913,7 +913,7 @@ TEST(interpreter, return_discard_strings)
 
 TEST(interpreter, structs)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {
@@ -928,27 +928,27 @@ TEST(interpreter, structs)
 
     auto& header = mod.get_header();
     ASSERT_EQ(header.exports.size(), 2);
-    EXPECT_EQ(header.exports[0].type, slang::symbol_type::type);
+    EXPECT_EQ(header.exports[0].type, slang::module_::symbol_type::type);
     EXPECT_EQ(header.exports[0].name, "S");
-    EXPECT_EQ(header.exports[1].type, slang::symbol_type::type);
+    EXPECT_EQ(header.exports[1].type, slang::module_::symbol_type::type);
     EXPECT_EQ(header.exports[1].name, "T");
 
     {
-        auto& desc = std::get<slang::type_descriptor>(header.exports[0].desc);
+        auto& desc = std::get<slang::module_::type_descriptor>(header.exports[0].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "i");
-        EXPECT_EQ(desc.member_types[0].second, slang::type_info("i32", false));
+        EXPECT_EQ(desc.member_types[0].second, slang::module_::type_info("i32", false));
         EXPECT_EQ(desc.member_types[1].first, "j");
-        EXPECT_EQ(desc.member_types[1].second, slang::type_info("f32", false));
+        EXPECT_EQ(desc.member_types[1].second, slang::module_::type_info("f32", false));
     }
 
     {
-        auto& desc = std::get<slang::type_descriptor>(header.exports[1].desc);
+        auto& desc = std::get<slang::module_::type_descriptor>(header.exports[1].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "s");
-        EXPECT_EQ(desc.member_types[0].second, slang::type_info("S", false));
+        EXPECT_EQ(desc.member_types[0].second, slang::module_::type_info("S", false));
         EXPECT_EQ(desc.member_types[1].first, "t");
-        EXPECT_EQ(desc.member_types[1].second, slang::type_info("str", false));
+        EXPECT_EQ(desc.member_types[1].second, slang::module_::type_info("str", false));
     }
 
     slang::file_manager file_mgr;
@@ -964,7 +964,7 @@ TEST(interpreter, structs)
 TEST(interpreter, structs_access)
 {
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -992,7 +992,7 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1020,7 +1020,7 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1048,7 +1048,7 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1073,7 +1073,7 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1102,7 +1102,7 @@ TEST(interpreter, structs_access)
 TEST(interpreter, nested_structs)
 {
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1127,7 +1127,7 @@ TEST(interpreter, nested_structs)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1159,7 +1159,7 @@ TEST(interpreter, nested_structs)
 TEST(interpreter, type_imports)
 {
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
 
         try
         {
@@ -1191,7 +1191,7 @@ TEST(interpreter, type_imports)
 
 TEST(interpreter, multiple_modules)
 {
-    slang::language_module mod;
+    slang::module_::language_module mod;
 
     try
     {

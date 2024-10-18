@@ -25,12 +25,17 @@
 #include "token.h"
 
 /* Forward declarations. */
+
 namespace slang
+{
+class instruction_emitter; /* emitter.h */
+}    // namespace slang
+
+namespace slang::module_
 {
 enum class symbol_type : std::uint8_t; /* module.h */
 class language_module;                 /* module.h */
-class instruction_emitter;             /* emitter.h */
-}    // namespace slang
+}    // namespace slang::module_
 
 namespace slang::codegen
 {
@@ -1692,7 +1697,7 @@ std::string to_string(binary_op op);
 struct imported_symbol
 {
     /** Symbol type. */
-    symbol_type type;
+    module_::symbol_type type;
 
     /** Symbol name. */
     std::string name;
@@ -1716,7 +1721,7 @@ struct imported_symbol
      * @param name The symbol's name.
      * @param import_path Path of the module the symbol is imported from.
      */
-    imported_symbol(symbol_type type, std::string name, std::string import_path)
+    imported_symbol(module_::symbol_type type, std::string name, std::string import_path)
     : type{type}
     , name{std::move(name)}
     , import_path{std::move(import_path)}
@@ -1813,7 +1818,7 @@ public:
      * @param name The symbol's name.
      * @throws Throws a `codegen_error` if the symbol already exists but the symbol type does not match.
      */
-    void add_import(symbol_type type, std::string import_path, std::string name);
+    void add_import(module_::symbol_type type, std::string import_path, std::string name);
 
     /**
      * Get the import index of a symbol. If the symbol is not found in the imports,
@@ -1825,7 +1830,7 @@ public:
      * @return The symbol's index in the import table.
      * @throws Throws a `codegen_error` if the symbol is not found.
      */
-    std::size_t get_import_index(symbol_type type, std::string import_path, std::string name) const;
+    std::size_t get_import_index(module_::symbol_type type, std::string import_path, std::string name) const;
 
     /**
      * Create a struct.

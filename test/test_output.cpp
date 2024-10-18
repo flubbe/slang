@@ -74,17 +74,17 @@ TEST(output, native_binding)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
-        slang::module_header header = mod.get_header();
+        slang::module_::language_module mod = emitter.to_module();
+        slang::module_::module_header header = mod.get_header();
 
         ASSERT_EQ(header.exports.size(), 2);
         EXPECT_EQ(header.imports.size(), 0);
         EXPECT_EQ(header.strings.size(), 0);
 
-        ASSERT_EQ(header.exports[0].type, slang::symbol_type::function);
+        ASSERT_EQ(header.exports[0].type, slang::module_::symbol_type::function);
         EXPECT_EQ(header.exports[0].name, "print");
         {
-            auto desc = std::get<slang::function_descriptor>(header.exports[0].desc);
+            auto desc = std::get<slang::module_::function_descriptor>(header.exports[0].desc);
             EXPECT_EQ(desc.native, true);
             EXPECT_EQ(desc.signature.return_type.first, "void");
             EXPECT_EQ(desc.signature.return_type.second, false);
@@ -93,10 +93,10 @@ TEST(output, native_binding)
             EXPECT_EQ(desc.signature.arg_types[0].second, false);
         }
 
-        ASSERT_EQ(header.exports[1].type, slang::symbol_type::function);
+        ASSERT_EQ(header.exports[1].type, slang::module_::symbol_type::function);
         EXPECT_EQ(header.exports[1].name, "println");
         {
-            auto desc = std::get<slang::function_descriptor>(header.exports[1].desc);
+            auto desc = std::get<slang::module_::function_descriptor>(header.exports[1].desc);
             EXPECT_EQ(desc.native, true);
             EXPECT_EQ(desc.signature.return_type.first, "void");
             EXPECT_EQ(desc.signature.return_type.second, false);
@@ -111,7 +111,7 @@ TEST(output, native_binding)
         }
 
         {
-            slang::module_header read_header;
+            slang::module_::module_header read_header;
             slang::file_read_archive read_ar("native_binding.cmod");
             ASSERT_NO_THROW(read_ar & read_header);
 
@@ -121,10 +121,10 @@ TEST(output, native_binding)
 
             ASSERT_EQ(read_header.exports.size(), 2);
 
-            ASSERT_EQ(read_header.exports[0].type, slang::symbol_type::function);
+            ASSERT_EQ(read_header.exports[0].type, slang::module_::symbol_type::function);
             EXPECT_EQ(read_header.exports[0].name, "print");
             {
-                auto desc = std::get<slang::function_descriptor>(read_header.exports[0].desc);
+                auto desc = std::get<slang::module_::function_descriptor>(read_header.exports[0].desc);
                 EXPECT_EQ(desc.native, true);
                 EXPECT_EQ(desc.signature.return_type.first, "void");
                 EXPECT_EQ(desc.signature.return_type.second, false);
@@ -133,10 +133,10 @@ TEST(output, native_binding)
                 EXPECT_EQ(desc.signature.arg_types[0].second, false);
             }
 
-            ASSERT_EQ(read_header.exports[1].type, slang::symbol_type::function);
+            ASSERT_EQ(read_header.exports[1].type, slang::module_::symbol_type::function);
             EXPECT_EQ(read_header.exports[1].name, "println");
             {
-                auto desc = std::get<slang::function_descriptor>(read_header.exports[1].desc);
+                auto desc = std::get<slang::module_::function_descriptor>(read_header.exports[1].desc);
                 EXPECT_EQ(desc.native, true);
                 EXPECT_EQ(desc.signature.return_type.first, "void");
                 EXPECT_EQ(desc.signature.return_type.second, false);
@@ -251,13 +251,13 @@ TEST(output, emitter)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("test_output.bin");
         EXPECT_NO_THROW(write_ar & mod);
     }
     {
-        slang::language_module mod;
+        slang::module_::language_module mod;
         slang::file_read_archive read_ar("test_output.bin");
         EXPECT_NO_THROW(read_ar & mod);
     }
@@ -301,7 +301,7 @@ TEST(output, hello_world)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("hello_world.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -403,7 +403,7 @@ TEST(output, operators)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("operators.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -485,7 +485,7 @@ TEST(output, string_operations)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("string_operations.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -586,7 +586,7 @@ TEST(output, prefix_postfix)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("prefix_postfix.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -654,7 +654,7 @@ TEST(output, control_flow)
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(emitter.run());
 
-    slang::language_module mod = emitter.to_module();
+    slang::module_::language_module mod = emitter.to_module();
 
     slang::file_write_archive write_ar("control_flow.cmod");
     EXPECT_NO_THROW(write_ar & mod);
@@ -702,7 +702,7 @@ TEST(output, loops)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("loops.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -759,7 +759,7 @@ TEST(output, loops)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("loops_bc.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -800,7 +800,7 @@ TEST(output, infinite_recursion)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("inf_recursion.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -848,7 +848,7 @@ TEST(output, arrays)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("arrays.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -924,7 +924,7 @@ TEST(output, arrays)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("return_array.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1060,7 +1060,7 @@ TEST(output, arrays)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("array_length.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1123,7 +1123,7 @@ TEST(output, arrays)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("array_copy.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1191,7 +1191,7 @@ TEST(output, return_discard)
                   " ret i32\n"
                   "}");
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("return_discard.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1233,7 +1233,7 @@ TEST(output, return_discard)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("return_discard_array.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1275,7 +1275,7 @@ TEST(output, return_discard)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("return_discard_strings.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1355,7 +1355,7 @@ TEST(output, structs)
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("structs.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1399,7 +1399,7 @@ TEST(output, structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("structs_access.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1449,7 +1449,7 @@ TEST(output, structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("structs_access2.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1490,7 +1490,7 @@ TEST(output, structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("structs_references.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1532,7 +1532,7 @@ TEST(output, structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("null_dereference.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1579,7 +1579,7 @@ TEST(output, nested_structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("nested_structs.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1631,7 +1631,7 @@ TEST(output, nested_structs)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("nested_structs2.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1679,7 +1679,7 @@ TEST(output, type_imports)
 
         ASSERT_NO_THROW(emitter.run());
 
-        slang::language_module mod = emitter.to_module();
+        slang::module_::language_module mod = emitter.to_module();
 
         slang::file_write_archive write_ar("type_imports.cmod");
         EXPECT_NO_THROW(write_ar & mod);
@@ -1761,7 +1761,7 @@ TEST(output, multiple_modules)
             ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
             ASSERT_NO_THROW(emitter.run());
 
-            slang::language_module mod = emitter.to_module();
+            slang::module_::language_module mod = emitter.to_module();
 
             slang::file_write_archive write_ar(fmt::format("{}.cmod", s.first));
             EXPECT_NO_THROW(write_ar & mod);

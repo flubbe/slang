@@ -27,6 +27,8 @@
 namespace slang::interpreter
 {
 
+namespace ty = slang::typing;
+
 /*
  * Verify size assumptions for arrays.
  */
@@ -44,7 +46,7 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<type_string, bool>& return_type)
+static opcode get_return_opcode(const std::pair<module_::type, bool>& return_type)
 {
     auto& name = std::get<0>(return_type);
 
@@ -84,7 +86,7 @@ static opcode get_return_opcode(const std::pair<type_string, bool>& return_type)
  * @param t The type string.
  * @returns Return whether a type is garbage collected.
  */
-static bool is_garbage_collected(const type_string& t)
+static bool is_garbage_collected(const module_::type& t)
 {
     if(t == "void")
     {
@@ -92,7 +94,7 @@ static bool is_garbage_collected(const type_string& t)
     }
 
     // check for built-in non-gc types.
-    return ty::is_reference_type(t.s);
+    return ty::is_reference_type(static_cast<std::string>(t));
 }
 
 /**
@@ -101,7 +103,7 @@ static bool is_garbage_collected(const type_string& t)
  * @param info The type info.
  * @returns Return whether a type is garbage collected.
  */
-static bool is_garbage_collected(const slang::type_info& info)
+static bool is_garbage_collected(const slang::module_::type_info& info)
 {
     return info.array || is_garbage_collected(info.base_type);
 }
@@ -121,10 +123,10 @@ static bool is_garbage_collected(const std::pair<std::string, bool>& info)
  * function implementation.
  */
 
-function::function(function_signature signature,
+function::function(module_::function_signature signature,
                    std::size_t entry_point,
                    std::size_t size,
-                   std::vector<variable> locals,
+                   std::vector<module_::variable> locals,
                    std::size_t locals_size,
                    std::size_t stack_size)
 : signature{std::move(signature)}
@@ -138,7 +140,7 @@ function::function(function_signature signature,
     ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
-function::function(function_signature signature, std::function<void(operand_stack&)> func)
+function::function(module_::function_signature signature, std::function<void(operand_stack&)> func)
 : signature{std::move(signature)}
 , native{true}
 , entry_point_or_function{std::move(func)}
@@ -160,7 +162,7 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const variable& v)
+static std::size_t get_type_or_reference_size(const module_::variable& v)
 {
     if(v.array || v.reference)
     {
@@ -173,11 +175,11 @@ static std::size_t get_type_or_reference_size(const variable& v)
         return built_in_it->second.first;
     }
 
-    throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", v.type.s));
+    throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", static_cast<std::string>(v.type)));
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const std::pair<type_string, bool>& v)
+static std::size_t get_type_or_reference_size(const std::pair<module_::type, bool>& v)
 {
     if(std::get<1>(v))
     {
@@ -194,8 +196,9 @@ static std::size_t get_type_or_reference_size(const std::pair<type_string, bool>
     return sizeof(void*);
 }
 
-type_properties context::get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                             const std::string& type_name, bool reference) const
+type_properties context::get_type_properties(
+  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::string& type_name, bool reference) const
 {
     // references.
     if(reference)
@@ -226,9 +229,10 @@ type_properties context::get_type_properties(const std::unordered_map<std::strin
     return {type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
 }
 
-field_properties context::get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                               const std::string& type_name,
-                                               std::size_t field_index) const
+field_properties context::get_field_properties(
+  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::string& type_name,
+  std::size_t field_index) const
 {
     // built-in types.
     if(type_name == "void")
@@ -253,7 +257,7 @@ field_properties context::get_field_properties(const std::unordered_map<std::str
     return {field_info.second.size, field_info.second.offset, is_garbage_collected(type_name)};
 }
 
-std::int32_t context::get_stack_delta(const function_signature& s) const
+std::int32_t context::get_stack_delta(const module_::function_signature& s) const
 {
     auto return_type_size = get_type_or_reference_size(s.return_type);
     std::int32_t arg_size = 0;
@@ -265,13 +269,15 @@ std::int32_t context::get_stack_delta(const function_signature& s) const
     return return_type_size - arg_size;
 }
 
-void context::decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map, function_descriptor& desc)
+void context::decode_locals(
+  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  module_::function_descriptor& desc)
 {
     if(desc.native)
     {
         throw interpreter_error("Cannot decode locals for native function.");
     }
-    auto& details = std::get<function_details>(desc.details);
+    auto& details = std::get<module_::function_details>(desc.details);
 
     details.args_size = 0;
     details.locals_size = 0;
@@ -313,12 +319,13 @@ void context::decode_locals(const std::unordered_map<std::string, type_descripto
     details.return_size = get_type_or_reference_size(desc.signature.return_type);
 }
 
-std::int32_t context::decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                         language_module& mod,
-                                         archive& ar,
-                                         std::byte instr,
-                                         const function_details& details,
-                                         std::vector<std::byte>& code) const
+std::int32_t context::decode_instruction(
+  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  module_::language_module& mod,
+  archive& ar,
+  std::byte instr,
+  const module_::function_details& details,
+  std::vector<std::byte>& code) const
 {
     switch(static_cast<opcode>(instr))
     {
@@ -452,7 +459,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
     case opcode::dup_x1:
     {
         // type arguments.
-        type_string t1, t2;
+        module_::type t1, t2;
         ar & t1 & t2;
 
         // "void" is not allowed.
@@ -489,28 +496,36 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
-            if(imp_symbol.type != symbol_type::function)
+            if(imp_symbol.type != module_::symbol_type::function)
             {
                 throw interpreter_error(fmt::format("Cannot resolve call: Import header at index {} does not refer to a function.", -i.i - 1));
             }
 
-            auto& exp_symbol = std::get<exported_symbol*>(imp_symbol.export_reference);
+            auto& exp_symbol = std::get<module_::exported_symbol*>(imp_symbol.export_reference);
             if(exp_symbol->type != imp_symbol.type)
             {
-                throw interpreter_error(fmt::format("Cannot resolve call: Export type for '{}' does not match import type ({} != {}).", imp_symbol.name, slang::to_string(exp_symbol->type), slang::to_string(imp_symbol.type)));
+                throw interpreter_error(
+                  fmt::format(
+                    "Cannot resolve call: Export type for '{}' does not match import type ({} != {}).",
+                    imp_symbol.name,
+                    slang::module_::to_string(exp_symbol->type),
+                    slang::module_::to_string(imp_symbol.type)));
             }
 
-            auto& desc = std::get<function_descriptor>(exp_symbol->desc);
+            auto& desc = std::get<module_::function_descriptor>(exp_symbol->desc);
 
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
-                throw interpreter_error(fmt::format("Package import index {} out of range ({} >= {}).", imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  fmt::format("Package import index {} out of range ({} >= {}).",
+                              imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
             }
 
-            const language_module* mod_ptr = std::get<const language_module*>(mod.header.imports[imp_symbol.package_index].export_reference);
+            const module_::language_module* mod_ptr =
+              std::get<const module_::language_module*>(mod.header.imports[imp_symbol.package_index].export_reference);
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&mod_ptr), reinterpret_cast<const std::byte*>(&mod_ptr) + sizeof(mod_ptr));
 
-            const function_descriptor* desc_ptr = &desc;
+            const module_::function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
 
             if(mod_ptr == nullptr)
@@ -528,16 +543,16 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& exp_symbol = mod.header.exports[i.i];
-            if(exp_symbol.type != symbol_type::function)
+            if(exp_symbol.type != module_::symbol_type::function)
             {
                 throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
             }
-            auto& desc = std::get<function_descriptor>(exp_symbol.desc);
+            auto& desc = std::get<module_::function_descriptor>(exp_symbol.desc);
 
-            const language_module* mod_ptr = &mod;
+            const module_::language_module* mod_ptr = &mod;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&mod_ptr), reinterpret_cast<const std::byte*>(&mod_ptr) + sizeof(mod_ptr));
 
-            const function_descriptor* desc_ptr = &desc;
+            const module_::function_descriptor* desc_ptr = &desc;
             code.insert(code.end(), reinterpret_cast<const std::byte*>(&desc_ptr), reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
 
             if(desc.native && !static_cast<bool>(std::get<1>(desc.details).func))
@@ -610,7 +625,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
-            if(imp_symbol.type != symbol_type::type)
+            if(imp_symbol.type != module_::symbol_type::type)
             {
                 throw interpreter_error(fmt::format(
                   "Cannot resolve type: Import header entry at index {} is not a type.",
@@ -625,7 +640,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
-            if(imp_package.type != symbol_type::package)
+            if(imp_package.type != module_::symbol_type::package)
             {
                 throw interpreter_error(fmt::format(
                   "Cannot resolve package: Import header entry at index {} is not a package.",
@@ -664,7 +679,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& exp_symbol = mod.header.exports[i.i];
-            if(exp_symbol.type != symbol_type::type)
+            if(exp_symbol.type != module_::symbol_type::type)
             {
                 throw interpreter_error(fmt::format(
                   "Cannot resolve type: Export header entry at index {} is not a type.",
@@ -700,7 +715,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
-            if(imp_symbol.type != symbol_type::type)
+            if(imp_symbol.type != module_::symbol_type::type)
             {
                 throw interpreter_error(fmt::format(
                   "Cannot resolve type: Import header entry at index {} is not a type.",
@@ -715,7 +730,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
-            if(imp_package.type != symbol_type::package)
+            if(imp_package.type != module_::symbol_type::package)
             {
                 throw interpreter_error(fmt::format(
                   "Cannot resolve package: Import header entry at index {} is not a package.",
@@ -751,7 +766,7 @@ std::int32_t context::decode_instruction(const std::unordered_map<std::string, t
             }
 
             auto& exp_symbol = mod.header.exports[struct_index.i];
-            if(exp_symbol.type != symbol_type::type)
+            if(exp_symbol.type != module_::symbol_type::type)
             {
                 throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
             }
@@ -795,8 +810,9 @@ std::function<void(operand_stack&)> context::resolve_native_function(const std::
     return func_it->second;
 }
 
-void context::decode_types(std::unordered_map<std::string, type_descriptor>& type_map,
-                           const language_module& mod)
+void context::decode_types(
+  std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const module_::language_module& mod)
 {
     for(auto& [name, desc]: type_map)
     {
@@ -830,7 +846,7 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
             {
                 if(type_map.find(member_type.base_type) == type_map.end())
                 {
-                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", member_type.base_type.s));
+                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", static_cast<std::string>(member_type.base_type)));
                 }
 
                 // size and alignment are the same for both array and non-array types.
@@ -874,15 +890,16 @@ void context::decode_types(std::unordered_map<std::string, type_descriptor>& typ
     }
 }
 
-std::unique_ptr<language_module> context::decode(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                                 const language_module& mod)
+std::unique_ptr<module_::language_module> context::decode(
+  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const module_::language_module& mod)
 {
     if(mod.is_decoded())
     {
         throw interpreter_error("Tried to decode a module that already is decoded.");
     }
 
-    module_header header = mod.get_header();
+    module_::module_header header = mod.get_header();
     memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
 
     /*
@@ -890,7 +907,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
      */
     for(auto& it: header.imports)
     {
-        if(it.type == symbol_type::package)
+        if(it.type == module_::symbol_type::package)
         {
             // packages are loaded while resolving other symbols.
             continue;
@@ -901,7 +918,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
         {
             throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
         }
-        else if(header.imports[it.package_index].type != symbol_type::package)
+        else if(header.imports[it.package_index].type != module_::symbol_type::package)
         {
             throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
         }
@@ -913,7 +930,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
         fs::path resolved_path = file_mgr.resolve(fs_path);
         std::unique_ptr<slang::file_archive> ar = file_mgr.open(resolved_path, slang::file_manager::open_mode::read);
 
-        language_module import_mod;
+        module_::language_module import_mod;
         (*ar) & import_mod;
 
         if(module_map.find(import_name) == module_map.end())
@@ -923,34 +940,43 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
         }
 
         // find the imported symbol.
-        module_header& import_header = module_map[import_name]->header;
+        module_::module_header& import_header = module_map[import_name]->header;
         auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
-                                   [&it](const exported_symbol& exp) -> bool
+                                   [&it](const module_::exported_symbol& exp) -> bool
                                    {
                                        return exp.name == it.name;
                                    });
         if(exp_it == import_header.exports.end())
         {
-            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.", it.name, import_name));
+            throw interpreter_error(
+              fmt::format(
+                "Error while resolving imports: Symbol '{}' is not exported by module '{}'.",
+                it.name, import_name));
         }
         if(exp_it->type != it.type)
         {
-            throw interpreter_error(fmt::format("Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').", it.name, import_name, slang::to_string(it.type), slang::to_string(exp_it->type)));
+            throw interpreter_error(
+              fmt::format(
+                "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
+                it.name,
+                import_name,
+                slang::module_::to_string(it.type),
+                slang::module_::to_string(exp_it->type)));
         }
 
         it.export_reference = &(*exp_it);
 
         // resolve symbol
-        if(it.type != symbol_type::function)
+        if(it.type != module_::symbol_type::function)
         {
             continue;
         }
 
-        auto& desc = std::get<function_descriptor>(exp_it->desc);
+        auto& desc = std::get<module_::function_descriptor>(exp_it->desc);
         if(desc.native)
         {
             // resolve native function.
-            auto& details = std::get<native_function_details>(desc.details);
+            auto& details = std::get<module_::native_function_details>(desc.details);
             details.func = resolve_native_function(exp_it->name, details.library_name);
         }
     }
@@ -960,16 +986,16 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
      */
     for(auto& it: header.exports)
     {
-        if(it.type != symbol_type::function)
+        if(it.type != module_::symbol_type::function)
         {
             continue;
         }
 
-        auto& desc = std::get<function_descriptor>(it.desc);
+        auto& desc = std::get<module_::function_descriptor>(it.desc);
         if(desc.native)
         {
             // resolve native function.
-            auto& details = std::get<native_function_details>(desc.details);
+            auto& details = std::get<module_::native_function_details>(desc.details);
             details.func = resolve_native_function(it.name, details.library_name);
             continue;
         }
@@ -978,7 +1004,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
     }
 
     // store header in decoded module.
-    auto decoded_module = std::make_unique<language_module>(std::move(header));
+    auto decoded_module = std::make_unique<module_::language_module>(std::move(header));
 
     /*
      * instructions.
@@ -986,18 +1012,18 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
     std::vector<std::byte> code;
     for(auto& it: decoded_module->header.exports)
     {
-        if(it.type != symbol_type::function)
+        if(it.type != module_::symbol_type::function)
         {
             continue;
         }
 
-        auto& desc = std::get<function_descriptor>(it.desc);
+        auto& desc = std::get<module_::function_descriptor>(it.desc);
         if(desc.native)
         {
             continue;
         }
 
-        auto& details = std::get<function_details>(desc.details);
+        auto& details = std::get<module_::function_details>(desc.details);
 
         std::size_t bytecode_end = details.offset + details.size;
 
@@ -1034,7 +1060,7 @@ std::unique_ptr<language_module> context::decode(const std::unordered_map<std::s
         details.size = code.size() - details.offset;
         details.stack_size = max_stack_size;
 
-        // jumps target resolution.
+        // jump target resolution.
         for(auto& [origin, id]: decoded_module->jump_origins)
         {
             auto target_it = decoded_module->jump_targets.find(id);
@@ -1059,7 +1085,7 @@ class locals_scope
     context& ctx;
 
     /** Locals. */
-    const std::vector<variable>& locals;
+    const std::vector<module_::variable>& locals;
 
     /** The function's stack frame. */
     stack_frame& frame;
@@ -1076,7 +1102,7 @@ public:
      * @param locals The locals.
      * @param frame The stack frame.
      */
-    locals_scope(context& ctx, const std::vector<variable>& locals, stack_frame& frame)
+    locals_scope(context& ctx, const std::vector<module_::variable>& locals, stack_frame& frame)
     : ctx{ctx}
     , locals{locals}
     , frame{frame}
@@ -1150,11 +1176,12 @@ static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offse
     return v;
 }
 
-opcode context::exec(const language_module& mod,
-                     std::size_t entry_point,
-                     std::size_t size,
-                     const std::vector<variable>& locals,
-                     stack_frame& frame)
+opcode context::exec(
+  const module_::language_module& mod,
+  std::size_t entry_point,
+  std::size_t size,
+  const std::vector<module_::variable>& locals,
+  stack_frame& frame)
 {
     if(!mod.is_decoded())
     {
@@ -1614,19 +1641,19 @@ opcode context::exec(const language_module& mod,
         {
             /* no out-of-bounds read possible, since this is checked during decode.
              * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-            language_module const* callee_mod;
+            module_::language_module const* callee_mod;
             std::memcpy(&callee_mod, &binary[offset], sizeof(callee_mod));
             offset += sizeof(callee_mod);
 
             /* no out-of-bounds read possible, since this is checked during decode.
              * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-            function_descriptor const* desc;
+            module_::function_descriptor const* desc;
             std::memcpy(&desc, &binary[offset], sizeof(desc));
             offset += sizeof(desc);
 
             if(desc->native)
             {
-                auto& details = std::get<native_function_details>(desc->details);
+                auto& details = std::get<module_::native_function_details>(desc->details);
                 if(!details.func)
                 {
                     throw interpreter_error("Tried to invoke unresolved native function.");
@@ -1636,7 +1663,7 @@ opcode context::exec(const language_module& mod,
             }
             else
             {
-                auto& details = std::get<function_details>(desc->details);
+                auto& details = std::get<module_::function_details>(desc->details);
 
                 // prepare stack frame
                 stack_frame callee_frame{frame.string_table, details.locals_size, details.stack_size};
@@ -1693,15 +1720,15 @@ opcode context::exec(const language_module& mod,
                 throw interpreter_error(fmt::format("Invalid array size '{}'.", size));
             }
 
-            if(type == static_cast<std::uint8_t>(array_type::i32))
+            if(type == static_cast<std::uint8_t>(module_::array_type::i32))
             {
                 frame.stack.push_addr(gc.gc_new_array<std::int32_t>(size, gc::gc_object::of_temporary));
             }
-            else if(type == static_cast<std::uint8_t>(array_type::f32))
+            else if(type == static_cast<std::uint8_t>(module_::array_type::f32))
             {
                 frame.stack.push_addr(gc.gc_new_array<float>(size, gc::gc_object::of_temporary));
             }
-            else if(type == static_cast<std::uint8_t>(array_type::str))
+            else if(type == static_cast<std::uint8_t>(module_::array_type::str))
             {
                 auto array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
                 for(std::string*& s: *array)
@@ -1710,7 +1737,7 @@ opcode context::exec(const language_module& mod,
                 }
                 frame.stack.push_addr(array);
             }
-            else if(type == static_cast<std::uint8_t>(array_type::ref))
+            else if(type == static_cast<std::uint8_t>(module_::array_type::ref))
             {
                 frame.stack.push_addr(gc.gc_new_array<void*>(size, gc::gc_object::of_temporary));
             }
@@ -2030,7 +2057,7 @@ public:
      */
     arguments_scope(context& ctx,
                     const std::vector<value>& args,
-                    const std::vector<std::pair<type_string, bool>>& arg_types,
+                    const std::vector<std::pair<module_::type, bool>>& arg_types,
                     std::vector<std::byte>& locals)
     : args{args}
     , locals{locals}
@@ -2042,7 +2069,7 @@ public:
             {
                 throw interpreter_error(
                   fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
-                              i, std::get<0>(arg_types[i]).s, std::get<0>(args[i].get_type())));
+                              i, static_cast<std::string>(std::get<0>(arg_types[i])), std::get<0>(args[i].get_type())));
             }
 
             if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
@@ -2085,9 +2112,10 @@ public:
     }
 };
 
-value context::exec(const language_module& mod,
-                    const function& f,
-                    std::vector<value> args)
+value context::exec(
+  const module_::language_module& mod,
+  const function& f,
+  std::vector<value> args)
 {
     /*
      * allocate locals and decode arguments.
@@ -2194,7 +2222,7 @@ void context::register_native_function(const std::string& mod_name, std::string 
     }
 }
 
-void context::load_module(const std::string& name, const language_module& mod)
+void context::load_module(const std::string& name, const module_::language_module& mod)
 {
     DEBUG_LOG("load_module: {}", name);
 
@@ -2204,10 +2232,10 @@ void context::load_module(const std::string& name, const language_module& mod)
     }
 
     // populate type map before decoding the module.
-    std::unordered_map<std::string, type_descriptor> tmap;
+    std::unordered_map<std::string, module_::type_descriptor> tmap;
     for(auto& it: mod.header.exports)
     {
-        if(it.type != symbol_type::type)
+        if(it.type != module_::symbol_type::type)
         {
             continue;
         }
@@ -2217,7 +2245,7 @@ void context::load_module(const std::string& name, const language_module& mod)
             throw interpreter_error(fmt::format("Type '{}' already exists in exports.", it.name));
         }
 
-        tmap.insert({it.name, std::get<type_descriptor>(it.desc)});
+        tmap.insert({it.name, std::get<module_::type_descriptor>(it.desc)});
     }
 
     decode_types(tmap, mod);
@@ -2225,13 +2253,13 @@ void context::load_module(const std::string& name, const language_module& mod)
 
     // decode the module.
     module_map.insert({name, decode(type_map[name], mod)});
-    module_header& decoded_header = module_map[name]->header;
+    module_::module_header& decoded_header = module_map[name]->header;
 
     // populate function map.
     std::unordered_map<std::string, function> fmap;
     for(auto& it: decoded_header.exports)
     {
-        if(it.type != symbol_type::function)
+        if(it.type != module_::symbol_type::function)
         {
             continue;
         }
@@ -2241,10 +2269,10 @@ void context::load_module(const std::string& name, const language_module& mod)
             throw interpreter_error(fmt::format("Function '{}' already exists in exports.", it.name));
         }
 
-        auto& desc = std::get<function_descriptor>(it.desc);
+        auto& desc = std::get<module_::function_descriptor>(it.desc);
         if(desc.native)
         {
-            auto& details = std::get<native_function_details>(desc.details);
+            auto& details = std::get<module_::native_function_details>(desc.details);
             auto mod_it = native_function_map.find(details.library_name);
             if(mod_it == native_function_map.end())
             {
@@ -2262,7 +2290,7 @@ void context::load_module(const std::string& name, const language_module& mod)
         }
         else
         {
-            auto& details = std::get<function_details>(desc.details);
+            auto& details = std::get<module_::function_details>(desc.details);
             fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals, details.locals_size, details.stack_size}});
         }
     }

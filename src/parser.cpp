@@ -788,7 +788,7 @@ std::unique_ptr<ast::expression> parser::parse_unary()
     }
 
     get_next_token();
-    return std::make_unique<ast::unary_ast>(current_token->location, std::move(op), parse_unary());
+    return std::make_unique<ast::unary_expression>(current_token->location, std::move(op), parse_unary());
 }
 
 // new_expr ::= 'new' identifier '[' expr ']'

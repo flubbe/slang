@@ -55,7 +55,7 @@ class instruction_emitter
     memory_write_archive instruction_buffer;
 
     /** Function details. */
-    std::unordered_map<std::string, function_details> func_details;
+    std::unordered_map<std::string, module_::function_details> func_details;
 
     /** Referenced jump targets. */
     std::set<std::string> jump_targets;
@@ -114,7 +114,7 @@ public:
      *
      * @returns A module representing the context state.
      */
-    language_module to_module() const;
+    module_::language_module to_module() const;
 };
 
 }    // namespace slang

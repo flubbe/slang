@@ -18,7 +18,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
-#include "type.h"
+#include "type.h" /* for slang::typing::is_reference_type */
 
 /* Forward declarations. */
 namespace slang::interpreter
@@ -27,7 +27,7 @@ class operand_stack;
 class context;
 };    // namespace slang::interpreter
 
-namespace slang
+namespace slang::module_
 {
 
 namespace si = slang::interpreter;
@@ -177,49 +177,50 @@ std::string encode_type(const std::string& t);
  */
 std::string decode_type(const std::string& t);
 
-/** A type string that can be en-/decoded. */
-struct type_string
+/** The type stored in the module. */
+class type
 {
     /** The string. */
     std::string s;
 
+public:
     /** Default constructors. */
-    type_string() = default;
-    type_string(const type_string&) = default;
-    type_string(type_string&&) = default;
+    type() = default;
+    type(const type&) = default;
+    type(type&&) = default;
 
     /** Default assignments. */
-    type_string& operator=(const type_string&) = default;
-    type_string& operator=(type_string&&) = default;
+    type& operator=(const type&) = default;
+    type& operator=(type&&) = default;
 
     /** Initialize from a `std::string`. */
-    type_string(std::string s)
+    type(std::string s)
     : s{std::move(s)}
     {
     }
 
     /** String assignment. */
-    type_string& operator=(const std::string& s)
+    type& operator=(const std::string& s)
     {
         this->s = s;
         return *this;
     }
 
     /** String assignment. */
-    type_string& operator=(std::string&& s)
+    type& operator=(std::string&& s)
     {
         this->s = std::move(s);
         return *this;
     }
 
     /** Comparison. */
-    bool operator==(const type_string& ts) const
+    bool operator==(const type& ts) const
     {
         return this->s == ts.s;
     }
 
     /** Comparison. */
-    bool operator!=(const type_string& ts) const
+    bool operator!=(const type& ts) const
     {
         return !(*this == ts);
     }
@@ -275,13 +276,13 @@ struct type_string
  * @param ar The archive to use for serialization.
  * @param ts The type string.
  */
-archive& operator&(archive& ar, type_string& ts);
+archive& operator&(archive& ar, type& ts);
 
 /** A variable. */
 struct variable : public symbol
 {
     /** The variable's type. */
-    type_string type;
+    type type;
 
     /** Whether this is an array type. */
     bool array;
@@ -330,10 +331,10 @@ inline archive& operator&(archive& ar, variable& v)
 struct function_signature
 {
     /** Return type. */
-    std::pair<type_string, bool> return_type;
+    std::pair<type, bool> return_type;
 
     /** Argument type list. */
-    std::vector<std::pair<type_string, bool>> arg_types;
+    std::vector<std::pair<type, bool>> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -355,7 +356,7 @@ struct function_signature
     : return_type{std::move(return_type)}
     {
         std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
-                       [](const auto& arg) -> std::pair<type_string, bool>
+                       [](const auto& arg) -> std::pair<type, bool>
                        {
                            return {arg.first, arg.second};
                        });
@@ -556,7 +557,7 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
 struct type_info
 {
     /** The field's base type: i32, f32, str, or a struct name. */
-    type_string base_type;
+    type base_type;
 
     /** Whether this is an array. */
     bool array{false};
@@ -986,4 +987,4 @@ inline archive& operator&(archive& ar, language_module& mod)
     return ar;
 }
 
-}    // namespace slang
+}    // namespace slang::module_

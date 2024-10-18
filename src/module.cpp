@@ -14,7 +14,7 @@
 
 #include "module.h"
 
-namespace slang
+namespace slang::module_
 {
 
 /*
@@ -68,7 +68,7 @@ std::string decode_type(const std::string& t)
     throw module_error(fmt::format("Cannot decode unknown type '{}'.", t));
 }
 
-archive& operator&(archive& ar, type_string& ts)
+archive& operator&(archive& ar, type& ts)
 {
     if(ar.is_reading())
     {
@@ -198,4 +198,4 @@ void language_module::add_type(std::string name, std::vector<std::pair<std::stri
     header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 
-}    // namespace slang
+}    // namespace slang::module_

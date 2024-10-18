@@ -1401,10 +1401,10 @@ std::string binary_expression::to_string() const
 }
 
 /*
- * unary_ast.
+ * unary_expression.
  */
 
-std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -1487,7 +1487,7 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
     else if(op.s == "!")
     {
         // TODO
-        throw std::runtime_error(fmt::format("{}: unary_ast::generate_code not implemented for logical not.", slang::to_string(loc)));
+        throw std::runtime_error(fmt::format("{}: unary_expression::generate_code not implemented for logical not.", slang::to_string(loc)));
     }
     else if(op.s == "~")
     {
@@ -1513,7 +1513,7 @@ std::unique_ptr<cg::value> unary_ast::generate_code(cg::context& ctx, memory_con
     throw std::runtime_error(fmt::format("{}: Code generation for unary operator '{}' not implemented.", slang::to_string(loc), op.s));
 }
 
-std::optional<ty::type> unary_ast::type_check(ty::context& ctx)
+std::optional<ty::type> unary_expression::type_check(ty::context& ctx)
 {
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
       {"++", {"i32", "f32"}},
@@ -1544,7 +1544,7 @@ std::optional<ty::type> unary_ast::type_check(ty::context& ctx)
     return ctx.get_type(*type_it, false);
 }
 
-std::string unary_ast::to_string() const
+std::string unary_expression::to_string() const
 {
     return fmt::format("Unary(op=\"{}\", operand={})", op.s, operand ? operand->to_string() : std::string("<none>"));
 }
@@ -1712,14 +1712,14 @@ std::string postfix_expression::to_string() const
 }
 
 /*
- * prototype_ast.
+ * prototype.
  */
 
 cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
     {
-        throw cg::codegen_error(loc, "Invalid memory context for prototype_ast.");
+        throw cg::codegen_error(loc, "Invalid memory context for prototype.");
     }
 
     std::vector<std::unique_ptr<cg::value>> function_args;

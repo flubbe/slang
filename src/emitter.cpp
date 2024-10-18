@@ -94,7 +94,7 @@ void instruction_emitter::collect_imports()
                             throw emitter_error(fmt::format("Could not resolve imported function '{}'.", *arg->get_value()->get_name()));
                         }
 
-                        ctx.add_import(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
+                        ctx.add_import(module_::symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name());
                     }
                 }
                 else if(instr->get_name() == "new")
@@ -119,7 +119,7 @@ void instruction_emitter::collect_imports()
                             throw emitter_error(fmt::format("Could not resolve imported type '{}'.", *arg->get_value()->get_name()));
                         }
 
-                        ctx.add_import(symbol_type::type, *(*import_it)->get_import_path(), (*import_it)->get_name());
+                        ctx.add_import(module_::symbol_type::type, *(*import_it)->get_import_path(), (*import_it)->get_name());
                     }
                 }
             }
@@ -353,11 +353,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            type_string v_type = v->get_type().to_string();
+            module_::type v_type = v->get_type().to_string();
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
-            type_string s_type = stack_arg->get_value()->get_type().to_string();
+            module_::type s_type = stack_arg->get_value()->get_type().to_string();
 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x1);
@@ -432,7 +432,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             throw emitter_error(fmt::format("Could not resolve imported function '{}'.", *arg->get_value()->get_name()));
         }
 
-        vle_int index = -ctx.get_import_index(symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name()) - 1;
+        vle_int index = -ctx.get_import_index(module_::symbol_type::function, *(*import_it)->get_import_path(), (*import_it)->get_name()) - 1;
         emit(instruction_buffer, opcode::invoke);
         instruction_buffer & index;
     }
@@ -474,7 +474,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                               [&struct_it](const cg::imported_symbol& s) -> bool
                                               {
-                                                  return s.type == symbol_type::type
+                                                  return s.type == module_::symbol_type::type
                                                          && s.name == (*struct_it)->get_name()
                                                          && s.import_path == (*struct_it)->get_import_path();
                                               });
@@ -541,7 +541,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                               [&struct_it](const cg::imported_symbol& s) -> bool
                                               {
-                                                  return s.type == symbol_type::type
+                                                  return s.type == module_::symbol_type::type
                                                          && s.name == (*struct_it)->get_name()
                                                          && s.import_path == (*struct_it)->get_import_path();
                                               });
@@ -705,7 +705,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                               [&it](const cg::imported_symbol& s) -> bool
                                               {
-                                                  return s.type == symbol_type::type
+                                                  return s.type == module_::symbol_type::type
                                                          && s.name == (*it)->get_name()
                                                          && s.import_path == (*it)->get_import_path();
                                               });
@@ -742,22 +742,22 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         auto& args = instr->get_args();
         auto type_class = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().get_type_class();
 
-        array_type type;
+        module_::array_type type;
         if(type_class == cg::type_class::i32)
         {
-            type = array_type::i32;
+            type = module_::array_type::i32;
         }
         else if(type_class == cg::type_class::f32)
         {
-            type = array_type::f32;
+            type = module_::array_type::f32;
         }
         else if(type_class == cg::type_class::str)
         {
-            type = array_type::str;
+            type = module_::array_type::str;
         }
         else if(type_class == cg::type_class::struct_)
         {
-            type = array_type::ref;
+            type = module_::array_type::ref;
         }
         else
         {
@@ -831,7 +831,7 @@ void instruction_emitter::run()
         auto& func_locals = f->get_scope()->get_locals();
         const std::size_t local_count = func_args.size() + func_locals.size();
 
-        std::vector<variable> locals{local_count};
+        std::vector<module_::variable> locals{local_count};
 
         std::set<std::size_t> unset_indices;
         for(std::size_t i = 0; i < local_count; ++i)
@@ -911,13 +911,15 @@ void instruction_emitter::run()
     // check that the import count did not change
     if(import_count != ctx.imports.size())
     {
-        throw emitter_error(fmt::format("Import count changed during instruction emission ({} -> {}).", import_count, ctx.imports.size()));
+        throw emitter_error(
+          fmt::format("Import count changed during instruction emission ({} -> {}).",
+                      import_count, ctx.imports.size()));
     }
 }
 
-language_module instruction_emitter::to_module() const
+module_::language_module instruction_emitter::to_module() const
 {
-    language_module mod;
+    module_::language_module mod;
 
     /*
      * imports.
@@ -927,7 +929,7 @@ language_module instruction_emitter::to_module() const
     std::vector<std::string> packages;
     for(const auto& it: ctx.imports)
     {
-        if(it.type == symbol_type::package)
+        if(it.type == module_::symbol_type::package)
         {
             auto p_it = std::find(packages.begin(), packages.end(), it.name);
             if(p_it != packages.end())
@@ -941,7 +943,7 @@ language_module instruction_emitter::to_module() const
             auto p_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                      [&it](auto& s) -> bool
                                      {
-                                         return s.type == symbol_type::package && s.name == it.import_path;
+                                         return s.type == module_::symbol_type::package && s.name == it.import_path;
                                      });
             if(p_it == ctx.imports.end())
             {
@@ -962,7 +964,7 @@ language_module instruction_emitter::to_module() const
         auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                       [&it](auto& s) -> bool
                                       {
-                                          return s.type == symbol_type::package && s.name == it.import_path;
+                                          return s.type == module_::symbol_type::package && s.name == it.import_path;
                                       });
         if(import_it != ctx.imports.end())
         {
@@ -982,7 +984,7 @@ language_module instruction_emitter::to_module() const
     }
     for(const auto& it: packages)
     {
-        mod.add_import(symbol_type::package, it);
+        mod.add_import(module_::symbol_type::package, it);
     }
 
     // strings.
@@ -1004,7 +1006,7 @@ language_module instruction_emitter::to_module() const
             auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                           [&it](const cg::imported_symbol& s) -> bool
                                           {
-                                              return s.type == symbol_type::type
+                                              return s.type == module_::symbol_type::type
                                                      && s.name == it->get_name()
                                                      && s.import_path == it->get_import_path();
                                           });
@@ -1019,10 +1021,10 @@ language_module instruction_emitter::to_module() const
         }
 
         auto members = it->get_members();
-        std::vector<std::pair<std::string, type_info>> transformed_members;
+        std::vector<std::pair<std::string, module_::type_info>> transformed_members;
 
         std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, type_info>
+                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::type_info>
                        {
                            const auto& t = std::get<1>(m);
 
@@ -1033,7 +1035,7 @@ language_module instruction_emitter::to_module() const
                                auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                                              [&t](const cg::imported_symbol& s) -> bool
                                                              {
-                                                                 return s.type == symbol_type::type
+                                                                 return s.type == module_::symbol_type::type
                                                                         && s.name == t.get_type().base_type().to_string()
                                                                         && s.import_path == t.get_type().base_type().get_import_path();
                                                              });
@@ -1049,7 +1051,7 @@ language_module instruction_emitter::to_module() const
 
                            return std::make_pair(
                              std::get<0>(m),
-                             type_info{
+                             module_::type_info{
                                t.get_type().base_type().to_string(),
                                t.get_type().is_array(),
                                import_index});

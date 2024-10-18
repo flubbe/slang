@@ -19,6 +19,8 @@
 namespace slang::codegen
 {
 
+namespace ty = slang::typing;
+
 /*
  * Exceptions.
  */
@@ -535,7 +537,7 @@ std::string struct_::to_string() const
  * context.
  */
 
-void context::add_import(symbol_type type, std::string import_path, std::string name)
+void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
 {
     auto it = std::find_if(imports.begin(), imports.end(),
                            [&name](const imported_symbol& s) -> bool
@@ -552,7 +554,11 @@ void context::add_import(symbol_type type, std::string import_path, std::string 
 
         if(it->type != type)
         {
-            throw codegen_error(fmt::format("Found different symbol types for import '{}': '{}' and '{}'.", name, slang::to_string(it->type), slang::to_string(type)));
+            throw codegen_error(
+              fmt::format("Found different symbol types for import '{}': '{}' and '{}'.",
+                          name,
+                          slang::module_::to_string(it->type),
+                          slang::module_::to_string(type)));
         }
     }
     else
@@ -562,7 +568,7 @@ void context::add_import(symbol_type type, std::string import_path, std::string 
     }
 }
 
-std::size_t context::get_import_index(symbol_type type, std::string import_path, std::string name) const
+std::size_t context::get_import_index(module_::symbol_type type, std::string import_path, std::string name) const
 {
     auto it = std::find_if(imports.begin(), imports.end(),
                            [&name](const imported_symbol& s) -> bool
@@ -578,13 +584,21 @@ std::size_t context::get_import_index(symbol_type type, std::string import_path,
 
         if(it->type != type)
         {
-            throw codegen_error(fmt::format("Found different symbol types for import '{}': '{}' and '{}'.", name, slang::to_string(it->type), slang::to_string(type)));
+            throw codegen_error(
+              fmt::format("Found different symbol types for import '{}': '{}' and '{}'.",
+                          name,
+                          slang::module_::to_string(it->type),
+                          slang::module_::to_string(type)));
         }
 
         return std::distance(imports.begin(), it);
     }
 
-    throw codegen_error(fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.", name, slang::to_string(type), import_path));
+    throw codegen_error(
+      fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.",
+                  name,
+                  slang::module_::to_string(type),
+                  import_path));
 }
 
 struct_* context::add_type(std::string name,

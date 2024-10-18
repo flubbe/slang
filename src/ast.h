@@ -935,7 +935,7 @@ public:
 };
 
 /** Unary operators. */
-class unary_ast : public expression
+class unary_expression : public expression
 {
     /** The operator. */
     token op;
@@ -945,18 +945,18 @@ class unary_ast : public expression
 
 public:
     /** No default constructor. */
-    unary_ast() = delete;
+    unary_expression() = delete;
 
     /** Default destructor. */
-    virtual ~unary_ast() = default;
+    virtual ~unary_expression() = default;
 
     /** Copy and move constructors. */
-    unary_ast(const unary_ast&) = delete;
-    unary_ast(unary_ast&&) = default;
+    unary_expression(const unary_expression&) = delete;
+    unary_expression(unary_expression&&) = default;
 
     /** Assignment operators. */
-    unary_ast& operator=(const unary_ast&) = delete;
-    unary_ast& operator=(unary_ast&&) = default;
+    unary_expression& operator=(const unary_expression&) = delete;
+    unary_expression& operator=(unary_expression&&) = default;
 
     /**
      * Construct a unary expression.
@@ -965,7 +965,7 @@ public:
      * @param op The operator.
      * @param operand The operand.
      */
-    unary_ast(token_location loc, token op, std::unique_ptr<expression> operand)
+    unary_expression(token_location loc, token op, std::unique_ptr<expression> operand)
     : expression{std::move(loc)}
     , op{std::move(op)}
     , operand{std::move(operand)}

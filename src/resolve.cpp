@@ -35,7 +35,7 @@ resolve_error::resolve_error(const token_location& loc, const std::string& messa
  * resolver context.
  */
 
-module_header& context::get_module_header(const fs::path& resolved_path)
+module_::module_header& context::get_module_header(const fs::path& resolved_path)
 {
     std::string path_str = resolved_path.string();
     auto it = headers.find(path_str);
@@ -46,7 +46,7 @@ module_header& context::get_module_header(const fs::path& resolved_path)
 
     std::unique_ptr<slang::file_archive> ar = mgr.open(resolved_path, slang::file_manager::open_mode::read);
 
-    module_header hdr;
+    module_::module_header hdr;
     (*ar) & hdr;
 
     auto insert_it = headers.insert({path_str, std::move(hdr)});
@@ -82,11 +82,11 @@ void context::resolve_module(const fs::path& resolved_path)
 
     modules.push_back({resolved_path.string(), false});
 
-    module_header& header = get_module_header(resolved_path);
+    module_::module_header& header = get_module_header(resolved_path);
 
     for(auto& it: header.imports)
     {
-        if(it.type == symbol_type::package)
+        if(it.type == module_::symbol_type::package)
         {
             // packages are loaded while resolving other symbols.
             continue;
@@ -97,7 +97,7 @@ void context::resolve_module(const fs::path& resolved_path)
         {
             throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
         }
-        else if(header.imports[it.package_index].type != symbol_type::package)
+        else if(header.imports[it.package_index].type != module_::symbol_type::package)
         {
             throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
         }
@@ -107,10 +107,10 @@ void context::resolve_module(const fs::path& resolved_path)
         resolve_module(resolved_import_path);
 
         // find the imported symbol.
-        module_header& import_header = get_module_header(resolved_import_path);
+        module_::module_header& import_header = get_module_header(resolved_import_path);
 
         auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
-                                   [&it](const exported_symbol& exp) -> bool
+                                   [&it](const module_::exported_symbol& exp) -> bool
                                    {
                                        return exp.name == it.name;
                                    });
@@ -125,28 +125,30 @@ void context::resolve_module(const fs::path& resolved_path)
             throw resolve_error(
               fmt::format(
                 "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
-                it.name, header.imports[it.package_index].name, slang::to_string(it.type), slang::to_string(exp_it->type)));
+                it.name, header.imports[it.package_index].name,
+                slang::module_::to_string(it.type),
+                slang::module_::to_string(exp_it->type)));
         }
     }
 
     for(auto& it: header.exports)
     {
         // resolve the symbol.
-        if(it.type == symbol_type::function)
+        if(it.type == module_::symbol_type::function)
         {
             if(imported_functions.find(resolved_path.string()) == imported_functions.end())
             {
                 imported_functions.insert({resolved_path.string(), {}});
             }
-            imported_functions[resolved_path.string()].push_back({it.name, std::get<function_descriptor>(it.desc)});
+            imported_functions[resolved_path.string()].push_back({it.name, std::get<module_::function_descriptor>(it.desc)});
         }
-        else if(it.type == symbol_type::type)
+        else if(it.type == module_::symbol_type::type)
         {
             if(imported_types.find(resolved_path.string()) == imported_types.end())
             {
                 imported_types.insert({resolved_path.string(), {}});
             }
-            imported_types[resolved_path.string()].push_back({it.name, std::get<type_descriptor>(it.desc)});
+            imported_types[resolved_path.string()].push_back({it.name, std::get<module_::type_descriptor>(it.desc)});
         }
         else
         {
@@ -258,7 +260,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 {
                     std::vector<std::pair<std::string, cg::value>> members;
                     std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
-                                   [&import_path](const std::pair<std::string, type_info>& member) -> std::pair<std::string, cg::value>
+                                   [&import_path](const std::pair<std::string, module_::type_info>& member) -> std::pair<std::string, cg::value>
                                    {
                                        if(ty::is_builtin_type(std::get<1>(member).base_type))
                                        {
@@ -280,7 +282,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                                          std::get<0>(member)}};
                                    });
 
-                    ctx.add_import(symbol_type::type, import_path, it.first);
+                    ctx.add_import(module_::symbol_type::type, import_path, it.first);
                     ctx.add_type(it.first, members, import_path);
                     ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
                 }

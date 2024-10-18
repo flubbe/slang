@@ -44,7 +44,7 @@ public:
  * Result and argument type.
  *
  * @note A `value` is implemented using `std::any`. This means methods accessing
- * the data potentially throw a `std::bad_any_cast` (that is, all methods except
+ * the data potentially throws a `std::bad_any_cast` (that is, all methods except
  * `value::get_size` and `value::get_type`).
  */
 class value
@@ -647,7 +647,7 @@ public:
 class function
 {
     /** Function signature. */
-    function_signature signature;
+    module_::function_signature signature;
 
     /** Whether this is a native function. */
     bool native;
@@ -662,7 +662,7 @@ class function
     opcode ret_opcode;
 
     /** Locals. Not serialized. */
-    std::vector<variable> locals;
+    std::vector<module_::variable> locals;
 
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
@@ -690,10 +690,10 @@ public:
      * @param locals_size The arguments and locals size.
      * @param stack_size The operand stack size.
      */
-    function(function_signature signature,
+    function(module_::function_signature signature,
              std::size_t entry_point,
              std::size_t size,
-             std::vector<variable> locals,
+             std::vector<module_::variable> locals,
              std::size_t locals_size,
              std::size_t stack_size);
 
@@ -703,10 +703,10 @@ public:
      * @param signature The function's signature.
      * @param func An std::function.
      */
-    function(function_signature signature, std::function<void(operand_stack&)> func);
+    function(module_::function_signature signature, std::function<void(operand_stack&)> func);
 
     /** Get the function signature. */
-    const function_signature& get_signature() const
+    const module_::function_signature& get_signature() const
     {
         return signature;
     }
@@ -736,7 +736,7 @@ public:
     }
 
     /** Get the function's locals. */
-    const std::vector<variable>& get_locals() const
+    const std::vector<module_::variable>& get_locals() const
     {
         return locals;
     }
@@ -844,10 +844,10 @@ struct field_properties
 class context
 {
     /** Loaded modules as `(name, decoded_module)`. */
-    std::unordered_map<std::string, std::unique_ptr<language_module>> module_map;
+    std::unordered_map<std::string, std::unique_ptr<module_::language_module>> module_map;
 
     /** Types, ordered by module and name. */
-    std::unordered_map<std::string, std::unordered_map<std::string, type_descriptor>> type_map;
+    std::unordered_map<std::string, std::unordered_map<std::string, module_::type_descriptor>> type_map;
 
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
@@ -876,9 +876,10 @@ class context
      * @return Returns the type properties.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
-    type_properties get_type_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                        const std::string& type_name,
-                                        bool reference) const;
+    type_properties get_type_properties(
+      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const std::string& type_name,
+      bool reference) const;
 
     /**
      * Get the byte size and offset of a field.
@@ -889,7 +890,7 @@ class context
      * @return Returns the field properties.
      * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
      */
-    field_properties get_field_properties(const std::unordered_map<std::string, type_descriptor>& type_map,
+    field_properties get_field_properties(const std::unordered_map<std::string, module_::type_descriptor>& type_map,
                                           const std::string& type_name,
                                           std::size_t field_index) const;
 
@@ -899,7 +900,7 @@ class context
      * @param s The signature.
      * @returns The stack size delta.
      */
-    std::int32_t get_stack_delta(const function_signature& s) const;
+    std::int32_t get_stack_delta(const module_::function_signature& s) const;
 
     /**
      * Decode the types. Set types sizes, alignments and offsets.
@@ -907,8 +908,9 @@ class context
      * @param type_map The type map.
      * @param mod The module, used for import resolution.
      */
-    void decode_types(std::unordered_map<std::string, type_descriptor>& type_map,
-                      const language_module& mod);    // FIXME Will this be used?
+    void decode_types(
+      std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const module_::language_module& mod);    // FIXME Will this be used?
 
     /**
      * Decode a module.
@@ -917,8 +919,9 @@ class context
      * @param mod The module.
      * @returns The decoded module.
      */
-    std::unique_ptr<language_module> decode(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                            const language_module& mod);
+    std::unique_ptr<module_::language_module> decode(
+      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const module_::language_module& mod);
 
     /**
      * Decode the function's arguments and locals.
@@ -926,8 +929,9 @@ class context
      * @param type_map The type map.
      * @param desc The function descriptor.
      */
-    void decode_locals(const std::unordered_map<std::string, type_descriptor>& type_map,
-                       function_descriptor& desc);
+    void decode_locals(
+      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      module_::function_descriptor& desc);
 
     /**
      * Decode an instruction.
@@ -940,12 +944,13 @@ class context
      * @param code Buffer to write the decoded bytes into.
      * @return Delta (in bytes) by which the instruction changes the stack size.
      */
-    std::int32_t decode_instruction(const std::unordered_map<std::string, type_descriptor>& type_map,
-                                    language_module& mod,
-                                    archive& ar,
-                                    std::byte instr,
-                                    const function_details& details,
-                                    std::vector<std::byte>& code) const;
+    std::int32_t decode_instruction(
+      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      module_::language_module& mod,
+      archive& ar,
+      std::byte instr,
+      const module_::function_details& details,
+      std::vector<std::byte>& code) const;
 
     /**
      * Resolve a native function.
@@ -955,7 +960,9 @@ class context
      * @returns Returns the resolved function.
      * @throws Throws an `interpreter_error` if the resolution failed.
      */
-    std::function<void(operand_stack&)> resolve_native_function(const std::string& name, const std::string& library_name) const;
+    std::function<void(operand_stack&)> resolve_native_function(
+      const std::string& name,
+      const std::string& library_name) const;
 
     /**
      * Execute a function.
@@ -965,9 +972,10 @@ class context
      * @param args The function's arguments.
      * @return The function's return value.
      */
-    value exec(const language_module& mod,
-               const function& f,
-               std::vector<value> args);
+    value exec(
+      const module_::language_module& mod,
+      const function& f,
+      std::vector<value> args);
 
     /**
      * Execute a function.
@@ -979,11 +987,12 @@ class context
      * @param frame The stack frame for the function.
      * @return The function's return opcode.
      */
-    opcode exec(const language_module& mod,
-                std::size_t entry_point,
-                std::size_t size,
-                const std::vector<variable>& locals,
-                stack_frame& frame);
+    opcode exec(
+      const module_::language_module& mod,
+      std::size_t entry_point,
+      std::size_t size,
+      const std::vector<module_::variable>& locals,
+      stack_frame& frame);
 
 public:
     /** Default constructors. */
@@ -1027,7 +1036,7 @@ public:
      * @param name The module name.
      * @param mod The module.
      */
-    void load_module(const std::string& name, const language_module& mod);
+    void load_module(const std::string& name, const module_::language_module& mod);
 
     /**
      * Invoke a function from a module.
