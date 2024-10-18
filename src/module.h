@@ -282,7 +282,7 @@ archive& operator&(archive& ar, type& ts);
 struct variable : public symbol
 {
     /** The variable's type. */
-    type type;
+    module_::type type;
 
     /** Whether this is an array type. */
     bool array;
