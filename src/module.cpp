@@ -31,52 +31,74 @@ static std::vector<std::pair<std::string, std::string>> type_encoding = {
 
 static constexpr char type_prefix = 'C';
 
-std::string encode_type(const std::string& t)
+std::string variable_type::encode() const
 {
     auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
-                           [&t](const std::pair<std::string, std::string>& p) -> bool
-                           { return p.first == t; });
+                           [this](const std::pair<std::string, std::string>& p) -> bool
+                           { return p.first == decoded_type_string; });
 
     if(it != type_encoding.end())
     {
-        return it->second;
+        return fmt::format("{:[>{}}{}", "", array_dims.value_or(0), it->second);
     }
 
     // assume it is a struct.
-    return fmt::format("{}{};", type_prefix, t);
+    if(decoded_type_string.length() == 0)
+    {
+        throw module_error("Cannot encode empty struct name.");
+    }
+
+    return fmt::format("{:[>{}}{}{};", "", array_dims.value_or(0), type_prefix, decoded_type_string);
 }
 
-std::string decode_type(const std::string& t)
+void variable_type::set_from_encoded(const std::string& s)
 {
+    std::string base_s;
+
+    std::size_t array_dim_indicator_end = s.find_first_not_of('[');
+    if(array_dim_indicator_end == std::string::npos)
+    {
+        throw module_error(fmt::format("Cannot decode invalid type '{}'.", s));
+    }
+
+    base_s = s.substr(array_dim_indicator_end);
+    array_dims = array_dim_indicator_end > 0 ? std::make_optional(array_dim_indicator_end) : std::nullopt;
+
     auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
-                           [&t](const std::pair<std::string, std::string>& p) -> bool
-                           { return p.second == t; });
+                           [&base_s](const std::pair<std::string, std::string>& p) -> bool
+                           { return p.second == base_s; });
 
     if(it != type_encoding.end())
     {
-        return it->first;
+        decoded_type_string = it->first;
     }
-    else if(t.length() >= 3 && t[0] == type_prefix)
+    else if(base_s.length() >= 3 && base_s[0] == type_prefix)
     {
-        if(t[t.length() - 1] != ';')
+        if(base_s[base_s.length() - 1] != ';')
         {
             throw module_error("Cannot decode type with invalid name.");
         }
-        return t.substr(1, t.length() - 2);
+        decoded_type_string = base_s.substr(1, base_s.length() - 2);
     }
-
-    throw module_error(fmt::format("Cannot decode unknown type '{}'.", t));
+    else
+    {
+        throw module_error(fmt::format("Cannot decode unknown type '{}'.", s));
+    }
 }
 
-archive& operator&(archive& ar, type& ts)
+archive& operator&(archive& ar, variable_type& ts)
 {
     if(ar.is_reading())
     {
         std::uint8_t c;
         std::string s;
 
-        ar & c;
-        s += c;
+        do
+        {
+            ar & c;
+            s += c;
+        } while(c == '[');
+
         if(c == type_prefix)
         {
             do
@@ -86,34 +108,14 @@ archive& operator&(archive& ar, type& ts)
             } while(c != ';');
         }
 
-        ts.decode(s);
+        ts.set_from_encoded(s);
     }
     else if(ar.is_writing())
     {
-        auto t = ts.encode();
-        std::uint8_t c = t[0];
-
-        ar & c;
-        if(c == type_prefix)
+        auto encoded_type = ts.encode();
+        for(char c: encoded_type)
         {
-            if(t.length() < 3)
-            {
-                throw module_error("Cannot encode empty struct type name.");
-            }
-
-            std::size_t i = 1;
-            do
-            {
-                c = t[i];
-                ++i;
-
-                ar & c;
-            } while(c != ';' && i < t.length());
-
-            if(c != ';')
-            {
-                throw module_error("Cannot encode invalid struct type name.");
-            }
+            ar & c;
         }
     }
     else
@@ -147,7 +149,7 @@ std::size_t language_module::add_import(symbol_type type, std::string name, std:
 void language_module::add_function(std::string name,
                                    std::pair<std::string, bool> return_type,
                                    std::vector<std::pair<std::string, bool>> arg_types,
-                                   std::size_t size, std::size_t entry_point, std::vector<variable> locals)
+                                   std::size_t size, std::size_t entry_point, std::vector<variable_descriptor> locals)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
@@ -182,7 +184,7 @@ void language_module::add_native_function(std::string name,
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
-void language_module::add_type(std::string name, std::vector<std::pair<std::string, type_info>> members)
+void language_module::add_struct(std::string name, std::vector<std::pair<std::string, field_descriptor>> members)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
@@ -194,7 +196,7 @@ void language_module::add_type(std::string name, std::vector<std::pair<std::stri
         throw module_error(fmt::format("Cannot add type: '{}' already defined.", name));
     }
 
-    type_descriptor desc{std::move(members)};
+    struct_descriptor desc{std::move(members)};
     header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 

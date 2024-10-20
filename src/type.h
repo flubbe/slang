@@ -27,7 +27,7 @@ enum class type_class : std::uint8_t
 };
 
 /** Type representation. */
-class type
+class type_info
 {
     /** Source location of the type (if available). */
     token_location location;
@@ -44,7 +44,7 @@ class type
      * - For structs, this is a list of all contained types.
      * - For functions, the first entry is the return type and the following types are the argument types.
      */
-    std::vector<std::shared_ptr<type>> components;
+    std::vector<std::shared_ptr<type_info>> components;
 
     /** Type id or std::nullopt for unresolved types. */
     std::optional<std::uint64_t> type_id;
@@ -54,42 +54,42 @@ class type
 
 public:
     /** Default constructors. */
-    type() = default;
-    type(const type&) = default;
-    type(type&&) = default;
+    type_info() = default;
+    type_info(const type_info&) = default;
+    type_info(type_info&&) = default;
 
     /** Default assignment operators. */
-    type& operator=(const type&) = default;
-    type& operator=(type&&) = default;
+    type_info& operator=(const type_info&) = default;
+    type_info& operator=(type_info&&) = default;
 
     /**
-     * Create a new type.
+     * Create a new type info.
      *
      * TODO Remove `base` and add `name`, `location` and `components` as optional parameters.
      *
      * @param base The base type name.
      * @param cls The type class.
-     * @param type_id The type's id, or std::nullopt for an unresolved type.
+     * @param type_id The type's id, or `std::nullopt` for an unresolved type.
      * @param import_path Optional import path.
      */
-    type(const token& base,
-         type_class cls,
-         std::optional<std::uint64_t> type_id,
-         std::optional<std::string> import_path = std::nullopt);
+    type_info(const token& base,
+              type_class cls,
+              std::optional<std::uint64_t> type_id,
+              std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return if two types are equal.
      *
      * @throws Throws a `type_error` if the types are not both resolved.
      */
-    bool operator==(const type& other) const;
+    bool operator==(const type_info& other) const;
 
     /**
      * Return if two types are not equal.
      *
      * @throws Throws a `type_error` if the types are not both resolved.
      */
-    bool operator!=(const type& other) const;
+    bool operator!=(const type_info& other) const;
 
     /** Get the token location. */
     const token_location& get_location() const
@@ -108,21 +108,21 @@ public:
      *
      * @throws Throws a `type_error` if the type is not an array type.
      */
-    type* get_element_type();
+    type_info* get_element_type();
 
     /**
      * Return the element type.
      *
      * @throws Throws a `type_error` if the type is not an array type.
      */
-    const type* get_element_type() const;
+    const type_info* get_element_type() const;
 
     /**
      * Return the function signature for function types.
      *
      * @throws Throws a `type_error` if the type is not a function type.
      */
-    const std::vector<std::shared_ptr<type>>& get_signature() const;
+    const std::vector<std::shared_ptr<type_info>>& get_signature() const;
 
     /** Return whether this type is an array type. */
     bool is_array() const
@@ -183,7 +183,7 @@ public:
      * @param cls The type class.
      * @param import_path The import path, or `std::nullopt` for the current module.
      */
-    static type make_unresolved(token base, type_class cls, std::optional<std::string> import_path)
+    static type_info make_unresolved(token base, type_class cls, std::optional<std::string> import_path)
     {
         return {std::move(base), cls, std::nullopt, std::move(import_path)};
     }
@@ -209,7 +209,7 @@ inline bool is_reference_type(const std::string& base_type)
  *
  * @param t The type to convert.
  */
-std::string to_string(const type& t);
+std::string to_string(const type_info& t);
 
 /**
  * Convert a type to a string.

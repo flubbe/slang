@@ -934,21 +934,21 @@ TEST(interpreter, structs)
     EXPECT_EQ(header.exports[1].name, "T");
 
     {
-        auto& desc = std::get<slang::module_::type_descriptor>(header.exports[0].desc);
+        auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[0].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "i");
-        EXPECT_EQ(desc.member_types[0].second, slang::module_::type_info("i32", false));
+        EXPECT_EQ(desc.member_types[0].second, slang::module_::field_descriptor("i32", false));
         EXPECT_EQ(desc.member_types[1].first, "j");
-        EXPECT_EQ(desc.member_types[1].second, slang::module_::type_info("f32", false));
+        EXPECT_EQ(desc.member_types[1].second, slang::module_::field_descriptor("f32", false));
     }
 
     {
-        auto& desc = std::get<slang::module_::type_descriptor>(header.exports[1].desc);
+        auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[1].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "s");
-        EXPECT_EQ(desc.member_types[0].second, slang::module_::type_info("S", false));
+        EXPECT_EQ(desc.member_types[0].second, slang::module_::field_descriptor("S", false));
         EXPECT_EQ(desc.member_types[1].first, "t");
-        EXPECT_EQ(desc.member_types[1].second, slang::module_::type_info("str", false));
+        EXPECT_EQ(desc.member_types[1].second, slang::module_::field_descriptor("str", false));
     }
 
     slang::file_manager file_mgr;

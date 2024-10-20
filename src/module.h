@@ -160,93 +160,42 @@ inline archive& operator&(archive& ar, array_type& t)
     return ar;
 }
 
-/**
- * Encode a type given by a string.
- *
- * @param t The type name.
- * @returns The encoded type string.
- */
-std::string encode_type(const std::string& t);
-
-/**
- * Decode a type given by a string.
- *
- * @param t The encoded type string.
- * @returns The decoded type name.
- * @throws Throws a `module_error` if the type is not known.
- */
-std::string decode_type(const std::string& t);
-
-/** The type stored in the module. */
-class type
+/** Type of a variable stored in the module. */
+class variable_type
 {
-    /** The string. */
-    std::string s;
+    /** The decoded type string. */
+    std::string decoded_type_string;
+
+    /** Array dimensions (if any). */
+    std::optional<std::size_t> array_dims;
 
 public:
     /** Default constructors. */
-    type() = default;
-    type(const type&) = default;
-    type(type&&) = default;
+    variable_type() = default;
+    variable_type(const variable_type&) = default;
+    variable_type(variable_type&&) = default;
 
     /** Default assignments. */
-    type& operator=(const type&) = default;
-    type& operator=(type&&) = default;
+    variable_type& operator=(const variable_type&) = default;
+    variable_type& operator=(variable_type&&) = default;
 
     /** Initialize from a `std::string`. */
-    type(std::string s)
-    : s{std::move(s)}
+    variable_type(std::string decoded_type_string, std::optional<std::size_t> array_dims = std::nullopt)
+    : decoded_type_string{std::move(decoded_type_string)}
+    , array_dims{array_dims}
     {
-    }
-
-    /** String assignment. */
-    type& operator=(const std::string& s)
-    {
-        this->s = s;
-        return *this;
-    }
-
-    /** String assignment. */
-    type& operator=(std::string&& s)
-    {
-        this->s = std::move(s);
-        return *this;
     }
 
     /** Comparison. */
-    bool operator==(const type& ts) const
+    bool operator==(const variable_type& ts) const
     {
-        return this->s == ts.s;
+        return decoded_type_string == ts.decoded_type_string;
     }
 
     /** Comparison. */
-    bool operator!=(const type& ts) const
+    bool operator!=(const variable_type& ts) const
     {
         return !(*this == ts);
-    }
-
-    /** Comparison. */
-    bool operator==(const std::string& s) const
-    {
-        return this->s == s;
-    }
-
-    /** Comparison. */
-    bool operator!=(const std::string& s) const
-    {
-        return !(*this == s);
-    }
-
-    /** Conversion to `std::string` */
-    operator std::string()
-    {
-        return s;
-    }
-
-    /** Conversion to `std::string` */
-    operator std::string() const
-    {
-        return s;
     }
 
     /*
@@ -254,19 +203,31 @@ public:
      *
      * @returns The encoded type string.
      */
-    std::string encode() const
-    {
-        return encode_type(s);
-    }
+    std::string encode() const;
 
     /**
      * Set type string from an encoded string.
      *
      * @param s The encoded string.
      */
-    void decode(const std::string& s)
+    void set_from_encoded(const std::string& s);
+
+    /** Return the base type. */
+    std::string base_type() const
     {
-        this->s = decode_type(s);
+        return decoded_type_string;
+    }
+
+    /** Whether the type is an array. */
+    bool is_array() const
+    {
+        return array_dims.has_value();
+    }
+
+    /** Return the array dimensions or `std::nullopt`. */
+    std::optional<std::size_t> get_array_dims() const
+    {
+        return array_dims;
     }
 };
 
@@ -276,54 +237,48 @@ public:
  * @param ar The archive to use for serialization.
  * @param ts The type string.
  */
-archive& operator&(archive& ar, type& ts);
+archive& operator&(archive& ar, variable_type& ts);
 
-/** A variable. */
-struct variable : public symbol
+/** Variable descriptor. */
+struct variable_descriptor : public symbol
 {
     /** The variable's type. */
-    module_::type type;
+    variable_type type;
 
-    /** Whether this is an array type. */
-    bool array;
-
-    /** Whether this is a reference type. */
+    /** Whether the base type is a reference type. This is inferred from `type`. */
     bool reference;
 
     /** Default constructors. */
-    variable() = default;
-    variable(const variable&) = default;
-    variable(variable&&) = default;
+    variable_descriptor() = default;
+    variable_descriptor(const variable_descriptor&) = default;
+    variable_descriptor(variable_descriptor&&) = default;
 
     /** Default assignments. */
-    variable& operator=(const variable&) = default;
-    variable& operator=(variable&&) = default;
+    variable_descriptor& operator=(const variable_descriptor&) = default;
+    variable_descriptor& operator=(variable_descriptor&&) = default;
 
     /**
-     * Construct a variable.
+     * Initialize the variable descriptor with a type.
      *
-     * @param type The variable's type.
-     * @param array Whether this is an array type.
+     * @param type The variable type.
      */
-    variable(std::string type, bool array = false)
+    variable_descriptor(variable_type type)
     : type{std::move(type)}
-    , array{array}
     {
-        reference = ty::is_reference_type(type);
+        reference = ty::is_reference_type(type.base_type());
     }
 };
 
 /**
- * Serializer for variables.
+ * Serializer for variable descriptors.
  *
  * @param ar The archive to use for serialization.
- * @param s The variable.
+ * @param desc The variable descriptor.
  */
-inline archive& operator&(archive& ar, variable& v)
+inline archive& operator&(archive& ar, variable_descriptor& desc)
 {
-    ar & v.type;
-    ar & v.array;
-    v.reference = ty::is_reference_type(v.type);
+    ar & desc.type;
+    desc.reference = ty::is_reference_type(desc.type.base_type());
     return ar;
 }
 
@@ -331,10 +286,10 @@ inline archive& operator&(archive& ar, variable& v)
 struct function_signature
 {
     /** Return type. */
-    std::pair<type, bool> return_type;
+    std::pair<variable_type, bool> return_type;
 
     /** Argument type list. */
-    std::vector<std::pair<type, bool>> arg_types;
+    std::vector<std::pair<variable_type, bool>> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -356,7 +311,7 @@ struct function_signature
     : return_type{std::move(return_type)}
     {
         std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
-                       [](const auto& arg) -> std::pair<type, bool>
+                       [](const auto& arg) -> std::pair<variable_type, bool>
                        {
                            return {arg.first, arg.second};
                        });
@@ -421,7 +376,7 @@ inline archive& operator&(archive& ar, native_function_details& details)
 struct function_details : public symbol
 {
     /** Locals (including arguments). */
-    std::vector<variable> locals;
+    std::vector<variable_descriptor> locals;
 
     /** Decoded arguments size. Not serialized. */
     std::size_t args_size{0};
@@ -451,7 +406,7 @@ struct function_details : public symbol
      * @param offset The offset of the function
      * @param locals The function's arguments and locals.
      */
-    function_details(std::size_t size, std::size_t offset, std::vector<variable> locals)
+    function_details(std::size_t size, std::size_t offset, std::vector<variable_descriptor> locals)
     : symbol{size, offset}
     , locals{std::move(locals)}
     {
@@ -553,14 +508,11 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
     return ar;
 }
 
-/** Type information of a variable. */
-struct type_info
+/** Field descriptor. */
+struct field_descriptor
 {
-    /** The field's base type: i32, f32, str, or a struct name. */
-    type base_type;
-
-    /** Whether this is an array. */
-    bool array{false};
+    /** The field's base type. */
+    variable_type base_type;
 
     /** Package in the import table for imported types. */
     std::optional<std::size_t> package_index;
@@ -575,60 +527,58 @@ struct type_info
     std::size_t offset{0};
 
     /** Default constructors. */
-    type_info() = default;
-    type_info(const type_info&) = default;
-    type_info(type_info&&) = default;
+    field_descriptor() = default;
+    field_descriptor(const field_descriptor&) = default;
+    field_descriptor(field_descriptor&&) = default;
 
     /** Default assignments. */
-    type_info& operator=(const type_info&) = default;
-    type_info& operator=(type_info&&) = default;
+    field_descriptor& operator=(const field_descriptor&) = default;
+    field_descriptor& operator=(field_descriptor&&) = default;
 
     /**
-     * Create a new `type_info`.
+     * Create a new `field_descriptor`.
      *
-     * @param base_type The type's base type.
-     * @param array Whether the type is an array type.
+     * @param base_type The field's base type.
+     * @param array Whether the field is an array type.
      * @param import_index Optional index into the import table. Only for imported types.
      */
-    type_info(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
-    : base_type{std::move(base_type)}
-    , array{array}
+    field_descriptor(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
+    : base_type{std::move(base_type), array ? std::make_optional(1) : std::nullopt}
     , package_index{import_index}
     {
     }
 
-    /** Type comparison. */
-    bool operator==(const type_info& other) const
+    /** Comparison. */
+    bool operator==(const field_descriptor& other) const
     {
-        return base_type == other.base_type && array == other.array;
+        return base_type == other.base_type && base_type.get_array_dims() == other.base_type.get_array_dims();
     }
 
-    /** Type comparison. */
-    bool operator!=(const type_info& other) const
+    /** Comparison. */
+    bool operator!=(const field_descriptor& other) const
     {
         return !(*this == other);
     }
 };
 
 /**
- * Serializer for type info.
+ * Serializer for field descriptors.
  *
  * @param ar The archive to use for serialization.
  * @param info The type descriptor.
  */
-inline archive& operator&(archive& ar, type_info& info)
+inline archive& operator&(archive& ar, field_descriptor& info)
 {
     ar & info.base_type;
-    ar & info.array;
     ar & info.package_index;
     return ar;
 }
 
-/** Type descriptor. */
-struct type_descriptor
+/** Struct descriptor. */
+struct struct_descriptor
 {
     /** Members as (name, type). */
-    std::vector<std::pair<std::string, type_info>> member_types;
+    std::vector<std::pair<std::string, field_descriptor>> member_types;
 
     /** Type size (not serialized). */
     std::size_t size{0};
@@ -641,12 +591,12 @@ struct type_descriptor
 };
 
 /**
- * Serializer for type descriptors.
+ * Serializer for struct descriptors.
  *
  * @param ar The archive to use for serialization.
- * @param details The type descriptor.
+ * @param details The struct descriptor.
  */
-inline archive& operator&(archive& ar, type_descriptor& desc)
+inline archive& operator&(archive& ar, struct_descriptor& desc)
 {
     ar & desc.member_types;
     return ar;
@@ -714,8 +664,8 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Type, function signature or type descriptor. */
-    std::variant<std::string, function_descriptor, type_descriptor> desc;
+    /** Type, function signature or struct descriptor. */
+    std::variant<variable_type, function_descriptor, struct_descriptor> desc;
 
     /** Default constructors. */
     exported_symbol() = default;
@@ -733,7 +683,7 @@ struct exported_symbol
      * @param name The symbol name.
      * @param desc The symbol's descriptor.
      */
-    exported_symbol(symbol_type type, std::string name, std::variant<std::string, function_descriptor, type_descriptor> desc)
+    exported_symbol(symbol_type type, std::string name, std::variant<variable_type, function_descriptor, struct_descriptor> desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -760,13 +710,13 @@ inline archive& operator&(archive& ar, exported_symbol& s)
     {
         if(ar.is_reading())
         {
-            std::string desc;
+            variable_type desc;
             ar & desc;
             s.desc = std::move(desc);
         }
         else if(ar.is_writing())
         {
-            auto& desc = std::get<std::string>(s.desc);
+            auto& desc = std::get<variable_type>(s.desc);
             ar & desc;
         }
     }
@@ -788,13 +738,13 @@ inline archive& operator&(archive& ar, exported_symbol& s)
     {
         if(ar.is_reading())
         {
-            type_descriptor desc;
+            struct_descriptor desc;
             ar & desc;
             s.desc = std::move(desc);
         }
         else if(ar.is_writing())
         {
-            auto& desc = std::get<type_descriptor>(s.desc);
+            auto& desc = std::get<struct_descriptor>(s.desc);
             ar & desc;
         }
     }
@@ -886,7 +836,7 @@ public:
     void add_function(std::string name,
                       std::pair<std::string, bool> return_type,
                       std::vector<std::pair<std::string, bool>> arg_types,
-                      std::size_t size, std::size_t entry_point, std::vector<variable> locals);
+                      std::size_t size, std::size_t entry_point, std::vector<variable_descriptor> locals);
 
     /**
      * Add a native function to the module.
@@ -902,12 +852,12 @@ public:
                              std::string lib_name);
 
     /**
-     * Add a type to the module.
+     * Add a struct to the module.
      *
-     * @param name The type's name.
-     * @param members The type's members as `(name, type)`.
+     * @param name The struct's name.
+     * @param members The struct's members as `(name, type)`.
      */
-    void add_type(std::string name, std::vector<std::pair<std::string, type_info>> members);
+    void add_struct(std::string name, std::vector<std::pair<std::string, field_descriptor>> members);
 
     /**
      * Set the string table.

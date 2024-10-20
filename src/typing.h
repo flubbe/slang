@@ -55,7 +55,7 @@ struct variable_type
     token name;
 
     /** The variable's type. */
-    type var_type;
+    type_info var_type;
 
     /** No default constructor. */
     variable_type() = delete;
@@ -74,7 +74,7 @@ struct variable_type
      * @param name The variable's name.
      * @param type The variable's type.
      */
-    variable_type(token name, type var_type)
+    variable_type(token name, type_info var_type)
     : name{std::move(name)}
     , var_type{std::move(var_type)}
     {
@@ -88,13 +88,13 @@ struct function_signature
     token name;
 
     /** Argument types. */
-    std::vector<type> arg_types;
+    std::vector<type_info> arg_types;
 
     /** Return type. */
-    type ret_type;
+    type_info ret_type;
 
     /** The function type (e.g. a combination of `ret_type`, `name` and `arg_types`, together with a type id). */
-    type func_type;
+    type_info func_type;
 
     /** No default constructor. */
     function_signature() = delete;
@@ -116,9 +116,9 @@ struct function_signature
      * @param func_type The function's type. E.g. a combination of return type, names and arguments, together with a type id.
      */
     function_signature(token name,
-                       std::vector<type> arg_types,
-                       type ret_type,
-                       type func_type)
+                       std::vector<type_info> arg_types,
+                       type_info ret_type,
+                       type_info func_type)
     : name{std::move(name)}
     , arg_types{std::move(arg_types)}
     , ret_type{std::move(ret_type)}
@@ -137,7 +137,7 @@ struct struct_definition
     token name;
 
     /** The struct's members as `(name, type)` pairs. */
-    std::vector<std::pair<token, type>> members;
+    std::vector<std::pair<token, type_info>> members;
 
     /** An optional import path. */
     std::optional<std::string> import_path;
@@ -159,7 +159,7 @@ struct struct_definition
      * @param import_path An optional import path.
      */
     struct_definition(token name,
-                      std::vector<std::pair<token, type>> members,
+                      std::vector<std::pair<token, type_info>> members,
                       std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
@@ -270,7 +270,7 @@ struct scope
      * @param name The name to find.
      * @returns If the name is found, returns its type and `std::nullopt` otherwise.
      */
-    std::optional<type> get_type(const std::string& name) const
+    std::optional<type_info> get_type(const std::string& name) const
     {
         auto var_it = variables.find(name);
         if(var_it != variables.end())
@@ -319,10 +319,10 @@ class context
     std::vector<const struct_definition*> struct_stack;
 
     /** Unresolved types. */
-    std::vector<type> unresolved_types;
+    std::vector<type_info> unresolved_types;
 
     /** Map of types to type ids. */
-    std::vector<std::pair<type, std::uint64_t>> type_map;
+    std::vector<std::pair<type_info, std::uint64_t>> type_map;
 
     /** Base types, stored as `(name, is_reference_type)`. */
     std::vector<std::pair<std::string, bool>> base_types;
@@ -394,7 +394,7 @@ public:
      * @param name The variable's name.
      * @param var_type The variable's type.
      */
-    void add_variable(token name, type var_type);
+    void add_variable(token name, type_info var_type);
 
     /**
      * Add a function to the context.
@@ -408,8 +408,8 @@ public:
      * @param import_path The import path for the function.
      */
     void add_function(token name,
-                      std::vector<type> arg_types,
-                      type ret_type,
+                      std::vector<type_info> arg_types,
+                      type_info ret_type,
                       std::optional<std::string> import_path = std::nullopt);
 
     /**
@@ -423,7 +423,7 @@ public:
      * @param import_path The import path for the struct.
      */
     void add_struct(token name,
-                    std::vector<std::pair<token, type>> members,
+                    std::vector<std::pair<token, type_info>> members,
                     std::optional<std::string> import_path = std::nullopt);
 
     /**
@@ -441,7 +441,7 @@ public:
      * @param t The type.
      * @returns True if the type exists within the current scope.
      */
-    bool has_type(const type& t) const;
+    bool has_type(const type_info& t) const;
 
     /**
      * Check if given string is a reference type within the context.
@@ -463,7 +463,7 @@ public:
      * @param t The type.
      * @returns Whether the type is a reference type.
      */
-    bool is_reference_type(const type& t) const;
+    bool is_reference_type(const type_info& t) const;
 
     /**
      * Get the type for an identifier.
@@ -472,7 +472,7 @@ public:
      * @returns The resolved type.
      * @throws Throws a `type_error` if the identifier's type could not be resolved.
      */
-    type get_identifier_type(const token& identifier) const;
+    type_info get_identifier_type(const token& identifier) const;
 
     /**
      * Get the type for a name and an optional array length.
@@ -485,9 +485,9 @@ public:
      * @returns An existing type.
      * @throws A `type_error` if the type cnould not be resolved.
      */
-    type get_type(const token& name,
-                  bool array,
-                  const std::optional<std::string>& import_path = std::nullopt)
+    type_info get_type(const token& name,
+                       bool array,
+                       const std::optional<std::string>& import_path = std::nullopt)
     {
         return get_type(name.s, array, import_path);
     }
@@ -502,9 +502,9 @@ public:
      * @param import_path Optional import path. Ignored for built-in types.
      * @returns An existing type.
      */
-    type get_type(const std::string& name,
-                  bool array,
-                  const std::optional<std::string>& import_path = std::nullopt);
+    type_info get_type(const std::string& name,
+                       bool array,
+                       const std::optional<std::string>& import_path = std::nullopt);
 
     /**
      * Get a type object for an unresolved type and add mark the type for resolution.
@@ -514,9 +514,9 @@ public:
      * @param import_path Optional import path. Ignored for built-in types.
      * @returns An unresolved type.
      */
-    type get_unresolved_type(token name,
-                             type_class cls,
-                             std::optional<std::string> import_path = std::nullopt);
+    type_info get_unresolved_type(token name,
+                                  type_class cls,
+                                  std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return whether a type is convertible into another type.
@@ -527,7 +527,7 @@ public:
      * @param to The type to convert to.
      * @returns Whether the type `from` is convertible to the type `to`.
      */
-    bool is_convertible(const type& from, const type& to) const;
+    bool is_convertible(const type_info& from, const type_info& to) const;
 
     /**
      * Resolve a type and set its type id.
@@ -535,7 +535,7 @@ public:
      * @param t The type to resolve.
      * @throws Throws a `type_error` if type resolution failed.
      */
-    void resolve(type& t);
+    void resolve(type_info& t);
 
     /**
      * Resolve all unresolved types.
@@ -552,7 +552,7 @@ public:
      * @param ret_type The return type.
      * @returns The function type.
      */
-    type get_function_type(const token& name, const std::vector<type>& arg_types, const type& ret_type);
+    type_info get_function_type(const token& name, const std::vector<type_info>& arg_types, const type_info& ret_type);
 
     /**
      * Get the signature of a function.

@@ -353,11 +353,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            module_::type v_type = v->get_type().to_string();
+            module_::variable_type v_type = v->get_type().to_string();
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
-            module_::type s_type = stack_arg->get_value()->get_type().to_string();
+            module_::variable_type s_type = stack_arg->get_value()->get_type().to_string();
 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x1);
@@ -831,7 +831,7 @@ void instruction_emitter::run()
         auto& func_locals = f->get_scope()->get_locals();
         const std::size_t local_count = func_args.size() + func_locals.size();
 
-        std::vector<module_::variable> locals{local_count};
+        std::vector<module_::variable_descriptor> locals{local_count};
 
         std::set<std::size_t> unset_indices;
         for(std::size_t i = 0; i < local_count; ++i)
@@ -854,7 +854,8 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_type().base_type().to_string(), it->get_type().is_array()};
+            locals[index] = {{it->get_type().base_type().to_string(),
+                              it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
         }
 
         for(auto& it: func_locals)
@@ -872,7 +873,8 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {it->get_type().base_type().to_string(), it->get_type().is_array()};
+            locals[index] = {{it->get_type().base_type().to_string(),
+                              it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
         }
 
         if(unset_indices.size() != 0)
@@ -1021,10 +1023,10 @@ module_::language_module instruction_emitter::to_module() const
         }
 
         auto members = it->get_members();
-        std::vector<std::pair<std::string, module_::type_info>> transformed_members;
+        std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
 
         std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::type_info>
+                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
                        {
                            const auto& t = std::get<1>(m);
 
@@ -1051,7 +1053,7 @@ module_::language_module instruction_emitter::to_module() const
 
                            return std::make_pair(
                              std::get<0>(m),
-                             module_::type_info{
+                             module_::field_descriptor{
                                t.get_type().base_type().to_string(),
                                t.get_type().is_array(),
                                import_index});
@@ -1059,7 +1061,7 @@ module_::language_module instruction_emitter::to_module() const
 
         if(!it->get_import_path().has_value())
         {
-            mod.add_type(it->get_name(), std::move(transformed_members));
+            mod.add_struct(it->get_name(), std::move(transformed_members));
         }
     }
 

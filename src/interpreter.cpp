@@ -46,7 +46,7 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<module_::type, bool>& return_type)
+static opcode get_return_opcode(const std::pair<module_::variable_type, bool>& return_type)
 {
     auto& name = std::get<0>(return_type);
 
@@ -55,23 +55,23 @@ static opcode get_return_opcode(const std::pair<module_::type, bool>& return_typ
         return opcode::aret;
     }
 
-    if(name == "void")
+    if(name.base_type() == "void")
     {
         return opcode::ret;
     }
-    else if(name == "i32")
+    else if(name.base_type() == "i32")
     {
         return opcode::iret;
     }
-    else if(name == "f32")
+    else if(name.base_type() == "f32")
     {
         return opcode::fret;
     }
-    else if(name == "str")
+    else if(name.base_type() == "str")
     {
         return opcode::sret;
     }
-    else if(name == "@addr" || name == "@array")
+    else if(name.base_type() == "@addr" || name.base_type() == "@array")
     {
         return opcode::aret;
     }
@@ -86,26 +86,26 @@ static opcode get_return_opcode(const std::pair<module_::type, bool>& return_typ
  * @param t The type string.
  * @returns Return whether a type is garbage collected.
  */
-static bool is_garbage_collected(const module_::type& t)
+static bool is_garbage_collected(const module_::variable_type& t)
 {
-    if(t == "void")
+    if(t.base_type() == "void")
     {
         throw interpreter_error("Found void type in type info for garbage collector.");
     }
 
     // check for built-in non-gc types.
-    return ty::is_reference_type(static_cast<std::string>(t));
+    return t.is_array() || ty::is_reference_type(t.base_type());
 }
 
 /**
- * Check if a type is garbage collected.
+ * Check if a field is garbage collected.
  *
  * @param info The type info.
  * @returns Return whether a type is garbage collected.
  */
-static bool is_garbage_collected(const slang::module_::type_info& info)
+static bool is_garbage_collected(const slang::module_::field_descriptor& info)
 {
-    return info.array || is_garbage_collected(info.base_type);
+    return info.base_type.is_array() || is_garbage_collected(info.base_type);
 }
 
 /**
@@ -126,7 +126,7 @@ static bool is_garbage_collected(const std::pair<std::string, bool>& info)
 function::function(module_::function_signature signature,
                    std::size_t entry_point,
                    std::size_t size,
-                   std::vector<module_::variable> locals,
+                   std::vector<module_::variable_descriptor> locals,
                    std::size_t locals_size,
                    std::size_t stack_size)
 : signature{std::move(signature)}
@@ -162,31 +162,41 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const module_::variable& v)
+static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {
-    if(v.array || v.reference)
+    if(v.type.base_type().length() == 0)
+    {
+        throw interpreter_error("Unable to determine type size for empty type.");
+    }
+
+    if(v.type.is_array() || ty::is_reference_type(v.type.base_type()))
     {
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(v.type);
+    auto built_in_it = type_properties_map.find(v.type.base_type());
     if(built_in_it != type_properties_map.end())
     {
         return built_in_it->second.first;
     }
 
-    throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", static_cast<std::string>(v.type)));
+    throw interpreter_error(fmt::format("Unable to determine type size for '{}'.", v.type.base_type()));
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const std::pair<module_::type, bool>& v)
+static std::size_t get_type_or_reference_size(const std::pair<module_::variable_type, bool>& v)
 {
-    if(std::get<1>(v))
+    if(std::get<0>(v).base_type().length() == 0)
+    {
+        throw interpreter_error("Unable to determine type size for empty type.");
+    }
+
+    if(std::get<1>(v) || std::get<0>(v).is_array())
     {
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(std::get<0>(v));
+    auto built_in_it = type_properties_map.find(std::get<0>(v).base_type());
     if(built_in_it != type_properties_map.end())
     {
         return built_in_it->second.first;
@@ -197,7 +207,7 @@ static std::size_t get_type_or_reference_size(const std::pair<module_::type, boo
 }
 
 type_properties context::get_type_properties(
-  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   const std::string& type_name, bool reference) const
 {
     // references.
@@ -220,8 +230,8 @@ type_properties context::get_type_properties(
     }
 
     // structs.
-    auto type_it = type_map.find(type_name);
-    if(type_it == type_map.end())
+    auto type_it = struct_map.find(type_name);
+    if(type_it == struct_map.end())
     {
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
     }
@@ -230,7 +240,7 @@ type_properties context::get_type_properties(
 }
 
 field_properties context::get_field_properties(
-  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   const std::string& type_name,
   std::size_t field_index) const
 {
@@ -247,8 +257,8 @@ field_properties context::get_field_properties(
     }
 
     // structs.
-    auto type_it = type_map.find(type_name);
-    if(type_it == type_map.end())
+    auto type_it = struct_map.find(type_name);
+    if(type_it == struct_map.end())
     {
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
     }
@@ -270,7 +280,7 @@ std::int32_t context::get_stack_delta(const module_::function_signature& s) cons
 }
 
 void context::decode_locals(
-  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   module_::function_descriptor& desc)
 {
     if(desc.native)
@@ -320,7 +330,7 @@ void context::decode_locals(
 }
 
 std::int32_t context::decode_instruction(
-  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   module_::language_module& mod,
   archive& ar,
   std::byte instr,
@@ -459,18 +469,18 @@ std::int32_t context::decode_instruction(
     case opcode::dup_x1:
     {
         // type arguments.
-        module_::type t1, t2;
+        module_::variable_type t1, t2;
         ar & t1 & t2;
 
         // "void" is not allowed.
-        if(t1 == "void" || t2 == "void")
+        if(t1.base_type() == "void" || t2.base_type() == "void")
         {
             throw interpreter_error("Error decoding dup_x1 instruction: Invalid argument type 'void'.");
         }
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties({}, t1, false);
-        auto properties2 = get_type_properties({}, t2, false);
+        auto properties1 = get_type_properties({}, t1.base_type(), false);
+        auto properties2 = get_type_properties({}, t2.base_type(), false);
 
         // check if the type needs garbage collection.
         std::uint8_t needs_gc = is_garbage_collected(t1);
@@ -655,15 +665,15 @@ std::int32_t context::decode_instruction(
                   imp_package.name));
             }
 
-            auto type_map_it = this->type_map.find(imp_package.name);
-            if(type_map_it == this->type_map.end())
+            auto struct_map_it = this->struct_map.find(imp_package.name);
+            if(struct_map_it == this->struct_map.end())
             {
                 throw interpreter_error(fmt::format(
                   "Type map for module '{}' not loaded.",
                   imp_package.name));
             }
 
-            auto properties = get_type_properties(type_map_it->second, imp_symbol.name, false);
+            auto properties = get_type_properties(struct_map_it->second, imp_symbol.name, false);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
@@ -686,7 +696,7 @@ std::int32_t context::decode_instruction(
                   i.i));
             }
 
-            auto properties = get_type_properties(type_map, exp_symbol.name, false);
+            auto properties = get_type_properties(struct_map, exp_symbol.name, false);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
@@ -745,15 +755,15 @@ std::int32_t context::decode_instruction(
                   imp_package.name));
             }
 
-            auto type_map_it = this->type_map.find(imp_package.name);
-            if(type_map_it == this->type_map.end())
+            auto struct_map_it = this->struct_map.find(imp_package.name);
+            if(struct_map_it == this->struct_map.end())
             {
                 throw interpreter_error(fmt::format(
                   "Type map for module '{}' not loaded.",
                   imp_package.name));
             }
 
-            properties = get_field_properties(type_map_it->second, imp_symbol.name, field_index.i);
+            properties = get_field_properties(struct_map_it->second, imp_symbol.name, field_index.i);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
@@ -771,7 +781,7 @@ std::int32_t context::decode_instruction(
                 throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
             }
 
-            properties = get_field_properties(type_map, exp_symbol.name, field_index.i);
+            properties = get_field_properties(struct_map, exp_symbol.name, field_index.i);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
@@ -810,11 +820,11 @@ std::function<void(operand_stack&)> context::resolve_native_function(const std::
     return func_it->second;
 }
 
-void context::decode_types(
-  std::unordered_map<std::string, module_::type_descriptor>& type_map,
+void context::decode_structs(
+  std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   const module_::language_module& mod)
 {
-    for(auto& [name, desc]: type_map)
+    for(auto& [name, desc]: struct_map)
     {
         std::size_t size = 0;
         std::size_t alignment = 0;
@@ -826,7 +836,7 @@ void context::decode_types(
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
-            auto built_in_it = type_properties_map.find(member_type.base_type);
+            auto built_in_it = type_properties_map.find(member_type.base_type.base_type());
             if(built_in_it != type_properties_map.end())
             {
                 if(is_garbage_collected(member_type))
@@ -844,9 +854,11 @@ void context::decode_types(
             }
             else
             {
-                if(type_map.find(member_type.base_type) == type_map.end())
+                if(struct_map.find(member_type.base_type.base_type()) == struct_map.end())
                 {
-                    throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", static_cast<std::string>(member_type.base_type)));
+                    throw interpreter_error(
+                      fmt::format("Cannot resolve size for type '{}': Type not found.",
+                                  member_type.base_type.base_type()));
                 }
 
                 // size and alignment are the same for both array and non-array types.
@@ -891,7 +903,7 @@ void context::decode_types(
 }
 
 std::unique_ptr<module_::language_module> context::decode(
-  const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+  const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   const module_::language_module& mod)
 {
     if(mod.is_decoded())
@@ -1000,7 +1012,7 @@ std::unique_ptr<module_::language_module> context::decode(
             continue;
         }
 
-        decode_locals(type_map, desc);
+        decode_locals(struct_map, desc);
     }
 
     // store header in decoded module.
@@ -1045,7 +1057,7 @@ std::unique_ptr<module_::language_module> context::decode(
                 code.push_back(instr);
             }
 
-            stack_size += decode_instruction(type_map, *decoded_module, ar, instr, details, code);
+            stack_size += decode_instruction(struct_map, *decoded_module, ar, instr, details, code);
             if(stack_size < 0)
             {
                 throw interpreter_error("Error during decode: Got negative stack size.");
@@ -1085,7 +1097,7 @@ class locals_scope
     context& ctx;
 
     /** Locals. */
-    const std::vector<module_::variable>& locals;
+    const std::vector<module_::variable_descriptor>& locals;
 
     /** The function's stack frame. */
     stack_frame& frame;
@@ -1102,14 +1114,14 @@ public:
      * @param locals The locals.
      * @param frame The stack frame.
      */
-    locals_scope(context& ctx, const std::vector<module_::variable>& locals, stack_frame& frame)
+    locals_scope(context& ctx, const std::vector<module_::variable_descriptor>& locals, stack_frame& frame)
     : ctx{ctx}
     , locals{locals}
     , frame{frame}
     {
         for(auto& local: locals)
         {
-            if(local.array || local.reference)
+            if(local.type.is_array() || local.reference)
             {
                 void* addr;
                 std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
@@ -1147,7 +1159,7 @@ public:
 
         for(auto& local: locals)
         {
-            if(local.array || local.reference)
+            if(local.type.is_array() || local.reference)
             {
                 void* addr;
                 std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
@@ -1180,7 +1192,7 @@ opcode context::exec(
   const module_::language_module& mod,
   std::size_t entry_point,
   std::size_t size,
-  const std::vector<module_::variable>& locals,
+  const std::vector<module_::variable_descriptor>& locals,
   stack_frame& frame)
 {
     if(!mod.is_decoded())
@@ -1678,7 +1690,7 @@ opcode context::exec(
                 {
                     auto& arg = details.locals[i];
 
-                    if(arg.array || arg.reference)
+                    if(arg.type.is_array() || arg.reference)
                     {
                         void* addr;
                         std::memcpy(&addr, &callee_frame.locals[arg.offset], sizeof(addr));
@@ -2057,7 +2069,7 @@ public:
      */
     arguments_scope(context& ctx,
                     const std::vector<value>& args,
-                    const std::vector<std::pair<module_::type, bool>>& arg_types,
+                    const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
                     std::vector<std::byte>& locals)
     : args{args}
     , locals{locals}
@@ -2069,7 +2081,7 @@ public:
             {
                 throw interpreter_error(
                   fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
-                              i, static_cast<std::string>(std::get<0>(arg_types[i])), std::get<0>(args[i].get_type())));
+                              i, std::get<0>(arg_types[i]).base_type(), std::get<0>(args[i].get_type())));
             }
 
             if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
@@ -2232,7 +2244,7 @@ void context::load_module(const std::string& name, const module_::language_modul
     }
 
     // populate type map before decoding the module.
-    std::unordered_map<std::string, module_::type_descriptor> tmap;
+    std::unordered_map<std::string, module_::struct_descriptor> tmap;
     for(auto& it: mod.header.exports)
     {
         if(it.type != module_::symbol_type::type)
@@ -2245,14 +2257,14 @@ void context::load_module(const std::string& name, const module_::language_modul
             throw interpreter_error(fmt::format("Type '{}' already exists in exports.", it.name));
         }
 
-        tmap.insert({it.name, std::get<module_::type_descriptor>(it.desc)});
+        tmap.insert({it.name, std::get<module_::struct_descriptor>(it.desc)});
     }
 
-    decode_types(tmap, mod);
-    type_map.insert({name, std::move(tmap)});
+    decode_structs(tmap, mod);
+    struct_map.insert({name, std::move(tmap)});
 
     // decode the module.
-    module_map.insert({name, decode(type_map[name], mod)});
+    module_map.insert({name, decode(struct_map[name], mod)});
     module_::module_header& decoded_header = module_map[name]->header;
 
     // populate function map.

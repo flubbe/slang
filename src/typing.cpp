@@ -24,10 +24,10 @@ namespace slang::typing
  * type implementation.
  */
 
-type::type(const token& base,
-           type_class cls,
-           std::optional<std::uint64_t> type_id,
-           std::optional<std::string> import_path)
+type_info::type_info(const token& base,
+                     type_class cls,
+                     std::optional<std::uint64_t> type_id,
+                     std::optional<std::string> import_path)
 : location{base.location}
 , cls{cls}
 , type_id{type_id}
@@ -35,7 +35,7 @@ type::type(const token& base,
 {
     if(cls == type_class::tc_array)
     {
-        components = {std::make_shared<type>(base, type_class::tc_plain, std::nullopt)};
+        components = {std::make_shared<type_info>(base, type_class::tc_plain, std::nullopt)};
     }
     else
     {
@@ -43,7 +43,7 @@ type::type(const token& base,
     }
 }
 
-bool type::operator==(const type& other) const
+bool type_info::operator==(const type_info& other) const
 {
     if(!type_id.has_value() || !other.type_id.has_value())
     {
@@ -58,12 +58,12 @@ bool type::operator==(const type& other) const
     return type_id.value() == other.type_id.value();
 }
 
-bool type::operator!=(const type& other) const
+bool type_info::operator!=(const type_info& other) const
 {
     return !(*this == other);
 }
 
-type* type::get_element_type()
+type_info* type_info::get_element_type()
 {
     if(!is_array())
     {
@@ -84,7 +84,7 @@ type* type::get_element_type()
     return components[0].get();
 }
 
-const type* type::get_element_type() const
+const type_info* type_info::get_element_type() const
 {
     if(!is_array())
     {
@@ -105,7 +105,7 @@ const type* type::get_element_type() const
     return components[0].get();
 }
 
-const std::vector<std::shared_ptr<type>>& type::get_signature() const
+const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
 {
     if(!is_function_type())
     {
@@ -126,7 +126,7 @@ const std::vector<std::shared_ptr<type>>& type::get_signature() const
     return components;
 }
 
-std::uint64_t type::get_type_id() const
+std::uint64_t type_info::get_type_id() const
 {
     if(!type_id.has_value())
     {
@@ -143,14 +143,14 @@ std::uint64_t type::get_type_id() const
  * type to string conversions.
  */
 
-std::string to_string(const type& t)
+std::string to_string(const type_info& t)
 {
     return t.to_string();
 }
 
 std::string to_string(const std::pair<token, bool>& t)
 {
-    return to_string(type{
+    return to_string(type_info{
       std::get<0>(t),
       std::get<1>(t) ? type_class::tc_array : type_class::tc_plain,
       std::nullopt});
@@ -158,7 +158,7 @@ std::string to_string(const std::pair<token, bool>& t)
 
 std::string to_string(const std::pair<std::string, bool>& t)
 {
-    return to_string(type{
+    return to_string(type_info{
       {std::get<0>(t), {0, 0}},
       std::get<1>(t) ? type_class::tc_array : type_class::tc_plain,
       std::nullopt});
@@ -179,7 +179,7 @@ type_error::type_error(const token_location& loc, const std::string& message)
 
 std::string function_signature::to_string() const
 {
-    auto transform = [](const type& t)
+    auto transform = [](const type_info& t)
     {
         return ty::to_string(t);
     };
@@ -236,7 +236,7 @@ std::string scope::to_string() const
 void context::add_base_type(std::string name, bool is_reference_type)
 {
     auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name](const std::pair<type, std::uint64_t>& t) -> bool
+                           [&name](const std::pair<type_info, std::uint64_t>& t) -> bool
                            {
                                return name == ty::to_string(t.first);
                            });
@@ -254,7 +254,7 @@ void context::add_base_type(std::string name, bool is_reference_type)
     }
 
     auto type_id = generate_type_id();
-    type_map.push_back({type{{name, {0, 0}}, type_class::tc_plain, type_id}, type_id});
+    type_map.push_back({type_info{{name, {0, 0}}, type_class::tc_plain, type_id}, type_id});
 
     base_types.push_back(std::make_pair(std::move(name), is_reference_type));
 }
@@ -277,7 +277,7 @@ void context::add_import(std::vector<token> path)
     imports.emplace_back(utils::join(path, {transform}, package::delimiter));
 }
 
-void context::add_variable(token name, type var_type)
+void context::add_variable(token name, type_info var_type)
 {
     if(current_scope == nullptr)
     {
@@ -295,8 +295,8 @@ void context::add_variable(token name, type var_type)
 }
 
 void context::add_function(token name,
-                           std::vector<type> arg_types,
-                           type ret_type,
+                           std::vector<type_info> arg_types,
+                           type_info ret_type,
                            std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
@@ -337,7 +337,7 @@ void context::add_function(token name,
     }
 }
 
-void context::add_struct(token name, std::vector<std::pair<token, type>> members, std::optional<std::string> import_path)
+void context::add_struct(token name, std::vector<std::pair<token, type_info>> members, std::optional<std::string> import_path)
 {
     // check for existing names.
     auto tok = global_scope.find(name.s);
@@ -353,7 +353,7 @@ void context::add_struct(token name, std::vector<std::pair<token, type>> members
 
     // add to type map.
     auto type_id = generate_type_id();
-    type_map.push_back({type{{name.s, {0, 0}}, type_class::tc_plain, type_id}, type_id});
+    type_map.push_back({type_info{{name.s, {0, 0}}, type_class::tc_plain, type_id}, type_id});
 }
 
 bool context::has_type(const std::string& name, const std::optional<std::string>& import_path) const
@@ -365,7 +365,7 @@ bool context::has_type(const std::string& name, const std::optional<std::string>
 
     // search type map.
     auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name, &import_path](const std::pair<type, std::uint64_t>& t) -> bool
+                           [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
                            {
                                return t.first.to_string() == name
                                       && t.first.get_import_path() == import_path;
@@ -387,7 +387,7 @@ bool context::has_type(const std::string& name, const std::optional<std::string>
     return false;
 }
 
-bool context::has_type(const type& ty) const
+bool context::has_type(const type_info& ty) const
 {
     return has_type(ty.to_string(), ty.get_import_path());
 }
@@ -413,12 +413,12 @@ bool context::is_reference_type(const std::string& name, const std::optional<std
     return has_type(name, import_path);
 }
 
-bool context::is_reference_type(const type& t) const
+bool context::is_reference_type(const type_info& t) const
 {
     return is_reference_type(t.to_string());
 }
 
-type context::get_identifier_type(const token& identifier) const
+type_info context::get_identifier_type(const token& identifier) const
 {
     // check if we're accessing a struct.
     std::string err;
@@ -451,10 +451,10 @@ type context::get_identifier_type(const token& identifier) const
     throw type_error(identifier.location, err);
 }
 
-type context::get_type(const std::string& name, bool array, const std::optional<std::string>& import_path)
+type_info context::get_type(const std::string& name, bool array, const std::optional<std::string>& import_path)
 {
     auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name, array, &import_path](const std::pair<type, std::uint64_t>& t) -> bool
+                           [&name, array, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
                            {
                                if(array != t.first.is_array())
                                {
@@ -468,7 +468,7 @@ type context::get_type(const std::string& name, bool array, const std::optional<
 
                                if(array && t.first.is_array())
                                {
-                                   const type* element_type = t.first.get_element_type();
+                                   const type_info* element_type = t.first.get_element_type();
                                    return name == ty::to_string(*element_type);
                                }
 
@@ -483,7 +483,7 @@ type context::get_type(const std::string& name, bool array, const std::optional<
     if(array)
     {
         auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &import_path](const std::pair<type, std::uint64_t>& t) -> bool
+                               [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
                                {
                                    if(t.first.is_array())
                                    {
@@ -497,7 +497,7 @@ type context::get_type(const std::string& name, bool array, const std::optional<
         {
             // add the array type to the type map.
             auto type_id = generate_type_id();
-            type_map.push_back({type{
+            type_map.push_back({type_info{
                                   token{name, {0, 0}},
                                   array ? type_class::tc_array : type_class::tc_plain,
                                   type_id, import_path},
@@ -516,7 +516,7 @@ type context::get_type(const std::string& name, bool array, const std::optional<
     }
 }
 
-type context::get_unresolved_type(token name, type_class cls, std::optional<std::string> import_path)
+type_info context::get_unresolved_type(token name, type_class cls, std::optional<std::string> import_path)
 {
     if(ty::is_builtin_type(name.s))
     {
@@ -524,7 +524,7 @@ type context::get_unresolved_type(token name, type_class cls, std::optional<std:
     }
 
     auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
-                           [&name, cls, &import_path](const type& t) -> bool
+                           [&name, cls, &import_path](const type_info& t) -> bool
                            {
                                if(import_path != t.get_import_path())
                                {
@@ -533,7 +533,7 @@ type context::get_unresolved_type(token name, type_class cls, std::optional<std:
 
                                if(cls == type_class::tc_array && t.is_array())
                                {
-                                   const type* element_type = t.get_element_type();
+                                   const type_info* element_type = t.get_element_type();
                                    return element_type != nullptr && (name.s == ty::to_string(*element_type));
                                }
 
@@ -544,17 +544,17 @@ type context::get_unresolved_type(token name, type_class cls, std::optional<std:
         return *it;
     }
 
-    unresolved_types.push_back(type::make_unresolved(std::move(name), cls, std::move(import_path)));
+    unresolved_types.push_back(type_info::make_unresolved(std::move(name), cls, std::move(import_path)));
     return unresolved_types.back();
 }
 
-bool context::is_convertible(const type& from, const type& to) const
+bool context::is_convertible(const type_info& from, const type_info& to) const
 {
     // Only conversions from array types to @array are allowed.
     return from.is_array() && (!to.is_array() && to.to_string() == "@array");
 }
 
-void context::resolve(type& ty)
+void context::resolve(type_info& ty)
 {
     if(ty.is_resolved())
     {
@@ -564,7 +564,7 @@ void context::resolve(type& ty)
     // check if array elements are resolved.
     if(ty.is_array())
     {
-        type* element_type = ty.get_element_type();
+        type_info* element_type = ty.get_element_type();
         if(!element_type->is_resolved())
         {
             resolve(*element_type);
@@ -573,7 +573,7 @@ void context::resolve(type& ty)
 
     // resolve type.
     auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&ty](const std::pair<type, std::uint64_t>& t) -> bool
+                           [&ty](const std::pair<type_info, std::uint64_t>& t) -> bool
                            {
                                return ty.to_string() == t.first.to_string()
                                       && ty.get_import_path() == t.first.get_import_path();
@@ -612,7 +612,7 @@ void context::resolve_types()
     for(auto& s: global_scope.structs)
     {
         auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&s](const std::pair<type, std::uint64_t>& t) -> bool
+                               [&s](const std::pair<type_info, std::uint64_t>& t) -> bool
                                {
                                    if(s.second.import_path != t.first.get_import_path())
                                    {
@@ -629,10 +629,10 @@ void context::resolve_types()
         if(it == type_map.end())
         {
             auto type_id = generate_type_id();
-            type_map.push_back({type{s.second.name,
-                                     type_class::tc_plain,
-                                     type_id,
-                                     s.second.import_path},
+            type_map.push_back({type_info{s.second.name,
+                                          type_class::tc_plain,
+                                          type_id,
+                                          s.second.import_path},
                                 type_id});
         }
     }
@@ -640,11 +640,11 @@ void context::resolve_types()
     // check that all types are resolved.
 
     // don't resolve built-in types and function types.
-    std::vector<type> unresolved;
+    std::vector<type_info> unresolved;
     std::copy_if(unresolved_types.begin(),
                  unresolved_types.end(),
                  std::back_inserter(unresolved),
-                 [](const type& t) -> bool
+                 [](const type_info& t) -> bool
                  {
                      return !is_builtin_type(t.to_string()) && !t.is_function_type();
                  });
@@ -678,9 +678,9 @@ void context::resolve_types()
     }
 }
 
-type context::get_function_type(const token& name, const std::vector<type>& arg_types, const type& ret_type)
+type_info context::get_function_type(const token& name, const std::vector<type_info>& arg_types, const type_info& ret_type)
 {
-    auto transform = [](const type& t) -> std::string
+    auto transform = [](const type_info& t) -> std::string
     { return ty::to_string(t); };
     std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
                                           ty::to_string(ret_type));

@@ -662,7 +662,7 @@ class function
     opcode ret_opcode;
 
     /** Locals. Not serialized. */
-    std::vector<module_::variable> locals;
+    std::vector<module_::variable_descriptor> locals;
 
     /** Argument and locals size. Not serialized. */
     std::size_t locals_size = 0;
@@ -693,7 +693,7 @@ public:
     function(module_::function_signature signature,
              std::size_t entry_point,
              std::size_t size,
-             std::vector<module_::variable> locals,
+             std::vector<module_::variable_descriptor> locals,
              std::size_t locals_size,
              std::size_t stack_size);
 
@@ -736,7 +736,7 @@ public:
     }
 
     /** Get the function's locals. */
-    const std::vector<module_::variable>& get_locals() const
+    const std::vector<module_::variable_descriptor>& get_locals() const
     {
         return locals;
     }
@@ -847,7 +847,7 @@ class context
     std::unordered_map<std::string, std::unique_ptr<module_::language_module>> module_map;
 
     /** Types, ordered by module and name. */
-    std::unordered_map<std::string, std::unordered_map<std::string, module_::type_descriptor>> type_map;
+    std::unordered_map<std::string, std::unordered_map<std::string, module_::struct_descriptor>> struct_map;
 
     /** Functions, ordered by module and name. */
     std::unordered_map<std::string, std::unordered_map<std::string, function>> function_map;
@@ -870,27 +870,27 @@ class context
     /**
      * Get the byte size and alignment of a type.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param type_name The base type name.
      * @param reference Whether this is a reference. Note that arrays are references.
      * @return Returns the type properties.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
     type_properties get_type_properties(
-      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
       const std::string& type_name,
       bool reference) const;
 
     /**
      * Get the byte size and offset of a field.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param type_name The base type name.
      * @param field_index The field index.
      * @return Returns the field properties.
      * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
      */
-    field_properties get_field_properties(const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+    field_properties get_field_properties(const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
                                           const std::string& type_name,
                                           std::size_t field_index) const;
 
@@ -903,40 +903,40 @@ class context
     std::int32_t get_stack_delta(const module_::function_signature& s) const;
 
     /**
-     * Decode the types. Set types sizes, alignments and offsets.
+     * Decode the structs. Set types sizes, alignments and offsets.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param mod The module, used for import resolution.
      */
-    void decode_types(
-      std::unordered_map<std::string, module_::type_descriptor>& type_map,
+    void decode_structs(
+      std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
       const module_::language_module& mod);    // FIXME Will this be used?
 
     /**
      * Decode a module.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param mod The module.
      * @returns The decoded module.
      */
     std::unique_ptr<module_::language_module> decode(
-      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
       const module_::language_module& mod);
 
     /**
      * Decode the function's arguments and locals.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param desc The function descriptor.
      */
     void decode_locals(
-      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
       module_::function_descriptor& desc);
 
     /**
      * Decode an instruction.
      *
-     * @param type_map The type map.
+     * @param struct_map The type map.
      * @param mod The decoded module.
      * @param ar The archive to read from.
      * @param instr The instruction to decode.
@@ -945,7 +945,7 @@ class context
      * @return Delta (in bytes) by which the instruction changes the stack size.
      */
     std::int32_t decode_instruction(
-      const std::unordered_map<std::string, module_::type_descriptor>& type_map,
+      const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
       module_::language_module& mod,
       archive& ar,
       std::byte instr,
@@ -991,7 +991,7 @@ class context
       const module_::language_module& mod,
       std::size_t entry_point,
       std::size_t size,
-      const std::vector<module_::variable>& locals,
+      const std::vector<module_::variable_descriptor>& locals,
       stack_frame& frame);
 
 public:

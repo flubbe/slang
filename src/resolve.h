@@ -85,10 +85,10 @@ class context
       std::vector<std::pair<std::string, module_::function_descriptor>>>
       imported_functions;
 
-    /** Type imports, , indexed by resolved module path, as a pair `(name, descriptor)`. */
+    /** Type imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
     std::unordered_map<
       std::string,
-      std::vector<std::pair<std::string, module_::type_descriptor>>>
+      std::vector<std::pair<std::string, module_::struct_descriptor>>>
       imported_types;
 
 protected:

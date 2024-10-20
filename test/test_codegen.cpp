@@ -583,7 +583,7 @@ TEST(codegen, struct_type)
          * }
          */
 
-        ctx.add_type("S", {{"a", {cg::type{cg::type_class::i32, 0}}}, {"b", {cg::type{cg::type_class::i32, 0}}}});
+        ctx.add_struct("S", {{"a", {cg::type{cg::type_class::i32, 0}}}, {"b", {cg::type{cg::type_class::i32, 0}}}});
 
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));

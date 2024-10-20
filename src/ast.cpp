@@ -116,7 +116,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
     }
 }
 
-std::optional<ty::type> literal_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
 {
     if(!tok.value)
     {
@@ -232,7 +232,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
     throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.", v->get_type().to_string(), target_type.s));
 }
 
-std::optional<ty::type> type_cast_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
 {
     auto type = expr->type_check(ctx);
     if(type == std::nullopt)
@@ -280,7 +280,7 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
     return type;
 }
 
-std::optional<ty::type> namespace_access_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
 {
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
@@ -382,7 +382,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     return std::make_unique<cg::value>(member);
 }
 
-std::optional<ty::type> access_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
 {
     type = ctx.get_identifier_type(name);
 
@@ -523,7 +523,7 @@ void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::con
     type_ctx.add_import(path);
 }
 
-std::optional<ty::type> import_expression::type_check([[maybe_unused]] ty::context& ctx)
+std::optional<ty::type_info> import_expression::type_check([[maybe_unused]] ty::context& ctx)
 {
     return std::nullopt;
 }
@@ -553,7 +553,7 @@ void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx
     expr->collect_names(ctx, type_ctx);
 }
 
-std::optional<ty::type> directive_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
 {
     return expr->type_check(ctx);
 }
@@ -619,7 +619,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     return std::make_unique<cg::value>(v);
 }
 
-std::optional<ty::type> variable_reference_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> variable_reference_expression::type_check(ty::context& ctx)
 {
     if(element_expr)
     {
@@ -782,7 +782,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     return nullptr;
 }
 
-std::optional<ty::type> variable_declaration_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> variable_declaration_expression::type_check(ty::context& ctx)
 {
     auto var_type = ctx.get_type(type->get_name(), is_array(), type->get_namespace_path());
     ctx.add_variable(name, var_type);
@@ -865,9 +865,9 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
     return v;
 }
 
-std::optional<ty::type> array_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> array_initializer_expression::type_check(ty::context& ctx)
 {
-    std::optional<ty::type> t;
+    std::optional<ty::type_info> t;
     for(auto& it: exprs)
     {
         auto expr_type = it->type_check(ctx);
@@ -955,14 +955,14 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     }
 
     s->add_struct(name.s, struct_members);    // FIXME do we need this?
-    ctx.add_type(name.s, std::move(struct_members));
+    ctx.add_struct(name.s, std::move(struct_members));
 
     return nullptr;
 }
 
 void struct_definition_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
-    std::vector<std::pair<token, ty::type>> struct_members;
+    std::vector<std::pair<token, ty::type_info>> struct_members;
     for(auto& m: members)
     {
         struct_members.emplace_back(
@@ -974,7 +974,7 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
     type_ctx.add_struct(name, std::move(struct_members));
 }
 
-std::optional<ty::type> struct_definition_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> struct_definition_expression::type_check(ty::context& ctx)
 {
     for(auto& m: members)
     {
@@ -1009,7 +1009,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
     throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
 }
 
-std::optional<ty::type> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
 {
     // TODO
     throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::type_check not implemented.", slang::to_string(loc)));
@@ -1088,7 +1088,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
 }
 
-std::optional<ty::type> struct_named_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty::context& ctx)
 {
     auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
@@ -1322,7 +1322,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op.s));
 }
 
-std::optional<ty::type> binary_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 {
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
@@ -1513,7 +1513,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     throw std::runtime_error(fmt::format("{}: Code generation for unary operator '{}' not implemented.", slang::to_string(loc), op.s));
 }
 
-std::optional<ty::type> unary_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
 {
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
       {"++", {"i32", "f32"}},
@@ -1580,7 +1580,7 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
     return std::make_unique<cg::value>(cg::type{cg::to_type_class(type.s), 1});
 }
 
-std::optional<ty::type> new_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
 {
     auto expr_type = expr->type_check(ctx);
     if(expr_type == std::nullopt)
@@ -1626,7 +1626,7 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
     return std::make_unique<cg::value>(cg::type{cg::type_class::null, 0});
 }
 
-std::optional<ty::type> null_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> null_expression::type_check(ty::context& ctx)
 {
     return ctx.get_type("@null", false);
 }
@@ -1691,7 +1691,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     return v;
 }
 
-std::optional<ty::type> postfix_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
 {
     auto identifier_type = identifier->type_check(ctx);
     if(identifier_type == std::nullopt)
@@ -1837,9 +1837,9 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 
     ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
 
-    std::vector<ty::type> arg_types;
+    std::vector<ty::type_info> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                   [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type
+                   [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
                    { return type_ctx.get_unresolved_type(
                        std::get<1>(arg)->get_name(),
                        std::get<1>(arg)->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
@@ -1929,7 +1929,7 @@ void block::collect_names(cg::context& ctx, ty::context& type_ctx) const
     }
 }
 
-std::optional<ty::type> block::type_check(ty::context& ctx)
+std::optional<ty::type_info> block::type_check(ty::context& ctx)
 {
     for(auto& expr: exprs)
     {
@@ -2048,7 +2048,7 @@ bool function_expression::supports_directive(const std::string& name) const
     return false;
 }
 
-std::optional<ty::type> function_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> function_expression::type_check(ty::context& ctx)
 {
     prototype->type_check(ctx);
     if(body)
@@ -2096,7 +2096,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     return std::make_unique<cg::value>(std::move(return_type));
 }
 
-std::optional<ty::type> call_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 {
     auto sig = ctx.get_function_signature(callee, get_namespace_path());
 
@@ -2182,7 +2182,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
     return nullptr;
 }
 
-std::optional<ty::type> return_statement::type_check(ty::context& ctx)
+std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
 {
     auto sig = ctx.get_current_function();
     if(sig == std::nullopt)
@@ -2301,7 +2301,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     return nullptr;
 }
 
-std::optional<ty::type> if_statement::type_check(ty::context& ctx)
+std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
 {
     auto condition_type = condition->type_check(ctx);
     if(condition_type == std::nullopt)
@@ -2387,7 +2387,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     return nullptr;
 }
 
-std::optional<ty::type> while_statement::type_check(ty::context& ctx)
+std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)
 {
     auto condition_type = condition->type_check(ctx);
     if(condition_type == std::nullopt)

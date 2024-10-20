@@ -90,7 +90,7 @@ protected:
     std::vector<std::string> namespace_stack;
 
     /** The expression's given or inferred type. Needs to be set by `type_check`. */
-    std::optional<ty::type> expr_type;
+    std::optional<ty::type_info> expr_type;
 
 public:
     /** No default constructor. */
@@ -229,7 +229,7 @@ public:
      * @param ctx Type system context.
      * @returns The expression's type or std::nullopt.
      */
-    virtual std::optional<ty::type> type_check(ty::context& ctx) = 0;
+    virtual std::optional<ty::type_info> type_check(ty::context& ctx) = 0;
 
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
@@ -321,7 +321,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -364,7 +364,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -406,7 +406,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -417,7 +417,7 @@ class access_expression : public named_expression
     std::unique_ptr<expression> expr;
 
     /** Identifyer type. Set during type checking. */
-    ty::type type;
+    ty::type_info type;
 
 public:
     /** No default constructor. */
@@ -460,7 +460,7 @@ public:
      *       calling `generate_object_load` beforehand.
      */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
     /**
@@ -509,7 +509,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -558,7 +558,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -601,7 +601,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
     /** Get the value of the object. */
@@ -714,7 +714,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
     /** Get the variable's type. */
@@ -761,7 +761,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -801,7 +801,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -840,7 +840,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -883,7 +883,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -930,7 +930,7 @@ public:
     bool needs_pop() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -973,7 +973,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1015,7 +1015,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1048,7 +1048,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1095,7 +1095,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1196,7 +1196,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1241,7 +1241,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     bool supports_directive(const std::string& s) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1292,7 +1292,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1334,7 +1334,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1382,7 +1382,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1425,7 +1425,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type> type_check(ty::context& ctx) override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1459,7 +1459,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<ty::type> type_check([[maybe_unused]] ty::context& ctx) override
+    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
     {
         return std::nullopt;
     }
@@ -1500,7 +1500,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<ty::type> type_check([[maybe_unused]] ty::context& ctx) override
+    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
     {
         return std::nullopt;
     }

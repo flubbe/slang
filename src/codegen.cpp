@@ -601,9 +601,9 @@ std::size_t context::get_import_index(module_::symbol_type type, std::string imp
                   import_path));
 }
 
-struct_* context::add_type(std::string name,
-                           std::vector<std::pair<std::string, value>> members,
-                           std::optional<std::string> import_path)
+struct_* context::add_struct(std::string name,
+                             std::vector<std::pair<std::string, value>> members,
+                             std::optional<std::string> import_path)
 {
     if(std::find_if(types.begin(), types.end(),
                     [&name](const std::unique_ptr<struct_>& t) -> bool

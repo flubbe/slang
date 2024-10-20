@@ -1842,9 +1842,9 @@ public:
      * @param import_path An optional import path for the struct.
      * @returns A representation of the created struct.
      */
-    struct_* add_type(std::string name,
-                      std::vector<std::pair<std::string, value>> members,
-                      std::optional<std::string> import_path = std::nullopt);
+    struct_* add_struct(std::string name,
+                        std::vector<std::pair<std::string, value>> members,
+                        std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a struct definition.
