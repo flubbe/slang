@@ -967,12 +967,16 @@ class context
     /**
      * Execute a function.
      *
+     * @param module_name The module name. Only used for error reporting.
+     * @param function_name The function's name. Only used for error reporting.
      * @param mod The decoded module.
      * @param f The function to execute.
      * @param args The function's arguments.
      * @return The function's return value.
      */
     value exec(
+      const std::string& module_name,
+      const std::string& function_name,
       const module_::language_module& mod,
       const function& f,
       std::vector<value> args);

@@ -2063,38 +2063,55 @@ public:
      * them in `locals`.
      *
      * @param ctx The associated interpreter context.
+     * @param module_name The module's name. Only used for error reporting.
+     * @param function_name The function's name. Only used for error reporting.
      * @param args The arguments to verify and write.
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
     arguments_scope(context& ctx,
+                    const std::string& module_name,
+                    const std::string& function_name,
                     const std::vector<value>& args,
                     const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
                     std::vector<std::byte>& locals)
     : args{args}
     , locals{locals}
     {
+        if(arg_types.size() != args.size())
+        {
+            throw interpreter_error(
+              fmt::format("Argument count for function '{}.{}' does not match: Expected {}, got {}.",
+                          module_name, function_name,
+                          arg_types.size(), args.size()));
+        }
+
         std::size_t offset = 0;
         for(std::size_t i = 0; i < args.size(); ++i)
         {
             if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} for function has wrong base type (expected '{}', got '{}').",
-                              i, std::get<0>(arg_types[i]).base_type(), std::get<0>(args[i].get_type())));
+                  fmt::format("Argument {} for function '{}.{}' has wrong base type (expected '{}', got '{}').",
+                              i,
+                              module_name, function_name,
+                              std::get<0>(arg_types[i]).base_type(), std::get<0>(args[i].get_type())));
             }
 
             if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} for function has wrong array property (expected '{}', got '{}').",
-                              i, std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
+                  fmt::format("Argument {} for function '{}.{}' has wrong array property (expected '{}', got '{}').",
+                              i,
+                              module_name, function_name,
+                              std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
             }
 
             if(offset + args[i].get_size() > locals.size())
             {
                 throw interpreter_error(fmt::format(
-                  "Stack overflow during argument allocation while processing argument {}.", i));
+                  "Stack overflow during argument allocation while processing argument {} of function '{}.{}'.",
+                  i, module_name, function_name));
             }
 
             if(is_garbage_collected(args[i].get_type()))
@@ -2125,6 +2142,8 @@ public:
 };
 
 value context::exec(
+  const std::string& module_name,
+  const std::string& function_name,
   const module_::language_module& mod,
   const function& f,
   std::vector<value> args)
@@ -2135,12 +2154,7 @@ value context::exec(
     stack_frame frame{mod.get_header().strings, f.get_locals_size(), f.get_stack_size()};
 
     auto& arg_types = f.get_signature().arg_types;
-    if(arg_types.size() != args.size())
-    {
-        throw interpreter_error(fmt::format("Arguments for function do not match: Expected {}, got {}.", arg_types.size(), args.size()));
-    }
-
-    arguments_scope arg_scope{*this, args, arg_types, frame.locals};
+    arguments_scope arg_scope{*this, module_name, function_name, args, arg_types, frame.locals};
 
     /*
      * Execute the function.
@@ -2331,7 +2345,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         throw interpreter_error(fmt::format("Function '{}' not found in module '{}'.", function_name, module_name));
     }
 
-    return exec(*mod_it->second, func_it->second, std::move(args));
+    return exec(module_name, function_name, *mod_it->second, func_it->second, std::move(args));
 }
 
 }    // namespace slang::interpreter
