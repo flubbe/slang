@@ -1082,7 +1082,11 @@ module_::language_module instruction_emitter::to_module() const
 
         if(it->is_native())
         {
-            mod.add_native_function(it->get_name(), std::move(return_type), std::move(arg_types), it->get_import_library());
+            mod.add_native_function(
+              it->get_name(),
+              std::move(return_type),
+              std::move(arg_types),
+              it->get_import_library());
         }
         else
         {
@@ -1092,7 +1096,13 @@ module_::language_module instruction_emitter::to_module() const
                 throw emitter_error(fmt::format("Unable to find entry point for function '{}'.", it->get_name()));
             }
 
-            mod.add_function(it->get_name(), std::move(return_type), std::move(arg_types), details->second.size, details->second.offset, details->second.locals);
+            mod.add_function(
+              it->get_name(),
+              std::move(return_type),
+              std::move(arg_types),
+              details->second.size,
+              details->second.offset,
+              details->second.locals);
         }
     }
 

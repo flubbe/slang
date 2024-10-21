@@ -161,7 +161,10 @@ void language_module::add_function(std::string name,
         throw module_error(fmt::format("Cannot add function: Symbol '{}' already defined.", name));
     }
 
-    function_descriptor desc{{std::move(return_type), std::move(arg_types)}, false, function_details{size, entry_point, locals}};
+    function_descriptor desc{
+      function_signature{std::move(return_type), std::move(arg_types)},
+      false,
+      function_details{size, entry_point, locals}};
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
@@ -180,7 +183,10 @@ void language_module::add_native_function(std::string name,
         throw module_error(fmt::format("Cannot add native function: '{}' already defined.", name));
     }
 
-    function_descriptor desc{{std::move(return_type), std::move(arg_types)}, true, native_function_details{std::move(lib_name)}};
+    function_descriptor desc{
+      function_signature{std::move(return_type), std::move(arg_types)},
+      true,
+      native_function_details{std::move(lib_name)}};
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 

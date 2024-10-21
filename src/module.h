@@ -52,9 +52,8 @@ public:
 enum class symbol_type : std::uint8_t
 {
     package = 0,
-    variable = 1,
-    function = 2,
-    type = 3,
+    function = 1,
+    type = 2,
 };
 
 /**
@@ -69,7 +68,6 @@ inline archive& operator&(archive& ar, symbol_type& s)
     ar & i;
 
     if(i != static_cast<std::uint8_t>(symbol_type::package)
-       && i != static_cast<std::uint8_t>(symbol_type::variable)
        && i != static_cast<std::uint8_t>(symbol_type::function)
        && i != static_cast<std::uint8_t>(symbol_type::type))
     {
@@ -86,7 +84,6 @@ inline std::string to_string(symbol_type s)
     switch(s)
     {
     case symbol_type::package: return "package";
-    case symbol_type::variable: return "variable";
     case symbol_type::function: return "function";
     case symbol_type::type: return "type";
     }
@@ -664,8 +661,8 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Type, function signature or struct descriptor. */
-    std::variant<variable_type, function_descriptor, struct_descriptor> desc;
+    /** Function or struct descriptor. */
+    std::variant<function_descriptor, struct_descriptor> desc;
 
     /** Default constructors. */
     exported_symbol() = default;
@@ -683,7 +680,7 @@ struct exported_symbol
      * @param name The symbol name.
      * @param desc The symbol's descriptor.
      */
-    exported_symbol(symbol_type type, std::string name, std::variant<variable_type, function_descriptor, struct_descriptor> desc)
+    exported_symbol(symbol_type type, std::string name, std::variant<function_descriptor, struct_descriptor> desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -706,21 +703,7 @@ inline archive& operator&(archive& ar, exported_symbol& s)
 
     ar & s.type;
     ar & s.name;
-    if(s.type == symbol_type::variable)
-    {
-        if(ar.is_reading())
-        {
-            variable_type desc;
-            ar & desc;
-            s.desc = std::move(desc);
-        }
-        else if(ar.is_writing())
-        {
-            auto& desc = std::get<variable_type>(s.desc);
-            ar & desc;
-        }
-    }
-    else if(s.type == symbol_type::function)
+    if(s.type == symbol_type::function)
     {
         if(ar.is_reading())
         {
