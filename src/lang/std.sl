@@ -99,3 +99,14 @@ fn parse_i32(s: str) -> i32;
 #[native(lib="slang")]
 fn parse_f32(s: str) -> f32;
   
+/*
+ * Debug.
+ */
+
+/**
+ * Assert that a condition does not evaluate to 0.
+ * 
+ * @param condition The condition.
+ */
+#[native(lib="slang")]
+fn assert(condition: i32) -> void;

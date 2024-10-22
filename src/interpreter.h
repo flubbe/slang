@@ -25,9 +25,48 @@
 namespace slang::interpreter
 {
 
+/** Entries of a stack trace. */
+struct stack_trace_entry
+{
+    /** Name of the module containing the function. */
+    std::string mod_name;
+
+    /** Function entry point. */
+    std::size_t entry_point;
+
+    /** Offset. */
+    std::size_t offset;
+
+    /** Defaulted constructors. */
+    stack_trace_entry() = default;
+    stack_trace_entry(const stack_trace_entry&) = default;
+    stack_trace_entry(stack_trace_entry&&) = default;
+
+    /**
+     * Initializing constructor.
+     *
+     * @param mod_name The module name.
+     * @param entry_point Entry point of the function for which the stack is unwound.
+     * @param offset Offset in the function for which the stack is unwound.
+     */
+    stack_trace_entry(std::string mod_name, std::size_t entry_point, std::size_t offset)
+    : mod_name{std::move(mod_name)}
+    , entry_point{entry_point}
+    , offset{offset}
+    {
+    }
+
+    /** Defaulted assignments. */
+    stack_trace_entry& operator=(const stack_trace_entry&) = default;
+    stack_trace_entry& operator=(stack_trace_entry&&) = default;
+};
+
 /** Interpreter error. */
 class interpreter_error : public std::runtime_error
 {
+    /** Call stack. */
+    std::vector<stack_trace_entry> stack_trace;
+
 public:
     /**
      * Construct a `interpreter_error`.
@@ -37,6 +76,36 @@ public:
     interpreter_error(const std::string& message)
     : std::runtime_error{message}
     {
+    }
+
+    /**
+     * Construct a `interpreter_error`.
+     *
+     * @param message The error message.
+     * @param stack_trace A stack trace to be passed along.
+     */
+    interpreter_error(const std::string& message, const std::vector<stack_trace_entry>& stack_trace)
+    : std::runtime_error{message}
+    , stack_trace{stack_trace}
+    {
+    }
+
+    /**
+     * Add a stack trace entry.
+     *
+     * @param mod_name The module name.
+     * @param entry_point Entry point of the function for which the stack is unwound.
+     * @param offset Offset in the function for which the stack is unwound.
+     */
+    void add_stack_trace_entry(std::string module_name, std::size_t entry_point, std::size_t offset)
+    {
+        stack_trace.emplace_back(module_name, entry_point, offset);
+    }
+
+    /** Get the stack trace. */
+    const std::vector<stack_trace_entry>& get_stack_trace() const
+    {
+        return stack_trace;
     }
 };
 

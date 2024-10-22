@@ -30,6 +30,7 @@ add_executable(slang
     src/opcodes.cpp
     src/resolve.cpp
     src/runtime/arrays.cpp
+    src/runtime/debug.cpp
     src/runtime/strings.cpp
     src/runtime/utils.cpp
     src/typing.cpp

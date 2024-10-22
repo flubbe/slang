@@ -88,4 +88,16 @@ void parse_i32(si::context& ctx, si::operand_stack& stack);
  */
 void parse_f32(si::context& ctx, si::operand_stack& stack);
 
+/*
+ * Debug.
+ */
+
+/**
+ * Assert that an expression does not evaluate to 0.
+ *
+ * @param ctx The interpreter context.
+ * @param stack The operand stack.
+ */
+void assert_(si::context& ctx, si::operand_stack& stack);
+
 }    // namespace slang::runtime

@@ -539,6 +539,11 @@ void exec::invoke(const std::vector<std::string>& args)
                                  {
                                      rt::parse_f32(ctx, stack);
                                  });
+    ctx.register_native_function("slang", "assert",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::assert_(ctx, stack);
+                                 });
 
     ctx.load_module(module_name, mod);
 
