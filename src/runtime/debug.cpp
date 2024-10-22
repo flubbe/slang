@@ -14,7 +14,7 @@
 namespace slang::runtime
 {
 
-void assert_(si::context& ctx, si::operand_stack& stack)
+void assert_([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     if(!stack.pop_i32())
     {

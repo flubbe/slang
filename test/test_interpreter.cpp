@@ -191,6 +191,11 @@ static void register_std_lib(si::context& ctx, std::vector<std::string>& print_b
                                  {
                                      rt::parse_f32(ctx, stack);
                                  });
+    ctx.register_native_function("slang", "assert",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::assert_(ctx, stack);
+                                 });
 }
 
 TEST(interpreter, hello_world)
