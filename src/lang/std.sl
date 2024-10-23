@@ -107,6 +107,7 @@ fn parse_f32(s: str) -> f32;
  * Assert that a condition does not evaluate to 0.
  * 
  * @param condition The condition.
+ * @param msg A message that is emitted when the condition is 0.
  */
 #[native(lib="slang")]
-fn assert(condition: i32) -> void;
+fn assert(condition: i32, msg: str) -> void;

@@ -78,5 +78,6 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/print_args Hello World
         ./build/${{env.BUILD_TYPE}}/slang compile examples/string_conversion
         ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion 3.141 a -1
-
-
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/assert
+        ! ./build/${{env.BUILD_TYPE}}/slang exec examples/assert
+        

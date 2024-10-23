@@ -5,7 +5,7 @@ fn first() -> void {
 }
 
 fn third() -> void {
-    std::assert(0);
+    std::assert(0, "Assertion test");
 }
 
 fn second() -> void {

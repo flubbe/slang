@@ -16,9 +16,18 @@ namespace slang::runtime
 
 void assert_([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
-    if(!stack.pop_i32())
+    gc_object<std::string> msg_container = gc_pop(ctx, stack);
+    std::int32_t condition = stack.pop_i32();
+
+    if(condition == 0)
     {
-        throw interpreter::interpreter_error("Assertion failed.");
+        std::string* msg = msg_container.get();
+        if(msg != nullptr && ctx.get_gc().get_object_type(msg) == gc::gc_object_type::str)
+        {
+            throw interpreter::interpreter_error(fmt::format("Assertion failed: {}", *msg));
+        }
+
+        throw interpreter::interpreter_error("Assertion failed (invalid message).");
     }
 }
 
