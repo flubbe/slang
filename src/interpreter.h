@@ -1067,6 +1067,28 @@ class context
       const std::vector<module_::variable_descriptor>& locals,
       stack_frame& frame);
 
+    /**
+     * Stack trace handler for `interpreter_error`s.
+     *
+     * @param err The interpreter error.
+     * @param mod Reference to the module where the error occured.
+     * @param entry_point Entry point of the function where the error occured.
+     * @param offset Offset into the decoded binary where the error occured.
+     */
+    void stack_trace_handler(interpreter_error& err,
+                             const module_::language_module& mod,
+                             std::size_t entry_point,
+                             std::size_t offset);
+
+    /**
+     * Create a readable message from a stack trace by resolving the entry points
+     * to function names.
+     *
+     * @param stack_trace The stack trace.
+     * @returns Returns the stack trace as a readable string.
+     */
+    std::string stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace);
+
 public:
     /** Default constructors. */
     context() = delete;

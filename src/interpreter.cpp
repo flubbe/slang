@@ -2051,20 +2051,54 @@ opcode context::exec(
     }
     catch(interpreter_error& e)
     {
-        // find the module name.
-        std::string module_name{"<unknown>"};
-        for(auto& [mod_name, mod_it]: module_map)
+        stack_trace_handler(e, mod, entry_point, offset);
+        throw e;
+    }
+}
+
+void context::stack_trace_handler(interpreter_error& err,
+                                  const module_::language_module& mod,
+                                  std::size_t entry_point,
+                                  std::size_t offset)
+{
+    // find the module name.
+    for(auto& [mod_name, mod_it]: module_map)
+    {
+        if(mod_it.get() == &mod)
         {
-            if(mod_it.get() == &mod)
+            err.add_stack_trace_entry(mod_name, entry_point, offset);
+            return;
+        }
+    }
+
+    err.add_stack_trace_entry("<unknown>", entry_point, offset);
+}
+
+std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace)
+{
+    std::string buf;
+    for(auto& entry: stack_trace)
+    {
+        // resolve the offset to a function name.
+        std::string func_name = fmt::format("<unknown at {}>", entry.entry_point);
+
+        auto mod_it = function_map.find(entry.mod_name);
+        if(mod_it != function_map.end())
+        {
+            auto func_it = std::find_if(mod_it->second.cbegin(), mod_it->second.cend(),
+                                        [&entry](const auto& f) -> bool
+                                        {
+                                            return f.second.get_entry_point() == entry.entry_point;
+                                        });
+            if(func_it != mod_it->second.end())
             {
-                module_name = mod_name;
-                break;
+                func_name = func_it->first;
             }
         }
 
-        e.add_stack_trace_entry(std::move(module_name), entry_point, offset);
-        throw e;
+        buf += fmt::format("  in {}.{}:{}\n", entry.mod_name, func_name, entry.offset);
     }
+    return buf;
 }
 
 /** Function argument writing and destruction. */
@@ -2381,28 +2415,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         auto stack_trace = e.get_stack_trace();
         if(stack_trace.size() > 0)
         {
-            buf += fmt::format("\n");
-            for(auto& entry: stack_trace)
-            {
-                // resolve the offset to a function name.
-                std::string func_name = fmt::format("<unknown at {}>", entry.entry_point);
-
-                auto mod_it = function_map.find(entry.mod_name);
-                if(mod_it != function_map.end())
-                {
-                    auto func_it = std::find_if(mod_it->second.cbegin(), mod_it->second.cend(),
-                                                [&entry](const auto& f) -> bool
-                                                {
-                                                    return f.second.get_entry_point() == entry.entry_point;
-                                                });
-                    if(func_it != mod_it->second.end())
-                    {
-                        func_name = func_it->first;
-                    }
-                }
-
-                buf += fmt::format("  in {}.{}:{}\n", entry.mod_name, func_name, entry.offset);
-            }
+            buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
         }
 
         throw interpreter_error(buf, stack_trace);
