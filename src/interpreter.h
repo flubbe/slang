@@ -940,15 +940,13 @@ class context
      * Get the byte size and alignment of a type.
      *
      * @param struct_map The type map.
-     * @param type_name The base type name.
-     * @param reference Whether this is a reference. Note that arrays are references.
+     * @param type The type.
      * @return Returns the type properties.
      * @throws Throws an `interpreter_error` if the type is not known.
      */
     type_properties get_type_properties(
       const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
-      const std::string& type_name,
-      bool reference) const;
+      const module_::variable_type& type) const;
 
     /**
      * Get the byte size and offset of a field.

@@ -208,32 +208,32 @@ static std::size_t get_type_or_reference_size(const std::pair<module_::variable_
 
 type_properties context::get_type_properties(
   const std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
-  const std::string& type_name, bool reference) const
+  const module_::variable_type& type) const
 {
-    // references.
-    if(reference)
+    // array types.
+    if(type.is_array())
     {
         // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
         return {sizeof(void*), std::size_t(std::alignment_of_v<void*>), 0};
     }
 
     // built-in types.
-    if(type_name == "void")
+    if(type.base_type() == "void")
     {
         return {0, 0, 0};
     }
 
-    auto built_in_it = type_properties_map.find(type_name);
+    auto built_in_it = type_properties_map.find(type.base_type());
     if(built_in_it != type_properties_map.end())
     {
         return {built_in_it->second.first, built_in_it->second.second, 0};
     }
 
     // structs.
-    auto type_it = struct_map.find(type_name);
+    auto type_it = struct_map.find(type.base_type());
     if(type_it == struct_map.end())
     {
-        throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type_name));
+        throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type.base_type()));
     }
 
     return {type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
@@ -479,8 +479,8 @@ std::int32_t context::decode_instruction(
         }
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties({}, t1.base_type(), false);
-        auto properties2 = get_type_properties({}, t2.base_type(), false);
+        auto properties1 = get_type_properties({}, t1);
+        auto properties2 = get_type_properties({}, t2);
 
         // check if the type needs garbage collection.
         std::uint8_t needs_gc = is_garbage_collected(t1);
@@ -673,7 +673,7 @@ std::int32_t context::decode_instruction(
                   imp_package.name));
             }
 
-            auto properties = get_type_properties(struct_map_it->second, imp_symbol.name, false);
+            auto properties = get_type_properties(struct_map_it->second, imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
@@ -696,7 +696,7 @@ std::int32_t context::decode_instruction(
                   i.i));
             }
 
-            auto properties = get_type_properties(struct_map, exp_symbol.name, false);
+            auto properties = get_type_properties(struct_map, exp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
