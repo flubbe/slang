@@ -14,7 +14,7 @@
 namespace slang::runtime
 {
 
-void assert_([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+void assert_(si::context& ctx, si::operand_stack& stack)
 {
     gc_object<std::string> msg_container = gc_pop(ctx, stack);
     std::int32_t condition = stack.pop_i32();

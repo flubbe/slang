@@ -64,7 +64,7 @@ jobs:
         rm *.cmod
         rm *.bin
     
-    - name: Run command line tests
+    - name: Run command line examples
       run: |
         ./build/${{env.BUILD_TYPE}}/slang compile examples/hello_world
         ./build/${{env.BUILD_TYPE}}/slang exec examples/hello_world
@@ -80,4 +80,19 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion 3.141 a -1
         ./build/${{env.BUILD_TYPE}}/slang compile examples/assert
         ! ./build/${{env.BUILD_TYPE}}/slang exec examples/assert
-        
+
+    - name: Run script tests
+      run: |
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_array
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_array
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
+
+    - name: Clean up script tests
+      run: |
+        cd ${{github.workspace}}/test
+        rm *.cmod
+
+  

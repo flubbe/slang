@@ -2096,7 +2096,7 @@ std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>&
             }
         }
 
-        buf += fmt::format("  in {}.{}:{}\n", entry.mod_name, func_name, entry.offset);
+        buf += fmt::format("  in {}.{}\n", entry.mod_name, func_name);
     }
     return buf;
 }
