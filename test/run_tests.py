@@ -1,5 +1,7 @@
+from typing import cast
 from pathlib import Path
 import subprocess
+from io import BytesIO
 
 _module_path = Path(__file__).parent
 
@@ -79,27 +81,49 @@ if __name__ == "__main__":
     )
 
     # Run script tests.
-    script_retcodes: list[int] = []
+    script_info: list[tuple[int, str, str]] = []
     for test_name in _script_tests:
-        script_retcodes.append(
-            subprocess.call(
-                [
-                    "./build/Debug/slang",
-                    "exec",
-                    f"test/{test_name}",
-                ],
-                cwd=_module_path.parent,
+        test_path = Path(f"test/{test_name}")
+        print(f"[......] Running {test_path.absolute()}", end="")
+        p = subprocess.Popen(
+            [
+                "./build/Debug/slang",
+                "exec",
+                f"test/{test_name}",
+            ],
+            cwd=_module_path.parent,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        p.wait(timeout=5)
+        script_info.append(
+            (
+                p.returncode,
+                cast(BytesIO, p.stdout).read().decode(),
+                cast(BytesIO, p.stderr).read().decode(),
             )
         )
+        if p.returncode == 0:
+            print(f"\r[  OK  ] Running {test_path.absolute()}")
+        else:
+            print(f"\r[FAILED] Running {test_path.absolute()}")
 
-    script_failed_tests = [(i, r) for i, r in enumerate(script_retcodes) if r != 0]
+    script_failed_tests = [
+        (idx, info) for idx, info in enumerate(script_info) if info[0] != 0
+    ]
     if len(script_failed_tests) > 0:
-        for i, r in script_failed_tests:
-            if r != 0:
-                print(f"Test {_script_tests[i]} failed")
+        for idx, info in script_failed_tests:
+            if info[0] != 0:
+                test_path = Path(f"test/{_script_tests[idx]}")
+                print()
+                print(f"{test_path.absolute()} failed.")
+                if len(info[1]) != 0:
+                    print(f"Captured stdout:\n{info[1]}")
+                if len(info[2]) != 0:
+                    print(f"Captured stderr:\n{info[2]}")
 
     print(
-        f"---------- {len(script_retcodes)} tests ran, {len(script_retcodes) - len(script_failed_tests)} passed, {len(script_failed_tests)} failed ----------"
+        f"---------- {len(script_info)} tests ran, {len(script_info) - len(script_failed_tests)} passed, {len(script_failed_tests)} failed ----------"
     )
 
     exit(len(failed_tests) + len(script_failed_tests) != 0)
