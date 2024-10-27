@@ -52,13 +52,17 @@ fn test_linked_list() -> void
 {
     let root: L = create_node("root");
 
+    std::assert(std::string_equals(root.data, "root"), "root.data == \"root\"");
     std::assert(root.next == null, "root.next == null");
 
-    append(root, "1");
-    append(root, "2");
+    let a1: L = append(root, "1");
+    let a2: L = append(root, "2");
 
     std::assert(root.next != null, "root.next != null");
+    std::assert(root.next == a1, "root.next == a1");
+
     std::assert(root.next.next != null, "root.next.next != null");
+    std::assert(root.next.next == a2, "root.next.next == a2");
 
     let l1: L = root.next;
     let l2: L = root.next.next;
