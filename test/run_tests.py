@@ -48,23 +48,6 @@ if __name__ == "__main__":
             print("Compiling lang/std failed. Exiting.")
             exit(1)
 
-    # compile test scripts.
-    for test_name in _script_tests:
-        print(f"Compiling test/{test_name} ...")
-        if (
-            subprocess.call(
-                [
-                    "./build/Debug/slang",
-                    "compile",
-                    f"test/{test_name}",
-                ],
-                cwd=_module_path.parent,
-            )
-            != 0
-        ):
-            print(f"Compiling test '{test_name}' failed")
-            exit(1)
-
     # Run C++ tests.
     retcodes: list[int] = []
     for t in _tests:
@@ -79,6 +62,48 @@ if __name__ == "__main__":
     print(
         f"---------- {len(retcodes)} tests ran, {len(retcodes) - len(failed_tests)} passed, {len(failed_tests)} failed ----------"
     )
+
+    # compile test scripts.
+    compile_info: list[tuple[int, str, str]] = []
+    for test_name in _script_tests:
+        print(f"[......] Compiling test/{test_name} ...", end="")
+        p = subprocess.Popen(
+            [
+                "./build/Debug/slang",
+                "compile",
+                f"test/{test_name}",
+            ],
+            cwd=_module_path.parent,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        p.wait(timeout=5)
+        compile_info.append(
+            (
+                p.returncode,
+                cast(BytesIO, p.stdout).read().decode(),
+                cast(BytesIO, p.stderr).read().decode(),
+            )
+        )
+        if p.returncode == 0:
+            print(f"\r[  OK  ]")
+        else:
+            print(f"\r[FAILED]")
+
+    failed_compilation = [
+        (idx, info) for idx, info in enumerate(compile_info) if info[0] != 0
+    ]
+    if len(failed_compilation) > 0:
+        for idx, info in failed_compilation:
+            test_path = Path(f"test/{_script_tests[idx]}")
+            print()
+            print(f"Compilation of '{test_path.absolute()}' failed.")
+            if len(info[1]) != 0:
+                print(f"Captured stdout:\n{info[1]}")
+            if len(info[2]) != 0:
+                print(f"Captured stderr:\n{info[2]}")
+
+        exit(1)
 
     # Run script tests.
     script_info: list[tuple[int, str, str]] = []
@@ -104,23 +129,22 @@ if __name__ == "__main__":
             )
         )
         if p.returncode == 0:
-            print(f"\r[  OK  ] Running {test_path.absolute()}")
+            print(f"\r[  OK  ]")
         else:
-            print(f"\r[FAILED] Running {test_path.absolute()}")
+            print(f"\r[FAILED]")
 
     script_failed_tests = [
         (idx, info) for idx, info in enumerate(script_info) if info[0] != 0
     ]
     if len(script_failed_tests) > 0:
         for idx, info in script_failed_tests:
-            if info[0] != 0:
-                test_path = Path(f"test/{_script_tests[idx]}")
-                print()
-                print(f"{test_path.absolute()} failed.")
-                if len(info[1]) != 0:
-                    print(f"Captured stdout:\n{info[1]}")
-                if len(info[2]) != 0:
-                    print(f"Captured stderr:\n{info[2]}")
+            test_path = Path(f"test/{_script_tests[idx]}")
+            print()
+            print(f"Test '{test_path.absolute()}' failed.")
+            if len(info[1]) != 0:
+                print(f"Captured stdout:\n{info[1]}")
+            if len(info[2]) != 0:
+                print(f"Captured stderr:\n{info[2]}")
 
     print(
         f"---------- {len(script_info)} tests ran, {len(script_info) - len(script_failed_tests)} passed, {len(script_failed_tests)} failed ----------"
