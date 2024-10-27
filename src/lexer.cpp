@@ -342,31 +342,35 @@ std::optional<token> lexer::next()
                     // handle escape sequences.
                     escaped = false;
 
-                    if(*c == 't')
+                    if(*c == 't') /* tab */
                     {
                         current_token += '\t';
                     }
-                    else if(*c == 'n')
+                    else if(*c == 'n') /* line feed / new line */
                     {
                         current_token += '\n';
                     }
-                    else if(*c == 'v')
+                    else if(*c == 'r') /* carriage return */
                     {
                         current_token += '\r';
                     }
-                    else if(*c == 'v')
+                    else if(*c == 'f') /* form feed / new page */
+                    {
+                        current_token += '\f';
+                    }
+                    else if(*c == 'v') /* vertial tab */
                     {
                         current_token += '\v';
                     }
-                    else if(*c == '"')
+                    else if(*c == '"') /* double quote */
                     {
                         current_token += '"';
                     }
-                    else if(*c == '\'')
+                    else if(*c == '\'') /* single quote */
                     {
                         current_token += '\'';
                     }
-                    else if(*c == '\\')
+                    else if(*c == '\\') /* backslash */
                     {
                         current_token += '\\';
                     }
