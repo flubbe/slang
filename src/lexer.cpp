@@ -315,16 +315,65 @@ std::optional<token> lexer::next()
         }
         else if(*c == '"')    // string literals.
         {
+            bool escaped = false;
             while((c = get()))
             {
-                current_token += *c;
-                if(*c == '"')
+                if(*c == '\\' && !escaped)
                 {
-                    break;
+                    escaped = true;
+                    continue;
                 }
-                if(*c == '\n')
+
+                if(!escaped)
                 {
-                    throw lexical_error(fmt::format("{}: Missing terminating character '\"'.", to_string(loc)));
+                    current_token += *c;
+
+                    if(*c == '"')
+                    {
+                        break;
+                    }
+                    if(*c == '\n')
+                    {
+                        throw lexical_error(fmt::format("{}: Missing terminating character '\"'.", to_string(loc)));
+                    }
+                }
+                else
+                {
+                    // handle escape sequences.
+                    escaped = false;
+
+                    if(*c == 't')
+                    {
+                        current_token += '\t';
+                    }
+                    else if(*c == 'n')
+                    {
+                        current_token += '\n';
+                    }
+                    else if(*c == 'v')
+                    {
+                        current_token += '\r';
+                    }
+                    else if(*c == 'v')
+                    {
+                        current_token += '\v';
+                    }
+                    else if(*c == '"')
+                    {
+                        current_token += '"';
+                    }
+                    else if(*c == '\'')
+                    {
+                        current_token += '\'';
+                    }
+                    else if(*c == '\\')
+                    {
+                        current_token += '\\';
+                    }
+                    else
+                    {
+                        throw lexical_error(fmt::format("{}: Unknown escape sequence '\\{}'.", to_string(loc), *c));
+                    }
                 }
             }
 

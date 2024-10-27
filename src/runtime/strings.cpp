@@ -24,7 +24,7 @@ void string_equals(si::context& ctx, si::operand_stack& stack)
     gc_object<std::string> s2_container = gc_pop(ctx, stack);
 
     std::string* s1 = s1_container.get();
-    std::string* s2 = s1_container.get();
+    std::string* s2 = s2_container.get();
 
     if(s1 == nullptr || s2 == nullptr)
     {
