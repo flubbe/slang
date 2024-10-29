@@ -66,7 +66,7 @@ public:
      *
      * @param message The error message.
      */
-    serialization_error(const std::string& message)
+    explicit serialization_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -100,10 +100,10 @@ public:
     /** Defaulted and deleted constructors. */
     archive() = delete;
     archive(const archive&) = default;
-    archive(archive&&) = default;
+    archive(archive&&) noexcept = default;
 
     /** Default destructor. */
-    virtual ~archive() = default;
+    virtual ~archive() noexcept = default;
 
     /**
      * Set up an archive.
@@ -127,7 +127,7 @@ public:
 
     /** Default assignments. */
     archive& operator=(const archive&) = default;
-    archive& operator=(archive&&) = default;
+    archive& operator=(archive&&) noexcept = default;
 
     /** Get the position in the archive. */
     virtual std::size_t tell() = 0;

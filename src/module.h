@@ -42,7 +42,7 @@ public:
      *
      * @param message The error message.
      */
-    module_error(const std::string& message)
+    explicit module_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -259,7 +259,7 @@ struct variable_descriptor : public symbol
      *
      * @param type The variable type.
      */
-    variable_descriptor(variable_type type)
+    explicit variable_descriptor(variable_type type)
     : type{std::move(type)}
     {
         reference = ty::is_reference_type(type.base_type());
@@ -351,7 +351,7 @@ struct native_function_details
      *
      * @param library_name The name of the library this function is implemented in.
      */
-    native_function_details(std::string library_name)
+    explicit native_function_details(std::string library_name)
     : library_name{library_name}
     {
     }
@@ -791,7 +791,7 @@ public:
      *
      * @param header THe module's header.
      */
-    language_module(module_header header)
+    explicit language_module(module_header header)
     : header{std::move(header)}
     {
     }

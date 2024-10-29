@@ -33,7 +33,7 @@ public:
      *
      * @param message The error message.
      */
-    file_error(const std::string& message)
+    explicit file_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

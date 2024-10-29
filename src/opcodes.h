@@ -107,7 +107,7 @@ public:
      *
      * @param message The error message.
      */
-    opcode_error(const std::string& message)
+    explicit opcode_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

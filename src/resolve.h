@@ -43,7 +43,7 @@ public:
      *
      * @param message The error message.
      */
-    resolve_error(const std::string& message)
+    explicit resolve_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -122,7 +122,7 @@ public:
      *
      * @param mgr The file manager used for path resolution.
      */
-    context(file_manager& mgr)
+    explicit context(file_manager& mgr)
     : mgr{mgr}
     {
     }

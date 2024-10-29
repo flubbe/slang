@@ -34,7 +34,7 @@ public:
      *
      * @param message The error message.
      */
-    parser_error(const std::string& message)
+    explicit parser_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -61,7 +61,7 @@ public:
      *
      * @param message The error message.
      */
-    syntax_error(const std::string& message)
+    explicit syntax_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

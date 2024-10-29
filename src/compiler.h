@@ -28,7 +28,7 @@ public:
      *
      * @param message The error message.
      */
-    compiler_error(const std::string& message)
+    explicit compiler_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -45,7 +45,7 @@ public:
      *
      * @param message The error message.
      */
-    dependency_error(const std::string& message)
+    explicit dependency_error(const std::string& message)
     : compiler_error{message}
     {
     }
@@ -69,7 +69,7 @@ public:
      *
      * @param in_manager The package manager to use.
      */
-    compiler(package_manager& in_manager) noexcept
+    explicit compiler(package_manager& in_manager) noexcept
     : manager{in_manager}
     {
     }

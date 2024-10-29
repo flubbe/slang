@@ -34,7 +34,7 @@ public:
      *
      * @param message The error message.
      */
-    type_error(const std::string& message)
+    explicit type_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

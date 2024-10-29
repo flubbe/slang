@@ -33,7 +33,7 @@ public:
      *
      * @param message The error message.
      */
-    lexical_error(const std::string& message)
+    explicit lexical_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

@@ -39,7 +39,7 @@ public:
      *
      * @param message The error message.
      */
-    gc_error(const std::string& message)
+    explicit gc_error(const std::string& message)
     : std::runtime_error{message}
     {
     }

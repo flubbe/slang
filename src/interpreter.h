@@ -73,7 +73,7 @@ public:
      *
      * @param message The error message.
      */
-    interpreter_error(const std::string& message)
+    explicit interpreter_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -479,7 +479,7 @@ public:
      *
      * @param max_size The maximal stack size.
      */
-    operand_stack(std::size_t max_size)
+    explicit operand_stack(std::size_t max_size)
     : max_size{max_size}
     {
         stack.reserve(max_size);
@@ -876,15 +876,6 @@ struct type_properties
 
     /** Type layout id (always `0` for non-struct types). */
     std::size_t layout_id{0};
-
-    /** Default constructors. */
-    type_properties() = default;
-    type_properties(const type_properties&) = default;
-    type_properties(type_properties&&) = default;
-
-    /** Default assignments. */
-    type_properties& operator=(const type_properties&) = default;
-    type_properties& operator=(type_properties&&) = default;
 };
 
 /** Type properties. */
@@ -898,15 +889,6 @@ struct field_properties
 
     /** Whether this is a garbage collected field. */
     bool needs_gc{false};
-
-    /** Default constructors. */
-    field_properties() = default;
-    field_properties(const field_properties&) = default;
-    field_properties(field_properties&&) = default;
-
-    /** Default assignments. */
-    field_properties& operator=(const field_properties&) = default;
-    field_properties& operator=(field_properties&&) = default;
 };
 
 /** Interpreter context. */

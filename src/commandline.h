@@ -42,7 +42,7 @@ public:
      *
      * @throws Throws a std::runtime_error if the name is invalid.
      */
-    command(const std::string& in_name)
+    explicit command(const std::string& in_name)
     : name{in_name}
     {
         validate_name();
@@ -99,7 +99,7 @@ class pkg : public command
 
 public:
     /** Constructor. */
-    pkg(slang::package_manager& manager);
+    explicit pkg(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };
@@ -112,7 +112,7 @@ class build : public command
 
 public:
     /** Constructor. */
-    build(slang::package_manager& manager);
+    explicit build(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };
@@ -125,7 +125,7 @@ class compile : public command
 
 public:
     /** Constructor. */
-    compile(slang::package_manager& manager);
+    explicit compile(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };
@@ -138,7 +138,7 @@ class exec : public command
 
 public:
     /** Constructor. */
-    exec(slang::package_manager& manager);
+    explicit exec(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };

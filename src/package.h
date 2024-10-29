@@ -47,7 +47,7 @@ public:
      *
      * @param path Path to the package. Does not need to exist.
      */
-    package(const fs::path& in_path);
+    explicit package(const fs::path& in_path);
 
     /**
      * Check if a given module is contained in this package.

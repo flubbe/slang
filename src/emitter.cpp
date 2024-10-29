@@ -854,8 +854,9 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {{it->get_type().base_type().to_string(),
-                              it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
+            locals[index] = module_::variable_descriptor{
+              module_::variable_type{it->get_type().base_type().to_string(),
+                                     it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
         }
 
         for(auto& it: func_locals)
@@ -873,8 +874,9 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
-            locals[index] = {{it->get_type().base_type().to_string(),
-                              it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
+            locals[index] = module_::variable_descriptor{
+              module_::variable_type{it->get_type().base_type().to_string(),
+                                     it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
         }
 
         if(unset_indices.size() != 0)

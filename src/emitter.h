@@ -40,7 +40,7 @@ public:
      *
      * @param message The error message.
      */
-    emitter_error(const std::string& message)
+    explicit emitter_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -96,7 +96,7 @@ public:
      *
      * @param ctx A codegen context.
      */
-    instruction_emitter(cg::context& ctx)
+    explicit instruction_emitter(cg::context& ctx)
     : ctx{ctx}
     , instruction_buffer{false, slang::endian::little}
     {

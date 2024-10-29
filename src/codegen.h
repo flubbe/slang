@@ -51,7 +51,7 @@ public:
      *
      * @param message The error message.
      */
-    codegen_error(const std::string& message)
+    explicit codegen_error(const std::string& message)
     : std::runtime_error{message}
     {
     }
@@ -509,7 +509,7 @@ public:
      *
      * @param i The constant integer.
      */
-    const_argument(int i)
+    explicit const_argument(int i)
     : argument()
     , type{std::make_unique<constant_int>(i)}
     {
@@ -640,7 +640,7 @@ public:
      *
      * @param v Value containing the type information to use.
      */
-    type_argument(value vt)
+    explicit type_argument(value vt)
     : argument()
     , vt{vt.copy_type()}
     {
@@ -701,7 +701,7 @@ public:
      *
      * @param v The variable.
      */
-    variable_argument(std::unique_ptr<value> v)
+    explicit variable_argument(std::unique_ptr<value> v)
     : argument()
     , var{std::move(v)}
     {
@@ -741,7 +741,7 @@ public:
      *
      * @param label The label.
      */
-    label_argument(std::string label)
+    explicit label_argument(std::string label)
     : argument()
     , label{std::move(label)}
     {
@@ -805,7 +805,7 @@ public:
      *
      * @param cast The cast type.
      */
-    cast_argument(type_cast cast)
+    explicit cast_argument(type_cast cast)
     : argument()
     , cast{cast}
     {
@@ -932,7 +932,7 @@ public:
      *
      * @param name The instruction's opcode name.
      */
-    instruction(std::string name)
+    explicit instruction(std::string name)
     : name{std::move(name)}
     {
     }
@@ -1010,7 +1010,7 @@ class basic_block
      *
      * @param label The block's label.
      */
-    basic_block(std::string label)
+    explicit basic_block(std::string label)
     : label{std::move(label)}
     {
     }
@@ -1224,7 +1224,7 @@ public:
      *
      * @param name The scope's name.
      */
-    scope(std::string name)
+    explicit scope(std::string name)
     : name{std::move(name)}
     {
     }

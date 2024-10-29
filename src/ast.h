@@ -105,7 +105,7 @@ public:
      *
      * @param loc The expression location.
      */
-    expression(token_location loc)
+    explicit expression(token_location loc)
     : loc{std::move(loc)}
     {
     }
@@ -501,7 +501,7 @@ public:
      *
      * @param in_path The import path.
      */
-    import_expression(std::vector<token> in_path)
+    explicit import_expression(std::vector<token> in_path)
     : expression{in_path[0].location}
     , path{std::move(in_path)}
     {
@@ -1042,7 +1042,7 @@ public:
      *
      * @param loc The location.
      */
-    null_expression(token_location loc)
+    explicit null_expression(token_location loc)
     : expression{std::move(loc)}
     {
     }
@@ -1452,7 +1452,7 @@ public:
      *
      * @param loc The location.
      */
-    break_statement(token_location loc)
+    explicit break_statement(token_location loc)
     : expression{std::move(loc)}
     {
     }
@@ -1493,7 +1493,7 @@ public:
      *
      * @param loc The location.
      */
-    continue_statement(token_location loc)
+    explicit continue_statement(token_location loc)
     : expression{std::move(loc)}
     {
     }
