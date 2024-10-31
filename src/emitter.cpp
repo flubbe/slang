@@ -237,8 +237,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
       [this, &name, &args, &func, expect_arg_size](
         opcode i32_opcode,
         opcode f32_opcode,
-        std::optional<opcode> str_opcode = std::nullopt,
-        std::optional<opcode> array_opcode = std::nullopt,
+        std::optional<opcode> str_array_opcode = std::nullopt,
         std::optional<opcode> ref_opcode = std::nullopt)
     {
         expect_arg_size(1);
@@ -254,12 +253,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
         if(v->get_type().is_array())
         {
-            if(!array_opcode.has_value())
+            if(!str_array_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
             }
 
-            emit(instruction_buffer, *array_opcode);
+            emit(instruction_buffer, *str_array_opcode);
         }
         else if(v->get_type().get_type_class() == cg::type_class::i32)
         {
@@ -271,12 +270,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(v->get_type().get_type_class() == cg::type_class::str)
         {
-            if(!str_opcode.has_value())
+            if(!str_array_opcode.has_value())
             {
                 throw std::runtime_error(fmt::format("Invalid type 'str' for instruction '{}'.", name));
             }
 
-            emit(instruction_buffer, *str_opcode);
+            emit(instruction_buffer, *str_array_opcode);
         }
         else if(v->get_type().is_reference())
         {
@@ -325,11 +324,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "load")
     {
-        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::sload, opcode::aload, opcode::aload);
+        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::aload, opcode::aload);
     }
     else if(name == "store")
     {
-        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::sstore, opcode::astore, opcode::astore);
+        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::astore, opcode::astore);
     }
     else if(name == "load_element")
     {

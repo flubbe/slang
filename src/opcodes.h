@@ -27,14 +27,12 @@ enum class opcode : opcode_base
     sconst,      /** Load str constant onto stack. */
     iload,       /** Load element at index 0 from i32 array onto stack. */
     fload,       /** Load element at index 0 from f32 array onto stack. */
-    sload,       /** Load element at index 0 from str array onto stack. */
     aload,       /** Load address onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
     saload,      /** Load str from array onto stack. */
     istore,      /** Store from stack into i32 array at index 0. */
     fstore,      /** Store from stack into f32 array at index 0. */
-    sstore,      /** Store from stack into str array at index 0. */
     astore,      /** Store from stack into array. */
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */

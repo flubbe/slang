@@ -576,11 +576,9 @@ std::int32_t context::decode_instruction(
     /* opcodes that need to resolve a variable. */
     case opcode::iload: [[fallthrough]];
     case opcode::fload: [[fallthrough]];
-    case opcode::sload: [[fallthrough]];
     case opcode::aload: [[fallthrough]];
     case opcode::istore: [[fallthrough]];
     case opcode::fstore: [[fallthrough]];
-    case opcode::sstore: [[fallthrough]];
     case opcode::astore:
     {
         vle_int i;
@@ -597,18 +595,11 @@ std::int32_t context::decode_instruction(
         // return correct size.
         bool is_store = (static_cast<opcode>(instr) == opcode::istore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
-                        || (static_cast<opcode>(instr) == opcode::sstore)
                         || (static_cast<opcode>(instr) == opcode::astore);
-        bool is_string = (static_cast<opcode>(instr) == opcode::sload)
-                         || (static_cast<opcode>(instr) == opcode::sstore);
         bool is_ref = (static_cast<opcode>(instr) == opcode::aload)
                       || (static_cast<opcode>(instr) == opcode::astore);
 
-        if(is_string)
-        {
-            return is_store ? -static_cast<std::int32_t>(sizeof(std::string*)) : sizeof(std::string*);
-        }
-        else if(is_ref)
+        if(is_ref)
         {
             return is_store ? -static_cast<std::int32_t>(sizeof(void*)) : sizeof(void*);
         }
@@ -1519,27 +1510,6 @@ opcode context::exec(
                 frame.stack.push_i32(v);
                 break;
             } /* opcode::iload, opcode::fload */
-            case opcode::sload:
-            {
-                /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
-
-                if(i < 0)
-                {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
-                }
-
-                if(i + sizeof(std::string*) > frame.locals.size())
-                {
-                    throw interpreter_error("Invalid memory access.");
-                }
-
-                std::string* s;
-                std::memcpy(&s, &frame.locals[i], sizeof(s));
-                gc.add_temporary(s);
-                frame.stack.push_addr(s);
-                break;
-            } /* opcode::sload */
             case opcode::aload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -1581,41 +1551,6 @@ opcode context::exec(
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
             } /* opcode::istore, opcode::fstore */
-            case opcode::sstore:
-            {
-                /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
-
-                if(i < 0)
-                {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
-                }
-
-                if(i + sizeof(std::string*) > frame.locals.size())
-                {
-                    throw interpreter_error("Stack overflow.");
-                }
-
-                auto s = frame.stack.pop_addr<std::string>();
-                gc.remove_temporary(s);
-
-                std::string* prev;
-                std::memcpy(&prev, &frame.locals[i], sizeof(prev));
-                if(s != prev)
-                {
-                    if(prev != nullptr)
-                    {
-                        gc.remove_root(prev);
-                    }
-                    if(s != nullptr)
-                    {
-                        gc.add_root(s);
-                    }
-                }
-
-                std::memcpy(&frame.locals[i], &s, sizeof(s));
-                break;
-            } /* opcode::sstore */
             case opcode::astore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
