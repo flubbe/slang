@@ -1989,6 +1989,12 @@ opcode context::exec(
         stack_trace_handler(e, mod, entry_point, offset);
         throw e;
     }
+    catch(gc::gc_error& e)
+    {
+        interpreter_error e_int{e.what()};
+        stack_trace_handler(e_int, mod, entry_point, offset);
+        throw e_int;
+    }
 }
 
 void context::stack_trace_handler(interpreter_error& err,
