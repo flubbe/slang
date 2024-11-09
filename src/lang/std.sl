@@ -7,6 +7,13 @@
  */
 
 /*
+ * Type.
+ */
+
+#[allow_cast]
+struct type {};
+
+/*
  * Output.
  */
 

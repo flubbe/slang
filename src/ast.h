@@ -179,9 +179,10 @@ public:
     /**
      * Check whether a directive is supported by the expression.
      *
+     * @param name Name of the directive.
      * @returns True if the directive is supported, and false otherwise.
      */
-    virtual bool supports_directive([[maybe_unused]] const std::string& s) const
+    virtual bool supports_directive([[maybe_unused]] const std::string& name) const
     {
         return false;
     }
@@ -801,6 +802,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
@@ -1240,7 +1242,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    bool supports_directive(const std::string& s) const override;
+    bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
