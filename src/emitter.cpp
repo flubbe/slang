@@ -36,6 +36,53 @@ void emit(archive& ar, opcode op, T arg)
     ar & arg;
 }
 
+/**
+ * Helper to get the type table size, excluding imports.
+ *
+ * FIXME This should be replaced by proper export table construction (see FIXME's below).
+ *
+ * @param types The type table.
+ */
+static std::size_t get_type_table_size(const std::vector<std::unique_ptr<cg::struct_>>& types)
+{
+    std::size_t s = 0;
+    for(auto& it: types)
+    {
+        if(!it->is_import())
+        {
+            ++s;
+        }
+    }
+    return s;
+}
+
+/**
+ * Helper to get the index of a type inside the type table.
+ *
+ * FIXME This should be replaced by proper export table construction (see FIXME's below).
+ *
+ * @param types The type table
+ */
+static std::size_t get_type_index(
+  const std::vector<std::unique_ptr<cg::struct_>>& types,
+  const std::vector<std::unique_ptr<cg::struct_>>::iterator& type_it)
+{
+    std::size_t s = 0;
+    for(std::vector<std::unique_ptr<cg::struct_>>::const_iterator it = types.begin(); it != types.end(); ++it)
+    {
+        if(it == type_it)
+        {
+            return s;
+        }
+
+        if(!(*it)->is_import())
+        {
+            ++s;
+        }
+    }
+    return s;
+}
+
 std::set<std::string> instruction_emitter::collect_jump_targets() const
 {
     std::set<std::string> targets;
@@ -411,9 +458,9 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             /*
              * FIXME The types are stored before the functions when constructing the header later.
              *       It would be better to have a single point that controls export table construction
-             *       and export index requests (instead of manually adding ctx.types.size()).
+             *       and export index requests (instead of manually adding the type table size).
              */
-            vle_int index = std::distance(ctx.funcs.begin(), it) + ctx.types.size();
+            vle_int index = std::distance(ctx.funcs.begin(), it) + get_type_table_size(ctx.types);
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;
@@ -492,7 +539,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                  *       It would be better to have a single point that controls export table construction
                  *       and export index requests.
                  */
-                struct_index = std::distance(ctx.types.begin(), struct_it);
+                struct_index = get_type_index(ctx.types, struct_it);
             }
         }
         else
@@ -559,7 +606,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                  *       It would be better to have a single point that controls export table construction
                  *       and export index requests.
                  */
-                struct_index = std::distance(ctx.types.begin(), struct_it);
+                struct_index = get_type_index(ctx.types, struct_it);
             }
         }
         else
@@ -723,7 +770,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                  *       It would be better to have a single point that controls export table construction
                  *       and export index requests.
                  */
-                index = std::distance(ctx.types.begin(), it);
+                index = get_type_index(ctx.types, it);
             }
         }
         else
@@ -998,13 +1045,6 @@ module_::language_module instruction_emitter::to_module() const
     {
         if(it->is_import())
         {
-            if(!it->get_import_path().has_value())
-            {
-                throw std::runtime_error(fmt::format(
-                  "Imported type '{}' has not import path.",
-                  it->get_name()));
-            }
-
             // Verify that the type is in the import table.
             auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
                                           [&it](const cg::imported_symbol& s) -> bool
@@ -1019,49 +1059,46 @@ module_::language_module instruction_emitter::to_module() const
                   "Type '{}' from package '{}' not found in import table.",
                   it->get_name(), *it->get_import_path()));
             }
-
-            continue;
         }
+        else
+        {
+            auto members = it->get_members();
+            std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
 
-        auto members = it->get_members();
-        std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
-
-        std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                       [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
-                       {
-                           const auto& t = std::get<1>(m);
-
-                           std::optional<std::size_t> import_index = std::nullopt;
-                           if(t.get_type().is_import())
+            std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
+                           [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
                            {
-                               // find the import index.
-                               auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                                             [&t](const cg::imported_symbol& s) -> bool
-                                                             {
-                                                                 return s.type == module_::symbol_type::type
-                                                                        && s.name == t.get_type().base_type().to_string()
-                                                                        && s.import_path == t.get_type().base_type().get_import_path();
-                                                             });
-                               if(import_it == ctx.imports.end())
+                               const auto& t = std::get<1>(m);
+
+                               std::optional<std::size_t> import_index = std::nullopt;
+                               if(t.get_type().is_import())
                                {
-                                   throw std::runtime_error(fmt::format(
-                                     "Type '{}' from package '{}' not found in import table.",
-                                     t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+                                   // find the import index.
+                                   auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                                                 [&t](const cg::imported_symbol& s) -> bool
+                                                                 {
+                                                                     return s.type == module_::symbol_type::type
+                                                                            && s.name == t.get_type().base_type().to_string()
+                                                                            && s.import_path == t.get_type().base_type().get_import_path();
+                                                                 });
+                                   if(import_it == ctx.imports.end())
+                                   {
+                                       throw std::runtime_error(fmt::format(
+                                         "Type '{}' from package '{}' not found in import table.",
+                                         t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+                                   }
+
+                                   import_index = std::distance(ctx.imports.begin(), import_it);
                                }
 
-                               import_index = std::distance(ctx.imports.begin(), import_it);
-                           }
+                               return std::make_pair(
+                                 std::get<0>(m),
+                                 module_::field_descriptor{
+                                   t.get_type().base_type().to_string(),
+                                   t.get_type().is_array(),
+                                   import_index});
+                           });
 
-                           return std::make_pair(
-                             std::get<0>(m),
-                             module_::field_descriptor{
-                               t.get_type().base_type().to_string(),
-                               t.get_type().is_array(),
-                               import_index});
-                       });
-
-        if(!it->get_import_path().has_value())
-        {
             mod.add_struct(it->get_name(), std::move(transformed_members));
         }
     }

@@ -974,6 +974,16 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
     type_ctx.add_struct(name, std::move(struct_members));
 }
 
+bool struct_definition_expression::supports_directive(const std::string& name) const
+{
+    if(name == "allow_cast")
+    {
+        return true;
+    }
+
+    return false;
+}
+
 std::optional<ty::type_info> struct_definition_expression::type_check(ty::context& ctx)
 {
     for(auto& m: members)
