@@ -46,6 +46,75 @@ public:
     }
 };
 
+/** Export table builder. */
+class export_table_builder
+{
+    /** Export table. */
+    std::vector<module_::exported_symbol> export_table;
+
+public:
+    /** Return the export table size. */
+    std::size_t size() const
+    {
+        return export_table.size();
+    }
+
+    /**
+     * Add a function to the export table.
+     *
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param arg_types The argument types.
+     * @param sym Symbol information (size and offset).
+     * @param locals The function's locals.
+     * @throws Throws an `emitter_error` if the function already exists.
+     */
+    void add_function(const std::string& name,
+                      std::pair<std::string, bool> return_type,
+                      std::vector<std::pair<std::string, bool>> arg_types,
+                      module_::symbol sym,
+                      std::vector<module_::variable_descriptor> locals);
+
+    /**
+     * Add a native function to the export table.
+     *
+     * @param name The function's name.
+     * @param return_type The function's return type.
+     * @param arg_types The argument types.
+     * @param import_library Name of the library this function is implemented in.
+     * @throws Throws an `emitter_error` if the function already exists.
+     */
+    void add_native_function(const std::string& name,
+                             std::pair<std::string, bool> return_type,
+                             std::vector<std::pair<std::string, bool>> arg_types,
+                             std::string import_library);
+
+    /**
+     * Add a type to the export table.
+     *
+     * @param ctx The context used for type resolution.
+     * @param type The type definition.
+     */
+    void add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type);
+
+    /**
+     * Get the index of a symbol.
+     *
+     * @param t The symbol type.
+     * @param name The symbol name.
+     * @return Returns the index of the symbol in the export table.
+     * @throw Throws an `emitter_error` if the symbol is not found.
+     */
+    std::size_t get_index(module_::symbol_type t, const std::string& name) const;
+
+    /**
+     * Write the export table to a module.
+     *
+     * @param mod The module to write to.
+     */
+    void write(module_::language_module& mod) const;
+};
+
 class instruction_emitter
 {
     /** The associated codegen context. */
