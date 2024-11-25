@@ -83,6 +83,193 @@ static std::size_t get_type_index(
     return s;
 }
 
+/*
+ * export_table_builder implementation.
+ */
+
+void export_table_builder::add_function(
+  const std::string& name,
+  std::pair<std::string, bool> return_type,
+  std::vector<std::pair<std::string, bool>> arg_types,
+  module_::symbol sym,
+  std::vector<module_::variable_descriptor> locals)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&name](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::function
+                             && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(
+      module_::symbol_type::function,
+      name,
+      module_::function_descriptor{
+        module_::function_signature{
+          std::move(return_type),
+          std::move(arg_types)},
+        false,
+        module_::function_details{
+          sym.size,
+          sym.offset,
+          std::move(locals)}});
+}
+
+void export_table_builder::add_native_function(
+  const std::string& name,
+  std::pair<std::string, bool> return_type,
+  std::vector<std::pair<std::string, bool>> arg_types,
+  std::string import_library)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&name](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::function
+                             && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(
+      module_::symbol_type::function,
+      name,
+      module_::function_descriptor{
+        module_::function_signature{
+          std::move(return_type),
+          std::move(arg_types)},
+        false,
+        module_::native_function_details{
+          std::move(import_library)}});
+}
+
+void export_table_builder::add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&type](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::type
+                             && entry.name == type->get_name(); })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", type->get_name()));
+    }
+
+    auto members = type->get_members();
+    std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
+
+    std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
+                   [&ctx](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
+                   {
+                       const auto& t = std::get<1>(m);
+
+                       std::optional<std::size_t> import_index = std::nullopt;
+                       if(t.get_type().is_import())
+                       {
+                           // find the import index.
+                           auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                                         [&t](const cg::imported_symbol& s) -> bool
+                                                         {
+                                                             return s.type == module_::symbol_type::type
+                                                                    && s.name == t.get_type().base_type().to_string()
+                                                                    && s.import_path == t.get_type().base_type().get_import_path();
+                                                         });
+                           if(import_it == ctx.imports.end())
+                           {
+                               throw emitter_error(fmt::format(
+                                 "Type '{}' from package '{}' not found in import table.",
+                                 t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+                           }
+
+                           import_index = std::distance(ctx.imports.begin(), import_it);
+                       }
+
+                       return std::make_pair(
+                         std::get<0>(m),
+                         module_::field_descriptor{
+                           t.get_type().base_type().to_string(),
+                           t.get_type().is_array(),
+                           import_index});
+                   });
+
+    export_table.emplace_back(
+      module_::symbol_type::type,
+      type->get_name(),
+      module_::struct_descriptor{std::move(transformed_members)});
+}
+
+std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
+{
+    auto it = std::find_if(export_table.begin(), export_table.end(),
+                           [t, &name](const module_::exported_symbol& entry) -> bool
+                           { return entry.type == t
+                                    && entry.name == name; });
+    if(it == export_table.end())
+    {
+        throw emitter_error(fmt::format("Symbol '{}' of type '{}' not found in export table.", name, to_string(t)));
+    }
+
+    return std::distance(export_table.begin(), it);
+}
+
+void export_table_builder::write(module_::language_module& mod) const
+{
+    for(const auto& entry: export_table)
+    {
+        if(entry.type == module_::symbol_type::function)
+        {
+            const module_::function_descriptor& desc = std::get<module_::function_descriptor>(entry.desc);
+
+            std::pair<std::string, bool> return_type = {
+              std::get<0>(desc.signature.return_type).base_type(),
+              std::get<0>(desc.signature.return_type).is_array()};
+            std::vector<std::pair<std::string, bool>> arg_types;
+
+            std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(arg_types),
+                           [](const std::pair<module_::variable_type, bool>& t) -> std::pair<std::string, bool>
+                           {
+                               return std::make_pair(std::get<0>(t).base_type(), std::get<0>(t).is_array());    // FIXME Store type.
+                           });
+
+            if(desc.native)
+            {
+                const module_::native_function_details& details = std::get<module_::native_function_details>(desc.details);
+
+                mod.add_native_function(
+                  entry.name,
+                  std::move(return_type),
+                  std::move(arg_types),
+                  details.library_name);
+            }
+            else
+            {
+                const module_::function_details& details = std::get<module_::function_details>(desc.details);
+
+                mod.add_function(
+                  entry.name,
+                  std::move(return_type),
+                  std::move(arg_types),
+                  details.size,
+                  details.offset,
+                  details.locals);
+            }
+        }
+        else if(entry.type == module_::symbol_type::type)
+        {
+            const module_::struct_descriptor& desc = std::get<module_::struct_descriptor>(entry.desc);
+            mod.add_struct(entry.name, desc.member_types);
+        }
+        else
+        {
+            throw emitter_error(fmt::format("Unexpected symbol type '{}' during export table write.", to_string(entry.type)));
+        }
+    }
+}
+
+/*
+ * instruction_emitter implementation.
+ */
+
 std::set<std::string> instruction_emitter::collect_jump_targets() const
 {
     std::set<std::string> targets;
@@ -1040,7 +1227,7 @@ module_::language_module instruction_emitter::to_module() const
     // strings.
     mod.set_string_table(ctx.strings);
 
-    // types.
+    // exported types.
     for(auto& it: ctx.types)
     {
         if(it->is_import())
@@ -1103,6 +1290,7 @@ module_::language_module instruction_emitter::to_module() const
         }
     }
 
+    // exported functions.
     for(auto& it: ctx.funcs)
     {
         auto signature = it->get_signature();
@@ -1144,6 +1332,7 @@ module_::language_module instruction_emitter::to_module() const
         }
     }
 
+    // instructions.
     mod.set_binary(instruction_buffer.get_buffer());
 
     return mod;

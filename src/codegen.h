@@ -28,7 +28,8 @@
 
 namespace slang
 {
-class instruction_emitter; /* emitter.h */
+class instruction_emitter;  /* emitter.h */
+class export_table_builder; /* emitter.h */
 }    // namespace slang
 
 namespace slang::module_
@@ -1733,6 +1734,7 @@ struct imported_symbol
 class context
 {
     friend class slang::instruction_emitter;
+    friend class slang::export_table_builder;
     friend class basic_block;
 
     /** List of structs. */
