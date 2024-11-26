@@ -36,53 +36,6 @@ void emit(archive& ar, opcode op, T arg)
     ar & arg;
 }
 
-/**
- * Helper to get the type table size, excluding imports.
- *
- * FIXME This should be replaced by proper export table construction (see FIXME's below).
- *
- * @param types The type table.
- */
-static std::size_t get_type_table_size(const std::vector<std::unique_ptr<cg::struct_>>& types)
-{
-    std::size_t s = 0;
-    for(auto& it: types)
-    {
-        if(!it->is_import())
-        {
-            ++s;
-        }
-    }
-    return s;
-}
-
-/**
- * Helper to get the index of a type inside the type table.
- *
- * FIXME This should be replaced by proper export table construction (see FIXME's below).
- *
- * @param types The type table
- */
-static std::size_t get_type_index(
-  const std::vector<std::unique_ptr<cg::struct_>>& types,
-  const std::vector<std::unique_ptr<cg::struct_>>::iterator& type_it)
-{
-    std::size_t s = 0;
-    for(std::vector<std::unique_ptr<cg::struct_>>::const_iterator it = types.begin(); it != types.end(); ++it)
-    {
-        if(it == type_it)
-        {
-            return s;
-        }
-
-        if(!(*it)->is_import())
-        {
-            ++s;
-        }
-    }
-    return s;
-}
-
 /*
  * export_table_builder implementation.
  */
@@ -90,9 +43,7 @@ static std::size_t get_type_index(
 void export_table_builder::add_function(
   const std::string& name,
   std::pair<std::string, bool> return_type,
-  std::vector<std::pair<std::string, bool>> arg_types,
-  module_::symbol sym,
-  std::vector<module_::variable_descriptor> locals)
+  std::vector<std::pair<std::string, bool>> arg_types)
 {
     if(std::find_if(export_table.begin(), export_table.end(),
                     [&name](const module_::exported_symbol& entry) -> bool
@@ -111,10 +62,31 @@ void export_table_builder::add_function(
           std::move(return_type),
           std::move(arg_types)},
         false,
-        module_::function_details{
-          sym.size,
-          sym.offset,
-          std::move(locals)}});
+        module_::function_details{} /* dummy details */
+      });
+}
+
+void export_table_builder::update_function(
+  const std::string& name,
+  std::size_t size,
+  std::size_t offset,
+  std::vector<module_::variable_descriptor> locals)
+{
+    auto it = std::find_if(export_table.begin(), export_table.end(),
+                           [&name](const module_::exported_symbol& entry) -> bool
+                           { return entry.type == module_::symbol_type::function
+                                    && entry.name == name; });
+    if(it == export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot update function to export table: '{}' not found.", name));
+    }
+
+    auto& desc = std::get<module_::function_descriptor>(it->desc);
+    auto& details = std::get<module_::function_details>(desc.details);
+
+    details.size = size;
+    details.offset = offset;
+    details.locals = std::move(locals);
 }
 
 void export_table_builder::add_native_function(
@@ -139,7 +111,7 @@ void export_table_builder::add_native_function(
         module_::function_signature{
           std::move(return_type),
           std::move(arg_types)},
-        false,
+        true,
         module_::native_function_details{
           std::move(import_library)}});
 }
@@ -222,13 +194,14 @@ void export_table_builder::write(module_::language_module& mod) const
 
             std::pair<std::string, bool> return_type = {
               std::get<0>(desc.signature.return_type).base_type(),
-              std::get<0>(desc.signature.return_type).is_array()};
+              std::get<1>(desc.signature.return_type)};    // FIXME array info is not stored in type.
             std::vector<std::pair<std::string, bool>> arg_types;
 
             std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(arg_types),
                            [](const std::pair<module_::variable_type, bool>& t) -> std::pair<std::string, bool>
                            {
-                               return std::make_pair(std::get<0>(t).base_type(), std::get<0>(t).is_array());    // FIXME Store type.
+                               // FIXME array info is not stored in type.
+                               return std::make_pair(std::get<0>(t).base_type(), std::get<1>(t));    // FIXME Store type.
                            });
 
             if(desc.native)
@@ -632,22 +605,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         if(!import_path.has_value())
         {
             // resolve module-local functions.
-            auto it = std::find_if(ctx.funcs.begin(), ctx.funcs.end(),
-                                   [&v](const std::unique_ptr<cg::function>& f) -> bool
-                                   {
-                                       return f->get_name() == *v->get_name();
-                                   });
-            if(it == ctx.funcs.end())
-            {
-                throw emitter_error(fmt::format("Could not resolve module-local function '{}'.", *v->get_name()));
-            }
-
-            /*
-             * FIXME The types are stored before the functions when constructing the header later.
-             *       It would be better to have a single point that controls export table construction
-             *       and export index requests (instead of manually adding the type table size).
-             */
-            vle_int index = std::distance(ctx.funcs.begin(), it) + get_type_table_size(ctx.types);
+            vle_int index = exports.get_index(module_::symbol_type::function, v->get_name().value());
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;
@@ -721,12 +679,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             }
             else
             {
-                /*
-                 * FIXME The types are stored first in the export table when constructing the header later.
-                 *       It would be better to have a single point that controls export table construction
-                 *       and export index requests.
-                 */
-                struct_index = get_type_index(ctx.types, struct_it);
+                // find struct in export table.
+                struct_index = exports.get_index(module_::symbol_type::type, (*struct_it)->get_name());
             }
         }
         else
@@ -788,12 +742,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             }
             else
             {
-                /*
-                 * FIXME The types are stored first in the export table when constructing the header later.
-                 *       It would be better to have a single point that controls export table construction
-                 *       and export index requests.
-                 */
-                struct_index = get_type_index(ctx.types, struct_it);
+                // find struct in export table.
+                struct_index = exports.get_index(module_::symbol_type::type, (*struct_it)->get_name());
             }
         }
         else
@@ -922,42 +872,38 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         auto type = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();
 
         // resolve type to index.
-        vle_int index = 0;
+        vle_int struct_index = 0;
 
-        auto it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                               [&type](const std::unique_ptr<cg::struct_>& t) -> bool
-                               {
-                                   return t->get_name() == type.get_struct_name()
-                                          && t->get_import_path() == type.get_import_path();
-                               });
-        if(it != ctx.types.end())
+        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                                      [&type](const std::unique_ptr<cg::struct_>& t) -> bool
+                                      {
+                                          return t->get_name() == type.get_struct_name()
+                                                 && t->get_import_path() == type.get_import_path();
+                                      });
+        if(struct_it != ctx.types.end())
         {
-            if((*it)->get_import_path().has_value())
+            if((*struct_it)->get_import_path().has_value())
             {
                 // find type in import table.
                 auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                              [&it](const cg::imported_symbol& s) -> bool
+                                              [&struct_it](const cg::imported_symbol& s) -> bool
                                               {
                                                   return s.type == module_::symbol_type::type
-                                                         && s.name == (*it)->get_name()
-                                                         && s.import_path == (*it)->get_import_path();
+                                                         && s.name == (*struct_it)->get_name()
+                                                         && s.import_path == (*struct_it)->get_import_path();
                                               });
                 if(import_it == ctx.imports.end())
                 {
                     throw emitter_error(fmt::format(
                       "Cannot find type '{}' from package '{}' in import table.",
-                      (*it)->get_name(), *(*it)->get_import_path()));
+                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
                 }
-                index = -std::distance(ctx.imports.begin(), import_it) - 1;
+                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
             }
             else
             {
-                /*
-                 * FIXME The types are stored first in the export table when constructing the header later.
-                 *       It would be better to have a single point that controls export table construction
-                 *       and export index requests.
-                 */
-                index = get_type_index(ctx.types, it);
+                // find struct in export table.
+                struct_index = exports.get_index(module_::symbol_type::type, (*struct_it)->get_name());
             }
         }
         else
@@ -966,7 +912,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
 
         emit(instruction_buffer, opcode::new_);
-        instruction_buffer & index;
+        instruction_buffer & struct_index;
     }
     else if(name == "newarray")
     {
@@ -1020,9 +966,9 @@ void instruction_emitter::run()
         throw emitter_error("Instruction buffer not empty.");
     }
 
-    if(func_details.size() != 0)
+    if(exports.size() != 0)
     {
-        throw emitter_error("Entry points not empty.");
+        throw emitter_error("Export table is not empty.");
     }
 
     if(jump_targets.size() != 0)
@@ -1039,17 +985,69 @@ void instruction_emitter::run()
     // the import count is not allowed to change, so store it here and check later.
     std::size_t import_count = ctx.imports.size();
 
+    // exported types.
+    for(auto& it: ctx.types)
+    {
+        if(it->is_import())
+        {
+            // Verify that the type is in the import table.
+            auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                          [&it](const cg::imported_symbol& s) -> bool
+                                          {
+                                              return s.type == module_::symbol_type::type
+                                                     && s.name == it->get_name()
+                                                     && s.import_path == it->get_import_path();
+                                          });
+            if(import_it == ctx.imports.end())
+            {
+                throw std::runtime_error(fmt::format(
+                  "Type '{}' from package '{}' not found in import table.",
+                  it->get_name(), *it->get_import_path()));
+            }
+        }
+        else
+        {
+            exports.add_type(ctx, it);
+        }
+    }
+
+    // exported functions.
+    for(auto& f: ctx.funcs)
+    {
+        auto [signature_ret_type, signature_arg_types] = f->get_signature();
+        std::pair<std::string, bool> return_type = {
+          signature_ret_type.base_type().to_string(),    // FIXME Store type.
+          signature_ret_type.is_array()};
+        std::vector<std::pair<std::string, bool>> arg_types;
+
+        std::transform(signature_arg_types.cbegin(), signature_arg_types.cend(), std::back_inserter(arg_types),
+                       [](const cg::type& t) -> std::pair<std::string, bool>
+                       {
+                           return std::make_pair(t.base_type().to_string(), t.is_array());    // FIXME Store type.
+                       });
+
+        if(f->is_native())
+        {
+            exports.add_native_function(
+              f->get_name(),
+              std::move(return_type),
+              std::move(arg_types),
+              f->get_import_library());
+        }
+        else
+        {
+            exports.add_function(
+              f->get_name(),
+              std::move(return_type),
+              std::move(arg_types));
+        }
+    }
+
     /*
      * generate bytecode.
      */
     for(auto& f: ctx.funcs)
     {
-        // verify that no entry point for the function exists.
-        if(func_details.find(f->get_name()) != func_details.end())
-        {
-            throw emitter_error(fmt::format("Function '{}' already has an entry point.", f->get_name()));
-        }
-
         // skip native functions.
         if(f->is_native())
         {
@@ -1142,7 +1140,7 @@ void instruction_emitter::run()
          * store function details
          */
         std::size_t size = instruction_buffer.tell() - entry_point;
-        func_details.insert({f->get_name(), {size, entry_point, locals}});
+        exports.update_function(f->get_name(), size, entry_point, locals);
     }
 
     // check that the import count did not change
@@ -1227,110 +1225,8 @@ module_::language_module instruction_emitter::to_module() const
     // strings.
     mod.set_string_table(ctx.strings);
 
-    // exported types.
-    for(auto& it: ctx.types)
-    {
-        if(it->is_import())
-        {
-            // Verify that the type is in the import table.
-            auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                          [&it](const cg::imported_symbol& s) -> bool
-                                          {
-                                              return s.type == module_::symbol_type::type
-                                                     && s.name == it->get_name()
-                                                     && s.import_path == it->get_import_path();
-                                          });
-            if(import_it == ctx.imports.end())
-            {
-                throw std::runtime_error(fmt::format(
-                  "Type '{}' from package '{}' not found in import table.",
-                  it->get_name(), *it->get_import_path()));
-            }
-        }
-        else
-        {
-            auto members = it->get_members();
-            std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
-
-            std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                           [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
-                           {
-                               const auto& t = std::get<1>(m);
-
-                               std::optional<std::size_t> import_index = std::nullopt;
-                               if(t.get_type().is_import())
-                               {
-                                   // find the import index.
-                                   auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                                                 [&t](const cg::imported_symbol& s) -> bool
-                                                                 {
-                                                                     return s.type == module_::symbol_type::type
-                                                                            && s.name == t.get_type().base_type().to_string()
-                                                                            && s.import_path == t.get_type().base_type().get_import_path();
-                                                                 });
-                                   if(import_it == ctx.imports.end())
-                                   {
-                                       throw std::runtime_error(fmt::format(
-                                         "Type '{}' from package '{}' not found in import table.",
-                                         t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
-                                   }
-
-                                   import_index = std::distance(ctx.imports.begin(), import_it);
-                               }
-
-                               return std::make_pair(
-                                 std::get<0>(m),
-                                 module_::field_descriptor{
-                                   t.get_type().base_type().to_string(),
-                                   t.get_type().is_array(),
-                                   import_index});
-                           });
-
-            mod.add_struct(it->get_name(), std::move(transformed_members));
-        }
-    }
-
-    // exported functions.
-    for(auto& it: ctx.funcs)
-    {
-        auto signature = it->get_signature();
-
-        std::pair<std::string, bool> return_type = {
-          std::get<0>(signature).base_type().to_string(),    // FIXME Store type.
-          std::get<0>(signature).is_array()};
-        std::vector<std::pair<std::string, bool>> arg_types;
-
-        std::transform(std::get<1>(signature).cbegin(), std::get<1>(signature).cend(), std::back_inserter(arg_types),
-                       [](const cg::type& t) -> std::pair<std::string, bool>
-                       {
-                           return std::make_pair(t.base_type().to_string(), t.is_array());    // FIXME Store type.
-                       });
-
-        if(it->is_native())
-        {
-            mod.add_native_function(
-              it->get_name(),
-              std::move(return_type),
-              std::move(arg_types),
-              it->get_import_library());
-        }
-        else
-        {
-            auto details = func_details.find(it->get_name());
-            if(details == func_details.end())
-            {
-                throw emitter_error(fmt::format("Unable to find entry point for function '{}'.", it->get_name()));
-            }
-
-            mod.add_function(
-              it->get_name(),
-              std::move(return_type),
-              std::move(arg_types),
-              details->second.size,
-              details->second.offset,
-              details->second.locals);
-        }
-    }
+    // export table.
+    exports.write(mod);
 
     // instructions.
     mod.set_binary(instruction_buffer.get_buffer());
