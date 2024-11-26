@@ -65,15 +65,24 @@ public:
      * @param name The function's name.
      * @param return_type The function's return type.
      * @param arg_types The argument types.
-     * @param sym Symbol information (size and offset).
-     * @param locals The function's locals.
      * @throws Throws an `emitter_error` if the function already exists.
      */
     void add_function(const std::string& name,
                       std::pair<std::string, bool> return_type,
-                      std::vector<std::pair<std::string, bool>> arg_types,
-                      module_::symbol sym,
-                      std::vector<module_::variable_descriptor> locals);
+                      std::vector<std::pair<std::string, bool>> arg_types);
+
+    /**
+     * Set the function's details (`size`, `offset` and `locals`).
+     *
+     * @param name Name of the function to set the details for.
+     * @param size The function's bytecode size.
+     * @param offset The function's offset / entry point.
+     * @param locals The function's locals.
+     */
+    void update_function(const std::string& name,
+                         std::size_t size,
+                         std::size_t offset,
+                         std::vector<module_::variable_descriptor> locals);
 
     /**
      * Add a native function to the export table.
@@ -123,8 +132,8 @@ class instruction_emitter
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
 
-    /** Function details. */
-    std::unordered_map<std::string, module_::function_details> func_details;
+    /** Exports. */
+    export_table_builder exports;
 
     /** Referenced jump targets. */
     std::set<std::string> jump_targets;
