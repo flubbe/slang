@@ -184,6 +184,74 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
         resolve_module(resolved_path);
 
+        /*
+         * import types.
+         */
+
+        auto imported_types_it = imported_types.find(resolved_path.string());
+        if(imported_types_it != imported_types.end())
+        {
+            for(auto& it: imported_types_it->second)
+            {
+                auto& desc = it.second;
+
+                // Add type to code generation context.
+                {
+                    std::vector<std::pair<std::string, cg::value>> members;
+                    std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
+                                   [&import_path](const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
+                                   {
+                                       if(ty::is_builtin_type(std::get<1>(member).base_type.base_type()))
+                                       {
+                                           return {std::get<0>(member),
+                                                   cg::value{cg::type{cg::to_type_class(std::get<1>(member).base_type.base_type()),
+                                                                      std::get<1>(member).base_type.is_array()
+                                                                        ? static_cast<std::size_t>(1)
+                                                                        : static_cast<std::size_t>(0)},
+                                                             std::get<0>(member)}};
+                                       }
+
+                                       return {std::get<0>(member),
+                                               cg::value{cg::type{cg::type_class::struct_,
+                                                                  std::get<1>(member).base_type.is_array()
+                                                                    ? static_cast<std::size_t>(1)
+                                                                    : static_cast<std::size_t>(0),
+                                                                  std::get<1>(member).base_type.base_type(),
+                                                                  import_path},    // FIXME This can be an imported type
+                                                         std::get<0>(member)}};
+                                   });
+
+                    ctx.add_import(module_::symbol_type::type, import_path, it.first);
+                    ctx.add_struct(it.first, members, import_path);
+                    ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
+                }
+
+                // Add type to typing context.
+                {
+                    std::vector<std::pair<token, ty::type_info>> members;
+                    for(auto& [member_name, member_type]: desc.member_types)
+                    {
+                        ty::type_info resolved_member_type = type_ctx.get_unresolved_type(
+                          {member_type.base_type.base_type(), {0, 0}},
+                          ty::is_builtin_type(member_type.base_type.base_type())
+                            ? typing::type_class::tc_plain
+                            : typing::type_class::tc_struct,
+                          import_path);    // FIXME This can be an imported type
+
+                        members.push_back(std::make_pair<token, ty::type_info>(
+                          {member_name, {0, 0}},
+                          std::move(resolved_member_type)));
+                    }
+
+                    type_ctx.add_struct({it.first, {0, 0}}, std::move(members), import_path);
+                }
+            }
+        }
+
+        /*
+         * import functions.
+         */
+
         auto imported_functions_it = imported_functions.find(resolved_path.string());
         if(imported_functions_it != imported_functions.end())
         {
@@ -246,66 +314,6 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
                 type_ctx.add_function({it.first, {0, 0}},
                                       std::move(arg_types), std::move(resolved_return_type), import_path);
-            }
-        }
-
-        auto imported_types_it = imported_types.find(resolved_path.string());
-        if(imported_types_it != imported_types.end())
-        {
-            for(auto& it: imported_types_it->second)
-            {
-                auto& desc = it.second;
-
-                // Add type to code generation context.
-                {
-                    std::vector<std::pair<std::string, cg::value>> members;
-                    std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
-                                   [&import_path](const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
-                                   {
-                                       if(ty::is_builtin_type(std::get<1>(member).base_type.base_type()))
-                                       {
-                                           return {std::get<0>(member),
-                                                   cg::value{cg::type{cg::to_type_class(std::get<1>(member).base_type.base_type()),
-                                                                      std::get<1>(member).base_type.is_array()
-                                                                        ? static_cast<std::size_t>(1)
-                                                                        : static_cast<std::size_t>(0)},
-                                                             std::get<0>(member)}};
-                                       }
-
-                                       return {std::get<0>(member),
-                                               cg::value{cg::type{cg::type_class::struct_,
-                                                                  std::get<1>(member).base_type.is_array()
-                                                                    ? static_cast<std::size_t>(1)
-                                                                    : static_cast<std::size_t>(0),
-                                                                  std::get<1>(member).base_type.base_type(),
-                                                                  import_path},    // FIXME This can be an imported type
-                                                         std::get<0>(member)}};
-                                   });
-
-                    ctx.add_import(module_::symbol_type::type, import_path, it.first);
-                    ctx.add_struct(it.first, members, import_path);
-                    ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
-                }
-
-                // Add type to typing context.
-                {
-                    std::vector<std::pair<token, ty::type_info>> members;
-                    for(auto& [member_name, member_type]: desc.member_types)
-                    {
-                        ty::type_info resolved_member_type = type_ctx.get_unresolved_type(
-                          {member_type.base_type.base_type(), {0, 0}},
-                          ty::is_builtin_type(member_type.base_type.base_type())
-                            ? typing::type_class::tc_plain
-                            : typing::type_class::tc_struct,
-                          import_path);    // FIXME This can be an imported type
-
-                        members.push_back(std::make_pair<token, ty::type_info>(
-                          {member_name, {0, 0}},
-                          std::move(resolved_member_type)));
-                    }
-
-                    type_ctx.add_struct({it.first, {0, 0}}, std::move(members), import_path);
-                }
             }
         }
     }
