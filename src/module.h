@@ -305,13 +305,24 @@ struct function_signature
      */
     function_signature(std::pair<std::string, bool> return_type,
                        std::vector<std::pair<std::string, bool>> arg_types)
-    : return_type{std::move(return_type)}
     {
         std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
                        [](const auto& arg) -> std::pair<variable_type, bool>
                        {
-                           return {arg.first, arg.second};
+                           return {variable_type{
+                                     arg.first,
+                                     arg.second
+                                       ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
+                                       : std::nullopt},
+                                   arg.second};
                        });
+
+        this->return_type = {variable_type{
+                               {std::move(return_type.first), return_type.second},
+                               return_type.second
+                                 ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
+                                 : std::nullopt},
+                             return_type.second};
     }
 };
 
