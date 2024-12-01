@@ -53,6 +53,12 @@ class export_table_builder
     std::vector<module_::exported_symbol> export_table;
 
 public:
+    /** Clear the export table. */
+    void clear()
+    {
+        export_table.clear();
+    }
+
     /** Return the export table size. */
     std::size_t size() const
     {
