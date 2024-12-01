@@ -954,6 +954,23 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
         }
     }
 
+    auto directives = get_directives("allow_cast");
+    if(directives.size() == 1)
+    {
+        if(struct_members.size() != 0)
+        {
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Types marked with 'allow_cast' cannot have members. Found {} member{} in type '{}'.",
+                struct_members.size(), struct_members.size() > 1 ? "s" : "", name.s));
+        }
+    }
+    else if(directives.size() > 1)
+    {
+        throw cg::codegen_error(loc, "More than one 'allow_cast' directive.");
+    }
+
     s->add_struct(name.s, struct_members);    // FIXME do we need this?
     ctx.add_struct(name.s, std::move(struct_members));
 
