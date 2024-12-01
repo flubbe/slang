@@ -194,14 +194,13 @@ void export_table_builder::write(module_::language_module& mod) const
 
             std::pair<std::string, bool> return_type = {
               std::get<0>(desc.signature.return_type).base_type(),
-              std::get<1>(desc.signature.return_type)};    // FIXME array info is not stored in type.
+              std::get<0>(desc.signature.return_type).is_array()};
             std::vector<std::pair<std::string, bool>> arg_types;
 
             std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(arg_types),
                            [](const std::pair<module_::variable_type, bool>& t) -> std::pair<std::string, bool>
                            {
-                               // FIXME array info is not stored in type.
-                               return std::make_pair(std::get<0>(t).base_type(), std::get<1>(t));    // FIXME Store type.
+                               return std::make_pair(std::get<0>(t).base_type(), std::get<0>(t).is_array());
                            });
 
             if(desc.native)
