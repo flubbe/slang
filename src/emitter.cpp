@@ -960,20 +960,9 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
 void instruction_emitter::run()
 {
-    if(instruction_buffer.size() != 0)
-    {
-        throw emitter_error("Instruction buffer not empty.");
-    }
-
-    if(exports.size() != 0)
-    {
-        throw emitter_error("Export table is not empty.");
-    }
-
-    if(jump_targets.size() != 0)
-    {
-        throw emitter_error("Jump targets not empty.");
-    }
+    // clear buffers and tables.
+    instruction_buffer.clear();
+    exports.clear();
 
     // collect jump targets.
     jump_targets = collect_jump_targets();
@@ -1041,6 +1030,9 @@ void instruction_emitter::run()
               std::move(arg_types));
         }
     }
+
+    // the export count is not allowed to change after this point, so store it here and check later.
+    std::size_t export_count = exports.size();
 
     /*
      * generate bytecode.
@@ -1136,18 +1128,24 @@ void instruction_emitter::run()
         }
 
         /*
-         * store function details
+         * store function details.
          */
         std::size_t size = instruction_buffer.tell() - entry_point;
         exports.update_function(f->get_name(), size, entry_point, locals);
     }
 
-    // check that the import count did not change
+    // check that the import and export counts did not change.
     if(import_count != ctx.imports.size())
     {
         throw emitter_error(
           fmt::format("Import count changed during instruction emission ({} -> {}).",
                       import_count, ctx.imports.size()));
+    }
+    if(export_count != exports.size())
+    {
+        throw emitter_error(
+          fmt::format("Export count changed during instruction emission ({} -> {}).",
+                      export_count, exports.size()));
     }
 }
 

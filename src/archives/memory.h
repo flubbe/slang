@@ -65,6 +65,12 @@ public:
         return memory_buffer.size();
     }
 
+    /** Clear the internal buffer. */
+    void clear()
+    {
+        memory_buffer.clear();
+    }
+
     /** Get the internal buffer. */
     const std::vector<std::byte>& get_buffer() const
     {
