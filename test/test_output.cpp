@@ -1067,8 +1067,10 @@ TEST(output, arrays)
     }
     {
         const std::string test_input =
+          "#[allow_cast]\n"
+          "struct type {};\n"
           "#[native(lib=\"slang\")]\n"
-          "fn array_copy(from: [], to: []) -> void;\n"
+          "fn array_copy(from: type, to: type) -> void;\n"
           "#[native(lib=\"slang\")]\n"
           "fn string_equals(s1: str, s2: str) -> i32;\n"
           "fn test_copy() -> i32\n"

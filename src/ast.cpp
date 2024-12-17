@@ -2141,7 +2141,7 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
         }
 
         if(sig.arg_types[i] != *arg_type
-           && !ctx.is_convertible(*arg_type, sig.arg_types[i]))
+           && !ctx.is_convertible(args[i]->get_location(), *arg_type, sig.arg_types[i]))
         {
             throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, ty::to_string(sig.arg_types[i]), ty::to_string(*arg_type)));
         }
