@@ -521,13 +521,12 @@ public:
     /**
      * Return whether a type is convertible into another type.
      *
-     * @note The checked types have to be different.
-     *
+     * @param loc A reference location for error reporting.
      * @param from The type to convert from.
      * @param to The type to convert to.
      * @returns Whether the type `from` is convertible to the type `to`.
      */
-    bool is_convertible(const type_info& from, const type_info& to) const;
+    bool is_convertible(token_location loc, const type_info& from, const type_info& to) const;
 
     /**
      * Resolve a type and set its type id.

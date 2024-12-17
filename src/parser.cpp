@@ -316,18 +316,7 @@ std::unique_ptr<ast::type_expression> parser::parse_type()
 
     if(current_token->type != token_type::identifier)
     {
-        if(!parsing_native || current_token->s != "]")
-        {
-            throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
-        }
-
-        get_next_token();    // skip ']'.
-
-        return std::make_unique<ast::type_expression>(
-          current_token->location,
-          token{"@array", current_token->location},
-          std::vector<token>{},
-          false);
+        throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
     }
     else
     {
@@ -1139,7 +1128,7 @@ void parser::push_directive(const token& name, [[maybe_unused]] const std::vecto
     else
     {
         // push empty entry to stack.
-        directive_stack.push_back(std::make_pair(token{}, []() {}));
+        directive_stack.push_back(std::make_pair(name, []() {}));
     }
 }
 

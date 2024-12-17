@@ -44,7 +44,7 @@ fn println(s: str) -> void;
  * @param to The array to copy into.
  */
 #[native(lib="slang")]
-fn array_copy(from: [], to: []) -> void;
+fn array_copy(from: type, to: type) -> void;
 
 /*
  * Strings.

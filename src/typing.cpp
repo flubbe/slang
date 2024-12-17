@@ -548,10 +548,34 @@ type_info context::get_unresolved_type(token name, type_class cls, std::optional
     return unresolved_types.back();
 }
 
-bool context::is_convertible(const type_info& from, const type_info& to) const
+bool context::is_convertible(token_location loc, const type_info& from, const type_info& to) const
 {
-    // Only conversions from array types to @array are allowed.
-    return from.is_array() && (!to.is_array() && to.to_string() == "@array");
+    if(from.to_string() == to.to_string() && from.get_import_path() == to.get_import_path())
+    {
+        return true;
+    }
+
+    /*
+     * Only conversions from array types to empty types are allowed.
+     * We check that the source is an array, and that the target is an empty type.
+     */
+    if(!from.is_array())
+    {
+        return false;
+    }
+
+    if(to.is_array())
+    {
+        return false;
+    }
+
+    auto struct_def = get_struct_definition(loc, to.to_string(), to.get_import_path());
+    if(struct_def->members.size() != 0)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 void context::resolve(type_info& ty)
