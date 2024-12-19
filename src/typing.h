@@ -303,8 +303,8 @@ class context
     /** The current scope. */
     scope* current_scope = &global_scope;
 
-    /** The current function scope. */
-    std::optional<token> function_scope;
+    /** The current named scope. */
+    std::optional<token> named_scope;
 
     /** The current anonymous scope id. */
     std::size_t anonymous_scope_id = 0;
@@ -574,15 +574,22 @@ public:
      */
     void enter_function_scope(token name);
 
-    /**
-     * Exit a function's scope.
-     *
-     * @param name The function's name. Used for validation.
-     */
-    void exit_function_scope(const token& name);
-
     /** Get the current function scope. */
     std::optional<function_signature> get_current_function() const;
+
+    /**
+     * Enter a struct's scope.
+     *
+     * @param name The struct's name.
+     */
+    void enter_struct_scope(token name);
+
+    /**
+     * Exit a named scope.
+     *
+     * @param name The scope's name. Used for validation.
+     */
+    void exit_named_scope(const token& name);
 
     /** Enter an anonymous scope. */
     void enter_anonymous_scope(token_location loc);

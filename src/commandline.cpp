@@ -457,6 +457,15 @@ void exec::invoke(const std::vector<std::string>& args)
         return;
     }
 
+    auto separator = std::find(args.begin(), args.end(), "--");
+    std::vector<std::string> forwarded_args{
+      separator != args.end()
+        ? separator + 1
+        : args.end(),
+      args.end()};
+
+    bool disassemble = std::find(args.begin(), separator, "--disasm") != separator;
+
     auto module_path = fs::path(args[0]);
     if(!module_path.has_extension())
     {
@@ -489,6 +498,9 @@ void exec::invoke(const std::vector<std::string>& args)
     }
 
     si::context ctx{file_mgr};
+    ctx.print_disassembly = disassemble;
+
+    rt::register_builtin_type_layouts(ctx.get_gc());
 
     ctx.register_native_function("slang", "print",
                                  [&ctx](si::operand_stack& stack)
@@ -547,7 +559,10 @@ void exec::invoke(const std::vector<std::string>& args)
 
     ctx.load_module(module_name, mod);
 
-    si::value res = ctx.invoke(module_name, "main", {si::value{std::vector<std::string>{args.begin() + 1, args.end()}}});
+    si::value res = ctx.invoke(
+      module_name,
+      "main",
+      {si::value{std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()}}});
     const int* return_value = res.get<int>();
 
     if(return_value == nullptr)

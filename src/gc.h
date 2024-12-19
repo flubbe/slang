@@ -229,7 +229,7 @@ class garbage_collector
     std::size_t allocated_bytes{0};
 
     /** Type layouts. */
-    std::unordered_map<std::size_t, std::vector<std::size_t>> type_layouts;
+    std::unordered_map<std::size_t, std::pair<std::string, std::vector<std::size_t>>> type_layouts;
 
     /**
      * Mark object as reachable.
@@ -347,7 +347,7 @@ public:
         }
         // note: references to elements remain valid after insert/emplace (but may invalidate iterators).
 
-        objects.insert({obj, gc_object::from(obj, size, alignment, flags, &layout_it->second)});
+        objects.insert({obj, gc_object::from(obj, size, alignment, flags, &layout_it->second.second)});
 
         if(add)
         {
@@ -441,10 +441,20 @@ public:
     /**
      * Register a new type layout.
      *
+     * @param name Name of the type.
      * @param layout The type layout, given as a list of offsets of pointers.
      * @returns Returns a layout identifier.
      */
-    std::size_t register_type_layout(std::vector<std::size_t> layout);
+    std::size_t register_type_layout(std::string name, std::vector<std::size_t> layout);
+
+    /**
+     * Get a type layout id from the type's name.
+     *
+     * @param name Name of the type.
+     * @returns Returns the layout identifier.
+     * @throws Throws a ´gc_error` if the name was not found.
+     */
+    std::size_t get_type_layout_id(const std::string& name) const;
 
     /** Get allocated object count. */
     std::size_t object_count() const
