@@ -99,13 +99,30 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("parse_i32: argument cannot be null.");
     }
 
+    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("result");
+    std::size_t i32s_layout_id = ctx.get_gc().get_type_layout_id("i32s");
+
+    result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
+      result_layout_id, sizeof(result), std::alignment_of_v<result>,
+      gc::gc_object::of_temporary));
+    stack.push_addr(r);
+
     try
     {
-        stack.push_i32(std::stoi(*s));
+        // convert first, so that no memory for `i32s` is allocated in case of failure.
+        std::int32_t i = std::stoi(*s);
+
+        r->value = ctx.get_gc().gc_new(
+          i32s_layout_id, sizeof(i32s), std::alignment_of_v<i32s>,
+          gc::gc_object::of_none, false);
+        static_cast<i32s*>(r->value)->value = i;
+        r->ok = 1;
     }
-    catch(std::invalid_argument&)
+    catch(std::invalid_argument& e)
     {
-        stack.push_i32(0);
+        r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
+        *static_cast<std::string*>(r->value) = e.what();
+        r->ok = 0;
     }
 }
 
@@ -119,13 +136,30 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("parse_i32: argument cannot be null.");
     }
 
+    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("result");
+    std::size_t f32s_layout_id = ctx.get_gc().get_type_layout_id("f32s");
+
+    result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
+      result_layout_id, sizeof(result), std::alignment_of_v<result>,
+      gc::gc_object::of_temporary));
+    stack.push_addr(r);
+
     try
     {
-        stack.push_f32(std::stof(*s));
+        // convert first, so that no memory for `i32s` is allocated in case of failure.
+        float f = std::stof(*s);
+
+        r->value = ctx.get_gc().gc_new(
+          f32s_layout_id, sizeof(f32s), std::alignment_of_v<f32s>,
+          gc::gc_object::of_none, false);
+        static_cast<f32s*>(r->value)->value = f;
+        r->ok = 1;
     }
-    catch(std::invalid_argument&)
+    catch(std::invalid_argument& e)
     {
-        stack.push_f32(0);
+        r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
+        *static_cast<std::string*>(r->value) = e.what();
+        r->ok = 0;
     }
 }
 

@@ -340,7 +340,7 @@ void context::add_function(token name,
 void context::add_struct(token name, std::vector<std::pair<token, type_info>> members, std::optional<std::string> import_path)
 {
     // check for existing names.
-    auto tok = global_scope.find(name.s);
+    auto tok = global_scope.find(name.s);    // FIXME ignores import_path.
     if(tok != std::nullopt)
     {
         throw type_error(name.location,
@@ -349,11 +349,11 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
     }
 
     // add to global scope.
-    global_scope.structs[name.s] = {name, std::move(members), std::move(import_path)};
+    global_scope.structs[name.s] = {name, std::move(members), import_path};
 
     // add to type map.
     auto type_id = generate_type_id();
-    type_map.push_back({type_info{{name.s, {0, 0}}, type_class::tc_plain, type_id}, type_id});
+    type_map.push_back({type_info{{name.s, {0, 0}}, type_class::tc_plain, type_id, std::move(import_path)}, type_id});
 }
 
 bool context::has_type(const std::string& name, const std::optional<std::string>& import_path) const
@@ -760,28 +760,39 @@ void context::enter_function_scope(token name)
         throw type_error(name.location, fmt::format("Cannot enter function scope '{}': No global scope.", name.s));
     }
 
-    if(function_scope != std::nullopt)
+    if(named_scope != std::nullopt)
     {
-        throw type_error(name.location, fmt::format("Nested functions are not allowed."));
+        throw type_error(name.location, fmt::format("Nested functions are not allowed. Current scope: '{}'.", named_scope->s));
     }
-    function_scope = name;
+    named_scope = name;
 
-    // check if the scope already exists.
-    auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
-                           [&name](const scope& s) -> bool
-                           { return s.name.s == name.s; });
-    if(it != current_scope->children.end())
-    {
-        current_scope = &(*it);
-    }
-    else
-    {
-        current_scope->children.emplace_back(std::move(name), current_scope);
-        current_scope = &current_scope->children.back();
-    }
+    current_scope->children.emplace_back(std::move(name), current_scope);
+    current_scope = &current_scope->children.back();
 }
 
-void context::exit_function_scope(const token& name)
+std::optional<function_signature> context::get_current_function() const
+{
+    if(named_scope == std::nullopt)
+    {
+        return std::nullopt;
+    }
+
+    return get_function_signature(*named_scope);
+}
+
+void context::enter_struct_scope(token name)
+{
+    if(current_scope == nullptr)
+    {
+        throw type_error(name.location, fmt::format("Cannot enter struct scope '{}': No global scope.", name.s));
+    }
+
+    named_scope = name;
+    current_scope->children.emplace_back(std::move(name), current_scope);
+    current_scope = &current_scope->children.back();
+}
+
+void context::exit_named_scope(const token& name)
 {
     if(current_scope == nullptr)
     {
@@ -798,18 +809,15 @@ void context::exit_function_scope(const token& name)
         throw type_error(name.location, fmt::format("Cannot exit scope '{}': Expected to exit scope '{}'.", name.s, current_scope->name.s));
     }
 
-    function_scope = std::nullopt;
     current_scope = current_scope->parent;
-}
-
-std::optional<function_signature> context::get_current_function() const
-{
-    if(function_scope == std::nullopt)
+    if(current_scope != &global_scope)
     {
-        return std::nullopt;
+        named_scope = current_scope->name;
     }
-
-    return get_function_signature(*function_scope);
+    else
+    {
+        named_scope = std::nullopt;
+    }
 }
 
 void context::enter_anonymous_scope(token_location loc)

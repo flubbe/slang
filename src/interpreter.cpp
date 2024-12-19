@@ -337,30 +337,71 @@ std::int32_t context::decode_instruction(
   const module_::function_details& details,
   std::vector<std::byte>& code) const
 {
+    if(print_disassembly && static_cast<opcode>(instr) != opcode::label)
+    {
+        fmt::print("    {:>11}    ", to_string(static_cast<opcode>(instr)));
+    }
+
     switch(static_cast<opcode>(instr))
     {
     /* opcodes without arguments. */
     case opcode::aconst_null: [[fallthrough]];
     case opcode::adup:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return static_cast<std::int32_t>(sizeof(void*));
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::pop:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::apop:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*));
     case opcode::arraylength:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::iaload: [[fallthrough]];
     case opcode::faload:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*));
     case opcode::saload:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::sastore:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
@@ -390,9 +431,17 @@ std::int32_t context::decode_instruction(
     case opcode::fcmpeq: [[fallthrough]];
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::acmpeq: [[fallthrough]];
     case opcode::acmpne:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return -2 * static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
@@ -401,12 +450,21 @@ std::int32_t context::decode_instruction(
     case opcode::fret: [[fallthrough]];
     case opcode::sret: [[fallthrough]];
     case opcode::aret:
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+        }
         return 0;
     /* opcodes with one 1-byte argument. */
     case opcode::newarray:
     {
         std::uint8_t i_u8;
         ar & i_u8;
+
+        if(print_disassembly)
+        {
+            fmt::print("{}\n", i_u8);
+        }
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u8), reinterpret_cast<std::byte*>(&i_u8) + sizeof(i_u8));
         return static_cast<std::int32_t>(sizeof(void*));
@@ -418,6 +476,20 @@ std::int32_t context::decode_instruction(
         std::uint32_t i_u32;
         ar & i_u32;
 
+        if(print_disassembly)
+        {
+            if(static_cast<opcode>(instr) == opcode::iconst)
+            {
+                fmt::print("{}\n", i_u32);
+            }
+            else
+            {
+                float f;
+                std::memcpy(&f, &i_u32, sizeof(float));
+                fmt::print("{}\n", f);
+            }
+        }
+
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
         return static_cast<std::int32_t>(sizeof(std::uint32_t));
     }
@@ -427,6 +499,11 @@ std::int32_t context::decode_instruction(
         vle_int i;
         ar & i;
 
+        if(print_disassembly)
+        {
+            fmt::print("{}\n", i.i);
+        }
+
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
         return static_cast<std::int32_t>(sizeof(std::string*));
     }
@@ -434,6 +511,11 @@ std::int32_t context::decode_instruction(
     {
         vle_int i;
         ar & i;
+
+        if(print_disassembly)
+        {
+            fmt::print("%{}:\n", i.i);
+        }
 
         // store jump target for later resolution.
         mod.jump_targets.insert({i.i, code.size()});
@@ -443,6 +525,11 @@ std::int32_t context::decode_instruction(
     {
         vle_int i;
         ar & i;
+
+        if(print_disassembly)
+        {
+            fmt::print("%{}\n", i.i);
+        }
 
         // store jump origin for later resolution and write zeros instead.
         std::size_t z = 0;
@@ -455,6 +542,11 @@ std::int32_t context::decode_instruction(
     {
         vle_int i1, i2;
         ar & i1 & i2;
+
+        if(print_disassembly)
+        {
+            fmt::print("{}, {}\n", i1.i, i2.i);
+        }
 
         // store jump origin for later resolution and write zeros instead.
         std::size_t z = 0;
@@ -471,6 +563,11 @@ std::int32_t context::decode_instruction(
         // type arguments.
         module_::variable_type t1, t2;
         ar & t1 & t2;
+
+        if(print_disassembly)
+        {
+            fmt::print("{}, {}\n", t1.base_type(), t2.base_type());
+        }
 
         // "void" is not allowed.
         if(t1.base_type() == "void" || t2.base_type() == "void")
@@ -543,6 +640,11 @@ std::int32_t context::decode_instruction(
                 throw interpreter_error(fmt::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
             }
 
+            if(print_disassembly)
+            {
+                fmt::print("{} ({})\n", imp_symbol.name, i.i);
+            }
+
             return get_stack_delta(desc.signature);
         }
         else
@@ -570,6 +672,11 @@ std::int32_t context::decode_instruction(
                 throw interpreter_error("Native function was null during decode.");
             }
 
+            if(print_disassembly)
+            {
+                fmt::print("{} ({})\n", exp_symbol.name, i.i);
+            }
+
             return get_stack_delta(desc.signature);
         }
     }
@@ -583,6 +690,11 @@ std::int32_t context::decode_instruction(
     {
         vle_int i;
         ar & i;
+
+        if(print_disassembly)
+        {
+            fmt::print("{}\n", i.i);
+        }
 
         if(i.i < 0 || static_cast<std::size_t>(i.i) >= details.locals.size())
         {
@@ -664,6 +776,11 @@ std::int32_t context::decode_instruction(
                   imp_package.name));
             }
 
+            if(print_disassembly)
+            {
+                fmt::print("{}\n", imp_symbol.name);
+            }
+
             auto properties = get_type_properties(struct_map_it->second, imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
@@ -685,6 +802,11 @@ std::int32_t context::decode_instruction(
                 throw interpreter_error(fmt::format(
                   "Cannot resolve type: Export header entry at index {} is not a type.",
                   i.i));
+            }
+
+            if(print_disassembly)
+            {
+                fmt::print("{}\n", exp_symbol.name);
             }
 
             auto properties = get_type_properties(struct_map, exp_symbol.name);
@@ -754,6 +876,11 @@ std::int32_t context::decode_instruction(
                   imp_package.name));
             }
 
+            if(print_disassembly)
+            {
+                fmt::print("{} ({}), {}\n", imp_symbol.name, struct_index.i, field_index.i);
+            }
+
             properties = get_field_properties(struct_map_it->second, imp_symbol.name, field_index.i);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
@@ -770,6 +897,11 @@ std::int32_t context::decode_instruction(
             if(exp_symbol.type != module_::symbol_type::type)
             {
                 throw interpreter_error(fmt::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+            }
+
+            if(print_disassembly)
+            {
+                fmt::print("{} ({}), {}\n", exp_symbol.name, struct_index.i, field_index.i);
             }
 
             properties = get_field_properties(struct_map, exp_symbol.name, field_index.i);
@@ -817,6 +949,11 @@ void context::decode_structs(
 {
     for(auto& [name, desc]: struct_map)
     {
+        if(print_disassembly)
+        {
+            fmt::print("%{} = type {{\n", name);
+        }
+
         std::size_t size = 0;
         std::size_t alignment = 0;
         std::vector<std::size_t> layout;
@@ -824,6 +961,17 @@ void context::decode_structs(
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
+            if(print_disassembly)
+            {
+                std::string base_type = member_type.base_type.base_type();
+                for(std::size_t i = 0; i < member_type.base_type.get_array_dims().value_or(0); ++i)
+                {
+                    base_type += "[]";
+                }
+
+                fmt::print("    {} %{},\n", member_type.base_type.base_type(), member_name);
+            }
+
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
@@ -889,7 +1037,12 @@ void context::decode_structs(
         desc.alignment = alignment;
 
         // store layout.
-        desc.layout_id = gc.register_type_layout(std::move(layout));
+        desc.layout_id = gc.register_type_layout(name, std::move(layout));
+
+        if(print_disassembly)
+        {
+            fmt::print("}}\n");
+        }
     }
 }
 
@@ -1029,6 +1182,24 @@ std::unique_ptr<module_::language_module> context::decode(
         auto& details = std::get<module_::function_details>(desc.details);
 
         std::size_t bytecode_end = details.offset + details.size;
+
+        if(print_disassembly)
+        {
+            fmt::print("\n");
+            fmt::print("{}:\n", it.name);
+            fmt::print("offset {} (size {})\n", details.offset, details.size);
+            fmt::print("locals size: {}\n", details.locals_size);
+            for(auto& local: details.locals)
+            {
+                std::string base_type = local.type.base_type();
+                for(std::size_t i = 0; i < local.type.get_array_dims().value_or(0); ++i)
+                {
+                    base_type += "[]";
+                }
+
+                fmt::print("local {} @ {}, {} bytes\n", base_type, local.offset, local.size);
+            }
+        }
 
         ar.seek(details.offset);
         details.offset = code.size();
@@ -1716,20 +1887,10 @@ opcode context::exec(
                 std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
                 bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
-                if(field_size == sizeof(std::int32_t))
+                if(field_size == sizeof(void*))
                 {
-                    std::int32_t v = frame.stack.pop_i32();
-                    void* type_ref = frame.stack.pop_addr<void*>();
-                    if(type_ref == nullptr)
-                    {
-                        throw interpreter_error("Null pointer access during setfield.");
-                    }
-                    gc.remove_temporary(type_ref);
+                    // this block also gets executed if `sizeof(void*)==sizeof(std::int32_t)`.
 
-                    std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
-                }
-                else if(field_size == sizeof(void*))
-                {
                     void* v = frame.stack.pop_addr<void>();
                     void* type_ref = frame.stack.pop_addr<void*>();
                     if(type_ref == nullptr)
@@ -1745,6 +1906,19 @@ opcode context::exec(
 
                     std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
                 }
+                else if(field_size == sizeof(std::int32_t))
+                {
+                    std::int32_t v = frame.stack.pop_i32();
+                    void* type_ref = frame.stack.pop_addr<void*>();
+                    if(type_ref == nullptr)
+                    {
+                        throw interpreter_error("Null pointer access during setfield.");
+                    }
+                    gc.remove_temporary(type_ref);
+
+                    std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
+                }
+
                 else
                 {
                     throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
@@ -1759,27 +1933,16 @@ opcode context::exec(
                 std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
                 bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
-                if(field_size == sizeof(std::int32_t))
+                void* type_ref = frame.stack.pop_addr<void*>();
+                if(type_ref == nullptr)
                 {
-                    void* type_ref = frame.stack.pop_addr<void*>();
-                    if(type_ref == nullptr)
-                    {
-                        throw interpreter_error("Null pointer access during setfield.");
-                    }
-                    gc.remove_temporary(type_ref);
-
-                    std::int32_t v;
-                    std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
-                    frame.stack.push_i32(v);
+                    throw interpreter_error("Null pointer access during getfield.");
                 }
-                else if(field_size == sizeof(void*))
+                gc.remove_temporary(type_ref);
+
+                if(field_size == sizeof(void*))
                 {
-                    void* type_ref = frame.stack.pop_addr<void*>();
-                    if(type_ref == nullptr)
-                    {
-                        throw interpreter_error("Null pointer access during setfield.");
-                    }
-                    gc.remove_temporary(type_ref);
+                    // this block also gets executed if `sizeof(void*)==sizeof(std::int32_t)`.
 
                     void* v;
                     std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
@@ -1789,6 +1952,12 @@ opcode context::exec(
                     {
                         gc.add_temporary(v);
                     }
+                }
+                else if(field_size == sizeof(std::int32_t))
+                {
+                    std::int32_t v;
+                    std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
+                    frame.stack.push_i32(v);
                 }
                 else
                 {

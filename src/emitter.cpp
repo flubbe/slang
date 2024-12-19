@@ -453,7 +453,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
         if(!v->has_name())
         {
-            throw std::runtime_error(fmt::format("Cannot emit instruction: Argument value has no name."));
+            throw std::runtime_error(fmt::format("Cannot emit instruction '{}': Argument value has no name.", name));
         }
         vle_int index = func->get_scope()->get_index(*v->get_name());
 

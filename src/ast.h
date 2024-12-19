@@ -326,14 +326,80 @@ public:
     std::string to_string() const override;
 };
 
+/** A type expression. */
+class type_expression
+{
+    /** Location. */
+    token_location loc;
+
+    /** The type name. */
+    token type_name;
+
+    /** Namespaces. */
+    std::vector<token> namespace_stack;
+
+    /** Whether the type is an array type. */
+    bool array{false};
+
+public:
+    /** Default and deleted constructors. */
+    type_expression() = delete;
+    type_expression(const type_expression&) = default;
+    type_expression(type_expression&&) = default;
+
+    /** Default assignments. */
+    type_expression& operator=(const type_expression&) = default;
+    type_expression& operator=(type_expression&&) = default;
+
+    /**
+     * Construct a `type_expression`.
+     *
+     * @param loc The location.
+     * @param type_name The (unqualified) type name.
+     * @param namespace_stack Namespaces for type resolution.
+     * @param is_array Whether the type is an array type.
+     */
+    type_expression(token_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
+    : loc{std::move(loc)}
+    , type_name{std::move(type_name)}
+    , namespace_stack{std::move(namespace_stack)}
+    , array{is_array}
+    {
+    }
+
+    /** Get the location. */
+    token_location get_location() const
+    {
+        return loc;
+    }
+
+    /** Returns the type name. */
+    token get_name() const
+    {
+        return type_name;
+    }
+
+    /** Return the namespace path, or `std::nullopt` if empty. */
+    std::optional<std::string> get_namespace_path() const;
+
+    /** Return a readable representation of the type. */
+    std::string to_string() const;
+
+    /** Return whether the type is an array. */
+    bool is_array() const
+    {
+        return array;
+    }
+};
+
 /** A type cast expression. */
-class type_cast_expression : public expression
+class type_cast_expression : public named_expression
 {
     /** The expression. */
     std::unique_ptr<expression> expr;
 
     /** The target type. */
-    token target_type;
+    std::unique_ptr<type_expression> target_type;
 
 public:
     /** No default constructor. */
@@ -357,11 +423,19 @@ public:
      * @param expr The expression.
      * @param target_type The target type.
      */
-    type_cast_expression(token_location loc, std::unique_ptr<expression> expr, token target_type)
-    : expression{std::move(loc)}
+    type_cast_expression(token_location loc, std::unique_ptr<expression> expr, std::unique_ptr<type_expression> target_type)
+    : named_expression{std::move(loc),
+                       expr->is_named_expression()
+                         ? static_cast<named_expression*>(expr.get())->get_name()
+                         : token{"<none>", {0, 0}}}    // FIXME we might not have a name.
     , expr{std::move(expr)}
     , target_type{std::move(target_type)}
     {
+    }
+
+    bool is_named_expression() const override
+    {
+        return expr->is_named_expression();
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -417,7 +491,7 @@ class access_expression : public named_expression
     /** The resolved expression. */
     std::unique_ptr<expression> expr;
 
-    /** Identifyer type. Set during type checking. */
+    /** Identifyer type. Set either explicitly during construction, or implicitly during type checking. */
     ty::type_info type;
 
 public:
@@ -607,72 +681,6 @@ public:
 
     /** Get the value of the object. */
     cg::value get_value(cg::context& ctx) const;
-};
-
-/** A type expression. */
-class type_expression
-{
-    /** Location. */
-    token_location loc;
-
-    /** The type name. */
-    token type_name;
-
-    /** Namespaces. */
-    std::vector<token> namespace_stack;
-
-    /** Whether the type is an array type. */
-    bool array{false};
-
-public:
-    /** Default and deleted constructors. */
-    type_expression() = delete;
-    type_expression(const type_expression&) = default;
-    type_expression(type_expression&&) = default;
-
-    /** Default assignments. */
-    type_expression& operator=(const type_expression&) = default;
-    type_expression& operator=(type_expression&&) = default;
-
-    /**
-     * Construct a `type_expression`.
-     *
-     * @param loc The location.
-     * @param type_name The (unqualified) type name.
-     * @param namespace_stack Namespaces for type resolution.
-     * @param is_array Whether the type is an array type.
-     */
-    type_expression(token_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
-    : loc{std::move(loc)}
-    , type_name{std::move(type_name)}
-    , namespace_stack{std::move(namespace_stack)}
-    , array{is_array}
-    {
-    }
-
-    /** Get the location. */
-    token_location get_location() const
-    {
-        return loc;
-    }
-
-    /** Returns the type name. */
-    token get_name() const
-    {
-        return type_name;
-    }
-
-    /** Return the namespace path, or `std::nullopt` if empty. */
-    std::optional<std::string> get_namespace_path() const;
-
-    /** Return a readable representation of the type. */
-    std::string to_string() const;
-
-    /** Return whether the type is an array. */
-    bool is_array() const
-    {
-        return array;
-    }
 };
 
 /** Variable declaration. */

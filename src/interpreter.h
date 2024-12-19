@@ -1070,6 +1070,10 @@ class context
     std::string stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace);
 
 public:
+    /** Whether to print the dissassembled program to `stdout` during load. */
+    bool print_disassembly{false};
+
+public:
     /** Default constructors. */
     context() = delete;
     context(const context&) = delete;
