@@ -174,6 +174,8 @@ void garbage_collector::remove_root(void* obj)
 
 void garbage_collector::run()
 {
+    GC_LOG("------- run -------");
+
     std::size_t object_set_size = objects.size();
 
     // collect roots.
@@ -328,7 +330,7 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
     return it->second.type;
 }
 
-std::size_t garbage_collector::register_type_layout(std::vector<std::size_t> layout)
+std::size_t garbage_collector::register_type_layout(std::string name, std::vector<std::size_t> layout)
 {
     // find the first free identifier.
     std::size_t id = 0;
@@ -344,8 +346,23 @@ std::size_t garbage_collector::register_type_layout(std::vector<std::size_t> lay
         id += 1;
     }
 
-    type_layouts.insert({id, std::move(layout)});
+    type_layouts.insert({id, std::make_pair(std::move(name), std::move(layout))});
     return id;
+}
+
+std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
+{
+    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
+                           [name](const std::pair<std::size_t, std::pair<std::string, std::vector<std::size_t>>>& layout) -> bool
+                           {
+                               return layout.second.first == name;
+                           });
+    if(it == type_layouts.end())
+    {
+        throw gc_error(fmt::format("No type layout for type '{}' registered.", name));
+    }
+
+    return it->first;
 }
 
 }    // namespace slang::gc

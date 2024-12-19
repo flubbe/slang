@@ -19,10 +19,51 @@ class operand_stack;
 class context;
 }    // namespace slang::interpreter
 
+namespace slang::gc
+{
+class garbage_collector;
+}    // namespace slang::gc
+
 namespace slang::runtime
 {
 
 namespace si = slang::interpreter;
+namespace gc = slang::gc;
+
+/*
+ * Built-in types.
+ */
+
+/** Wrapper around i32. */
+struct i32s
+{
+    /** Value held by the wrapper. */
+    std::int32_t value{0};
+};
+
+/** Wrapper around f32. */
+struct f32s
+{
+    /** Value held by the wrapper. */
+    float value{0};
+};
+
+/** Result type. */
+struct result
+{
+    /** Indicates whether the evaluation succeeded. Defaults to `0`, indicating a failure. */
+    std::uint32_t ok{0};
+
+    /** Holds the evaluation's result on success, and an object describing the error on failure. */
+    void* value{nullptr};
+};
+
+/**
+ * Register layouts for built-in types.
+ *
+ * @param gc The garbage collector to register the types with.
+ */
+void register_builtin_type_layouts(gc::garbage_collector& gc);
 
 /*
  * Arrays.

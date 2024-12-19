@@ -1017,15 +1017,7 @@ std::unique_ptr<ast::expression> parser::parse_type_cast_expression(std::unique_
         throw syntax_error(*current_token, fmt::format("Expected <identifier>, got '{}'.", current_token->s));
     }
 
-    // check we're casting to primitive type.
-    token type = *current_token;
-    if(type.s != "i32" && type.s != "f32")
-    {
-        throw syntax_error(type, fmt::format("Expected <primitive-type>, got '{}'.", type.s));
-    }
-    get_next_token();
-
-    return std::make_unique<ast::type_cast_expression>(std::move(loc), std::move(expr), std::move(type));
+    return std::make_unique<ast::type_cast_expression>(std::move(loc), std::move(expr), parse_type());
 }
 
 // ifexpr ::= '(' expression ')' block 'else' (ifexpr | block)

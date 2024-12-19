@@ -7,11 +7,33 @@
  */
 
 /*
- * Type.
+ * Types.
  */
 
+/** Generic type. */
 #[allow_cast]
 struct type {};
+
+/** 
+ * Result type, holding a generic value and an indicator whether the result holds an error. 
+ */
+struct result 
+{
+    ok: i32,
+    value: type
+};
+
+/** Wrapper around i32. */
+struct i32s
+{
+    value: i32
+};
+
+/** Wrapper around f32. */
+struct f32s
+{
+    value: f32
+};
 
 /*
  * Output.
@@ -92,19 +114,19 @@ fn f32_to_string(f: f32) -> str;
  * Parse a string and return an i32 integer. 
  *
  * @param s The string to parse.
- * @return Returns an integer on success, else 0.
+ * @return Returns a `result` containing a `i32_s`.
  */
 #[native(lib="slang")]
-fn parse_i32(s: str) -> i32;
+fn parse_i32(s: str) -> result;
 
 /**
  * Parse a string and return an f32 float.
  *
  * @param s The string to parse.
- * @return Returns a float on success, else 0.
+ * @return Returns a `result` containing a `f32_s`.
  */
 #[native(lib="slang")]
-fn parse_f32(s: str) -> f32;
+fn parse_f32(s: str) -> result;
   
 /*
  * Debug.

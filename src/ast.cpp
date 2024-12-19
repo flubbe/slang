@@ -199,37 +199,54 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
     auto v = expr->generate_code(ctx, mc);
 
     // only cast if necessary.
-    if(target_type.s != v->get_type().to_string())
+    if(target_type->get_name().s != v->get_type().to_string())    // FIXME namespaces
     {
-        if(target_type.s == "i32" && v->get_type().get_type_class() == cg::type_class::f32)
+        if(target_type->get_name().s == "i32" && v->get_type().get_type_class() == cg::type_class::f32)
         {
             ctx.generate_cast(cg::type_cast::f32_to_i32);
         }
-        else if(target_type.s == "f32" && v->get_type().get_type_class() == cg::type_class::i32)
+        else if(target_type->get_name().s == "f32" && v->get_type().get_type_class() == cg::type_class::i32)
         {
             ctx.generate_cast(cg::type_cast::i32_to_f32);
         }
+        else if(target_type->get_name().s == "str" && v->get_type().get_type_class() != cg::type_class::struct_)
+        {
+            throw cg::codegen_error(loc,
+                                    fmt::format("Cannot cast '{}' to 'str'.", v->get_type().to_string()));
+        }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to '{}'.", v->get_type().to_string(), target_type.s));
+            if(target_type->get_name().s == "str")
+            {
+                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+            }
+
+            // TODO casts between non-builtin types are checked at run-time.
+            return std::make_unique<cg::value>(cg::type{
+              cg::type_class::struct_,
+              0,
+              target_type->get_name().s,
+              target_type->get_namespace_path()});
         }
 
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type.s), 0});
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
     }
     else
     {
         // identity transformation.
-        if(ty::is_builtin_type(target_type.s))
+        if(ty::is_builtin_type(target_type->to_string()))
         {
-            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type.s), 0});
+            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
         }
         else
         {
-            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type.s});
+            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
         }
     }
 
-    throw cg::codegen_error(loc, fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.", v->get_type().to_string(), target_type.s));
+    throw cg::codegen_error(loc,
+                            fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.",
+                                        v->get_type().to_string(), target_type->get_name().s));
 }
 
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
@@ -240,30 +257,30 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
         throw ty::type_error(loc, "Invalid cast from untyped expression.");
     }
 
-    // valid type casts.
-    static const std::unordered_map<std::string, std::set<std::string>> valid_casts = {
+    // casts for primitive types.
+    static const std::unordered_map<std::string, std::set<std::string>> primitive_type_casts = {
       {"i32", {"i32", "f32"}},
-      {"f32", {"i32", "f32"}}};
+      {"f32", {"i32", "f32"}},
+      {"str", {}}};
 
-    auto cast_from = valid_casts.find(ty::to_string(*type));
-    if(cast_from == valid_casts.end())
+    auto cast_from = primitive_type_casts.find(ty::to_string(*type));
+    if(cast_from != primitive_type_casts.end())
     {
-        throw ty::type_error(loc, fmt::format("Invalid cast from non-primitive type '{}'.", ty::to_string(*type)));
+        auto cast_to = cast_from->second.find(target_type->get_name().s);
+        if(cast_to == cast_from->second.end())
+        {
+            throw ty::type_error(loc, fmt::format("Invalid cast to non-primitive type '{}'.", target_type->get_name().s));
+        }
     }
 
-    auto cast_to = cast_from->second.find(target_type.s);
-    if(cast_to == cast_from->second.end())
-    {
-        throw ty::type_error(loc, fmt::format("Invalid cast to non-primitive type '{}'.", target_type.s));
-    }
-
-    expr_type = ctx.get_type(target_type.s, false);    // no array casts.
+    // casts for struct types. this is checked at run-time.
+    expr_type = ctx.get_type(target_type->get_name().s, false, target_type->get_namespace_path());    // no array casts.
     return expr_type;
 }
 
 std::string type_cast_expression::to_string() const
 {
-    return fmt::format("TypeCast(target_type={}, expr={})", target_type.s, expr ? expr->to_string() : std::string("<none>"));
+    return fmt::format("TypeCast(target_type={}, expr={})", target_type->to_string(), expr ? expr->to_string() : std::string("<none>"));
 }
 
 /*
@@ -275,9 +292,7 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
-
-    auto type = expr->generate_code(ctx, mc);
-    return type;
+    return expr->generate_code(ctx, mc);
 }
 
 std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
@@ -285,9 +300,7 @@ std::optional<ty::type_info> namespace_access_expression::type_check(ty::context
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
-
-    auto type = expr->type_check(ctx);
-    return type;
+    return expr->type_check(ctx);
 }
 
 std::string namespace_access_expression::to_string() const
@@ -796,11 +809,17 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
         }
 
-        // Either the types match, or the type is a reference types which is set to 'null'.
+        // Either the types match, or the type is a reference type which is set to 'null'.
         if(*rhs != var_type
            && !(ctx.is_reference_type(var_type) && *rhs == ctx.get_type("@null", false)))
         {
-            throw ty::type_error(name.location, fmt::format("R.h.s. has type '{}', which does not match the variable type '{}'.", ty::to_string(*rhs), ty::to_string(var_type)));
+            throw ty::type_error(
+              name.location,
+              fmt::format("R.h.s. has type '{}' (type id {}), which does not match the variable type '{}' (type id {}).",
+                          ty::to_string(*rhs),
+                          rhs->get_type_id(),
+                          ty::to_string(var_type),
+                          var_type.get_type_id()));
         }
     }
 
@@ -1003,10 +1022,12 @@ bool struct_definition_expression::supports_directive(const std::string& name) c
 
 std::optional<ty::type_info> struct_definition_expression::type_check(ty::context& ctx)
 {
+    ctx.enter_function_scope(name);
     for(auto& m: members)
     {
         m->type_check(ctx);
     }
+    ctx.exit_named_scope(name);
 
     return std::nullopt;
 }
@@ -1232,6 +1253,7 @@ bool binary_expression::needs_pop() const
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
+    bool is_access = (op.s == ".");
 
     if(!is_assignment || is_compound)
     {
@@ -1241,13 +1263,57 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         }
 
         auto lhs_value = lhs->generate_code(ctx, memory_context::load);
+
+        /*
+         * Check if we are accessing a struct. This can happen e.g. if the access happens
+         * after a cast. In this case, the expression is treated as a binary expression
+         * (as opposed to an access expression).
+         */
+        if(is_access)
+        {
+            if(!lhs_value->get_type().is_struct())
+            {
+                throw cg::codegen_error(loc,
+                                        fmt::format("Cannot access non-struct type '{}'.",
+                                                    lhs_value->get_type().to_string()));
+            }
+
+            if(!rhs->is_named_expression())
+            {
+                throw cg::codegen_error(loc,
+                                        fmt::format("Cannot use unnamed expression to access struct '{}'.",
+                                                    lhs_value->get_type().to_string()));
+            }
+            std::string expr_name = static_cast<named_expression*>(rhs.get())->get_name().s;
+
+            auto lhs_type = lhs_value->get_type();
+
+            cg::scope* s = ctx.get_global_scope();
+            auto& members = s->get_struct(lhs_type.to_string(), lhs_type.get_import_path());
+
+            auto it = std::find_if(members.begin(), members.end(),
+                                   [&expr_name](const std::pair<std::string, cg::value>& v)
+                                   {
+                                       return v.first == expr_name;
+                                   });
+            if(it == members.end())
+            {
+                throw cg::codegen_error(rhs->get_location(),
+                                        fmt::format("Struct '{}' does not contain a field with name '{}'.",
+                                                    lhs_type.to_string(), expr_name));
+            }
+
+            ctx.generate_get_field(std::make_unique<cg::field_access_argument>(lhs_type, it->second));
+            return std::make_unique<cg::value>(it->second);
+        }
+
         auto rhs_value = rhs->generate_code(ctx, memory_context::load);
 
         if(lhs_value->get_type() != rhs_value->get_type()
            && !(is_comparison && lhs_value->get_type().is_reference() && rhs_value->get_type().is_null()))
         {
             throw cg::codegen_error(loc,
-                                    fmt::format("Types don't match in binary operation. LHS: {}, RHS: {}.",
+                                    fmt::format("Types don't match in binary operation. L.h.s.: {}, R.h.s.: {}.",
                                                 lhs_value->get_type().to_string(),
                                                 rhs_value->get_type().to_string()));
         }
@@ -1354,7 +1420,21 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     auto lhs_type = lhs->type_check(ctx);
+
+    const ty::struct_definition* struct_def = nullptr;
+    if(op.s == ".")    // scope access
+    {
+        struct_def = ctx.get_struct_definition(loc, lhs_type->to_string(), lhs_type->get_import_path());
+        ctx.push_struct_definition(struct_def);
+    }
+
     auto rhs_type = rhs->type_check(ctx);
+
+    if(struct_def)
+    {
+        ctx.pop_struct_definition();
+        return rhs_type;
+    }
 
     if(lhs_type == std::nullopt || rhs_type == std::nullopt)
     {
@@ -1902,7 +1982,7 @@ void prototype_ast::type_check(ty::context& ctx)
 void prototype_ast::finish_type_check(ty::context& ctx)
 {
     // exit the function's scope.
-    ctx.exit_function_scope(name);
+    ctx.exit_named_scope(name);
 }
 
 std::string prototype_ast::to_string() const
