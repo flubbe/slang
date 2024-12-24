@@ -788,6 +788,31 @@ type context::get_accessed_struct() const
     return struct_access.back();
 }
 
+value context::get_struct_member(
+  token_location loc,
+  const std::string& struct_name,
+  const std::string& member_name,
+  std::optional<std::string> import_path) const
+{
+    const scope* s = get_global_scope();
+    auto& members = s->get_struct(struct_name, import_path);
+
+    auto it = std::find_if(members.begin(), members.end(),
+                           [&member_name](const std::pair<std::string, value>& v)
+                           {
+                               return v.first == member_name;
+                           });
+    if(it == members.end())
+    {
+        throw codegen_error(
+          loc,
+          fmt::format("Struct '{}' does not contain a field with name '{}'.",
+                      struct_name, member_name));
+    }
+
+    return it->second;
+}
+
 /*
  * Code generation.
  */

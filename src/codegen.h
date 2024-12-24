@@ -76,7 +76,6 @@ enum class type_class
     str,     /** String. */
     struct_, /** Struct. */
     addr,    /** Anonymous address. */
-    array,   /** Array type. */
     fn       /** A function. */
 };
 
@@ -1984,6 +1983,12 @@ public:
         return global_scope.get();
     }
 
+    /** Get the global scope. */
+    const scope* get_global_scope() const
+    {
+        return global_scope.get();
+    }
+
     /** Return whether a given scope is the global scope. */
     bool is_global_scope(const scope* s) const
     {
@@ -2012,6 +2017,22 @@ public:
      * @throws Throws a `codegen_error` if no struct is accessed.
      */
     type get_accessed_struct() const;
+
+    /**
+     * Get a member of a struct by name.
+     *
+     * @param loc Source location of the access.
+     * @param struct_name Name of the struct.
+     * @param member_name Name of the accessed member.
+     * @param import_path Import path of the struct. Optional for module-local structs.
+     * @returns Returns a type describing the struct member.
+     * @throws Throws a `codegen_error` if the struct or the requested member could not be found.
+     */
+    value get_struct_member(
+      token_location loc,
+      const std::string& struct_name,
+      const std::string& member_name,
+      std::optional<std::string> import_path = std::nullopt) const;
 
     /**
      * Enter a function. Only one function can be entered at a time.

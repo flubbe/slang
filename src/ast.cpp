@@ -31,6 +31,26 @@ namespace slang::ast
  * expression.
  */
 
+access_expression* expression::as_access_expression()
+{
+    throw std::runtime_error("Expression is not an access expression.");
+}
+
+const access_expression* expression::as_access_expression() const
+{
+    throw std::runtime_error("Expression is not an access expression.");
+}
+
+named_expression* expression::as_named_expression()
+{
+    throw std::runtime_error("Expression is not a named expression.");
+}
+
+const named_expression* expression::as_named_expression() const
+{
+    throw std::runtime_error("Expression is not a named expression.");
+}
+
 void expression::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
 {
     if(!supports_directive(name.s))
@@ -191,11 +211,6 @@ std::string literal_expression::to_string() const
 
 std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, fmt::format("Invalid memory context for type cast expression."));
-    }
-
     auto v = expr->generate_code(ctx, mc);
 
     // only cast if necessary.
@@ -218,29 +233,30 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         {
             if(target_type->get_name().s == "str")
             {
-                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}, v->get_name());
             }
 
             // TODO casts between non-builtin types are checked at run-time.
             return std::make_unique<cg::value>(cg::type{
-              cg::type_class::struct_,
-              0,
-              target_type->get_name().s,
-              target_type->get_namespace_path()});
+                                                 cg::type_class::struct_,
+                                                 0,
+                                                 target_type->get_name().s,
+                                                 target_type->get_namespace_path()},
+                                               v->get_name());
         }
 
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
     }
     else
     {
         // identity transformation.
         if(ty::is_builtin_type(target_type->to_string()))
         {
-            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
+            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
         }
         else
         {
-            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
+            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s}, v->get_name());
         }
     }
 
@@ -311,7 +327,6 @@ std::string namespace_access_expression::to_string() const
 /*
  * access_expression.
  */
-
 class access_guard
 {
     /** The associated context. */
@@ -346,6 +361,13 @@ public:
     }
 };
 
+access_expression::access_expression(std::unique_ptr<ast::expression> lhs, std::unique_ptr<ast::expression> rhs)
+: expression{lhs->get_location()}
+, lhs{std::move(lhs)}
+, rhs{std::move(rhs)}
+{
+}
+
 std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // validate expression.
@@ -353,172 +375,122 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     {
         throw cg::codegen_error(loc, "Access expression has no type.");
     }
-    if(!expr->is_named_expression())
+    if(!rhs)
     {
-        throw cg::codegen_error(loc, fmt::format("Could not find name for element access in access expression."));
+        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
     }
-    auto identifier_expr = reinterpret_cast<named_expression*>(expr.get());
 
-    std::unique_ptr<cg::value> var = std::make_unique<cg::value>(get_value(ctx));
+    auto lhs_value = lhs->generate_code(ctx, memory_context::load);
 
-    // arrays.
-    if(var->get_type().is_array())
+    /*
+     * arrays.
+     */
+    if(lhs_type.is_array())
     {
+        if(!rhs->is_named_expression())
+        {
+            throw cg::codegen_error(loc, fmt::format("Could not find name for element access in array access expression."));
+        }
+        auto identifier_expr = rhs->as_named_expression();
+
         if(identifier_expr->get_name().s == "length")
         {
             if(mc == memory_context::store)
             {
-                throw cg::codegen_error(expr->get_location(), "Array length is read only.");
+                throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
             }
 
-            ctx.generate_load(std::make_unique<cg::variable_argument>(std::move(var)));
             ctx.generate_arraylength();
             return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
         else
         {
-            throw cg::codegen_error(expr->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
+            throw cg::codegen_error(rhs->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
         }
     }
 
-    // structs.
-    auto [struct_value, member] = generate_object_load(ctx);
-    if(mc != memory_context::store)
+    /*
+     * structs.
+     */
+    cg::type lhs_value_type = lhs_value->get_type();
+
+    // validate expression.
+    if(lhs_value_type.is_array())
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
-    }
-    else
-    {
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
+        throw cg::codegen_error(loc,
+                                fmt::format(
+                                  "Cannot load array '{}' as an object.",
+                                  lhs_value->get_name().value_or("<none>")));
     }
 
-    return std::make_unique<cg::value>(member);
+    if(!lhs_value_type.is_struct())
+    {
+        throw cg::codegen_error(loc,
+                                fmt::format(
+                                  "Cannot access members of non-struct type '{}'.",
+                                  lhs_value_type.to_string()));
+    }
+
+    // generate access instructions for rhs.
+    access_guard ag{ctx, lhs_value_type};
+    if(!rhs->is_named_expression())
+    {
+        return rhs->generate_code(ctx, mc);
+    }
+
+    cg::value member_value = ctx.get_struct_member(
+      rhs->get_location(),
+      lhs_value_type.to_string(),
+      rhs->as_named_expression()->get_name().s,
+      lhs_value_type.get_import_path());
+
+    if(mc != memory_context::store)
+    {
+        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(lhs_value_type, member_value));
+    }
+    // NOTE set_field instructions have to be generated by the caller
+
+    return std::make_unique<cg::value>(member_value);
 }
 
 std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
 {
-    type = ctx.get_identifier_type(name);
+    if(lhs->is_named_expression())
+    {
+        lhs_type = ctx.get_identifier_type(lhs->as_named_expression()->get_name());
+    }
+    else
+    {
+        auto t = lhs->type_check(ctx);
+        if(!t.has_value())
+        {
+            throw ty::type_error(loc, "Could not determine type of access expression.");
+        }
+        lhs_type = t.value();
+    }
 
     // array built-ins.
-    if(type.is_array())
+    if(lhs_type.is_array())
     {
-        const ty::struct_definition* array_struct = ctx.get_struct_definition(name.location, "@array");
+        const ty::struct_definition* array_struct = ctx.get_struct_definition(lhs_type.get_location(), "@array");
         ctx.push_struct_definition(array_struct);
-        expr_type = expr->type_check(ctx);
+        expr_type = rhs->type_check(ctx);
         ctx.pop_struct_definition();
         return expr_type;
     }
 
     // structs.
-    const ty::struct_definition* struct_def = ctx.get_struct_definition(name.location, ty::to_string(type), type.get_import_path());
+    const ty::struct_definition* struct_def = ctx.get_struct_definition(
+      lhs_type.get_location(), ty::to_string(lhs_type), lhs_type.get_import_path());
     ctx.push_struct_definition(struct_def);
-    expr_type = expr->type_check(ctx);
+    expr_type = rhs->type_check(ctx);
     ctx.pop_struct_definition();
     return expr_type;
 }
 
 std::string access_expression::to_string() const
 {
-    return fmt::format("Access(name={}, expr={})", name.s, expr ? expr->to_string() : std::string("<none>"));
-}
-
-std::pair<cg::value, cg::value> access_expression::generate_object_load(cg::context& ctx) const
-{
-    // validate expression.
-    if(!expr)
-    {
-        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
-    }
-    if(!expr->is_named_expression())
-    {
-        throw cg::codegen_error(loc, fmt::format("Could not find name for element access in access expression."));
-    }
-
-    // get lhs object value.
-    std::unique_ptr<cg::value> var = std::make_unique<cg::value>(get_value(ctx));
-    if(var->get_type().is_array())
-    {
-        throw cg::codegen_error(loc, fmt::format("Cannot load array '{}' as an object.", name.s));
-    }
-
-    // get rhs.
-    std::string expr_name = static_cast<named_expression*>(expr.get())->get_name().s;
-    cg::type ty = var->get_type();
-
-    cg::scope* s = ctx.get_global_scope();
-    auto& members = s->get_struct(ty.to_string(), ty.get_import_path());
-
-    auto it = std::find_if(members.begin(), members.end(),
-                           [&expr_name](const std::pair<std::string, cg::value>& v)
-                           {
-                               return v.first == expr_name;
-                           });
-    if(it == members.end())
-    {
-        throw cg::codegen_error(expr->get_location(), fmt::format("Struct '{}' does not contain a field with name '{}'.", var->get_type().to_string(), expr_name));
-    }
-
-    // check if we need to load the base object.
-    if(!ctx.is_struct_access())
-    {
-        ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
-            std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, var->get_type().to_string()}, name.s)));
-    }
-
-    // load the expression, if needed.
-    if(expr->is_struct_member_access())
-    {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(var->get_type(), it->second));
-
-        access_guard ag{ctx, var->get_type()};
-        return static_cast<access_expression*>(expr.get())->generate_object_load(ctx);
-    }
-
-    return std::make_pair(std::move(*var), it->second);
-}
-
-cg::value access_expression::get_value(cg::context& ctx) const
-{
-    if(!ctx.is_struct_access())
-    {
-        auto* scope = ctx.get_scope();
-        if(scope == nullptr)
-        {
-            throw cg::codegen_error(loc, fmt::format("No scope to search for '{}'.", name.s));
-        }
-
-        while(scope != nullptr)
-        {
-            cg::value* v = scope->get_value(name.s);
-            if(v != nullptr)
-            {
-                return *v;
-            }
-            scope = scope->get_outer();
-        }
-
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
-    }
-    else
-    {
-        auto s = ctx.get_accessed_struct();
-        auto& members = ctx.get_global_scope()->get_struct(s.get_struct_name().value(), s.get_import_path());
-        auto it = std::find_if(members.begin(), members.end(),
-                               [this](const std::pair<std::string, cg::value>& v)
-                               {
-                                   return v.first == get_name().s;
-                               });
-        if(it == members.end())
-        {
-            throw cg::codegen_error(expr->get_location(),
-                                    fmt::format("Struct '{}' does not contain a field with name '{}'.",
-                                                ctx.get_accessed_struct().get_struct_name().value(),
-                                                get_name().s));
-        }
-
-        return it->second;
-    }
+    return fmt::format("Access(lhs={}, rhs={})", lhs->to_string(), rhs->to_string());
 }
 
 /*
@@ -587,19 +559,23 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 {
     cg::value v = get_value(ctx);
 
-    // decay type for code generation.
-    if(mc == memory_context::none)
+    if(mc == memory_context::load)
     {
-        // load arrays for assignments.
-        if(element_expr)
+        if(ctx.is_struct_access())
+        {
+            auto struct_type = ctx.get_accessed_struct();
+            auto member_value = ctx.get_struct_member(
+              loc,
+              struct_type.to_string(),
+              *v.get_name(),
+              struct_type.get_import_path());
+
+            ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_type, member_value));
+        }
+        else
         {
             ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
-            element_expr->generate_code(ctx, memory_context::load);
         }
-    }
-    else if(mc == memory_context::load)
-    {
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
 
         if(element_expr)
         {
@@ -613,7 +589,8 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         {
             ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
             element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_store(std::make_unique<cg::type_argument>(v.deref()), true);
+
+            // if we're storing an element, generation of the store opcode needs to be deferred to the caller.
         }
         else
         {
@@ -622,7 +599,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     }
     else
     {
-        throw cg::codegen_error(loc, "Invalid memory context.");
+        throw cg::codegen_error(loc, "Invalid memory context for variable reference expression.");
     }
 
     if(element_expr)
@@ -687,22 +664,12 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
     }
     else
     {
-        auto s = ctx.get_accessed_struct();
-        auto& members = ctx.get_global_scope()->get_struct(s.get_struct_name().value(), s.get_import_path());
-        auto it = std::find_if(members.begin(), members.end(),
-                               [this](const std::pair<std::string, cg::value>& v)
-                               {
-                                   return v.first == get_name().s;
-                               });
-        if(it == members.end())
-        {
-            throw cg::codegen_error(loc,
-                                    fmt::format("Struct '{}' does not contain a field with name '{}'.",
-                                                ctx.get_accessed_struct().get_struct_name().value(),
-                                                get_name().s));
-        }
-
-        return it->second;
+        auto struct_type = ctx.get_accessed_struct();
+        return ctx.get_struct_member(
+          loc,
+          struct_type.get_struct_name().value(),
+          get_name().s,
+          struct_type.get_import_path());
     }
 }
 
@@ -1214,9 +1181,9 @@ std::string struct_named_initializer_expression::to_string() const
         {
             for(std::size_t i = 0; i < initializers.size() - 1; ++i)
             {
-                ret += fmt::format("{}={}, ", member_names[i]->to_string(), initializers[i]->to_string());
+                ret += fmt::format("name={}, expr={}, ", member_names[i]->to_string(), initializers[i]->to_string());
             }
-            ret += fmt::format("{}={}", member_names.back()->to_string(), initializers.back()->to_string());
+            ret += fmt::format("name={}, expr={}", member_names.back()->to_string(), initializers.back()->to_string());
         }
         ret += ")";
     }
@@ -1227,6 +1194,13 @@ std::string struct_named_initializer_expression::to_string() const
  * binary_expression.
  */
 
+/**
+ * Classify a binary operator. If the operator is a compound assignment, the given operator
+ * is reduced to its non-assignment form (and left unchanged otherwise).
+ *
+ * @param s The binary operator.
+ * @returns Returns a tuple `(is_assignment, is_compound, is_comparison, reduced_op)`.
+ */
 static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::string& s)
 {
     bool is_assignment = (s == "=" || s == "+=" || s == "-="
@@ -1244,6 +1218,26 @@ static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::s
     return {is_assignment, is_compound, is_comparison, reduced_op};
 }
 
+static const std::unordered_map<std::string, cg::binary_op> binary_op_map = {
+  {"*", cg::binary_op::op_mul},
+  {"/", cg::binary_op::op_div},
+  {"%", cg::binary_op::op_mod},
+  {"+", cg::binary_op::op_add},
+  {"-", cg::binary_op::op_sub},
+  {"<<", cg::binary_op::op_shl},
+  {">>", cg::binary_op::op_shr},
+  {"<", cg::binary_op::op_less},
+  {"<=", cg::binary_op::op_less_equal},
+  {">", cg::binary_op::op_greater},
+  {">=", cg::binary_op::op_greater_equal},
+  {"==", cg::binary_op::op_equal},
+  {"!=", cg::binary_op::op_not_equal},
+  {"&", cg::binary_op::op_and},
+  {"^", cg::binary_op::op_xor},
+  {"|", cg::binary_op::op_or},
+  {"&&", cg::binary_op::op_logical_and},
+  {"||", cg::binary_op::op_logical_or}};
+
 bool binary_expression::needs_pop() const
 {
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
@@ -1252,62 +1246,89 @@ bool binary_expression::needs_pop() const
 
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    bool is_access = (op.s == ".");
+    /*
+     * Code generation for binary expressions
+     * --------------------------------------
+     *
+     * We need to distinguish the following types:
+     * 1. Assignments
+     *    a. Assignments to variables
+     *    b. Assignments to array entries
+     *    c. Assignments to struct members
+     * 2. Non-assignments
+     *
+     * Further, an assignment can be a compound assignment, which is composed
+     * of a non-assignment binary expression and an assignment.
+     *
+     * Generated IR
+     * ------------
+     *
+     * 1. Compound assignment to variables
+     *
+     *    v := <l.h.s. load>
+     *    <r.h.s. load>
+     *    <binary-op>
+     *    <store into v>
+     *
+     * 2. Compound assignment to array entries
+     *
+     *    v := <l.h.s. load>
+     *    <r.h.s. load>
+     *    <binary-op>
+     *    <store-element into v>
+     *
+     * 3. Compound assignment to struct members
+     *
+     *    v := <l.h.s. object load>
+     *    <r.h.s. load>
+     *    <binary-op>
+     *    <set-field v>
+     *
+     * 4. Assignment to variables
+     *
+     *    <r.h.s. load>
+     *    <store into l.h.s.>
+     *
+     * 5. Assignment to array entries
+     *
+     *    <r.h.s load>
+     *    <store-element into v>
+     *
+     * 6. Assignment to struct members
+     *
+     *    v := <l.h.s. object load>
+     *    <r.h.s. load>
+     *    <set-field v>
+     *
+     * 7. Non-assigning binary operation
+     *
+     *    <l.h.s. load>
+     *    <r.h.s. load>
+     *    <binary-op>
+     */
 
+    std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
+
+    if(!is_assignment && mc == memory_context::store)
+    {
+        throw cg::codegen_error("Invalid memory context for assignment (value needs to be writable).");
+    }
+
+    /* Cases 2., 3., 5., 6. */
+    if((lhs->is_struct_member_access() || lhs->is_array_element_access())
+       && (is_assignment || is_compound))
+    {
+        // memory_context::store will only generate the object load.
+        // set_field is generated below.
+        lhs_store_value = lhs->generate_code(ctx, memory_context::store);
+    }
+
+    /* Cases 1., 2. (cont.), 3. (cont.), 7. */
     if(!is_assignment || is_compound)
     {
-        if(mc == memory_context::store)
-        {
-            throw cg::codegen_error(loc, "Invalid memory context for binary operator.");
-        }
-
-        auto lhs_value = lhs->generate_code(ctx, memory_context::load);
-
-        /*
-         * Check if we are accessing a struct. This can happen e.g. if the access happens
-         * after a cast. In this case, the expression is treated as a binary expression
-         * (as opposed to an access expression).
-         */
-        if(is_access)
-        {
-            if(!lhs_value->get_type().is_struct())
-            {
-                throw cg::codegen_error(loc,
-                                        fmt::format("Cannot access non-struct type '{}'.",
-                                                    lhs_value->get_type().to_string()));
-            }
-
-            if(!rhs->is_named_expression())
-            {
-                throw cg::codegen_error(loc,
-                                        fmt::format("Cannot use unnamed expression to access struct '{}'.",
-                                                    lhs_value->get_type().to_string()));
-            }
-            std::string expr_name = static_cast<named_expression*>(rhs.get())->get_name().s;
-
-            auto lhs_type = lhs_value->get_type();
-
-            cg::scope* s = ctx.get_global_scope();
-            auto& members = s->get_struct(lhs_type.to_string(), lhs_type.get_import_path());
-
-            auto it = std::find_if(members.begin(), members.end(),
-                                   [&expr_name](const std::pair<std::string, cg::value>& v)
-                                   {
-                                       return v.first == expr_name;
-                                   });
-            if(it == members.end())
-            {
-                throw cg::codegen_error(rhs->get_location(),
-                                        fmt::format("Struct '{}' does not contain a field with name '{}'.",
-                                                    lhs_type.to_string(), expr_name));
-            }
-
-            ctx.generate_get_field(std::make_unique<cg::field_access_argument>(lhs_type, it->second));
-            return std::make_unique<cg::value>(it->second);
-        }
-
-        auto rhs_value = rhs->generate_code(ctx, memory_context::load);
+        lhs_value = lhs->generate_code(ctx, memory_context::load);
+        rhs_value = rhs->generate_code(ctx, memory_context::load);
 
         if(lhs_value->get_type() != rhs_value->get_type()
            && !(is_comparison && lhs_value->get_type().is_reference() && rhs_value->get_type().is_null()))
@@ -1318,101 +1339,87 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                                                 rhs_value->get_type().to_string()));
         }
 
-        static const std::unordered_map<std::string, cg::binary_op> op_map = {
-          {"*", cg::binary_op::op_mul},
-          {"/", cg::binary_op::op_div},
-          {"%", cg::binary_op::op_mod},
-          {"+", cg::binary_op::op_add},
-          {"-", cg::binary_op::op_sub},
-          {"<<", cg::binary_op::op_shl},
-          {">>", cg::binary_op::op_shr},
-          {"<", cg::binary_op::op_less},
-          {"<=", cg::binary_op::op_less_equal},
-          {">", cg::binary_op::op_greater},
-          {">=", cg::binary_op::op_greater_equal},
-          {"==", cg::binary_op::op_equal},
-          {"!=", cg::binary_op::op_not_equal},
-          {"&", cg::binary_op::op_and},
-          {"^", cg::binary_op::op_xor},
-          {"|", cg::binary_op::op_or},
-          {"&&", cg::binary_op::op_logical_and},
-          {"||", cg::binary_op::op_logical_or}};
-
-        auto it = op_map.find(reduced_op);
-        if(it != op_map.end())
-        {
-            ctx.generate_binary_op(it->second, *lhs_value);
-
-            if(is_compound)
-            {
-                lhs_value = lhs->generate_code(ctx, memory_context::store);
-
-                if(mc == memory_context::load)
-                {
-                    lhs_value = lhs->generate_code(ctx, memory_context::load);
-                }
-            }
-
-            if(is_comparison)
-            {
-                return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
-            }
-            else
-            {
-                return lhs_value;
-            }
-        }
-        else
+        auto it = binary_op_map.find(reduced_op);
+        if(it == binary_op_map.end())
         {
             throw std::runtime_error(fmt::format("{}: Code generation for binary operator '{}' not implemented.", slang::to_string(loc), op.s));
         }
-    }
 
-    if(is_assignment)
-    {
-        if(mc == memory_context::store)
+        ctx.generate_binary_op(it->second, *lhs_value);
+
+        /* Case 7. */
+        if(is_comparison)
         {
-            throw cg::codegen_error(loc, "Invalid memory context for assignment.");
+            // comparisons are non-compound, so this must be a non-assignment operation.
+            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
-
-        if(lhs->is_struct_member_access())
+        else if(!is_assignment)
         {
-            // by the above check, lhs is an access_expression.
-            access_expression* ae_lhs = static_cast<access_expression*>(lhs.get());
-
-            auto [struct_value, member] = ae_lhs->generate_object_load(ctx);
-            auto rhs_value = rhs->generate_code(ctx, memory_context::load);
-
-            // we might need to duplicate the value for chained assignments.
-            if(mc == memory_context::load)
-            {
-                ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
-            }
-
-            ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_value.get_type(), member));
-            return rhs_value;
-        }
-        else
-        {
-            auto lhs_value = lhs->generate_code(ctx, memory_context::none);
-            auto rhs_value = rhs->generate_code(ctx, memory_context::load);
-
-            // we might need to duplicate the value for chained assignments.
-            if(mc == memory_context::load)
-            {
-                ctx.generate_dup(*rhs_value);
-            }
-
-            ctx.generate_store(
-              std::make_unique<cg::variable_argument>(
-                std::make_unique<cg::value>(*lhs_value)),
-              lhs->is_array_element_access());
-
+            // non-assignment operation.
             return lhs_value;
         }
     }
 
-    throw std::runtime_error(fmt::format("{}: binary_expression::generate_code not implemented for '{}'.", slang::to_string(loc), op.s));
+    /*
+     * assignments: Cases 1.-3. (cont.), 4., 5.-6. (cont.)
+     */
+
+    /* Cases 4.-5. (cont.) */
+    if(!rhs_value)
+    {
+        rhs_value = rhs->generate_code(ctx, memory_context::load);
+    }
+
+    /* Cases 3. (cont.), 6. (cont.) */
+    if(lhs->is_struct_member_access())
+    {
+        // duplicate the value for chained assignments.
+        if(mc == memory_context::load)
+        {
+            ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
+        }
+
+        // by the above check, lhs is an access_expression.
+        access_expression* ae_lhs = lhs->as_access_expression();
+        ty::type_info struct_type_info = ae_lhs->get_struct_type();
+        cg::type struct_type{
+          cg::type_class::struct_,
+          0,
+          struct_type_info.to_string(),
+          struct_type_info.get_import_path()};    // FIXME get as cg::type directly?
+
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, *lhs_store_value));
+        return rhs_value;
+    }
+    /* Cases 2. (cont.), 5. (cont.) */
+    else if(lhs->is_array_element_access())
+    {
+        // duplicate the value for chained assignments.
+        if(mc == memory_context::load)
+        {
+            ctx.generate_dup(*rhs_value,
+                             {cg::value{cg::type{cg::type_class::i32, 0}},
+                              cg::value{cg::type{cg::type_class::addr, 0}}});
+        }
+
+        ctx.generate_store(
+          std::make_unique<cg::variable_argument>(
+            std::make_unique<cg::value>(*rhs_value)),
+          true);
+
+        return rhs_value;
+    }
+    /* Case 1. (cont.), 4. (cont.) */
+    else
+    {
+        // we might need to duplicate the value for chained assignments.
+        if(mc == memory_context::load)
+        {
+            ctx.generate_dup(*rhs_value);
+        }
+
+        return lhs->generate_code(ctx, memory_context::store);
+    }
 }
 
 std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
