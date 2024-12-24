@@ -23,7 +23,13 @@ _tests = [
     "test_interpreter",
 ]
 
-_script_tests = ["test_array", "test_conversions", "test_strings", "test_structs"]
+_script_tests = [
+    "test_array",
+    "test_cast",
+    "test_conversions",
+    "test_strings",
+    "test_structs",
+]
 
 _lang_path = (_module_path / Path("..") / Path("lang")).absolute()
 _lang_std_module_path = (_lang_path / Path("std.cmod")).absolute()

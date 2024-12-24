@@ -528,6 +528,52 @@ TEST(compile_ir, arrays)
                   "}");
     }
     {
+        // test: chained element assignment
+        const std::string test_input =
+          "fn f() -> i32\n"
+          "{\n"
+          " let b: [i32];\n"
+          " b = new i32[2];\n"
+          " b[0] = b[1] = 2;\n"
+          " return b[0];\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::block> ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f() {\n"
+                  "local [i32] %b\n"
+                  "entry:\n"
+                  " const i32 2\n"
+                  " newarray i32\n"
+                  " store [i32] %b\n"
+                  " load [i32] %b\n"          // array_ref
+                  " const i32 0\n"            // index
+                  " load [i32] %b\n"          // array_ref
+                  " const i32 1\n"            // index
+                  " const i32 2\n"            // value
+                  " dup i32, i32, @addr\n"    // duplicate i32 value and store it (i32, @addr) down the stack
+                  " store_element i32\n"
+                  " store_element i32\n"
+                  " load [i32] %b\n"
+                  " const i32 0\n"
+                  " load_element i32\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
         // test: invalid new operator syntax
         const std::string test_input =
           "fn f() -> i32\n"
@@ -999,8 +1045,8 @@ TEST(compile_ir, compound_assignments)
                   " load i32 %j\n"
                   " const i32 1\n"
                   " add i32\n"
+                  " dup i32\n"
                   " store i32 %j\n"
-                  " load i32 %j\n"
                   " add i32\n"
                   " store i32 %i\n"
                   " load i32 %i\n"

@@ -198,6 +198,9 @@ protected:
     /** Parse identifier expression. */
     std::unique_ptr<ast::expression> parse_identifier_expression();
 
+    /** Parse a member access expression. */
+    std::unique_ptr<ast::expression> parse_access_expression(std::unique_ptr<ast::expression> lhs);
+
     /** Parse literal expression. */
     std::unique_ptr<ast::literal_expression> parse_literal_expression();
 

@@ -135,11 +135,39 @@ public:
         return false;
     }
 
+    /**
+     * Get the expression as a struct member access expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
+     */
+    virtual class access_expression* as_access_expression();
+
+    /**
+     * Get the expression as a struct member access expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
+     */
+    virtual const class access_expression* as_access_expression() const;
+
     /** Whether this expression is a `named_expression`. */
     virtual bool is_named_expression() const
     {
         return false;
     }
+
+    /**
+     * Get the expression as a named expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a named expression.
+     */
+    virtual class named_expression* as_named_expression();
+
+    /**
+     * Get the expression as a named expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a named expression.
+     */
+    virtual const class named_expression* as_named_expression() const;
 
     /**
      * Generate IR.
@@ -162,7 +190,7 @@ public:
     /**
      * Push a directive to the expression's directive stack (during code generation).
      *
-     * @throws A type_error if the directive is not supported by the expression.
+     * @throws A `type_error` if the directive is not supported by the expression.
      *
      * @param name The directive's name.
      * @param args The directive's arguments.
@@ -172,7 +200,7 @@ public:
     /**
      * Pop the last directive from the expression's directive stack.
      *
-     * @throws A type_error if the stack was empty.
+     * @throws A `type_error` if the stack was empty.
      */
     void pop_directive();
 
@@ -225,7 +253,7 @@ public:
     /**
      * Type checking.
      *
-     * @throws A type_error if a type error was found.
+     * @throws A `type_error` if a type error was found.
      *
      * @param ctx Type system context.
      * @returns The expression's type or std::nullopt.
@@ -279,6 +307,16 @@ public:
     bool is_named_expression() const override
     {
         return true;
+    }
+
+    named_expression* as_named_expression() override
+    {
+        return this;
+    }
+
+    const named_expression* as_named_expression() const override
+    {
+        return this;
     }
 
     /** Get the name. */
@@ -433,9 +471,34 @@ public:
     {
     }
 
+    bool is_struct_member_access() const override
+    {
+        return expr->is_struct_member_access();
+    }
+
+    access_expression* as_access_expression() override
+    {
+        return expr->as_access_expression();
+    }
+
+    const access_expression* as_access_expression() const override
+    {
+        return expr->as_access_expression();
+    }
+
     bool is_named_expression() const override
     {
         return expr->is_named_expression();
+    }
+
+    named_expression* as_named_expression() override
+    {
+        return expr->as_named_expression();
+    }
+
+    const named_expression* as_named_expression() const override
+    {
+        return expr->as_named_expression();
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -486,13 +549,16 @@ public:
 };
 
 /** Access expression. */
-class access_expression : public named_expression
+class access_expression : public expression
 {
-    /** The resolved expression. */
-    std::unique_ptr<expression> expr;
+    /** Left-hand side of the access axpression. */
+    std::unique_ptr<expression> lhs;
 
-    /** Identifyer type. Set either explicitly during construction, or implicitly during type checking. */
-    ty::type_info type;
+    /** Right-hand side of the access expression. */
+    std::unique_ptr<expression> rhs;
+
+    /** Struct type of the l.h.s. Set during type checking. */
+    ty::type_info lhs_type;
 
 public:
     /** No default constructor. */
@@ -512,18 +578,24 @@ public:
     /**
      * Construct an access expression.
      *
-     * @param identifier The identifier.
-     * @param expr An identifier expression.
+     * @param lhs Left-hand side of the access expression.
+     * @param rhs Right-hand side of the access expression.
      */
-    access_expression(token identifier, std::unique_ptr<expression> expr)
-    : named_expression{identifier.location, std::move(identifier)}
-    , expr{std::move(expr)}
-    {
-    }
+    access_expression(std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs);
 
     bool is_struct_member_access() const override
     {
         return true;
+    }
+
+    virtual access_expression* as_access_expression() override
+    {
+        return this;
+    }
+
+    virtual const access_expression* as_access_expression() const override
+    {
+        return this;
     }
 
     /**
@@ -538,16 +610,11 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
-    /**
-     * Generate IR to load the associated object onto the stack (without loading the field).
-     *
-     * @param ctx The context to use for code generation.
-     * @returns A pair of the loaded `(struct_value, value)`.
-     */
-    std::pair<cg::value, cg::value> generate_object_load(cg::context& ctx) const;
-
-    /** Get the value of the object. */
-    cg::value get_value(cg::context& ctx) const;
+    /** Return the accessed struct's type info. */
+    ty::type_info get_struct_type() const
+    {
+        return lhs_type;
+    }
 };
 
 /** Import statements. */

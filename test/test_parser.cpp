@@ -511,7 +511,7 @@ TEST(parser, operators)
         EXPECT_TRUE(lexer.eof());
 
         // clang-format off
-        std::string expected =
+        const std::string expected =
           "Block("
             "exprs=("
               "VariableDeclaration("
@@ -840,7 +840,7 @@ TEST(parser, variable_declaration)
         ASSERT_NO_THROW(parser.parse(lexer));
 
         // clang-format off
-        std::string expected =
+        const std::string expected =
           "Block("
             "exprs=("
               "Function("
@@ -928,7 +928,7 @@ TEST(parser, explicit_cast)
     ASSERT_NO_THROW(parser.parse(lexer));
 
     // clang-format off
-    std::string expected =
+    const std::string expected =
       "Block("
         "exprs=("
           "VariableDeclaration("
@@ -1083,9 +1083,35 @@ TEST(parser, struct_member_access)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(lexer));
 
         EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        const std::string expected =
+          "Block("
+            "exprs=("
+              "VariableDeclaration("
+                "name=s1, "
+                "type=TypeExpression("
+                  "name=i32, "
+                  "namespaces=(), "
+                  "array=false"
+                "), "
+                "expr=Access("
+                  "lhs=VariableReference("
+                    "name=s"
+                  "), "
+                  "rhs=VariableReference("
+                    "name=a"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
     }
     {
         const std::string test_input =
@@ -1108,6 +1134,71 @@ TEST(parser, struct_member_access)
 
         lexer.set_input(test_input);
         EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+}
+
+TEST(parser, struct_cast)
+{
+    {
+        const std::string test_input =
+          "fn test() -> void\n"
+          "{\n"
+          "    (s as S).v = 12;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        const std::string expected =
+          "Block("
+            "exprs=("
+              "Function("
+                "prototype=Prototype("
+                  "name=test, "
+                  "return_type=TypeExpression("
+                    "name=void, "
+                    "namespaces=(), "
+                    "array=false"
+                  "), "
+                  "args=()"
+                "), "
+                "body=Block("
+                  "exprs=("
+                    "Binary("
+                      "op=\"=\", "
+                      "lhs=Access("
+                        "lhs=TypeCast("
+                          "target_type=TypeExpression("
+                            "name=S, "
+                            "namespaces=(), "
+                            "array=false"
+                          "), "
+                          "expr=VariableReference("
+                            "name=s"
+                          ")"
+                        "), "
+                        "rhs=VariableReference("
+                          "name=v"
+                        ")"
+                      "), "
+                      "rhs=IntLiteral("
+                        "value=12"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
     }
 }
 
