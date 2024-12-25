@@ -559,6 +559,11 @@ void exec::invoke(const std::vector<std::string>& args)
 
     ctx.load_module(module_name, mod);
 
+    if(disassemble)
+    {
+        return;
+    }
+
     si::value res = ctx.invoke(
       module_name,
       "main",

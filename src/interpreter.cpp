@@ -1041,6 +1041,11 @@ void context::decode_structs(
   std::unordered_map<std::string, module_::struct_descriptor>& struct_map,
   const module_::language_module& mod)
 {
+    if(print_disassembly)
+    {
+        fmt::print("--- Exported types ---\n");
+    }
+
     for(auto& [name, desc]: struct_map)
     {
         if(print_disassembly)
@@ -1185,7 +1190,12 @@ std::unique_ptr<module_::language_module> context::decode(
 
         if(module_map.find(import_name) == module_map.end())
         {
+            // disable disassembly printing for imported modules.
+            bool print_disassembly_state = print_disassembly;
+            print_disassembly = false;
             load_module(import_name, import_mod);
+            print_disassembly = print_disassembly_state;
+
             header.imports[it.package_index].export_reference = module_map[import_name].get();
         }
 
@@ -1259,6 +1269,11 @@ std::unique_ptr<module_::language_module> context::decode(
     /*
      * instructions.
      */
+    if(print_disassembly)
+    {
+        fmt::print("--- Disassembly ---\n");
+    }
+
     std::vector<std::byte> code;
     for(auto& it: decoded_module->header.exports)
     {
@@ -2540,6 +2555,15 @@ void context::load_module(const std::string& name, const module_::language_modul
         throw interpreter_error(fmt::format("Module '{}' already loaded.", name));
     }
 
+    if(print_disassembly)
+    {
+        fmt::print("--- String table ---\n");
+        for(std::size_t i = 0; i < mod.get_header().strings.size(); ++i)
+        {
+            fmt::print("{}: {}\n", i, mod.get_header().strings[i]);
+        }
+    }
+
     // populate type map before decoding the module.
     std::unordered_map<std::string, module_::struct_descriptor> tmap;
     for(auto& it: mod.header.exports)
@@ -2565,6 +2589,11 @@ void context::load_module(const std::string& name, const module_::language_modul
     module_::module_header& decoded_header = module_map[name]->header;
 
     // populate function map.
+    if(print_disassembly)
+    {
+        fmt::print("--- Exported functions ---\n");
+    }
+
     std::unordered_map<std::string, function> fmap;
     for(auto& it: decoded_header.exports)
     {
@@ -2596,11 +2625,49 @@ void context::load_module(const std::string& name, const module_::language_modul
             }
 
             fmap.insert({it.name, function{desc.signature, func_it->second}});
+
+            if(print_disassembly)
+            {
+                fmt::print("declare {}{} @{}(",
+                           std::get<0>(desc.signature.return_type).base_type(),
+                           std::get<1>(desc.signature.return_type)
+                             ? "[]"
+                             : "",
+                           it.name);
+                for(std::size_t i = 0; i < desc.signature.arg_types.size(); ++i)
+                {
+                    auto& arg = desc.signature.arg_types[i];
+                    fmt::print("{}{}{}",
+                               std::get<0>(arg).base_type(),
+                               std::get<1>(arg) ? "[]" : "",
+                               i != desc.signature.arg_types.size() - 1 ? ", " : "");
+                }
+                fmt::print(") [native, library={}]\n", details.library_name);
+            }
         }
         else
         {
             auto& details = std::get<module_::function_details>(desc.details);
             fmap.insert({it.name, function{desc.signature, details.offset, details.size, details.locals, details.locals_size, details.stack_size}});
+
+            if(print_disassembly)
+            {
+                fmt::print("declare {}{} @{}(",
+                           std::get<0>(desc.signature.return_type).base_type(),
+                           std::get<1>(desc.signature.return_type)
+                             ? "[]"
+                             : "",
+                           it.name);
+                for(std::size_t i = 0; i < desc.signature.arg_types.size(); ++i)
+                {
+                    auto& arg = desc.signature.arg_types[i];
+                    fmt::print("{}{}{}",
+                               std::get<0>(arg).base_type(),
+                               std::get<1>(arg) ? "[]" : "",
+                               i != desc.signature.arg_types.size() - 1 ? ", " : "");
+                }
+                fmt::print(") @ {}\n", details.offset);
+            }
         }
     }
     function_map.insert({name, std::move(fmap)});
