@@ -89,6 +89,10 @@ jobs:
       run: |
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_array
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_array
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_cast
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_cast
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_cast_fail
+        ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_cast_fail
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_strings
