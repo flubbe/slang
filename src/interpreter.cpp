@@ -2562,6 +2562,21 @@ void context::load_module(const std::string& name, const module_::language_modul
         {
             fmt::print("{}: {}\n", i, mod.get_header().strings[i]);
         }
+
+        fmt::print("--- Import table ---\n");
+        for(std::size_t i = 0; i < mod.get_header().imports.size(); ++i)
+        {
+            auto& imp = mod.get_header().imports[i];
+            fmt::print("{}: {}, {}",
+                       i,
+                       to_string(imp.type),
+                       imp.name);
+            if(imp.package_index != static_cast<std::uint32_t>(-1))
+            {
+                fmt::print(", {}", imp.package_index);
+            }
+            fmt::print("\n");
+        }
     }
 
     // populate type map before decoding the module.
