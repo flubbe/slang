@@ -333,7 +333,6 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
 std::size_t garbage_collector::register_type_layout(std::string name, std::vector<std::size_t> layout)
 {
     // check if the layout already exists
-    // TODO report an error in this case.
     auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
                            [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
                            {
@@ -341,6 +340,12 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
                            });
     if(it != type_layouts.end())
     {
+        // compare layouts.
+        if(layout != it->second.second)
+        {
+            throw gc_error(fmt::format("A different type layout for '{}' was already registered.", name));
+        }
+
         return it->first;
     }
 

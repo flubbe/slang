@@ -439,11 +439,13 @@ public:
     gc_object_type get_object_type(void* obj) const;
 
     /**
-     * Register a new type layout.
+     * Register a type layout. If the layout name is already registered, the incoming
+     * and existing layouts are compared.
      *
      * @param name Name of the type.
      * @param layout The type layout, given as a list of offsets of pointers.
      * @returns Returns a layout identifier.
+     * @throws Throws a `gc_error´ if the layout already exists and does not match the incoming description.
      */
     std::size_t register_type_layout(std::string name, std::vector<std::size_t> layout);
 
