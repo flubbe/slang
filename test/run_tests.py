@@ -8,7 +8,7 @@ _module_path = Path(__file__).parent
 _test_dir = (
     _module_path / Path("..") / Path("build") / Path("Debug") / Path("test")
 ).absolute()
-_tests = [
+_tests: list[str] = [
     "test_vector",
     "test_package",
     "test_lexer",
@@ -22,14 +22,18 @@ _tests = [
     "test_resolve",
     "test_interpreter",
 ]
+_expect_failure: list[str] = []
 
-_script_tests = [
+_script_tests: list[str] = [
     "test_array",
     "test_cast",
+    "test_cast_fail",
     "test_conversions",
     "test_strings",
     "test_structs",
 ]
+_script_expect_failure: list[str] = ["test_cast_fail"]
+
 
 _lang_path = (_module_path / Path("..") / Path("lang")).absolute()
 _lang_std_module_path = (_lang_path / Path("std.cmod")).absolute()
@@ -57,7 +61,11 @@ if __name__ == "__main__":
     # Run C++ tests.
     retcodes: list[int] = []
     for t in _tests:
-        retcodes.append(subprocess.call(_test_dir / t, cwd=_module_path.parent))
+        result = subprocess.call(_test_dir / t, cwd=_module_path.parent)
+        if t not in _expect_failure:
+            retcodes.append(result)
+        else:
+            retcodes.append(result == 0)
 
     failed_tests = [(i, r) for i, r in enumerate(retcodes) if r != 0]
     if len(failed_tests) > 0:
@@ -127,14 +135,20 @@ if __name__ == "__main__":
             stderr=subprocess.PIPE,
         )
         p.wait(timeout=5)
+
+        result = (
+            p.returncode
+            if test_name not in _script_expect_failure
+            else p.returncode == 0
+        )
         script_info.append(
             (
-                p.returncode,
+                result,
                 cast(BytesIO, p.stdout).read().decode(),
                 cast(BytesIO, p.stderr).read().decode(),
             )
         )
-        if p.returncode == 0:
+        if result == 0:
             print(f"\r[  OK  ]")
         else:
             print(f"\r[FAILED]")

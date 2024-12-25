@@ -451,19 +451,12 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
 
 std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
 {
-    if(lhs->is_named_expression())
+    auto t = lhs->type_check(ctx);
+    if(!t.has_value())
     {
-        lhs_type = ctx.get_identifier_type(lhs->as_named_expression()->get_name());
+        throw ty::type_error(loc, "Could not determine type of access expression.");
     }
-    else
-    {
-        auto t = lhs->type_check(ctx);
-        if(!t.has_value())
-        {
-            throw ty::type_error(loc, "Could not determine type of access expression.");
-        }
-        lhs_type = t.value();
-    }
+    lhs_type = t.value();
 
     // array built-ins.
     if(lhs_type.is_array())
