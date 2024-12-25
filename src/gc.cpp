@@ -332,6 +332,18 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
 
 std::size_t garbage_collector::register_type_layout(std::string name, std::vector<std::size_t> layout)
 {
+    // check if the layout already exists
+    // TODO report an error in this case.
+    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
+                           [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
+                           {
+                               return t.second.first == name;
+                           });
+    if(it != type_layouts.end())
+    {
+        return it->first;
+    }
+
     // find the first free identifier.
     std::size_t id = 0;
     for(; id < type_layouts.size(); ++id)
@@ -340,10 +352,6 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
         {
             break;
         }
-    }
-    if(type_layouts.find(id) != type_layouts.end())
-    {
-        id += 1;
     }
 
     type_layouts.insert({id, std::make_pair(std::move(name), std::move(layout))});
@@ -363,6 +371,38 @@ std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
     }
 
     return it->first;
+}
+
+std::size_t garbage_collector::get_type_layout_id(void* obj) const
+{
+    auto obj_it = objects.find(obj);
+    if(obj_it == objects.end())
+    {
+        throw gc_error(fmt::format("Reference at {} does not exist in the GC object list.", obj));
+    }
+
+    for(const auto& it: type_layouts)
+    {
+        if(&it.second.second == obj_it->second.layout)
+        {
+            return it.first;
+        }
+    }
+
+    throw gc_error(fmt::format("No type layout for type '{}' registered.", obj));
+}
+
+std::string garbage_collector::layout_to_string(std::size_t layout_id) const
+{
+    for(const auto& it: type_layouts)
+    {
+        if(it.first == layout_id)
+        {
+            return it.second.first;
+        }
+    }
+
+    throw gc_error(fmt::format("No type layout for id {} registered.", layout_id));
 }
 
 }    // namespace slang::gc

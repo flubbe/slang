@@ -190,7 +190,10 @@ void language_module::add_native_function(std::string name,
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
-void language_module::add_struct(std::string name, std::vector<std::pair<std::string, field_descriptor>> members)
+void language_module::add_struct(
+  std::string name,
+  std::vector<std::pair<std::string, field_descriptor>> members,
+  uint8_t flags)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
@@ -202,7 +205,7 @@ void language_module::add_struct(std::string name, std::vector<std::pair<std::st
         throw module_error(fmt::format("Cannot add type: '{}' already defined.", name));
     }
 
-    struct_descriptor desc{std::move(members)};
+    struct_descriptor desc{flags, std::move(members)};
     header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 

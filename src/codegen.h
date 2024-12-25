@@ -1126,6 +1126,9 @@ class struct_
     /** The type's members as pairs `(name, type)`. */
     std::vector<std::pair<std::string, value>> members;
 
+    /** Flags. */
+    std::uint8_t flags = 0;
+
     /** The module path for imported types and `std::nullopt` for types within the current module. */
     std::optional<std::string> import_path;
 
@@ -1147,13 +1150,16 @@ public:
      *
      * @param name The type's name.
      * @param members The type's members.
+     * @param flags THe type's flags.
      * @param import_path The import path of the module for imported types.
      */
     struct_(std::string name,
             std::vector<std::pair<std::string, value>> members,
+            std::uint8_t flags = 0,
             std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
+    , flags{flags}
     , import_path{std::move(import_path)}
     {
     }
@@ -1168,6 +1174,12 @@ public:
     const std::vector<std::pair<std::string, value>>& get_members() const
     {
         return members;
+    }
+
+    /** Get the type's flags. */
+    std::uint8_t get_flags() const
+    {
+        return flags;
     }
 
     /** Return whether this is an imported type. */
@@ -1303,10 +1315,12 @@ public:
      * @param name The struct's name.
      * @param members The struct's members.
      * @param import_path Optional import path.
+     * @param flags The struct's flags.
      * @throws Throws a `codegen_error` if the name is already registered as a type in this scope.
      */
     void add_struct(std::string name,
                     std::vector<std::pair<std::string, value>> members,
+                    std::uint8_t flags,
                     std::optional<std::string> import_path = std::nullopt);
 
     /** Get the arguments for this scope. */
@@ -1840,11 +1854,13 @@ public:
      *
      * @param name The struct's name.
      * @param members The struct's members as pairs `(name, type)`.
+     * @param flags Struct flags.
      * @param import_path An optional import path for the struct.
      * @returns A representation of the created struct.
      */
     struct_* add_struct(std::string name,
                         std::vector<std::pair<std::string, value>> members,
+                        std::uint8_t flags = 0,
                         std::optional<std::string> import_path = std::nullopt);
 
     /**
@@ -2217,6 +2233,16 @@ public:
      * @param tc The type cast to do.
      */
     void generate_cast(type_cast tc);
+
+    /**
+     * Generate a `checkcast` instruction for type cast validation.
+     *
+     * Reads an address off the stack, validates that it is of a given type, and writes it back to the stack.
+     * If the check fails, an `interpreter_error` is thrown`.
+     *
+     * @param tc The type to check for.
+     */
+    void generate_checkcast(type target_type);
 
     /**
      * Generate a compare instruction.

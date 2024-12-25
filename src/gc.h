@@ -456,6 +456,24 @@ public:
      */
     std::size_t get_type_layout_id(const std::string& name) const;
 
+    /**
+     * Get the layout id for an object.
+     *
+     * @param obj The object's address.
+     * @returns Returns the layout identifier.
+     * @throws Throws a ´gc_error` if the name was not found.
+     */
+    std::size_t get_type_layout_id(void* obj) const;
+
+    /**
+     * Get the name of a type layout.
+     *
+     * @param layout_id The layout id.
+     * @returns Returns the name of the type layout.
+     * @throws Throws a `gc_error` if the layout id was not found.
+     */
+    std::string layout_to_string(std::size_t layout_id) const;
+
     /** Get allocated object count. */
     std::size_t object_count() const
     {

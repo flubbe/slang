@@ -14,6 +14,7 @@
 
 #include "ast.h"
 #include "codegen.h"
+#include "module.h"
 #include "typing.h"
 #include "utils.h"
 
@@ -236,33 +237,28 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
                 return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}, v->get_name());
             }
 
-            // TODO casts between non-builtin types are checked at run-time.
-            return std::make_unique<cg::value>(cg::type{
-                                                 cg::type_class::struct_,
-                                                 0,
-                                                 target_type->get_name().s,
-                                                 target_type->get_namespace_path()},
-                                               v->get_name());
+            auto cast_target_type = cg::type{
+              cg::type_class::struct_,
+              0,
+              target_type->get_name().s,
+              target_type->get_namespace_path()};
+
+            // casts between non-builtin types are checked at run-time.
+            ctx.generate_checkcast(cast_target_type);
+
+            return std::make_unique<cg::value>(std::move(cast_target_type), v->get_name());
         }
 
         return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
     }
-    else
+
+    // identity transformation.
+    if(ty::is_builtin_type(target_type->to_string()))
     {
-        // identity transformation.
-        if(ty::is_builtin_type(target_type->to_string()))
-        {
-            return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
-        }
-        else
-        {
-            return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s}, v->get_name());
-        }
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
     }
 
-    throw cg::codegen_error(loc,
-                            fmt::format("Invalid type cast from '{}' to non-builtin type '{}'.",
-                                        v->get_type().to_string(), target_type->get_name().s));
+    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s}, v->get_name());
 }
 
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
@@ -940,6 +936,8 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
         }
     }
 
+    std::uint8_t flags = static_cast<std::uint8_t>(module_::struct_flags::none);
+
     auto directives = get_directives("allow_cast");
     if(directives.size() == 1)
     {
@@ -951,14 +949,16 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
                 "Types marked with 'allow_cast' cannot have members. Found {} member{} in type '{}'.",
                 struct_members.size(), struct_members.size() > 1 ? "s" : "", name.s));
         }
+
+        flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
     }
     else if(directives.size() > 1)
     {
         throw cg::codegen_error(loc, "More than one 'allow_cast' directive.");
     }
 
-    s->add_struct(name.s, struct_members);    // FIXME do we need this?
-    ctx.add_struct(name.s, std::move(struct_members));
+    s->add_struct(name.s, struct_members, flags);    // FIXME do we need this?
+    ctx.add_struct(name.s, std::move(struct_members), flags);
 
     return nullptr;
 }

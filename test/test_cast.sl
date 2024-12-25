@@ -7,6 +7,9 @@ fn main(args: [str]) -> i32 {
     };
 
     (r.value as std::i32s).value = 321;
+    
+    std::assert(r.ok == 1, "ok != 1");
+    std::assert((r.value as std::i32s).value == 321, "value != 321");
 
     return 0;
 }

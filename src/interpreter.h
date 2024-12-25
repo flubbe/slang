@@ -868,6 +868,9 @@ struct stack_frame
 /** Type properties. */
 struct type_properties
 {
+    /** Type flags. */
+    std::size_t flags{0};
+
     /** Type size. */
     std::size_t size{0};
 
