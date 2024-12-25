@@ -55,6 +55,7 @@ std::string to_string(opcode op)
     case opcode::new_: return "new";
     case opcode::newarray: return "newarray";
     case opcode::arraylength: return "arraylength";
+    case opcode::checkcast: return "checkcast";
     case opcode::ret: return "ret";
     case opcode::iret: return "iret";
     case opcode::fret: return "fret";

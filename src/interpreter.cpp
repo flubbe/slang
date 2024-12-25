@@ -214,19 +214,19 @@ type_properties context::get_type_properties(
     if(type.is_array())
     {
         // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
-        return {sizeof(void*), std::size_t(std::alignment_of_v<void*>), 0};
+        return {0, sizeof(void*), std::size_t(std::alignment_of_v<void*>), 0};
     }
 
     // built-in types.
     if(type.base_type() == "void")
     {
-        return {0, 0, 0};
+        return {0, 0, 0, 0};
     }
 
     auto built_in_it = type_properties_map.find(type.base_type());
     if(built_in_it != type_properties_map.end())
     {
-        return {built_in_it->second.first, built_in_it->second.second, 0};
+        return {0, built_in_it->second.first, built_in_it->second.second, 0};
     }
 
     // structs.
@@ -236,7 +236,7 @@ type_properties context::get_type_properties(
         throw interpreter_error(fmt::format("Cannot resolve size for type '{}': Type not found.", type.base_type()));
     }
 
-    return {type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
+    return {type_it->second.flags, type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
 }
 
 field_properties context::get_field_properties(
@@ -918,6 +918,100 @@ std::int32_t context::decode_instruction(
         {
             return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
         }
+    }
+    /* checkcast */
+    case opcode::checkcast:
+    {
+        vle_int struct_index;
+        ar & struct_index;
+
+        if(struct_index.i < 0)
+        {
+            // imported type.
+            std::size_t import_index = -struct_index.i - 1;
+            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Import index {} out of range ({} >= {}).",
+                  import_index, import_index, mod.header.imports.size()));
+            }
+
+            auto& imp_symbol = mod.header.imports[import_index];
+            if(imp_symbol.type != module_::symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Import header entry at index {} is not a type.",
+                  import_index));
+            }
+
+            if(imp_symbol.package_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Package import index {} out of range ({} >= {}).",
+                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+            }
+
+            auto& imp_package = mod.header.imports[imp_symbol.package_index];
+            if(imp_package.type != module_::symbol_type::package)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve package: Import header entry at index {} is not a package.",
+                  imp_symbol.package_index));
+            }
+
+            auto mod_it = module_map.find(imp_package.name);
+            if(mod_it == module_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Referenced module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            auto struct_map_it = this->struct_map.find(imp_package.name);
+            if(struct_map_it == this->struct_map.end())
+            {
+                throw interpreter_error(fmt::format(
+                  "Type map for module '{}' not loaded.",
+                  imp_package.name));
+            }
+
+            if(print_disassembly)
+            {
+                fmt::print("{}\n", imp_symbol.name);
+            }
+
+            auto properties = get_type_properties(struct_map_it->second, imp_symbol.name);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.flags), reinterpret_cast<std::byte*>(&properties.flags) + sizeof(properties.flags));
+        }
+        else
+        {
+            // exported type.
+
+            if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
+            {
+                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).",
+                                                    struct_index.i, struct_index.i, mod.header.exports.size()));
+            }
+
+            auto& exp_symbol = mod.header.exports[struct_index.i];
+            if(exp_symbol.type != module_::symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Export header entry at index {} is not a type.",
+                  struct_index.i));
+            }
+
+            if(print_disassembly)
+            {
+                fmt::print("{}\n", exp_symbol.name);
+            }
+
+            auto properties = get_type_properties(struct_map, exp_symbol.name);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+        }
+
+        return 0; /* no stack size change */
     }
     default:
         throw interpreter_error(fmt::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
@@ -1966,6 +2060,27 @@ opcode context::exec(
 
                 break;
             } /* opcode::getfield */
+            case opcode::checkcast:
+            {
+                std::size_t target_layout_id = read_unchecked<std::size_t>(binary, offset);
+                std::size_t flags = read_unchecked<std::size_t>(binary, offset);
+
+                if((flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) == 0)
+                {
+                    void* obj = frame.stack.pop_addr<void>();
+                    std::size_t source_layout_id = gc.get_type_layout_id(obj);
+
+                    if(target_layout_id != source_layout_id)
+                    {
+                        throw interpreter_error(
+                          fmt::format("Type cast from '{}' to '{}' failed.",
+                                      gc.layout_to_string(source_layout_id), gc.layout_to_string(target_layout_id)));
+                    }
+                    frame.stack.push_addr(obj);
+                }
+
+                break;
+            } /* opcode::checkcast */
             case opcode::iand:
             {
                 std::int32_t v = frame.stack.pop_i32();

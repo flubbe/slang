@@ -222,8 +222,8 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                                    });
 
                     ctx.add_import(module_::symbol_type::type, import_path, it.first);
-                    ctx.add_struct(it.first, members, import_path);
-                    ctx.get_global_scope()->add_struct(it.first, std::move(members), import_path);
+                    ctx.add_struct(it.first, members, desc.flags, import_path);
+                    ctx.get_global_scope()->add_struct(it.first, std::move(members), desc.flags, import_path);
                 }
 
                 // Add type to typing context.

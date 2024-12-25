@@ -426,6 +426,7 @@ void scope::add_local(std::unique_ptr<value> arg)
 
 void scope::add_struct(std::string name,
                        std::vector<std::pair<std::string, value>> members,
+                       std::uint8_t flags,
                        std::optional<std::string> import_path)
 {
     auto it = std::find_if(structs.begin(), structs.end(),
@@ -444,7 +445,7 @@ void scope::add_struct(std::string name,
     }
 
     std::string name_copy = name;
-    structs.insert({name, struct_{std::move(name_copy), std::move(members), import_path}});
+    structs.insert({name, struct_{std::move(name_copy), std::move(members), flags, import_path}});
 }
 
 const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
@@ -603,6 +604,7 @@ std::size_t context::get_import_index(module_::symbol_type type, std::string imp
 
 struct_* context::add_struct(std::string name,
                              std::vector<std::pair<std::string, value>> members,
+                             std::uint8_t flags,
                              std::optional<std::string> import_path)
 {
     if(std::find_if(types.begin(), types.end(),
@@ -615,7 +617,13 @@ struct_* context::add_struct(std::string name,
         throw codegen_error(fmt::format("Type '{}' already defined.", name));
     }
 
-    return types.emplace_back(std::make_unique<struct_>(name, std::move(members), std::move(import_path))).get();
+    return types.emplace_back(
+                  std::make_unique<struct_>(
+                    name,
+                    std::move(members),
+                    flags,
+                    std::move(import_path)))
+      .get();
 }
 
 struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
@@ -852,6 +860,15 @@ void context::generate_cast(type_cast tc)
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     insertion_point->add_instruction(std::make_unique<instruction>("cast", std::move(args)));
+}
+
+void context::generate_checkcast(type target_type)
+{
+    validate_insertion_point();
+    auto arg0 = std::make_unique<type_argument>(value{std::move(target_type)});
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::move(arg0));
+    insertion_point->add_instruction(std::make_unique<instruction>("checkcast", std::move(args)));
 }
 
 void context::generate_cmp()

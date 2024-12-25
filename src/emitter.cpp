@@ -167,7 +167,7 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
     export_table.emplace_back(
       module_::symbol_type::type,
       type->get_name(),
-      module_::struct_descriptor{std::move(transformed_members)});
+      module_::struct_descriptor{type->get_flags(), std::move(transformed_members)});
 }
 
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
@@ -229,7 +229,7 @@ void export_table_builder::write(module_::language_module& mod) const
         else if(entry.type == module_::symbol_type::type)
         {
             const module_::struct_descriptor& desc = std::get<module_::struct_descriptor>(entry.desc);
-            mod.add_struct(entry.name, desc.member_types);
+            mod.add_struct(entry.name, desc.member_types, desc.flags);
         }
         else
         {
@@ -950,6 +950,56 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     else if(name == "arraylength")
     {
         emit(instruction_buffer, opcode::arraylength);
+    }
+    else if(name == "checkcast")
+    {
+        expect_arg_size(1);
+
+        auto& args = instr->get_args();
+        auto type = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();
+
+        // resolve type to index.
+        vle_int struct_index = 0;
+
+        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
+                                      [&type](const std::unique_ptr<cg::struct_>& t) -> bool
+                                      {
+                                          return t->get_name() == type.get_struct_name()
+                                                 && t->get_import_path() == type.get_import_path();
+                                      });
+        if(struct_it != ctx.types.end())
+        {
+            if((*struct_it)->get_import_path().has_value())
+            {
+                // find type in import table.
+                auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
+                                              [&struct_it](const cg::imported_symbol& s) -> bool
+                                              {
+                                                  return s.type == module_::symbol_type::type
+                                                         && s.name == (*struct_it)->get_name()
+                                                         && s.import_path == (*struct_it)->get_import_path();
+                                              });
+                if(import_it == ctx.imports.end())
+                {
+                    throw emitter_error(fmt::format(
+                      "Cannot find type '{}' from package '{}' in import table.",
+                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
+                }
+                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
+            }
+            else
+            {
+                // find struct in export table.
+                struct_index = exports.get_index(module_::symbol_type::type, (*struct_it)->get_name());
+            }
+        }
+        else
+        {
+            throw emitter_error(fmt::format("Type '{}' not found.", type.to_string()));
+        }
+
+        emit(instruction_buffer, opcode::checkcast);
+        instruction_buffer & struct_index;
     }
     else
     {

@@ -582,9 +582,19 @@ inline archive& operator&(archive& ar, field_descriptor& info)
     return ar;
 }
 
+/** Struct flags. */
+enum class struct_flags : std::uint8_t
+{
+    none = 0,      /** No flags. */
+    allow_cast = 1 /** Allow casts to and from arbitrary objects. */
+};
+
 /** Struct descriptor. */
 struct struct_descriptor
 {
+    /** Struct flags. */
+    std::uint8_t flags{0};
+
     /** Members as (name, type). */
     std::vector<std::pair<std::string, field_descriptor>> member_types;
 
@@ -606,6 +616,7 @@ struct struct_descriptor
  */
 inline archive& operator&(archive& ar, struct_descriptor& desc)
 {
+    ar & desc.flags;
     ar & desc.member_types;
     return ar;
 }
@@ -815,7 +826,10 @@ public:
      * @param package_index The symbol's package index as an index into the import table. Ignored for `symbol_type::package`.
      * @returns The import's index inside the import table.
      */
-    std::size_t add_import(symbol_type type, std::string name, std::uint32_t package_index = static_cast<std::uint32_t>(-1));
+    std::size_t add_import(
+      symbol_type type,
+      std::string name,
+      std::uint32_t package_index = static_cast<std::uint32_t>(-1));
 
     /**
      * Add a function to the module.
@@ -850,8 +864,12 @@ public:
      *
      * @param name The struct's name.
      * @param members The struct's members as `(name, type)`.
+     * @param flags The struct's flags.
      */
-    void add_struct(std::string name, std::vector<std::pair<std::string, field_descriptor>> members);
+    void add_struct(
+      std::string name,
+      std::vector<std::pair<std::string, field_descriptor>> members,
+      std::uint8_t flags);
 
     /**
      * Set the string table.

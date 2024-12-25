@@ -58,6 +58,7 @@ enum class opcode : opcode_base
     new_,        /** Create a new struct. */
     newarray,    /** Create a new array for i32, f32 or references. */
     arraylength, /** Return the length of an array. */
+    checkcast,   /** Check if an object is of a given type. */
     ret,         /** Return void from a function. */
     iret,        /** Return an i32 from a function. */
     fret,        /** Return an f32 from a function. */
