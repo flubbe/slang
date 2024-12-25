@@ -17,6 +17,12 @@ Hello, World!
 
 Program exited with exit code 0.
 ```
+To get an impression of the generated modules and bytecode, you can use
+```bash
+$ slang exec lang/std --disasm
+$ slang exec examples/hello_world --disasm
+```
+
 To see how the language works, have a look at the [examples](examples) and also at 
 [test/test_compile_ir.cpp](test/test_compile_ir.cpp) and [test/test_output.cpp](test/test_output.cpp).
 
