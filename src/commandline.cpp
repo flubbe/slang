@@ -581,10 +581,10 @@ void exec::invoke(const std::vector<std::string>& args)
     }
 
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(module_path.parent_path());
+
     file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
-
-    file_mgr.add_search_path(module_path.parent_path());
 
     if(!file_mgr.is_file(module_path))
     {
