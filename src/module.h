@@ -23,8 +23,9 @@
 /* Forward declarations. */
 namespace slang::interpreter
 {
-class operand_stack;
 class context;
+class module_loader;
+class operand_stack;
 };    // namespace slang::interpreter
 
 namespace slang::module_
@@ -235,6 +236,14 @@ public:
  * @param ts The type string.
  */
 archive& operator&(archive& ar, variable_type& ts);
+
+/**
+ * Convert a `variable_type` to a readable string.
+ *
+ * @param t The type.
+ * @returns Returns a readable variable type string.
+ */
+std::string to_string(const variable_type& t);
 
 /** Variable descriptor. */
 struct variable_descriptor : public symbol
@@ -634,7 +643,7 @@ struct imported_symbol
     std::uint32_t package_index;
 
     /** If the import is resolved, this points to the corresponding module or into the export table. Not serialized. */
-    std::variant<const class language_module*, struct exported_symbol*> export_reference;
+    std::variant<const si::module_loader*, struct exported_symbol*> export_reference;
 
     /** Default constructors. */
     imported_symbol() = default;
@@ -911,6 +920,7 @@ public:
 
     friend archive& operator&(archive& ar, language_module& mod);
     friend class si::context;
+    friend class si::module_loader;
 };
 
 /**

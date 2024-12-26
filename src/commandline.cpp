@@ -15,7 +15,7 @@
 #include "commandline.h"
 #include "compiler.h"
 #include "emitter.h"
-#include "interpreter.h"
+#include "interpreter/interpreter.h"
 #include "module.h"
 #include "parser.h"
 #include "resolve.h"
@@ -441,6 +441,114 @@ std::string compile::get_description() const
  * Package execution.
  */
 
+class instruction_logger : public slang::interpreter::instruction_recorder
+{
+    /** String table entries. */
+    std::size_t string_entries{0};
+
+    /** Import table entry count. */
+    std::size_t import_entries{0};
+
+    /** Export table entry count */
+    std::size_t export_entries{0};
+
+public:
+    virtual void section(const std::string& name) override
+    {
+        fmt::print("--- {} ---\n", name);
+    }
+
+    virtual void function(const std::string& name, const module_::function_details& details) override
+    {
+        fmt::print(
+          "{:>4}: @{} (size {}, args {}, locals {})\n",
+          details.offset, name, details.size, details.args_size, details.locals_size);
+    }
+
+    virtual void type(const std::string& name, const module_::struct_descriptor& desc) override
+    {
+        fmt::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
+
+        for(std::size_t i = 0; i < desc.member_types.size(); ++i)
+        {
+            auto& [member_name, member_type] = desc.member_types[i];
+            fmt::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
+                       to_string(member_type.base_type),
+                       member_name,
+                       member_type.offset,
+                       member_type.size,
+                       member_type.alignment,
+                       i != desc.member_types.size() - 1
+                         ? ","
+                         : "");
+        }
+
+        fmt::print("}}\n");
+    }
+
+    virtual void string(const std::string& s) override
+    {
+        fmt::print("{:>3}: {}\n", string_entries, s);
+        ++string_entries;
+    }
+
+    virtual void record(const module_::exported_symbol& s) override
+    {
+        fmt::print("{:>3}: {:>11}, {}\n", export_entries, to_string(s.type), s.name);
+        ++export_entries;
+    }
+
+    virtual void record(const module_::imported_symbol& s) override
+    {
+        fmt::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
+        ++import_entries;
+    }
+
+    virtual void label(std::int64_t index) override
+    {
+        fmt::print("%{}:\n", index);
+    }
+
+    virtual void record(opcode instr) override
+    {
+        fmt::print("    {:>11}\n", to_string(instr));
+    }
+
+    virtual void record(opcode instr, std::int64_t i) override
+    {
+        fmt::print("    {:>11}    {}\n", to_string(instr), i);
+    }
+
+    virtual void record(opcode instr, std::int64_t i1, std::int64_t i2) override
+    {
+        fmt::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
+    }
+
+    virtual void record(opcode instr, float f) override
+    {
+        fmt::print("    {:>11}    {}\n", to_string(instr), f);
+    }
+
+    virtual void record(opcode instr, std::int64_t i, std::string s) override
+    {
+        fmt::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
+    }
+
+    virtual void record(
+      opcode instr,
+      std::int64_t i,
+      std::string s,
+      std::int64_t field_index) override
+    {
+        fmt::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
+    }
+
+    virtual void record(opcode instr, std::string s1, std::string s2) override
+    {
+        fmt::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
+    }
+};
+
 exec::exec(slang::package_manager& in_manager)
 : command{"exec"}
 , manager{in_manager}
@@ -473,6 +581,8 @@ void exec::invoke(const std::vector<std::string>& args)
     }
 
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(module_path.parent_path());
+
     file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
 
@@ -491,14 +601,7 @@ void exec::invoke(const std::vector<std::string>& args)
           module_path.string()));
     }
 
-    slang::module_::language_module mod;
-    {
-        auto read_ar = file_mgr.open(module_path, slang::file_manager::open_mode::read);
-        (*read_ar) & mod;
-    }
-
     si::context ctx{file_mgr};
-    ctx.print_disassembly = disassemble;
 
     rt::register_builtin_type_layouts(ctx.get_gc());
 
@@ -557,12 +660,14 @@ void exec::invoke(const std::vector<std::string>& args)
                                      rt::assert_(ctx, stack);
                                  });
 
-    ctx.load_module(module_name, mod);
-
     if(disassemble)
     {
+        auto recorder = std::make_shared<instruction_logger>();
+        ctx.resolve_module(module_name, recorder);
         return;
     }
+
+    ctx.resolve_module(module_name);
 
     si::value res = ctx.invoke(
       module_name,

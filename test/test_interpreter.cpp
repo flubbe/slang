@@ -15,7 +15,7 @@
 
 #include "archives/file.h"
 #include "runtime/runtime.h"
-#include "interpreter.h"
+#include "interpreter/interpreter.h"
 
 namespace
 {
@@ -25,106 +25,95 @@ namespace rt = slang::runtime;
 
 TEST(interpreter, module_and_functions)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("test_output.bin");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'test_output.bin'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
     si::context ctx{file_mgr};
-    ASSERT_NO_THROW(ctx.load_module("test_output", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("test_output.bin"));
 
     si::value res;
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "itest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "itest", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "iadd", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "iadd", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "isub", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "isub", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "imul", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "imul", {}));
     EXPECT_EQ(*res.get<int>(), 6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "idiv", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "idiv", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "ftest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "ftest", {}));
     EXPECT_NEAR(*res.get<float>(), 1.1, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fadd", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "fadd", {}));
     EXPECT_NEAR(*res.get<float>(), 3.2, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fsub", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "fsub", {}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fmul", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "fmul", {}));
     EXPECT_NEAR(*res.get<float>(), 6.51, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "fdiv", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "fdiv", {}));
     EXPECT_NEAR(*res.get<float>(), 3.2, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "stest", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "stest", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{1}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg", {si::value{1}}));
     EXPECT_EQ(*res.get<int>(), 2);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{15}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg", {si::value{15}}));
     EXPECT_EQ(*res.get<int>(), 16);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg", {si::value{-100}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg", {si::value{-100}}));
     EXPECT_EQ(*res.get<int>(), -99);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{1.0f}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg2", {si::value{1.0f}}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{-1.0f}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg2", {si::value{-1.0f}}));
     EXPECT_NEAR(*res.get<float>(), -1.0, 1e-6);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg2", {si::value{0.f}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg2", {si::value{0.f}}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "sid", {si::value{"Test"}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "sid", {si::value{"Test"}}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "arg3", {si::value(1.0f), si::value{"Test"}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg3", {si::value(1.0f), si::value{"Test"}}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "call", {si::value{0}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "call", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local", {si::value{0}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "local", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), -1);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local2", {si::value{0}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "local2", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 1);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "local3", {}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "local3", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_i2f", {si::value{23}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_i2f", {si::value{23}}));
     EXPECT_EQ(*res.get<float>(), 23.0);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output", "cast_f2i", {si::value{92.3f}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_f2i", {si::value{92.3f}}));
     EXPECT_EQ(*res.get<int>(), 92);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
@@ -200,27 +189,15 @@ static void register_std_lib(si::context& ctx, std::vector<std::string>& print_b
 
 TEST(interpreter, hello_world)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("hello_world.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'hello_world.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("hello_world", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("hello_world"));
     EXPECT_NO_THROW(ctx.invoke("hello_world", "main", {si::value{std::vector<std::string>{"Test"}}}));
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Hello, World!\n");
@@ -240,23 +217,11 @@ TEST(interpreter, hello_world)
 
 TEST(interpreter, operators)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("operators.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'operators.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("operators", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("operators"));
     ASSERT_NO_THROW(ctx.invoke("operators", "main", {}));
 
     si::value res;
@@ -296,27 +261,15 @@ TEST(interpreter, operators)
 
 TEST(interpreter, control_flow)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("control_flow.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'control_flow.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("control_flow", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("control_flow"));
 
     si::value res;
 
@@ -359,27 +312,15 @@ TEST(interpreter, control_flow)
 
 TEST(interpreter, loops)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("loops.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'loops.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("loops", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("loops"));
 
     si::value res;
 
@@ -397,27 +338,15 @@ TEST(interpreter, loops)
 
 TEST(interpreter, loop_break_continue)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("loops_bc.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'loops.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("loops_bc", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("loops_bc"));
 
     si::value res;
 
@@ -437,23 +366,11 @@ TEST(interpreter, loop_break_continue)
 
 TEST(interpreter, infinite_recursion)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("inf_recursion.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'inf_recursion.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("inf_recursion", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("inf_recursion"));
 
     si::value res;
 
@@ -466,23 +383,11 @@ TEST(interpreter, infinite_recursion)
 
 TEST(interpreter, arrays)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("arrays.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'arrays.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("arrays", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("arrays"));
 
     si::value res;
 
@@ -503,23 +408,11 @@ TEST(interpreter, arrays)
 
 TEST(interpreter, return_arrays)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_array"));
 
     si::value res;
 
@@ -543,23 +436,11 @@ TEST(interpreter, return_arrays)
 
 TEST(interpreter, pass_array)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_array"));
 
     si::value res;
 
@@ -576,46 +457,22 @@ TEST(interpreter, pass_array)
 
 TEST(interpreter, invalid_index)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_array"));
 
     ASSERT_THROW(ctx.invoke("return_array", "invalid_index", {}), si::interpreter_error);
 }
 
 TEST(interpreter, return_str_array)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_array"));
 
     si::value res;
 
@@ -652,23 +509,11 @@ TEST(interpreter, return_str_array)
 
 TEST(interpreter, array_length)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("array_length.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'array_length.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("array_length", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("array_length"));
 
     si::value res;
 
@@ -684,26 +529,14 @@ TEST(interpreter, array_length)
 
 TEST(interpreter, array_copy)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("array_copy.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'array_copy.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("array_copy", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("array_copy"));
 
     si::value res;
 
@@ -723,26 +556,14 @@ TEST(interpreter, array_copy)
 
 TEST(interpreter, string_operations)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("string_operations.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'string_operations.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
     std::vector<std::string> print_buf;
     register_std_lib(ctx, print_buf);
 
-    ASSERT_NO_THROW(ctx.load_module("string_operations", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("string_operations"));
 
     si::value res;
 
@@ -756,23 +577,11 @@ TEST(interpreter, string_operations)
 
 TEST(interpreter, operator_new)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_array"));
 
     si::value res;
 
@@ -787,23 +596,11 @@ TEST(interpreter, operator_new)
 
 TEST(interpreter, prefix_postfix)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("prefix_postfix.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'prefix_postfix.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("prefix_postfix", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("prefix_postfix"));
 
     si::value res;
 
@@ -831,23 +628,11 @@ TEST(interpreter, prefix_postfix)
 
 TEST(interpreter, return_discard)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_discard.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_discard.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_discard", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_discard"));
 
     si::value res;
 
@@ -860,23 +645,11 @@ TEST(interpreter, return_discard)
 
 TEST(interpreter, return_discard_array)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_discard_array.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_discard_array.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_discard_array", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_discard_array"));
 
     si::value res;
 
@@ -889,23 +662,11 @@ TEST(interpreter, return_discard_array)
 
 TEST(interpreter, return_discard_strings)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("return_discard_strings.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'return_discard_strings.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("return_discard_strings", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("return_discard_strings"));
 
     si::value res;
 
@@ -957,9 +718,10 @@ TEST(interpreter, structs)
     }
 
     slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("structs", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("structs"));
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
@@ -969,23 +731,11 @@ TEST(interpreter, structs)
 TEST(interpreter, structs_access)
 {
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("structs_access.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'structs_access.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("structs_access", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("structs_access"));
 
         si::value res;
 
@@ -997,23 +747,11 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("structs_access2.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'structs_access2.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("structs_access2", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("structs_access2"));
 
         si::value res;
 
@@ -1025,23 +763,11 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("structs_access2.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'structs_access2.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("structs_access2", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("structs_access2"));
 
         si::value res;
 
@@ -1053,23 +779,11 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("structs_references.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'structs_references.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("structs_references", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("structs_references"));
 
         ASSERT_NO_THROW(ctx.invoke("structs_references", "test", {}));
 
@@ -1078,23 +792,11 @@ TEST(interpreter, structs_access)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("null_dereference.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'null_dereference.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("null_dereference", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("null_dereference"));
 
         ASSERT_THROW(ctx.invoke("null_dereference", "test", {}), si::interpreter_error);
 
@@ -1107,23 +809,11 @@ TEST(interpreter, structs_access)
 TEST(interpreter, nested_structs)
 {
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("nested_structs.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'nested_structs.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("nested_structs", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("nested_structs"));
 
         ASSERT_NO_THROW(ctx.invoke("nested_structs", "test", {}));
 
@@ -1132,23 +822,11 @@ TEST(interpreter, nested_structs)
         EXPECT_EQ(ctx.get_gc().byte_size(), 0);
     }
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("nested_structs2.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'nested_structs2.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
         si::context ctx{file_mgr};
 
-        ASSERT_NO_THROW(ctx.load_module("nested_structs2", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("nested_structs2"));
 
         si::value res;
         ASSERT_NO_THROW(res = ctx.invoke("nested_structs2", "test", {}));
@@ -1164,26 +842,13 @@ TEST(interpreter, nested_structs)
 TEST(interpreter, type_imports)
 {
     {
-        slang::module_::language_module mod;
-
-        try
-        {
-            slang::file_read_archive read_ar("type_imports.cmod");
-            EXPECT_NO_THROW(read_ar & mod);
-        }
-        catch(const std::runtime_error& e)
-        {
-            fmt::print("Error loading 'type_imports.cmod'. Make sure to run 'test_output' to generate the file.\n");
-            throw e;
-        }
-
         slang::file_manager file_mgr;
         file_mgr.add_search_path(".");
 
         si::context ctx{file_mgr};
 
         si::value res;
-        ASSERT_NO_THROW(ctx.load_module("type_imports", mod));
+        ASSERT_NO_THROW(ctx.resolve_module("type_imports"));
         ASSERT_NO_THROW(res = ctx.invoke("type_imports", "test", {}));
 
         EXPECT_EQ(*res.get<int>(), 2);
@@ -1196,25 +861,12 @@ TEST(interpreter, type_imports)
 
 TEST(interpreter, multiple_modules)
 {
-    slang::module_::language_module mod;
-
-    try
-    {
-        slang::file_read_archive read_ar("mod3.cmod");
-        EXPECT_NO_THROW(read_ar & mod);
-    }
-    catch(const std::runtime_error& e)
-    {
-        fmt::print("Error loading 'mod3.cmod'. Make sure to run 'test_output' to generate the file.\n");
-        throw e;
-    }
-
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
 
     si::context ctx{file_mgr};
 
-    ASSERT_NO_THROW(ctx.load_module("mod3", mod));
+    ASSERT_NO_THROW(ctx.resolve_module("mod3"));
 
     si::value res;
 

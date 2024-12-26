@@ -21,7 +21,8 @@ add_executable(slang
     src/emitter.cpp
     src/filemanager.cpp
     src/gc.cpp
-    src/interpreter.cpp
+    src/interpreter/interpreter.cpp
+    src/interpreter/module_loader.cpp
     src/lexer.cpp
     src/main.cpp
     src/module.cpp
