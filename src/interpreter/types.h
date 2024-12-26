@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <any>
+#include <cstring>
 #include <string>
 #include <exception>
 #include <functional>

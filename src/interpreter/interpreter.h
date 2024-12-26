@@ -8,13 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <any>
-#include <cstring>
 #include <functional>
-#include <stdexcept>
 #include <unordered_map>
-#include <utility>
-#include <variant>
 #include <vector>
 
 #include "interpreter/module_loader.h"
