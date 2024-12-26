@@ -22,6 +22,7 @@ To get an impression of the generated modules and bytecode, you can use
 $ slang exec lang/std --disasm
 $ slang exec examples/hello_world --disasm
 ```
+You can also have a look at the [instruction set](docs/instructions.md).
 
 To see how the language works, have a look at the [examples](examples) and also at 
 [test/test_compile_ir.cpp](test/test_compile_ir.cpp) and [test/test_output.cpp](test/test_output.cpp).

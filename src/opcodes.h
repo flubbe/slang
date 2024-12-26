@@ -25,22 +25,22 @@ enum class opcode : opcode_base
     iconst,      /** Load i32 constant onto stack. */
     fconst,      /** Load f32 constant onto stack. */
     sconst,      /** Load str constant onto stack. */
-    iload,       /** Load element at index 0 from i32 array onto stack. */
-    fload,       /** Load element at index 0 from f32 array onto stack. */
-    aload,       /** Load address onto stack. */
+    iload,       /** Load `i32` from variable onto stack. */
+    fload,       /** Load `f32` from variable onto stack. */
+    aload,       /** Load address from variable onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
     saload,      /** Load str from array onto stack. */
-    istore,      /** Store from stack into i32 array at index 0. */
-    fstore,      /** Store from stack into f32 array at index 0. */
-    astore,      /** Store from stack into array. */
+    istore,      /** Store i32 from stack into variable. */
+    fstore,      /** Store f32 from stack into variable. */
+    astore,      /** Store address from stack into variable. */
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */
     sastore,     /** Store str from stack into array. */
-    idup,        /** Duplicate top i32 at a given depth in the stack. */
-    fdup,        /** Duplicate top f32 at a given depth in the stack. */
-    adup,        /** Duplicate top address at a given depth in the stack. */
-    dup_x1,      /** Duplicate top stack element and push it 2 down the stack. */
+    idup,        /** Duplicate top i32 of the stack. */
+    fdup,        /** Duplicate top f32 of the stack. */
+    adup,        /** Duplicate top address of the stack. */
+    dup_x1,      /** Duplicate top stack element and push it 2 elements down the stack. */
     pop,         /** Pop-discard a 4-byte value from the stack. */
     apop,        /** Pop-discard a reference from the stack. */
     iadd,        /** Add two i32 from the stack. */
