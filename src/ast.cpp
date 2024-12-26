@@ -2020,8 +2020,13 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
         v = expr->generate_code(ctx, memory_context::none);
 
         // non-assigning expressions need cleanup.
-        if(expr->needs_pop() && v && v->get_type().to_string() != "void")
+        if(expr->needs_pop())
         {
+            if(!v)
+            {
+                throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
+            }
+
             ctx.generate_pop(*v);
         }
     }
@@ -2206,6 +2211,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
 std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 {
     auto sig = ctx.get_function_signature(callee, get_namespace_path());
+    return_type = sig.ret_type;
 
     if(sig.arg_types.size() != args.size())
     {

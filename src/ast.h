@@ -543,6 +543,11 @@ public:
     {
     }
 
+    virtual bool needs_pop() const override
+    {
+        return expr->needs_pop();
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -1334,6 +1339,9 @@ class call_expression : public expression
     /** An optional index expression for return value array access. */
     std::unique_ptr<expression> index_expr;
 
+    /** The return type. Set during type checking. */
+    ty::type_info return_type;
+
 public:
     /** No default constructor. */
     call_expression() = delete;
@@ -1365,7 +1373,7 @@ public:
 
     bool needs_pop() const override
     {
-        return true;
+        return return_type.to_string() != "void";
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;

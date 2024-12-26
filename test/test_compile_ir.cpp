@@ -1147,6 +1147,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1186,6 +1188,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1232,6 +1236,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1274,6 +1280,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
     }
     {
@@ -1307,6 +1315,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1360,6 +1370,8 @@ TEST(compile_ir, function_calls)
         cg::context ctx;
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
