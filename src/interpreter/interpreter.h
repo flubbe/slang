@@ -152,10 +152,13 @@ public:
      * Resolve a module given it's import name. This loads the module if it is not
      * already loaded.
      *
-     * @param import_name The module's import name in the for `a::b::mod_name`.
+     * @param import_name The module's import name in the form `a::b::mod_name`.
+     * @param recorder An optional instruction recorder for disassembling the module on load.
      * @returns Returns the module loader.
      */
-    module_loader* resolve_module(const std::string& import_name);
+    module_loader* resolve_module(
+      const std::string& import_name,
+      std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
 
     /**
      * Invoke a function from a module.

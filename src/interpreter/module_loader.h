@@ -25,6 +25,156 @@ namespace fs = std::filesystem;
  */
 class context; /* from interpreter/interpreter.h */
 
+/** An instruction recorder, e.g. for disassembling a module. */
+struct instruction_recorder
+{
+    /** Default destructor. */
+    virtual ~instruction_recorder() = default;
+
+    /**
+     * Begin recording a new section.
+     *
+     * @param name Name of the section.
+     */
+    virtual void section([[maybe_unused]] const std::string& name)
+    {
+    }
+
+    /**
+     * Record function information.
+     *
+     * @param name Name of the function.
+     * @param details Details of the function.
+     */
+    virtual void function([[maybe_unused]] const std::string& name, [[maybe_unused]] const module_::function_details& details)
+    {
+    }
+
+    /**
+     * Record type information.
+     *
+     * @param name The type name.
+     * @param desc The type descriptor.
+     */
+    virtual void type([[maybe_unused]] const std::string& name, [[maybe_unused]] const module_::struct_descriptor& desc)
+    {
+    }
+
+    /**
+     * Record a string table entry.
+     *
+     * @param s The string.
+     */
+    virtual void string([[maybe_unused]] const std::string& s)
+    {
+    }
+
+    /**
+     * Record an exported symbol.
+     *
+     * @param s The exported symbol.
+     */
+    virtual void record([[maybe_unused]] const module_::exported_symbol& s)
+    {
+    }
+
+    /**
+     * Record an imported symbol.
+     *
+     * @param s The imported symbol.
+     */
+    virtual void record([[maybe_unused]] const module_::imported_symbol& s)
+    {
+    }
+
+    /**
+     * Add a label.
+     *
+     * @param index The label's index.
+     */
+    virtual void label([[maybe_unused]] std::int64_t index)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     */
+    virtual void record([[maybe_unused]] opcode instr)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param i An integer parameter.
+     */
+    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param i1 The first integer parameter.
+     * @param i2 The second integer parameter.
+     */
+    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i1, [[maybe_unused]] std::int64_t i2)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param f A floating-point parameter.
+     */
+    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] float f)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param i A table index.
+     * @param s The table entry.
+     */
+    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i, [[maybe_unused]] std::string s)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param i A table index.
+     * @param s The table entry.
+     * @param field_index A field index.
+     */
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::int64_t i,
+      [[maybe_unused]] std::string s,
+      [[maybe_unused]] std::int64_t field_index)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param s1 The first string parameter.
+     * @param s2 The second string parameter.
+     */
+    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::string s1, [[maybe_unused]] std::string s2)
+    {
+    }
+};
+
 /** A module loader. Represents a loaded module, and is associated to an interpreter context. */
 class module_loader
 {
@@ -42,6 +192,9 @@ class module_loader
 
     /** Decoded functions, ordered by name. */
     std::unordered_map<std::string, function> function_map;
+
+    /** An instruction recorder, for disassembly. */
+    std::shared_ptr<instruction_recorder> recorder;
 
     /**
      * Get the byte size and alignment of a type.
@@ -117,8 +270,11 @@ public:
      *
      * @param ctx The associated interpreter context.
      * @param path The module's path.
+     * @param recorder An optional instruction recorder.
      */
-    module_loader(context& ctx, fs::path path);
+    module_loader(context& ctx,
+                  fs::path path,
+                  std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
 
     /**
      * Check if the module contains a function.

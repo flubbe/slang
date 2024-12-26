@@ -179,6 +179,8 @@ std::int32_t module_loader::get_stack_delta(const module_::function_signature& s
 
 void module_loader::decode_structs()
 {
+    recorder->section("Types");
+
     for(auto& [name, desc]: struct_map)
     {
         std::size_t size = 0;
@@ -254,6 +256,8 @@ void module_loader::decode_structs()
 
         // store layout.
         desc.layout_id = ctx.get_gc().register_type_layout(name, std::move(layout));
+
+        recorder->type(name, desc);
     }
 }
 
@@ -266,11 +270,21 @@ void module_loader::decode()
 
     memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
 
+    recorder->section("String table");
+    for(auto& s: mod.header.strings)
+    {
+        recorder->string(s);
+    }
+
     /*
      * resolve imports.
      */
+    recorder->section("Import table");
+
     for(auto& it: mod.header.imports)
     {
+        recorder->record(it);
+
         if(it.type == module_::symbol_type::package)
         {
             // packages are loaded while resolving other symbols.
@@ -357,6 +371,8 @@ void module_loader::decode()
     /*
      * instructions.
      */
+    recorder->section("Disassembly");
+
     std::vector<std::byte> code;
     for(auto& it: mod.header.exports)
     {
@@ -377,6 +393,8 @@ void module_loader::decode()
 
         ar.seek(details.offset);
         details.offset = code.size();
+
+        recorder->function(it.name, details);
 
         std::byte instr;
 
@@ -483,25 +501,34 @@ std::int32_t module_loader::decode_instruction(
     /* opcodes without arguments. */
     case opcode::aconst_null: [[fallthrough]];
     case opcode::adup:
+        recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(sizeof(void*));
     case opcode::idup: [[fallthrough]];
     case opcode::fdup:
+        recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::pop:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::apop:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*));
     case opcode::arraylength:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::iaload: [[fallthrough]];
     case opcode::faload:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*));
     case opcode::saload:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::sastore:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(std::string*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
@@ -531,9 +558,11 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fcmpeq: [[fallthrough]];
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
+        recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::acmpeq: [[fallthrough]];
     case opcode::acmpne:
+        recorder->record(static_cast<opcode>(instr));
         return -2 * static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
@@ -542,6 +571,7 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fret: [[fallthrough]];
     case opcode::sret: [[fallthrough]];
     case opcode::aret:
+        recorder->record(static_cast<opcode>(instr));
         return 0;
     /* opcodes with one 1-byte argument. */
     case opcode::newarray:
@@ -550,6 +580,8 @@ std::int32_t module_loader::decode_instruction(
         ar & i_u8;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u8), reinterpret_cast<std::byte*>(&i_u8) + sizeof(i_u8));
+
+        recorder->record(static_cast<opcode>(instr), static_cast<std::int64_t>(i_u8));
         return static_cast<std::int32_t>(sizeof(void*));
     }
     /* opcodes with one 4-byte argument. */
@@ -560,6 +592,18 @@ std::int32_t module_loader::decode_instruction(
         ar & i_u32;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
+
+        if(static_cast<opcode>(instr) == opcode::iconst)
+        {
+            recorder->record(opcode::iconst, static_cast<std::int64_t>(i_u32));
+        }
+        else
+        {
+            float f;
+            std::memcpy(&f, &i_u32, sizeof(float));
+            recorder->record(opcode::iconst, f);
+        }
+
         return static_cast<std::int32_t>(sizeof(std::uint32_t));
     }
     /* opcodes with one VLE integer. */
@@ -569,6 +613,8 @@ std::int32_t module_loader::decode_instruction(
         ar & i;
 
         code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
+
+        recorder->record(static_cast<opcode>(instr), i.i);
         return static_cast<std::int32_t>(sizeof(std::string*));
     }
     case opcode::label:
@@ -578,6 +624,8 @@ std::int32_t module_loader::decode_instruction(
 
         // store jump target for later resolution.
         mod.jump_targets.insert({i.i, code.size()});
+
+        recorder->label(i.i);
         return 0;
     }
     case opcode::jmp:
@@ -589,6 +637,8 @@ std::int32_t module_loader::decode_instruction(
         std::size_t z = 0;
         mod.jump_origins.insert({code.size(), i.i});
         code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+
+        recorder->record(static_cast<opcode>(instr), i.i);
         return 0;
     }
     /* opcodes with two VLE integers. */
@@ -604,6 +654,8 @@ std::int32_t module_loader::decode_instruction(
 
         mod.jump_origins.insert({code.size(), i2.i});
         code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+
+        recorder->record(static_cast<opcode>(instr), i1.i, i2.i);
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* dup_x1. */
@@ -629,6 +681,8 @@ std::int32_t module_loader::decode_instruction(
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
         code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
         code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
+
+        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2));
         return static_cast<std::int32_t>(properties1.size);
     }
     /* invoke. */
@@ -690,6 +744,7 @@ std::int32_t module_loader::decode_instruction(
                 throw interpreter_error(fmt::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
             }
 
+            recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
             return get_stack_delta(desc.signature);
         }
         else
@@ -723,6 +778,7 @@ std::int32_t module_loader::decode_instruction(
                 throw interpreter_error("Native function was null during decode.");
             }
 
+            recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
             return get_stack_delta(desc.signature);
         }
     }
@@ -744,6 +800,8 @@ std::int32_t module_loader::decode_instruction(
 
         std::int64_t offset = details.locals[i.i].offset;
         code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+
+        recorder->record(static_cast<opcode>(instr), i.i);
 
         // return correct size.
         bool is_store = (static_cast<opcode>(instr) == opcode::istore)
@@ -806,6 +864,8 @@ std::int32_t module_loader::decode_instruction(
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+
+            recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
         }
         else
         {
@@ -829,6 +889,8 @@ std::int32_t module_loader::decode_instruction(
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+
+            recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
         }
 
         return static_cast<std::int32_t>(sizeof(void*));
@@ -881,6 +943,8 @@ std::int32_t module_loader::decode_instruction(
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
+
+            recorder->record(static_cast<opcode>(instr), struct_index.i, imp_symbol.name, field_index.i);
         }
         else
         {
@@ -899,6 +963,8 @@ std::int32_t module_loader::decode_instruction(
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
+
+            recorder->record(static_cast<opcode>(instr), struct_index.i, exp_symbol.name, field_index.i);
         }
 
         if(static_cast<opcode>(instr) == opcode::setfield)
@@ -954,6 +1020,8 @@ std::int32_t module_loader::decode_instruction(
             auto properties = loader->get_type_properties(imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.flags), reinterpret_cast<std::byte*>(&properties.flags) + sizeof(properties.flags));
+
+            recorder->record(static_cast<opcode>(instr), struct_index.i, imp_symbol.name);
         }
         else
         {
@@ -976,6 +1044,8 @@ std::int32_t module_loader::decode_instruction(
             module_loader* loader = ctx.resolve_module(exp_symbol.name);
             auto properties = loader->get_type_properties(exp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+
+            recorder->record(static_cast<opcode>(instr), struct_index.i, exp_symbol.name);
         }
 
         return 0; /* no stack size change */
@@ -985,24 +1055,32 @@ std::int32_t module_loader::decode_instruction(
     }
 }
 
-module_loader::module_loader(context& ctx, fs::path path)
+module_loader::module_loader(
+  context& ctx,
+  fs::path path,
+  std::shared_ptr<instruction_recorder> recorder)
 : ctx{ctx}
 , path{std::move(path)}
+, recorder{std::move(recorder)}
 {
+    // make sure we have an instruction recorder.
+    if(!this->recorder)
+    {
+        throw interpreter_error("Instruction recorder cannot be set to null.");
+    }
+
     auto read_ar = ctx.file_mgr.open(this->path, slang::file_manager::open_mode::read);
     (*read_ar) & mod;
 
     // populate type map before decoding the module.
+    this->recorder->section("Export table");
     for(auto& it: mod.header.exports)
     {
+        this->recorder->record(it);
+
         if(it.type != module_::symbol_type::type)
         {
             continue;
-        }
-
-        if(struct_map.find(it.name) != struct_map.end())
-        {
-            throw interpreter_error(fmt::format("Type '{}' already exists in exports.", it.name));
         }
 
         struct_map.insert({it.name, std::get<module_::struct_descriptor>(it.desc)});

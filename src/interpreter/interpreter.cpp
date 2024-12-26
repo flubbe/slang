@@ -1339,7 +1339,7 @@ void context::register_native_function(const std::string& mod_name, std::string 
     }
 }
 
-module_loader* context::resolve_module(const std::string& import_name)
+module_loader* context::resolve_module(const std::string& import_name, std::shared_ptr<instruction_recorder> recorder)
 {
     auto it = loaders.find(import_name);
     if(it != loaders.end())
@@ -1357,7 +1357,7 @@ module_loader* context::resolve_module(const std::string& import_name)
     }
     fs::path resolved_path = file_mgr.resolve(fs_path);
 
-    loaders.insert({import_name, std::make_unique<module_loader>(*this, resolved_path)});
+    loaders.insert({import_name, std::make_unique<module_loader>(*this, resolved_path, recorder)});
     return loaders[import_name].get();
 }
 

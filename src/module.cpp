@@ -126,6 +126,16 @@ archive& operator&(archive& ar, variable_type& ts)
     return ar;
 }
 
+std::string to_string(const variable_type& t)
+{
+    std::string s = t.base_type();
+    for(std::size_t i = 0; i < t.get_array_dims(); ++i)
+    {
+        s += "[]";
+    }
+    return s;
+}
+
 /*
  * language_module implementation.
  */

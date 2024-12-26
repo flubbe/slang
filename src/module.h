@@ -237,6 +237,14 @@ public:
  */
 archive& operator&(archive& ar, variable_type& ts);
 
+/**
+ * Convert a `variable_type` to a readable string.
+ *
+ * @param t The type.
+ * @returns Returns a readable variable type string.
+ */
+std::string to_string(const variable_type& t);
+
 /** Variable descriptor. */
 struct variable_descriptor : public symbol
 {
