@@ -113,7 +113,7 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
 
     if(resolved_path.empty())
     {
-        throw file_error(fmt::format("Unable to find file '{}' in search paths.", resolved_path.c_str()));
+        throw file_error(fmt::format("Unable to find file '{}' in search paths.", path.string()));
     }
 
     if(mode == open_mode::read)

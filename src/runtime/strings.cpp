@@ -10,7 +10,7 @@
 
 #include <fmt/core.h>
 
-#include "interpreter.h"
+#include "interpreter/interpreter.h"
 #include "runtime/runtime.h"
 
 namespace gc = slang::gc;

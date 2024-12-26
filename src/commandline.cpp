@@ -15,7 +15,7 @@
 #include "commandline.h"
 #include "compiler.h"
 #include "emitter.h"
-#include "interpreter.h"
+#include "interpreter/interpreter.h"
 #include "module.h"
 #include "parser.h"
 #include "resolve.h"
@@ -476,6 +476,8 @@ void exec::invoke(const std::vector<std::string>& args)
     file_mgr.add_search_path(".");
     file_mgr.add_search_path("lang");
 
+    file_mgr.add_search_path(module_path.parent_path());
+
     if(!file_mgr.is_file(module_path))
     {
         throw std::runtime_error(fmt::format(
@@ -491,14 +493,7 @@ void exec::invoke(const std::vector<std::string>& args)
           module_path.string()));
     }
 
-    slang::module_::language_module mod;
-    {
-        auto read_ar = file_mgr.open(module_path, slang::file_manager::open_mode::read);
-        (*read_ar) & mod;
-    }
-
     si::context ctx{file_mgr};
-    ctx.print_disassembly = disassemble;
 
     rt::register_builtin_type_layouts(ctx.get_gc());
 
@@ -557,7 +552,7 @@ void exec::invoke(const std::vector<std::string>& args)
                                      rt::assert_(ctx, stack);
                                  });
 
-    ctx.load_module(module_name, mod);
+    ctx.resolve_module(module_name);
 
     if(disassemble)
     {

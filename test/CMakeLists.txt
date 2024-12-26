@@ -171,7 +171,8 @@ add_executable(test_interpreter
     ../src/runtime/utils.cpp
     ../src/filemanager.cpp
     ../src/gc.cpp
-    ../src/interpreter.cpp
+    ../src/interpreter/interpreter.cpp
+    ../src/interpreter/module_loader.cpp
     ../src/module.cpp
     ../src/opcodes.cpp
 )
