@@ -59,16 +59,12 @@ class context
     /**
      * Execute a function.
      *
-     * @param module_name The module name. Only used for error reporting.
-     * @param function_name The function's name. Only used for error reporting.
      * @param loader The module loader.
      * @param f The function to execute.
      * @param args The function's arguments.
      * @return The function's return value.
      */
     value exec(
-      const std::string& module_name,
-      const std::string& function_name,
       const module_loader& loader,
       const function& f,
       std::vector<value> args);
@@ -161,7 +157,16 @@ public:
       std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
 
     /**
-     * Invoke a function from a module.
+     * Get the import name for a module loader.
+     *
+     * @param loader The loader.
+     * @returns Returns the import name.
+     * @throws Throws an `interpreter_error` if the loader does not exist.
+     */
+    std::string get_import_name(const module_loader& loader) const;
+
+    /**
+     * Invoke a function from a module by name.
      *
      * @param module_name Name of the module of the function.
      * @param function_name The function's name.
@@ -169,6 +174,16 @@ public:
      * @returns The function's return value.
      */
     value invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args);
+
+    /**
+     * Invoke a function from a module.
+     *
+     * @param loader The module loader.
+     * @param fn The function to invoke.
+     * @param args The function's arguments.
+     * @returns The function's return value.
+     */
+    value invoke(const module_loader& loader, const function& fn, std::vector<value> args);
 
     /** Reset the interpreter. Needs to be called when an exception was thrown and caught. */
     void reset()

@@ -1143,15 +1143,11 @@ public:
      * them in `locals`.
      *
      * @param ctx The associated interpreter context.
-     * @param module_name The module's name. Only used for error reporting.
-     * @param function_name The function's name. Only used for error reporting.
      * @param args The arguments to verify and write.
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
     arguments_scope(context& ctx,
-                    const std::string& module_name,
-                    const std::string& function_name,
                     const std::vector<value>& args,
                     const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
                     std::vector<std::byte>& locals)
@@ -1161,8 +1157,7 @@ public:
         if(arg_types.size() != args.size())
         {
             throw interpreter_error(
-              fmt::format("Argument count for function '{}.{}' does not match: Expected {}, got {}.",
-                          module_name, function_name,
+              fmt::format("Argument count does not match: Expected {}, got {}.",
                           arg_types.size(), args.size()));
         }
 
@@ -1172,26 +1167,24 @@ public:
             if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} for function '{}.{}' has wrong base type (expected '{}', got '{}').",
+                  fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
                               i,
-                              module_name, function_name,
-                              std::get<0>(arg_types[i]).base_type(), std::get<0>(args[i].get_type())));
+                              std::get<0>(arg_types[i]).base_type(),
+                              std::get<0>(args[i].get_type())));
             }
 
             if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} for function '{}.{}' has wrong array property (expected '{}', got '{}').",
+                  fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
                               i,
-                              module_name, function_name,
                               std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
             }
 
             if(offset + args[i].get_size() > locals.size())
             {
                 throw interpreter_error(fmt::format(
-                  "Stack overflow during argument allocation while processing argument {} of function '{}.{}'.",
-                  i, module_name, function_name));
+                  "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
             if(is_garbage_collected(args[i].get_type()))
@@ -1222,8 +1215,6 @@ public:
 };
 
 value context::exec(
-  const std::string& module_name,
-  const std::string& function_name,
   const module_loader& loader,
   const function& f,
   std::vector<value> args)
@@ -1237,7 +1228,7 @@ value context::exec(
       f.get_stack_size()};
 
     auto& arg_types = f.get_signature().arg_types;
-    arguments_scope arg_scope{*this, module_name, function_name, args, arg_types, frame.locals};
+    arguments_scope arg_scope{*this, args, arg_types, frame.locals};
 
     /*
      * Execute the function.
@@ -1285,8 +1276,7 @@ value context::exec(
     else
     {
         throw interpreter_error(fmt::format(
-          "'{}.{}': Invalid return opcode '{}' ({}).",
-          module_name, function_name,
+          "Invalid return opcode '{}' ({}).",
           to_string(ret_opcode), static_cast<int>(ret_opcode)));
     }
 
@@ -1296,9 +1286,7 @@ value context::exec(
     // verify that the stack is empty.
     if(!frame.stack.empty())
     {
-        throw interpreter_error(fmt::format(
-          "'{}.{}': Non-empty stack on function exit.",
-          module_name, function_name));
+        throw interpreter_error("Non-empty stack on function exit.");
     }
 
     return ret;
@@ -1361,6 +1349,21 @@ module_loader* context::resolve_module(const std::string& import_name, std::shar
     return loaders[import_name].get();
 }
 
+std::string context::get_import_name(const module_loader& loader) const
+{
+    auto it = std::find_if(loaders.cbegin(), loaders.cend(),
+                           [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
+                           {
+                               return p.second.get() == &loader;
+                           });
+    if(it == loaders.cend())
+    {
+        throw interpreter_error("Unable to find name for loader.");
+    }
+
+    return it->first;
+}
+
 value context::invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args)
 {
     try
@@ -1370,7 +1373,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         module_loader* loader = resolve_module(module_name);
         function& fn = loader->get_function(function_name);
 
-        return exec(module_name, function_name, *loader, fn, std::move(args));
+        return exec(*loader, fn, std::move(args));
     }
     catch(interpreter_error& e)
     {
@@ -1381,6 +1384,43 @@ value context::invoke(const std::string& module_name, const std::string& functio
         if(stack_trace.size() > 0)
         {
             buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
+        }
+
+        if(call_stack_level == 0)
+        {
+            // we never entered context.exec, so add the function explicitly.
+            buf += fmt::format("  in {}.{}\n", module_name, function_name);
+        }
+
+        throw interpreter_error(buf, stack_trace);
+    }
+}
+
+value context::invoke(const module_loader& loader, const function& fn, std::vector<value> args)
+{
+    try
+    {
+        return exec(loader, fn, std::move(args));
+    }
+    catch(interpreter_error& e)
+    {
+        // Update the error message with the stack trace.
+        std::string buf = e.what();
+
+        auto stack_trace = e.get_stack_trace();
+        if(stack_trace.size() > 0)
+        {
+            buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
+        }
+
+        if(call_stack_level == 0)
+        {
+            // we never entered context.exec, so add the function explicitly.
+            std::string module_name = get_import_name(loader);
+            std::string function_name = loader.resolve_entry_point(fn.get_entry_point())
+                                          .value_or(fmt::format("<unknown at {}>", fn.get_entry_point()));
+
+            buf += fmt::format("  in {}.{}\n", module_name, function_name);
         }
 
         throw interpreter_error(buf, stack_trace);
