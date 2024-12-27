@@ -2245,15 +2245,6 @@ public:
     void generate_checkcast(type target_type);
 
     /**
-     * Generate a compare instruction.
-     *
-     * Reads two `i32` values `[value0, value1]` from the stack and pushes the `i32` comparison result to the stack:
-     * If `value0==value1`, `0` is pushed onto the stack. If `value0<value1`, `-1` is pushed onto the stack.
-     * If `value0>value1`, `1` is pushed onto the stack.
-     */
-    void generate_cmp();
-
-    /**
      * Generate a conditional branch.
      *
      * Pops 'condition off the stack. If 'condition' is != 0, jumps to `then_block`, else to `else_block`.

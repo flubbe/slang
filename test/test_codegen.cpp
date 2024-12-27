@@ -292,7 +292,7 @@ TEST(codegen, conditional_branch)
 
         ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
         ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
-        ctx.generate_cmp();
+        ctx.generate_binary_op(cg::binary_op::op_equal, {cg::type{cg::type_class::i32, 0}});
         ctx.generate_cond_branch(then_block, else_block);
 
         ctx.set_insertion_point(then_block);
@@ -315,7 +315,7 @@ TEST(codegen, conditional_branch)
                   "entry:\n"
                   " load i32 %a\n"
                   " const i32 1\n"
-                  " cmp\n"
+                  " cmpeq i32\n"
                   " jnz %then, %else\n"
                   "then:\n"
                   " const i32 1\n"

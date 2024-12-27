@@ -1626,7 +1626,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         if(v->get_type().get_type_class() != cg::type_class::i32
            && v->get_type().get_type_class() != cg::type_class::f32)
         {
-            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator '++'. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
         if(v->get_type().get_type_class() == cg::type_class::i32)
@@ -1648,7 +1648,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         auto v = operand->generate_code(ctx, mc);
         if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
         {
-            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator. Expected 'i32' or 'f32'.", v->get_type().to_string()));
+            throw cg::codegen_error(loc, fmt::format("Wrong expression type '{}' for prefix operator '--'. Expected 'i32' or 'f32'.", v->get_type().to_string()));
         }
 
         if(v->get_type().get_type_class() == cg::type_class::i32)
@@ -1686,7 +1686,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         }
         else
         {
-            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32' or 'f32', got '{}'.", v->get_type().to_string()));
+            throw cg::codegen_error(loc, fmt::format("Type error for unary operator '-': Expected 'i32' or 'f32', got '{}'.", v->get_type().to_string()));
         }
         instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
 
@@ -1695,24 +1695,31 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     }
     else if(op.s == "!")
     {
-        // TODO
-        throw std::runtime_error(fmt::format("{}: unary_expression::generate_code not implemented for logical not.", slang::to_string(loc)));
+        auto v = operand->generate_code(ctx, memory_context::load);
+        if(v->get_type().get_type_class() != cg::type_class::i32)
+        {
+            throw cg::codegen_error(loc, fmt::format("Type error for unary operator '!': Expected 'i32', got '{}'.", v->get_type().to_string()));
+        }
+
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 0);
+        ctx.generate_binary_op(cg::binary_op::op_equal, *v);
+
+        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
     else if(op.s == "~")
     {
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
+
         auto v = operand->generate_code(ctx, mc);
+        if(v->get_type().get_type_class() != cg::type_class::i32)
+        {
+            throw cg::codegen_error(loc, fmt::format("Type error for unary operator '~': Expected 'i32', got '{}'.", v->get_type().to_string()));
+        }
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type().get_type_class() == cg::type_class::i32)
-        {
-            args.emplace_back(std::make_unique<cg::const_argument>(~0));
-        }
-        else
-        {
-            throw cg::codegen_error(loc, fmt::format("Type error in unary operator: Expected 'i32', got '{}'.", v->get_type().to_string()));
-        }
+        args.emplace_back(std::make_unique<cg::const_argument>(~0));
+
         instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
 
         ctx.generate_binary_op(cg::binary_op::op_xor, *v);

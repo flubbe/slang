@@ -29,6 +29,7 @@ _script_tests: list[str] = [
     "test_cast",
     "test_cast_fail",
     "test_conversions",
+    "test_operators",
     "test_strings",
     "test_structs",
 ]

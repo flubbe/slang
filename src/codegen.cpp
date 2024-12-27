@@ -871,12 +871,6 @@ void context::generate_checkcast(type target_type)
     insertion_point->add_instruction(std::make_unique<instruction>("checkcast", std::move(args)));
 }
 
-void context::generate_cmp()
-{
-    validate_insertion_point();
-    insertion_point->add_instruction(std::make_unique<instruction>("cmp"));
-}
-
 void context::generate_cond_branch(basic_block* then_block, basic_block* else_block)
 {
     if(then_block == nullptr)
