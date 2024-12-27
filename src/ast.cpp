@@ -90,7 +90,7 @@ std::optional<directive> expression::get_unique_directive(const std::string& s) 
     auto directives = get_directives(s);
     if(directives.size() > 1)
     {
-        throw cg::codegen_error(loc, "More than one 'allow_cast' directive.");
+        throw cg::codegen_error(loc, fmt::format("More than one '{}' directive.", s));
     }
 
     if(directives.size() == 1)
