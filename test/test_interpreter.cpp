@@ -122,7 +122,7 @@ TEST(interpreter, module_and_functions)
 }
 
 /**
- * Register standard library functions.
+ * Register standard library functions and types.
  *
  * The functions `print` and `println` are redirected to a buffer.
  *
@@ -131,6 +131,8 @@ TEST(interpreter, module_and_functions)
  */
 static void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
 {
+    rt::register_builtin_type_layouts(ctx.get_gc());
+
     ctx.register_native_function("slang", "print",
                                  [&ctx, &print_buf](si::operand_stack& stack)
                                  {

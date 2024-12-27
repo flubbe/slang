@@ -99,8 +99,8 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("parse_i32: argument cannot be null.");
     }
 
-    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("result");
-    std::size_t i32s_layout_id = ctx.get_gc().get_type_layout_id("i32s");
+    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("std.result");
+    std::size_t i32s_layout_id = ctx.get_gc().get_type_layout_id("std.i32s");
 
     result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
       result_layout_id, sizeof(result), std::alignment_of_v<result>,
@@ -136,8 +136,8 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("parse_i32: argument cannot be null.");
     }
 
-    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("result");
-    std::size_t f32s_layout_id = ctx.get_gc().get_type_layout_id("f32s");
+    std::size_t result_layout_id = ctx.get_gc().get_type_layout_id("std.result");
+    std::size_t f32s_layout_id = ctx.get_gc().get_type_layout_id("std.f32s");
 
     result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
       result_layout_id, sizeof(result), std::alignment_of_v<result>,

@@ -14,7 +14,6 @@
 #include <unordered_map>
 
 #include "vector.h"
-#include "module.h"
 
 namespace slang::gc
 {
@@ -320,7 +319,7 @@ public:
      * Allocate a new garbage collected variable of a given size and alignment,
      * and optionally add it to the root set or temporary set.
      *
-     * @param layout_id The type layout id, as returned by `register_layout`.
+     * @param layout_id The type layout id, as returned by `register_type_layout`.
      * @param size Size of the object, in bytes.
      * @param alignment Byte-alignment of the object.
      * @param flags Flags.
@@ -439,15 +438,26 @@ public:
     gc_object_type get_object_type(void* obj) const;
 
     /**
-     * Register a type layout. If the layout name is already registered, the incoming
-     * and existing layouts are compared.
+     * Register a type layout. If a layout of the same name already exists, a `gc_error` is thrown.
      *
      * @param name Name of the type.
      * @param layout The type layout, given as a list of offsets of pointers.
      * @returns Returns a layout identifier.
-     * @throws Throws a `gc_error´ if the layout already exists and does not match the incoming description.
+     * @throws Throws a `gc_error´ if the layout already exists.
      */
     std::size_t register_type_layout(std::string name, std::vector<std::size_t> layout);
+
+    /**
+     * Check a type layout against an existing one. If there no layout is registered for the name,
+     * or if the layouts disagree, a `gc_error` is thrown.
+     *
+     * @param name Name of the type.
+     * @param layout The type layout, given as a list of offsets of pointers.
+     * @returns Returns a layout identifier.
+     * @throws Throws a `gc_error´ if the layout does not exist, or if it exists and does not match
+     *         the incoming description.
+     */
+    std::size_t check_type_layout(const std::string& name, const std::vector<std::size_t>& layout) const;
 
     /**
      * Get a type layout id from the type's name.

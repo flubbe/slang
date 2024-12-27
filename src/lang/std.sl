@@ -17,6 +17,7 @@ struct type {};
 /** 
  * Result type, holding a generic value and an indicator whether the result holds an error. 
  */
+#[native]
 struct result 
 {
     ok: i32,
@@ -24,12 +25,14 @@ struct result
 };
 
 /** Wrapper around i32. */
+#[native]
 struct i32s
 {
     value: i32
 };
 
 /** Wrapper around f32. */
+#[native]
 struct f32s
 {
     value: f32

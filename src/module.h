@@ -594,8 +594,9 @@ inline archive& operator&(archive& ar, field_descriptor& info)
 /** Struct flags. */
 enum class struct_flags : std::uint8_t
 {
-    none = 0,      /** No flags. */
-    allow_cast = 1 /** Allow casts to and from arbitrary objects. */
+    none = 0,       /** No flags. */
+    allow_cast = 1, /** Allow casts to and from arbitrary objects. */
+    native = 2      /** This struct has a native implementation. */
 };
 
 /** Struct descriptor. */

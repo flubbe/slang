@@ -173,6 +173,7 @@ add_executable(test_interpreter
     ../src/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
+    ../src/runtime/types.cpp
     ../src/module.cpp
     ../src/opcodes.cpp
 )

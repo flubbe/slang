@@ -181,6 +181,9 @@ class module_loader
     /** The associated interpreter context. */
     context& ctx;
 
+    /** The module's import name. */
+    std::string import_name;
+
     /** The module's path. */
     fs::path path;
 
@@ -269,10 +272,12 @@ public:
      * Create a new module loader.
      *
      * @param ctx The associated interpreter context.
+     * @param import_name The module's import name.
      * @param path The module's path.
      * @param recorder An optional instruction recorder.
      */
     module_loader(context& ctx,
+                  std::string import_name,
                   fs::path path,
                   std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
 

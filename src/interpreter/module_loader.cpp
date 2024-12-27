@@ -254,8 +254,15 @@ void module_loader::decode_structs()
         desc.size = size;
         desc.alignment = alignment;
 
-        // store layout.
-        desc.layout_id = ctx.get_gc().register_type_layout(name, std::move(layout));
+        // check/store layout.
+        if((desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0)
+        {
+            desc.layout_id = ctx.get_gc().check_type_layout(fmt::format("{}.{}", import_name, name), layout);
+        }
+        else
+        {
+            desc.layout_id = ctx.get_gc().register_type_layout(fmt::format("{}.{}", import_name, name), std::move(layout));
+        }
 
         recorder->type(name, desc);
     }
@@ -1057,9 +1064,11 @@ std::int32_t module_loader::decode_instruction(
 
 module_loader::module_loader(
   context& ctx,
+  std::string import_name,
   fs::path path,
   std::shared_ptr<instruction_recorder> recorder)
 : ctx{ctx}
+, import_name{std::move(import_name)}
 , path{std::move(path)}
 , recorder{std::move(recorder)}
 {

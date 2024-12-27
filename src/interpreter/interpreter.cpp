@@ -1345,7 +1345,7 @@ module_loader* context::resolve_module(const std::string& import_name, std::shar
     }
     fs::path resolved_path = file_mgr.resolve(fs_path);
 
-    loaders.insert({import_name, std::make_unique<module_loader>(*this, resolved_path, recorder)});
+    loaders.insert({import_name, std::make_unique<module_loader>(*this, import_name, resolved_path, recorder)});
     return loaders[import_name].get();
 }
 

@@ -340,13 +340,7 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
                            });
     if(it != type_layouts.end())
     {
-        // compare layouts.
-        if(layout != it->second.second)
-        {
-            throw gc_error(fmt::format("A different type layout for '{}' was already registered.", name));
-        }
-
-        return it->first;
+        throw gc_error(fmt::format("Layout for type '{}' already registered.", name));
     }
 
     // find the first free identifier.
@@ -361,6 +355,29 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
 
     type_layouts.insert({id, std::make_pair(std::move(name), std::move(layout))});
     return id;
+}
+
+std::size_t garbage_collector::check_type_layout(
+  const std::string& name,
+  const std::vector<std::size_t>& layout) const
+{
+    // check if the layout already exists
+    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
+                           [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
+                           {
+                               return t.second.first == name;
+                           });
+    if(it == type_layouts.end())
+    {
+        throw gc_error(fmt::format("Layout for type '{}' not found.", name));
+    }
+
+    if(it->second.second != layout)
+    {
+        throw gc_error(fmt::format("A different layout was already registered for type '{}'.", name));
+    }
+
+    return it->first;
 }
 
 std::size_t garbage_collector::get_type_layout_id(const std::string& name) const

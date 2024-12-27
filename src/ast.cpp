@@ -85,6 +85,21 @@ std::vector<directive> expression::get_directives(const std::string& s) const
     return ret;
 }
 
+std::optional<directive> expression::get_unique_directive(const std::string& s) const
+{
+    auto directives = get_directives(s);
+    if(directives.size() > 1)
+    {
+        throw cg::codegen_error(loc, "More than one 'allow_cast' directive.");
+    }
+
+    if(directives.size() == 1)
+    {
+        return std::make_optional(std::move(directives[0]));
+    }
+    return std::nullopt;
+}
+
 /*
  * literal_expression.
  */
@@ -931,8 +946,8 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
     std::uint8_t flags = static_cast<std::uint8_t>(module_::struct_flags::none);
 
-    auto directives = get_directives("allow_cast");
-    if(directives.size() == 1)
+    std::optional<directive> d = get_unique_directive("allow_cast");
+    if(d.has_value())
     {
         if(struct_members.size() != 0)
         {
@@ -945,9 +960,11 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
         flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
     }
-    else if(directives.size() > 1)
+
+    d = get_unique_directive("native");
+    if(d.has_value())
     {
-        throw cg::codegen_error(loc, "More than one 'allow_cast' directive.");
+        flags |= static_cast<std::uint8_t>(module_::struct_flags::native);
     }
 
     s->add_struct(name.s, struct_members, flags);    // FIXME do we need this?
@@ -973,6 +990,10 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
 bool struct_definition_expression::supports_directive(const std::string& name) const
 {
     if(name == "allow_cast")
+    {
+        return true;
+    }
+    else if(name == "native")
     {
         return true;
     }
@@ -2181,8 +2202,8 @@ std::string block::to_string() const
 
 std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto directives = get_directives("native");
-    if(directives.size() == 0)
+    auto d = get_unique_directive("native");
+    if(!d.has_value())
     {
         if(mc != memory_context::none)
         {
@@ -2224,12 +2245,10 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
 
             ctx.generate_ret(v ? std::make_optional(*v) : std::nullopt);
         }
-
-        return nullptr;
     }
-    else if(directives.size() == 1)
+    else
     {
-        auto& directive = directives[0];
+        auto& directive = *d;
         if(directive.args.size() != 1 || directive.args[0].first.s != "lib")
         {
             throw cg::codegen_error(loc, fmt::format("Native function '{}': Expected argument 'lib' for directive.", prototype->get_name().s));
@@ -2246,12 +2265,9 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             : directive.args[0].second.s;
 
         prototype->generate_native_binding(lib_name, ctx);
-        return nullptr;
     }
-    else
-    {
-        throw cg::codegen_error(loc, "Too many 'native' directives. Can only bind to a single native function.");
-    }
+
+    return nullptr;
 }
 
 void function_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const

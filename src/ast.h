@@ -218,10 +218,19 @@ public:
     /**
      * Get a list of matching directives.
      *
-     * @param name The directive name.
+     * @param name The directive's name.
      * @returns A vector of directives matching the name, or an empty vector if none are found.
      */
     std::vector<directive> get_directives(const std::string& s) const;
+
+    /**
+     * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
+     *
+     * @param name The directive's name.
+     * @returns The directive, or `std::nullopt` if the directive was not found.
+     * @throws Throws a `codegen_error` if the directive is not unique.
+     */
+    std::optional<directive> get_unique_directive(const std::string& s) const;
 
     /**
      * Set the namespace stack for the expression.
