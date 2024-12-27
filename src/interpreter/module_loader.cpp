@@ -601,7 +601,7 @@ std::int32_t module_loader::decode_instruction(
         {
             float f;
             std::memcpy(&f, &i_u32, sizeof(float));
-            recorder->record(opcode::iconst, f);
+            recorder->record(opcode::fconst, f);
         }
 
         return static_cast<std::int32_t>(sizeof(std::uint32_t));
