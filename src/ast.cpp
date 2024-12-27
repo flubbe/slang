@@ -1013,37 +1013,6 @@ std::string struct_definition_expression::to_string() const
 
 std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    // TODO
-    throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::generate_code not implemented.", slang::to_string(loc)));
-}
-
-std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
-{
-    // TODO
-    throw std::runtime_error(fmt::format("{}: struct_anonymous_initializer_expression::type_check not implemented.", slang::to_string(loc)));
-}
-
-std::string struct_anonymous_initializer_expression::to_string() const
-{
-    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
-    if(initializers.size() > 0)
-    {
-        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
-        {
-            ret += fmt::format("{}, ", initializers[i]->to_string());
-        }
-        ret += fmt::format("{}", initializers.back()->to_string());
-    }
-    ret += ")";
-    return ret;
-}
-
-/*
- * struct_named_initializer_expression.
- */
-
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
-{
     if(mc == memory_context::store)
     {
         throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
@@ -1096,6 +1065,135 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
 }
 
+std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
+{
+    auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+
+    if(initializers.size() != struct_def->members.size())
+    {
+        throw ty::type_error(name.location,
+                             fmt::format("Struct '{}' has {} members, but {} are initialized.",
+                                         name.s, struct_def->members.size(), initializers.size()));
+    }
+
+    for(std::size_t i = 0; i < initializers.size(); ++i)
+    {
+        const auto& initializer = initializers[i];
+        const auto& struct_member = struct_def->members[i];
+
+        auto initializer_type = initializer->type_check(ctx);
+        if(!initializer_type.has_value())
+        {
+            throw ty::type_error(name.location,
+                                 fmt::format("Initializer expression for struct member '{}.{}' has no type.",
+                                             name.s, struct_member.first.s));
+        }
+
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(struct_member.second != initializer_type
+           && !(ctx.is_reference_type(struct_member.second) && initializer_type == ctx.get_type("@null", false)))
+        {
+            throw ty::type_error(name.location,
+                                 fmt::format("Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+                                             name.s, struct_member.first.s,
+                                             struct_member.second.to_string(), initializer_type->to_string()));
+        }
+    }
+
+    return ctx.get_type(name.s, false, get_namespace_path());
+}
+
+std::string struct_anonymous_initializer_expression::to_string() const
+{
+    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
+    if(initializers.size() > 0)
+    {
+        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", initializers[i]->to_string());
+        }
+        ret += fmt::format("{}", initializers.back()->to_string());
+    }
+    ret += ")";
+    return ret;
+}
+
+/*
+ * struct_named_initializer_expression.
+ */
+
+std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
+{
+    if(mc == memory_context::store)
+    {
+        throw cg::codegen_error(loc, "Invalid memory context for struct initializer.");
+    }
+
+    cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
+
+    cg::type struct_type{cg::type_class::struct_, 0, name.s, get_namespace_path()};
+    const std::vector<std::pair<std::string, cg::value>>* t{nullptr};
+
+    if(s->contains_struct(name.s, get_namespace_path()))
+    {
+        t = &s->get_struct(name.s, get_namespace_path());
+        ctx.generate_new(struct_type);
+    }
+    else
+    {
+        auto type = ctx.get_type(name.s, get_namespace_path());
+        struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
+
+        t = &ctx.get_type(name.s, get_namespace_path())->get_members();
+        ctx.generate_new(struct_type);
+    }
+
+    for(std::size_t i = 0; i < member_names.size(); ++i)
+    {
+        const auto& initializer = initializers[i];
+        const auto& member_name_expr = member_names[i];
+
+        if(!member_name_expr->is_named_expression())
+        {
+            throw ty::type_error(member_name_expr->get_location(),
+                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
+        }
+        auto member_name = member_name_expr->as_named_expression()->get_name().s;
+
+        auto it = std::find_if(t->cbegin(), t->cend(),
+                               [&member_name](const auto& m) -> bool
+                               { return m.first == member_name; });
+        if(it == t->cend())
+        {
+            throw ty::type_error(name.location,
+                                 fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
+        }
+
+        const auto& member_type = it->second;
+
+        ctx.generate_dup(cg::value{struct_type});
+
+        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        if(!initializer_value)
+        {
+            throw cg::codegen_error(loc,
+                                    fmt::format("Code generation for '{}.{}' initialization returned no type.",
+                                                name.s, member_name));
+        }
+        if(!initializer_value->get_type().is_null()
+           && initializer_value->get_type().to_string() != member_type.get_type().to_string())
+        {
+            throw cg::codegen_error(loc,
+                                    fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                                                name.s, member_name, initializer_value->get_type().to_string(), member_type.get_type().to_string()));
+        }
+
+        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
+    }
+
+    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
+}
+
 std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty::context& ctx)
 {
     auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
@@ -1108,22 +1206,26 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
     std::vector<std::string> initialized_member_names;
     for(std::size_t i = 0; i < member_names.size(); ++i)
     {
-        const auto& member_name = member_names[i];
+        const auto& member_name_expr = member_names[i];
         const auto& initializer = initializers[i];
 
-        // FIXME This cast needs to be checked / validated.
-        auto member_name_expr = static_cast<ast::variable_reference_expression*>(member_name.get());
+        if(!member_name_expr->is_named_expression())
+        {
+            throw ty::type_error(member_name_expr->get_location(),
+                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
+        }
+        auto member_name = member_name_expr->as_named_expression()->get_name().s;
 
         if(std::find_if(initialized_member_names.begin(), initialized_member_names.end(),
-                        [&member_name_expr](auto& name) -> bool
-                        { return name == member_name_expr->get_name().s; })
+                        [&member_name](auto& name) -> bool
+                        { return name == member_name; })
            != initialized_member_names.end())
         {
             throw ty::type_error(name.location,
                                  fmt::format("Multiple initializations of struct member '{}::{}'.",
-                                             name.s, member_name_expr->get_name().s));
+                                             name.s, member_name));
         }
-        initialized_member_names.push_back(member_name_expr->get_name().s);
+        initialized_member_names.push_back(member_name);
 
         if(member_name_expr->is_array_element_access())    // this is an array access.
         {
@@ -1131,11 +1233,11 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         }
 
         auto it = std::find_if(struct_def->members.begin(), struct_def->members.end(),
-                               [member_name_expr](const auto& m) -> bool
-                               { return m.first.s == member_name_expr->get_name().s; });
+                               [&member_name](const auto& m) -> bool
+                               { return m.first.s == member_name; });
         if(it == struct_def->members.end())
         {
-            throw ty::type_error(name.location, fmt::format("Struct '{}' has no member '{}'.", name.s, member_name_expr->get_name().s));
+            throw ty::type_error(name.location, fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
         }
 
         auto initializer_type = initializer->type_check(ctx);
@@ -1143,7 +1245,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         {
             throw ty::type_error(name.location,
                                  fmt::format("Initializer expression for struct member '{}.{}' has no type.",
-                                             name.s, member_name_expr->get_name().s));
+                                             name.s, member_name));
         }
 
         // Either the types match, or the type is a reference types which is set to 'null'.
@@ -1152,7 +1254,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         {
             throw ty::type_error(name.location,
                                  fmt::format("Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-                                             name.s, member_name_expr->get_name().s,
+                                             name.s, member_name,
                                              it->second.to_string(), initializer_type->to_string()));
         }
     }

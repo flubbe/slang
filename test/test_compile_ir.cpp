@@ -1505,6 +1505,7 @@ TEST(compile_ir, continue_fail)
 TEST(compile_ir, structs)
 {
     {
+        // named initialization.
         const std::string test_input =
           "struct S {\n"
           " i: i32,\n"
@@ -1552,6 +1553,105 @@ TEST(compile_ir, structs)
                   "}");
     }
     {
+        // re-ordered named initialization.
+        const std::string test_input =
+          "struct S {\n"
+          " j: f32,\n"
+          " i: i32\n"
+          "};\n"
+          "fn test() -> void\n"
+          "{\n"
+          " let s: S = S{ i: 2, j: 3 as f32 };\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::block> ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "%S = type {\n"
+                  " f32 %j,\n"
+                  " i32 %i,\n"
+                  "}\n"
+                  "define void @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"
+                  " dup S\n"
+                  " const i32 2\n"
+                  " set_field %S, i32 %i\n"
+                  " dup S\n"
+                  " const i32 3\n"
+                  " cast i32_to_f32\n"
+                  " set_field %S, f32 %j\n"
+                  " store S %s\n"
+                  " ret void\n"
+                  "}");
+    }
+    {
+        // anonymous initialization.
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " j: f32\n"
+          "};\n"
+          "fn test() -> void\n"
+          "{\n"
+          " let s: S = S{ 2, 3 as f32 };\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::block> ast = parser.get_ast();
+        ASSERT_NE(ast, nullptr);
+
+        cg::context ctx;
+        ty::context type_ctx;
+        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "%S = type {\n"
+                  " i32 %i,\n"
+                  " f32 %j,\n"
+                  "}\n"
+                  "define void @test() {\n"
+                  "local S %s\n"
+                  "entry:\n"
+                  " new S\n"
+                  " dup S\n"
+                  " const i32 2\n"
+                  " set_field %S, i32 %i\n"
+                  " dup S\n"
+                  " const i32 3\n"
+                  " cast i32_to_f32\n"
+                  " set_field %S, f32 %j\n"
+                  " store S %s\n"
+                  " ret void\n"
+                  "}");
+    }
+    {
+        // member access and conversions.
         const std::string test_input =
           "struct S {\n"
           " i: i32,\n"
@@ -1613,6 +1713,7 @@ TEST(compile_ir, structs)
                   "}");
     }
     {
+        // member access in chained assignments.
         const std::string test_input =
           "struct S {\n"
           " i: i32,\n"

@@ -1694,7 +1694,7 @@ enum class binary_op
     op_not_equal,     /** a != b */
     op_and,           /** a & b */
     op_xor,           /** a ^ b */
-    op_or,            /** a | b*/
+    op_or,            /** a | b */
     op_logical_and,   /** a && b */
     op_logical_or,    /** a || b */
 };

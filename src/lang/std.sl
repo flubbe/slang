@@ -114,7 +114,7 @@ fn f32_to_string(f: f32) -> str;
  * Parse a string and return an i32 integer. 
  *
  * @param s The string to parse.
- * @return Returns a `result` containing a `i32_s`.
+ * @return Returns a `result` containing a `i32s`.
  */
 #[native(lib="slang")]
 fn parse_i32(s: str) -> result;
@@ -123,7 +123,7 @@ fn parse_i32(s: str) -> result;
  * Parse a string and return an f32 float.
  *
  * @param s The string to parse.
- * @return Returns a `result` containing a `f32_s`.
+ * @return Returns a `result` containing a `f32s`.
  */
 #[native(lib="slang")]
 fn parse_f32(s: str) -> result;
