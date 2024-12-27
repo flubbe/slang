@@ -10,9 +10,16 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <new>
 #include <set>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "vector.h"
 
