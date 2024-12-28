@@ -648,6 +648,42 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
     return it->get();
 }
 
+void context::add_constant(std::string name, std::int32_t i)
+{
+    auto it = named_constants.find(name);
+    if(it != named_constants.end())
+    {
+        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+    }
+
+    constants.emplace_back(module_::constant_type::i32, i);
+    named_constants.insert({name, constants.size() - 1});
+}
+
+void context::add_constant(std::string name, float f)
+{
+    auto it = named_constants.find(name);
+    if(it != named_constants.end())
+    {
+        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+    }
+
+    constants.emplace_back(module_::constant_type::f32, f);
+    named_constants.insert({name, constants.size() - 1});
+}
+
+void context::add_constant(std::string name, std::string s)
+{
+    auto it = named_constants.find(name);
+    if(it != named_constants.end())
+    {
+        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+    }
+
+    constants.emplace_back(module_::constant_type::str, std::move(s));
+    named_constants.insert({name, constants.size() - 1});
+}
+
 std::size_t context::get_string(std::string str)
 {
     auto it = std::find_if(constants.begin(), constants.end(),

@@ -55,6 +55,7 @@ enum class symbol_type : std::uint8_t
     package = 0,
     function = 1,
     type = 2,
+    constant = 3,
 };
 
 /**
@@ -70,7 +71,8 @@ inline archive& operator&(archive& ar, symbol_type& s)
 
     if(i != static_cast<std::uint8_t>(symbol_type::package)
        && i != static_cast<std::uint8_t>(symbol_type::function)
-       && i != static_cast<std::uint8_t>(symbol_type::type))
+       && i != static_cast<std::uint8_t>(symbol_type::type)
+       && i != static_cast<std::uint8_t>(symbol_type::constant))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -87,6 +89,7 @@ inline std::string to_string(symbol_type s)
     case symbol_type::package: return "package";
     case symbol_type::function: return "function";
     case symbol_type::type: return "type";
+    case symbol_type::constant: return "constant";
     }
     return "<unknown>";
 }
@@ -829,8 +832,8 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Function or struct descriptor. */
-    std::variant<function_descriptor, struct_descriptor> desc;
+    /** Function, struct descriptor or constant table index. */
+    std::variant<function_descriptor, struct_descriptor, std::size_t> desc;
 
     /** Default constructors. */
     exported_symbol() = default;
@@ -848,7 +851,9 @@ struct exported_symbol
      * @param name The symbol name.
      * @param desc The symbol's descriptor.
      */
-    exported_symbol(symbol_type type, std::string name, std::variant<function_descriptor, struct_descriptor> desc)
+    exported_symbol(symbol_type type,
+                    std::string name,
+                    std::variant<function_descriptor, struct_descriptor, std::size_t> desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -899,7 +904,25 @@ inline archive& operator&(archive& ar, exported_symbol& s)
             ar & desc;
         }
     }
-    else if(s.type != symbol_type::package)
+    else if(s.type == symbol_type::package)
+    {
+        /* nothing to do */
+    }
+    else if(s.type == symbol_type::constant)
+    {
+        if(ar.is_reading())
+        {
+            std::size_t i;
+            ar & i;
+            s.desc = i;
+        }
+        else if(ar.is_writing())
+        {
+            std::size_t i = std::get<std::size_t>(s.desc);
+            ar & i;
+        }
+    }
+    else
     {
         throw serialization_error("Unknown symbol type.");
     }

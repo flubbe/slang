@@ -371,6 +371,12 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    /** Get the token. */
+    const token& get_token() const
+    {
+        return tok;
+    }
 };
 
 /** A type expression. */
@@ -817,6 +823,59 @@ public:
     bool is_array() const
     {
         return type->is_array();
+    }
+};
+
+/** A constant expression. */
+class constant_expression : public named_expression
+{
+    /** The constant's type. */
+    std::unique_ptr<ast::type_expression> type;
+
+    /** The initializer expression. */
+    std::unique_ptr<ast::literal_expression> expr;
+
+public:
+    /** No default constructor. */
+    constant_expression() = delete;
+
+    /** Default destructor. */
+    virtual ~constant_expression() = default;
+
+    /** Copy and move constructors. */
+    constant_expression(const constant_expression&) = delete;
+    constant_expression(constant_expression&&) = default;
+
+    /** Assignment operators. */
+    constant_expression& operator=(const constant_expression&) = delete;
+    constant_expression& operator=(constant_expression&&) = default;
+
+    /**
+     * Construct a constant expression.
+     *
+     * @param loc The location.
+     * @param name The constant's name.
+     * @param type The constant's type.
+     * @param expr The initializer expression.
+     */
+    constant_expression(token_location loc,
+                        token name,
+                        std::unique_ptr<ast::type_expression> type,
+                        std::unique_ptr<ast::literal_expression> expr)
+    : named_expression{std::move(loc), std::move(name)}
+    , type{std::move(type)}
+    , expr{std::move(expr)}
+    {
+    }
+
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::string to_string() const override;
+
+    /** Get the constant's type. */
+    const std::unique_ptr<ast::type_expression>& get_type() const
+    {
+        return type;
     }
 };
 

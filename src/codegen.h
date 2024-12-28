@@ -1750,6 +1750,9 @@ class context
     /** Constant table. */
     std::vector<module_::constant_table_entry> constants;
 
+    /** Named constants (index into constant table). */
+    std::unordered_map<std::string, std::size_t> named_constants;
+
     /** Global scope. */
     std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
 
@@ -1866,6 +1869,30 @@ public:
      * @param import_path Import path.
      */
     struct_* get_type(const std::string& name, std::optional<std::string> import_path);
+
+    /**
+     * Add a `i32` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param i The constant's value.
+     */
+    void add_constant(std::string name, std::int32_t i);
+
+    /**
+     * Add a `f32` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param f The constant's value.
+     */
+    void add_constant(std::string name, float i);
+
+    /**
+     * Add a `str` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param s The constant's value.
+     */
+    void add_constant(std::string name, std::string s);
 
     /**
      * Get a reference to a string or create a new one if it does not exist.
