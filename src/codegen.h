@@ -21,7 +21,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
-
+#include "module.h"
 #include "token.h"
 
 /* Forward declarations. */
@@ -31,12 +31,6 @@ namespace slang
 class instruction_emitter;  /* emitter.h */
 class export_table_builder; /* emitter.h */
 }    // namespace slang
-
-namespace slang::module_
-{
-enum class symbol_type : std::uint8_t; /* module.h */
-class language_module;                 /* module.h */
-}    // namespace slang::module_
 
 namespace slang::codegen
 {
@@ -402,7 +396,7 @@ class constant_str : public value
     /** The string. */
     std::string s;
 
-    /** Index into the string table. */
+    /** Index into the constant table. */
     int constant_index{-1};
 
 public:
@@ -434,7 +428,7 @@ public:
     }
 
     /**
-     * Set the index into the string table.
+     * Set the index into the constant table.
      *
      * @param index The new index. A index of -1 means "no index".
      *              Must be non-negative or -1.
@@ -449,7 +443,7 @@ public:
         constant_index = index;
     }
 
-    /** Get the index into the string table. A value of -1 indicates "no index". */
+    /** Get the index into the constant table. A value of -1 indicates "no index". */
     int get_constant_index() const
     {
         return constant_index;
@@ -1753,8 +1747,8 @@ class context
     /** List of structs. */
     std::vector<std::unique_ptr<struct_>> types;
 
-    /** String table. */
-    std::vector<std::string> strings;
+    /** Constant table. */
+    std::vector<module_::constant_table_entry> constants;
 
     /** Global scope. */
     std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
@@ -1877,7 +1871,7 @@ public:
      * Get a reference to a string or create a new one if it does not exist.
      *
      * @param str The string.
-     * @returns An index into the string table.
+     * @returns An index into the constant table.
      */
     std::size_t get_string(std::string str);
 

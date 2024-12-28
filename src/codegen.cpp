@@ -374,7 +374,7 @@ std::size_t scope::get_index(const std::string& name) const
                            });
     if(it != args.end())
     {
-        return it - args.begin();
+        return std::distance(args.begin(), it);
     }
 
     it = std::find_if(locals.begin(), locals.end(),
@@ -390,7 +390,7 @@ std::size_t scope::get_index(const std::string& name) const
 
     if(it != locals.end())
     {
-        return args.size() + (it - locals.begin());
+        return args.size() + std::distance(locals.begin(), it);
     }
 
     throw codegen_error(fmt::format("Name '{}' not found in scope.", name));
@@ -650,14 +650,18 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
 
 std::size_t context::get_string(std::string str)
 {
-    auto it = std::find(strings.begin(), strings.end(), str);
-    if(it != strings.end())
+    auto it = std::find_if(constants.begin(), constants.end(),
+                           [&str](const module_::constant_table_entry& t) -> bool
+                           {
+                               return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
+                           });
+    if(it != constants.end())
     {
-        return it - strings.begin();
+        return std::distance(constants.begin(), it);
     }
 
-    strings.emplace_back(std::move(str));
-    return strings.size() - 1;
+    constants.emplace_back(module_::constant_type::str, std::move(str));
+    return constants.size() - 1;
 }
 
 prototype* context::add_prototype(std::string name,
@@ -1063,8 +1067,8 @@ std::string context::to_string() const
 {
     std::string buf;
 
-    // strings.
-    if(strings.size())
+    // constants.
+    if(constants.size())
     {
         auto make_printable = [](const std::string& s) -> std::string
         {
@@ -1086,13 +1090,38 @@ std::string context::to_string() const
             return str;
         };
 
-        for(std::size_t i = 0; i < strings.size() - 1; ++i)
+        auto print_constant = [&buf, &make_printable](std::size_t i, const module_::constant_table_entry& c, bool newline = true) -> void
         {
-            buf += fmt::format(".string @{} \"{}\"\n", i, make_printable(strings[i]));
-        }
-        buf += fmt::format(".string @{} \"{}\"", strings.size() - 1, make_printable(strings.back()));
+            if(c.type == module_::constant_type::i32)
+            {
+                buf += fmt::format(".i32 @{} {}", i, std::get<std::int32_t>(c.data));
+            }
+            else if(c.type == module_::constant_type::f32)
+            {
+                buf += fmt::format(".f32 @{} {}", i, std::get<float>(c.data));
+            }
+            else if(c.type == module_::constant_type::str)
+            {
+                buf += fmt::format(".string @{} \"{}\"", i, make_printable(std::get<std::string>(c.data)));
+            }
+            else
+            {
+                buf += fmt::format(".<unknown> @{}", i);
+            }
 
-        // don't append a newline if the string table is the only non-empty buffer.
+            if(newline)
+            {
+                buf += "\n";
+            }
+        };
+
+        for(std::size_t i = 0; i < constants.size() - 1; ++i)
+        {
+            print_constant(i, constants[i]);
+        }
+        print_constant(constants.size() - 1, constants.back(), false);
+
+        // don't append a newline if the constant table is the only non-empty buffer.
         if(types.size() != 0 || funcs.size() != 0)
         {
             buf += "\n";

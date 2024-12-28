@@ -465,13 +465,18 @@ opcode context::exec(
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
-                if(i < 0 || static_cast<std::size_t>(i) >= frame.string_table.size())
+                if(i < 0 || static_cast<std::size_t>(i) >= frame.constants.size())
                 {
-                    throw interpreter_error(fmt::format("Invalid index '{}' into string table.", i));
+                    throw interpreter_error(fmt::format("Invalid index '{}' into constant table.", i));
                 }
 
                 auto str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
-                *str = frame.string_table[i];
+                if(frame.constants[i].type != module_::constant_type::str)
+                {
+                    throw interpreter_error(fmt::format("Entry {} of constant table is not a string.", i));
+                }
+
+                *str = std::get<std::string>(frame.constants[i].data);
 
                 frame.stack.push_addr(str);
                 break;
@@ -700,7 +705,7 @@ opcode context::exec(
                     auto& details = std::get<module_::function_details>(desc->details);
 
                     // prepare stack frame
-                    stack_frame callee_frame{frame.string_table, details.locals_size, details.stack_size};
+                    stack_frame callee_frame{frame.constants, details.locals_size, details.stack_size};
 
                     auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                     std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
@@ -1253,7 +1258,7 @@ value context::exec(
      * allocate locals and decode arguments.
      */
     stack_frame frame{
-      loader.get_module().get_header().strings,
+      loader.get_module().get_header().constants,
       f.get_locals_size(),
       f.get_stack_size()};
 
@@ -1418,7 +1423,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
 
         if(call_stack_level == 0)
         {
-            // we never entered context.exec, so add the function explicitly.
+            // we never entered context::exec, so add the function explicitly.
             buf += fmt::format("  in {}.{}\n", module_name, function_name);
         }
 
@@ -1445,7 +1450,7 @@ value context::invoke(const module_loader& loader, const function& fn, std::vect
 
         if(call_stack_level == 0)
         {
-            // we never entered context.exec, so add the function explicitly.
+            // we never entered context::exec, so add the function explicitly.
             std::string module_name = get_import_name(loader);
             std::string function_name = loader.resolve_entry_point(fn.get_entry_point())
                                           .value_or(fmt::format("<unknown at {}>", fn.get_entry_point()));

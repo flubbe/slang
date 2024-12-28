@@ -1269,8 +1269,8 @@ module_::language_module instruction_emitter::to_module() const
         mod.add_import(module_::symbol_type::package, it);
     }
 
-    // strings.
-    mod.set_string_table(ctx.strings);
+    // constants.
+    mod.set_constant_table(ctx.constants);
 
     // export table.
     exports.write(mod);

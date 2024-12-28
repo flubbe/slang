@@ -79,7 +79,7 @@ TEST(output, native_binding)
 
         ASSERT_EQ(header.exports.size(), 2);
         EXPECT_EQ(header.imports.size(), 0);
-        EXPECT_EQ(header.strings.size(), 0);
+        EXPECT_EQ(header.constants.size(), 0);
 
         ASSERT_EQ(header.exports[0].type, slang::module_::symbol_type::function);
         EXPECT_EQ(header.exports[0].name, "print");
@@ -117,7 +117,7 @@ TEST(output, native_binding)
 
             EXPECT_EQ(read_header.exports.size(), header.exports.size());
             EXPECT_EQ(read_header.imports.size(), header.imports.size());
-            EXPECT_EQ(read_header.strings.size(), header.strings.size());
+            EXPECT_EQ(read_header.constants.size(), header.constants.size());
 
             ASSERT_EQ(read_header.exports.size(), 2);
 

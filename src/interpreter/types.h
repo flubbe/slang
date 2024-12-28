@@ -486,8 +486,8 @@ public:
 /** A stack frame. */
 struct stack_frame
 {
-    /** String table reference. */
-    const std::vector<std::string>& string_table;
+    /** Constant table reference. */
+    const std::vector<module_::constant_table_entry>& constants;
 
     /** Locals and arguments. */
     std::vector<std::byte> locals;
@@ -507,12 +507,14 @@ struct stack_frame
     /**
      * Construct a stack frame.
      *
-     * @param string_table Reference to the module string table.
+     * @param constants Reference to the module constant table.
      * @param locals_size Size to allocate for the locals.
      * @param stack_size The operand stack size.
      */
-    stack_frame(const std::vector<std::string>& string_table, std::size_t locals_size, std::size_t stack_size)
-    : string_table{string_table}
+    stack_frame(const std::vector<module_::constant_table_entry>& constants,
+                std::size_t locals_size,
+                std::size_t stack_size)
+    : constants{constants}
     , locals{locals_size}
     , stack{stack_size}
     {

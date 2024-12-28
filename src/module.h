@@ -158,6 +158,142 @@ inline archive& operator&(archive& ar, array_type& t)
     return ar;
 }
 
+/** Constant type. */
+enum class constant_type : std::uint8_t
+{
+    i32, /** 32-bit integer constant. */
+    f32, /** 32-bit floating point constant. */
+    str, /** A string. */
+};
+
+/** Convert `constant_type` to a readable string. */
+inline std::string to_string(constant_type type)
+{
+    switch(type)
+    {
+    case constant_type::i32: return "i32";
+    case constant_type::f32: return "f32";
+    case constant_type::str: return "str";
+    }
+
+    return "<unknown>";
+}
+
+/** Entry of the constant table. */
+struct constant_table_entry
+{
+    /** Constant type. */
+    constant_type type;
+
+    /** Constant data. */
+    std::variant<std::int32_t, float, std::string> data;
+
+    /** Default constructors. */
+    constant_table_entry() = default;
+    constant_table_entry(const constant_table_entry&) = default;
+    constant_table_entry(constant_table_entry&&) = default;
+
+    /**
+     * Initialize a constant table entry.
+     *
+     * @param type The constant type.
+     * @param data The constant data.
+     */
+    constant_table_entry(constant_type type, std::variant<std::int32_t, float, std::string> data)
+    : type{type}
+    , data{std::move(data)}
+    {
+    }
+
+    /** Default assignments. */
+    constant_table_entry& operator=(const constant_table_entry&) = default;
+    constant_table_entry& operator=(constant_table_entry&&) = default;
+};
+
+/**
+ * Serializer for constant table entries.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The constant table entry.
+ */
+inline archive& operator&(archive& ar, constant_table_entry& entry)
+{
+    if(!ar.is_reading() && !ar.is_writing())
+    {
+        throw serialization_error("Archive has to be reading or writing.");
+    }
+
+    std::uint8_t t = static_cast<std::uint8_t>(entry.type);
+    ar & t;
+
+    if(t != static_cast<std::uint8_t>(constant_type::i32)
+       && t != static_cast<std::uint8_t>(constant_type::f32)
+       && t != static_cast<std::uint8_t>(constant_type::str))
+    {
+        throw serialization_error("Invalid constant type.");
+    }
+
+    entry.type = static_cast<constant_type>(t);
+
+    if(ar.is_reading())
+    {
+        switch(entry.type)
+        {
+        case constant_type::i32:
+        {
+            std::int32_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
+        case constant_type::f32:
+        {
+            float f;
+            ar & f;
+            entry.data = f;
+            break;
+        }
+        case constant_type::str:
+        {
+            std::string s;
+            ar & s;
+            entry.data = s;
+            break;
+        }
+        default:
+            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+        }
+    }
+    else if(ar.is_writing())
+    {
+        switch(entry.type)
+        {
+        case constant_type::i32:
+        {
+            std::int32_t i = std::get<std::int32_t>(entry.data);
+            ar & i;
+            break;
+        }
+        case constant_type::f32:
+        {
+            float f = std::get<float>(entry.data);
+            ar & f;
+            break;
+        }
+        case constant_type::str:
+        {
+            std::string s = std::get<std::string>(entry.data);
+            ar & s;
+            break;
+        }
+        default:
+            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+        }
+    }
+
+    return ar;
+}
+
 /** Type of a variable stored in the module. */
 class variable_type
 {
@@ -783,8 +919,8 @@ struct module_header
     /** Export table. */
     std::vector<exported_symbol> exports;
 
-    /** String table. */
-    std::vector<std::string> strings;
+    /** Constant table. */
+    std::vector<constant_table_entry> constants;
 };
 
 /** A compiled binary file. */
@@ -882,13 +1018,13 @@ public:
       std::uint8_t flags);
 
     /**
-     * Set the string table.
+     * Set the constant table.
      *
-     * @param strings The new string table.
+     * @param constants The new constant table.
      */
-    void set_string_table(const std::vector<std::string>& strings)
+    void set_constant_table(const std::vector<constant_table_entry>& constants)
     {
-        header.strings = strings;
+        header.constants = constants;
     }
 
     /**
@@ -943,7 +1079,7 @@ inline archive& operator&(archive& ar, module_header& header)
     }
     ar & header.imports;
     ar & header.exports;
-    ar & header.strings;
+    ar & header.constants;
     return ar;
 }
 

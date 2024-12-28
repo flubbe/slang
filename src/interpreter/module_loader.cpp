@@ -277,10 +277,10 @@ void module_loader::decode()
 
     memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
 
-    recorder->section("String table");
-    for(auto& s: mod.header.strings)
+    recorder->section("Constant table");
+    for(auto& c: mod.header.constants)
     {
-        recorder->string(s);
+        recorder->constant(c);
     }
 
     /*
