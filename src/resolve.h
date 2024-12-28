@@ -67,6 +67,16 @@ struct module_entry
     bool is_resolved{false};
 };
 
+/** A constant descriptor. */
+struct constant_descriptor
+{
+    /** The constant type. */
+    module_::constant_type type;
+
+    /** The constant's value. */
+    std::variant<std::int32_t, float, std::string> value;
+};
+
 /** Resolver context. */
 class context
 {
@@ -90,6 +100,12 @@ class context
       std::string,
       std::vector<std::pair<std::string, module_::struct_descriptor>>>
       imported_types;
+
+    /** Constant imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<std::pair<std::string, constant_descriptor>>>
+      imported_constants;
 
 protected:
     /**

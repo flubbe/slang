@@ -150,6 +150,25 @@ void context::resolve_module(const fs::path& resolved_path)
             }
             imported_types[resolved_path.string()].push_back({it.name, std::get<module_::struct_descriptor>(it.desc)});
         }
+        else if(it.type == module_::symbol_type::constant)
+        {
+            if(imported_constants.find(resolved_path.string()) == imported_constants.end())
+            {
+                imported_constants.insert({resolved_path.string(), {}});
+            }
+
+            std::size_t i = std::get<std::size_t>(it.desc);
+            if(i >= header.constants.size())
+            {
+                throw resolve_error(
+                  fmt::format(
+                    "Cannot resolve constant '{}': Index {} outside of constant table (size {}).",
+                    it.name, i, header.constants.size()));
+            }
+
+            const module_::constant_table_entry& entry = header.constants[i];
+            imported_constants[resolved_path.string()].push_back({it.name, {entry.type, entry.data}});
+        }
         else
         {
             throw resolve_error(fmt::format("Cannot resolve symbol '{}' of type '{}'.", it.name, to_string(it.type)));
