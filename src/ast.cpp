@@ -814,17 +814,17 @@ std::unique_ptr<cg::value> constant_expression::generate_code(cg::context& ctx, 
     auto& tok = expr->get_token();
     if(tok.type == token_type::int_literal)
     {
-        ctx.add_constant(tok.s, std::get<std::int32_t>(*tok.value));
+        ctx.add_constant(name.s, std::get<std::int32_t>(*tok.value));
         return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
     else if(tok.type == token_type::fp_literal)
     {
-        ctx.add_constant(tok.s, std::get<float>(*tok.value));
+        ctx.add_constant(name.s, std::get<float>(*tok.value));
         return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
     }
     else if(tok.type == token_type::str_literal)
     {
-        ctx.add_constant(tok.s, std::get<std::string>(*tok.value));
+        ctx.add_constant(name.s, std::get<std::string>(*tok.value));
         return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
     }
 

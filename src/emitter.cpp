@@ -170,6 +170,20 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
       module_::struct_descriptor{type->get_flags(), std::move(transformed_members)});
 }
 
+void export_table_builder::add_constant(std::string name, std::size_t i)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&name](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::constant
+                             && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add constant to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(module_::symbol_type::constant, std::move(name), i);
+}
+
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
 {
     auto it = std::find_if(export_table.begin(), export_table.end(),
@@ -230,6 +244,10 @@ void export_table_builder::write(module_::language_module& mod) const
         {
             const module_::struct_descriptor& desc = std::get<module_::struct_descriptor>(entry.desc);
             mod.add_struct(entry.name, desc.member_types, desc.flags);
+        }
+        else if(entry.type == module_::symbol_type::constant)
+        {
+            mod.add_constant(entry.name, std::get<std::size_t>(entry.desc));
         }
         else
         {
@@ -1022,6 +1040,12 @@ void instruction_emitter::run()
 
     // the import count is not allowed to change, so store it here and check later.
     std::size_t import_count = ctx.imports.size();
+
+    // exported constants.
+    for(auto& it: ctx.named_constants)
+    {
+        exports.add_constant(it.first, it.second);
+    }
 
     // exported types.
     for(auto& it: ctx.types)

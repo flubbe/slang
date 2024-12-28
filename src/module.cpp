@@ -219,4 +219,19 @@ void language_module::add_struct(
     header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 
+void language_module::add_constant(std::string name, std::size_t i)
+{
+    if(std::find_if(header.exports.begin(), header.exports.end(),
+                    [&name](const exported_symbol& s) -> bool
+                    {
+                        return s.type == symbol_type::constant && s.name == name;
+                    })
+       != header.exports.end())
+    {
+        throw module_error(fmt::format("Cannot add constant: '{}' already defined.", name));
+    }
+
+    header.exports.emplace_back(symbol_type::constant, name, i);
+}
+
 }    // namespace slang::module_

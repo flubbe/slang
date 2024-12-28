@@ -113,6 +113,14 @@ public:
     void add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type);
 
     /**
+     * Add a constant to the export table.
+     *
+     * @param name The constant's name.
+     * @param i Index into the constant table.
+     */
+    void add_constant(std::string name, std::size_t i);
+
+    /**
      * Get the index of a symbol.
      *
      * @param t The symbol type.

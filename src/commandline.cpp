@@ -506,7 +506,12 @@ public:
 
     virtual void record(const module_::exported_symbol& s) override
     {
-        fmt::print("{:>3}: {:>11}, {}\n", export_entries, to_string(s.type), s.name);
+        fmt::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
+        if(s.type == module_::symbol_type::constant)
+        {
+            fmt::print(", {}", std::get<std::size_t>(s.desc));
+        }
+        fmt::print("\n");
         ++export_entries;
     }
 

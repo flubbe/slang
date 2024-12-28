@@ -1041,6 +1041,14 @@ public:
       std::uint8_t flags);
 
     /**
+     * Add a constant to the module.
+     *
+     * @param name The constant's name.
+     * @param i An index into the constant table.
+     */
+    void add_constant(std::string name, std::size_t i);
+
+    /**
      * Set the constant table.
      *
      * @param constants The new constant table.
