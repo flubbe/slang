@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <stdexcept>
 
 #include <fmt/core.h>
 
@@ -115,8 +116,8 @@ static std::array<char, operator_chars_count> operator_chars = {
 /**
  * Check whether a character starts an operator.
  *
- * @param c The std::optional<char> to check.
- * @return Whether the character starts an operator. Returns false if c was std::nullopt.
+ * @param c The `std::optional<char>` to check.
+ * @return Whether the character starts an operator. Returns `false` if `c` was `std::nullopt`.
  */
 static bool is_operator(const std::optional<char>& c)
 {
@@ -124,12 +125,13 @@ static bool is_operator(const std::optional<char>& c)
 }
 
 /**
- * Evaluate a string, given its token type. If type is not one of token_type::int_literal,
- * token_type::fp_literal or token_type::str_literal, std::nullopt is returned.
+ * Evaluate a string, given its token type. If type is not one of `token_type::int_literal`,
+ * `token_type::fp_literal` or `token_type::str_literal`, `std::nullopt` is returned.
  *
  * @param s The string to evaluate.
  * @param type The string's token type.
  * @return Returns the evaluated token or std::nullopt.
+ * @throws Throws a `lexical_error` if evaluation failed.
  */
 static std::optional<std::variant<int, float, std::string>> eval(const std::string& s, token_type type)
 {
@@ -139,15 +141,37 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
     }
     else if(type == token_type::int_literal)
     {
-        if(s.substr(0, 2) == "0x")
+        try
         {
-            return std::stoi(s, nullptr, 16);
+            if(s.substr(0, 2) == "0x")
+            {
+                return std::stoi(s, nullptr, 16);
+            }
+            return std::stoi(s);
         }
-        return std::stoi(s);
+        catch(const std::invalid_argument&)
+        {
+            throw lexical_error(fmt::format("Invalid argument for integer conversion: '{}'.", s));
+        }
+        catch(const std::out_of_range& e)
+        {
+            throw lexical_error(fmt::format("Argument out of range for integer conversion: '{}'.", s));
+        }
     }
     else if(type == token_type::fp_literal)
     {
-        return std::stof(s);
+        try
+        {
+            return std::stof(s);
+        }
+        catch(const std::invalid_argument& e)
+        {
+            throw lexical_error(fmt::format("Invalid argument for floating point conversion: '{}'.", s));
+        }
+        catch(const std::out_of_range& e)
+        {
+            throw lexical_error(fmt::format("Argument out of range for floating point conversion: '{}'.", s));
+        }
     }
 
     return std::nullopt;

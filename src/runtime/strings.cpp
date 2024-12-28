@@ -118,7 +118,13 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
         static_cast<i32s*>(r->value)->value = i;
         r->ok = 1;
     }
-    catch(std::invalid_argument& e)
+    catch(const std::invalid_argument& e)
+    {
+        r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
+        *static_cast<std::string*>(r->value) = e.what();
+        r->ok = 0;
+    }
+    catch(const std::out_of_range& e)
     {
         r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
         *static_cast<std::string*>(r->value) = e.what();
@@ -155,7 +161,13 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
         static_cast<f32s*>(r->value)->value = f;
         r->ok = 1;
     }
-    catch(std::invalid_argument& e)
+    catch(const std::invalid_argument& e)
+    {
+        r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
+        *static_cast<std::string*>(r->value) = e.what();
+        r->ok = 0;
+    }
+    catch(const std::out_of_range& e)
     {
         r->value = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_none, false);
         *static_cast<std::string*>(r->value) = e.what();
