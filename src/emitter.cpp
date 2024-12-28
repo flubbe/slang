@@ -1044,6 +1044,19 @@ void instruction_emitter::run()
     // exported constants.
     for(auto& it: ctx.named_constants)
     {
+        if(it.second >= ctx.constants.size())
+        {
+            throw std::runtime_error(fmt::format(
+              "Constant index larger than constant table size ({}>={}).",
+              it.second, ctx.constants.size()));
+        }
+
+        if(ctx.constants[it.second].import_path.has_value())
+        {
+            // skip constants not defined in this module.
+            continue;
+        }
+
         exports.add_constant(it.first, it.second);
     }
 
@@ -1294,7 +1307,26 @@ module_::language_module instruction_emitter::to_module() const
     }
 
     // constants.
-    mod.set_constant_table(ctx.constants);
+    std::vector<cg::constant_table_entry> exported_constants;
+    std::copy_if(
+      ctx.constants.cbegin(),
+      ctx.constants.cend(),
+      std::back_inserter(exported_constants),
+      [](const cg::constant_table_entry& entry) -> bool
+      {
+          return !entry.import_path.has_value();
+      });
+
+    std::vector<module_::constant_table_entry> constants;
+    std::transform(
+      exported_constants.cbegin(),
+      exported_constants.cend(),
+      std::back_inserter(constants),
+      [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
+      {
+          return entry;
+      });
+    mod.set_constant_table(constants);
 
     // export table.
     exports.write(mod);

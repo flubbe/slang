@@ -105,6 +105,25 @@ inline void replace_all(std::string& str, const std::string& old_value, const st
 std::list<std::string> wrap_text(const std::string& s, std::size_t line_len);
 
 /**
+ * Sorted insert into a `std::vector`.
+ *
+ * @param v The vector. Needs to be sorted.
+ * @param item The item to insert.
+ * @param pred Binary predicate which returns ​`true` if the first argument is ordered before the second.
+ * @return Iterator pointing to the inserted `value`.
+ */
+template<typename T, typename Predicate>
+typename std::vector<T>::iterator insert_sorted(
+  std::vector<T>& v,
+  T const& item,
+  Predicate pred)
+{
+    return v.insert(
+      std::upper_bound(v.begin(), v.end(), item, pred),
+      item);
+}
+
+/**
  * Print help on commands in a two-column layout to stdout.
  *
  * @param info_text An info text to be printed before the command help.

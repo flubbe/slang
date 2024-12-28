@@ -115,10 +115,11 @@ struct function_signature
      * @param ret_type The function's return type.
      * @param func_type The function's type. E.g. a combination of return type, names and arguments, together with a type id.
      */
-    function_signature(token name,
-                       std::vector<type_info> arg_types,
-                       type_info ret_type,
-                       type_info func_type)
+    function_signature(
+      token name,
+      std::vector<type_info> arg_types,
+      type_info ret_type,
+      type_info func_type)
     : name{std::move(name)}
     , arg_types{std::move(arg_types)}
     , ret_type{std::move(ret_type)}
@@ -158,9 +159,10 @@ struct struct_definition
      * @param members The struct's members.
      * @param import_path An optional import path.
      */
-    struct_definition(token name,
-                      std::vector<std::pair<token, type_info>> members,
-                      std::optional<std::string> import_path = std::nullopt)
+    struct_definition(
+      token name,
+      std::vector<std::pair<token, type_info>> members,
+      std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
     , import_path{std::move(import_path)}
@@ -312,8 +314,18 @@ class context
     /** Imported modules. */
     std::vector<std::string> imports;
 
-    /** Imported functions, indexed by (import_path, function_name). */
-    std::unordered_map<std::string, std::unordered_map<std::string, function_signature>> imported_functions;
+    /** Imported functions, indexed by `(import_path, function_name)`. */
+    std::unordered_map<
+      std::string,
+      std::unordered_map<
+        std::string, function_signature>>
+      imported_functions;
+
+    /** Imported constants, indexed by `(import_path, constant_desc)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<variable_type>>
+      imported_constants;
 
     /** Struct/type stack, for member/type lookups. */
     std::vector<const struct_definition*> struct_stack;
@@ -388,13 +400,19 @@ public:
     /**
      * Add a variable to the context.
      *
+     * FIXME This also handles constants, which mandates having the `import_path` argument.
+     *
      * @throws A type_error if the name already exists in the scope.
      * @throws A type_error if the given type is unknown.
      *
      * @param name The variable's name.
      * @param var_type The variable's type.
+     * @param import_path An optional import path.
      */
-    void add_variable(token name, type_info var_type);
+    void add_variable(
+      token name,
+      type_info var_type,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Add a function to the context.
@@ -407,10 +425,11 @@ public:
      * @param ret_type The function's return type.
      * @param import_path The import path for the function.
      */
-    void add_function(token name,
-                      std::vector<type_info> arg_types,
-                      type_info ret_type,
-                      std::optional<std::string> import_path = std::nullopt);
+    void add_function(
+      token name,
+      std::vector<type_info> arg_types,
+      type_info ret_type,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Add a struct to the context in the global scope.
@@ -422,9 +441,10 @@ public:
      * @param members The members, given as pairs `(name, type)`.
      * @param import_path The import path for the struct.
      */
-    void add_struct(token name,
-                    std::vector<std::pair<token, type_info>> members,
-                    std::optional<std::string> import_path = std::nullopt);
+    void add_struct(
+      token name,
+      std::vector<std::pair<token, type_info>> members,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Check if the context contains a specific type, given by a string.
@@ -452,8 +472,9 @@ public:
      * @param import_path Optional import path.
      * @returns Whether the type is a reference type.
      */
-    bool is_reference_type(const std::string& name,
-                           const std::optional<std::string>& import_path = std::nullopt) const;
+    bool is_reference_type(
+      const std::string& name,
+      const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Check if given string is a reference type within the context.
@@ -469,10 +490,13 @@ public:
      * Get the type for an identifier.
      *
      * @param identifier The identifier to resolve the type for.
+     * @param namespace_path Optional namespace path of the identifier.
      * @returns The resolved type.
      * @throws Throws a `type_error` if the identifier's type could not be resolved.
      */
-    type_info get_identifier_type(const token& identifier) const;
+    type_info get_identifier_type(
+      const token& identifier,
+      const std::optional<std::string>& namespace_path = std::nullopt) const;
 
     /**
      * Get the type for a name and an optional array length.
@@ -485,9 +509,10 @@ public:
      * @returns An existing type.
      * @throws A `type_error` if the type cnould not be resolved.
      */
-    type_info get_type(const token& name,
-                       bool array,
-                       const std::optional<std::string>& import_path = std::nullopt)
+    type_info get_type(
+      const token& name,
+      bool array,
+      const std::optional<std::string>& import_path = std::nullopt)
     {
         return get_type(name.s, array, import_path);
     }
@@ -502,9 +527,10 @@ public:
      * @param import_path Optional import path. Ignored for built-in types.
      * @returns An existing type.
      */
-    type_info get_type(const std::string& name,
-                       bool array,
-                       const std::optional<std::string>& import_path = std::nullopt);
+    type_info get_type(
+      const std::string& name,
+      bool array,
+      const std::optional<std::string>& import_path = std::nullopt);
 
     /**
      * Get a type object for an unresolved type and add mark the type for resolution.
@@ -514,9 +540,10 @@ public:
      * @param import_path Optional import path. Ignored for built-in types.
      * @returns An unresolved type.
      */
-    type_info get_unresolved_type(token name,
-                                  type_class cls,
-                                  std::optional<std::string> import_path = std::nullopt);
+    type_info get_unresolved_type(
+      token name,
+      type_class cls,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return whether a type is convertible into another type.
@@ -562,10 +589,9 @@ public:
      * @param import_path Optional import path of the function.
      * @returns A reference to the function signature.
      */
-    const function_signature&
-      get_function_signature(
-        const token& name,
-        const std::optional<std::string>& import_path = std::nullopt) const;
+    const function_signature& get_function_signature(
+      const token& name,
+      const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Enter a function's scope.
@@ -610,9 +636,10 @@ public:
      * @param import_path Optional import path.
      * @returns A reference to the struct's definition.
      */
-    const struct_definition* get_struct_definition(token_location loc,
-                                                   const std::string& name,
-                                                   const std::optional<std::string>& import_path = std::nullopt) const;
+    const struct_definition* get_struct_definition(
+      token_location loc,
+      const std::string& name,
+      const std::optional<std::string>& import_path = std::nullopt) const;
 
     /** Push a struct lookup. */
     void push_struct_definition(const struct_definition* s);

@@ -561,6 +561,38 @@ std::string directive_expression::to_string() const
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // check if we're loading a constant.
+    auto import_path = get_namespace_path();
+    auto const_v = ctx.get_constant(name.s, import_path);
+    if(const_v != nullptr)
+    {
+        // load the constant directly.
+
+        if(const_v->type == module_::constant_type::i32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+        }
+        else if(const_v->type == module_::constant_type::f32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+        }
+        else if(const_v->type == module_::constant_type::str)
+        {
+            ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+        }
+
+        throw cg::codegen_error(
+          fmt::format("Cannot load constant '{}{}' of unknown type {}.",
+                      import_path.has_value()
+                        ? fmt::format("{}::", *import_path)
+                        : "",
+                      name.s,
+                      static_cast<int>(const_v->type)));
+    }
+
     cg::value v = get_value(ctx);
 
     if(mc == memory_context::load)
@@ -623,7 +655,7 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
 
-        auto t = ctx.get_identifier_type(name);
+        auto t = ctx.get_identifier_type(name, get_namespace_path());
         if(!t.is_array())
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
@@ -632,7 +664,7 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
         auto base_type = t.get_element_type();
         return ctx.get_type(base_type->to_string(), base_type->is_array());
     }
-    return ctx.get_identifier_type(name);
+    return ctx.get_identifier_type(name, get_namespace_path());
 }
 
 std::string variable_reference_expression::to_string() const
@@ -664,7 +696,7 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
             scope = scope->get_outer();
         }
 
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable or constant '{}' in current scope.", name.s));
     }
     else
     {

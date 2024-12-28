@@ -24,10 +24,11 @@ namespace slang::typing
  * type implementation.
  */
 
-type_info::type_info(const token& base,
-                     type_class cls,
-                     std::optional<std::uint64_t> type_id,
-                     std::optional<std::string> import_path)
+type_info::type_info(
+  const token& base,
+  type_class cls,
+  std::optional<std::uint64_t> type_id,
+  std::optional<std::string> import_path)
 : location{base.location}
 , cls{cls}
 , type_id{type_id}
@@ -67,17 +68,21 @@ type_info* type_info::get_element_type()
 {
     if(!is_array())
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Cannot get element type for '{}'.", *name)
-                              : std::string{"Cannot get element type."};
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Cannot get element type for '{}'.", *name)
+            : std::string{"Cannot get element type."};
         throw type_error(location, error_string);
     }
 
     if(components.size() != 1)
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).", *name, components.size())
-                              : fmt::format("Inconsistent component count for array type ({} components, expected 1).", components.size());
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).",
+                          *name, components.size())
+            : fmt::format("Inconsistent component count for array type ({} components, expected 1).",
+                          components.size());
         throw type_error(location, error_string);
     }
 
@@ -88,17 +93,21 @@ const type_info* type_info::get_element_type() const
 {
     if(!is_array())
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Cannot get element type for '{}'.", *name)
-                              : std::string{"Cannot get element type."};
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Cannot get element type for '{}'.", *name)
+            : std::string{"Cannot get element type."};
         throw type_error(location, error_string);
     }
 
     if(components.size() != 1)
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).", *name, components.size())
-                              : fmt::format("Inconsistent component count for array type ({} components, expected 1).", components.size());
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).",
+                          *name, components.size())
+            : fmt::format("Inconsistent component count for array type ({} components, expected 1).",
+                          components.size());
         throw type_error(location, error_string);
     }
 
@@ -109,17 +118,20 @@ const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
 {
     if(!is_function_type())
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Cannot get signature for non-function type '{}'.", *name)
-                              : std::string{"Cannot get signature for non-function type."};
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Cannot get signature for non-function type '{}'.", *name)
+            : std::string{"Cannot get signature for non-function type."};
         throw type_error(location, error_string);
     }
 
     if(components.size() == 0)
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Inconsistent component count for function signature '{}' (0 components, expected at least 1).", *name)
-                              : std::string{"Inconsistent component count for function signature (0 components, expected at least 1)."};
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Inconsistent component count for function signature '{}' (0 components, expected at least 1).",
+                          *name)
+            : std::string{"Inconsistent component count for function signature (0 components, expected at least 1)."};
         throw type_error(location, error_string);
     }
 
@@ -130,9 +142,10 @@ std::uint64_t type_info::get_type_id() const
 {
     if(!type_id.has_value())
     {
-        auto error_string = name.has_value()
-                              ? fmt::format("Unresolved type '{}'.", *name)
-                              : std::string{"Unresolved type."};
+        auto error_string =
+          name.has_value()
+            ? fmt::format("Unresolved type '{}'.", *name)
+            : std::string{"Unresolved type."};
         throw type_error(location, error_string);
     }
 
@@ -183,10 +196,11 @@ std::string function_signature::to_string() const
     {
         return ty::to_string(t);
     };
-    return fmt::format("fn {}({}) -> {}",
-                       name.s,
-                       slang::utils::join(arg_types, {transform}, ", "),
-                       ty::to_string(ret_type));
+    return fmt::format(
+      "fn {}({}) -> {}",
+      name.s,
+      slang::utils::join(arg_types, {transform}, ", "),
+      ty::to_string(ret_type));
 }
 
 /*
@@ -277,27 +291,65 @@ void context::add_import(std::vector<token> path)
     imports.emplace_back(utils::join(path, {transform}, package::delimiter));
 }
 
-void context::add_variable(token name, type_info var_type)
+void context::add_variable(
+  token name,
+  type_info var_type,
+  std::optional<std::string> import_path)
 {
-    if(current_scope == nullptr)
+    if(import_path.has_value())
     {
-        throw std::runtime_error("Typing context: No current scope.");
+        // FIXME This is for constants only.
+        auto mod_it = imported_constants.find(*import_path);
+        if(mod_it == imported_constants.end())
+        {
+            imported_constants.insert({*import_path, {}});
+            imported_constants[*import_path].emplace_back(std::move(name), var_type);
+        }
+        else
+        {
+            auto const_it = std::find_if(
+              mod_it->second.begin(),
+              mod_it->second.end(),
+              [&name](const variable_type& entry) -> bool
+              {
+                  return entry.name.s == name.s;
+              });
+            if(const_it != mod_it->second.end())
+            {
+                throw type_error(
+                  name.location,
+                  fmt::format("The module '{}' containing the constant '{}' already is imported.",
+                              *import_path, name.s));
+            }
+            mod_it->second.emplace_back(std::move(name), var_type);
+        }
     }
-
-    // check for existing names.
-    auto tok = current_scope->find(name.s);
-    if(tok != std::nullopt)
+    else
     {
-        throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
-    }
+        if(current_scope == nullptr)
+        {
+            throw std::runtime_error("Typing context: No current scope.");
+        }
 
-    current_scope->variables.insert({name.s, {name, std::move(var_type)}});
+        // check for existing names.
+        auto tok = current_scope->find(name.s);
+        if(tok != std::nullopt)
+        {
+            throw type_error(
+              name.location,
+              fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                          name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+        }
+
+        current_scope->variables.insert({name.s, {name, std::move(var_type)}});
+    }
 }
 
-void context::add_function(token name,
-                           std::vector<type_info> arg_types,
-                           type_info ret_type,
-                           std::optional<std::string> import_path)
+void context::add_function(
+  token name,
+  std::vector<type_info> arg_types,
+  type_info ret_type,
+  std::optional<std::string> import_path)
 {
     if(current_scope == nullptr)
     {
@@ -310,17 +362,25 @@ void context::add_function(token name,
         if(mod_it == imported_functions.end())
         {
             auto func_type = get_function_type(name, arg_types, ret_type);
-            imported_functions.insert({*import_path, {{name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}}}});
+            imported_functions.insert(
+              {*import_path,
+               {{name.s,
+                 {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}}}});
         }
         else
         {
             auto func_it = mod_it->second.find(name.s);
             if(func_it != mod_it->second.end())
             {
-                throw type_error(name.location, fmt::format("The module '{}' containing the symbol '{}' already is imported.", *import_path, name.s));
+                throw type_error(
+                  name.location,
+                  fmt::format("The module '{}' containing the symbol '{}' already is imported.",
+                              *import_path, name.s));
             }
             auto func_type = get_function_type(name, arg_types, ret_type);
-            imported_functions[*import_path].insert({name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
+            mod_it->second.insert(
+              {name.s,
+               {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
         }
     }
     else
@@ -329,11 +389,16 @@ void context::add_function(token name,
         auto tok = current_scope->find(name.s);
         if(tok != std::nullopt)
         {
-            throw type_error(name.location, fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}", name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+            throw type_error(
+              name.location,
+              fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                          name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
         }
 
         auto func_type = get_function_type(name, arg_types, ret_type);
-        current_scope->functions.insert({name.s, {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
+        current_scope->functions.insert(
+          {name.s,
+           {name, std::move(arg_types), std::move(ret_type), std::move(func_type)}});
     }
 }
 
@@ -343,9 +408,10 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
     auto tok = global_scope.find(name.s);    // FIXME ignores import_path.
     if(tok != std::nullopt)
     {
-        throw type_error(name.location,
-                         fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
-                                     name.s, global_scope.get_qualified_name(), slang::to_string(tok->location)));
+        throw type_error(
+          name.location,
+          fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                      name.s, global_scope.get_qualified_name(), slang::to_string(tok->location)));
     }
 
     // add to global scope.
@@ -353,7 +419,9 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
 
     // add to type map.
     auto type_id = generate_type_id();
-    type_map.push_back({type_info{{name.s, {0, 0}}, type_class::tc_plain, type_id, std::move(import_path)}, type_id});
+    type_map.emplace_back(
+      type_info{{name.s, {0, 0}}, type_class::tc_plain, type_id, std::move(import_path)},
+      type_id);
 }
 
 bool context::has_type(const std::string& name, const std::optional<std::string>& import_path) const
@@ -418,11 +486,40 @@ bool context::is_reference_type(const type_info& t) const
     return is_reference_type(t.to_string());
 }
 
-type_info context::get_identifier_type(const token& identifier) const
+type_info context::get_identifier_type(const token& identifier, const std::optional<std::string>& namespace_path) const
 {
-    // check if we're accessing a struct.
     std::string err;
-    if(struct_stack.size() > 0)
+
+    // FIXME This is only called in a variable-access-like context, so we don't search functions or types here.
+    //       This is not visible from the function's name.
+
+    /* 1. fully-qualified identifiers. */
+    if(namespace_path.has_value())
+    {
+        for(const auto& [import_path, constants]: imported_constants)
+        {
+            if(import_path == *namespace_path)
+            {
+                auto it = std::find_if(
+                  constants.cbegin(),
+                  constants.cend(),
+                  [&identifier](const variable_type& t) -> bool
+                  {
+                      return identifier.s == t.name.s;
+                  });
+
+                if(it == constants.cend())
+                {
+                    err = fmt::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
+                    break;
+                }
+
+                return it->var_type;
+            }
+        }
+    }
+    /* 2. struct member access. */
+    else if(struct_stack.size() > 0)
     {
         for(auto [n, t]: struct_stack.back()->members)
         {
@@ -434,6 +531,7 @@ type_info context::get_identifier_type(const token& identifier) const
 
         err = fmt::format("Name '{}' not found in struct '{}'.", identifier.s, struct_stack.back()->name.s);
     }
+    /* 3. unqualified non-member access. */
     else
     {
         for(scope* s = current_scope; s != nullptr; s = s->parent)
@@ -681,8 +779,17 @@ void context::resolve_types()
     }
     unresolved_types.clear();
 
+    // propagate type resolution to imported constants.
+    for(auto& [_, var_types]: imported_constants)
+    {
+        for(auto& t: var_types)
+        {
+            resolve(t.var_type);
+        }
+    }
+
     // propagate type resolutions to functions.
-    for(auto& [f, sig]: global_scope.functions)
+    for(auto& [_, sig]: global_scope.functions)
     {
         for(auto& arg: sig.arg_types)
         {
