@@ -94,6 +94,8 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_cast_fail
         ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_cast_fail
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_const_export
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_const_import
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators
