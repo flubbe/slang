@@ -563,8 +563,8 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 {
     // check if we're loading a constant.
     auto import_path = get_namespace_path();
-    auto const_v = ctx.get_constant(name.s, import_path);
-    if(const_v != nullptr)
+    std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
+    if(const_v.has_value())
     {
         // load the constant directly.
 

@@ -488,7 +488,7 @@ bool context::is_reference_type(const type_info& t) const
 
 type_info context::get_identifier_type(const token& identifier, const std::optional<std::string>& namespace_path) const
 {
-    std::string err;
+    std::string err = fmt::format("Unknown type error at identifier '{}'.", identifier.s);
 
     // FIXME This is only called in a variable-access-like context, so we don't search functions or types here.
     //       This is not visible from the function's name.
@@ -510,13 +510,14 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
 
                 if(it == constants.cend())
                 {
-                    err = fmt::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
                     break;
                 }
 
                 return it->var_type;
             }
         }
+
+        err = fmt::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
     }
     /* 2. struct member access. */
     else if(struct_stack.size() > 0)

@@ -538,20 +538,6 @@ std::string struct_::to_string() const
  * context.
  */
 
-/**
- * Comparison function the the constant table, to ensure that non-imported constants remain at the
- * beginning of the list.
- *
- * FIXME This is a hack to have stable indices into the constant list for the emitter.
- *
- * @param a The first entry to compare.
- * @param b The second entry to compare.
- */
-static bool constant_table_comparator(const constant_table_entry& a, const constant_table_entry& b)
-{
-    return (a.import_path.has_value() && !b.import_path.has_value());
-}
-
 void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
 {
     auto it = std::find_if(imports.begin(), imports.end(),
@@ -662,52 +648,111 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
     return it->get();
 }
 
+/** Helper to map types to `module_::constant_type` values. */
+template<typename T>
+struct constant_type_mapper
+{
+    static constexpr module_::constant_type value = module_::constant_type::i32;
+    static_assert(false, "Invalid constant type.");
+};
+
+/** Map `std::int32_t` to `module_::constant_type::i32`. */
+template<>
+struct constant_type_mapper<std::int32_t>
+{
+    static constexpr module_::constant_type value = module_::constant_type::i32;
+};
+
+/** Map `float` to `module_::constant_type::f32`. */
+template<>
+struct constant_type_mapper<float>
+{
+    static constexpr module_::constant_type value = module_::constant_type::f32;
+};
+
+/** Map `std::string` to `module_::constant_type::str`. */
+template<>
+struct constant_type_mapper<std::string>
+{
+    static constexpr module_::constant_type value = module_::constant_type::str;
+};
+
+/**
+ * Add a constant to the corresponding table. That is, it is added to the import table
+ * if `import_path` is specified, and to the module's constant table otherwise.
+ *
+ * @param module_constants The module's constant table.
+ * @param imported_constants The module's imported constants.
+ * @param name The constant's name.
+ * @param value The constant's value.
+ * @param import_path An import path or `std::nullopt`.
+ */
+template<typename T>
+void add_constant(
+  std::vector<constant_table_entry>& module_constants,
+  std::vector<constant_table_entry>& imported_constants,
+  std::string name,
+  T value,
+  std::optional<std::string> import_path)
+{
+    if(import_path.has_value())
+    {
+        // add constant to imported constants table.
+        auto it = std::find_if(
+          imported_constants.begin(),
+          imported_constants.end(),
+          [&name, &import_path](const constant_table_entry& entry) -> bool
+          {
+              return entry.name.has_value() && *entry.name == name && entry.import_path == import_path;
+          });
+        if(it != imported_constants.end())
+        {
+            throw codegen_error(fmt::format("Imported constant with name '{}' already exists.", name));
+        }
+
+        imported_constants.emplace_back(
+          constant_type_mapper<T>::value,
+          std::move(value),
+          std::move(import_path),
+          std::move(name));
+    }
+    else
+    {
+        // add constant to constants table.
+        auto it = std::find_if(
+          module_constants.begin(),
+          module_constants.end(),
+          [&name](const constant_table_entry& entry) -> bool
+          {
+              return entry.name.has_value() && *entry.name == name;
+          });
+        if(it != module_constants.end())
+        {
+            throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+        }
+
+        module_constants.emplace_back(
+          constant_type_mapper<T>::value,
+          std::move(value),
+          std::move(import_path),
+          std::move(name),
+          true);
+    }
+}
+
 void context::add_constant(std::string name, std::int32_t i, std::optional<std::string> import_path)
 {
-    auto it = named_constants.find(name);
-    if(it != named_constants.end())
-    {
-        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
-    }
-
-    auto insert_it = slang::utils::insert_sorted(
-      constants,
-      {module_::constant_type::i32, i, std::move(import_path)},
-      constant_table_comparator);
-
-    named_constants.insert({name, std::distance(constants.begin(), insert_it)});
+    slang::codegen::add_constant(constants, imported_constants, name, i, import_path);
 }
 
 void context::add_constant(std::string name, float f, std::optional<std::string> import_path)
 {
-    auto it = named_constants.find(name);
-    if(it != named_constants.end())
-    {
-        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
-    }
-
-    auto insert_it = slang::utils::insert_sorted(
-      constants,
-      {module_::constant_type::f32, f, std::move(import_path)},
-      constant_table_comparator);
-
-    named_constants.insert({name, std::distance(constants.begin(), insert_it)});
+    slang::codegen::add_constant(constants, imported_constants, name, f, import_path);
 }
 
 void context::add_constant(std::string name, std::string s, std::optional<std::string> import_path)
 {
-    auto it = named_constants.find(name);
-    if(it != named_constants.end())
-    {
-        throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
-    }
-
-    auto insert_it = slang::utils::insert_sorted(
-      constants,
-      {module_::constant_type::str, std::move(s), std::move(import_path)},
-      constant_table_comparator);
-
-    named_constants.insert({name, std::distance(constants.begin(), insert_it)});
+    slang::codegen::add_constant(constants, imported_constants, name, std::move(s), import_path);
 }
 
 std::size_t context::get_string(std::string str)
@@ -720,113 +765,53 @@ std::size_t context::get_string(std::string str)
       });
     if(it != constants.end())
     {
-        // FIXME Move the entry to the bottom of the imported constants in the list.
-        //       This keeps the returned index stable across calls, but is a hack for the emitter.
-        if(it->import_path.has_value())
-        {
-            auto no_import_path_it = std::find_if(
-              constants.rbegin(),
-              constants.rend(),
-              [](const constant_table_entry& c) -> bool
-              {
-                  return !c.import_path.has_value();
-              });
-
-            // Remove the import marker, since we're using the string.
-            // Needs to be done after the search above.
-            it->import_path = std::nullopt;
-
-            if(no_import_path_it != constants.rend())
-            {
-                std::size_t idx1 = std::distance(constants.begin(), it);
-                std::size_t idx2 = std::distance(constants.begin(), (no_import_path_it + 1).base());
-
-                auto named_it1 = std::find_if(
-                  named_constants.begin(),
-                  named_constants.end(),
-                  [idx1](const std::pair<std::string, std::size_t>& c) -> bool
-                  {
-                      return idx1 == c.second;
-                  });
-
-                auto named_it2 = std::find_if(
-                  named_constants.begin(),
-                  named_constants.end(),
-                  [idx2](const std::pair<std::string, std::size_t>& c) -> bool
-                  {
-                      return idx2 == c.second;
-                  });
-
-                if(named_it1 == named_constants.end()
-                   || named_it2 == named_constants.end())
-                {
-                    throw codegen_error("Inconsistent constant table.");
-                }
-
-                std::swap(named_it1->second, named_it2->second);
-                std::iter_swap(it, (no_import_path_it + 1).base());
-
-                return idx2;
-            }
-            else if(it != constants.begin())
-            {
-                std::size_t idx = std::distance(constants.begin(), it);
-
-                auto named_it = std::find_if(
-                  named_constants.begin(),
-                  named_constants.end(),
-                  [idx](const std::pair<std::string, std::size_t>& c) -> bool
-                  {
-                      return c.second == idx;
-                  });
-                auto begin_it = std::find_if(
-                  named_constants.begin(),
-                  named_constants.end(),
-                  [](const std::pair<std::string, std::size_t>& c) -> bool
-                  {
-                      return c.second == 0;
-                  });
-
-                if(named_it == named_constants.end()
-                   || begin_it == named_constants.end()
-                   || named_it == begin_it)
-                {
-                    throw codegen_error("Inconsistent constant table.");
-                }
-
-                std::iter_swap(it, constants.begin());
-                std::swap(named_it->second, begin_it->second);
-
-                return 0;
-            }
-            else
-            {
-                // it == constants.begin()
-                return 0;
-            }
-        }
+        it->import_path = std::nullopt;
+        return std::distance(constants.begin(), it);
     }
 
-    // NOTE This keeps the sorting (by the existence of the import path) of the list.
     constants.emplace_back(module_::constant_type::str, std::move(str));
     return constants.size() - 1;
 }
 
-const constant_table_entry* context::get_constant(
+std::optional<constant_table_entry> context::get_constant(
   const std::string& name,
   const std::optional<std::string>& import_path)
 {
+    /*
+     * First try to find the constant in the module's constant table.
+     * If not found, search the import table and copy the constant into
+     * the import table.
+     */
     auto it = std::find_if(
-      named_constants.cbegin(), named_constants.cend(),
-      [&name](const std::pair<std::string, std::size_t>& c) -> bool
+      constants.cbegin(), constants.cend(),
+      [&name, &import_path](const constant_table_entry& entry) -> bool
       {
-          return c.first == name;
+          return entry.name == name && entry.import_path == import_path;
       });
-    if(it != named_constants.cend())
+    if(it != constants.cend())
     {
-        return &constants.at(it->second);
+        return *it;
     }
-    return nullptr;
+
+    it = std::find_if(
+      imported_constants.cbegin(), imported_constants.cend(),
+      [&name, &import_path](const constant_table_entry& entry) -> bool
+      {
+          return entry.name == name && entry.import_path == import_path;
+      });
+    if(it != imported_constants.end())
+    {
+        // copy string constants to constant table.
+        if(it->type == module_::constant_type::str)
+        {
+            return constants.emplace_back(*it);
+        }
+
+        // return primitive constant.
+        return *it;
+    }
+
+    return std::nullopt;
 }
 
 prototype* context::add_prototype(std::string name,

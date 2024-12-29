@@ -1743,21 +1743,39 @@ struct constant_table_entry : public module_::constant_table_entry
     /** Optional import path. */
     std::optional<std::string> import_path = std::nullopt;
 
+    /** Optional name. */
+    std::optional<std::string> name = std::nullopt;
+
+    /** Whether to export the constant. */
+    bool add_to_exports = false;
+
     /**
      * Construct a constant table entry.
+     *
+     * @throws Throws a `codegen_error` if `add_to_exports` is `true` and no `name` was set.
      *
      * @param type The constant type.
      * @param value The constant's value.
      * @param import_path Optional import path.
+     * @param name Optional name for the constant.
+     * @param add_to_exports Whether to export the constant. Defaults to `false`.
      */
     template<typename T>
     constant_table_entry(
       module_::constant_type type,
       T value,
-      std::optional<std::string> import_path = std::nullopt)
+      std::optional<std::string> import_path = std::nullopt,
+      std::optional<std::string> name = std::nullopt,
+      bool add_to_exports = false)
     : module_::constant_table_entry{type, std::move(value)}
     , import_path{std::move(import_path)}
+    , name{std::move(name)}
+    , add_to_exports{add_to_exports}
     {
+        if(add_to_exports && !this->name.has_value())
+        {
+            throw codegen_error("Cannot export constant without a name.");
+        }
     }
 };
 
@@ -1774,8 +1792,8 @@ class context
     /** Constant table. */
     std::vector<constant_table_entry> constants;
 
-    /** Named constants (index into constant table). */
-    std::unordered_map<std::string, std::size_t> named_constants;
+    /** Imported constants. */
+    std::vector<constant_table_entry> imported_constants;
 
     /** Global scope. */
     std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
@@ -1952,9 +1970,9 @@ public:
      *
      * @param name The constant's name.
      * @param import_path The constant's import path.
-     * @returns Returns a pointer to a `constant_table_entry` if the constant was found, and `nullptr` otherwise.
+     * @returns Returns a `constant_table_entry` if the constant was found, and `std::nullopt` otherwise.
      */
-    const constant_table_entry* get_constant(
+    std::optional<constant_table_entry> get_constant(
       const std::string& name,
       const std::optional<std::string>& import_path = std::nullopt);
 

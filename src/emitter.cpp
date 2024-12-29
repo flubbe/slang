@@ -1042,22 +1042,19 @@ void instruction_emitter::run()
     std::size_t import_count = ctx.imports.size();
 
     // exported constants.
-    for(auto& it: ctx.named_constants)
+    for(std::size_t i = 0; i < ctx.constants.size(); ++i)
     {
-        if(it.second >= ctx.constants.size())
+        auto& c = ctx.constants[i];
+        if(!c.add_to_exports)
         {
-            throw std::runtime_error(fmt::format(
-              "Constant index larger than constant table size ({}>={}).",
-              it.second, ctx.constants.size()));
-        }
-
-        if(ctx.constants[it.second].import_path.has_value())
-        {
-            // skip constants not defined in this module.
             continue;
         }
+        if(!c.name.has_value())
+        {
+            throw emitter_error("Cannot export a constant without a name.");
+        }
 
-        exports.add_constant(it.first, it.second);
+        exports.add_constant(*c.name, i);
     }
 
     // exported types.
