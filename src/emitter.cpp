@@ -170,6 +170,20 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
       module_::struct_descriptor{type->get_flags(), std::move(transformed_members)});
 }
 
+void export_table_builder::add_constant(std::string name, std::size_t i)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&name](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::constant
+                             && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add constant to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(module_::symbol_type::constant, std::move(name), i);
+}
+
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
 {
     auto it = std::find_if(export_table.begin(), export_table.end(),
@@ -230,6 +244,10 @@ void export_table_builder::write(module_::language_module& mod) const
         {
             const module_::struct_descriptor& desc = std::get<module_::struct_descriptor>(entry.desc);
             mod.add_struct(entry.name, desc.member_types, desc.flags);
+        }
+        else if(entry.type == module_::symbol_type::constant)
+        {
+            mod.add_constant(entry.name, std::get<std::size_t>(entry.desc));
         }
         else
         {
@@ -1023,6 +1041,22 @@ void instruction_emitter::run()
     // the import count is not allowed to change, so store it here and check later.
     std::size_t import_count = ctx.imports.size();
 
+    // exported constants.
+    for(std::size_t i = 0; i < ctx.constants.size(); ++i)
+    {
+        auto& c = ctx.constants[i];
+        if(!c.add_to_exports)
+        {
+            continue;
+        }
+        if(!c.name.has_value())
+        {
+            throw emitter_error("Cannot export a constant without a name.");
+        }
+
+        exports.add_constant(*c.name, i);
+    }
+
     // exported types.
     for(auto& it: ctx.types)
     {
@@ -1269,8 +1303,27 @@ module_::language_module instruction_emitter::to_module() const
         mod.add_import(module_::symbol_type::package, it);
     }
 
-    // strings.
-    mod.set_string_table(ctx.strings);
+    // constants.
+    std::vector<cg::constant_table_entry> exported_constants;
+    std::copy_if(
+      ctx.constants.cbegin(),
+      ctx.constants.cend(),
+      std::back_inserter(exported_constants),
+      [](const cg::constant_table_entry& entry) -> bool
+      {
+          return !entry.import_path.has_value();
+      });
+
+    std::vector<module_::constant_table_entry> constants;
+    std::transform(
+      exported_constants.cbegin(),
+      exported_constants.cend(),
+      std::back_inserter(constants),
+      [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
+      {
+          return entry;
+      });
+    mod.set_constant_table(constants);
 
     // export table.
     exports.write(mod);

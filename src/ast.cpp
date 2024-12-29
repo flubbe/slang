@@ -52,6 +52,11 @@ const named_expression* expression::as_named_expression() const
     throw std::runtime_error("Expression is not a named expression.");
 }
 
+std::unique_ptr<cg::value> expression::evaluate(cg::context&) const
+{
+    return {};
+}
+
 void expression::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
 {
     if(!supports_directive(name.s))
@@ -561,6 +566,38 @@ std::string directive_expression::to_string() const
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // check if we're loading a constant.
+    auto import_path = get_namespace_path();
+    std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
+    if(const_v.has_value())
+    {
+        // load the constant directly.
+
+        if(const_v->type == module_::constant_type::i32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+        }
+        else if(const_v->type == module_::constant_type::f32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+        }
+        else if(const_v->type == module_::constant_type::str)
+        {
+            ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+        }
+
+        throw cg::codegen_error(
+          fmt::format("Cannot load constant '{}{}' of unknown type {}.",
+                      import_path.has_value()
+                        ? fmt::format("{}::", *import_path)
+                        : "",
+                      name.s,
+                      static_cast<int>(const_v->type)));
+    }
+
     cg::value v = get_value(ctx);
 
     if(mc == memory_context::load)
@@ -623,7 +660,7 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
 
-        auto t = ctx.get_identifier_type(name);
+        auto t = ctx.get_identifier_type(name, get_namespace_path());
         if(!t.is_array())
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
@@ -632,7 +669,7 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
         auto base_type = t.get_element_type();
         return ctx.get_type(base_type->to_string(), base_type->is_array());
     }
-    return ctx.get_identifier_type(name);
+    return ctx.get_identifier_type(name, get_namespace_path());
 }
 
 std::string variable_reference_expression::to_string() const
@@ -664,7 +701,7 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
             scope = scope->get_outer();
         }
 
-        throw cg::codegen_error(loc, fmt::format("Cannot find variable '{}' in current scope.", name.s));
+        throw cg::codegen_error(loc, fmt::format("Cannot find variable or constant '{}' in current scope.", name.s));
     }
     else
     {
@@ -774,7 +811,6 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
     if(expr)
     {
         auto rhs = expr->type_check(ctx);
-
         if(!rhs)
         {
             throw ty::type_error(name.location, fmt::format("Expression has no type."));
@@ -786,7 +822,7 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
         {
             throw ty::type_error(
               name.location,
-              fmt::format("R.h.s. has type '{}' (type id {}), which does not match the variable type '{}' (type id {}).",
+              fmt::format("R.h.s. has type '{}' (type id {}), which does not match the variable's type '{}' (type id {}).",
                           ty::to_string(*rhs),
                           rhs->get_type_id(),
                           ty::to_string(var_type),
@@ -804,6 +840,92 @@ std::string variable_declaration_expression::to_string() const
       name.s,
       type->to_string(),
       expr ? expr->to_string() : std::string("<none>"));
+}
+
+/*
+ * constant_declaration_expression.
+ */
+
+std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
+{
+    if(!expr->is_const_eval(ctx))
+    {
+        throw cg::codegen_error(expr->get_location(), fmt::format("Expression in constant declaration is not compile-time computable."));
+    }
+
+    auto v = expr->evaluate(ctx);
+    if(!v)
+    {
+        throw cg::codegen_error(expr->get_location(), fmt::format("Expression in constant declaration is not compile-time computable."));
+    }
+
+    auto t = v->get_type();
+
+    if(t.is_array())
+    {
+        throw cg::codegen_error(expr->get_location(), "Compile-time assignment not supported for arrays.");
+    }
+    if(t.is_reference())
+    {
+        throw cg::codegen_error(expr->get_location(), "Compile-time assignment not supported for references.");
+    }
+
+    if(t.to_string() == "i32")
+    {
+        cg::constant_int* v_i32 = static_cast<cg::constant_int*>(v.get());
+        ctx.add_constant(name.s, v_i32->get_int());
+        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+    }
+    else if(t.to_string() == "f32")
+    {
+        cg::constant_float* v_f32 = static_cast<cg::constant_float*>(v.get());
+        ctx.add_constant(name.s, v_f32->get_float());
+        return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+    }
+    else if(t.to_string() == "str")
+    {
+        cg::constant_str* v_str = static_cast<cg::constant_str*>(v.get());
+        ctx.add_constant(name.s, v_str->get_str());
+        return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+    }
+
+    throw cg::codegen_error(expr->get_location(), fmt::format("Invalid token type '{}' for constant declaration.", t.to_string()));
+}
+
+std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
+{
+    auto const_type = ctx.get_type(type->get_name(), false, type->get_namespace_path());
+    ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
+
+    auto rhs = expr->type_check(ctx);
+    if(!rhs)
+    {
+        throw ty::type_error(name.location, fmt::format("Expression has no type."));
+    }
+
+    // Either the types match, or the type is a reference type which is set to 'null'.
+    if(*rhs != const_type
+       && !(ctx.is_reference_type(const_type) && *rhs == ctx.get_type("@null", false)))
+    {
+        throw ty::type_error(
+          name.location,
+          fmt::format("R.h.s. has type '{}' (type id {}), which does not match the constant's type '{}' (type id {}).",
+                      ty::to_string(*rhs),
+                      rhs->get_type_id(),
+                      ty::to_string(const_type),
+                      const_type.get_type_id()));
+    }
+
+    return std::nullopt;
+}
+
+std::string constant_declaration_expression::to_string() const
+{
+    return fmt::format(
+      "Constant(name={}, type={}, expr={})",
+      name.s,
+      type->to_string(),
+      expr->to_string());
 }
 
 /*

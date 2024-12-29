@@ -21,7 +21,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
-
+#include "module.h"
 #include "token.h"
 
 /* Forward declarations. */
@@ -31,12 +31,6 @@ namespace slang
 class instruction_emitter;  /* emitter.h */
 class export_table_builder; /* emitter.h */
 }    // namespace slang
-
-namespace slang::module_
-{
-enum class symbol_type : std::uint8_t; /* module.h */
-class language_module;                 /* module.h */
-}    // namespace slang::module_
 
 namespace slang::codegen
 {
@@ -402,7 +396,7 @@ class constant_str : public value
     /** The string. */
     std::string s;
 
-    /** Index into the string table. */
+    /** Index into the constant table. */
     int constant_index{-1};
 
 public:
@@ -434,7 +428,7 @@ public:
     }
 
     /**
-     * Set the index into the string table.
+     * Set the index into the constant table.
      *
      * @param index The new index. A index of -1 means "no index".
      *              Must be non-negative or -1.
@@ -449,7 +443,7 @@ public:
         constant_index = index;
     }
 
-    /** Get the index into the string table. A value of -1 indicates "no index". */
+    /** Get the index into the constant table. A value of -1 indicates "no index". */
     int get_constant_index() const
     {
         return constant_index;
@@ -1743,6 +1737,48 @@ struct imported_symbol
     }
 };
 
+/** Constant table entry. */
+struct constant_table_entry : public module_::constant_table_entry
+{
+    /** Optional import path. */
+    std::optional<std::string> import_path = std::nullopt;
+
+    /** Optional name. */
+    std::optional<std::string> name = std::nullopt;
+
+    /** Whether to export the constant. */
+    bool add_to_exports = false;
+
+    /**
+     * Construct a constant table entry.
+     *
+     * @throws Throws a `codegen_error` if `add_to_exports` is `true` and no `name` was set.
+     *
+     * @param type The constant type.
+     * @param value The constant's value.
+     * @param import_path Optional import path.
+     * @param name Optional name for the constant.
+     * @param add_to_exports Whether to export the constant. Defaults to `false`.
+     */
+    template<typename T>
+    constant_table_entry(
+      module_::constant_type type,
+      T value,
+      std::optional<std::string> import_path = std::nullopt,
+      std::optional<std::string> name = std::nullopt,
+      bool add_to_exports = false)
+    : module_::constant_table_entry{type, std::move(value)}
+    , import_path{std::move(import_path)}
+    , name{std::move(name)}
+    , add_to_exports{add_to_exports}
+    {
+        if(add_to_exports && !this->name.has_value())
+        {
+            throw codegen_error("Cannot export constant without a name.");
+        }
+    }
+};
+
 /** Code generator context. */
 class context
 {
@@ -1753,8 +1789,11 @@ class context
     /** List of structs. */
     std::vector<std::unique_ptr<struct_>> types;
 
-    /** String table. */
-    std::vector<std::string> strings;
+    /** Constant table. */
+    std::vector<constant_table_entry> constants;
+
+    /** Imported constants. */
+    std::vector<constant_table_entry> imported_constants;
 
     /** Global scope. */
     std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
@@ -1833,7 +1872,10 @@ public:
      * @param name The symbol's name.
      * @throws Throws a `codegen_error` if the symbol already exists but the symbol type does not match.
      */
-    void add_import(module_::symbol_type type, std::string import_path, std::string name);
+    void add_import(
+      module_::symbol_type type,
+      std::string import_path,
+      std::string name);
 
     /**
      * Get the import index of a symbol. If the symbol is not found in the imports,
@@ -1845,7 +1887,10 @@ public:
      * @return The symbol's index in the import table.
      * @throws Throws a `codegen_error` if the symbol is not found.
      */
-    std::size_t get_import_index(module_::symbol_type type, std::string import_path, std::string name) const;
+    std::size_t get_import_index(
+      module_::symbol_type type,
+      std::string import_path,
+      std::string name) const;
 
     /**
      * Create a struct.
@@ -1858,10 +1903,11 @@ public:
      * @param import_path An optional import path for the struct.
      * @returns A representation of the created struct.
      */
-    struct_* add_struct(std::string name,
-                        std::vector<std::pair<std::string, value>> members,
-                        std::uint8_t flags = 0,
-                        std::optional<std::string> import_path = std::nullopt);
+    struct_* add_struct(
+      std::string name,
+      std::vector<std::pair<std::string, value>> members,
+      std::uint8_t flags = 0,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a struct definition.
@@ -1871,15 +1917,64 @@ public:
      * @param name The struct name.
      * @param import_path Import path.
      */
-    struct_* get_type(const std::string& name, std::optional<std::string> import_path);
+    struct_* get_type(
+      const std::string& name,
+      std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Add a `i32` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param i The constant's value.
+     * @param import_path Import path.
+     */
+    void add_constant(
+      std::string name,
+      std::int32_t i,
+      std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Add a `f32` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param f The constant's value.
+     * @param import_path Import path.
+     */
+    void add_constant(
+      std::string name,
+      float i,
+      std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Add a `str` constant to the constant table.
+     *
+     * @param name The constant's name.
+     * @param s The constant's value.
+     * @param import_path Import path.
+     */
+    void add_constant(
+      std::string name,
+      std::string s,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a reference to a string or create a new one if it does not exist.
      *
      * @param str The string.
-     * @returns An index into the string table.
+     * @returns An index into the constant table.
      */
     std::size_t get_string(std::string str);
+
+    /**
+     * Get a constant from the constant table.
+     *
+     * @param name The constant's name.
+     * @param import_path The constant's import path.
+     * @returns Returns a `constant_table_entry` if the constant was found, and `std::nullopt` otherwise.
+     */
+    std::optional<constant_table_entry> get_constant(
+      const std::string& name,
+      const std::optional<std::string>& import_path = std::nullopt);
 
     /**
      * Add a function prototype.
@@ -1892,7 +1987,11 @@ public:
      * @param import_path The import path for the prototype.
      * @returns A representation of the prototype.
      */
-    prototype* add_prototype(std::string name, value return_type, std::vector<value> args, std::optional<std::string> import_path = std::nullopt);
+    prototype* add_prototype(
+      std::string name,
+      value return_type,
+      std::vector<value> args,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Get a function's prototype.
@@ -1903,7 +2002,9 @@ public:
      * @param import_path The import path of the function, or `std::nullopt`.
      * @returns A reference the the function's prototype.
      */
-    const prototype& get_prototype(const std::string& name, std::optional<std::string> import_path) const;
+    const prototype& get_prototype(
+      const std::string& name,
+      std::optional<std::string> import_path) const;
 
     /**
      * Add a function definition.
@@ -1915,7 +2016,10 @@ public:
      * @param args The function's arguments.
      * @returns A representation of the function.
      */
-    function* create_function(std::string name, std::unique_ptr<value> return_type, std::vector<std::unique_ptr<value>> args);
+    function* create_function(
+      std::string name,
+      std::unique_ptr<value> return_type,
+      std::vector<std::unique_ptr<value>> args);
 
     /**
      * Add a function with a native implementation in a library.
@@ -1927,7 +2031,11 @@ public:
      * @param return_type The function's return type.
      * @param args The function's arguments.
      */
-    void create_native_function(std::string lib_name, std::string name, std::unique_ptr<value> return_type, std::vector<std::unique_ptr<value>> arg);
+    void create_native_function(
+      std::string lib_name,
+      std::string name,
+      std::unique_ptr<value> return_type,
+      std::vector<std::unique_ptr<value>> arg);
 
     /**
      * Set instruction insertion point.

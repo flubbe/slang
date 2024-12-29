@@ -55,6 +55,7 @@ enum class symbol_type : std::uint8_t
     package = 0,
     function = 1,
     type = 2,
+    constant = 3,
 };
 
 /**
@@ -70,7 +71,8 @@ inline archive& operator&(archive& ar, symbol_type& s)
 
     if(i != static_cast<std::uint8_t>(symbol_type::package)
        && i != static_cast<std::uint8_t>(symbol_type::function)
-       && i != static_cast<std::uint8_t>(symbol_type::type))
+       && i != static_cast<std::uint8_t>(symbol_type::type)
+       && i != static_cast<std::uint8_t>(symbol_type::constant))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -87,6 +89,7 @@ inline std::string to_string(symbol_type s)
     case symbol_type::package: return "package";
     case symbol_type::function: return "function";
     case symbol_type::type: return "type";
+    case symbol_type::constant: return "constant";
     }
     return "<unknown>";
 }
@@ -155,6 +158,142 @@ inline archive& operator&(archive& ar, array_type& t)
         throw serialization_error("Invalid array type.");
     }
     t = static_cast<array_type>(v);
+    return ar;
+}
+
+/** Constant type. */
+enum class constant_type : std::uint8_t
+{
+    i32, /** 32-bit integer constant. */
+    f32, /** 32-bit floating point constant. */
+    str, /** A string. */
+};
+
+/** Convert `constant_type` to a readable string. */
+inline std::string to_string(constant_type type)
+{
+    switch(type)
+    {
+    case constant_type::i32: return "i32";
+    case constant_type::f32: return "f32";
+    case constant_type::str: return "str";
+    }
+
+    return "<unknown>";
+}
+
+/** Entry of the constant table. */
+struct constant_table_entry
+{
+    /** Constant type. */
+    constant_type type;
+
+    /** Constant data. */
+    std::variant<std::int32_t, float, std::string> data;
+
+    /** Default constructors. */
+    constant_table_entry() = default;
+    constant_table_entry(const constant_table_entry&) = default;
+    constant_table_entry(constant_table_entry&&) = default;
+
+    /**
+     * Initialize a constant table entry.
+     *
+     * @param type The constant type.
+     * @param data The constant data.
+     */
+    constant_table_entry(constant_type type, std::variant<std::int32_t, float, std::string> data)
+    : type{type}
+    , data{std::move(data)}
+    {
+    }
+
+    /** Default assignments. */
+    constant_table_entry& operator=(const constant_table_entry&) = default;
+    constant_table_entry& operator=(constant_table_entry&&) = default;
+};
+
+/**
+ * Serializer for constant table entries.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The constant table entry.
+ */
+inline archive& operator&(archive& ar, constant_table_entry& entry)
+{
+    if(!ar.is_reading() && !ar.is_writing())
+    {
+        throw serialization_error("Archive has to be reading or writing.");
+    }
+
+    std::uint8_t t = static_cast<std::uint8_t>(entry.type);
+    ar & t;
+
+    if(t != static_cast<std::uint8_t>(constant_type::i32)
+       && t != static_cast<std::uint8_t>(constant_type::f32)
+       && t != static_cast<std::uint8_t>(constant_type::str))
+    {
+        throw serialization_error("Invalid constant type.");
+    }
+
+    entry.type = static_cast<constant_type>(t);
+
+    if(ar.is_reading())
+    {
+        switch(entry.type)
+        {
+        case constant_type::i32:
+        {
+            std::int32_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
+        case constant_type::f32:
+        {
+            float f;
+            ar & f;
+            entry.data = f;
+            break;
+        }
+        case constant_type::str:
+        {
+            std::string s;
+            ar & s;
+            entry.data = s;
+            break;
+        }
+        default:
+            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+        }
+    }
+    else if(ar.is_writing())
+    {
+        switch(entry.type)
+        {
+        case constant_type::i32:
+        {
+            std::int32_t i = std::get<std::int32_t>(entry.data);
+            ar & i;
+            break;
+        }
+        case constant_type::f32:
+        {
+            float f = std::get<float>(entry.data);
+            ar & f;
+            break;
+        }
+        case constant_type::str:
+        {
+            std::string s = std::get<std::string>(entry.data);
+            ar & s;
+            break;
+        }
+        default:
+            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+        }
+    }
+
     return ar;
 }
 
@@ -693,8 +832,8 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Function or struct descriptor. */
-    std::variant<function_descriptor, struct_descriptor> desc;
+    /** Function, struct descriptor or constant table index. */
+    std::variant<function_descriptor, struct_descriptor, std::size_t> desc;
 
     /** Default constructors. */
     exported_symbol() = default;
@@ -712,7 +851,9 @@ struct exported_symbol
      * @param name The symbol name.
      * @param desc The symbol's descriptor.
      */
-    exported_symbol(symbol_type type, std::string name, std::variant<function_descriptor, struct_descriptor> desc)
+    exported_symbol(symbol_type type,
+                    std::string name,
+                    std::variant<function_descriptor, struct_descriptor, std::size_t> desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -763,7 +904,25 @@ inline archive& operator&(archive& ar, exported_symbol& s)
             ar & desc;
         }
     }
-    else if(s.type != symbol_type::package)
+    else if(s.type == symbol_type::package)
+    {
+        /* nothing to do */
+    }
+    else if(s.type == symbol_type::constant)
+    {
+        if(ar.is_reading())
+        {
+            std::size_t i;
+            ar & i;
+            s.desc = i;
+        }
+        else if(ar.is_writing())
+        {
+            std::size_t i = std::get<std::size_t>(s.desc);
+            ar & i;
+        }
+    }
+    else
     {
         throw serialization_error("Unknown symbol type.");
     }
@@ -783,8 +942,8 @@ struct module_header
     /** Export table. */
     std::vector<exported_symbol> exports;
 
-    /** String table. */
-    std::vector<std::string> strings;
+    /** Constant table. */
+    std::vector<constant_table_entry> constants;
 };
 
 /** A compiled binary file. */
@@ -882,13 +1041,21 @@ public:
       std::uint8_t flags);
 
     /**
-     * Set the string table.
+     * Add a constant to the module.
      *
-     * @param strings The new string table.
+     * @param name The constant's name.
+     * @param i An index into the constant table.
      */
-    void set_string_table(const std::vector<std::string>& strings)
+    void add_constant(std::string name, std::size_t i);
+
+    /**
+     * Set the constant table.
+     *
+     * @param constants The new constant table.
+     */
+    void set_constant_table(const std::vector<constant_table_entry>& constants)
     {
-        header.strings = strings;
+        header.constants = constants;
     }
 
     /**
@@ -943,7 +1110,7 @@ inline archive& operator&(archive& ar, module_header& header)
     }
     ar & header.imports;
     ar & header.exports;
-    ar & header.strings;
+    ar & header.constants;
     return ar;
 }
 

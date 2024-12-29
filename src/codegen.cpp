@@ -36,7 +36,7 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
 
 std::string to_string(binary_op op)
 {
-    std::array<std::string, 18> strs = {
+    static const std::array<std::string, 18> strs = {
       "mul",
       "div",
       "mod",
@@ -71,7 +71,7 @@ std::string to_string(binary_op op)
 
 std::string to_string(type_cast tc)
 {
-    std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
+    static const std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
 
     std::size_t idx = static_cast<std::size_t>(tc);
     if(idx > strs.size())
@@ -374,7 +374,7 @@ std::size_t scope::get_index(const std::string& name) const
                            });
     if(it != args.end())
     {
-        return it - args.begin();
+        return std::distance(args.begin(), it);
     }
 
     it = std::find_if(locals.begin(), locals.end(),
@@ -390,7 +390,7 @@ std::size_t scope::get_index(const std::string& name) const
 
     if(it != locals.end())
     {
-        return args.size() + (it - locals.begin());
+        return args.size() + std::distance(locals.begin(), it);
     }
 
     throw codegen_error(fmt::format("Name '{}' not found in scope.", name));
@@ -648,16 +648,170 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
     return it->get();
 }
 
+/** Helper to map types to `module_::constant_type` values. */
+template<typename T>
+struct constant_type_mapper
+{
+    static constexpr module_::constant_type value = module_::constant_type::i32;
+    static_assert(false, "Invalid constant type.");
+};
+
+/** Map `std::int32_t` to `module_::constant_type::i32`. */
+template<>
+struct constant_type_mapper<std::int32_t>
+{
+    static constexpr module_::constant_type value = module_::constant_type::i32;
+};
+
+/** Map `float` to `module_::constant_type::f32`. */
+template<>
+struct constant_type_mapper<float>
+{
+    static constexpr module_::constant_type value = module_::constant_type::f32;
+};
+
+/** Map `std::string` to `module_::constant_type::str`. */
+template<>
+struct constant_type_mapper<std::string>
+{
+    static constexpr module_::constant_type value = module_::constant_type::str;
+};
+
+/**
+ * Add a constant to the corresponding table. That is, it is added to the import table
+ * if `import_path` is specified, and to the module's constant table otherwise.
+ *
+ * @param module_constants The module's constant table.
+ * @param imported_constants The module's imported constants.
+ * @param name The constant's name.
+ * @param value The constant's value.
+ * @param import_path An import path or `std::nullopt`.
+ */
+template<typename T>
+void add_constant(
+  std::vector<constant_table_entry>& module_constants,
+  std::vector<constant_table_entry>& imported_constants,
+  std::string name,
+  T value,
+  std::optional<std::string> import_path)
+{
+    if(import_path.has_value())
+    {
+        // add constant to imported constants table.
+        auto it = std::find_if(
+          imported_constants.begin(),
+          imported_constants.end(),
+          [&name, &import_path](const constant_table_entry& entry) -> bool
+          {
+              return entry.name.has_value() && *entry.name == name && entry.import_path == import_path;
+          });
+        if(it != imported_constants.end())
+        {
+            throw codegen_error(fmt::format("Imported constant with name '{}' already exists.", name));
+        }
+
+        imported_constants.emplace_back(
+          constant_type_mapper<T>::value,
+          std::move(value),
+          std::move(import_path),
+          std::move(name));
+    }
+    else
+    {
+        // add constant to constants table.
+        auto it = std::find_if(
+          module_constants.begin(),
+          module_constants.end(),
+          [&name](const constant_table_entry& entry) -> bool
+          {
+              return entry.name.has_value() && *entry.name == name;
+          });
+        if(it != module_constants.end())
+        {
+            throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+        }
+
+        module_constants.emplace_back(
+          constant_type_mapper<T>::value,
+          std::move(value),
+          std::move(import_path),
+          std::move(name),
+          true);
+    }
+}
+
+void context::add_constant(std::string name, std::int32_t i, std::optional<std::string> import_path)
+{
+    slang::codegen::add_constant(constants, imported_constants, name, i, import_path);
+}
+
+void context::add_constant(std::string name, float f, std::optional<std::string> import_path)
+{
+    slang::codegen::add_constant(constants, imported_constants, name, f, import_path);
+}
+
+void context::add_constant(std::string name, std::string s, std::optional<std::string> import_path)
+{
+    slang::codegen::add_constant(constants, imported_constants, name, std::move(s), import_path);
+}
+
 std::size_t context::get_string(std::string str)
 {
-    auto it = std::find(strings.begin(), strings.end(), str);
-    if(it != strings.end())
+    auto it = std::find_if(
+      constants.begin(), constants.end(),
+      [&str](const module_::constant_table_entry& t) -> bool
+      {
+          return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
+      });
+    if(it != constants.end())
     {
-        return it - strings.begin();
+        it->import_path = std::nullopt;
+        return std::distance(constants.begin(), it);
     }
 
-    strings.emplace_back(std::move(str));
-    return strings.size() - 1;
+    constants.emplace_back(module_::constant_type::str, std::move(str));
+    return constants.size() - 1;
+}
+
+std::optional<constant_table_entry> context::get_constant(
+  const std::string& name,
+  const std::optional<std::string>& import_path)
+{
+    /*
+     * First try to find the constant in the module's constant table.
+     * If not found, search the import table and copy the constant into
+     * the import table.
+     */
+    auto it = std::find_if(
+      constants.cbegin(), constants.cend(),
+      [&name, &import_path](const constant_table_entry& entry) -> bool
+      {
+          return entry.name == name && entry.import_path == import_path;
+      });
+    if(it != constants.cend())
+    {
+        return *it;
+    }
+
+    it = std::find_if(
+      imported_constants.cbegin(), imported_constants.cend(),
+      [&name, &import_path](const constant_table_entry& entry) -> bool
+      {
+          return entry.name == name && entry.import_path == import_path;
+      });
+    if(it != imported_constants.end())
+    {
+        // copy string constants to constant table.
+        if(it->type == module_::constant_type::str)
+        {
+            return constants.emplace_back(*it);
+        }
+
+        // return primitive constant.
+        return *it;
+    }
+
+    return std::nullopt;
 }
 
 prototype* context::add_prototype(std::string name,
@@ -1063,8 +1217,8 @@ std::string context::to_string() const
 {
     std::string buf;
 
-    // strings.
-    if(strings.size())
+    // constants.
+    if(constants.size())
     {
         auto make_printable = [](const std::string& s) -> std::string
         {
@@ -1086,13 +1240,38 @@ std::string context::to_string() const
             return str;
         };
 
-        for(std::size_t i = 0; i < strings.size() - 1; ++i)
+        auto print_constant = [&buf, &make_printable](std::size_t i, const module_::constant_table_entry& c, bool newline = true) -> void
         {
-            buf += fmt::format(".string @{} \"{}\"\n", i, make_printable(strings[i]));
-        }
-        buf += fmt::format(".string @{} \"{}\"", strings.size() - 1, make_printable(strings.back()));
+            if(c.type == module_::constant_type::i32)
+            {
+                buf += fmt::format(".i32 @{} {}", i, std::get<std::int32_t>(c.data));
+            }
+            else if(c.type == module_::constant_type::f32)
+            {
+                buf += fmt::format(".f32 @{} {}", i, std::get<float>(c.data));
+            }
+            else if(c.type == module_::constant_type::str)
+            {
+                buf += fmt::format(".string @{} \"{}\"", i, make_printable(std::get<std::string>(c.data)));
+            }
+            else
+            {
+                buf += fmt::format(".<unknown> @{}", i);
+            }
 
-        // don't append a newline if the string table is the only non-empty buffer.
+            if(newline)
+            {
+                buf += "\n";
+            }
+        };
+
+        for(std::size_t i = 0; i < constants.size() - 1; ++i)
+        {
+            print_constant(i, constants[i]);
+        }
+        print_constant(constants.size() - 1, constants.back(), false);
+
+        // don't append a newline if the constant table is the only non-empty buffer.
         if(types.size() != 0 || funcs.size() != 0)
         {
             buf += "\n";

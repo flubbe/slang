@@ -157,6 +157,9 @@ protected:
     /** Parse a variable declaration. */
     std::unique_ptr<ast::variable_declaration_expression> parse_variable();
 
+    /** Parse a constant expression. */
+    std::unique_ptr<ast::constant_declaration_expression> parse_const();
+
     /**
      * Parse a type.
      *

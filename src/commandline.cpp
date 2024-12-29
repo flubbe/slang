@@ -443,8 +443,8 @@ std::string compile::get_description() const
 
 class instruction_logger : public slang::interpreter::instruction_recorder
 {
-    /** String table entries. */
-    std::size_t string_entries{0};
+    /** Constant table entries. */
+    std::size_t constant_entries{0};
 
     /** Import table entry count. */
     std::size_t import_entries{0};
@@ -486,15 +486,32 @@ public:
         fmt::print("}}\n");
     }
 
-    virtual void string(const std::string& s) override
+    virtual void constant(const module_::constant_table_entry& c) override
     {
-        fmt::print("{:>3}: {}\n", string_entries, s);
-        ++string_entries;
+        fmt::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
+        if(c.type == module_::constant_type::i32)
+        {
+            fmt::print("{}\n", std::get<std::int32_t>(c.data));
+        }
+        else if(c.type == module_::constant_type::f32)
+        {
+            fmt::print("{}\n", std::get<float>(c.data));
+        }
+        else if(c.type == module_::constant_type::str)
+        {
+            fmt::print("{}\n", std::get<std::string>(c.data));
+        }
+        ++constant_entries;
     }
 
     virtual void record(const module_::exported_symbol& s) override
     {
-        fmt::print("{:>3}: {:>11}, {}\n", export_entries, to_string(s.type), s.name);
+        fmt::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
+        if(s.type == module_::symbol_type::constant)
+        {
+            fmt::print(", {}", std::get<std::size_t>(s.desc));
+        }
+        fmt::print("\n");
         ++export_entries;
     }
 

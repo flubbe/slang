@@ -150,6 +150,25 @@ void context::resolve_module(const fs::path& resolved_path)
             }
             imported_types[resolved_path.string()].push_back({it.name, std::get<module_::struct_descriptor>(it.desc)});
         }
+        else if(it.type == module_::symbol_type::constant)
+        {
+            if(imported_constants.find(resolved_path.string()) == imported_constants.end())
+            {
+                imported_constants.insert({resolved_path.string(), {}});
+            }
+
+            std::size_t i = std::get<std::size_t>(it.desc);
+            if(i >= header.constants.size())
+            {
+                throw resolve_error(
+                  fmt::format(
+                    "Cannot resolve constant '{}': Index {} outside of constant table (size {}).",
+                    it.name, i, header.constants.size()));
+            }
+
+            const module_::constant_table_entry& entry = header.constants[i];
+            imported_constants[resolved_path.string()].push_back({it.name, {entry.type, entry.data}});
+        }
         else
         {
             throw resolve_error(fmt::format("Cannot resolve symbol '{}' of type '{}'.", it.name, to_string(it.type)));
@@ -183,6 +202,49 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
         fs::path resolved_path = mgr.resolve(fs_path);
 
         resolve_module(resolved_path);
+
+        /*
+         * import constants.
+         */
+        auto imported_constants_it = imported_constants.find(resolved_path.string());
+        if(imported_constants_it != imported_constants.end())
+        {
+            for(auto& it: imported_constants_it->second)
+            {
+                auto& desc = it.second;
+
+                // Add constant to contexts.
+                // Note that we don't add the constant to the imports.
+                if(desc.type == module_::constant_type::i32)
+                {
+                    ctx.add_constant(it.first, std::get<std::int32_t>(desc.value), import_path);
+                    type_ctx.add_variable(
+                      {it.first, {0, 0}},
+                      type_ctx.get_unresolved_type({"i32", {0, 0}}, ty::type_class::tc_plain),
+                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
+                }
+                else if(desc.type == module_::constant_type::f32)
+                {
+                    ctx.add_constant(it.first, std::get<float>(desc.value), import_path);
+                    type_ctx.add_variable(
+                      {it.first, {0, 0}},
+                      type_ctx.get_unresolved_type({"f32", {0, 0}}, ty::type_class::tc_plain),
+                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
+                }
+                else if(desc.type == module_::constant_type::str)
+                {
+                    ctx.add_constant(it.first, std::get<std::string>(desc.value), import_path);
+                    type_ctx.add_variable(
+                      {it.first, {0, 0}},
+                      type_ctx.get_unresolved_type({"str", {0, 0}}, ty::type_class::tc_plain),
+                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
+                }
+                else
+                {
+                    throw resolve_error(fmt::format("Constant '{}' has unknown type id {}.", it.first, static_cast<int>(desc.type)));
+                }
+            }
+        }
 
         /*
          * import types.
@@ -234,8 +296,8 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                         ty::type_info resolved_member_type = type_ctx.get_unresolved_type(
                           {member_type.base_type.base_type(), {0, 0}},
                           ty::is_builtin_type(member_type.base_type.base_type())
-                            ? typing::type_class::tc_plain
-                            : typing::type_class::tc_struct,
+                            ? ty::type_class::tc_plain
+                            : ty::type_class::tc_struct,
                           import_path);    // FIXME This can be an imported type
 
                         members.push_back(std::make_pair<token, ty::type_info>(

@@ -24,10 +24,15 @@ _tests: list[str] = [
 ]
 _expect_failure: list[str] = []
 
+_compile_only_tests: list[str] = []
+_compile_only_expect_failure: list[str] = []
+
 _script_tests: list[str] = [
     "test_array",
     "test_cast",
     "test_cast_fail",
+    "test_const_export",
+    "test_const_import",
     "test_conversions",
     "test_operators",
     "test_strings",
@@ -78,8 +83,50 @@ if __name__ == "__main__":
         f"---------- {len(retcodes)} tests ran, {len(retcodes) - len(failed_tests)} passed, {len(failed_tests)} failed ----------"
     )
 
-    # compile test scripts.
+    # compile-only tests.
     compile_info: list[tuple[int, str, str]] = []
+    for test_name in _compile_only_tests:
+        print(f"[......] Compiling test/{test_name} ...", end="")
+        p = subprocess.Popen(
+            [
+                "./build/Debug/slang",
+                "compile",
+                f"test/{test_name}",
+            ],
+            cwd=_module_path.parent,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        p.wait(timeout=5)
+        compile_info.append(
+            (
+                p.returncode,
+                cast(BytesIO, p.stdout).read().decode(),
+                cast(BytesIO, p.stderr).read().decode(),
+            )
+        )
+        if p.returncode == 0:
+            print(f"\r[  OK  ]")
+        else:
+            print(f"\r[FAILED]")
+
+    failed_compilation = [
+        (idx, info)
+        for idx, info in enumerate(compile_info)
+        if info[0] != 0 and _compile_only_tests[idx] not in _compile_only_expect_failure
+    ]
+    if len(failed_compilation) > 0:
+        for idx, info in failed_compilation:
+            test_path = Path(f"test/{_script_tests[idx]}")
+            print()
+            print(f"Compilation of '{test_path.absolute()}' failed.")
+            if len(info[1]) != 0:
+                print(f"Captured stdout:\n{info[1]}")
+            if len(info[2]) != 0:
+                print(f"Captured stderr:\n{info[2]}")
+
+    # compile test scripts.
+    compile_info = []
     for test_name in _script_tests:
         print(f"[......] Compiling test/{test_name} ...", end="")
         p = subprocess.Popen(

@@ -121,6 +121,10 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
     {
         return parse_variable();
     }
+    else if(current_token->s == "const")
+    {
+        return parse_const();
+    }
     else if(current_token->s == "fn")
     {
         return parse_definition();
@@ -301,6 +305,46 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     }
 
     throw syntax_error(*current_token, fmt::format("Expected '=', got '{}'.", current_token->s));
+}
+
+// const_def ::= 'const' identifier ':' identifier '=' literal_expression
+std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
+{
+    token_location loc = current_token->location;
+    get_next_token();    // skip 'const'.
+    if(current_token->type != token_type::identifier)
+    {
+        throw syntax_error(*current_token, "Expected <identifier>.");
+    }
+
+    token name = *current_token;
+    validate_identifier_name(name);
+
+    get_next_token();
+    if(current_token->s != ":")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected ': <identifier>', got '{}'.", current_token->s));
+    }
+
+    get_next_token();
+    if(current_token->type != token_type::identifier)
+    {
+        throw syntax_error(*current_token, fmt::format("Expected '<identifier>', got '{}'.", current_token->s));
+    }
+
+    auto type = parse_type();
+    if(current_token->s != "=")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected '=' for constant initialization, got '{}'.", current_token->s));
+    }
+
+    get_next_token();    // skip '='.
+
+    return std::make_unique<ast::constant_declaration_expression>(
+      std::move(loc),
+      std::move(name),
+      std::move(type),
+      parse_expression());
 }
 
 std::unique_ptr<ast::type_expression> parser::parse_type()

@@ -61,11 +61,11 @@ struct instruction_recorder
     }
 
     /**
-     * Record a string table entry.
+     * Record a constant table entry.
      *
-     * @param s The string.
+     * @param c The constant.
      */
-    virtual void string([[maybe_unused]] const std::string& s)
+    virtual void constant([[maybe_unused]] const module_::constant_table_entry& c)
     {
     }
 
