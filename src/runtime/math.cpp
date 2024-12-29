@@ -16,24 +16,38 @@
 namespace slang::runtime
 {
 
+// Work around missing inclusions of some math functions into std on GCC.
+// See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79700.
+#if !defined(__clang__) && defined(__GNUC__) && (__GNUC__ < 14)
+const auto builtin_fabsf = ::fabsf;
+const auto builtin_sqrtf = ::sqrtf;
+const auto builtin_ceilf = ::ceilf;
+const auto builtin_floorf = ::floorf;
+#else
+const auto builtin_fabsf = std::fabsf;
+const auto builtin_sqrtf = std::sqrtf;
+const auto builtin_ceilf = std::ceilf;
+const auto builtin_floorf = std::floorf;
+#endif
+
 void abs(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::fabsf(stack.pop_f32()));
+    stack.push_f32(builtin_fabsf(stack.pop_f32()));
 }
 
 void sqrt(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::sqrtf(stack.pop_f32()));
+    stack.push_f32(builtin_sqrtf(stack.pop_f32()));
 }
 
 void ceil(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::ceilf(stack.pop_f32()));
+    stack.push_f32(builtin_ceilf(stack.pop_f32()));
 }
 
 void floor(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::floorf(stack.pop_f32()));
+    stack.push_f32(builtin_floorf(stack.pop_f32()));
 }
 
 void trunc(si::context&, si::operand_stack& stack)
