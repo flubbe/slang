@@ -24,8 +24,8 @@ _tests: list[str] = [
 ]
 _expect_failure: list[str] = []
 
-_compile_only_tests: list[str] = []
-_compile_only_expect_failure: list[str] = []
+_compile_only_tests: list[str] = ["test_const_assign_fail"]
+_compile_only_expect_failure: list[str] = ["test_const_assign_fail"]
 
 _script_tests: list[str] = [
     "test_array",
@@ -105,7 +105,13 @@ if __name__ == "__main__":
                 cast(BytesIO, p.stderr).read().decode(),
             )
         )
-        if p.returncode == 0:
+
+        result = (
+            p.returncode
+            if test_name not in _compile_only_expect_failure
+            else int(p.returncode == 0)
+        )
+        if result == 0:
             print(f"\r[  OK  ]")
         else:
             print(f"\r[FAILED]")
@@ -187,7 +193,7 @@ if __name__ == "__main__":
         result = (
             p.returncode
             if test_name not in _script_expect_failure
-            else p.returncode == 0
+            else int(p.returncode == 0)
         )
         script_info.append(
             (

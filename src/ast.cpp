@@ -567,10 +567,22 @@ std::string directive_expression::to_string() const
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // check if we're loading a constant.
-    auto import_path = get_namespace_path();
+    std::optional<std::string> import_path = get_namespace_path();
     std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
     if(const_v.has_value())
     {
+        if(mc != memory_context::load)
+        {
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Cannot assign to constant '{}{}'.",
+                import_path.has_value()
+                  ? fmt::format("{}::", *import_path)
+                  : "",
+                name.s));
+        }
+
         // load the constant directly.
 
         if(const_v->type == module_::constant_type::i32)
