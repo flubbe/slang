@@ -308,7 +308,7 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
 }
 
 // const_def ::= 'const' identifier ':' identifier '=' literal_expression
-std::unique_ptr<ast::constant_expression> parser::parse_const()
+std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
 {
     token_location loc = current_token->location;
     get_next_token();    // skip 'const'.
@@ -339,13 +339,12 @@ std::unique_ptr<ast::constant_expression> parser::parse_const()
     }
 
     get_next_token();    // skip '='.
-    if(current_token->type != token_type::int_literal
-       && current_token->type != token_type::fp_literal
-       && current_token->type != token_type::str_literal)
-    {
-        throw syntax_error(*current_token, fmt::format("Expected <literal> for constant initialization, got '{}'.", current_token->s));
-    }
-    return std::make_unique<ast::constant_expression>(std::move(loc), std::move(name), std::move(type), parse_literal_expression());
+
+    return std::make_unique<ast::constant_declaration_expression>(
+      std::move(loc),
+      std::move(name),
+      std::move(type),
+      parse_expression());
 }
 
 std::unique_ptr<ast::type_expression> parser::parse_type()

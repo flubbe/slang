@@ -37,6 +37,7 @@ target_compile_options(test_lexer PRIVATE
 add_executable(test_parser
     test_parser.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/lexer.cpp
     ../src/module.cpp
@@ -53,6 +54,7 @@ target_compile_options(test_parser PRIVATE
 add_executable(test_codegen
     test_codegen.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/lexer.cpp
     ../src/module.cpp
@@ -69,6 +71,7 @@ target_compile_options(test_codegen PRIVATE
 add_executable(test_compile_ir
     test_compile_ir.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/lexer.cpp
     ../src/module.cpp
@@ -86,6 +89,7 @@ add_executable(test_type_system
     test_type_system.cpp
     ../src/archives/file.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/filemanager.cpp
     ../src/lexer.cpp
@@ -105,6 +109,7 @@ add_executable(test_resolve
     test_resolve.cpp
     ../src/archives/file.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/filemanager.cpp
     ../src/lexer.cpp
@@ -124,6 +129,7 @@ add_executable(test_output
     test_output.cpp
     ../src/archives/file.cpp
     ../src/ast.cpp
+    ../src/eval.cpp
     ../src/codegen.cpp
     ../src/emitter.cpp
     ../src/filemanager.cpp

@@ -170,6 +170,26 @@ public:
     virtual const class named_expression* as_named_expression() const;
 
     /**
+     * Return whether this expression can be evaluated to a compile-time constant.
+     *
+     * @param ctx The context in which to check evaluation.
+     */
+    virtual bool is_const_eval(cg::context&) const
+    {
+        return false;
+    }
+
+    /**
+     * Evaluate the compile-time constant.
+     *
+     * @returns Returns the result of the evaluation, or a `nullptr` if evaluation failed.
+     */
+    virtual std::unique_ptr<cg::value> evaluate(cg::context&) const
+    {
+        return {};
+    }
+
+    /**
      * Generate IR.
      *
      * @param ctx The context to use for code generation.
@@ -368,6 +388,13 @@ public:
     {
     }
 
+    bool is_const_eval(cg::context&) const override
+    {
+        return true;
+    }
+
+    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -562,6 +589,13 @@ public:
     {
         return expr->needs_pop();
     }
+
+    bool is_const_eval(cg::context& ctx) const override
+    {
+        return expr->is_const_eval(ctx);
+    }
+
+    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -762,6 +796,9 @@ public:
         return static_cast<bool>(element_expr);
     }
 
+    bool is_const_eval(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -826,29 +863,29 @@ public:
     }
 };
 
-/** A constant expression. */
-class constant_expression : public named_expression
+/** Constant declaration. */
+class constant_declaration_expression : public named_expression
 {
     /** The constant's type. */
     std::unique_ptr<ast::type_expression> type;
 
     /** The initializer expression. */
-    std::unique_ptr<ast::literal_expression> expr;
+    std::unique_ptr<ast::expression> expr;
 
 public:
     /** No default constructor. */
-    constant_expression() = delete;
+    constant_declaration_expression() = delete;
 
     /** Default destructor. */
-    virtual ~constant_expression() = default;
+    virtual ~constant_declaration_expression() = default;
 
     /** Copy and move constructors. */
-    constant_expression(const constant_expression&) = delete;
-    constant_expression(constant_expression&&) = default;
+    constant_declaration_expression(const constant_declaration_expression&) = delete;
+    constant_declaration_expression(constant_declaration_expression&&) = default;
 
     /** Assignment operators. */
-    constant_expression& operator=(const constant_expression&) = delete;
-    constant_expression& operator=(constant_expression&&) = default;
+    constant_declaration_expression& operator=(const constant_declaration_expression&) = delete;
+    constant_declaration_expression& operator=(constant_declaration_expression&&) = default;
 
     /**
      * Construct a constant expression.
@@ -858,10 +895,10 @@ public:
      * @param type The constant's type.
      * @param expr The initializer expression.
      */
-    constant_expression(token_location loc,
-                        token name,
-                        std::unique_ptr<ast::type_expression> type,
-                        std::unique_ptr<ast::literal_expression> expr)
+    constant_declaration_expression(token_location loc,
+                                    token name,
+                                    std::unique_ptr<ast::type_expression> type,
+                                    std::unique_ptr<ast::expression> expr)
     : named_expression{std::move(loc), std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
@@ -1079,6 +1116,9 @@ public:
 
     bool needs_pop() const override;
 
+    bool is_const_eval(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -1121,6 +1161,9 @@ public:
     , operand{std::move(operand)}
     {
     }
+
+    bool is_const_eval(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;

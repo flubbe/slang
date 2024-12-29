@@ -838,32 +838,56 @@ std::string variable_declaration_expression::to_string() const
 }
 
 /*
- * constant_expression.
+ * constant_declaration_expression.
  */
 
-std::unique_ptr<cg::value> constant_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto& tok = expr->get_token();
-    if(tok.type == token_type::int_literal)
+    if(!expr->is_const_eval(ctx))
     {
-        ctx.add_constant(name.s, std::get<std::int32_t>(*tok.value));
+        throw cg::codegen_error(expr->get_location(), fmt::format("Expression in constant declaration is not compile-time computable."));
+    }
+
+    auto v = expr->evaluate(ctx);
+    if(!v)
+    {
+        throw cg::codegen_error(expr->get_location(), fmt::format("Expression in constant declaration is not compile-time computable."));
+    }
+
+    auto t = v->get_type();
+
+    if(t.is_array())
+    {
+        throw cg::codegen_error(expr->get_location(), "Compile-time assignment not supported for arrays.");
+    }
+    if(t.is_reference())
+    {
+        throw cg::codegen_error(expr->get_location(), "Compile-time assignment not supported for references.");
+    }
+
+    if(t.to_string() == "i32")
+    {
+        cg::constant_int* v_i32 = static_cast<cg::constant_int*>(v.get());
+        ctx.add_constant(name.s, v_i32->get_int());
         return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
-    else if(tok.type == token_type::fp_literal)
+    else if(t.to_string() == "f32")
     {
-        ctx.add_constant(name.s, std::get<float>(*tok.value));
+        cg::constant_float* v_f32 = static_cast<cg::constant_float*>(v.get());
+        ctx.add_constant(name.s, v_f32->get_float());
         return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
     }
-    else if(tok.type == token_type::str_literal)
+    else if(t.to_string() == "str")
     {
-        ctx.add_constant(name.s, std::get<std::string>(*tok.value));
+        cg::constant_str* v_str = static_cast<cg::constant_str*>(v.get());
+        ctx.add_constant(name.s, v_str->get_str());
         return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
     }
 
-    throw cg::codegen_error(loc, fmt::format("Invalid token type id {} for literal.", static_cast<int>(tok.type)));
+    throw cg::codegen_error(expr->get_location(), fmt::format("Invalid token type '{}' for constant declaration.", t.to_string()));
 }
 
-std::optional<ty::type_info> constant_expression::type_check(ty::context& ctx)
+std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
 {
     auto const_type = ctx.get_type(type->get_name(), false, type->get_namespace_path());
     ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
@@ -890,7 +914,7 @@ std::optional<ty::type_info> constant_expression::type_check(ty::context& ctx)
     return std::nullopt;
 }
 
-std::string constant_expression::to_string() const
+std::string constant_declaration_expression::to_string() const
 {
     return fmt::format(
       "Constant(name={}, type={}, expr={})",

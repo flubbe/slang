@@ -15,6 +15,7 @@ find_package(fmt REQUIRED)
 add_executable(slang
     src/archives/file.cpp
     src/ast.cpp
+    src/eval.cpp
     src/codegen.cpp
     src/commandline.cpp
     src/compiler.cpp

@@ -36,7 +36,7 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
 
 std::string to_string(binary_op op)
 {
-    std::array<std::string, 18> strs = {
+    static const std::array<std::string, 18> strs = {
       "mul",
       "div",
       "mod",
@@ -71,7 +71,7 @@ std::string to_string(binary_op op)
 
 std::string to_string(type_cast tc)
 {
-    std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
+    static const std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
 
     std::size_t idx = static_cast<std::size_t>(tc);
     if(idx > strs.size())

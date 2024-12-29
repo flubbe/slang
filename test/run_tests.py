@@ -24,13 +24,14 @@ _tests: list[str] = [
 ]
 _expect_failure: list[str] = []
 
-_compile_only_tests: list[str] = ["test_const_export"]
+_compile_only_tests: list[str] = []
 _compile_only_expect_failure: list[str] = []
 
 _script_tests: list[str] = [
     "test_array",
     "test_cast",
     "test_cast_fail",
+    "test_const_export",
     "test_const_import",
     "test_conversions",
     "test_operators",
