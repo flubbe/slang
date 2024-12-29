@@ -173,13 +173,14 @@ add_executable(test_interpreter
     ../src/archives/file.cpp
     ../src/runtime/arrays.cpp
     ../src/runtime/debug.cpp
+    ../src/runtime/math.cpp
     ../src/runtime/strings.cpp
+    ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
     ../src/filemanager.cpp
     ../src/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
-    ../src/runtime/types.cpp
     ../src/module.cpp
     ../src/opcodes.cpp
 )

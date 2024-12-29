@@ -34,6 +34,7 @@ _script_tests: list[str] = [
     "test_const_export",
     "test_const_import",
     "test_conversions",
+    "test_math",
     "test_operators",
     "test_strings",
     "test_structs",

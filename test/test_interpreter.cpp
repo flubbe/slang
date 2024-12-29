@@ -187,6 +187,76 @@ static void register_std_lib(si::context& ctx, std::vector<std::string>& print_b
                                  {
                                      rt::assert_(ctx, stack);
                                  });
+
+    /*
+     * Math.
+     */
+
+    ctx.register_native_function("slang", "abs",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::abs(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "sqrt",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::sqrt(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "ceil",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::ceil(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "floor",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::floor(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "trunc",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::trunc(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "round",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::round(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "sin",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::sin(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "cos",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::cos(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "tan",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::tan(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "asin",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::asin(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "acos",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::acos(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "atan",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::atan(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "atan2",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::atan2(ctx, stack);
+                                 });
 }
 
 TEST(interpreter, hello_world)

@@ -100,6 +100,8 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_math
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_operators
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_strings

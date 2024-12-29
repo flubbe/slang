@@ -141,4 +141,114 @@ void parse_f32(si::context& ctx, si::operand_stack& stack);
  */
 void assert_(si::context& ctx, si::operand_stack& stack);
 
+/*
+ * Math functions.
+ */
+
+/**
+ * Compute the absolute value.
+ *
+ * @param x A floating point value.
+ * @return Returns `abs(x)`.
+ */
+void abs(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the square root.
+ *
+ * @param x A floating point value.
+ * @return Returns `sqrt(x)`.
+ */
+void sqrt(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Computes the least integer value not less than `x`.
+ *
+ * @param x A floating point value.
+ * @return Returns `ceil(x)`.
+ */
+void ceil(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Computes the largest integer value not greater than `x`.
+ *
+ * @param x A floating point value.
+ * @return Returns `floor(x)`.
+ */
+void floor(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Computes the nearest integer not greater in magnitude than `x`.
+ *
+ * @param x A floating point value.
+ * @return Returns `trunc(x)`.
+ */
+void trunc(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Computes the nearest integer value to `x` (in floating-point format),
+ * rounding halfway cases away from zero, regardless of the current rounding mode
+ *
+ * @param x A floating point value.
+ * @return Returns `round(x)`.
+ */
+void round(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the sine.
+ *
+ * @param x Argument to the sine.
+ * @return Returns `sin(x)`.
+ */
+void sin(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the cosine.
+ *
+ * @param x Argument to the cosine.
+ * @return Returns `cos(x)`.
+ */
+void cos(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the tangent.
+ *
+ * @param x Argument to the tangent.
+ * @return Returns `tan(x)`.
+ */
+void tan(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the arc sine.
+ *
+ * @param x Argument to the arc sine.
+ * @return Returns `asin(x)`.
+ */
+void asin(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the arc cosine.
+ *
+ * @param x Argument to the arc cosine.
+ * @return Returns `acos(x)`.
+ */
+void acos(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Compute the principal value of the arc tangent.
+ *
+ * @param x Argument to the arc tangent.
+ * @return Returns `atan(x)`.
+ */
+void atan(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Computes the arc tangent of `y/x` using the signs of arguments to determine the correct quadrant.
+ *
+ * @param x `f32` value.
+ * @param y `f32` value.
+ * @return Returns `atan(x)`.
+ */
+void atan2(si::context& ctx, si::operand_stack& stack);
+
 }    // namespace slang::runtime

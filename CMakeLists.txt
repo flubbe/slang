@@ -33,6 +33,7 @@ add_executable(slang
     src/resolve.cpp
     src/runtime/arrays.cpp
     src/runtime/debug.cpp
+    src/runtime/math.cpp
     src/runtime/strings.cpp
     src/runtime/types.cpp
     src/runtime/utils.cpp
