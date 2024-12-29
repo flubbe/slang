@@ -184,10 +184,7 @@ public:
      *
      * @returns Returns the result of the evaluation, or a `nullptr` if evaluation failed.
      */
-    virtual std::unique_ptr<cg::value> evaluate(cg::context&) const
-    {
-        return {};
-    }
+    virtual std::unique_ptr<cg::value> evaluate(cg::context&) const;
 
     /**
      * Generate IR.

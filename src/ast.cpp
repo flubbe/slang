@@ -52,6 +52,11 @@ const named_expression* expression::as_named_expression() const
     throw std::runtime_error("Expression is not a named expression.");
 }
 
+std::unique_ptr<cg::value> expression::evaluate(cg::context&) const
+{
+    return {};
+}
+
 void expression::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
 {
     if(!supports_directive(name.s))
