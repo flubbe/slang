@@ -23,11 +23,25 @@ const auto builtin_fabsf = ::fabsf;
 const auto builtin_sqrtf = ::sqrtf;
 const auto builtin_ceilf = ::ceilf;
 const auto builtin_floorf = ::floorf;
+const auto builtin_sinf = ::sinf;
+const auto builtin_cosf = ::cosf;
+const auto builtin_tanf = ::tanf;
+const auto builtin_asinf = ::asinf;
+const auto builtin_acosf = ::acosf;
+const auto builtin_atanf = ::atanf;
+const auto builtin_atan2f = ::atan2f;
 #else
 const auto builtin_fabsf = std::fabsf;
 const auto builtin_sqrtf = std::sqrtf;
 const auto builtin_ceilf = std::ceilf;
 const auto builtin_floorf = std::floorf;
+const auto builtin_sinf = std::sinf;
+const auto builtin_cosf = std::cosf;
+const auto builtin_tanf = std::tanf;
+const auto builtin_asinf = std::asinf;
+const auto builtin_acosf = std::acosf;
+const auto builtin_atanf = std::atanf;
+const auto builtin_atan2f = std::atan2f;
 #endif
 
 void abs(si::context&, si::operand_stack& stack)
@@ -76,49 +90,49 @@ void sin(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::sinf(value); });
+      { return builtin_sinf(value); });
 }
 
 void cos(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::cosf(value); });
+      { return builtin_cosf(value); });
 }
 
 void tan(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::tanf(value); });
+      { return builtin_tanf(value); });
 }
 
 void asin(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::asinf(value); });
+      { return builtin_asinf(value); });
 }
 
 void acos(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::acosf(value); });
+      { return builtin_acosf(value); });
 }
 
 void atan(si::context&, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
-      { return std::atanf(value); });
+      { return builtin_atanf(value); });
 }
 
 void atan2(si::context&, si::operand_stack& stack)
 {
     float y = stack.pop_f32();
     float x = stack.pop_f32();
-    stack.push_f32(std::atan2f(x, y));
+    stack.push_f32(builtin_atan2f(x, y));
 }
 
 }    // namespace slang::runtime
