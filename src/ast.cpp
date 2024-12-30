@@ -868,22 +868,7 @@ void constant_declaration_expression::push_directive(
   const std::vector<std::pair<token, token>>& args)
 {
     // verify that 'const_eval' is not disabled.
-    auto disable_directives = ctx.get_directives("disable");
-    if(std::find_if(
-         disable_directives.begin(),
-         disable_directives.end(),
-         [](const cg::directive& d) -> bool
-         {
-             return std::find_if(
-                      d.args.begin(), d.args.end(),
-                      [](const std::pair<token, token>& p) -> bool
-                      {
-                          return p.first.s == "const_eval"
-                                 && (p.second.s.empty() || p.second.s == "true");
-                      })
-                    != d.args.end();
-         })
-       != disable_directives.end())
+    if(ctx.get_directive_flag("disable", "const_eval", false))
     {
         throw cg::codegen_error(loc, "Cannot declare constant with 'const_eval' disabled.");
     }
@@ -1603,26 +1588,13 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     {
         // Evaluate constant subexpressions.
         bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
-        auto disable_directives = ctx.get_directives("disable");
+        bool disable_const_eval = !ctx_const_eval;
 
-        if(std::find_if(
-             disable_directives.begin(),
-             disable_directives.end(),
-             [](const cg::directive& d) -> bool
-             {
-                 return std::find_if(
-                          d.args.begin(), d.args.end(),
-                          [](const std::pair<token, token>& p) -> bool
-                          {
-                              return p.first.s == "const_eval"
-                                     && (p.second.s.empty() || p.second.s == "true");
-                          })
-                        != d.args.end();
-             })
-           != disable_directives.end())
-        {
-            ctx.evaluate_constant_subexpressions = false;
-        }
+        disable_const_eval = ctx.get_directive_flag(
+          "disable",
+          "const_eval",
+          disable_const_eval);
+        ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
         if(ctx.evaluate_constant_subexpressions
            && is_const_eval(ctx))
@@ -1898,26 +1870,13 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
 
     // Evaluate constant subexpressions.
     bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
-    auto disable_directives = ctx.get_directives("disable");
+    bool disable_const_eval = !ctx_const_eval;
 
-    if(std::find_if(
-         disable_directives.begin(),
-         disable_directives.end(),
-         [](const cg::directive& d) -> bool
-         {
-             return std::find_if(
-                      d.args.begin(), d.args.end(),
-                      [](const std::pair<token, token>& p) -> bool
-                      {
-                          return p.first.s == "const_eval"
-                                 && (p.second.s.empty() || p.second.s == "true");
-                      })
-                    != d.args.end();
-         })
-       != disable_directives.end())
-    {
-        ctx.evaluate_constant_subexpressions = false;
-    }
+    disable_const_eval = ctx.get_directive_flag(
+      "disable",
+      "const_eval",
+      disable_const_eval);
+    ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
     if(ctx.evaluate_constant_subexpressions
        && is_const_eval(ctx))

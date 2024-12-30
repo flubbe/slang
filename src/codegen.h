@@ -2206,6 +2206,57 @@ public:
         return directives;
     }
 
+    /**
+     * Check if the directive has the specified flag set, that is, it is
+     * part of the directive's keys with a value of `true` or `false`. If
+     * the flag is not found or the values are invalid, `default_value` is
+     * returned.
+     *
+     * If multiple directives with the same flag, or multiple flags with the same
+     * name are found, the respective last one is used.
+     *
+     * @param name The directive's name.
+     * @param flag_name The flag's name.
+     * @param default_value The default value.
+     * @returns The flag's value or the default value.
+     */
+    bool get_directive_flag(
+      const std::string& name,
+      const std::string& flag_name,
+      bool default_value) const
+    {
+        for(auto it = directive_stack.rbegin(); it != directive_stack.rend(); ++it)
+        {
+            if(it->name.s == name)
+            {
+                auto flag_it = std::find_if(
+                  it->args.begin(),
+                  it->args.end(),
+                  [&flag_name](const std::pair<token, token>& arg)
+                  {
+                      return arg.first.s == flag_name;
+                  });
+                if(flag_it != it->args.end())
+                {
+                    if(flag_it->second.s.empty() || flag_it->second.s == "true")
+                    {
+                        return true;
+                    }
+                    else if(flag_it->second.s == "false")
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        return default_value;
+                    }
+                }
+            }
+        }
+
+        return default_value;
+    }
+
     /** Get the last on the stack directive matching a given name. */
     std::optional<directive> get_last_directive(const std::string& name) const
     {
