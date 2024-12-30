@@ -120,4 +120,8 @@ void print_command_help(const std::string& info_text, const std::vector<std::pai
  */
 void print_usage_help(const std::string& usage_text, const std::string& help_text);
 
+/**
+ * Scope exit guard. Calls a function on exit.
+ */
+
 }    // namespace slang::utils

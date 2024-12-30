@@ -21,8 +21,8 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
+#include "directive.h"
 #include "module.h"
-#include "token.h"
 
 /* Forward declarations. */
 
@@ -1807,6 +1807,9 @@ class context
     /** Struct stack for access resolution. */
     std::vector<type> struct_access;
 
+    /** Directive stack. */
+    std::vector<directive> directive_stack;
+
     /** List of function prototypes. */
     std::vector<std::unique_ptr<prototype>> prototypes;
 
@@ -2161,6 +2164,66 @@ public:
       const std::string& struct_name,
       const std::string& member_name,
       std::optional<std::string> import_path = std::nullopt) const;
+
+    /**
+     * Push a directive onto the directive stack.
+     *
+     * @param dir The directive.
+     */
+    void push_directive(directive dir)
+    {
+        directive_stack.emplace_back(std::move(dir));
+    }
+
+    /** Pop a directive from the directive stack. */
+    void pop_directive()
+    {
+        if(directive_stack.size() == 0)
+        {
+            throw codegen_error("No directive to pop.");
+        }
+        directive_stack.pop_back();
+    }
+
+    /** Get all directives. */
+    const std::vector<directive>& get_directives() const
+    {
+        return directive_stack;
+    }
+
+    /** Get directives matching a given name. */
+    std::vector<directive> get_directives(const std::string& name) const
+    {
+        std::vector<directive> directives;
+        std::copy_if(
+          directive_stack.begin(),
+          directive_stack.end(),
+          std::back_inserter(directives),
+          [&name](const directive& dir)
+          {
+              return dir.name.s == name;
+          });
+        return directives;
+    }
+
+    /** Get the last on the stack directive matching a given name. */
+    std::optional<directive> get_last_directive(const std::string& name) const
+    {
+        auto it = std::find_if(
+          directive_stack.rbegin(),
+          directive_stack.rend(),
+          [&name](const directive& dir)
+          {
+              return dir.name.s == name;
+          });
+
+        if(it != directive_stack.rend())
+        {
+            return *it;
+        }
+
+        return std::nullopt;
+    }
 
     /**
      * Enter a function. Only one function can be entered at a time.

@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-#include "token.h"
+#include "directive.h"
 #include "type.h"
 #include "utils.h"
 
@@ -50,41 +50,12 @@ enum class memory_context
     store, /** storing context. */
 };
 
-/** A directive that modifies an expression. */
-struct directive
-{
-    /** The directive's name. */
-    token name;
-
-    /** The directive's arguments. */
-    std::vector<std::pair<token, token>> args;
-
-    /** Default constructors. */
-    directive() = default;
-    directive(const directive&) = default;
-    directive(directive&&) = default;
-
-    /** Default assignments. */
-    directive& operator=(const directive&) = default;
-    directive& operator=(directive&&) = default;
-
-    /** Default constructor. */
-    directive(token name, std::vector<std::pair<token, token>> args)
-    : name{std::move(name)}
-    , args{std::move(args)}
-    {
-    }
-};
-
 /** Base class for all expression nodes. */
 class expression
 {
 protected:
     /** The expression's location. */
     token_location loc;
-
-    /** The expression's directive stack. */
-    std::vector<directive> directive_stack;
 
     /** Namespace stack for the expression. */
     std::vector<std::string> namespace_stack;
@@ -209,17 +180,22 @@ public:
      *
      * @throws A `type_error` if the directive is not supported by the expression.
      *
+     * @param ctx The code generation context.
      * @param name The directive's name.
      * @param args The directive's arguments.
      */
-    void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
+    virtual void push_directive(
+      cg::context& ctx,
+      const token& name,
+      const std::vector<std::pair<token, token>>& args);
 
     /**
      * Pop the last directive from the expression's directive stack.
      *
+     * @param ctx The code generation context.
      * @throws A `type_error` if the stack was empty.
      */
-    void pop_directive();
+    virtual void pop_directive(cg::context& ctx);
 
     /**
      * Check whether a directive is supported by the expression.
@@ -227,18 +203,7 @@ public:
      * @param name Name of the directive.
      * @returns True if the directive is supported, and false otherwise.
      */
-    virtual bool supports_directive([[maybe_unused]] const std::string& name) const
-    {
-        return false;
-    }
-
-    /**
-     * Get a list of matching directives.
-     *
-     * @param name The directive's name.
-     * @returns A vector of directives matching the name, or an empty vector if none are found.
-     */
-    std::vector<directive> get_directives(const std::string& s) const;
+    virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -247,7 +212,7 @@ public:
      * @returns The directive, or `std::nullopt` if the directive was not found.
      * @throws Throws a `codegen_error` if the directive is not unique.
      */
-    std::optional<directive> get_unique_directive(const std::string& s) const;
+    std::optional<cg::directive> get_unique_directive(const std::string& s) const;
 
     /**
      * Set the namespace stack for the expression.
@@ -304,6 +269,9 @@ protected:
     token name;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     named_expression() = delete;
 
@@ -359,6 +327,9 @@ class literal_expression : public expression
     token tok;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     literal_expression() = delete;
 
@@ -479,6 +450,9 @@ class type_cast_expression : public named_expression
     std::unique_ptr<type_expression> target_type;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     type_cast_expression() = delete;
 
@@ -555,6 +529,9 @@ class namespace_access_expression : public expression
     std::unique_ptr<expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     namespace_access_expression() = delete;
 
@@ -612,6 +589,9 @@ class access_expression : public expression
     ty::type_info lhs_type;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     access_expression() = delete;
 
@@ -675,6 +655,9 @@ class import_expression : public expression
     std::vector<token> path;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     import_expression() = delete;
 
@@ -716,6 +699,9 @@ class directive_expression : public named_expression
     std::unique_ptr<expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     directive_expression() = delete;
 
@@ -762,6 +748,9 @@ class variable_reference_expression : public named_expression
     std::unique_ptr<expression> element_expr;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     variable_reference_expression() = delete;
 
@@ -814,6 +803,9 @@ class variable_declaration_expression : public named_expression
     std::unique_ptr<ast::expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     variable_declaration_expression() = delete;
 
@@ -870,6 +862,9 @@ class constant_declaration_expression : public named_expression
     std::unique_ptr<ast::expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     constant_declaration_expression() = delete;
 
@@ -902,6 +897,11 @@ public:
     {
     }
 
+    void push_directive(
+      cg::context& ctx,
+      const token& name,
+      const std::vector<std::pair<token, token>>& args) override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -920,6 +920,9 @@ class array_initializer_expression : public expression
     std::vector<std::unique_ptr<ast::expression>> exprs;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     array_initializer_expression() = delete;
 
@@ -955,6 +958,9 @@ class struct_definition_expression : public named_expression
     std::vector<std::unique_ptr<variable_declaration_expression>> members;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     struct_definition_expression() = delete;
 
@@ -996,6 +1002,9 @@ class struct_anonymous_initializer_expression : public named_expression
     std::vector<std::unique_ptr<expression>> initializers;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     struct_anonymous_initializer_expression() = delete;
 
@@ -1038,6 +1047,9 @@ class struct_named_initializer_expression : public named_expression
     std::vector<std::unique_ptr<expression>> initializers;
 
 public:
+    /** Set the super class. */
+    using super = named_expression;
+
     /** No default constructor. */
     struct_named_initializer_expression() = delete;
 
@@ -1081,6 +1093,9 @@ class binary_expression : public expression
     std::unique_ptr<expression> lhs, rhs;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     binary_expression() = delete;
 
@@ -1131,6 +1146,9 @@ class unary_expression : public expression
     std::unique_ptr<expression> operand;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     unary_expression() = delete;
 
@@ -1176,6 +1194,9 @@ class new_expression : public expression
     std::unique_ptr<expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     new_expression() = delete;
 
@@ -1213,6 +1234,9 @@ public:
 class null_expression : public expression
 {
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     null_expression() = delete;
 
@@ -1252,6 +1276,9 @@ class postfix_expression : public expression
     token op;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     postfix_expression() = delete;
 
@@ -1358,6 +1385,9 @@ class block : public expression
     std::vector<std::unique_ptr<expression>> exprs;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     block() = delete;
 
@@ -1400,6 +1430,9 @@ class function_expression : public expression
     std::unique_ptr<block> body;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     function_expression() = delete;
 
@@ -1451,6 +1484,9 @@ class call_expression : public expression
     ty::type_info return_type;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     call_expression() = delete;
 
@@ -1500,6 +1536,9 @@ class return_statement : public expression
     std::unique_ptr<ast::expression> expr;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     return_statement() = delete;
 
@@ -1544,6 +1583,9 @@ class if_statement : public expression
     std::unique_ptr<ast::expression> else_block;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     if_statement() = delete;
 
@@ -1589,6 +1631,9 @@ class while_statement : public expression
     std::unique_ptr<ast::expression> while_block;
 
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     while_statement() = delete;
 
@@ -1626,6 +1671,9 @@ public:
 class break_statement : public expression
 {
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     break_statement() = delete;
 
@@ -1667,6 +1715,9 @@ public:
 class continue_statement : public expression
 {
 public:
+    /** Set the super class. */
+    using super = expression;
+
     /** No default constructor. */
     continue_statement() = delete;
 

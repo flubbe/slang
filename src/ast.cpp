@@ -57,52 +57,56 @@ std::unique_ptr<cg::value> expression::evaluate(cg::context&) const
     return {};
 }
 
-void expression::push_directive(const token& name, const std::vector<std::pair<token, token>>& args)
+void expression::push_directive(
+  cg::context& ctx,
+  const token& name,
+  const std::vector<std::pair<token, token>>& args)
 {
     if(!supports_directive(name.s))
     {
-        throw ty::type_error(name.location, fmt::format("Directive '{}' is not supported by the following expression.", name.s));
-    }
+        auto transform = [](const std::pair<token, token>& arg) -> std::string
+        { 
+            if(arg.second.s.empty())
+            {
+                return arg.first.s;
+            }
+            return fmt::format("{}={}", arg.first.s, arg.second.s); };
 
-    directive_stack.emplace_back(name, args);
-}
+        auto arg_string = slang::utils::join(args, {transform}, ", ");
 
-void expression::pop_directive()
-{
-    if(directive_stack.size() == 0)
-    {
-        throw ty::type_error("Cannot pop directive for expression. Directive stack is empty.");
-    }
-
-    directive_stack.pop_back();
-}
-
-std::vector<directive> expression::get_directives(const std::string& s) const
-{
-    std::vector<directive> ret;
-    for(auto& it: directive_stack)
-    {
-        if(it.name.s == s)
+        // FIXME This should print the source instead of the AST.
+        auto expr_string = to_string();
+        if(expr_string.empty())
         {
-            ret.emplace_back(it);
+            expr_string = "<unknown>";
         }
+        else if(expr_string.size() > 80)    // arbitrary limit.
+        {
+            expr_string = expr_string.substr(0, 80) + "...";
+        }
+
+        throw ty::type_error(
+          name.location,
+          fmt::format(
+            "Directive '{}' with arguments '{}' is not supported by the expression with AST '{}'.",
+            name.s, arg_string, expr_string));
     }
-    return ret;
+
+    ctx.push_directive({name, args});
 }
 
-std::optional<directive> expression::get_unique_directive(const std::string& s) const
+void expression::pop_directive(cg::context& ctx)
 {
-    auto directives = get_directives(s);
-    if(directives.size() > 1)
-    {
-        throw cg::codegen_error(loc, fmt::format("More than one '{}' directive.", s));
-    }
+    ctx.pop_directive();
+}
 
-    if(directives.size() == 1)
+bool expression::supports_directive(const std::string& name) const
+{
+    if(name == "disable")
     {
-        return std::make_optional(std::move(directives[0]));
+        return true;
     }
-    return std::nullopt;
+    return false;
 }
 
 /*
@@ -536,9 +540,9 @@ std::string import_expression::to_string() const
 
 std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    expr->push_directive(name, args);
+    expr->push_directive(ctx, name, args);
     std::unique_ptr<cg::value> ret = expr->generate_code(ctx, mc);
-    expr->pop_directive();
+    expr->pop_directive(ctx);
     return ret;
 }
 
@@ -858,6 +862,35 @@ std::string variable_declaration_expression::to_string() const
  * constant_declaration_expression.
  */
 
+void constant_declaration_expression::push_directive(
+  cg::context& ctx,
+  const token& name,
+  const std::vector<std::pair<token, token>>& args)
+{
+    // verify that 'const_eval' is not disabled.
+    auto disable_directives = ctx.get_directives("disable");
+    if(std::find_if(
+         disable_directives.begin(),
+         disable_directives.end(),
+         [](const cg::directive& d) -> bool
+         {
+             return std::find_if(
+                      d.args.begin(), d.args.end(),
+                      [](const std::pair<token, token>& p) -> bool
+                      {
+                          return p.first.s == "const_eval"
+                                 && (p.second.s.empty() || p.second.s == "true");
+                      })
+                    != d.args.end();
+         })
+       != disable_directives.end())
+    {
+        throw cg::codegen_error(loc, "Cannot declare constant with 'const_eval' disabled.");
+    }
+
+    super::push_directive(ctx, name, args);
+}
+
 std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(!expr->is_const_eval(ctx))
@@ -1079,24 +1112,11 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     }
 
     std::uint8_t flags = static_cast<std::uint8_t>(module_::struct_flags::none);
-
-    std::optional<directive> d = get_unique_directive("allow_cast");
-    if(d.has_value())
+    if(ctx.get_last_directive("allow_cast").has_value())
     {
-        if(struct_members.size() != 0)
-        {
-            throw cg::codegen_error(
-              loc,
-              fmt::format(
-                "Types marked with 'allow_cast' cannot have members. Found {} member{} in type '{}'.",
-                struct_members.size(), struct_members.size() > 1 ? "s" : "", name.s));
-        }
-
         flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
     }
-
-    d = get_unique_directive("native");
-    if(d.has_value())
+    if(ctx.get_last_directive("native").has_value())
     {
         flags |= static_cast<std::uint8_t>(module_::struct_flags::native);
     }
@@ -1123,7 +1143,11 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
 
 bool struct_definition_expression::supports_directive(const std::string& name) const
 {
-    if(name == "allow_cast")
+    if(super::supports_directive(name))
+    {
+        return true;
+    }
+    else if(name == "allow_cast")
     {
         return true;
     }
@@ -1578,6 +1602,28 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     if(!is_assignment || is_compound)
     {
         // Evaluate constant subexpressions.
+        bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
+        auto disable_directives = ctx.get_directives("disable");
+
+        if(std::find_if(
+             disable_directives.begin(),
+             disable_directives.end(),
+             [](const cg::directive& d) -> bool
+             {
+                 return std::find_if(
+                          d.args.begin(), d.args.end(),
+                          [](const std::pair<token, token>& p) -> bool
+                          {
+                              return p.first.s == "const_eval"
+                                     && (p.second.s.empty() || p.second.s == "true");
+                          })
+                        != d.args.end();
+             })
+           != disable_directives.end())
+        {
+            ctx.evaluate_constant_subexpressions = false;
+        }
+
         if(ctx.evaluate_constant_subexpressions
            && is_const_eval(ctx))
         {
@@ -1602,6 +1648,9 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
             // fall-through
         }
+
+        // FIXME This should be done via a mechanism like scope_exit.
+        ctx.evaluate_constant_subexpressions = ctx_const_eval;
 
         lhs_value = lhs->generate_code(ctx, memory_context::load);
         rhs_value = rhs->generate_code(ctx, memory_context::load);
@@ -1848,6 +1897,28 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     }
 
     // Evaluate constant subexpressions.
+    bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
+    auto disable_directives = ctx.get_directives("disable");
+
+    if(std::find_if(
+         disable_directives.begin(),
+         disable_directives.end(),
+         [](const cg::directive& d) -> bool
+         {
+             return std::find_if(
+                      d.args.begin(), d.args.end(),
+                      [](const std::pair<token, token>& p) -> bool
+                      {
+                          return p.first.s == "const_eval"
+                                 && (p.second.s.empty() || p.second.s == "true");
+                      })
+                    != d.args.end();
+         })
+       != disable_directives.end())
+    {
+        ctx.evaluate_constant_subexpressions = false;
+    }
+
     if(ctx.evaluate_constant_subexpressions
        && is_const_eval(ctx))
     {
@@ -1872,6 +1943,9 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
         // fall-through
     }
+
+    // FIXME This should be done via a mechanism like scope_exit.
+    ctx.evaluate_constant_subexpressions = ctx_const_eval;
 
     if(op.s == "+")
     {
@@ -2389,7 +2463,7 @@ std::string block::to_string() const
 
 std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    auto d = get_unique_directive("native");
+    auto d = ctx.get_last_directive("native");
     if(!d.has_value())
     {
         if(mc != memory_context::none)
@@ -2464,7 +2538,11 @@ void function_expression::collect_names(cg::context& ctx, ty::context& type_ctx)
 
 bool function_expression::supports_directive(const std::string& name) const
 {
-    if(name == "native")
+    if(super::supports_directive(name))
+    {
+        return true;
+    }
+    else if(name == "native")
     {
         return true;
     }

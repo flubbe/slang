@@ -100,6 +100,8 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_eval_subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_eval_subexpr
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_math
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators
@@ -124,6 +126,8 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_eval_subexpr --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_eval_subexpr
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_math --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators --no-eval-const-subexpr
