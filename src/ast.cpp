@@ -1577,6 +1577,32 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     /* Cases 1., 2. (cont.), 3. (cont.), 7. */
     if(!is_assignment || is_compound)
     {
+        // Evaluate constant subexpressions.
+        if(ctx.evaluate_constant_subexpressions
+           && is_const_eval(ctx))
+        {
+            auto v = evaluate(ctx);
+            if(v)
+            {
+                auto t = v->get_type();
+                if(t.to_string() == "i32")
+                {
+                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());
+                    return v;
+                }
+                else if(t.to_string() == "f32")
+                {
+                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());
+                    return v;
+                }
+
+                // fall-through
+            }
+
+            fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+            // fall-through
+        }
+
         lhs_value = lhs->generate_code(ctx, memory_context::load);
         rhs_value = rhs->generate_code(ctx, memory_context::load);
 
@@ -1820,7 +1846,34 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
         return v;
     }
-    else if(op.s == "+")
+
+    // Evaluate constant subexpressions.
+    if(ctx.evaluate_constant_subexpressions
+       && is_const_eval(ctx))
+    {
+        auto v = evaluate(ctx);
+        if(v)
+        {
+            auto t = v->get_type();
+            if(t.to_string() == "i32")
+            {
+                ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());
+                return v;
+            }
+            else if(t.to_string() == "f32")
+            {
+                ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());
+                return v;
+            }
+
+            // fall-through
+        }
+
+        fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+        // fall-through
+    }
+
+    if(op.s == "+")
     {
         return operand->generate_code(ctx, mc);
     }

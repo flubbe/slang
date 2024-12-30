@@ -83,7 +83,7 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile examples/string_conversion
         ./build/${{env.BUILD_TYPE}}/slang exec examples/string_conversion "--" 3.141 a -1
         ./build/${{env.BUILD_TYPE}}/slang compile examples/assert
-        ! ./build/${{env.BUILD_TYPE}}/slang exec examples/assert
+        ! ./build/${{env.BUILD_TYPE}}/slang exec examples/assert    
 
     - name: Run script tests
       run: |
@@ -109,9 +109,32 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
 
+    - name: Run script tests (no constant subexpression evaluation)
+      run: |
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_array --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_array
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_cast --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_cast
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_cast_fail --no-eval-const-subexpr
+        ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_cast_fail
+        ! ./build/${{env.BUILD_TYPE}}/slang compile test/test_const_assign_fail --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_const_export --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_export
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_const_import --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_const_import
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_conversions --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_math --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_operators
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_strings --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_strings
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
+
     - name: Clean up script tests
       run: |
         cd ${{github.workspace}}/test
         rm *.cmod
 
-  

@@ -24,6 +24,13 @@ namespace ty = slang::typing;
 namespace
 {
 
+static cg::context get_context()
+{
+    cg::context ctx;
+    ctx.evaluate_constant_subexpressions = false;
+    return ctx;
+}
+
 TEST(compile_ir, empty)
 {
     // test: empty input
@@ -40,7 +47,8 @@ TEST(compile_ir, empty)
     std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
-    cg::context ctx;
+    cg::context ctx = get_context();
+
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string().length(), 0);
@@ -65,7 +73,8 @@ TEST(compile_ir, double_definition)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
@@ -88,7 +97,8 @@ TEST(compile_ir, double_definition)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
     {
@@ -112,7 +122,8 @@ TEST(compile_ir, double_definition)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -136,7 +147,8 @@ TEST(compile_ir, empty_function)
     std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
-    cg::context ctx;
+    cg::context ctx = get_context();
+
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
@@ -167,7 +179,8 @@ TEST(compile_ir, builtin_return_values)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -196,7 +209,8 @@ TEST(compile_ir, builtin_return_values)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -225,7 +239,8 @@ TEST(compile_ir, builtin_return_values)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -258,7 +273,8 @@ TEST(compile_ir, function_arguments_and_locals)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -287,7 +303,8 @@ TEST(compile_ir, function_arguments_and_locals)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -320,7 +337,8 @@ TEST(compile_ir, function_arguments_and_locals)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -353,7 +371,8 @@ TEST(compile_ir, function_arguments_and_locals)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -385,7 +404,8 @@ TEST(compile_ir, function_arguments_and_locals)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -422,7 +442,8 @@ TEST(compile_ir, arrays)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -463,7 +484,8 @@ TEST(compile_ir, arrays)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -507,7 +529,8 @@ TEST(compile_ir, arrays)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -549,7 +572,8 @@ TEST(compile_ir, arrays)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -645,7 +669,8 @@ TEST(compile_ir, unary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -679,7 +704,8 @@ TEST(compile_ir, unary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -719,7 +745,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -755,7 +782,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -791,7 +819,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -827,7 +856,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -867,7 +897,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -907,7 +938,8 @@ TEST(compile_ir, binary_operators)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -950,7 +982,8 @@ TEST(compile_ir, postfix_operators)
     std::shared_ptr<ast::block> ast = parser.get_ast();
     ASSERT_NE(ast, nullptr);
 
-    cg::context ctx;
+    cg::context ctx = get_context();
+
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
@@ -991,7 +1024,8 @@ TEST(compile_ir, compound_assignments)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1029,7 +1063,8 @@ TEST(compile_ir, compound_assignments)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1074,7 +1109,8 @@ TEST(compile_ir, compound_assignments)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1117,7 +1153,8 @@ TEST(compile_ir, compound_assignments)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1144,7 +1181,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1185,7 +1223,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1233,7 +1272,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1277,7 +1317,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1312,7 +1353,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1367,7 +1409,8 @@ TEST(compile_ir, function_calls)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
@@ -1422,7 +1465,8 @@ TEST(compile_ir, if_statement)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
@@ -1468,7 +1512,8 @@ TEST(compile_ir, break_fail)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
@@ -1495,7 +1540,8 @@ TEST(compile_ir, continue_fail)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
@@ -1527,7 +1573,8 @@ TEST(compile_ir, structs)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
@@ -1575,7 +1622,8 @@ TEST(compile_ir, structs)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(ast->generate_code(ctx));
@@ -1623,7 +1671,8 @@ TEST(compile_ir, structs)
         std::shared_ptr<ast::block> ast = parser.get_ast();
         ASSERT_NE(ast, nullptr);
 
-        cg::context ctx;
+        cg::context ctx = get_context();
+
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());

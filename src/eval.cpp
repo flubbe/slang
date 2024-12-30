@@ -92,21 +92,36 @@ std::unique_ptr<cg::value> variable_reference_expression::evaluate(cg::context& 
 
 struct binary_operation_helper
 {
+    token_location loc;
     std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
     std::function<float(float, float)> func_f32;
 
-    std::unique_ptr<cg::value> operator()(
-      const std::unique_ptr<cg::value>& lhs,
-      const std::unique_ptr<cg::value>& rhs) const
+    binary_operation_helper(
+      const binary_expression& expr,
+      std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32,
+      std::function<float(float, float)> func_f32)
+    : loc{expr.get_location()}
+    , func_i32{std::move(func_i32)}
+    , func_f32{std::move(func_f32)}
+    {
+    }
+
+    std::unique_ptr<cg::value>
+      operator()(
+        const std::unique_ptr<cg::value>& lhs,
+        const std::unique_ptr<cg::value>& rhs) const
     {
         if(!lhs || !rhs)
         {
-            throw cg::codegen_error("Null argument passed to binary operator evaluation.");
+            throw cg::codegen_error(
+              loc,
+              "Null argument passed to binary operator evaluation.");
         }
 
         if(lhs->to_string() != rhs->to_string())
         {
             throw cg::codegen_error(
+              loc,
               fmt::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
                 lhs->to_string(), rhs->to_string()));
@@ -126,8 +141,67 @@ struct binary_operation_helper
         }
 
         throw cg::codegen_error(
+          loc,
           fmt::format(
-            "Invalid type '{}' for unary operator evaluation.",
+            "Invalid type '{}' for binary operator evaluation.",
+            lhs->get_type().to_string()));
+    }
+};
+
+struct binary_comparison_helper
+{
+    token_location loc;
+    std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
+    std::function<std::int32_t(float, float)> func_f32;
+
+    binary_comparison_helper(
+      const binary_expression& expr,
+      std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32,
+      std::function<std::int32_t(float, float)> func_f32)
+    : loc{expr.get_location()}
+    , func_i32{std::move(func_i32)}
+    , func_f32{std::move(func_f32)}
+    {
+    }
+
+    std::unique_ptr<cg::value>
+      operator()(
+        const std::unique_ptr<cg::value>& lhs,
+        const std::unique_ptr<cg::value>& rhs) const
+    {
+        if(!lhs || !rhs)
+        {
+            throw cg::codegen_error(
+              loc,
+              "Null argument passed to binary operator evaluation.");
+        }
+
+        if(lhs->to_string() != rhs->to_string())
+        {
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
+                lhs->to_string(), rhs->to_string()));
+        }
+
+        if(lhs->to_string() == "i32")
+        {
+            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(lhs.get());
+            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(rhs.get());
+            return std::make_unique<cg::constant_int>(func_i32(lhs_i32->get_int(), rhs_i32->get_int()));
+        }
+        else if(lhs->to_string() == "f32")
+        {
+            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(lhs.get());
+            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(rhs.get());
+            return std::make_unique<cg::constant_int>(func_f32(lhs_f32->get_float(), rhs_f32->get_float()));
+        }
+
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Invalid type '{}' for comparison evaluation.",
             lhs->get_type().to_string()));
     }
 };
@@ -153,172 +227,133 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
         return {};
     }
 
+    // clang-format off
     std::unordered_map<std::string, binary_operation_helper> eval_map = {
-      {"+", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a + b;
-             },
+      {"+", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a + b; }, 
              [](float a, float b) -> float
-             {
-                 return a + b;
-             }}},
-      {"-", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a - b;
-             },
+             { return a + b; }}},
+      {"-", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a - b; }, 
              [](float a, float b) -> float
-             {
-                 return a - b;
-             }}},
-      {"*", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a * b;
-             },
+             { return a - b; }}},
+      {"*", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a * b; }, 
              [](float a, float b) -> float
-             {
-                 return a * b;
-             }}},
-      {"/", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
+             { return a * b; }}},
+      {"/", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
              {
                  if(b == 0)
                  {
                      throw cg::codegen_error("Division by zero detected while evaluating constant.");
                  }
-                 return a / b;
-             },
+                 return a / b; 
+             }, 
              [](float a, float b) -> float
              {
                  if(b == 0)
                  {
                      throw cg::codegen_error("Division by zero detected while evaluating constant.");
                  }
-                 return a / b;
+                 return a / b; 
              }}},
-      {"%", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
+      {"%", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
              {
                  if(b == 0)
                  {
                      throw cg::codegen_error("Division by zero detected while evaluating constant.");
                  }
-                 return a % b;
-             },
-             [](float, float) -> float
-             {
-                 throw cg::codegen_error("Invalid type 'f32' for binary operator '%'.");
-             }}},
-      {"<<", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a << (b & 0x1f);
-              },
+                 return a % b; }, [](float, float) -> float
+             { throw cg::codegen_error("Invalid type 'f32' for binary operator '%'."); }}},
+      {"<<", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a << (b & 0x1f); }, 
               [](float, float) -> float
-              {
-                  throw cg::codegen_error("Invalid type 'f32' for binary operator '<<'.");
-              }}},
-      {">>", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a >> (b & 0x1f);
-              },
+              { throw cg::codegen_error("Invalid type 'f32' for binary operator '<<'."); }}},
+      {">>", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a >> (b & 0x1f); }, 
               [](float, float) -> float
-              {
-                  throw cg::codegen_error("Invalid type 'f32' for binary operator '>>'.");
-              }}},
-      {"<", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a < b;
-             },
-             [](float a, float b) -> float
-             {
-                 return a < b;
-             }}},
-      {"<=", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a <= b;
-              },
-              [](float a, float b) -> float
-              {
-                  return a <= b;
-              }}},
-      {">", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a > b;
-             },
-             [](float a, float b) -> float
-             {
-                 return a > b;
-             }}},
-      {">=", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a >= b;
-              },
-              [](float a, float b) -> float
-              {
-                  return a >= b;
-              }}},
-      {"==", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a == b;
-              },
-              [](float a, float b) -> float
-              {
-                  return a == b;
-              }}},
-      {"!=", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a != b;
-              },
-              [](float a, float b) -> float
-              {
-                  return a != b;
-              }}},
-      {"&", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a & b;
-             },
+              { throw cg::codegen_error("Invalid type 'f32' for binary operator '>>'."); }}},
+      {"&", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a & b; }, 
              [](float, float) -> float
-             {
-                 throw cg::codegen_error("Invalid type 'f32' for binary operator '&'.");
-             }}},
-      {"^", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a ^ b;
-             },
+             { throw cg::codegen_error("Invalid type 'f32' for binary operator '&'."); }}},
+      {"^", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a ^ b; },
              [](float, float) -> float
-             {
-                 throw cg::codegen_error("Invalid type 'f32' for binary operator '^'.");
-             }}},
-      {"|", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-             {
-                 return a | b;
-             },
+             { throw cg::codegen_error("Invalid type 'f32' for binary operator '^'."); }}},
+      {"|", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a | b; }, 
              [](float, float) -> float
-             {
-                 throw cg::codegen_error("Invalid type 'f32' for binary operator '|'.");
-             }}},
-      {"&&", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a && b;
-              },
+             { throw cg::codegen_error("Invalid type 'f32' for binary operator '|'."); }}},
+      {"&&", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a && b; }, 
               [](float, float) -> float
-              {
-                  throw cg::codegen_error("Invalid type 'f32' for binary operator '&&'.");
-              }}},
-      {"||", {[](std::uint32_t a, std::uint32_t b) -> std::uint32_t
-              {
-                  return a || b;
-              },
+              { throw cg::codegen_error("Invalid type 'f32' for binary operator '&&'."); }}},
+      {"||", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a || b; }, 
               [](float, float) -> float
-              {
-                  throw cg::codegen_error("Invalid type 'f32' for binary operator '||'.");
-              }}},
+              { throw cg::codegen_error("Invalid type 'f32' for binary operator '||'."); }}},
     };
 
-    auto it = eval_map.find(op.s);
-    if(it == eval_map.end())
+    std::unordered_map<std::string, binary_comparison_helper> comp_map = {
+      {"<", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a < b; }, 
+             [](float a, float b) -> std::int32_t
+             { return a < b; }}},
+      {"<=", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a <= b; }, 
+              [](float a, float b) -> std::int32_t
+              { return a <= b; }}},
+      {">", {*this, 
+             [](std::int32_t a, std::int32_t b) -> std::int32_t
+             { return a > b; }, 
+             [](float a, float b) -> std::int32_t
+             { return a > b; }}},
+      {">=", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a >= b; }, 
+              [](float a, float b) -> std::int32_t
+              { return a >= b; }}},
+      {"==", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a == b; }, 
+              [](float a, float b) -> std::int32_t
+              { return a == b; }}},
+      {"!=", {*this, 
+              [](std::int32_t a, std::int32_t b) -> std::int32_t
+              { return a != b; }, 
+              [](float a, float b) -> std::int32_t
+              { return a != b; }}}
+    };
+    // clang-format on
+
+    auto eval_it = eval_map.find(op.s);
+    if(eval_it != eval_map.end())
     {
-        return {nullptr};
+        return eval_it->second(lhs->evaluate(ctx), rhs->evaluate(ctx));
     }
 
-    return it->second(lhs->evaluate(ctx), rhs->evaluate(ctx));
+    auto comp_it = comp_map.find(op.s);
+    if(comp_it != comp_map.end())
+    {
+        return comp_it->second(lhs->evaluate(ctx), rhs->evaluate(ctx));
+    }
+
+    return {nullptr};
 }
 
 /*
@@ -327,14 +362,26 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
 
 struct unary_operation_helper
 {
+    token_location loc;
     std::function<std::int32_t(std::int32_t)> func_i32;
     std::function<float(float)> func_f32;
 
-    std::unique_ptr<cg::value> operator()(const std::unique_ptr<cg::value>& v) const
+    unary_operation_helper(
+      const unary_expression& expr,
+      std::function<std::int32_t(std::int32_t)> func_i32,
+      std::function<float(float)> func_f32)
+    : loc{expr.get_location()}
+    , func_i32{std::move(func_i32)}
+    , func_f32{std::move(func_f32)}
+    {
+    }
+
+    std::unique_ptr<cg::value>
+      operator()(const std::unique_ptr<cg::value>& v) const
     {
         if(!v)
         {
-            throw cg::codegen_error("Null argument passed to unary operator evaluation.");
+            throw cg::codegen_error(loc, "Null argument passed to unary operator evaluation.");
         }
 
         if(v->to_string() == "i32")
@@ -348,7 +395,7 @@ struct unary_operation_helper
             return std::make_unique<cg::constant_float>(func_f32(v_f32->get_float()));
         }
 
-        throw cg::codegen_error(fmt::format("Invalid type '{}' for unary operator evaluation.", v->get_type().to_string()));
+        throw cg::codegen_error(loc, fmt::format("Invalid type '{}' for unary operator evaluation.", v->get_type().to_string()));
     }
 };
 
@@ -371,6 +418,7 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
 
     std::unordered_map<std::string, unary_operation_helper> eval_map = {
       {"+", {
+              *this,
               [](std::int32_t a) -> std::int32_t
               {
                   return a;
@@ -381,6 +429,7 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
               },
             }},
       {"-", {
+              *this,
               [](std::int32_t a) -> std::int32_t
               {
                   return -a;
@@ -391,6 +440,7 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
               },
             }},
       {"!", {
+              *this,
               [](std::int32_t a) -> std::int32_t
               {
                   return a == 0;    // matches the generated opcodes.
@@ -401,6 +451,7 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
               },
             }},
       {"~", {
+              *this,
               [](std::int32_t a) -> std::int32_t
               {
                   return static_cast<std::int32_t>(~0) ^ a;    // matches the generated opcodes.

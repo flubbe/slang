@@ -1849,6 +1849,10 @@ protected:
     }
 
 public:
+    /** Whether to evaluate constant subexpressions during code generation. */
+    bool evaluate_constant_subexpressions{true};
+
+public:
     /** Constructors. */
     context() = default;
     context(const context&) = delete;

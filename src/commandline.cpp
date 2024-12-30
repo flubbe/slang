@@ -318,44 +318,41 @@ void compile::invoke(const std::vector<std::string>& args)
     fs::path module_path;
     fs::path output_file;
 
-    if(args.size() != 1 && args.size() != 3)
+    if(args.size() < 1)
     {
         display_help_and_exit = true;
     }
 
+    std::vector<std::string>::const_iterator output_file_it;
     if(!display_help_and_exit)
     {
+        // get input file.
         module_path = fs::path(args[0]);
         if(!module_path.has_extension())
         {
             module_path.replace_extension(package::source_ext);
         }
 
-        if(args.size() == 1)
+        // get output file.
+        output_file_it = std::find(args.begin(), args.end(), "-o");
+        if(output_file_it != args.end())
+        {
+            if(output_file_it + 1 == args.end())
+            {
+                fmt::print(" -o <output-file>: Missing <output-file>.\n");
+                return;
+            }
+
+            output_file = *(output_file_it + 1);
+            if(!output_file.has_extension())
+            {
+                output_file.replace_extension(package::module_ext);
+            }
+        }
+        else
         {
             output_file = module_path;
             output_file.replace_extension(package::module_ext);
-        }
-        else if(args.size() == 3)
-        {
-            module_path = fs::path(args[0]);
-            if(!module_path.has_extension())
-            {
-                module_path.replace_extension(package::source_ext);
-            }
-
-            if(args[1] != "-o")
-            {
-                display_help_and_exit = true;
-            }
-            else
-            {
-                output_file = args[2];
-                if(!output_file.has_extension())
-                {
-                    output_file.replace_extension(package::module_ext);
-                }
-            }
         }
     }
 
@@ -365,6 +362,34 @@ void compile::invoke(const std::vector<std::string>& args)
           "Compile the module `mod.sl` into `mod.cmod`.";
         slang::utils::print_usage_help("slang compile mod", help_text);
         return;
+    }
+
+    auto evaluate_constant_subexpressions_it =
+      std::find(
+        args.begin(),
+        args.end(),
+        "--no-eval-const-subexpr");
+    bool evaluate_constant_subexpressions =
+      (evaluate_constant_subexpressions_it == args.end())
+      || (evaluate_constant_subexpressions_it == output_file_it);
+
+    auto verbose_it =
+      std::find(
+        args.begin(),
+        args.end(),
+        "--verbose");
+    bool verbose = (verbose_it != args.end()) && (verbose_it != output_file_it);
+
+    if(verbose)
+    {
+        if(!evaluate_constant_subexpressions)
+        {
+            fmt::print("Info: Evaluation of constant subexpressions disabled.\n");
+        }
+        else
+        {
+            fmt::print("Info: Evaluation of constant subexpressions enabled (default).\n");
+        }
     }
 
     slang::file_manager file_mgr;
@@ -415,6 +440,8 @@ void compile::invoke(const std::vector<std::string>& args)
     rs::context resolve_ctx{file_mgr};
     cg::context codegen_ctx;
     slang::instruction_emitter emitter{codegen_ctx};
+
+    codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
     ast->collect_names(codegen_ctx, type_ctx);
     resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
