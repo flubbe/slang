@@ -32,69 +32,93 @@ const auto builtin_floorf = std::floorf;
 
 void abs(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(builtin_fabsf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return builtin_fabsf(value); });
 }
 
 void sqrt(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(builtin_sqrtf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return builtin_sqrtf(value); });
 }
 
 void ceil(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(builtin_ceilf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return builtin_ceilf(value); });
 }
 
 void floor(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(builtin_floorf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return builtin_floorf(value); });
 }
 
 void trunc(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::truncf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::truncf(value); });
 }
 
 void round(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(std::roundf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::roundf(value); });
 }
 
 void sin(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::sinf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::sinf(value); });
 }
 
 void cos(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::cosf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::cosf(value); });
 }
 
 void tan(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::tanf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::tanf(value); });
 }
 
 void asin(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::asinf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::asinf(value); });
 }
 
 void acos(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::acosf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::acosf(value); });
 }
 
 void atan(si::context&, si::operand_stack& stack)
 {
-    stack.push_f32(::atanf(stack.pop_f32()));
+    stack.modify_top<float, float>(
+      [](float value) -> float
+      { return std::atanf(value); });
 }
 
 void atan2(si::context&, si::operand_stack& stack)
 {
     float y = stack.pop_f32();
     float x = stack.pop_f32();
-    stack.push_f32(::atan2f(x, y));
+    stack.push_f32(std::atan2f(x, y));
 }
 
 }    // namespace slang::runtime
