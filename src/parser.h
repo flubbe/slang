@@ -174,7 +174,7 @@ protected:
     std::unique_ptr<ast::struct_definition_expression> parse_struct();
 
     /** Parse a compiler directive. */
-    std::unique_ptr<ast::directive_expression> parse_directive();
+    std::pair<token, std::vector<std::pair<token, token>>> get_directive();
 
     /**
      * Parse any block of expressions between { and }.
@@ -185,6 +185,12 @@ protected:
      * @param skip_closing_brace Whether to skip the block's closing brace.
      */
     std::unique_ptr<ast::block> parse_block(bool skip_closing_brace = true);
+
+    /**
+     * Parse a statement or expression in a block. Returns an empty `std::unique_ptr`
+     * if the statement/expression was empty.
+     */
+    std::unique_ptr<ast::expression> parse_block_stmt_expr();
 
     /** Parse a primary expression. */
     std::unique_ptr<ast::expression> parse_primary();

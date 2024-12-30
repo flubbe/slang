@@ -109,7 +109,21 @@ parser_error::parser_error(const token& tok, const std::string& message)
 
 std::unique_ptr<ast::expression> parser::parse_top_level_statement()
 {
-    if(current_token->s == "import")
+    if(current_token->s == "#")
+    {
+        auto directive = get_directive();
+
+        // evaluate expression within the context of this directive.
+        push_directive(directive.first, directive.second);
+        auto expr = std::make_unique<ast::directive_expression>(
+          std::move(directive.first),
+          std::move(directive.second),
+          parse_top_level_statement());
+        pop_directive();
+
+        return expr;
+    }
+    else if(current_token->s == "import")
     {
         return parse_import();
     }
@@ -128,10 +142,6 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
     else if(current_token->s == "fn")
     {
         return parse_definition();
-    }
-    else if(current_token->s == "#")
-    {
-        return parse_directive();
     }
     else
     {
@@ -499,7 +509,7 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 // directive ::= '#[' directive '(' args ')' ']'
 // args ::= (arg_name '=' arg_value)
 //        | (arg_name '=' arg_value) ',' args
-std::unique_ptr<ast::directive_expression> parser::parse_directive()
+std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
 {
     get_next_token();    // skip '#'.
 
@@ -530,21 +540,26 @@ std::unique_ptr<ast::directive_expression> parser::parse_directive()
             }
             get_next_token();
 
+            token value;
             if(current_token->s != "=")
             {
-                throw syntax_error(*current_token, fmt::format("Expected '=', got '{}'.", current_token->s));
+                // only key, no value.
             }
-            get_next_token();
-
-            token value = *current_token;
-            if(value.type != token_type::fp_literal
-               && value.type != token_type::int_literal
-               && value.type != token_type::str_literal
-               && value.type != token_type::identifier)
+            else
             {
-                throw syntax_error(value, fmt::format("Value in directive can only be an i32-, f32- or string literal, or an identifier."));
+                // key-value pair.
+                get_next_token();
+
+                value = *current_token;
+                if(value.type != token_type::fp_literal
+                   && value.type != token_type::int_literal
+                   && value.type != token_type::str_literal
+                   && value.type != token_type::identifier)
+                {
+                    throw syntax_error(value, fmt::format("Value in directive can only be an i32-, f32- or string literal, or an identifier."));
+                }
+                get_next_token();
             }
-            get_next_token();
 
             args.emplace_back(std::make_pair(std::move(key), std::move(value)));
         }
@@ -557,12 +572,7 @@ std::unique_ptr<ast::directive_expression> parser::parse_directive()
     }
     get_next_token();    // skip ']'
 
-    // evaluate expression within the context of this directive.
-    push_directive(name, args);
-    auto expr = std::make_unique<ast::directive_expression>(std::move(name), std::move(args), parse_top_level_statement());
-    pop_directive();
-
-    return expr;
+    return std::make_pair(std::move(name), std::move(args));
 }
 
 // block_expr ::= '{' stmts_exprs '}'
@@ -585,47 +595,30 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
     std::vector<std::unique_ptr<ast::expression>> stmts_exprs;
     while(current_token->s != "}")
     {
-        if(current_token->s == ";")
+        if(current_token->s == "#")
         {
-            get_next_token();
-        }
-        else if(current_token->s == "let")
-        {
-            stmts_exprs.emplace_back(parse_variable());
-        }
-        else if(current_token->s == "if")
-        {
-            stmts_exprs.emplace_back(parse_if());
-        }
-        else if(current_token->s == "while")
-        {
-            stmts_exprs.emplace_back(parse_while());
-        }
-        else if(current_token->s == "break")
-        {
-            stmts_exprs.emplace_back(parse_break());
-        }
-        else if(current_token->s == "continue")
-        {
-            stmts_exprs.emplace_back(parse_continue());
-        }
-        else if(current_token->s == "return")
-        {
-            stmts_exprs.emplace_back(parse_return());
-        }
-        else if(is_keyword(current_token->s))
-        {
-            throw syntax_error(*current_token, fmt::format("Unexpected keyword '{}'.", current_token->s));
+            auto directive = get_directive();
+
+            // evaluate expression within the context of this directive.
+            push_directive(directive.first, directive.second);
+            auto expr = parse_block_stmt_expr();
+            pop_directive();
+
+            if(expr)
+            {
+                stmts_exprs.emplace_back(std::make_unique<ast::directive_expression>(
+                  std::move(directive.first),
+                  std::move(directive.second),
+                  std::move(expr)));
+            }
         }
         else
         {
-            stmts_exprs.emplace_back(parse_expression());
-
-            if(current_token->s != ";")
+            auto expr = parse_block_stmt_expr();
+            if(expr)
             {
-                throw syntax_error(*current_token, fmt::format("Expected ';', got '{}'.", current_token->s));
+                stmts_exprs.emplace_back(std::move(expr));
             }
-            get_next_token();
         }
     }
 
@@ -635,6 +628,53 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
     }
 
     return std::make_unique<ast::block>(std::move(loc), std::move(stmts_exprs));
+}
+
+std::unique_ptr<ast::expression> parser::parse_block_stmt_expr()
+{
+    if(current_token->s == ";")
+    {
+        get_next_token();
+        return {};
+    }
+    else if(current_token->s == "let")
+    {
+        return parse_variable();
+    }
+    else if(current_token->s == "if")
+    {
+        return parse_if();
+    }
+    else if(current_token->s == "while")
+    {
+        return parse_while();
+    }
+    else if(current_token->s == "break")
+    {
+        return parse_break();
+    }
+    else if(current_token->s == "continue")
+    {
+        return parse_continue();
+    }
+    else if(current_token->s == "return")
+    {
+        return parse_return();
+    }
+    else if(is_keyword(current_token->s))
+    {
+        throw syntax_error(*current_token, fmt::format("Unexpected keyword '{}'.", current_token->s));
+    }
+
+    auto expr = parse_expression();
+
+    if(current_token->s != ";")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected ';', got '{}'.", current_token->s));
+    }
+    get_next_token();
+
+    return expr;
 }
 
 // primary_expr ::= identifier_expr | literal_expr | paren_expr
