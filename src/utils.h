@@ -121,7 +121,37 @@ void print_command_help(const std::string& info_text, const std::vector<std::pai
 void print_usage_help(const std::string& usage_text, const std::string& help_text);
 
 /**
- * Scope exit guard. Calls a function on exit.
+ * Align a parameter according to the specified alignment.
+ *
+ * @note The alignment must be a power of 2.
+ * @param alignment The alignment to use.
+ * @param p The parameter to align.
+ * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
  */
+template<typename T>
+constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignment, T p)
+{
+    return reinterpret_cast<T>((reinterpret_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
+}
+
+/**
+ * Align an integral parameter according to the specified alignment.
+ *
+ * @note The alignment must be a power of 2.
+ * @param alignment The alignment to use.
+ * @param p The parameter to align.
+ * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
+ */
+template<typename T>
+constexpr std::enable_if_t<std::is_integral_v<T>, T> align(std::size_t alignment, T p)
+{
+    return static_cast<T>((static_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
+}
+
+/** Check if a given argument is a power of two. */
+constexpr bool is_power_of_two(std::size_t c)
+{
+    return (c & (c - 1)) == 0;
+}
 
 }    // namespace slang::utils

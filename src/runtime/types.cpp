@@ -12,6 +12,7 @@
 
 #include "interpreter/interpreter.h"
 #include "runtime/runtime.h"
+#include "../utils.h"
 
 namespace slang::runtime
 {
@@ -36,7 +37,7 @@ void register_builtin_type_layouts(gc::garbage_collector& gc)
     offset = sizeof(decltype(result::ok));
 
     alignment = std::alignment_of_v<decltype(result::value)>;
-    offset = (static_cast<std::size_t>(offset) + (alignment - 1)) & ~(alignment - 1);
+    offset = utils::align(alignment, offset);
     layout.push_back(offset);
 
     gc.register_type_layout("std.result", layout);

@@ -62,6 +62,20 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"@addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
+/* Assert  alignment requirements. */
+static_assert(
+  utils::is_power_of_two(std::alignment_of_v<std::int32_t>),
+  "Alignment of std::int32_t is not a power of two.");
+static_assert(
+  utils::is_power_of_two(std::alignment_of_v<float>),
+  "Alignment of float is not a power of two.");
+static_assert(
+  utils::is_power_of_two(std::alignment_of_v<std::string*>),
+  "Alignment of std::string* is not a power of two.");
+static_assert(
+  utils::is_power_of_two(std::alignment_of_v<void*>),
+  "Alignment of void* is not a power of two.");
+
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {
@@ -226,14 +240,14 @@ void module_loader::decode_structs()
             }
 
             // store offset.
-            member_type.offset = (static_cast<std::size_t>(offset) + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
+            member_type.offset = utils::align(member_type.alignment, offset);
 
             // calculate member offset as `size_after - size_before`.
             offset -= size;
 
             // update struct size and alignment.
             size += member_type.size;
-            size = (size + (member_type.alignment - 1)) & ~(member_type.alignment - 1);
+            size = utils::align(member_type.alignment, size);
 
             alignment = std::max(alignment, member_type.alignment);
 
@@ -248,7 +262,7 @@ void module_loader::decode_structs()
         }
 
         // trailing padding.
-        size = (size + (alignment - 1)) & ~(alignment - 1);
+        size = utils::align(alignment, size);
 
         // store type size and alignment.
         desc.size = size;
