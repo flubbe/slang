@@ -259,6 +259,18 @@ public:
     {
         return loc;
     }
+
+    /** Get all child nodes. */
+    virtual std::vector<expression*> get_children()
+    {
+        return {};
+    }
+
+    /** Get all child nodes. */
+    virtual std::vector<const expression*> get_children() const
+    {
+        return {};
+    }
 };
 
 /** Any expression with a name. */
@@ -517,6 +529,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** Scope expression. */
@@ -574,6 +595,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** Access expression. */
@@ -640,6 +670,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), rhs.get()};
+    }
 
     /** Return the accessed struct's type info. */
     ty::type_info get_struct_type() const
@@ -739,6 +778,15 @@ public:
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** Variable references. */
@@ -789,6 +837,23 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
+    std::vector<expression*> get_children() override
+    {
+        if(element_expr)
+        {
+            return {element_expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(element_expr)
+        {
+            return {element_expr.get()};
+        }
+        return {};
+    }
+
     /** Get the value of the object. */
     cg::value get_value(cg::context& ctx) const;
 };
@@ -838,6 +903,23 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
 
     /** Get the variable's type. */
     const std::unique_ptr<ast::type_expression>& get_type() const
@@ -906,6 +988,15 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
+
     /** Get the constant's type. */
     const std::unique_ptr<ast::type_expression>& get_type() const
     {
@@ -949,6 +1040,29 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** Struct definition. */
@@ -993,6 +1107,29 @@ public:
     bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(members.size());
+
+        for(auto& e: members)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(members.size());
+
+        for(auto& e: members)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** Anonymous struct initialization. */
@@ -1035,6 +1172,29 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(initializers.size());
+
+        for(auto& initializer: initializers)
+        {
+            children.emplace_back(initializer.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(initializers.size());
+
+        for(auto& initializer: initializers)
+        {
+            children.emplace_back(initializer.get());
+        }
+        return children;
+    }
 };
 
 /** Named struct initialization. */
@@ -1081,6 +1241,37 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(member_names.size() + initializers.size());
+
+        for(auto& member_name: member_names)
+        {
+            children.emplace_back(member_name.get());
+        }
+        for(auto& initializer: initializers)
+        {
+            children.emplace_back(initializer.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(member_names.size() + initializers.size());
+
+        for(auto& member_name: member_names)
+        {
+            children.emplace_back(member_name.get());
+        }
+        for(auto& initializer: initializers)
+        {
+            children.emplace_back(initializer.get());
+        }
+        return children;
+    }
 };
 
 /** Binary operators. */
@@ -1134,6 +1325,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), rhs.get()};
+    }
 };
 
 /** Unary operators. */
@@ -1183,6 +1383,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {operand.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {operand.get()};
+    }
 };
 
 class new_expression : public expression
@@ -1228,6 +1437,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** 'null' expression. */
@@ -1314,6 +1532,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {identifier.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {identifier.get()};
+    }
 };
 
 /** Function prototype. */
@@ -1418,6 +1645,29 @@ public:
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** A function definition. */
@@ -1466,6 +1716,23 @@ public:
     bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
+    }
 };
 
 /** Function calls. */
@@ -1523,6 +1790,37 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(args.size());
+
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(args.size());
+
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        return children;
+    }
 };
 
 /*
@@ -1568,6 +1866,23 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
 };
 
 /** If statement. */
@@ -1619,6 +1934,23 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(else_block)
+        {
+            return {condition.get(), if_block.get(), else_block.get()};
+        }
+        return {condition.get(), if_block.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(else_block)
+        {
+            return {condition.get(), if_block.get(), else_block.get()};
+        }
+        return {condition.get(), if_block.get()};
+    }
 };
 
 /** While statement. */
@@ -1665,6 +1997,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {condition.get(), while_block.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {condition.get(), while_block.get()};
+    }
 };
 
 /** Break statement. */
