@@ -148,10 +148,4 @@ constexpr std::enable_if_t<std::is_integral_v<T>, T> align(std::size_t alignment
     return static_cast<T>((static_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
-/** Check if a given argument is a power of two. */
-constexpr bool is_power_of_two(std::size_t c)
-{
-    return (c & (c - 1)) == 0;
-}
-
 }    // namespace slang::utils

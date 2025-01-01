@@ -95,6 +95,9 @@ protected:
     /** The parsed AST. */
     std::shared_ptr<ast::block> ast;
 
+    /** The topologically sorted AST. */
+    std::vector<ast::expression*> sorted_ast;
+
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
 
@@ -243,6 +246,9 @@ protected:
     /** Pop last directive from directive stack. */
     void pop_directive();
 
+    /** Topologically sort the AST. */
+    void topological_sort();
+
 public:
     /** Default constructor. */
     parser() = default;
@@ -265,12 +271,16 @@ public:
      */
     void parse(lexer& in_lexer);
 
-    /**
-     * Get the AST.
-     */
+    /** Get the AST. */
     std::shared_ptr<ast::block> get_ast() const
     {
         return ast;
+    }
+
+    /** Returns a vector of expressions in topological order. */
+    const std::vector<ast::expression*>& get_sorted_ast() const
+    {
+        return sorted_ast;
     }
 };
 

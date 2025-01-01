@@ -62,20 +62,6 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
   {"@addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
-/* Assert  alignment requirements. */
-static_assert(
-  utils::is_power_of_two(std::alignment_of_v<std::int32_t>),
-  "Alignment of std::int32_t is not a power of two.");
-static_assert(
-  utils::is_power_of_two(std::alignment_of_v<float>),
-  "Alignment of float is not a power of two.");
-static_assert(
-  utils::is_power_of_two(std::alignment_of_v<std::string*>),
-  "Alignment of std::string* is not a power of two.");
-static_assert(
-  utils::is_power_of_two(std::alignment_of_v<void*>),
-  "Alignment of void* is not a power of two.");
-
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {

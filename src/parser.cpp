@@ -10,6 +10,7 @@
 
 #include <unordered_map>
 #include <set>
+#include <stack>
 
 #include "parser.h"
 #include "type.h"
@@ -1262,6 +1263,36 @@ void parser::pop_directive()
     directive_stack.pop_back();
 }
 
+void parser::topological_sort()
+{
+    // use DFS to topologically sort the AST.
+
+    sorted_ast.clear();
+
+    std::stack<ast::expression*> stack;
+    stack.push(ast.get());
+
+    while(stack.size() > 0)
+    {
+        ast::expression* current = stack.top();
+        stack.pop();
+
+        if(current == nullptr)
+        {
+            throw parser_error("Null expression in AST.");
+        }
+
+        sorted_ast.emplace_back(current);
+
+        for(auto child: current->get_children())
+        {
+            stack.push(child);
+        }
+    }
+
+    std::reverse(sorted_ast.begin(), sorted_ast.end());
+}
+
 void parser::parse(lexer& in_lexer)
 {
     m_lexer = &in_lexer;
@@ -1286,6 +1317,9 @@ void parser::parse(lexer& in_lexer)
     {
         ast = std::make_unique<ast::block>(current_token->location, std::move(exprs));
     }
+
+    // topologically sort the AST.
+    topological_sort();
 }
 
 }    // namespace slang
