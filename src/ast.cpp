@@ -10,6 +10,7 @@
 
 #include <unordered_map>
 #include <set>
+#include <stack>
 #include <tuple>
 
 #include "ast.h"
@@ -109,6 +110,86 @@ bool expression::supports_directive(const std::string& name) const
     return false;
 }
 
+/**
+ * Templated visit helper. Implements DFS to walk the AST.
+ *
+ * @param expr The expression to visit.
+ * @param visitor The visitor function.
+ * @param visit_self Whether to visit the expression itself.
+ * @tparam T The expression type. Must be a subclass of `expression`.
+ */
+template<typename T>
+void visit_nodes(
+  T& expr,
+  std::function<void(T&)> visitor,
+  bool visit_self,
+  bool reverse)
+{
+    static_assert(
+      std::is_same_v<std::decay_t<T>, expression>
+      || std::is_base_of_v<expression, std::decay_t<T>>);
+
+    // use DFS to topologically sort the AST.
+    std::stack<T*> stack;
+    stack.push(&expr);
+
+    std::deque<T*> sorted_ast;
+
+    while(stack.size() > 0)
+    {
+        T* current = stack.top();
+        stack.pop();
+
+        if(current == nullptr)
+        {
+            throw std::runtime_error("Null expression in AST.");
+        }
+
+        sorted_ast.emplace_back(current);
+
+        for(auto child: current->get_children())
+        {
+            stack.push(child);
+        }
+    }
+
+    if(!visit_self)
+    {
+        sorted_ast.pop_front();
+    }
+
+    if(reverse)
+    {
+        for(auto it = sorted_ast.rbegin(); it != sorted_ast.rend(); ++it)
+        {
+            visitor(**it);
+        }
+    }
+    else
+    {
+        for(auto it = sorted_ast.begin(); it != sorted_ast.end(); ++it)
+        {
+            visitor(**it);
+        }
+    }
+}
+
+void expression::visit_nodes(
+  std::function<void(expression&)> visitor,
+  bool visit_self,
+  bool reverse)
+{
+    slang::ast::visit_nodes(*this, visitor, visit_self, reverse);
+}
+
+void expression::visit_nodes(
+  std::function<void(const expression&)> visitor,
+  bool visit_self,
+  bool reverse) const
+{
+    slang::ast::visit_nodes(*this, visitor, visit_self, reverse);
+}
+
 /*
  * literal_expression.
  */
@@ -171,22 +252,24 @@ std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
     if(tok.type == token_type::int_literal)
     {
         expr_type = ctx.get_type("i32", false);
-        return expr_type;
+        ctx.set_expression_type(this, *expr_type);
     }
     else if(tok.type == token_type::fp_literal)
     {
         expr_type = ctx.get_type("f32", false);
-        return expr_type;
+        ctx.set_expression_type(this, *expr_type);
     }
     else if(tok.type == token_type::str_literal)
     {
         expr_type = ctx.get_type("str", false);
-        return expr_type;
+        ctx.set_expression_type(this, *expr_type);
     }
     else
     {
         throw ty::type_error(tok.location, fmt::format("Unknown literal type with id '{}'.", static_cast<int>(tok.type)));
     }
+
+    return expr_type;
 }
 
 std::string literal_expression::to_string() const
@@ -288,9 +371,9 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
 {
     auto type = expr->type_check(ctx);
-    if(type == std::nullopt)
+    if(!type.has_value())
     {
-        throw ty::type_error(loc, "Invalid cast from untyped expression.");
+        throw ty::type_error(loc, "Type cast expression has no type.");
     }
 
     // casts for primitive types.
@@ -311,6 +394,8 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
 
     // casts for struct types. this is checked at run-time.
     expr_type = ctx.get_type(target_type->get_name().s, false, target_type->get_namespace_path());    // no array casts.
+    ctx.set_expression_type(this, *expr_type);
+
     return expr_type;
 }
 
@@ -336,7 +421,9 @@ std::optional<ty::type_info> namespace_access_expression::type_check(ty::context
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
-    return expr->type_check(ctx);
+    expr_type = expr->type_check(ctx);
+    ctx.set_expression_type(this, *expr_type);
+    return expr_type;
 }
 
 std::string namespace_access_expression::to_string() const
@@ -475,29 +562,26 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
 
 std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
 {
-    auto t = lhs->type_check(ctx);
-    if(!t.has_value())
+    auto type = lhs->type_check(ctx);
+    if(!type.has_value())
     {
-        throw ty::type_error(loc, "Could not determine type of access expression.");
+        throw ty::type_error(loc, "Access expression has no l.h.s.");
     }
-    lhs_type = t.value();
+    lhs_type = *type;
 
-    // array built-ins.
-    if(lhs_type.is_array())
-    {
-        const ty::struct_definition* array_struct = ctx.get_struct_definition(lhs_type.get_location(), "@array");
-        ctx.push_struct_definition(array_struct);
-        expr_type = rhs->type_check(ctx);
-        ctx.pop_struct_definition();
-        return expr_type;
-    }
+    const ty::struct_definition* struct_def =
+      lhs_type.is_array()
+        ? ctx.get_struct_definition(lhs_type.get_location(),
+                                    "@array")    // array built-ins.
+        : ctx.get_struct_definition(lhs_type.get_location(),
+                                    ty::to_string(lhs_type),
+                                    lhs_type.get_import_path());
 
-    // structs.
-    const ty::struct_definition* struct_def = ctx.get_struct_definition(
-      lhs_type.get_location(), ty::to_string(lhs_type), lhs_type.get_import_path());
     ctx.push_struct_definition(struct_def);
     expr_type = rhs->type_check(ctx);
     ctx.pop_struct_definition();
+
+    ctx.set_expression_type(this, *expr_type);
     return expr_type;
 }
 
@@ -519,11 +603,6 @@ std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg:
 void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
     type_ctx.add_import(path);
-}
-
-std::optional<ty::type_info> import_expression::type_check([[maybe_unused]] ty::context& ctx)
-{
-    return std::nullopt;
 }
 
 std::string import_expression::to_string() const
@@ -553,7 +632,12 @@ void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx
 
 std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
 {
-    return expr->type_check(ctx);
+    expr_type = expr->type_check(ctx);
+    if(expr_type.has_value())
+    {
+        ctx.set_expression_type(this, *expr_type);
+    }
+    return expr_type;
 }
 
 std::string directive_expression::to_string() const
@@ -683,9 +767,16 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
         }
 
         auto base_type = t.get_element_type();
-        return ctx.get_type(base_type->to_string(), base_type->is_array());
+        expr_type = ctx.get_type(base_type->to_string(), base_type->is_array());
+        ctx.set_expression_type(this, *expr_type);
     }
-    return ctx.get_identifier_type(name, get_namespace_path());
+    else
+    {
+        expr_type = ctx.get_identifier_type(name, get_namespace_path());
+        ctx.set_expression_type(this, *expr_type);
+    }
+
+    return expr_type;
 }
 
 std::string variable_reference_expression::to_string() const
@@ -1023,7 +1114,11 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
         {
             if(*t != *expr_type)
             {
-                throw ty::type_error(loc, fmt::format("Initializer types do not match. Found '{}' and '{}'.", ty::to_string(*t), ty::to_string(*expr_type)));
+                throw ty::type_error(loc,
+                                     fmt::format(
+                                       "Initializer types do not match. Found '{}' and '{}'.",
+                                       ty::to_string(*t),
+                                       ty::to_string(*expr_type)));
             }
         }
         else
@@ -1037,7 +1132,10 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
         throw ty::type_error(loc, "Initializer expression has no type.");
     }
 
-    return ctx.get_type(t->to_string(), true);
+    expr_type = ctx.get_type(t->to_string(), true);
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string array_initializer_expression::to_string() const
@@ -1248,23 +1346,29 @@ std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check
         auto initializer_type = initializer->type_check(ctx);
         if(!initializer_type.has_value())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Initializer expression for struct member '{}.{}' has no type.",
-                                             name.s, struct_member.first.s));
+            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
         }
 
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(struct_member.second != initializer_type
-           && !(ctx.is_reference_type(struct_member.second) && initializer_type == ctx.get_type("@null", false)))
+           && !(ctx.is_reference_type(struct_member.second)
+                && initializer_type == ctx.get_type("@null", false)))
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-                                             name.s, struct_member.first.s,
-                                             struct_member.second.to_string(), initializer_type->to_string()));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+                name.s,
+                struct_member.first.s,
+                struct_member.second.to_string(),
+                initializer_type->to_string()));
         }
     }
 
-    return ctx.get_type(name.s, false, get_namespace_path());
+    expr_type = ctx.get_type(name.s, false, get_namespace_path());
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string struct_anonymous_initializer_expression::to_string() const
@@ -1407,23 +1511,28 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         auto initializer_type = initializer->type_check(ctx);
         if(!initializer_type.has_value())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Initializer expression for struct member '{}.{}' has no type.",
-                                             name.s, member_name));
+            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
         }
 
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(it->second != initializer_type
            && !(ctx.is_reference_type(it->second) && initializer_type == ctx.get_type("@null", false)))
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-                                             name.s, member_name,
-                                             it->second.to_string(), initializer_type->to_string()));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+                name.s,
+                member_name,
+                it->second.to_string(),
+                initializer_type->to_string()));
         }
     }
 
-    return ctx.get_type(name.s, false, get_namespace_path());
+    expr_type = ctx.get_type(name.s, false, get_namespace_path());
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string struct_named_initializer_expression::to_string() const
@@ -1724,6 +1833,10 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     auto lhs_type = lhs->type_check(ctx);
+    if(!lhs_type.has_value())
+    {
+        throw ty::type_error(loc, "L.h.s. of binary expression has no type.");
+    }
 
     const ty::struct_definition* struct_def = nullptr;
     if(op.s == ".")    // scope access
@@ -1733,16 +1846,18 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     }
 
     auto rhs_type = rhs->type_check(ctx);
+    if(!rhs_type.has_value())
+    {
+        throw ty::type_error(loc, "R.h.s. of binary expression has no type.");
+    }
 
     if(struct_def)
     {
         ctx.pop_struct_definition();
-        return rhs_type;
-    }
 
-    if(lhs_type == std::nullopt || rhs_type == std::nullopt)
-    {
-        throw ty::type_error(loc, fmt::format("Could not infer types for binary operator '{}'.", reduced_op));
+        expr_type = rhs_type;
+        ctx.set_expression_type(this, *expr_type);
+        return expr_type;
     }
 
     // some operations restrict the type.
@@ -1753,11 +1868,20 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     {
         if(ty::to_string(*lhs_type) != "i32" || ty::to_string(*rhs_type) != "i32")
         {
-            throw ty::type_error(loc, fmt::format("Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.", ty::to_string(*lhs_type), reduced_op, ty::to_string(*rhs_type), reduced_op));
+            throw ty::type_error(
+              loc,
+              fmt::format(
+                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                ty::to_string(*lhs_type),
+                reduced_op,
+                ty::to_string(*rhs_type),
+                reduced_op));
         }
 
-        // return the restricted type.
-        return ctx.get_type("i32", false);
+        // set the restricted type.
+        expr_type = ctx.get_type("i32", false);
+        ctx.set_expression_type(this, *expr_type);
+        return expr_type;
     }
 
     // assignments and comparisons.
@@ -1767,41 +1891,73 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
         if(*lhs_type != *rhs_type
            && !(ctx.is_reference_type(*lhs_type) && *rhs_type == ctx.get_type("@null", false)))
         {
-            throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", ty::to_string(*lhs_type), reduced_op, ty::to_string(*rhs_type)));
+            throw ty::type_error(
+              loc,
+              fmt::format(
+                "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+                ty::to_string(*lhs_type),
+                reduced_op,
+                ty::to_string(*rhs_type)));
         }
 
         if(op.s == "=")
         {
             // assignments return the type of the l.h.s.
-            return lhs_type;
+            expr_type = lhs_type;
+            ctx.set_expression_type(this, *expr_type);
+            return expr_type;
         }
 
         // comparisons return i32.
-        return ctx.get_type("i32", false);
+        expr_type = ctx.get_type("i32", false);
+        ctx.set_expression_type(this, *expr_type);
+        return expr_type;
     }
 
     // check lhs and rhs have supported types (i32 and f32 at the moment).
     if(*lhs_type != ctx.get_type("i32", false) && *lhs_type != ctx.get_type("f32", false))
     {
-        throw ty::type_error(loc, fmt::format("Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.", reduced_op, ty::to_string(*lhs_type)));
+        throw ty::type_error(
+          loc,
+          fmt::format(
+            "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ty::to_string(*lhs_type)));
     }
     if(*rhs_type != ctx.get_type("i32", false) && *rhs_type != ctx.get_type("f32", false))
     {
-        throw ty::type_error(loc, fmt::format("Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.", reduced_op, ty::to_string(*rhs_type)));
+        throw ty::type_error(
+          loc,
+          fmt::format(
+            "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ty::to_string(*rhs_type)));
     }
 
     if(*lhs_type != *rhs_type)
     {
-        throw ty::type_error(loc, fmt::format("Types don't match in binary expression. Got expression of type '{}' {} '{}'.", ty::to_string(*lhs_type), reduced_op, ty::to_string(*rhs_type)));
+        throw ty::type_error(
+          loc,
+          fmt::format(
+            "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+            ty::to_string(*lhs_type),
+            reduced_op,
+            ty::to_string(*rhs_type)));
     }
 
-    // comparisons return i32.
     if(is_comparison)
     {
-        return ctx.get_type("i32", false);
+        // comparisons return i32.
+        expr_type = ctx.get_type("i32", false);
+    }
+    else
+    {
+        // set the type of the binary expression.
+        expr_type = lhs_type;
     }
 
-    return lhs_type;
+    ctx.set_expression_type(this, *expr_type);
+    return expr_type;
 }
 
 std::string binary_expression::to_string() const
@@ -1987,18 +2143,26 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
     }
 
     auto operand_type = operand->type_check(ctx);
-    if(operand_type == std::nullopt)
+    if(!operand_type.has_value())
     {
-        throw ty::type_error(op.location, fmt::format("Operand of unary operator '{}' has no type.", op.s));
+        throw ty::type_error(operand->get_location(), "Operand has no type.");
     }
 
     auto type_it = std::find(op_it->second.begin(), op_it->second.end(), ty::to_string(*operand_type));
     if(type_it == op_it->second.end())
     {
-        throw ty::type_error(operand->get_location(), fmt::format("Invalid operand type '{}' for unary operator '{}'.", ty::to_string(*operand_type), op.s));
+        throw ty::type_error(
+          operand->get_location(),
+          fmt::format(
+            "Invalid operand type '{}' for unary operator '{}'.",
+            ty::to_string(*operand_type),
+            op.s));
     }
 
-    return ctx.get_type(*type_it, false);
+    expr_type = operand_type;
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string unary_expression::to_string() const
@@ -2039,14 +2203,19 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
 
 std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
 {
-    auto expr_type = expr->type_check(ctx);
-    if(expr_type == std::nullopt)
+    auto array_size_type = expr->type_check(ctx);
+    if(!array_size_type.has_value())
     {
-        throw ty::type_error(expr->get_location(), "Array size has no type.");
+        throw ty::type_error(expr->get_location(), "Array size expression has no type.");
     }
-    if(ty::to_string(*expr_type) != "i32")
+
+    if(ty::to_string(*array_size_type) != "i32")
     {
-        throw ty::type_error(expr->get_location(), fmt::format("Expected array size of type 'i32', got '{}'.", ty::to_string(*expr_type)));
+        throw ty::type_error(
+          expr->get_location(),
+          fmt::format(
+            "Expected array size of type 'i32', got '{}'.",
+            ty::to_string(*array_size_type)));
     }
 
     if(!ty::is_builtin_type(type.s))
@@ -2059,7 +2228,10 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
         throw ty::type_error(type.location, "Cannot use operator new with type 'void'.");
     }
 
-    return ctx.get_type(type.s, true);
+    expr_type = ctx.get_type(type.s, true);
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string new_expression::to_string() const
@@ -2085,7 +2257,9 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
 
 std::optional<ty::type_info> null_expression::type_check(ty::context& ctx)
 {
-    return ctx.get_type("@null", false);
+    expr_type = ctx.get_type("@null", false);
+    ctx.set_expression_type(this, *expr_type);
+    return expr_type;
 }
 
 std::string null_expression::to_string() const
@@ -2151,16 +2325,26 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
 std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
 {
     auto identifier_type = identifier->type_check(ctx);
-    if(identifier_type == std::nullopt)
+    if(!identifier_type.has_value())
     {
-        throw ty::type_error(identifier->get_location(), fmt::format("Cannot evaluate type of expression."));
+        throw ty::type_error(identifier->get_location(), "Identifier has no type.");
     }
+
     auto identifier_type_str = ty::to_string(*identifier_type);
     if(identifier_type_str != "i32" && identifier_type_str != "f32")
     {
-        throw ty::type_error(identifier->get_location(), fmt::format("Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').", op.s, identifier_type_str));
+        throw ty::type_error(
+          identifier->get_location(),
+          fmt::format(
+            "Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').",
+            op.s,
+            identifier_type_str));
     }
-    return identifier_type;
+
+    expr_type = identifier_type;
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string postfix_expression::to_string() const
@@ -2310,9 +2494,6 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 
 void prototype_ast::type_check(ty::context& ctx)
 {
-    // enter function scope. the scope is exited in the type_check for the function's body.
-    ctx.enter_function_scope(name);
-
     // add the arguments to the current scope.
     for(const auto& arg: args)
     {
@@ -2327,12 +2508,6 @@ void prototype_ast::type_check(ty::context& ctx)
     {
         throw ty::type_error(return_type->get_location(), fmt::format("Unknown return type '{}'.", return_type->get_name().s));
     }
-}
-
-void prototype_ast::finish_type_check(ty::context& ctx)
-{
-    // exit the function's scope.
-    ctx.exit_named_scope(name);
 }
 
 std::string prototype_ast::to_string() const
@@ -2365,7 +2540,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
     }
 
     std::unique_ptr<cg::value> v;
-    for(auto& expr: this->exprs)
+    for(auto& expr: exprs)
     {
         v = expr->generate_code(ctx, memory_context::none);
 
@@ -2511,12 +2686,16 @@ bool function_expression::supports_directive(const std::string& name) const
 
 std::optional<ty::type_info> function_expression::type_check(ty::context& ctx)
 {
+    // enter function scope. the scope is exited in the type_check for the function's body.
+    ctx.enter_function_scope(prototype->get_name());
+
     prototype->type_check(ctx);
     if(body)
     {
         body->type_check(ctx);
     }
-    prototype->finish_type_check(ctx);
+
+    ctx.exit_named_scope(prototype->get_name());
 
     return std::nullopt;
 }
@@ -2570,22 +2749,33 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
     for(std::size_t i = 0; i < args.size(); ++i)
     {
         auto arg_type = args[i]->type_check(ctx);
-        if(arg_type == std::nullopt)
+        if(!arg_type.has_value())
         {
-            throw ty::type_error(args[i]->get_location(), fmt::format("Cannot evaluate type of argument {}.", i + 1));
+            throw ty::type_error(args[i]->get_location(), "Argument has no type.");
         }
 
         if(sig.arg_types[i] != *arg_type
            && !ctx.is_convertible(args[i]->get_location(), *arg_type, sig.arg_types[i]))
         {
-            throw ty::type_error(args[i]->get_location(), fmt::format("Type of argument {} does not match signature: Expected '{}', got '{}'.", i + 1, ty::to_string(sig.arg_types[i]), ty::to_string(*arg_type)));
+            throw ty::type_error(
+              args[i]->get_location(),
+              fmt::format(
+                "Type of argument {} does not match signature: Expected '{}', got '{}'.",
+                i + 1,
+                ty::to_string(sig.arg_types[i]),
+                ty::to_string(*arg_type)));
         }
     }
 
     if(index_expr)
     {
         auto v = index_expr->type_check(ctx);
-        if(!v.has_value() || ty::to_string(*v) != "i32")
+        if(!v.has_value())
+        {
+            throw ty::type_error(index_expr->get_location(), "Index expression has no type.");
+        }
+
+        if(ty::to_string(*v) != "i32")
         {
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
@@ -2595,10 +2785,15 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        return ctx.get_type(sig.ret_type.get_element_type()->to_string(), false);
+        expr_type = ctx.get_type(sig.ret_type.get_element_type()->to_string(), false);
+    }
+    else
+    {
+        expr_type = sig.ret_type;
     }
 
-    return sig.ret_type;
+    ctx.set_expression_type(this, *expr_type);
+    return expr_type;
 }
 
 std::string call_expression::to_string() const
@@ -2662,23 +2857,37 @@ std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
     else
     {
         auto ret_type = expr->type_check(ctx);
-
-        if(ret_type.has_value() && !ret_type.value().is_resolved())
+        if(!ret_type.has_value())
         {
-            throw ty::type_error(loc, fmt::format("Function '{}': Unresolved return type '{}'.", sig->name.s, ty::to_string(*ret_type)));
+            throw ty::type_error(loc, "Return expression has no type.");
         }
 
-        if(ret_type == std::nullopt)
+        if(!ret_type->is_resolved())
         {
-            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has no type, expected '{}'.", sig->name.s, ty::to_string(sig->ret_type)));
+            throw ty::type_error(
+              loc,
+              fmt::format(
+                "Function '{}': Unresolved return type '{}'.",
+                sig->name.s,
+                ty::to_string(*ret_type)));
         }
+
         if(*ret_type != sig->ret_type)
         {
-            throw ty::type_error(loc, fmt::format("Function '{}': Return expression has type '{}', expected '{}'.", sig->name.s, ty::to_string(*ret_type), ty::to_string(sig->ret_type)));
+            throw ty::type_error(
+              loc,
+              fmt::format(
+                "Function '{}': Return expression has type '{}', expected '{}'.",
+                sig->name.s,
+                ty::to_string(*ret_type),
+                ty::to_string(sig->ret_type)));
         }
     }
 
-    return sig->ret_type;
+    expr_type = sig->ret_type;
+    ctx.set_expression_type(this, *expr_type);
+
+    return expr_type;
 }
 
 std::string return_statement::to_string() const
@@ -2766,14 +2975,18 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
 std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
 {
     auto condition_type = condition->type_check(ctx);
-    if(condition_type == std::nullopt)
+    if(!condition_type.has_value())
     {
-        throw ty::type_error(loc, "If condition has no type.");
+        throw ty::type_error(condition->get_location(), "Condition has no type.");
     }
 
     if(ty::to_string(*condition_type) != "i32")
     {
-        throw ty::type_error(loc, fmt::format("Expected if condition to be of type 'i32', got '{}", ty::to_string(*condition_type)));
+        throw ty::type_error(
+          loc,
+          fmt::format(
+            "Expected if condition to be of type 'i32', got '{}",
+            ty::to_string(*condition_type)));
     }
 
     ctx.enter_anonymous_scope(if_block->get_location());
@@ -2852,14 +3065,18 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
 std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)
 {
     auto condition_type = condition->type_check(ctx);
-    if(condition_type == std::nullopt)
+    if(!condition_type.has_value())
     {
-        throw ty::type_error(loc, "While condition has no type.");
+        throw ty::type_error(condition->get_location(), "Condition has no type.");
     }
 
     if(ty::to_string(*condition_type) != "i32")
     {
-        throw ty::type_error(loc, fmt::format("Expected while condition to be of type 'i32', got '{}", ty::to_string(*condition_type)));
+        throw ty::type_error(
+          loc,
+          fmt::format(
+            "Expected while condition to be of type 'i32', got '{}",
+            ty::to_string(*condition_type)));
     }
 
     ctx.enter_anonymous_scope(while_block->get_location());

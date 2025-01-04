@@ -20,6 +20,14 @@
 #include "token.h"
 #include "type.h"
 
+/*
+ * Forward declartions.
+ */
+namespace slang::ast
+{
+class expression;
+}    // namespace slang::ast
+
 namespace slang::typing
 {
 
@@ -345,6 +353,9 @@ class context
     /** Directive stack with entries `(name, restore_function)`. */
     std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
 
+    /** Expression type map. */
+    std::unordered_map<const ast::expression*, type_info> expression_types;
+
     /**
      * Generate a unique type id.
      *
@@ -646,6 +657,23 @@ public:
 
     /** Pop a struct definition. */
     void pop_struct_definition();
+
+    /**
+     * Get the type of an expression.
+     *
+     * @param expr The expression.
+     * @returns The expression's type.
+     * @throws A type_error if the expression's type could not be determined.
+     */
+    type_info get_expression_type(const ast::expression& expr) const;
+
+    /**
+     * Set the type of an expression.
+     *
+     * @param expr The expression.
+     * @param t The expression's type.
+     */
+    void set_expression_type(const ast::expression* expr, type_info t);
 
     /** Get the import list. */
     const std::vector<std::string>& get_imports() const

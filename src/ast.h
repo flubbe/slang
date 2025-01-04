@@ -247,9 +247,11 @@ public:
      * @throws A `type_error` if a type error was found.
      *
      * @param ctx Type system context.
-     * @returns The expression's type or std::nullopt.
      */
-    virtual std::optional<ty::type_info> type_check(ty::context& ctx) = 0;
+    virtual std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx)
+    {
+        return std::nullopt;
+    }
 
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
@@ -271,6 +273,32 @@ public:
     {
         return {};
     }
+
+    /**
+     * Visit all nodes in this expression tree in depth-first order.
+     *
+     * @param visitor The visitor function.
+     * @param visit_self Whether to visit the current node.
+     * @param reverse Whether to visit the nodes in reverse order.
+     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     */
+    void visit_nodes(
+      std::function<void(expression&)> visitor,
+      bool visit_self,
+      bool reverse = false);
+
+    /**
+     * Visit all nodes in this expression tree in depth-first order.
+     *
+     * @param visitor The visitor function.
+     * @param visit_self Whether to visit the current node.
+     * @param reverse Whether to visit the nodes in reverse order.
+     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     */
+    void visit_nodes(
+      std::function<void(const expression&)> visitor,
+      bool visit_self,
+      bool reverse = false) const;
 };
 
 /** Any expression with a name. */
@@ -724,7 +752,6 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -1178,9 +1205,9 @@ public:
         std::vector<expression*> children;
         children.reserve(initializers.size());
 
-        for(auto& initializer: initializers)
+        for(auto& e: initializers)
         {
-            children.emplace_back(initializer.get());
+            children.emplace_back(e.get());
         }
         return children;
     }
@@ -1189,9 +1216,9 @@ public:
         std::vector<const expression*> children;
         children.reserve(initializers.size());
 
-        for(auto& initializer: initializers)
+        for(auto& e: initializers)
         {
-            children.emplace_back(initializer.get());
+            children.emplace_back(e.get());
         }
         return children;
     }
@@ -1247,13 +1274,13 @@ public:
         std::vector<expression*> children;
         children.reserve(member_names.size() + initializers.size());
 
-        for(auto& member_name: member_names)
+        for(auto& e: member_names)
         {
-            children.emplace_back(member_name.get());
+            children.emplace_back(e.get());
         }
-        for(auto& initializer: initializers)
+        for(auto& e: initializers)
         {
-            children.emplace_back(initializer.get());
+            children.emplace_back(e.get());
         }
         return children;
     }
@@ -1262,13 +1289,13 @@ public:
         std::vector<const expression*> children;
         children.reserve(member_names.size() + initializers.size());
 
-        for(auto& member_name: member_names)
+        for(auto& e: member_names)
         {
-            children.emplace_back(member_name.get());
+            children.emplace_back(e.get());
         }
-        for(auto& initializer: initializers)
+        for(auto& e: initializers)
         {
-            children.emplace_back(initializer.get());
+            children.emplace_back(e.get());
         }
         return children;
     }
@@ -1543,7 +1570,11 @@ public:
     }
 };
 
-/** Function prototype. */
+/**
+ * Function prototype.
+ *
+ * @note Not a subclass of `expression` because the signature of `generate_code` does not match.
+ */
 class prototype_ast
 {
     /** Token location. */
@@ -1596,10 +1627,9 @@ public:
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const;
     void type_check(ty::context& ctx);
-    void finish_type_check(ty::context& ctx);
     std::string to_string() const;
 
-    token get_name() const
+    const token& get_name() const
     {
         return name;
     }
@@ -1719,19 +1749,11 @@ public:
 
     std::vector<expression*> get_children() override
     {
-        if(body)
-        {
-            return {body.get()};
-        }
-        return {};
+        return {body.get()};
     }
     std::vector<const expression*> get_children() const override
     {
-        if(body)
-        {
-            return {body.get()};
-        }
-        return {};
+        return {body.get()};
     }
 };
 
@@ -1937,19 +1959,29 @@ public:
 
     std::vector<expression*> get_children() override
     {
+        std::vector<expression*> children;
+        children.reserve(else_block ? 3 : 2);
+
+        children.emplace_back(condition.get());
+        children.emplace_back(if_block.get());
         if(else_block)
         {
-            return {condition.get(), if_block.get(), else_block.get()};
+            children.emplace_back(else_block.get());
         }
-        return {condition.get(), if_block.get()};
+        return children;
     }
     std::vector<const expression*> get_children() const override
     {
+        std::vector<const expression*> children;
+        children.reserve(else_block ? 3 : 2);
+
+        children.emplace_back(condition.get());
+        children.emplace_back(if_block.get());
         if(else_block)
         {
-            return {condition.get(), if_block.get(), else_block.get()};
+            children.emplace_back(else_block.get());
         }
-        return {condition.get(), if_block.get()};
+        return children;
     }
 };
 
@@ -2041,11 +2073,6 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
-    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
-    {
-        return std::nullopt;
-    }
-
     std::string to_string() const override
     {
         return "Break()";
@@ -2084,11 +2111,6 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-
-    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
-    {
-        return std::nullopt;
-    }
 
     std::string to_string() const override
     {

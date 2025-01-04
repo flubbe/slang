@@ -429,8 +429,8 @@ void compile::invoke(const std::vector<std::string>& args)
         return;
     }
 
-    std::shared_ptr<ast::block> ast = parser.get_ast();
-    if(ast == nullptr)
+    std::shared_ptr<ast::expression> ast = parser.get_ast();
+    if(!ast)
     {
         fmt::print("No AST produced.\n");
         return;
