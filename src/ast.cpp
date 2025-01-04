@@ -112,10 +112,13 @@ bool expression::supports_directive(const std::string& name) const
 
 /**
  * Templated visit helper. Implements DFS to walk the AST.
+ * The visitor function is called for each node in the AST.
+ * The nodes are visited in pre-order or post-order.
  *
  * @param expr The expression to visit.
  * @param visitor The visitor function.
  * @param visit_self Whether to visit the expression itself.
+ * @param post_order Whether to visit the nodes in post-order.
  * @tparam T The expression type. Must be a subclass of `expression`.
  */
 template<typename T>
@@ -123,7 +126,7 @@ void visit_nodes(
   T& expr,
   std::function<void(T&)> visitor,
   bool visit_self,
-  bool reverse)
+  bool post_order)
 {
     static_assert(
       std::is_same_v<std::decay_t<T>, expression>
@@ -158,7 +161,7 @@ void visit_nodes(
         sorted_ast.pop_front();
     }
 
-    if(reverse)
+    if(post_order)
     {
         for(auto it = sorted_ast.rbegin(); it != sorted_ast.rend(); ++it)
         {
@@ -177,17 +180,17 @@ void visit_nodes(
 void expression::visit_nodes(
   std::function<void(expression&)> visitor,
   bool visit_self,
-  bool reverse)
+  bool post_order)
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, reverse);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
 }
 
 void expression::visit_nodes(
   std::function<void(const expression&)> visitor,
   bool visit_self,
-  bool reverse) const
+  bool post_order) const
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, reverse);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
 }
 
 /*
@@ -1830,26 +1833,33 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
 std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 {
+    visit_nodes(
+      [&ctx](ast::expression& node)
+      {
+          // if we're getting called from an expression that includes this node,
+          // we already have a type.
+          // FIXME This can be avoided by adjusting `type_check`.
+          if(!ctx.has_expression_type(node))
+          {
+              node.type_check(ctx);
+          }
+      },
+      false, /* don't visit this node */
+      true   /* post-order traversal */
+    );
+
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
-    auto lhs_type = lhs->type_check(ctx);
-    if(!lhs_type.has_value())
-    {
-        throw ty::type_error(loc, "L.h.s. of binary expression has no type.");
-    }
+    auto lhs_type = ctx.get_expression_type(*lhs);
 
     const ty::struct_definition* struct_def = nullptr;
     if(op.s == ".")    // scope access
     {
-        struct_def = ctx.get_struct_definition(loc, lhs_type->to_string(), lhs_type->get_import_path());
+        struct_def = ctx.get_struct_definition(loc, lhs_type.to_string(), lhs_type.get_import_path());
         ctx.push_struct_definition(struct_def);
     }
 
-    auto rhs_type = rhs->type_check(ctx);
-    if(!rhs_type.has_value())
-    {
-        throw ty::type_error(loc, "R.h.s. of binary expression has no type.");
-    }
+    auto rhs_type = ctx.get_expression_type(*rhs);
 
     if(struct_def)
     {
@@ -1866,15 +1876,15 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
        || reduced_op == "&" || reduced_op == "^" || reduced_op == "|"
        || reduced_op == "&&" || reduced_op == "||")
     {
-        if(ty::to_string(*lhs_type) != "i32" || ty::to_string(*rhs_type) != "i32")
+        if(ty::to_string(lhs_type) != "i32" || ty::to_string(rhs_type) != "i32")
         {
             throw ty::type_error(
               loc,
               fmt::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
-                ty::to_string(*lhs_type),
+                ty::to_string(lhs_type),
                 reduced_op,
-                ty::to_string(*rhs_type),
+                ty::to_string(rhs_type),
                 reduced_op));
         }
 
@@ -1888,16 +1898,16 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     if(op.s == "=" || op.s == "==" || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
-        if(*lhs_type != *rhs_type
-           && !(ctx.is_reference_type(*lhs_type) && *rhs_type == ctx.get_type("@null", false)))
+        if(lhs_type != rhs_type
+           && !(ctx.is_reference_type(lhs_type) && rhs_type == ctx.get_type("@null", false)))
         {
             throw ty::type_error(
               loc,
               fmt::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
-                ty::to_string(*lhs_type),
+                ty::to_string(lhs_type),
                 reduced_op,
-                ty::to_string(*rhs_type)));
+                ty::to_string(rhs_type)));
         }
 
         if(op.s == "=")
@@ -1915,34 +1925,34 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     }
 
     // check lhs and rhs have supported types (i32 and f32 at the moment).
-    if(*lhs_type != ctx.get_type("i32", false) && *lhs_type != ctx.get_type("f32", false))
+    if(lhs_type != ctx.get_type("i32", false) && lhs_type != ctx.get_type("f32", false))
     {
         throw ty::type_error(
           loc,
           fmt::format(
             "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ty::to_string(*lhs_type)));
+            ty::to_string(lhs_type)));
     }
-    if(*rhs_type != ctx.get_type("i32", false) && *rhs_type != ctx.get_type("f32", false))
+    if(rhs_type != ctx.get_type("i32", false) && rhs_type != ctx.get_type("f32", false))
     {
         throw ty::type_error(
           loc,
           fmt::format(
             "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ty::to_string(*rhs_type)));
+            ty::to_string(rhs_type)));
     }
 
-    if(*lhs_type != *rhs_type)
+    if(lhs_type != rhs_type)
     {
         throw ty::type_error(
           loc,
           fmt::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
-            ty::to_string(*lhs_type),
+            ty::to_string(lhs_type),
             reduced_op,
-            ty::to_string(*rhs_type)));
+            ty::to_string(rhs_type)));
     }
 
     if(is_comparison)

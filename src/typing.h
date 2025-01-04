@@ -675,6 +675,14 @@ public:
      */
     void set_expression_type(const ast::expression* expr, type_info t);
 
+    /**
+     * Check whether an expression has a type registered.
+     *
+     * @param expr The expression.
+     * @returns True if the expression has a type.
+     */
+    bool has_expression_type(const ast::expression& expr) const;
+
     /** Get the import list. */
     const std::vector<std::string>& get_imports() const
     {

@@ -1024,6 +1024,11 @@ void context::set_expression_type(const ast::expression* expr, type_info t)
     expression_types[expr] = std::move(t);
 }
 
+bool context::has_expression_type(const ast::expression& expr) const
+{
+    return expression_types.find(&expr) != expression_types.end();
+}
+
 std::string context::to_string() const
 {
     std::string ret = "Imports:\n";

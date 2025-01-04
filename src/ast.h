@@ -275,30 +275,30 @@ public:
     }
 
     /**
-     * Visit all nodes in this expression tree in depth-first order.
+     * Visit all nodes in this expression tree using pre-order or post-order traversal.
      *
      * @param visitor The visitor function.
      * @param visit_self Whether to visit the current node.
-     * @param reverse Whether to visit the nodes in reverse order.
+     * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
      * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(expression&)> visitor,
       bool visit_self,
-      bool reverse = false);
+      bool post_order = false);
 
     /**
-     * Visit all nodes in this expression tree in depth-first order.
+     * Visit all nodes in this expression tree using pre-order or post-order traversal.
      *
      * @param visitor The visitor function.
      * @param visit_self Whether to visit the current node.
-     * @param reverse Whether to visit the nodes in reverse order.
+     * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
      * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(const expression&)> visitor,
       bool visit_self,
-      bool reverse = false) const;
+      bool post_order = false) const;
 };
 
 /** Any expression with a name. */
@@ -623,15 +623,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    std::vector<expression*> get_children() override
-    {
-        return {expr.get()};
-    }
-    std::vector<const expression*> get_children() const override
-    {
-        return {expr.get()};
-    }
 };
 
 /** Access expression. */
@@ -698,15 +689,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    std::vector<expression*> get_children() override
-    {
-        return {lhs.get(), rhs.get()};
-    }
-    std::vector<const expression*> get_children() const override
-    {
-        return {lhs.get(), rhs.get()};
-    }
 
     /** Return the accessed struct's type info. */
     ty::type_info get_struct_type() const
