@@ -1181,29 +1181,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    std::vector<expression*> get_children() override
-    {
-        std::vector<expression*> children;
-        children.reserve(initializers.size());
-
-        for(auto& e: initializers)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
-    }
-    std::vector<const expression*> get_children() const override
-    {
-        std::vector<const expression*> children;
-        children.reserve(initializers.size());
-
-        for(auto& e: initializers)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
-    }
 };
 
 /** Named struct initialization. */
@@ -1250,37 +1227,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
-
-    std::vector<expression*> get_children() override
-    {
-        std::vector<expression*> children;
-        children.reserve(member_names.size() + initializers.size());
-
-        for(auto& e: member_names)
-        {
-            children.emplace_back(e.get());
-        }
-        for(auto& e: initializers)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
-    }
-    std::vector<const expression*> get_children() const override
-    {
-        std::vector<const expression*> children;
-        children.reserve(member_names.size() + initializers.size());
-
-        for(auto& e: member_names)
-        {
-            children.emplace_back(e.get());
-        }
-        for(auto& e: initializers)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
-    }
 };
 
 /** Binary operators. */

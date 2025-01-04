@@ -2138,6 +2138,21 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
 
 std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
 {
+    visit_nodes(
+      [&ctx](ast::expression& node)
+      {
+          // if we're getting called from an expression that includes this node,
+          // we already have a type.
+          // FIXME This can be avoided by adjusting `type_check`.
+          if(!ctx.has_expression_type(node))
+          {
+              node.type_check(ctx);
+          }
+      },
+      false, /* don't visit this node */
+      true   /* post-order traversal */
+    );
+
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
       {"++", {"i32", "f32"}},
       {"--", {"i32", "f32"}},
@@ -2152,20 +2167,15 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
         throw ty::type_error(op.location, fmt::format("Unknown unary operator '{}'.", op.s));
     }
 
-    auto operand_type = operand->type_check(ctx);
-    if(!operand_type.has_value())
-    {
-        throw ty::type_error(operand->get_location(), "Operand has no type.");
-    }
-
-    auto type_it = std::find(op_it->second.begin(), op_it->second.end(), ty::to_string(*operand_type));
+    auto operand_type = ctx.get_expression_type(*operand);
+    auto type_it = std::find(op_it->second.begin(), op_it->second.end(), ty::to_string(operand_type));
     if(type_it == op_it->second.end())
     {
         throw ty::type_error(
           operand->get_location(),
           fmt::format(
             "Invalid operand type '{}' for unary operator '{}'.",
-            ty::to_string(*operand_type),
+            ty::to_string(operand_type),
             op.s));
     }
 
