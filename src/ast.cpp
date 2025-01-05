@@ -1833,20 +1833,20 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
 std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 {
-    visit_nodes(
-      [&ctx](ast::expression& node)
-      {
-          // if we're getting called from an expression that includes this node,
-          // we already have a type.
-          // FIXME This can be avoided by adjusting `type_check`.
-          if(!ctx.has_expression_type(node))
+    if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
+    {
+        // visit the nodes to get the types. note that if we are here,
+        // no type has been set yet, so we can traverse all nodes without
+        // doing evaluation twice.
+        visit_nodes(
+          [&ctx](ast::expression& node)
           {
               node.type_check(ctx);
-          }
-      },
-      false, /* don't visit this node */
-      true   /* post-order traversal */
-    );
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+    }
 
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
@@ -2138,20 +2138,20 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
 
 std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
 {
-    visit_nodes(
-      [&ctx](ast::expression& node)
-      {
-          // if we're getting called from an expression that includes this node,
-          // we already have a type.
-          // FIXME This can be avoided by adjusting `type_check`.
-          if(!ctx.has_expression_type(node))
+    if(!ctx.has_expression_type(*operand))
+    {
+        // visit the nodes to get the types. note that if we are here,
+        // no type has been set yet, so we can traverse all nodes without
+        // doing evaluation twice.
+        visit_nodes(
+          [&ctx](ast::expression& node)
           {
               node.type_check(ctx);
-          }
-      },
-      false, /* don't visit this node */
-      true   /* post-order traversal */
-    );
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+    }
 
     static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
       {"++", {"i32", "f32"}},
