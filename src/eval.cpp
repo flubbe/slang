@@ -108,35 +108,28 @@ struct binary_operation_helper
 
     std::unique_ptr<cg::value>
       operator()(
-        const std::unique_ptr<cg::value>& lhs,
-        const std::unique_ptr<cg::value>& rhs) const
+        const cg::value& lhs,
+        const cg::value& rhs) const
     {
-        if(!lhs || !rhs)
-        {
-            throw cg::codegen_error(
-              loc,
-              "Null argument passed to binary operator evaluation.");
-        }
-
-        if(lhs->to_string() != rhs->to_string())
+        if(lhs.to_string() != rhs.to_string())
         {
             throw cg::codegen_error(
               loc,
               fmt::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
-                lhs->to_string(), rhs->to_string()));
+                lhs.to_string(), rhs.to_string()));
         }
 
-        if(lhs->to_string() == "i32")
+        if(lhs.to_string() == "i32")
         {
-            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(lhs.get());
-            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(rhs.get());
+            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);
+            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);
             return std::make_unique<cg::constant_int>(func_i32(lhs_i32->get_int(), rhs_i32->get_int()));
         }
-        else if(lhs->to_string() == "f32")
+        else if(lhs.to_string() == "f32")
         {
-            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(lhs.get());
-            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(rhs.get());
+            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);
+            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);
             return std::make_unique<cg::constant_float>(func_f32(lhs_f32->get_float(), rhs_f32->get_float()));
         }
 
@@ -144,7 +137,7 @@ struct binary_operation_helper
           loc,
           fmt::format(
             "Invalid type '{}' for binary operator evaluation.",
-            lhs->get_type().to_string()));
+            lhs.get_type().to_string()));
     }
 };
 
@@ -166,35 +159,28 @@ struct binary_comparison_helper
 
     std::unique_ptr<cg::value>
       operator()(
-        const std::unique_ptr<cg::value>& lhs,
-        const std::unique_ptr<cg::value>& rhs) const
+        const cg::value& lhs,
+        const cg::value& rhs) const
     {
-        if(!lhs || !rhs)
-        {
-            throw cg::codegen_error(
-              loc,
-              "Null argument passed to binary operator evaluation.");
-        }
-
-        if(lhs->to_string() != rhs->to_string())
+        if(lhs.to_string() != rhs.to_string())
         {
             throw cg::codegen_error(
               loc,
               fmt::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
-                lhs->to_string(), rhs->to_string()));
+                lhs.to_string(), rhs.to_string()));
         }
 
-        if(lhs->to_string() == "i32")
+        if(lhs.to_string() == "i32")
         {
-            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(lhs.get());
-            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(rhs.get());
+            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);
+            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);
             return std::make_unique<cg::constant_int>(func_i32(lhs_i32->get_int(), rhs_i32->get_int()));
         }
-        else if(lhs->to_string() == "f32")
+        else if(lhs.to_string() == "f32")
         {
-            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(lhs.get());
-            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(rhs.get());
+            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);
+            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);
             return std::make_unique<cg::constant_int>(func_f32(lhs_f32->get_float(), rhs_f32->get_float()));
         }
 
@@ -202,7 +188,7 @@ struct binary_comparison_helper
           loc,
           fmt::format(
             "Invalid type '{}' for comparison evaluation.",
-            lhs->get_type().to_string()));
+            lhs.get_type().to_string()));
     }
 };
 
@@ -361,13 +347,27 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
     auto eval_it = eval_map.find(op.s);
     if(eval_it != eval_map.end())
     {
-        return eval_it->second(lhs->evaluate(ctx), rhs->evaluate(ctx));
+        auto lhs_val = lhs->evaluate(ctx);
+        auto rhs_val = rhs->evaluate(ctx);
+        if(!lhs_val || !rhs_val)
+        {
+            return {nullptr};
+        }
+
+        return eval_it->second(*lhs_val, *rhs_val);
     }
 
     auto comp_it = comp_map.find(op.s);
     if(comp_it != comp_map.end())
     {
-        return comp_it->second(lhs->evaluate(ctx), rhs->evaluate(ctx));
+        auto lhs_val = lhs->evaluate(ctx);
+        auto rhs_val = rhs->evaluate(ctx);
+        if(!lhs_val || !rhs_val)
+        {
+            return {nullptr};
+        }
+
+        return comp_it->second(*lhs_val, *rhs_val);
     }
 
     return {nullptr};
@@ -394,25 +394,23 @@ struct unary_operation_helper
     }
 
     std::unique_ptr<cg::value>
-      operator()(const std::unique_ptr<cg::value>& v) const
+      operator()(const cg::value& v) const
     {
-        if(!v)
+        if(v.to_string() == "i32")
         {
-            throw cg::codegen_error(loc, "Null argument passed to unary operator evaluation.");
-        }
-
-        if(v->to_string() == "i32")
-        {
-            const cg::constant_int* v_i32 = static_cast<const cg::constant_int*>(v.get());
+            const cg::constant_int* v_i32 = static_cast<const cg::constant_int*>(&v);
             return std::make_unique<cg::constant_int>(func_i32(v_i32->get_int()));
         }
-        else if(v->to_string() == "f32")
+        else if(v.to_string() == "f32")
         {
-            const cg::constant_float* v_f32 = static_cast<const cg::constant_float*>(v.get());
+            const cg::constant_float* v_f32 = static_cast<const cg::constant_float*>(&v);
             return std::make_unique<cg::constant_float>(func_f32(v_f32->get_float()));
         }
 
-        throw cg::codegen_error(loc, fmt::format("Invalid type '{}' for unary operator evaluation.", v->get_type().to_string()));
+        throw cg::codegen_error(
+          loc,
+          fmt::format("Invalid type '{}' for unary operator evaluation.",
+                      v.get_type().to_string()));
     }
 };
 
@@ -498,7 +496,13 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
         return {nullptr};
     }
 
-    return it->second(operand->evaluate(ctx));
+    auto operand_val = operand->evaluate(ctx);
+    if(!operand_val)
+    {
+        return {nullptr};
+    }
+
+    return it->second(*operand_val);
 }
 
 }    // namespace slang::ast
