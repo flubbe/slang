@@ -67,8 +67,8 @@ public:
     /** No default constructor. */
     expression() = delete;
 
-    /** Default copy/move constructors. */
-    expression(const expression&) = default;
+    /** Copy and move constructors. */
+    expression(const expression&) = delete;
     expression(expression&&) = default;
 
     /**
@@ -82,7 +82,7 @@ public:
     }
 
     /** Default assignments. */
-    expression& operator=(const expression&) = default;
+    expression& operator=(const expression&) = delete;
     expression& operator=(expression&&) = default;
 
     /** Default destructor. */
@@ -247,9 +247,11 @@ public:
      * @throws A `type_error` if a type error was found.
      *
      * @param ctx Type system context.
-     * @returns The expression's type or std::nullopt.
      */
-    virtual std::optional<ty::type_info> type_check(ty::context& ctx) = 0;
+    virtual std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx)
+    {
+        return std::nullopt;
+    }
 
     /** Get a readable string representation of the node. */
     virtual std::string to_string() const = 0;
@@ -259,6 +261,44 @@ public:
     {
         return loc;
     }
+
+    /** Get all child nodes. */
+    virtual std::vector<expression*> get_children()
+    {
+        return {};
+    }
+
+    /** Get all child nodes. */
+    virtual std::vector<const expression*> get_children() const
+    {
+        return {};
+    }
+
+    /**
+     * Visit all nodes in this expression tree using pre-order or post-order traversal.
+     *
+     * @param visitor The visitor function.
+     * @param visit_self Whether to visit the current node.
+     * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
+     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     */
+    void visit_nodes(
+      std::function<void(expression&)> visitor,
+      bool visit_self,
+      bool post_order = false);
+
+    /**
+     * Visit all nodes in this expression tree using pre-order or post-order traversal.
+     *
+     * @param visitor The visitor function.
+     * @param visit_self Whether to visit the current node.
+     * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
+     * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
+     */
+    void visit_nodes(
+      std::function<void(const expression&)> visitor,
+      bool visit_self,
+      bool post_order = false) const;
 };
 
 /** Any expression with a name. */
@@ -275,15 +315,12 @@ public:
     /** No default constructor. */
     named_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~named_expression() = default;
-
-    /** Default copy and move constructors. */
-    named_expression(const named_expression&) = default;
+    /** Copy and move constructors. */
+    named_expression(const named_expression&) = delete;
     named_expression(named_expression&&) = default;
 
     /** Default assignment operators. */
-    named_expression& operator=(const named_expression&) = default;
+    named_expression& operator=(const named_expression&) = delete;
     named_expression& operator=(named_expression&&) = default;
 
     /**
@@ -333,15 +370,12 @@ public:
     /** No default constructor. */
     literal_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~literal_expression() = default;
-
-    /** Default copy and move constructors. */
-    literal_expression(const literal_expression&) = default;
+    /** Copy and move constructors. */
+    literal_expression(const literal_expression&) = delete;
     literal_expression(literal_expression&&) = default;
 
     /** Default assignment operators. */
-    literal_expression& operator=(const literal_expression&) = default;
+    literal_expression& operator=(const literal_expression&) = delete;
     literal_expression& operator=(literal_expression&&) = default;
 
     /**
@@ -392,11 +426,11 @@ class type_expression
 public:
     /** Default and deleted constructors. */
     type_expression() = delete;
-    type_expression(const type_expression&) = default;
+    type_expression(const type_expression&) = delete;
     type_expression(type_expression&&) = default;
 
     /** Default assignments. */
-    type_expression& operator=(const type_expression&) = default;
+    type_expression& operator=(const type_expression&) = delete;
     type_expression& operator=(type_expression&&) = default;
 
     /**
@@ -456,9 +490,6 @@ public:
     /** No default constructor. */
     type_cast_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~type_cast_expression() = default;
-
     /** Copy and move constructors. */
     type_cast_expression(const type_cast_expression&) = delete;
     type_cast_expression(type_cast_expression&&) = default;
@@ -517,6 +548,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** Scope expression. */
@@ -534,9 +574,6 @@ public:
 
     /** No default constructor. */
     namespace_access_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~namespace_access_expression() = default;
 
     /** Copy and move constructors. */
     namespace_access_expression(const namespace_access_expression&) = delete;
@@ -594,9 +631,6 @@ public:
 
     /** No default constructor. */
     access_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~access_expression() = default;
 
     /** Copy and move constructors. */
     access_expression(const access_expression&) = delete;
@@ -661,15 +695,12 @@ public:
     /** No default constructor. */
     import_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~import_expression() = default;
-
-    /** Default copy and move constructors. */
-    import_expression(const import_expression&) = default;
+    /** Copy and move constructors. */
+    import_expression(const import_expression&) = delete;
     import_expression(import_expression&&) = default;
 
     /** Default assignment operators. */
-    import_expression& operator=(const import_expression&) = default;
+    import_expression& operator=(const import_expression&) = delete;
     import_expression& operator=(import_expression&&) = default;
 
     /**
@@ -685,7 +716,6 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 };
 
@@ -705,10 +735,7 @@ public:
     /** No default constructor. */
     directive_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~directive_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     directive_expression(const directive_expression&) = delete;
     directive_expression(directive_expression&&) = default;
 
@@ -739,6 +766,15 @@ public:
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** Variable references. */
@@ -754,10 +790,7 @@ public:
     /** No default constructor. */
     variable_reference_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~variable_reference_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     variable_reference_expression(const variable_reference_expression&) = delete;
     variable_reference_expression(variable_reference_expression&&) = default;
 
@@ -789,6 +822,23 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
+    std::vector<expression*> get_children() override
+    {
+        if(element_expr)
+        {
+            return {element_expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(element_expr)
+        {
+            return {element_expr.get()};
+        }
+        return {};
+    }
+
     /** Get the value of the object. */
     cg::value get_value(cg::context& ctx) const;
 };
@@ -808,9 +858,6 @@ public:
 
     /** No default constructor. */
     variable_declaration_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~variable_declaration_expression() = default;
 
     /** Copy and move constructors. */
     variable_declaration_expression(const variable_declaration_expression&) = delete;
@@ -838,6 +885,23 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
 
     /** Get the variable's type. */
     const std::unique_ptr<ast::type_expression>& get_type() const
@@ -867,9 +931,6 @@ public:
 
     /** No default constructor. */
     constant_declaration_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~constant_declaration_expression() = default;
 
     /** Copy and move constructors. */
     constant_declaration_expression(const constant_declaration_expression&) = delete;
@@ -906,6 +967,15 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
+
     /** Get the constant's type. */
     const std::unique_ptr<ast::type_expression>& get_type() const
     {
@@ -925,9 +995,6 @@ public:
 
     /** No default constructor. */
     array_initializer_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~array_initializer_expression() = default;
 
     /** Copy and move constructors. */
     array_initializer_expression(const array_initializer_expression&) = delete;
@@ -949,6 +1016,29 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** Struct definition. */
@@ -963,9 +1053,6 @@ public:
 
     /** No default constructor. */
     struct_definition_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~struct_definition_expression() = default;
 
     /** Copy and move constructors. */
     struct_definition_expression(const struct_definition_expression&) = delete;
@@ -993,6 +1080,29 @@ public:
     bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(members.size());
+
+        for(auto& e: members)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(members.size());
+
+        for(auto& e: members)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** Anonymous struct initialization. */
@@ -1007,9 +1117,6 @@ public:
 
     /** No default constructor. */
     struct_anonymous_initializer_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~struct_anonymous_initializer_expression() = default;
 
     /** Copy and move constructors. */
     struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression&) = delete;
@@ -1052,9 +1159,6 @@ public:
 
     /** No default constructor. */
     struct_named_initializer_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~struct_named_initializer_expression() = default;
 
     /** Copy and move constructors. */
     struct_named_initializer_expression(const struct_named_initializer_expression&) = delete;
@@ -1099,9 +1203,6 @@ public:
     /** No default constructor. */
     binary_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~binary_expression() = default;
-
     /** Copy and move constructors. */
     binary_expression(const binary_expression&) = delete;
     binary_expression(binary_expression&&) = default;
@@ -1134,6 +1235,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), rhs.get()};
+    }
 };
 
 /** Unary operators. */
@@ -1151,9 +1261,6 @@ public:
 
     /** No default constructor. */
     unary_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~unary_expression() = default;
 
     /** Copy and move constructors. */
     unary_expression(const unary_expression&) = delete;
@@ -1183,6 +1290,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {operand.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {operand.get()};
+    }
 };
 
 class new_expression : public expression
@@ -1199,9 +1315,6 @@ public:
 
     /** No default constructor. */
     new_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~new_expression() = default;
 
     /** Copy and move constructors. */
     new_expression(const new_expression&) = delete;
@@ -1228,6 +1341,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
 };
 
 /** 'null' expression. */
@@ -1239,9 +1361,6 @@ public:
 
     /** No default constructor. */
     null_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~null_expression() = default;
 
     /** Copy and move constructors. */
     null_expression(const null_expression&) = delete;
@@ -1282,9 +1401,6 @@ public:
     /** No default constructor. */
     postfix_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~postfix_expression() = default;
-
     /** Copy and move constructors. */
     postfix_expression(const postfix_expression&) = delete;
     postfix_expression(postfix_expression&&) = default;
@@ -1314,9 +1430,22 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {identifier.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {identifier.get()};
+    }
 };
 
-/** Function prototype. */
+/**
+ * Function prototype.
+ *
+ * @note Not a subclass of `expression` because the signature of `generate_code` does not match.
+ */
 class prototype_ast
 {
     /** Token location. */
@@ -1335,10 +1464,7 @@ public:
     /** No default constructor. */
     prototype_ast() = delete;
 
-    /** Default destructor. */
-    virtual ~prototype_ast() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     prototype_ast(const prototype_ast&) = delete;
     prototype_ast(prototype_ast&&) = default;
 
@@ -1369,10 +1495,9 @@ public:
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const;
     void type_check(ty::context& ctx);
-    void finish_type_check(ty::context& ctx);
     std::string to_string() const;
 
-    token get_name() const
+    const token& get_name() const
     {
         return name;
     }
@@ -1390,9 +1515,6 @@ public:
 
     /** No default constructor. */
     block() = delete;
-
-    /** Default destructor. */
-    virtual ~block() = default;
 
     /** Copy and move constructors. */
     block(const block&) = delete;
@@ -1418,6 +1540,29 @@ public:
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(exprs.size());
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
 };
 
 /** A function definition. */
@@ -1435,9 +1580,6 @@ public:
 
     /** No default constructor. */
     function_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~function_expression() = default;
 
     /** Copy and move constructors. */
     function_expression(const function_expression&) = delete;
@@ -1466,6 +1608,15 @@ public:
     bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {body.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {body.get()};
+    }
 };
 
 /** Function calls. */
@@ -1490,10 +1641,7 @@ public:
     /** No default constructor. */
     call_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~call_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     call_expression(const call_expression&) = delete;
     call_expression(call_expression&&) = default;
 
@@ -1523,6 +1671,37 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(args.size());
+
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(args.size());
+
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        return children;
+    }
 };
 
 /*
@@ -1541,9 +1720,6 @@ public:
 
     /** No default constructor. */
     return_statement() = delete;
-
-    /** Default destructor. */
-    virtual ~return_statement() = default;
 
     /** Copy and move constructors. */
     return_statement(const return_statement&) = delete;
@@ -1568,6 +1744,23 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
 };
 
 /** If statement. */
@@ -1588,9 +1781,6 @@ public:
 
     /** No default constructor. */
     if_statement() = delete;
-
-    /** Default destructor. */
-    virtual ~if_statement() = default;
 
     /** Copy and move constructors. */
     if_statement(const if_statement&) = delete;
@@ -1619,6 +1809,33 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(else_block ? 3 : 2);
+
+        children.emplace_back(condition.get());
+        children.emplace_back(if_block.get());
+        if(else_block)
+        {
+            children.emplace_back(else_block.get());
+        }
+        return children;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(else_block ? 3 : 2);
+
+        children.emplace_back(condition.get());
+        children.emplace_back(if_block.get());
+        if(else_block)
+        {
+            children.emplace_back(else_block.get());
+        }
+        return children;
+    }
 };
 
 /** While statement. */
@@ -1636,9 +1853,6 @@ public:
 
     /** No default constructor. */
     while_statement() = delete;
-
-    /** Default destructor. */
-    virtual ~while_statement() = default;
 
     /** Copy and move constructors. */
     while_statement(const while_statement&) = delete;
@@ -1665,6 +1879,15 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {condition.get(), while_block.get()};
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        return {condition.get(), while_block.get()};
+    }
 };
 
 /** Break statement. */
@@ -1677,15 +1900,12 @@ public:
     /** No default constructor. */
     break_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~break_statement() = default;
-
-    /** Default copy and move constructors. */
-    break_statement(const break_statement&) = default;
+    /** Copy and move constructors. */
+    break_statement(const break_statement&) = delete;
     break_statement(break_statement&&) = default;
 
     /** Default assignment operators. */
-    break_statement& operator=(const break_statement&) = default;
+    break_statement& operator=(const break_statement&) = delete;
     break_statement& operator=(break_statement&&) = default;
 
     /**
@@ -1699,11 +1919,6 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-
-    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
-    {
-        return std::nullopt;
-    }
 
     std::string to_string() const override
     {
@@ -1721,15 +1936,12 @@ public:
     /** No default constructor. */
     continue_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~continue_statement() = default;
-
-    /** Default copy and move constructors. */
-    continue_statement(const continue_statement&) = default;
+    /** Copy and move constructors. */
+    continue_statement(const continue_statement&) = delete;
     continue_statement(continue_statement&&) = default;
 
     /** Default assignment operators. */
-    continue_statement& operator=(const continue_statement&) = default;
+    continue_statement& operator=(const continue_statement&) = delete;
     continue_statement& operator=(continue_statement&&) = default;
 
     /**
@@ -1743,11 +1955,6 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-
-    std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override
-    {
-        return std::nullopt;
-    }
 
     std::string to_string() const override
     {

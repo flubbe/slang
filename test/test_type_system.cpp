@@ -43,8 +43,7 @@ TEST(type_system, name_collection)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -68,8 +67,7 @@ TEST(type_system, name_collection)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -92,8 +90,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -112,8 +109,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -132,8 +128,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -152,8 +147,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -172,8 +166,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -192,8 +185,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -214,8 +206,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -236,8 +227,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -257,8 +247,7 @@ TEST(type_system, variables)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -282,8 +271,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -303,8 +291,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -324,8 +311,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -345,8 +331,7 @@ TEST(type_system, explicit_cast)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -390,8 +375,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -411,8 +395,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -432,8 +415,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -453,8 +435,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -474,8 +455,7 @@ TEST(type_system, binary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -502,8 +482,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -524,8 +503,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -545,8 +523,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -566,8 +543,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -587,8 +563,7 @@ TEST(type_system, unary_operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -614,8 +589,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -638,8 +612,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -662,8 +635,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -686,8 +658,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -710,8 +681,7 @@ TEST(type_system, functions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -739,8 +709,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -769,8 +738,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -799,8 +767,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -829,8 +796,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -859,8 +825,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -889,8 +854,7 @@ TEST(type_system, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -923,8 +887,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -946,8 +909,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -968,8 +930,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -995,8 +956,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1023,8 +983,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1049,8 +1008,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1075,8 +1033,7 @@ TEST(type_system, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1106,8 +1063,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1133,8 +1089,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1160,8 +1115,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1187,8 +1141,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1215,8 +1168,7 @@ TEST(type_system, function_calls)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1243,8 +1195,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1267,8 +1218,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1295,8 +1245,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1325,8 +1274,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1351,8 +1299,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1379,8 +1326,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1407,8 +1353,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1435,8 +1380,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1463,8 +1407,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1491,8 +1434,7 @@ TEST(type_system, element_access)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1520,8 +1462,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1547,8 +1488,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         ty::context type_ctx;
         cg::context codegen_ctx;
@@ -1574,8 +1514,7 @@ TEST(type_system, examples)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -1619,8 +1558,7 @@ TEST(type_system, native_binding)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         ty::context type_ctx;

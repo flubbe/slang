@@ -93,7 +93,7 @@ protected:
     lexer* m_lexer{nullptr};
 
     /** The parsed AST. */
-    std::shared_ptr<ast::block> ast;
+    std::shared_ptr<ast::expression> ast;
 
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
@@ -265,10 +265,8 @@ public:
      */
     void parse(lexer& in_lexer);
 
-    /**
-     * Get the AST.
-     */
-    std::shared_ptr<ast::block> get_ast() const
+    /** Get the AST. */
+    std::shared_ptr<ast::expression> get_ast() const
     {
         return ast;
     }

@@ -1265,6 +1265,7 @@ void parser::pop_directive()
 void parser::parse(lexer& in_lexer)
 {
     m_lexer = &in_lexer;
+    auto start_location = m_lexer->get_location();
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
     while((current_token = get_next_token(false)) != std::nullopt)
@@ -1284,7 +1285,7 @@ void parser::parse(lexer& in_lexer)
     }
     else
     {
-        ast = std::make_unique<ast::block>(current_token->location, std::move(exprs));
+        ast = std::make_unique<ast::block>(start_location, std::move(exprs));
     }
 }
 

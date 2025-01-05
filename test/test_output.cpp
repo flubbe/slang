@@ -58,8 +58,7 @@ TEST(output, native_binding)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         ty::context type_ctx;
@@ -235,8 +234,7 @@ TEST(output, emitter)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         ty::context type_ctx;
@@ -283,8 +281,7 @@ TEST(output, hello_world)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -324,8 +321,7 @@ TEST(output, hello_world)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -385,8 +381,7 @@ TEST(output, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -423,8 +418,7 @@ TEST(output, operators)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -467,8 +461,7 @@ TEST(output, string_operations)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -505,8 +498,7 @@ TEST(output, string_operations)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -568,8 +560,7 @@ TEST(output, prefix_postfix)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -636,8 +627,7 @@ TEST(output, control_flow)
 
     EXPECT_TRUE(lexer.eof());
 
-    std::shared_ptr<ast::block> ast = parser.get_ast();
-    ASSERT_NE(ast, nullptr);
+    std::shared_ptr<ast::expression> ast = parser.get_ast();
 
     slang::file_manager mgr;
     mgr.add_search_path("lang");
@@ -684,8 +674,7 @@ TEST(output, loops)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -741,8 +730,7 @@ TEST(output, loops)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path("lang");
@@ -783,8 +771,7 @@ TEST(output, infinite_recursion)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -831,8 +818,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -876,13 +862,13 @@ TEST(output, arrays)
           "}\n"
           "fn str_array() -> [str]\n"
           "{\n"
-          " let s: [str] = [\"a\", \"test\", \"123\"];"
+          " let s: [str] = [\"a\", \"test\", \"123\"];\n"
           " return s;\n"
           "}\n"
           "fn ret_str() -> str\n"
           "{\n"
-          " let s: [str] = [\"a\", \"test\", \"123\"];"
-          " return s[2];"
+          " let s: [str] = [\"a\", \"test\", \"123\"];\n"
+          " return s[2];\n"
           "}\n"
           "fn call_return() -> i32\n"
           "{\n"
@@ -907,8 +893,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -945,8 +930,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -976,8 +960,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1007,8 +990,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1043,8 +1025,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1108,8 +1089,7 @@ TEST(output, arrays)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1163,8 +1143,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1218,8 +1197,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1260,8 +1238,7 @@ TEST(output, return_discard)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1301,8 +1278,7 @@ TEST(output, missing_return)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1340,8 +1316,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1383,8 +1358,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1433,8 +1407,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1474,8 +1447,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1516,8 +1488,7 @@ TEST(output, structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1563,8 +1534,7 @@ TEST(output, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1615,8 +1585,7 @@ TEST(output, nested_structs)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1662,8 +1631,7 @@ TEST(output, type_imports)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
         mgr.add_search_path(".");
@@ -1705,8 +1673,7 @@ TEST(output, null_assignment)
 
         EXPECT_TRUE(lexer.eof());
 
-        std::shared_ptr<ast::block> ast = parser.get_ast();
-        ASSERT_NE(ast, nullptr);
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
 
@@ -1745,8 +1712,7 @@ TEST(output, multiple_modules)
 
             EXPECT_TRUE(lexer.eof());
 
-            std::shared_ptr<ast::block> ast = parser.get_ast();
-            ASSERT_NE(ast, nullptr);
+            std::shared_ptr<ast::expression> ast = parser.get_ast();
 
             slang::file_manager mgr;
             mgr.add_search_path(".");

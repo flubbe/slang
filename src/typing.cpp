@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include "ast.h"
 #include "package.h"
 #include "type.h"
 #include "typing.h"
@@ -1006,6 +1007,26 @@ void context::pop_struct_definition()
     }
 
     struct_stack.pop_back();
+}
+
+type_info context::get_expression_type(const ast::expression& expr) const
+{
+    auto it = expression_types.find(&expr);
+    if(it == expression_types.end())
+    {
+        throw type_error(expr.get_location(), "Typing context: Expression type not found.");
+    }
+    return it->second;
+}
+
+void context::set_expression_type(const ast::expression* expr, type_info t)
+{
+    expression_types[expr] = std::move(t);
+}
+
+bool context::has_expression_type(const ast::expression& expr) const
+{
+    return expression_types.find(&expr) != expression_types.end();
 }
 
 std::string context::to_string() const
