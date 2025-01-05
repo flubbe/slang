@@ -67,8 +67,8 @@ public:
     /** No default constructor. */
     expression() = delete;
 
-    /** Default copy/move constructors. */
-    expression(const expression&) = default;
+    /** Copy and move constructors. */
+    expression(const expression&) = delete;
     expression(expression&&) = default;
 
     /**
@@ -82,7 +82,7 @@ public:
     }
 
     /** Default assignments. */
-    expression& operator=(const expression&) = default;
+    expression& operator=(const expression&) = delete;
     expression& operator=(expression&&) = default;
 
     /** Default destructor. */
@@ -315,15 +315,12 @@ public:
     /** No default constructor. */
     named_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~named_expression() = default;
-
-    /** Default copy and move constructors. */
-    named_expression(const named_expression&) = default;
+    /** Copy and move constructors. */
+    named_expression(const named_expression&) = delete;
     named_expression(named_expression&&) = default;
 
     /** Default assignment operators. */
-    named_expression& operator=(const named_expression&) = default;
+    named_expression& operator=(const named_expression&) = delete;
     named_expression& operator=(named_expression&&) = default;
 
     /**
@@ -373,15 +370,12 @@ public:
     /** No default constructor. */
     literal_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~literal_expression() = default;
-
-    /** Default copy and move constructors. */
-    literal_expression(const literal_expression&) = default;
+    /** Copy and move constructors. */
+    literal_expression(const literal_expression&) = delete;
     literal_expression(literal_expression&&) = default;
 
     /** Default assignment operators. */
-    literal_expression& operator=(const literal_expression&) = default;
+    literal_expression& operator=(const literal_expression&) = delete;
     literal_expression& operator=(literal_expression&&) = default;
 
     /**
@@ -432,11 +426,11 @@ class type_expression
 public:
     /** Default and deleted constructors. */
     type_expression() = delete;
-    type_expression(const type_expression&) = default;
+    type_expression(const type_expression&) = delete;
     type_expression(type_expression&&) = default;
 
     /** Default assignments. */
-    type_expression& operator=(const type_expression&) = default;
+    type_expression& operator=(const type_expression&) = delete;
     type_expression& operator=(type_expression&&) = default;
 
     /**
@@ -495,9 +489,6 @@ public:
 
     /** No default constructor. */
     type_cast_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~type_cast_expression() = default;
 
     /** Copy and move constructors. */
     type_cast_expression(const type_cast_expression&) = delete;
@@ -584,9 +575,6 @@ public:
     /** No default constructor. */
     namespace_access_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~namespace_access_expression() = default;
-
     /** Copy and move constructors. */
     namespace_access_expression(const namespace_access_expression&) = delete;
     namespace_access_expression(namespace_access_expression&&) = default;
@@ -643,9 +631,6 @@ public:
 
     /** No default constructor. */
     access_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~access_expression() = default;
 
     /** Copy and move constructors. */
     access_expression(const access_expression&) = delete;
@@ -710,15 +695,12 @@ public:
     /** No default constructor. */
     import_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~import_expression() = default;
-
-    /** Default copy and move constructors. */
-    import_expression(const import_expression&) = default;
+    /** Copy and move constructors. */
+    import_expression(const import_expression&) = delete;
     import_expression(import_expression&&) = default;
 
     /** Default assignment operators. */
-    import_expression& operator=(const import_expression&) = default;
+    import_expression& operator=(const import_expression&) = delete;
     import_expression& operator=(import_expression&&) = default;
 
     /**
@@ -753,10 +735,7 @@ public:
     /** No default constructor. */
     directive_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~directive_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     directive_expression(const directive_expression&) = delete;
     directive_expression(directive_expression&&) = default;
 
@@ -811,10 +790,7 @@ public:
     /** No default constructor. */
     variable_reference_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~variable_reference_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     variable_reference_expression(const variable_reference_expression&) = delete;
     variable_reference_expression(variable_reference_expression&&) = default;
 
@@ -882,9 +858,6 @@ public:
 
     /** No default constructor. */
     variable_declaration_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~variable_declaration_expression() = default;
 
     /** Copy and move constructors. */
     variable_declaration_expression(const variable_declaration_expression&) = delete;
@@ -959,9 +932,6 @@ public:
     /** No default constructor. */
     constant_declaration_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~constant_declaration_expression() = default;
-
     /** Copy and move constructors. */
     constant_declaration_expression(const constant_declaration_expression&) = delete;
     constant_declaration_expression(constant_declaration_expression&&) = default;
@@ -1026,9 +996,6 @@ public:
     /** No default constructor. */
     array_initializer_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~array_initializer_expression() = default;
-
     /** Copy and move constructors. */
     array_initializer_expression(const array_initializer_expression&) = delete;
     array_initializer_expression(array_initializer_expression&&) = default;
@@ -1086,9 +1053,6 @@ public:
 
     /** No default constructor. */
     struct_definition_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~struct_definition_expression() = default;
 
     /** Copy and move constructors. */
     struct_definition_expression(const struct_definition_expression&) = delete;
@@ -1154,9 +1118,6 @@ public:
     /** No default constructor. */
     struct_anonymous_initializer_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~struct_anonymous_initializer_expression() = default;
-
     /** Copy and move constructors. */
     struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression&) = delete;
     struct_anonymous_initializer_expression(struct_anonymous_initializer_expression&&) = default;
@@ -1198,9 +1159,6 @@ public:
 
     /** No default constructor. */
     struct_named_initializer_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~struct_named_initializer_expression() = default;
 
     /** Copy and move constructors. */
     struct_named_initializer_expression(const struct_named_initializer_expression&) = delete;
@@ -1244,9 +1202,6 @@ public:
 
     /** No default constructor. */
     binary_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~binary_expression() = default;
 
     /** Copy and move constructors. */
     binary_expression(const binary_expression&) = delete;
@@ -1307,9 +1262,6 @@ public:
     /** No default constructor. */
     unary_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~unary_expression() = default;
-
     /** Copy and move constructors. */
     unary_expression(const unary_expression&) = delete;
     unary_expression(unary_expression&&) = default;
@@ -1364,9 +1316,6 @@ public:
     /** No default constructor. */
     new_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~new_expression() = default;
-
     /** Copy and move constructors. */
     new_expression(const new_expression&) = delete;
     new_expression(new_expression&&) = default;
@@ -1413,9 +1362,6 @@ public:
     /** No default constructor. */
     null_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~null_expression() = default;
-
     /** Copy and move constructors. */
     null_expression(const null_expression&) = delete;
     null_expression(null_expression&&) = default;
@@ -1454,9 +1400,6 @@ public:
 
     /** No default constructor. */
     postfix_expression() = delete;
-
-    /** Default destructor. */
-    virtual ~postfix_expression() = default;
 
     /** Copy and move constructors. */
     postfix_expression(const postfix_expression&) = delete;
@@ -1521,10 +1464,7 @@ public:
     /** No default constructor. */
     prototype_ast() = delete;
 
-    /** Default destructor. */
-    virtual ~prototype_ast() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     prototype_ast(const prototype_ast&) = delete;
     prototype_ast(prototype_ast&&) = default;
 
@@ -1575,9 +1515,6 @@ public:
 
     /** No default constructor. */
     block() = delete;
-
-    /** Default destructor. */
-    virtual ~block() = default;
 
     /** Copy and move constructors. */
     block(const block&) = delete;
@@ -1644,9 +1581,6 @@ public:
     /** No default constructor. */
     function_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~function_expression() = default;
-
     /** Copy and move constructors. */
     function_expression(const function_expression&) = delete;
     function_expression(function_expression&&) = default;
@@ -1707,10 +1641,7 @@ public:
     /** No default constructor. */
     call_expression() = delete;
 
-    /** Default destructor. */
-    virtual ~call_expression() = default;
-
-    /** Default copy and move constructors. */
+    /** Copy and move constructors. */
     call_expression(const call_expression&) = delete;
     call_expression(call_expression&&) = default;
 
@@ -1790,9 +1721,6 @@ public:
     /** No default constructor. */
     return_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~return_statement() = default;
-
     /** Copy and move constructors. */
     return_statement(const return_statement&) = delete;
     return_statement(return_statement&&) = default;
@@ -1853,9 +1781,6 @@ public:
 
     /** No default constructor. */
     if_statement() = delete;
-
-    /** Default destructor. */
-    virtual ~if_statement() = default;
 
     /** Copy and move constructors. */
     if_statement(const if_statement&) = delete;
@@ -1929,9 +1854,6 @@ public:
     /** No default constructor. */
     while_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~while_statement() = default;
-
     /** Copy and move constructors. */
     while_statement(const while_statement&) = delete;
     while_statement(while_statement&&) = default;
@@ -1978,15 +1900,12 @@ public:
     /** No default constructor. */
     break_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~break_statement() = default;
-
-    /** Default copy and move constructors. */
-    break_statement(const break_statement&) = default;
+    /** Copy and move constructors. */
+    break_statement(const break_statement&) = delete;
     break_statement(break_statement&&) = default;
 
     /** Default assignment operators. */
-    break_statement& operator=(const break_statement&) = default;
+    break_statement& operator=(const break_statement&) = delete;
     break_statement& operator=(break_statement&&) = default;
 
     /**
@@ -2017,15 +1936,12 @@ public:
     /** No default constructor. */
     continue_statement() = delete;
 
-    /** Default destructor. */
-    virtual ~continue_statement() = default;
-
-    /** Default copy and move constructors. */
-    continue_statement(const continue_statement&) = default;
+    /** Copy and move constructors. */
+    continue_statement(const continue_statement&) = delete;
     continue_statement(continue_statement&&) = default;
 
     /** Default assignment operators. */
-    continue_statement& operator=(const continue_statement&) = default;
+    continue_statement& operator=(const continue_statement&) = delete;
     continue_statement& operator=(continue_statement&&) = default;
 
     /**
