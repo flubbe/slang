@@ -1000,6 +1000,27 @@ bool context::has_expression_constant(const ast::expression& expr) const
     return constant_expressions.find(&expr) != constant_expressions.end();
 }
 
+void context::set_expression_value(const ast::expression& expr, std::unique_ptr<value> v)
+{
+    expression_values[&expr] = std::move(v);
+}
+
+const value& context::get_expression_value(const ast::expression& expr) const
+{
+    auto it = expression_values.find(&expr);
+    if(it == expression_values.end())
+    {
+        throw codegen_error(expr.get_location(), "Expression value not found.");
+    }
+
+    return *it->second;
+}
+
+bool context::has_expression_value(const ast::expression& expr) const
+{
+    return expression_values.find(&expr) != expression_values.end();
+}
+
 /*
  * Code generation.
  */

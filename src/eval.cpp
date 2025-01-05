@@ -344,30 +344,39 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
     };
     // clang-format on
 
-    auto eval_it = eval_map.find(op.s);
-    if(eval_it != eval_map.end())
+    if(!ctx.has_expression_value(*lhs) || !ctx.has_expression_value(*rhs))
     {
-        auto lhs_val = lhs->evaluate(ctx);
-        auto rhs_val = rhs->evaluate(ctx);
-        if(!lhs_val || !rhs_val)
+        // visit the nodes to get the expression values.
+        visit_nodes(
+          [&ctx](const ast::expression& node)
+          {
+              ctx.set_expression_value(node, node.evaluate(ctx));
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+
+        // check that we calculated the required values.
+        if(!ctx.has_expression_value(*lhs) || !ctx.has_expression_value(*rhs))
         {
             return {nullptr};
         }
+    }
 
-        return eval_it->second(*lhs_val, *rhs_val);
+    auto eval_it = eval_map.find(op.s);
+    if(eval_it != eval_map.end())
+    {
+        return eval_it->second(
+          ctx.get_expression_value(*lhs),
+          ctx.get_expression_value(*rhs));
     }
 
     auto comp_it = comp_map.find(op.s);
     if(comp_it != comp_map.end())
     {
-        auto lhs_val = lhs->evaluate(ctx);
-        auto rhs_val = rhs->evaluate(ctx);
-        if(!lhs_val || !rhs_val)
-        {
-            return {nullptr};
-        }
-
-        return comp_it->second(*lhs_val, *rhs_val);
+        return comp_it->second(
+          ctx.get_expression_value(*lhs),
+          ctx.get_expression_value(*rhs));
     }
 
     return {nullptr};
@@ -496,13 +505,26 @@ std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
         return {nullptr};
     }
 
-    auto operand_val = operand->evaluate(ctx);
-    if(!operand_val)
+    if(!ctx.has_expression_value(*operand))
     {
-        return {nullptr};
+        // visit the nodes to get the expression values.
+        visit_nodes(
+          [&ctx](const ast::expression& node)
+          {
+              ctx.set_expression_value(node, node.evaluate(ctx));
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+
+        // check that we calculated the required value.
+        if(!ctx.has_expression_value(*operand))
+        {
+            return {nullptr};
+        }
     }
 
-    return it->second(*operand_val);
+    return it->second(ctx.get_expression_value(*operand));
 }
 
 }    // namespace slang::ast

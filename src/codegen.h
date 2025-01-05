@@ -1847,6 +1847,9 @@ class context
     /** Expressions that are known to be compile-time constant. */
     std::unordered_map<const ast::expression*, bool> constant_expressions;
 
+    /** Expressions with value known at compile-time. */
+    std::unordered_map<const ast::expression*, std::unique_ptr<value>> expression_values;
+
 protected:
     /**
      * Check that the insertion point is not null.
@@ -2461,6 +2464,31 @@ public:
      * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
      */
     bool has_expression_constant(const ast::expression& expr) const;
+
+    /**
+     * Set an expression's compile-time value.
+     *
+     * @param expr The expression.
+     * @param value The expression's value.
+     */
+    void set_expression_value(const ast::expression& expr, std::unique_ptr<value> v);
+
+    /**
+     * Get an expression's compile-time value.
+     *
+     * @param expr The expression.
+     * @returns The expression's value.
+     * @throws Throws a `codegen_error` if the expression is not known.
+     */
+    const value& get_expression_value(const ast::expression& expr) const;
+
+    /**
+     * Check if an expression is known to have a compile-time value.
+     *
+     * @param expr The expression.
+     * @returns `true` if the expression is known to have a compile-time value, `false` otherwise.
+     */
+    bool has_expression_value(const ast::expression& expr) const;
 
     /*
      * Code generation.
