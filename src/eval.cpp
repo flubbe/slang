@@ -221,7 +221,20 @@ bool binary_expression::is_const_eval(cg::context& ctx) const
         return false;
     }
 
-    return lhs->is_const_eval(ctx) && rhs->is_const_eval(ctx);
+    if(!ctx.has_expression_constant(*lhs) || !ctx.has_expression_constant(*rhs))
+    {
+        // visit the nodes to get whether this expression is a compile time constant.
+        visit_nodes(
+          [&ctx](const ast::expression& node)
+          {
+              ctx.set_expression_constant(node, node.is_const_eval(ctx));
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+    }
+
+    return ctx.get_expression_constant(*lhs) && ctx.get_expression_constant(*rhs);
 }
 
 std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
@@ -408,6 +421,19 @@ bool unary_expression::is_const_eval(cg::context& ctx) const
     if(op.s != "+" && op.s != "-" && op.s != "!" && op.s != "~")
     {
         return false;
+    }
+
+    if(!ctx.has_expression_constant(*operand))
+    {
+        // visit the nodes to get whether this expression is a compile time constant.
+        visit_nodes(
+          [&ctx](const ast::expression& node)
+          {
+              ctx.set_expression_constant(node, node.is_const_eval(ctx));
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
     }
 
     return operand->is_const_eval(ctx);
