@@ -2201,32 +2201,82 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
         throw cg::codegen_error(loc, "Cannot store into new expression.");
     }
 
-    if(type.s == "void")
+    token type_name = type_expr->get_name();
+    if(ty::is_builtin_type(type_name.s) && type_expr->get_namespace_path().has_value())
     {
-        throw cg::codegen_error(loc, "Cannot create array with entries of type 'void'.");
-    }
-    else if(!ty::is_builtin_type(type.s))
-    {
-        throw cg::codegen_error(loc, fmt::format("Cannot create array with entries of non-builtin type '{}'.", type.s));
+        throw cg::codegen_error(
+          loc,
+          "Cannot use namespaces with built-in types.");
     }
 
+    if(type_name.s == "void")
+    {
+        throw cg::codegen_error(
+          loc,
+          "Cannot create array with entries of type 'void'.");
+    }
+    else if(!ty::is_builtin_type(type_name.s))
+    {
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot create array with entries of non-builtin type '{}'.",
+            type_expr->get_namespace_path().has_value()
+              ? fmt::format("{}::{}", *type_expr->get_namespace_path(), type_name.s)
+              : type_name.s));
+    }
+
+    // generate array size.
     std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::load);
     if(v->get_type().get_type_class() != cg::type_class::i32)
     {
-        throw cg::codegen_error(loc, fmt::format("Expected <integer> as array size, got '{}'.", v->get_type().to_string()));
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Expected <integer> as array size, got '{}'.",
+            v->get_type().to_string()));
     }
 
-    ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type.s), 0}});
+    // TODO Implement for non built-in types.
 
-    return std::make_unique<cg::value>(cg::type{cg::to_type_class(type.s), 1});
+    ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type_name.s), 0}});
+    return std::make_unique<cg::value>(cg::type{cg::to_type_class(type_name.s), 1});
 }
 
 std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
 {
+    token type_name = type_expr->get_name();
+    if(ty::is_builtin_type(type_name.s) && type_expr->get_namespace_path().has_value())
+    {
+        throw cg::codegen_error(
+          loc,
+          "Cannot use namespaces with built-in types.");
+    }
+
+    if(!ty::is_builtin_type(type_name.s))
+    {
+        throw ty::type_error(
+          type_name.location,
+          fmt::format(
+            "Invalid type '{}' for new expression. Only built-in types 'i32', 'f32' and 'str' are supported.",
+            type_expr->get_namespace_path().has_value()
+              ? fmt::format("{}::{}", *type_expr->get_namespace_path(), type_name.s)
+              : type_name.s));
+    }
+
+    if(type_name.s == "void")
+    {
+        throw ty::type_error(
+          type_name.location,
+          "Cannot use operator new with type 'void'.");
+    }
+
     auto array_size_type = expr->type_check(ctx);
     if(!array_size_type.has_value())
     {
-        throw ty::type_error(expr->get_location(), "Array size expression has no type.");
+        throw ty::type_error(
+          expr->get_location(),
+          "Array size expression has no type.");
     }
 
     if(ty::to_string(*array_size_type) != "i32")
@@ -2238,17 +2288,7 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
             ty::to_string(*array_size_type)));
     }
 
-    if(!ty::is_builtin_type(type.s))
-    {
-        throw ty::type_error(type.location, fmt::format("Invalid type '{}' for new expression.", type.s));
-    }
-
-    if(type.s == "void")
-    {
-        throw ty::type_error(type.location, "Cannot use operator new with type 'void'.");
-    }
-
-    expr_type = ctx.get_type(type.s, true);
+    expr_type = ctx.get_type(type_name.s, true);
     ctx.set_expression_type(this, *expr_type);
 
     return expr_type;
@@ -2256,7 +2296,7 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
 
 std::string new_expression::to_string() const
 {
-    return fmt::format("NewExpression(type={}, expr={})", type.s, expr->to_string());
+    return fmt::format("NewExpression(type={}, expr={})", type_expr->to_string(), expr->to_string());
 }
 
 /*

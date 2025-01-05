@@ -1303,8 +1303,8 @@ public:
 
 class new_expression : public expression
 {
-    /** The type. */
-    token type;
+    /** The type expression. */
+    std::unique_ptr<type_expression> type_expr;
 
     /** Array length expression. */
     std::unique_ptr<expression> expr;
@@ -1331,9 +1331,12 @@ public:
      * @param type The type to be allocated.
      * @param expr The array length expression.
      */
-    new_expression(token_location loc, token type, std::unique_ptr<expression> expr)
+    new_expression(
+      token_location loc,
+      std::unique_ptr<type_expression> type_expr,
+      std::unique_ptr<expression> expr)
     : expression{std::move(loc)}
-    , type{std::move(type)}
+    , type_expr{std::move(type_expr)}
     , expr{std::move(expr)}
     {
     }

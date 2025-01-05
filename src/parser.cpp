@@ -868,19 +868,13 @@ std::unique_ptr<ast::expression> parser::parse_unary()
     return std::make_unique<ast::unary_expression>(current_token->location, std::move(op), parse_unary());
 }
 
-// new_expr ::= 'new' identifier '[' expr ']'
+// new_expr ::= 'new' type_expr '[' expr ']'
 std::unique_ptr<ast::expression> parser::parse_new()
 {
     token new_token = *current_token;
     get_next_token();
 
-    if(current_token->type != token_type::identifier)
-    {
-        throw syntax_error(*current_token, fmt::format("Expected <identifier> got '{}'.", current_token->s));
-    }
-    token type = *current_token;
-    get_next_token();
-
+    auto type_expr = parse_type();
     if(current_token->s != "[")
     {
         throw syntax_error(*current_token, fmt::format("Expected '[', got '{}'.", current_token->s));
@@ -895,7 +889,7 @@ std::unique_ptr<ast::expression> parser::parse_new()
     }
     get_next_token();    // skip "]"
 
-    return std::make_unique<ast::new_expression>(current_token->location, std::move(type), std::move(expr));
+    return std::make_unique<ast::new_expression>(current_token->location, std::move(type_expr), std::move(expr));
 }
 
 // identifierexpr ::= identifier
