@@ -10,7 +10,7 @@
 
 #include <fmt/core.h>
 
-#include "token.h"
+#include "ast.h"
 #include "codegen.h"
 #include "module.h"
 #include "opcodes.h"
@@ -973,6 +973,31 @@ value context::get_struct_member(
     }
 
     return it->second;
+}
+
+/*
+ * Compile-time expression evaluation.
+ */
+
+void context::set_expression_constant(const ast::expression& expr, bool is_constant)
+{
+    constant_expressions[&expr] = is_constant;
+}
+
+bool context::get_expression_constant(const ast::expression& expr) const
+{
+    auto it = constant_expressions.find(&expr);
+    if(it == constant_expressions.end())
+    {
+        throw codegen_error(expr.get_location(), "Expression is not known to be constant.");
+    }
+
+    return it->second;
+}
+
+bool context::has_expression_constant(const ast::expression& expr) const
+{
+    return constant_expressions.find(&expr) != constant_expressions.end();
 }
 
 /*

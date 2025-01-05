@@ -24,13 +24,20 @@
 #include "directive.h"
 #include "module.h"
 
-/* Forward declarations. */
+/*
+ * Forward declarations.
+ */
 
 namespace slang
 {
 class instruction_emitter;  /* emitter.h */
 class export_table_builder; /* emitter.h */
 }    // namespace slang
+
+namespace slang::ast
+{
+class expression; /* ast.h */
+}    // namespace slang::ast
 
 namespace slang::codegen
 {
@@ -1837,6 +1844,9 @@ class context
     /** Holds the array type when declaring an array. */
     std::optional<value> array_type = std::nullopt;
 
+    /** Expressions that are known to be compile-time constant. */
+    std::unordered_map<const ast::expression*, bool> constant_expressions;
+
 protected:
     /**
      * Check that the insertion point is not null.
@@ -2422,6 +2432,35 @@ public:
     {
         return basic_block_brk_cnt.size();
     }
+
+    /*
+     * Compile-time expression evaluation.
+     */
+
+    /**
+     * Set an expression's compile-time constancy info.
+     *
+     * @param expr The expression.
+     * @param is_constant Whether the expression is constant.
+     */
+    void set_expression_constant(const ast::expression& expr, bool is_constant = true);
+
+    /**
+     * Get an expression's compile-time constancy info.
+     *
+     * @param expr The expression.
+     * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
+     * @throws Throws a `codegen_error` if the expression is not known.
+     */
+    bool get_expression_constant(const ast::expression& expr) const;
+
+    /**
+     * Check if an expression is known to be compile-time constant.
+     *
+     * @param expr The expression.
+     * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
+     */
+    bool has_expression_constant(const ast::expression& expr) const;
 
     /*
      * Code generation.
