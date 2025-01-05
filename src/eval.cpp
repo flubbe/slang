@@ -22,46 +22,6 @@ namespace slang::ast
 {
 
 /*
- * helper functions.
- */
-
-/**
- * Check whether all child expressions are a constant expression.
- *
- * @param expr The expression to check.
- * @param ctx The context in which to check.
- * @returns `true` if the expression is a constant expression, `false` otherwise.
- */
-static bool check_children_const_eval(const expression& expr, cg::context& ctx)
-{
-    bool ret_const_eval = true;
-    expr.visit_nodes(
-      [&ctx, &ret_const_eval](const expression& expr) -> void
-      {
-          bool expr_const = false;
-          if(!ctx.has_expression_constant(expr))
-          {
-              expr_const = expr.is_const_eval(ctx);
-              ctx.set_expression_constant(expr, expr_const);
-          }
-          else
-          {
-              expr_const = ctx.get_expression_constant(expr);
-          }
-
-          if(!expr_const)
-          {
-              ret_const_eval = false;
-          }
-      },
-      false, /* don't visit this node */
-      true   /* post-order traversal */
-    );
-
-    return ret_const_eval;
-}
-
-/*
  * literal_expression.
  */
 
@@ -261,7 +221,7 @@ bool binary_expression::is_const_eval(cg::context& ctx) const
         return false;
     }
 
-    return check_children_const_eval(*this, ctx);
+    return lhs->is_const_eval(ctx) && rhs->is_const_eval(ctx);
 }
 
 std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
@@ -450,7 +410,7 @@ bool unary_expression::is_const_eval(cg::context& ctx) const
         return false;
     }
 
-    return check_children_const_eval(*this, ctx);
+    return operand->is_const_eval(ctx);
 }
 
 std::unique_ptr<cg::value> unary_expression::evaluate(cg::context& ctx) const
