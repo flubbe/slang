@@ -412,7 +412,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
             emit(instruction_buffer, *str_opcode);
         }
-        else if(v->get_type().is_reference())
+        else if(v->get_type().is_reference() || v->get_type().is_null())
         {
             if(!ref_opcode.has_value())
             {
