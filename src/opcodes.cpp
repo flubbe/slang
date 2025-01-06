@@ -26,9 +26,11 @@ std::string to_string(opcode op)
     case opcode::iload: return "iload";
     case opcode::fload: return "fload";
     case opcode::aload: return "aload";
+    case opcode::aaload: return "aaload";
     case opcode::istore: return "istore";
     case opcode::fstore: return "fstore";
     case opcode::astore: return "astore";
+    case opcode::aastore: return "aastore";
     case opcode::iaload: return "iaload";
     case opcode::faload: return "faload";
     case opcode::saload: return "saload";
@@ -54,6 +56,7 @@ std::string to_string(opcode op)
     case opcode::invoke: return "invoke";
     case opcode::new_: return "new";
     case opcode::newarray: return "newarray";
+    case opcode::anewarray: return "anewarray";
     case opcode::arraylength: return "arraylength";
     case opcode::checkcast: return "checkcast";
     case opcode::ret: return "ret";

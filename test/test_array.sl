@@ -1,6 +1,6 @@
 import std;
 
-fn main(args: [str]) -> i32 {
+fn test_builtin() -> void {
     let strs: [str] = [
         "This", "is", "a", "loop!"
     ];
@@ -14,6 +14,23 @@ fn main(args: [str]) -> i32 {
     }
 
     std::assert(i == strs.length, "i == strs.length");
+}
+
+fn test_custom() -> void {
+    let arr: [std::i32s] = new std::i32s[2];
+
+    std::assert(arr.length == 2, "arr.length == 2");
+
+    arr[0] = std::i32s{value: 123};
+    arr[1] = std::i32s{value: 321};
+
+    std::assert(arr[0].value == 123, "arr[0].value == 123");
+    std::assert(arr[1].value == 321, "arr[1].value == 321");
+}
+
+fn main(args: [str]) -> i32 {
+    test_builtin();
+    test_custom();
 
     return 0;
 }

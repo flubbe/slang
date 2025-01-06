@@ -527,16 +527,18 @@ std::int32_t module_loader::decode_instruction(
     case opcode::faload:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*));
-    case opcode::saload:
+    case opcode::saload: [[fallthrough]];
+    case opcode::aaload:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(std::string*));
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(void*));
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
-    case opcode::sastore:
+    case opcode::sastore: [[fallthrough]];
+    case opcode::aastore:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(std::string*));
+        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(void*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
     case opcode::isub: [[fallthrough]];
@@ -895,6 +897,78 @@ std::int32_t module_loader::decode_instruction(
             auto properties = get_type_properties(exp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+
+            recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
+        }
+
+        return static_cast<std::int32_t>(sizeof(void*));
+    }
+    /* anewarray. */
+    case opcode::anewarray:
+    {
+        vle_int i;
+        ar & i;
+
+        if(i.i < 0)
+        {
+            // imported type.
+            std::size_t import_index = -i.i - 1;
+            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Import index {} out of range ({} >= {}).",
+                  import_index, import_index, mod.header.imports.size()));
+            }
+
+            auto& imp_symbol = mod.header.imports[import_index];
+            if(imp_symbol.type != module_::symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Import header entry at index {} is not a type.",
+                  import_index));
+            }
+
+            if(imp_symbol.package_index >= mod.header.imports.size())
+            {
+                throw interpreter_error(fmt::format(
+                  "Package import index {} out of range ({} >= {}).",
+                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+            }
+
+            auto& imp_package = mod.header.imports[imp_symbol.package_index];
+            if(imp_package.type != module_::symbol_type::package)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve package: Import header entry at index {} is not a package.",
+                  imp_symbol.package_index));
+            }
+
+            module_loader* loader = ctx.resolve_module(imp_package.name);
+            auto properties = loader->get_type_properties(imp_symbol.name);
+            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+
+            recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
+        }
+        else
+        {
+            // exported type.
+
+            if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
+            {
+                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).",
+                                                    i.i, i.i, mod.header.exports.size()));
+            }
+
+            auto& exp_symbol = mod.header.exports[i.i];
+            if(exp_symbol.type != module_::symbol_type::type)
+            {
+                throw interpreter_error(fmt::format(
+                  "Cannot resolve type: Export header entry at index {} is not a type.",
+                  i.i));
+            }
+
+            auto properties = get_type_properties(exp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
 
             recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);

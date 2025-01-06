@@ -134,7 +134,12 @@ struct gc_object
     }
 
     /** Create an object with a given size. */
-    static gc_object from(void* obj, std::size_t size, std::size_t alignment, std::uint8_t flags = of_none, std::vector<std::size_t>* layout = nullptr)
+    static gc_object from(
+      void* obj,
+      std::size_t size,
+      std::size_t alignment,
+      std::uint8_t flags = of_none,
+      std::vector<std::size_t>* layout = nullptr)
     {
         return {gc_object_type::obj, layout, size, alignment, flags, obj};
     }
@@ -142,7 +147,9 @@ struct gc_object
 
 template<>
 inline gc_object gc_object::from<std::string>(
-  std::string* obj, std::uint8_t flags, std::vector<std::size_t>* layout)
+  std::string* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
 {
     if(layout != nullptr)
     {
@@ -158,7 +165,9 @@ inline gc_object gc_object::from<std::string>(
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
-  si::fixed_vector<std::int32_t>* obj, std::uint8_t flags, std::vector<std::size_t>* layout)
+  si::fixed_vector<std::int32_t>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
 {
     if(layout != nullptr)
     {
@@ -174,7 +183,9 @@ inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<float>>(
-  si::fixed_vector<float>* obj, std::uint8_t flags, std::vector<std::size_t>* layout)
+  si::fixed_vector<float>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
 {
     if(layout != nullptr)
     {
@@ -190,7 +201,9 @@ inline gc_object gc_object::from<si::fixed_vector<float>>(
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
-  si::fixed_vector<std::string*>* obj, std::uint8_t flags, std::vector<std::size_t>* layout)
+  si::fixed_vector<std::string*>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
 {
     if(layout != nullptr)
     {
@@ -206,15 +219,17 @@ inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<void*>>(
-  si::fixed_vector<void*>* obj, std::uint8_t flags, std::vector<std::size_t>* layout)
+  si::fixed_vector<void*>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
 {
-    if(layout != nullptr)
+    if(layout == nullptr)
     {
-        throw gc_error("Invalid function call: Tried to create object array with a type layout.");
+        throw gc_error("Invalid function call: Tried to create object array without a type layout.");
     }
 
     return {gc_object_type::array_aref,
-            nullptr,
+            layout,
             sizeof(si::fixed_vector<void*>),
             std::alignment_of_v<si::fixed_vector<void*>>,
             flags, obj};
@@ -300,7 +315,9 @@ public:
      * @returns Returns a (pointer to a) garbage collected variable.
      */
     template<typename T>
-    T* gc_new(std::uint32_t flags = gc_object::of_none, bool add = true)
+    T* gc_new(
+      std::uint32_t flags = gc_object::of_none,
+      bool add = true)
     {
         allocated_bytes += sizeof(T);
 
@@ -334,11 +351,12 @@ public:
      * @param add Whether to add the object to the root set or temporary set (depending on the flags).
      * @returns Returns a (pointer to a) garbage collected variable.
      */
-    void* gc_new(std::size_t layout_id,
-                 std::size_t size,
-                 std::size_t alignment,
-                 std::uint32_t flags = gc_object::of_none,
-                 bool add = true)
+    void* gc_new(
+      std::size_t layout_id,
+      std::size_t size,
+      std::size_t alignment,
+      std::uint32_t flags = gc_object::of_none,
+      bool add = true)
     {
         allocated_bytes += size;
 
@@ -389,6 +407,40 @@ public:
             return static_cast<si::fixed_vector<T>*>(add_temporary(array));
         }
         return static_cast<si::fixed_vector<T>*>(add_root(array));
+    }
+
+    /**
+     * Allocate a new garbage collected array and add it to the root set.
+     *
+     * @param layout_id Layout identifier for an element.
+     * @param length The array length.
+     * @param flags Flags.
+     * @returns Returns a (pointer to a) garbage collected array.
+     */
+    si::fixed_vector<void*>* gc_new_array(
+      std::size_t layout_id,
+      std::size_t length,
+      std::uint32_t flags = gc_object::of_none)
+    {
+        auto array = new si::fixed_vector<void*>(length);
+        assert(array->size() == length);
+
+        auto layout_it = type_layouts.find(layout_id);
+        if(layout_it == type_layouts.end())
+        {
+            throw gc_error("Tried to create object with unknown type layout index.");
+        }
+        // note: references to elements remain valid after insert/emplace (but may invalidate iterators).
+
+        objects.insert({array, gc_object::from(array, flags, &layout_it->second.second)});
+
+        allocated_bytes += sizeof(si::fixed_vector<void*>);
+
+        if(flags & gc_object::of_temporary)
+        {
+            return static_cast<si::fixed_vector<void*>*>(add_temporary(array));
+        }
+        return static_cast<si::fixed_vector<void*>*>(add_root(array));
     }
 
     /**

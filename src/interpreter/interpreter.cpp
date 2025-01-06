@@ -511,10 +511,11 @@ opcode context::exec(
                 frame.stack.push_f32((*arr)[array_index]);
                 break;
             } /* opcode::faload */
-            case opcode::saload:
+            case opcode::saload: [[fallthrough]];
+            case opcode::aaload:
             {
                 std::int32_t array_index = frame.stack.pop_i32();
-                fixed_vector<std::string*>* arr = frame.stack.pop_addr<fixed_vector<std::string*>>();
+                fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 gc.remove_temporary(arr);
 
@@ -528,7 +529,7 @@ opcode context::exec(
 
                 frame.stack.push_addr(obj);
                 break;
-            } /* opcode::saload */
+            } /* opcode::saload, opcode::aaload */
             case opcode::iastore:
             {
                 std::int32_t v = frame.stack.pop_i32();
@@ -561,13 +562,14 @@ opcode context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::fastore */
-            case opcode::sastore:
+            case opcode::sastore: [[fallthrough]];
+            case opcode::aastore:
             {
-                std::string* s = frame.stack.pop_addr<std::string>();
+                void* obj = frame.stack.pop_addr<void>();
                 std::int32_t index = frame.stack.pop_i32();
-                fixed_vector<std::string*>* arr = frame.stack.pop_addr<fixed_vector<std::string*>>();
+                fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
-                gc.remove_temporary(s);
+                gc.remove_temporary(obj);
                 gc.remove_temporary(arr);
 
                 if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
@@ -575,10 +577,10 @@ opcode context::exec(
                     throw interpreter_error("Out of bounds array access.");
                 }
 
-                (*arr)[index] = s;
+                (*arr)[index] = obj;
 
                 break;
-            } /* opcode::sastore */
+            } /* opcode::sastore, opcode::aastore */
             case opcode::iload: [[fallthrough]];
             case opcode::fload:
             {
@@ -787,6 +789,21 @@ opcode context::exec(
 
                 break;
             } /* opcode::newarray */
+            case opcode::anewarray:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                std::size_t layout_id = read_unchecked<std::size_t>(binary, offset);
+
+                std::int32_t length = frame.stack.pop_i32();
+                if(length < 0)
+                {
+                    throw interpreter_error(fmt::format("Invalid array length '{}'.", length));
+                }
+
+                frame.stack.push_addr(gc.gc_new_array(layout_id, length, gc::gc_object::of_temporary));
+
+                break;
+            } /* opcode::anewarray */
             case opcode::arraylength:
             {
                 // convert to any fixed_vector type.

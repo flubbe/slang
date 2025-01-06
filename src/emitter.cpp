@@ -556,11 +556,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "load_element")
     {
-        emit_typed(opcode::iaload, opcode::faload, opcode::saload);
+        emit_typed(opcode::iaload, opcode::faload, opcode::saload, std::nullopt, opcode::aaload);
     }
     else if(name == "store_element")
     {
-        emit_typed(opcode::iastore, opcode::fastore, opcode::sastore);
+        emit_typed(opcode::iastore, opcode::fastore, opcode::sastore, std::nullopt, opcode::aastore);
     }
     else if(name == "dup")
     {
@@ -881,7 +881,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         emit(instruction_buffer, opcode::jmp);
         instruction_buffer & index;
     }
-    else if(name == "new")
+    else if(name == "new" || name == "anewarray")
     {
         expect_arg_size(1);
 
@@ -928,7 +928,19 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             throw emitter_error(fmt::format("Type '{}' not found.", type.to_string()));
         }
 
-        emit(instruction_buffer, opcode::new_);
+        if(name == "new")
+        {
+            emit(instruction_buffer, opcode::new_);
+        }
+        else if(name == "anewarray")
+        {
+            emit(instruction_buffer, opcode::anewarray);
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Unknown instruction '{}'.", name));
+        }
+
         instruction_buffer & struct_index;
     }
     else if(name == "newarray")
@@ -950,10 +962,6 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         else if(type_class == cg::type_class::str)
         {
             type = module_::array_type::str;
-        }
-        else if(type_class == cg::type_class::struct_)
-        {
-            type = module_::array_type::ref;
         }
         else
         {

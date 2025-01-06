@@ -1202,6 +1202,15 @@ void context::generate_newarray(value vt)
     insertion_point->add_instruction(std::make_unique<instruction>("newarray", std::move(args)));
 }
 
+void context::generate_anewarray(value vt)
+{
+    array_type = vt;
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(vt));
+    insertion_point->add_instruction(std::make_unique<instruction>("anewarray", std::move(args)));
+}
+
 void context::generate_pop(value vt)
 {
     validate_insertion_point();

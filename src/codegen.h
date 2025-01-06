@@ -2598,11 +2598,18 @@ public:
     void generate_new(value vt);
 
     /**
-     * Create a new array of the given type.
+     * Create a new array of a given built-in type.
      *
      * @param vt The array type.
      */
     void generate_newarray(value vt);
+
+    /**
+     * Create a new array of a given custom type.
+     *
+     * @param vt The array type.
+     */
+    void generate_anewarray(value vt);
 
     /**
      * Pop a value from the stack.
