@@ -556,11 +556,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "load_element")
     {
-        emit_typed(opcode::iaload, opcode::faload, opcode::saload, std::nullopt, opcode::aaload);
+        emit_typed(opcode::iaload, opcode::faload, opcode::aaload, std::nullopt, opcode::aaload);
     }
     else if(name == "store_element")
     {
-        emit_typed(opcode::iastore, opcode::fastore, opcode::sastore, std::nullopt, opcode::aastore);
+        emit_typed(opcode::iastore, opcode::fastore, opcode::aastore, std::nullopt, opcode::aastore);
     }
     else if(name == "dup")
     {

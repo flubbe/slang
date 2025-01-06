@@ -511,7 +511,6 @@ opcode context::exec(
                 frame.stack.push_f32((*arr)[array_index]);
                 break;
             } /* opcode::faload */
-            case opcode::saload: [[fallthrough]];
             case opcode::aaload:
             {
                 std::int32_t array_index = frame.stack.pop_i32();
@@ -529,7 +528,7 @@ opcode context::exec(
 
                 frame.stack.push_addr(obj);
                 break;
-            } /* opcode::saload, opcode::aaload */
+            } /* opcode::aaload */
             case opcode::iastore:
             {
                 std::int32_t v = frame.stack.pop_i32();
@@ -562,7 +561,6 @@ opcode context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::fastore */
-            case opcode::sastore: [[fallthrough]];
             case opcode::aastore:
             {
                 void* obj = frame.stack.pop_addr<void>();
@@ -580,7 +578,7 @@ opcode context::exec(
                 (*arr)[index] = obj;
 
                 break;
-            } /* opcode::sastore, opcode::aastore */
+            } /* opcode::aastore */
             case opcode::iload: [[fallthrough]];
             case opcode::fload:
             {

@@ -527,7 +527,6 @@ std::int32_t module_loader::decode_instruction(
     case opcode::faload:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*));
-    case opcode::saload: [[fallthrough]];
     case opcode::aaload:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(void*));
@@ -535,7 +534,6 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fastore:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
-    case opcode::sastore: [[fallthrough]];
     case opcode::aastore:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(void*));

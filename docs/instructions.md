@@ -11,13 +11,13 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 - `aload`: Load address from variable onto stack.
 - `iaload`: Load `i32` from array onto stack.
 - `faload`: Load `f32` from array onto stack.
-- `saload`: Load `str` from array onto stack.
+- `aaload`: Load address from array onto stack.
 - `istore`: Store `i32` from stack into variable.
 - `fstore`: Store `f32` from stack into variable.
 - `astore`: Store address from stack into variable.
 - `iastore`: Store `i32` from stack into array.
 - `fastore`: Store `f32` from stack into array.
-- `sastore`: Store `str` from stack into array.
+- `aastore`: Store address from stack into array.
 - `idup`: Duplicate top `i32` of the stack. 
 - `fdup`: Duplicate top `f32` of the stack.
 - `adup`: Duplicate top address of the stack.
