@@ -340,6 +340,22 @@ opcode context::exec(
                 }
                 break;
             } /* opcode::dup_x1 */
+            case opcode::dup_x2:
+            {
+                std::size_t size1 = read_unchecked<std::size_t>(binary, offset);
+                std::size_t size2 = read_unchecked<std::size_t>(binary, offset);
+                std::size_t size3 = read_unchecked<std::size_t>(binary, offset);
+                std::uint8_t needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+                frame.stack.dup_x2(size1, size2, size3);
+
+                if(needs_gc)
+                {
+                    void* addr;
+                    std::memcpy(&addr, frame.stack.end(2 * size1 + size2 + size3), size1);
+                    gc.add_temporary(addr);
+                }
+                break;
+            } /* opcode::dup_x2 */
             case opcode::pop:
             {
                 frame.stack.pop_i32();

@@ -1798,7 +1798,25 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
+            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
+            {
+                ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else if(
+              rhs_value->get_type().is_array()
+              || rhs_value->get_type().is_reference()
+              || rhs_value->get_type().is_null())
+            {
+                ctx.generate_dup(
+                  {cg::value{cg::type{cg::type_class::addr, 0}}},
+                  {cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format("Unexpected type '{}' when generating dup instruction.", rhs_value->to_string()));
+            }
         }
 
         // by the above check, lhs is an access_expression.
@@ -1819,9 +1837,27 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            ctx.generate_dup(*rhs_value,
-                             {cg::value{cg::type{cg::type_class::i32, 0}},
-                              cg::value{cg::type{cg::type_class::addr, 0}}});
+            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
+            {
+                ctx.generate_dup(*rhs_value,
+                                 {cg::value{cg::type{cg::type_class::i32, 0}},
+                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else if(
+              rhs_value->get_type().is_array()
+              || rhs_value->get_type().is_reference()
+              || rhs_value->get_type().is_null())
+            {
+                ctx.generate_dup(cg::value{cg::type{cg::type_class::addr, 0}},
+                                 {cg::value{cg::type{cg::type_class::i32, 0}},
+                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format("Unexpected type '{}' when generating dup instruction.", rhs_value->to_string()));
+            }
         }
 
         ctx.generate_store(

@@ -692,7 +692,35 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2));
         return static_cast<std::int32_t>(properties1.size);
     }
-    /* invoke. */
+    /* dup_x2. */
+    case opcode::dup_x2:
+    {
+        // type arguments.
+        module_::variable_type t1, t2, t3;
+        ar & t1 & t2 & t3;
+
+        // "void" is not allowed.
+        if(t1.base_type() == "void" || t2.base_type() == "void" || t3.base_type() == "void")
+        {
+            throw interpreter_error("Error decoding dup_x2 instruction: Invalid argument type 'void'.");
+        }
+
+        // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
+        auto properties1 = get_type_properties(t1);
+        auto properties2 = get_type_properties(t2);
+        auto properties3 = get_type_properties(t3);
+
+        // check if the type needs garbage collection.
+        std::uint8_t needs_gc = is_garbage_collected(t1);
+
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties3.size), reinterpret_cast<std::byte*>(&properties3.size) + sizeof(properties3.size));
+        code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
+
+        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2), to_string(t3));
+        return static_cast<std::int32_t>(properties1.size);
+    } /* invoke. */
     case opcode::invoke:
     {
         vle_int i;

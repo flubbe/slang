@@ -41,6 +41,7 @@ enum class opcode : opcode_base
     fdup,        /** Duplicate top f32 of the stack. */
     adup,        /** Duplicate top address of the stack. */
     dup_x1,      /** Duplicate top stack element and push it 2 elements down the stack. */
+    dup_x2,      /** Duplicate top stack element and push it 3 elements down the stack. */
     pop,         /** Pop-discard a 4-byte value from the stack. */
     apop,        /** Pop-discard a reference from the stack. */
     iadd,        /** Add two i32 from the stack. */

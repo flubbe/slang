@@ -591,6 +591,11 @@ public:
     {
         fmt::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
     }
+
+    virtual void record(opcode instr, std::string s1, std::string s2, std::string s3) override
+    {
+        fmt::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
+    }
 };
 
 exec::exec(slang::package_manager& in_manager)

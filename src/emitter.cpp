@@ -586,6 +586,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             emit(instruction_buffer, opcode::dup_x1);
             instruction_buffer & v_type & s_type;
         }
+        else if(args.size() == 3)
+        {
+            // We intentionally do not resolve the types for the instruction, since
+            // we only need to know if it is a built-in type or an address.
+
+            // get the duplicated value.
+            cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
+            const cg::value* v = v_arg->get_value();
+            module_::variable_type v_type = v->get_type().to_string();
+
+            // get the stack arguments.
+            cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
+            module_::variable_type s_type1 = stack_arg->get_value()->get_type().to_string();
+
+            stack_arg = static_cast<cg::type_argument*>(args[2].get());
+            module_::variable_type s_type2 = stack_arg->get_value()->get_type().to_string();
+
+            // emit instruction.
+            emit(instruction_buffer, opcode::dup_x2);
+            instruction_buffer & v_type & s_type1 & s_type2;
+        }
         else
         {
             throw emitter_error(fmt::format("Unexpected argument count ({}) for 'dup'.", args.size()));
