@@ -37,9 +37,42 @@ fn test_custom() -> void {
     std::assert(arr[0].value == d.value, "arr[0].value == d.value");
 }
 
+fn g(i: i32) -> i32 {
+    return i + 1;
+}
+
+fn f(n: i32) -> [std::i32s] {
+    return new std::i32s[g(n) + 2];
+}
+
+fn test_custom2() -> void {
+    let arr: [std::i32s] = f(3);
+    std::assert(arr.length == 6, "arr.length == 6");
+
+    let i: i32 = 0;
+    while(i<arr.length - 1)
+    {
+        arr[i] = std::i32s{0};
+        arr[i].value = i;
+        i++;
+    }
+
+    arr[arr.length - 1] = std::i32s{0};
+    arr[arr.length - 1].value = 123;
+
+    i = 0;
+    while(i<arr.length - 1)
+    {
+        std::assert(arr[i].value == i, "arr[i].value == i");
+        i++;
+    }
+    std::assert(arr[arr.length - 1].value == 123, "arr[arr.length - 1].value == 123");
+}
+
 fn main(args: [str]) -> i32 {
     test_builtin();
     test_custom();
+    test_custom2();
 
     return 0;
 }

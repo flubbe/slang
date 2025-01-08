@@ -1481,6 +1481,8 @@ value context::invoke(const std::string& module_name, const std::string& functio
     }
     catch(interpreter_error& e)
     {
+        reset();
+
         // Update the error message with the stack trace.
         std::string buf = e.what();
 
@@ -1508,6 +1510,8 @@ value context::invoke(const module_loader& loader, const function& fn, std::vect
     }
     catch(interpreter_error& e)
     {
+        reset();
+
         // Update the error message with the stack trace.
         std::string buf = e.what();
 
