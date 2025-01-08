@@ -24,11 +24,20 @@ _tests: list[str] = [
 ]
 _expect_failure: list[str] = []
 
-_compile_only_tests: list[str] = ["test_const_assign_fail"]
-_compile_only_expect_failure: list[str] = ["test_const_assign_fail"]
+_compile_only_tests: list[str] = [
+    "test_array_fail1",
+    "test_array_fail2",
+    "test_const_assign_fail",
+]
+_compile_only_expect_failure: list[str] = [
+    "test_array_fail1",
+    "test_array_fail2",
+    "test_const_assign_fail",
+]
 
 _script_tests: list[str] = [
     "test_array",
+    "test_array_fail3",
     "test_cast",
     "test_cast_fail",
     "test_const_export",
@@ -40,7 +49,7 @@ _script_tests: list[str] = [
     "test_strings",
     "test_structs",
 ]
-_script_expect_failure: list[str] = ["test_cast_fail"]
+_script_expect_failure: list[str] = ["test_cast_fail", "test_array_fail3"]
 
 
 _lang_path = (_module_path / Path("..") / Path("lang")).absolute()
@@ -85,6 +94,9 @@ if __name__ == "__main__":
         f"---------- {len(retcodes)} tests ran, {len(retcodes) - len(failed_tests)} passed, {len(failed_tests)} failed ----------"
     )
 
+    passed_test_count: int = 0
+    failed_test_count: int = 0
+
     # compile-only tests.
     compile_info: list[tuple[int, str, str]] = []
     for test_name in _compile_only_tests:
@@ -123,6 +135,8 @@ if __name__ == "__main__":
         for idx, info in enumerate(compile_info)
         if info[0] != 0 and _compile_only_tests[idx] not in _compile_only_expect_failure
     ]
+    failed_test_count += len(failed_compilation)
+    passed_test_count += len(compile_info) - len(failed_compilation)
     if len(failed_compilation) > 0:
         for idx, info in failed_compilation:
             test_path = Path(f"test/{_script_tests[idx]}")
@@ -163,6 +177,8 @@ if __name__ == "__main__":
     failed_compilation = [
         (idx, info) for idx, info in enumerate(compile_info) if info[0] != 0
     ]
+    failed_test_count += len(failed_compilation)
+    passed_test_count += len(compile_info) - len(failed_compilation)
     if len(failed_compilation) > 0:
         for idx, info in failed_compilation:
             test_path = Path(f"test/{_script_tests[idx]}")
@@ -212,6 +228,8 @@ if __name__ == "__main__":
     script_failed_tests = [
         (idx, info) for idx, info in enumerate(script_info) if info[0] != 0
     ]
+    failed_test_count += len(script_failed_tests)
+    passed_test_count += len(script_info) - len(script_failed_tests)
     if len(script_failed_tests) > 0:
         for idx, info in script_failed_tests:
             test_path = Path(f"test/{_script_tests[idx]}")
@@ -223,7 +241,7 @@ if __name__ == "__main__":
                 print(f"Captured stderr:\n{info[2]}")
 
     print(
-        f"---------- {len(script_info)} tests ran, {len(script_info) - len(script_failed_tests)} passed, {len(script_failed_tests)} failed ----------"
+        f"---------- {passed_test_count + failed_test_count} tests ran, {passed_test_count} passed, {failed_test_count} failed ----------"
     )
 
-    exit(len(failed_tests) + len(script_failed_tests) != 0)
+    exit(failed_test_count == 0)

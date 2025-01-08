@@ -502,6 +502,11 @@ opcode context::exec(
                 std::int32_t array_index = frame.stack.pop_i32();
                 fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during iaload.");
+                }
+
                 gc.remove_temporary(arr);
 
                 if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
@@ -517,6 +522,11 @@ opcode context::exec(
                 std::int32_t array_index = frame.stack.pop_i32();
                 fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during faload.");
+                }
+
                 gc.remove_temporary(arr);
 
                 if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
@@ -531,6 +541,11 @@ opcode context::exec(
             {
                 std::int32_t array_index = frame.stack.pop_i32();
                 fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during aaload.");
+                }
 
                 gc.remove_temporary(arr);
 
@@ -551,6 +566,11 @@ opcode context::exec(
                 std::int32_t index = frame.stack.pop_i32();
                 fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during iastore.");
+                }
+
                 gc.remove_temporary(arr);
 
                 if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
@@ -567,6 +587,11 @@ opcode context::exec(
                 std::int32_t index = frame.stack.pop_i32();
                 fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during fastore.");
+                }
+
                 gc.remove_temporary(arr);
 
                 if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
@@ -582,6 +607,11 @@ opcode context::exec(
                 void* obj = frame.stack.pop_addr<void>();
                 std::int32_t index = frame.stack.pop_i32();
                 fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during aastore.");
+                }
 
                 gc.remove_temporary(obj);
                 gc.remove_temporary(arr);
@@ -924,6 +954,11 @@ opcode context::exec(
                 if((flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) == 0)
                 {
                     void* obj = frame.stack.pop_addr<void>();
+                    if(obj == nullptr)
+                    {
+                        throw interpreter_error("Null pointer access during checkcast.");
+                    }
+
                     std::size_t source_layout_id = gc.get_type_layout_id(obj);
 
                     if(target_layout_id != source_layout_id)
@@ -1330,8 +1365,11 @@ value context::exec(
     else if(ret_opcode == opcode::sret)
     {
         std::string* s = frame.stack.pop_addr<std::string>();
-        ret = value{*s};    // copy string
-        gc.remove_temporary(s);
+        if(s != nullptr)
+        {
+            ret = value{*s};    // copy string
+            gc.remove_temporary(s);
+        }
     }
     else if(ret_opcode == opcode::aret)
     {

@@ -34,7 +34,7 @@ fn test_custom() -> void {
     let d: std::i32s = std::i32s{value: 321};
 
     std::assert(arr[0] != d, "arr[0] != d");
-    std::assert(arr[0].value == d.value, "arr[0].value != d.value");
+    std::assert(arr[0].value == d.value, "arr[0].value == d.value");
 }
 
 fn main(args: [str]) -> i32 {
