@@ -931,6 +931,24 @@ TEST(interpreter, type_imports)
     }
 }
 
+TEST(interpreter, null_access)
+{
+    {
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+
+        si::context ctx{file_mgr};
+
+        si::value res;
+        ASSERT_NO_THROW(ctx.resolve_module("null_access"));
+        ASSERT_THROW(res = ctx.invoke("null_access", "main", {}), si::interpreter_error);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+}
+
 TEST(interpreter, multiple_modules)
 {
     slang::file_manager file_mgr;
