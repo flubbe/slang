@@ -199,7 +199,7 @@ protected:
     std::unique_ptr<ast::expression> parse_bin_op_rhs(int prec, std::unique_ptr<ast::expression> lhs);
 
     /** Parse a unary operator expression. */
-    std::unique_ptr<ast::expression> parse_unary();
+    std::unique_ptr<ast::expression> parse_unary(bool ignore_type_cast = false);
 
     /** Parse the new operator. */
     std::unique_ptr<ast::expression> parse_new();

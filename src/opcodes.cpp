@@ -31,10 +31,10 @@ std::string to_string(opcode op)
     case opcode::astore: return "astore";
     case opcode::iaload: return "iaload";
     case opcode::faload: return "faload";
-    case opcode::saload: return "saload";
+    case opcode::aaload: return "aaload";
     case opcode::iastore: return "iastore";
     case opcode::fastore: return "fastore";
-    case opcode::sastore: return "sastore";
+    case opcode::aastore: return "aastore";
     case opcode::iadd: return "iadd";
     case opcode::fadd: return "fadd";
     case opcode::isub: return "isub";
@@ -49,11 +49,13 @@ std::string to_string(opcode op)
     case opcode::fdup: return "fdup";
     case opcode::adup: return "adup";
     case opcode::dup_x1: return "dup_x1";
+    case opcode::dup_x2: return "dup_x2";
     case opcode::pop: return "pop";
     case opcode::apop: return "apop";
     case opcode::invoke: return "invoke";
     case opcode::new_: return "new";
     case opcode::newarray: return "newarray";
+    case opcode::anewarray: return "anewarray";
     case opcode::arraylength: return "arraylength";
     case opcode::checkcast: return "checkcast";
     case opcode::ret: return "ret";

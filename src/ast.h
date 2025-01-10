@@ -461,6 +461,12 @@ public:
         return type_name;
     }
 
+    /**
+     * Return the qualified type name, that is, the type name with its namespace path
+     * prepended, if not empty.
+     */
+    std::string get_qualified_name() const;
+
     /** Return the namespace path, or `std::nullopt` if empty. */
     std::optional<std::string> get_namespace_path() const;
 

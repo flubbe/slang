@@ -706,11 +706,6 @@ std::unique_ptr<ast::expression> parser::parse_primary()
         throw syntax_error(*current_token, fmt::format("Expected <primary-expression>, got '{}'.", current_token->s));
     }
 
-    if(current_token->s == "as")
-    {
-        expr = parse_type_cast_expression(std::move(expr));
-    }
-
     return expr;
 }
 
@@ -817,7 +812,8 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         token bin_op = *current_token;
         get_next_token();
 
-        std::unique_ptr<ast::expression> rhs = parse_unary();
+        bool is_access = (bin_op.s == ".");
+        std::unique_ptr<ast::expression> rhs = parse_unary(is_access);
 
         int next_prec = get_token_precedence();
         std::optional<associativity> assoc = get_token_associativity();
@@ -827,9 +823,14 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         }
 
         // special case for access expressions, since we treat them separately.
-        if(bin_op.s == ".")
+        if(is_access)
         {
             lhs = std::make_unique<ast::access_expression>(std::move(lhs), std::move(rhs));
+
+            if(current_token->s == "as")
+            {
+                lhs = parse_type_cast_expression(std::move(lhs));
+            }
         }
         else
         {
@@ -842,30 +843,42 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 //         | ('++' | '--' | '-' | '+' | '~' | '!') primary
 //         | 'new' primary
 //         | 'null'
-std::unique_ptr<ast::expression> parser::parse_unary()
+std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
 {
-    // parse the new operator.
+    std::unique_ptr<ast::expression> expr;
+
     if(current_token->s == "new")
     {
-        return parse_new();
+        // parse the new operator.
+        expr = parse_new();
     }
-
-    // parse 'null'.
-    if(current_token->s == "null")
+    else if(current_token->s == "null")
     {
+        // parse 'null'.
         get_next_token();
-        return std::make_unique<ast::null_expression>(current_token->location);
+        expr = std::make_unique<ast::null_expression>(current_token->location);
     }
-
-    // if we're not parsing a unary operator, it must be a primary expression.
-    token op = *current_token;
-    if(op.s != "++" && op.s != "--" && op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
+    else
     {
-        return parse_primary();
+        // if we're not parsing a unary operator, it must be a primary expression.
+        token op = *current_token;
+        if(op.s != "++" && op.s != "--" && op.s != "+" && op.s != "-" && op.s != "~" && op.s != "!")
+        {
+            expr = parse_primary();
+        }
+        else
+        {
+            get_next_token();
+            expr = std::make_unique<ast::unary_expression>(current_token->location, std::move(op), parse_unary());
+        }
     }
 
-    get_next_token();
-    return std::make_unique<ast::unary_expression>(current_token->location, std::move(op), parse_unary());
+    if(!ignore_type_cast && current_token->s == "as")
+    {
+        expr = parse_type_cast_expression(std::move(expr));
+    }
+
+    return expr;
 }
 
 // new_expr ::= 'new' type_expr '[' expr ']'

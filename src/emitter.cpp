@@ -412,7 +412,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
             emit(instruction_buffer, *str_opcode);
         }
-        else if(v->get_type().is_reference())
+        else if(v->get_type().is_reference() || v->get_type().is_null())
         {
             if(!ref_opcode.has_value())
             {
@@ -556,11 +556,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
     }
     else if(name == "load_element")
     {
-        emit_typed(opcode::iaload, opcode::faload, opcode::saload);
+        emit_typed(opcode::iaload, opcode::faload, opcode::aaload, std::nullopt, opcode::aaload);
     }
     else if(name == "store_element")
     {
-        emit_typed(opcode::iastore, opcode::fastore, opcode::sastore);
+        emit_typed(opcode::iastore, opcode::fastore, opcode::aastore, std::nullopt, opcode::aastore);
     }
     else if(name == "dup")
     {
@@ -585,6 +585,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x1);
             instruction_buffer & v_type & s_type;
+        }
+        else if(args.size() == 3)
+        {
+            // We intentionally do not resolve the types for the instruction, since
+            // we only need to know if it is a built-in type or an address.
+
+            // get the duplicated value.
+            cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
+            const cg::value* v = v_arg->get_value();
+            module_::variable_type v_type = v->get_type().to_string();
+
+            // get the stack arguments.
+            cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
+            module_::variable_type s_type1 = stack_arg->get_value()->get_type().to_string();
+
+            stack_arg = static_cast<cg::type_argument*>(args[2].get());
+            module_::variable_type s_type2 = stack_arg->get_value()->get_type().to_string();
+
+            // emit instruction.
+            emit(instruction_buffer, opcode::dup_x2);
+            instruction_buffer & v_type & s_type1 & s_type2;
         }
         else
         {
@@ -881,7 +902,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         emit(instruction_buffer, opcode::jmp);
         instruction_buffer & index;
     }
-    else if(name == "new")
+    else if(name == "new" || name == "anewarray")
     {
         expect_arg_size(1);
 
@@ -928,7 +949,19 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             throw emitter_error(fmt::format("Type '{}' not found.", type.to_string()));
         }
 
-        emit(instruction_buffer, opcode::new_);
+        if(name == "new")
+        {
+            emit(instruction_buffer, opcode::new_);
+        }
+        else if(name == "anewarray")
+        {
+            emit(instruction_buffer, opcode::anewarray);
+        }
+        else
+        {
+            throw std::runtime_error(fmt::format("Unknown instruction '{}'.", name));
+        }
+
         instruction_buffer & struct_index;
     }
     else if(name == "newarray")
@@ -950,10 +983,6 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         else if(type_class == cg::type_class::str)
         {
             type = module_::array_type::str;
-        }
-        else if(type_class == cg::type_class::struct_)
-        {
-            type = module_::array_type::ref;
         }
         else
         {

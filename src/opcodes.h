@@ -30,17 +30,18 @@ enum class opcode : opcode_base
     aload,       /** Load address from variable onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
-    saload,      /** Load str from array onto stack. */
+    aaload,      /** Load address from array onto stack. */
     istore,      /** Store i32 from stack into variable. */
     fstore,      /** Store f32 from stack into variable. */
     astore,      /** Store address from stack into variable. */
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */
-    sastore,     /** Store str from stack into array. */
+    aastore,     /** Store address from stack into array. */
     idup,        /** Duplicate top i32 of the stack. */
     fdup,        /** Duplicate top f32 of the stack. */
     adup,        /** Duplicate top address of the stack. */
     dup_x1,      /** Duplicate top stack element and push it 2 elements down the stack. */
+    dup_x2,      /** Duplicate top stack element and push it 3 elements down the stack. */
     pop,         /** Pop-discard a 4-byte value from the stack. */
     apop,        /** Pop-discard a reference from the stack. */
     iadd,        /** Add two i32 from the stack. */
@@ -56,7 +57,8 @@ enum class opcode : opcode_base
     f2i,         /** Convert a f32 into an i32. */
     invoke,      /** Invoke a function. */
     new_,        /** Create a new struct. */
-    newarray,    /** Create a new array for i32, f32 or references. */
+    newarray,    /** Create a new array for i32, f32. */
+    anewarray,   /** Create a new array for struct types. */
     arraylength, /** Return the length of an array. */
     checkcast,   /** Check if an object is of a given type. */
     ret,         /** Return void from a function. */

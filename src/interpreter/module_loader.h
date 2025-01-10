@@ -173,6 +173,22 @@ struct instruction_recorder
     virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::string s1, [[maybe_unused]] std::string s2)
     {
     }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
+     * @param s1 The first string parameter.
+     * @param s2 The second string parameter.
+     * @param s3 The third string parameter.
+     */
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::string s1,
+      [[maybe_unused]] std::string s2,
+      [[maybe_unused]] std::string s3)
+    {
+    }
 };
 
 /** A module loader. Represents a loaded module, and is associated to an interpreter context. */

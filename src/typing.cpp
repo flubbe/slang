@@ -37,7 +37,11 @@ type_info::type_info(
 {
     if(cls == type_class::tc_array)
     {
-        components = {std::make_shared<type_info>(base, type_class::tc_plain, std::nullopt)};
+        components = {std::make_shared<type_info>(
+          base,
+          type_class::tc_plain,
+          std::nullopt,
+          this->import_path)};
     }
     else
     {

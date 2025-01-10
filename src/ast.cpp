@@ -344,7 +344,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         {
             if(target_type->get_name().s == "str")
             {
-                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}, v->get_name());
+                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
             }
 
             auto cast_target_type = cg::type{
@@ -356,19 +356,19 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
             // casts between non-builtin types are checked at run-time.
             ctx.generate_checkcast(cast_target_type);
 
-            return std::make_unique<cg::value>(std::move(cast_target_type), v->get_name());
+            return std::make_unique<cg::value>(std::move(cast_target_type));
         }
 
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
     }
 
     // identity transformation.
     if(ty::is_builtin_type(target_type->to_string()))
     {
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
     }
 
-    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s}, v->get_name());
+    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
 }
 
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
@@ -770,7 +770,10 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
         }
 
         auto base_type = t.get_element_type();
-        expr_type = ctx.get_type(base_type->to_string(), base_type->is_array());
+        expr_type = ctx.get_type(
+          base_type->to_string(),
+          base_type->is_array(),
+          base_type->get_import_path());
         ctx.set_expression_type(this, *expr_type);
     }
     else
@@ -827,6 +830,16 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
 /*
  * type_expression.
  */
+
+std::string type_expression::get_qualified_name() const
+{
+    std::optional<std::string> namespace_path = get_namespace_path();
+    if(namespace_path.has_value())
+    {
+        return fmt::format("{}::{}", namespace_path.value(), type_name.s);
+    }
+    return type_name.s;
+}
 
 std::optional<std::string> type_expression::get_namespace_path() const
 {
@@ -1268,7 +1281,7 @@ std::string struct_definition_expression::to_string() const
         }
         ret += fmt::format("{}", members.back()->to_string());
     }
-    ret += ")";
+    ret += "))";
     return ret;
 }
 
@@ -1785,7 +1798,25 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
+            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
+            {
+                ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else if(
+              rhs_value->get_type().is_array()
+              || rhs_value->get_type().is_reference()
+              || rhs_value->get_type().is_null())
+            {
+                ctx.generate_dup(
+                  {cg::value{cg::type{cg::type_class::addr, 0}}},
+                  {cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format("Unexpected type '{}' when generating dup instruction.", rhs_value->to_string()));
+            }
         }
 
         // by the above check, lhs is an access_expression.
@@ -1806,9 +1837,27 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            ctx.generate_dup(*rhs_value,
-                             {cg::value{cg::type{cg::type_class::i32, 0}},
-                              cg::value{cg::type{cg::type_class::addr, 0}}});
+            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
+            {
+                ctx.generate_dup(*rhs_value,
+                                 {cg::value{cg::type{cg::type_class::i32, 0}},
+                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else if(
+              rhs_value->get_type().is_array()
+              || rhs_value->get_type().is_reference()
+              || rhs_value->get_type().is_null())
+            {
+                ctx.generate_dup(cg::value{cg::type{cg::type_class::addr, 0}},
+                                 {cg::value{cg::type{cg::type_class::i32, 0}},
+                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format("Unexpected type '{}' when generating dup instruction.", rhs_value->to_string()));
+            }
         }
 
         ctx.generate_store(
@@ -2215,16 +2264,6 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
           loc,
           "Cannot create array with entries of type 'void'.");
     }
-    else if(!ty::is_builtin_type(type_name.s))
-    {
-        throw cg::codegen_error(
-          loc,
-          fmt::format(
-            "Cannot create array with entries of non-builtin type '{}'.",
-            type_expr->get_namespace_path().has_value()
-              ? fmt::format("{}::{}", *type_expr->get_namespace_path(), type_name.s)
-              : type_name.s));
-    }
 
     // generate array size.
     std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::load);
@@ -2237,10 +2276,26 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
             v->get_type().to_string()));
     }
 
-    // TODO Implement for non built-in types.
+    if(ty::is_builtin_type(type_name.s))
+    {
+        ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type_name.s), 0}});
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(type_name.s), 1});
+    }
 
-    ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type_name.s), 0}});
-    return std::make_unique<cg::value>(cg::type{cg::to_type_class(type_name.s), 1});
+    // custom type.
+    ctx.generate_anewarray(
+      cg::value{
+        cg::type{
+          cg::type_class::struct_,
+          0,
+          type_expr->get_name().s,
+          type_expr->get_namespace_path()}});
+    return std::make_unique<cg::value>(
+      cg::type{
+        cg::type_class::struct_,
+        1,
+        type_expr->get_name().s,
+        type_expr->get_namespace_path()});
 }
 
 std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
@@ -2251,17 +2306,6 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
         throw cg::codegen_error(
           loc,
           "Cannot use namespaces with built-in types.");
-    }
-
-    if(!ty::is_builtin_type(type_name.s))
-    {
-        throw ty::type_error(
-          type_name.location,
-          fmt::format(
-            "Invalid type '{}' for new expression. Only built-in types 'i32', 'f32' and 'str' are supported.",
-            type_expr->get_namespace_path().has_value()
-              ? fmt::format("{}::{}", *type_expr->get_namespace_path(), type_name.s)
-              : type_name.s));
     }
 
     if(type_name.s == "void")
@@ -2288,7 +2332,7 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
             ty::to_string(*array_size_type)));
     }
 
-    expr_type = ctx.get_type(type_name.s, true);
+    expr_type = ctx.get_type(type_name.s, true, type_expr->get_namespace_path());
     ctx.set_expression_type(this, *expr_type);
 
     return expr_type;
