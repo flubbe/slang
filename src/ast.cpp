@@ -344,7 +344,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         {
             if(target_type->get_name().s == "str")
             {
-                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}, v->get_name());
+                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
             }
 
             auto cast_target_type = cg::type{
@@ -356,19 +356,19 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
             // casts between non-builtin types are checked at run-time.
             ctx.generate_checkcast(cast_target_type);
 
-            return std::make_unique<cg::value>(std::move(cast_target_type), v->get_name());
+            return std::make_unique<cg::value>(std::move(cast_target_type));
         }
 
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
     }
 
     // identity transformation.
     if(ty::is_builtin_type(target_type->to_string()))
     {
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0}, v->get_name());
+        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
     }
 
-    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s}, v->get_name());
+    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
 }
 
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
@@ -1281,7 +1281,7 @@ std::string struct_definition_expression::to_string() const
         }
         ret += fmt::format("{}", members.back()->to_string());
     }
-    ret += ")";
+    ret += "))";
     return ret;
 }
 

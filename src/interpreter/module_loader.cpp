@@ -1148,8 +1148,7 @@ std::int32_t module_loader::decode_instruction(
                   struct_index.i));
             }
 
-            module_loader* loader = ctx.resolve_module(exp_symbol.name);
-            auto properties = loader->get_type_properties(exp_symbol.name);
+            auto properties = get_type_properties(exp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
 
             recorder->record(static_cast<opcode>(instr), struct_index.i, exp_symbol.name);

@@ -1340,4 +1340,116 @@ TEST(parser, array_return)
     }
 }
 
+TEST(parser, struct_array_access)
+{
+    {
+        const std::string test_input =
+          "struct L{f: f32};\n"
+          "fn f() -> [i32] {\n"
+          " let l: [L] = new L[1];\n"
+          " l[0].f = 123.0;\n"
+          " return l[0].f as i32;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        // clang-format off
+        const std::string expected =
+        "Block("
+          "exprs=("
+            "Struct("
+              "name=L, "
+              "members=("
+                "VariableDeclaration("
+                  "name=f, "
+                  "type=TypeExpression("
+                    "name=f32, "
+                    "namespaces=(), "
+                    "array=false"
+                  "), "
+                  "expr=<none>"
+                ")"
+              ")"
+            "), "
+            "Function("
+              "prototype=Prototype("
+                "name=f, "
+                "return_type=TypeExpression("
+                  "name=i32, "
+                  "namespaces=(), "
+                  "array=true"
+                "), "
+                "args=()"
+              "), "
+              "body=Block("
+                "exprs=("
+                  "VariableDeclaration(name=l, "
+                    "type=TypeExpression("
+                      "name=L, "
+                      "namespaces=(), "
+                      "array=true"
+                    "), "
+                    "expr=NewExpression("
+                      "type=TypeExpression("
+                        "name=L, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=IntLiteral("
+                        "value=1"
+                      ")"
+                    ")"
+                  "), "
+                  "Binary("
+                    "op=\"=\", "
+                    "lhs=Access("
+                      "lhs=VariableReference("
+                        "name=l, "
+                        "element_expr=IntLiteral("
+                          "value=0"
+                        ")"
+                      "), "
+                      "rhs=VariableReference("
+                        "name=f"
+                      ")"
+                    "), "
+                    "rhs=FloatLiteral("
+                      "value=123"
+                    ")"
+                  "), "
+                  "Return("
+                    "expr=TypeCast("
+                      "target_type=TypeExpression("
+                        "name=i32, "
+                        "namespaces=(), "
+                        "array=false"
+                      "), "
+                      "expr=Access("
+                        "lhs=VariableReference("
+                          "name=l, "
+                          "element_expr=IntLiteral("
+                            "value=0"
+                          ")"
+                        "), "
+                        "rhs=VariableReference("
+                          "name=f"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")"
+        ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+}
+
 }    // namespace

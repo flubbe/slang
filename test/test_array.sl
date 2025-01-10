@@ -69,6 +69,26 @@ fn test_custom2() -> void {
     std::assert(arr[arr.length - 1].value == 123, "arr[arr.length - 1].value == 123");
 }
 
+struct L{
+    i: i32,
+    f: f32
+};
+
+fn test_local() -> void {
+    let arr: [L] = new L[3];
+    arr[0] = L{1, 2.0};
+    arr[1] = L{2, 3.0};
+    arr[2] = L{3, 4.0};
+
+    let t: std::type = arr[1] as std::type;
+
+    let k: f32 = (arr[0].i as f32) + arr[0].f
+        + ((t as L).i as f32) + (t as L).f
+        + (arr[2].i as f32) + arr[2].f;
+
+    std::assert(std::abs(k - 15.0) < 1e-6, "k == 15.0");
+}
+
 fn main(args: [str]) -> i32 {
     test_builtin();
     test_custom();
