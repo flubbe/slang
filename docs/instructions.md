@@ -39,6 +39,7 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 - `invoke`: Invoke a function.
 - `new`: Create a new struct.
 - `newarray`: Create a new array for `i32`, `f32` or references.
+- `anewarray`: Create a new array for struct types.
 - `arraylength`: Return the length of an array.
 - `checkcast`: Check if an object is of a given type.
 - `ret`: Return void from a function.
