@@ -89,10 +89,30 @@ fn test_local() -> void {
     std::assert(std::abs(k - 15.0) < 1e-6, "k == 15.0");
 }
 
+fn test_array_copy() -> void {
+    let arr1: [L] = new L[3];
+    arr1[0] = L{1, 2.0};
+    arr1[1] = L{2, 3.0};
+    arr1[2] = L{3, 4.0};
+
+    let arr2: [L] = new L[3];
+    std::array_copy(arr1, arr2);
+
+    std::assert(arr1 != arr2, "arr1 != arr2");
+    std::assert(arr1.length == arr2.length, "arr1.length == arr2.length");
+    std::assert(arr1[0].i == arr2[0].i, "arr1[0].i == arr2[0].i");
+    std::assert(arr1[0].f == arr2[0].f, "arr1[0].f == arr2[0].f");
+    std::assert(arr1[1].i == arr2[1].i, "arr1[1].i == arr2[1].i");
+    std::assert(arr1[1].f == arr2[1].f, "arr1[1].f == arr2[1].f");
+    std::assert(arr1[2].i == arr2[2].i, "arr1[2].i == arr2[2].i");
+    std::assert(arr1[2].f == arr2[2].f, "arr1[2].f == arr2[2].f");
+}
+
 fn main(args: [str]) -> i32 {
     test_builtin();
     test_custom();
     test_custom2();
+    test_array_copy();
 
     return 0;
 }
