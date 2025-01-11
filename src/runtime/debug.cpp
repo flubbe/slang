@@ -19,7 +19,7 @@ void assert_(si::context& ctx, si::operand_stack& stack)
     /*
      * note: the second argument was pushed last onto stack, so it's the first we pop.
      */
-    gc_object<std::string> msg_container = gc_pop(ctx, stack);
+    auto [msg_container] = get_args<gc_object<std::string>>(ctx, stack);
     std::int32_t condition = stack.pop_i32();
 
     if(condition == 0)

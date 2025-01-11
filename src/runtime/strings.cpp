@@ -20,8 +20,7 @@ namespace slang::runtime
 
 void string_equals(si::context& ctx, si::operand_stack& stack)
 {
-    gc_object<std::string> s1_container = gc_pop(ctx, stack);
-    gc_object<std::string> s2_container = gc_pop(ctx, stack);
+    auto [s1_container, s2_container] = get_args<gc_object<std::string>, gc_object<std::string>>(ctx, stack);
 
     std::string* s1 = s1_container.get();
     std::string* s2 = s2_container.get();
@@ -46,8 +45,7 @@ void string_equals(si::context& ctx, si::operand_stack& stack)
 
 void string_concat(si::context& ctx, si::operand_stack& stack)
 {
-    gc_object<std::string> s2_container = gc_pop(ctx, stack);
-    gc_object<std::string> s1_container = gc_pop(ctx, stack);
+    auto [s1_container, s2_container] = get_args<gc_object<std::string>, gc_object<std::string>>(ctx, stack);
 
     std::string* s1 = s1_container.get();
     std::string* s2 = s2_container.get();
@@ -75,7 +73,7 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
 
 void i32_to_string(si::context& ctx, si::operand_stack& stack)
 {
-    std::int32_t i = stack.pop_i32();
+    auto [i] = get_args<std::int32_t>(ctx, stack);
     std::string* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
     str->assign(fmt::format("{}", i));
     stack.push_addr<std::string>(str);
@@ -83,7 +81,7 @@ void i32_to_string(si::context& ctx, si::operand_stack& stack)
 
 void f32_to_string(si::context& ctx, si::operand_stack& stack)
 {
-    float f = stack.pop_f32();
+    auto [f] = get_args<float>(ctx, stack);
     std::string* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
     str->assign(fmt::format("{}", f));
     stack.push_addr<std::string>(str);
@@ -91,7 +89,7 @@ void f32_to_string(si::context& ctx, si::operand_stack& stack)
 
 void parse_i32(si::context& ctx, si::operand_stack& stack)
 {
-    gc_object<std::string> container = gc_pop(ctx, stack);
+    auto [container] = get_args<gc_object<std::string>>(ctx, stack);
     std::string* s = container.get();
 
     if(s == nullptr)
@@ -134,7 +132,7 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
 
 void parse_f32(si::context& ctx, si::operand_stack& stack)
 {
-    gc_object<std::string> container = gc_pop(ctx, stack);
+    auto [container] = get_args<gc_object<std::string>>(ctx, stack);
     std::string* s = container.get();
 
     if(s == nullptr)

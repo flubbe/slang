@@ -17,6 +17,7 @@
 #include "gc.h"
 #include "module.h"
 #include "opcodes.h"
+#include "utils.h"
 
 namespace slang::interpreter
 {
@@ -198,5 +199,109 @@ public:
         return gc;
     }
 };
+
+/*
+ * Function invokation helpers.
+ */
+
+namespace detail
+{
+
+/**
+ * Helper for moving a tuple into a `std::vector<value>`.
+ *
+ * @tparam Tuple Tuple type.
+ * @param tuple The tuple.
+ * @returns A `std::vector<value>` with the tuple's contents.
+ */
+template<typename Tuple>
+std::vector<value> move_into_value_vector(Tuple&& tuple)
+{
+    static_assert(
+      utils::all_same_type_v<Tuple>,
+      "All tuple elements have to be of the same type.");
+
+    using T = std::decay_t<std::tuple_element_t<0, std::decay_t<Tuple>>>;
+    static_assert(
+      std::is_same_v<T, value>,
+      "All tuple elements have to be of type `value`.");
+
+    return std::apply(
+      [](auto&&... elems)
+      {
+          std::vector<value> result;
+          result.reserve(sizeof...(elems));
+          (result.emplace_back(std::forward<value>(elems)), ...);
+          return result;
+      },
+      std::forward<Tuple>(tuple));
+}
+
+/** Convert a variadic template argument list to a tuple with elements of type `value`. */
+template<typename T, typename... Args>
+std::tuple<value, Args...> to_tuple(T&& arg0, const Args&&... args)
+{
+    auto vs = to_tuple<Args...>(std::forward<Args>(args)...);
+    return std::tuple_cat<value, Args...>(std::move(arg0), std::move(vs));
+}
+
+template<typename T>
+std::tuple<value> to_tuple(T&& arg)
+{
+    return std::make_tuple<value>(value{std::move(arg)});
+}
+
+inline std::tuple<value> to_tuple()
+{
+    return {};
+}
+
+}    // namespace detail
+
+/**
+ * Invoke a function.
+ *
+ * @param ctx Interpreter context.
+ * @param module_name Name of the module that contains the function.
+ * @param function_name Name of the function.
+ * @param args Arguments that are passed to the function.
+ * @returns The function's return value.
+ */
+template<typename... Args>
+value invoke(
+  context& ctx,
+  const std::string& module_name,
+  const std::string& function_name,
+  Args&&... args)
+{
+    return ctx.invoke(
+      module_name,
+      function_name,
+      detail::move_into_value_vector(
+        detail::to_tuple(std::forward<Args>(args)...)));
+}
+
+/**
+ * Invoke a function.
+ *
+ * @param ctx Interpreter context.
+ * @param loader Loader of the module that contains the function.
+ * @param fn The function.
+ * @param args Arguments that are passed to the function.
+ * @returns The function's return value.
+ */
+template<typename... Args>
+value invoke(
+  context& ctx,
+  const module_loader& loader,
+  const function& fn,
+  Args&&... args)
+{
+    return ctx.invoke(
+      loader,
+      fn,
+      detail::move_into_value_vector(
+        detail::to_tuple(std::forward<Args>(args)...)));
+}
 
 }    // namespace slang::interpreter

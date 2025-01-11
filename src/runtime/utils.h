@@ -10,6 +10,9 @@
 
 #pragma once
 
+#include <tuple>
+#include <utility>
+
 /* Forward declarations. */
 namespace slang::interpreter
 {
@@ -88,7 +91,7 @@ public:
 
     /** Move constructor. */
     gc_object(gc_object&& other) noexcept
-    : gc_object_base{other}
+    : gc_object_base{std::move(other)}
     {
     }
 
@@ -130,5 +133,36 @@ public:
  * @return Returns the popped object wrapped in a `gc_object_base`.
  */
 gc_object_base gc_pop(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Get function arguments from the stack.
+ *
+ * @param ctx The interpreter context.
+ * @param stack The stack.
+ * @return Returns a `std::tuple` containing the parameters in the order of declaration.
+ */
+template<typename T, typename... Args>
+std::tuple<T, Args...> get_args(si::context& ctx, si::operand_stack& stack)
+{
+    auto arg = get_args<T>(ctx, stack);
+    auto var_args = get_args<Args...>(ctx, stack);
+    return std::tuple_cat(std::move(var_args), std::move(arg));
+}
+
+/*
+ * get_args specializations.
+ */
+
+template<>
+std::tuple<gc_object<void>> get_args(si::context& ctx, si::operand_stack& stack);
+
+template<>
+std::tuple<gc_object<std::string>> get_args(si::context& ctx, si::operand_stack& stack);
+
+template<>
+std::tuple<std::int32_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
+
+template<>
+std::tuple<float> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
 
 }    // namespace slang::runtime

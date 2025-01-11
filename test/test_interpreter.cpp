@@ -968,4 +968,43 @@ TEST(interpreter, multiple_modules)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
+TEST(interpreter, invokation_api)
+{
+    {
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.resolve_module("mod3"));
+
+        si::value res;
+
+        ASSERT_NO_THROW(res = si::invoke(ctx, "mod3", "f", 1.0f));
+        EXPECT_EQ(*res.get<int>(), 4);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+    {
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+
+        si::context ctx{file_mgr};
+        si::module_loader* loader{nullptr};
+
+        ASSERT_NO_THROW(loader = ctx.resolve_module("mod3"));
+        si::function& f = loader->get_function("f");
+
+        si::value res;
+        ASSERT_NO_THROW(res = si::invoke(ctx, *loader, f, 1.0f));
+        EXPECT_EQ(*res.get<int>(), 4);
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+}
+
 }    // namespace

@@ -148,4 +148,30 @@ constexpr std::enable_if_t<std::is_integral_v<T>, T> align(std::size_t alignment
     return static_cast<T>((static_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
+/*
+ * Helpers for tuples.
+ */
+
+/** Check that all tuple types are the same. */
+template<typename T, typename... Args>
+struct all_same_type
+{
+    constexpr static bool value = std::is_same_v<std::tuple<T, Args...>,
+                                                 std::tuple<Args..., T>>;
+};
+
+template<typename... Args>
+struct all_same_type<std::tuple<Args...>> : all_same_type<Args...>
+{
+};
+
+template<>
+struct all_same_type<std::tuple<>>
+{
+    constexpr static bool value = true;
+};
+
+template<typename... Args>
+constexpr bool all_same_type_v = all_same_type<Args...>::value;
+
 }    // namespace slang::utils

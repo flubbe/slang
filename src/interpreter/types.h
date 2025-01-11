@@ -574,17 +574,23 @@ class value
     /** The stored value. */
     std::any data;
 
-    /** Create this value in memory. */
-    std::function<void(std::byte*)> create_function;
-
-    /** Destroy this value in memory. */
-    std::function<void(std::byte*)> destroy_function;
-
     /** Size of the value, in bytes. */
     std::size_t size;
 
     /** Type identifier, as `(type_name, is_array)`. */
     std::pair<std::string, bool> type;
+
+    /** Pointer to the create function for this value. */
+    void (value::*unbound_create_function)(std::byte*) const = nullptr;
+
+    /** Pointer to the destroy function for this value. */
+    void (value::*unbound_destroy_function)(std::byte*) const = nullptr;
+
+    /** Create this value in memory. */
+    std::function<void(std::byte*)> create_function;
+
+    /** Destroy this value in memory. */
+    std::function<void(std::byte*)> destroy_function;
 
     /**
      * Create a primitive type value in memory.
@@ -695,15 +701,79 @@ class value
         std::memset(memory, 0, sizeof(void*));
     }
 
-public:
-    /** Default constructors. */
-    value() = default;
-    value(const value&) = default;
-    value(value&&) = default;
+    /**
+     * Bind the value creation and destruction methods.
+     *
+     * @param new_unbound_create_function The new (unbound) value creation method. Can be `nullptr`.
+     * @param new_unbound_destroy_function The new (unbound) value destruction method. Can be `nullptr`.
+     */
+    void bind(
+      void (value::*new_unbound_create_function)(std::byte*) const,
+      void (value::*new_unbound_destroy_function)(std::byte*) const)
+    {
+        unbound_create_function = new_unbound_create_function;
+        unbound_destroy_function = new_unbound_destroy_function;
 
-    /** Default assignments. */
-    value& operator=(const value&) = default;
-    value& operator=(value&&) = default;
+        if(unbound_create_function != nullptr)
+        {
+            create_function = std::bind(unbound_create_function, this, std::placeholders::_1);
+        }
+        else
+        {
+            create_function = [](std::byte*) {}; /* no-op */
+        }
+
+        if(unbound_destroy_function != nullptr)
+        {
+            destroy_function = std::bind(unbound_destroy_function, this, std::placeholders::_1);
+        }
+        else
+        {
+            destroy_function = [](std::byte*) {}; /* no-op */
+        }
+    }
+
+public:
+    /** Default constructor. */
+    value() = default;
+
+    /** Copy constructor. */
+    value(const value& other)
+    : data{other.data}
+    , size{other.size}
+    , type{other.type}
+    {
+        bind(other.unbound_create_function, other.unbound_destroy_function);
+    }
+
+    /** Move constructor. */
+    value(value&& other)
+    : data{std::move(other.data)}
+    , size{other.size}
+    , type{std::move(other.type)}
+    {
+        bind(other.unbound_create_function, other.unbound_destroy_function);
+    }
+
+    /** Copy assignment. */
+    value& operator=(const value& other)
+    {
+        data = other.data;
+        size = other.size;
+        type = other.type;
+        bind(other.unbound_create_function, other.unbound_destroy_function);
+        return *this;
+    }
+
+    /** Move assignment. */
+    value& operator=(value&& other)
+    {
+        data = std::move(other.data);
+        size = other.size;
+        type = std::move(other.type);
+        bind(other.unbound_create_function, other.unbound_destroy_function);
+        return *this;
+    }
 
     /**
      * Construct a integer value.
@@ -712,11 +782,10 @@ public:
      */
     explicit value(int i)
     : data{i}
-    , create_function{std::bind(&value::create_primitive_type<std::int32_t>, this, std::placeholders::_1)}
-    , destroy_function{[](std::byte*) {}} /* no-op */
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
     {
+        bind(&value::create_primitive_type<std::int32_t>, nullptr);
     }
 
     /**
@@ -726,11 +795,10 @@ public:
      */
     explicit value(float f)
     : data{f}
-    , create_function{std::bind(&value::create_primitive_type<float>, this, std::placeholders::_1)}
-    , destroy_function{[](std::byte*) {}} /* no-op */
     , size{sizeof(float)}
     , type{"f32", false}
     {
+        bind(&value::create_primitive_type<float>, nullptr);
     }
 
     /**
@@ -743,11 +811,10 @@ public:
      */
     explicit value(std::string s)
     : data{std::move(s)}
-    , create_function{std::bind(&value::create_str, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_str, this, std::placeholders::_1)}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
+        bind(&value::create_str, &value::destroy_str);
     }
 
     /**
@@ -757,11 +824,10 @@ public:
      */
     explicit value(const char* s)
     : data{std::string{s}}
-    , create_function{std::bind(&value::create_str, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_str, this, std::placeholders::_1)}
     , size{sizeof(std::string*)}
     , type{"str", false}
     {
+        bind(&value::create_str, &value::destroy_str);
     }
 
     /**
@@ -795,11 +861,10 @@ public:
      */
     explicit value(void* addr)
     : data{addr}
-    , create_function{std::bind(&value::create_addr, this, std::placeholders::_1)}
-    , destroy_function{std::bind(&value::destroy_addr, this, std::placeholders::_1)}
     , size{sizeof(void*)}
     , type{"@addr", false}
     {
+        bind(&value::create_addr, &value::destroy_addr);
     }
 
     /**
@@ -882,29 +947,26 @@ inline void value::destroy_vector_type<std::string>(std::byte* memory) const
 
 inline value::value(std::vector<std::int32_t> int_vec)
 : data{std::move(int_vec)}
-, create_function{std::bind(&value::create_vector_type<std::int32_t>, this, std::placeholders::_1)}
-, destroy_function{std::bind(&value::destroy_vector_type<std::int32_t>, this, std::placeholders::_1)}
 , size{sizeof(void*)}
 , type{"i32", true}
 {
+    bind(&value::create_vector_type<std::int32_t>, &value::destroy_vector_type<std::int32_t>);
 }
 
 inline value::value(std::vector<float> float_vec)
 : data{std::move(float_vec)}
-, create_function{std::bind(&value::create_vector_type<float>, this, std::placeholders::_1)}
-, destroy_function{std::bind(&value::destroy_vector_type<float>, this, std::placeholders::_1)}
 , size{sizeof(void*)}
 , type{"f32", true}
 {
+    bind(&value::create_vector_type<float>, &value::destroy_vector_type<float>);
 }
 
 inline value::value(std::vector<std::string> string_vec)
 : data{std::move(string_vec)}
-, create_function{std::bind(&value::create_vector_type<std::string>, this, std::placeholders::_1)}
-, destroy_function{std::bind(&value::destroy_vector_type<std::string>, this, std::placeholders::_1)}
 , size{sizeof(void*)}
 , type{"str", true}
 {
+    bind(&value::create_vector_type<std::string>, &value::destroy_vector_type<std::string>);
 }
 
 }    // namespace slang::interpreter
