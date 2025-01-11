@@ -788,10 +788,12 @@ void exec::invoke(const std::vector<std::string>& args)
 
     ctx.resolve_module(module_name);
 
-    si::value res = ctx.invoke(
+    si::value res = si::invoke(
+      ctx,
       module_name,
       "main",
-      {si::value{std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()}}});
+      std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()});
+
     const int* return_value = res.get<int>();
 
     if(return_value == nullptr)

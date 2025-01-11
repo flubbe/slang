@@ -10,6 +10,9 @@
 
 #pragma once
 
+#include <tuple>
+#include <utility>
+
 /* Forward declarations. */
 namespace slang::interpreter
 {
