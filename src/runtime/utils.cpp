@@ -32,4 +32,32 @@ gc_object_base gc_pop(si::context& ctx, si::operand_stack& stack)
     return {ctx, stack.pop_addr<void*>()};
 }
 
+/*
+ * get_args specializations.
+ */
+
+template<>
+std::tuple<gc_object<void>> get_args(si::context& ctx, si::operand_stack& stack)
+{
+    return gc_pop(ctx, stack);
+}
+
+template<>
+std::tuple<gc_object<std::string>> get_args(si::context& ctx, si::operand_stack& stack)
+{
+    return gc_pop(ctx, stack);
+}
+
+template<>
+std::tuple<std::int32_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_i32();
+}
+
+template<>
+std::tuple<float> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_f32();
+}
+
 }    // namespace slang::runtime

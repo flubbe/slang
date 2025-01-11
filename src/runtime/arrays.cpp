@@ -16,8 +16,7 @@ namespace slang::runtime
 
 void array_copy(si::context& ctx, si::operand_stack& stack)
 {
-    gc_object<void> to_container = gc_pop(ctx, stack);
-    gc_object<void> from_container = gc_pop(ctx, stack);
+    auto [from_container, to_container] = get_args<gc_object<void>, gc_object<void>>(ctx, stack);
 
     void* to = to_container.get();
     void* from = from_container.get();
