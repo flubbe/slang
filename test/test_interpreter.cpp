@@ -878,6 +878,41 @@ TEST(interpreter, structs_access)
     }
 }
 
+TEST(interpreter, returned_struct)
+{
+    {
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.resolve_module("return_struct"));
+
+        si::value res;
+        ASSERT_NO_THROW(res = ctx.invoke("return_struct", "return_struct", {}));
+
+        // needs to match the definition inside the script.
+        struct S
+        {
+            std::int32_t i;
+            float j;
+            std::string* s;
+        };
+
+        S* s = static_cast<S*>(*res.get<void*>());
+
+        EXPECT_EQ(s->i, 1);
+        EXPECT_FLOAT_EQ(s->j, 2.3);
+        EXPECT_EQ(*s->s, "test");
+
+        ctx.get_gc().remove_temporary(s);
+        ctx.get_gc().run();
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+}
+
 TEST(interpreter, nested_structs)
 {
     {
