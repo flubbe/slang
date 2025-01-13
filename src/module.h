@@ -23,6 +23,7 @@
 /* Forward declarations. */
 namespace slang::interpreter
 {
+class arguments_scope;
 class context;
 class module_loader;
 class operand_stack;
@@ -300,11 +301,17 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
 /** Type of a variable stored in the module. */
 class variable_type
 {
+    friend class si::module_loader;
+    friend class si::arguments_scope;
+
     /** The decoded type string. */
     std::string decoded_type_string;
 
     /** Array dimensions (if any). */
     std::optional<std::size_t> array_dims;
+
+    /** Type layout id (not encoded/serialized). */
+    std::optional<std::size_t> layout_id;
 
 public:
     /** Default constructors. */
@@ -316,17 +323,29 @@ public:
     variable_type& operator=(const variable_type&) = default;
     variable_type& operator=(variable_type&&) = default;
 
-    /** Initialize from a `std::string`. */
-    variable_type(std::string decoded_type_string, std::optional<std::size_t> array_dims = std::nullopt)
+    /**
+     * Construct a variable type.
+     *
+     * @param decoded_type_string The decoded type string.
+     * @param array_dims Array dimensions.
+     * @param layout_id Type layout id in the interpreter.
+     */
+    variable_type(
+      std::string decoded_type_string,
+      std::optional<std::size_t> array_dims = std::nullopt,
+      std::optional<std::size_t> layout_id = std::nullopt)
     : decoded_type_string{std::move(decoded_type_string)}
     , array_dims{array_dims}
+    , layout_id{layout_id}
     {
     }
 
     /** Comparison. */
     bool operator==(const variable_type& ts) const
     {
-        return decoded_type_string == ts.decoded_type_string;
+        // TODO type layout id's should correspond to decoded_type_string
+        return decoded_type_string == ts.decoded_type_string
+               && array_dims == ts.array_dims;
     }
 
     /** Comparison. */
@@ -454,6 +473,13 @@ struct function_signature
     function_signature(std::pair<std::string, bool> return_type,
                        std::vector<std::pair<std::string, bool>> arg_types)
     {
+        this->return_type = {variable_type{
+                               std::move(return_type.first),
+                               return_type.second
+                                 ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
+                                 : std::nullopt},
+                             return_type.second};
+
         std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
                        [](const auto& arg) -> std::pair<variable_type, bool>
                        {
@@ -464,13 +490,6 @@ struct function_signature
                                        : std::nullopt},
                                    arg.second};
                        });
-
-        this->return_type = {variable_type{
-                               {std::move(return_type.first), return_type.second},
-                               return_type.second
-                                 ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
-                                 : std::nullopt},
-                             return_type.second};
     }
 };
 

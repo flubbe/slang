@@ -235,6 +235,21 @@ inline gc_object gc_object::from<si::fixed_vector<void*>>(
             flags, obj};
 }
 
+/** Persistent object. */
+struct gc_persistent_object
+{
+    /**
+     * Type layout (offsets of references inside this object).
+     *
+     * @note Not used for arrays, since we don't want to create a new
+     * layout for arrays of a different sizes.
+     */
+    std::vector<std::size_t>* layout = nullptr;
+
+    /** Reference count. */
+    std::size_t reference_count{0};
+};
+
 /** Garbage collector. */
 class garbage_collector
 {
@@ -246,6 +261,9 @@ class garbage_collector
 
     /** Reference-counted temporary objects. */
     std::unordered_map<void*, std::size_t> temporary_objects;
+
+    /** Reference-counted persistent objects. */
+    std::unordered_map<void*, gc_persistent_object> persistent_objects;
 
     /** Allocated bytes. */
     std::size_t allocated_bytes{0};
@@ -444,6 +462,25 @@ public:
     }
 
     /**
+     * Add a persistent object. If the object already exists in the
+     * objects set, its reference count is increased.
+     *
+     * @param obj The object.
+     * @param layout_id Type layout id for the object.
+     * @returns The object.
+     * @throws Throws a `gc_error` if `obj` is `nullptr`.
+     */
+    void* add_persistent(void* obj, std::size_t layout_id);
+
+    /**
+     * Remove a temporary object (or decrease it's reference count).
+     *
+     * @param obj The object.
+     * @throws Throws a `gc_error` if the object is not found in the persistent object's list.
+     */
+    void remove_persistent(void* obj);
+
+    /**
      * Add a temporary object. If the object already exists in the
      * temporary objects set, its reference count is increased.
      *
@@ -475,6 +512,17 @@ public:
     bool is_root(void* obj) const
     {
         return root_set.find(obj) != root_set.end();
+    }
+
+    /**
+     * Check if an object is in the persistent set.
+     *
+     * @param obj The object.
+     * @returns True if the object is found in the persistent set and false otherwise.
+     */
+    bool is_persistent(void* obj) const
+    {
+        return persistent_objects.find(obj) != persistent_objects.end();
     }
 
     /**

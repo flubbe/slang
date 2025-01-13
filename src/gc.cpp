@@ -31,13 +31,42 @@ void garbage_collector::mark_object(void* obj)
     auto it = objects.find(obj);
     if(it == objects.end())
     {
-        // nothing to mark.
+        auto it = persistent_objects.find(obj);
+        if(it == persistent_objects.end())
+        {
+            GC_LOG("mark_object: object {} not part of GC set", obj);
+
+            // nothing to mark.
+            return;
+        }
+
+        if(it->second.reference_count == 0)
+        {
+            GC_LOG("mark_object {}\n", obj);
+            throw gc_error("Cannot mark object: Reference count is zero.");
+        }
+
+        if(it->second.layout == nullptr)
+        {
+            GC_LOG("mark_object {}\n", obj);
+            throw gc_error("Cannot mark object: Missing layout information.");
+        }
+
+        GC_LOG("mark_object {}: object layout", obj);
+        void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));
+        for(auto offset: *it->second.layout)
+        {
+            mark_object(*reinterpret_cast<void**>(static_cast<std::byte*>(mark_obj) + offset));
+        }
+
         return;
     }
 
     gc_object& obj_info = it->second;
     if(obj_info.flags & gc_object::of_reachable)
     {
+        GC_LOG("mark_object: object {} unreachable", obj);
+
         return;
     }
 
@@ -186,6 +215,10 @@ void garbage_collector::run()
     {
         current_root_set.insert(obj);
     }
+    for(auto& [obj, props]: persistent_objects)
+    {
+        current_root_set.insert(obj);
+    }
     for(auto& [obj, ref_count]: temporary_objects)
     {
         current_root_set.insert(obj);
@@ -268,6 +301,53 @@ void garbage_collector::reset()
     objects.clear();
 
     GC_LOG("reset {} -> 0", object_count);
+}
+
+void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
+{
+    GC_LOG("add_persistent {} (layout id {})", obj, layout_id);
+
+    if(obj == nullptr)
+    {
+        throw gc_error("Cannot add null object to persistent set.");
+    }
+
+    auto layout_it = type_layouts.find(layout_id);
+    if(layout_it == type_layouts.end())
+    {
+        throw gc_error(fmt::format("No type for layout id {} registered.", layout_id));
+    }
+
+    auto it = persistent_objects.find(obj);
+    if(it == persistent_objects.end())
+    {
+        persistent_objects.insert({obj, gc_persistent_object{&layout_it->second.second, 1}});
+    }
+    else
+    {
+        ++persistent_objects[obj].reference_count;
+    }
+
+    return obj;
+}
+
+void garbage_collector::remove_persistent(void* obj)
+{
+    GC_LOG("remove_persistent {}", obj);
+
+    auto it = persistent_objects.find(obj);
+    if(it == persistent_objects.end())
+    {
+        throw gc_error(fmt::format("Reference at {} does not exist in GC persistent object set.", obj));
+    }
+    else
+    {
+        --it->second.reference_count;
+        if(it->second.reference_count == 0)
+        {
+            persistent_objects.erase(it);
+        }
+    }
 }
 
 void* garbage_collector::add_temporary(void* obj)

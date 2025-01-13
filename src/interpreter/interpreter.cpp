@@ -898,7 +898,6 @@ opcode context::exec(
 
                     std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
                 }
-
                 else
                 {
                     throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
@@ -1232,6 +1231,9 @@ std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>&
 /** Function argument writing and destruction. */
 class arguments_scope
 {
+    /** Interpreter context. */
+    context& ctx;
+
     /** The arguments to manage. */
     const std::vector<value>& args;
 
@@ -1248,11 +1250,13 @@ public:
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
-    arguments_scope(context& ctx,
-                    const std::vector<value>& args,
-                    const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
-                    std::vector<std::byte>& locals)
-    : args{args}
+    arguments_scope(
+      context& ctx,
+      const std::vector<value>& args,
+      const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
+      std::vector<std::byte>& locals)
+    : ctx{ctx}
+    , args{args}
     , locals{locals}
     {
         if(arg_types.size() != args.size())
@@ -1265,21 +1269,36 @@ public:
         std::size_t offset = 0;
         for(std::size_t i = 0; i < args.size(); ++i)
         {
-            if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
+            std::pair<std::string, bool> arg_type = args[i].get_type();
+            std::optional<std::size_t> layout_id = args[i].get_layout_id();
+
+            if(layout_id.has_value())
+            {
+                if(arg_types[i].first.layout_id != layout_id)
+                {
+                    throw interpreter_error(
+                      fmt::format(
+                        "Argument {} has wrong base type (expected id '{}', got id '{}').",
+                        i,
+                        *layout_id,
+                        ctx.get_gc().get_type_layout_id(std::get<0>(arg_types[i]).base_type())));
+                }
+            }
+            else if(std::get<0>(arg_types[i]).base_type() != std::get<0>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
                               i,
                               std::get<0>(arg_types[i]).base_type(),
-                              std::get<0>(args[i].get_type())));
+                              std::get<0>(arg_type)));
             }
 
-            if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
+            if(std::get<1>(arg_types[i]) != std::get<1>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
                               i,
-                              std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
+                              std::get<1>(arg_types[i]), std::get<1>(arg_type)));
             }
 
             if(offset + args[i].get_size() > locals.size())
@@ -1288,10 +1307,16 @@ public:
                   "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
-            if(is_garbage_collected(args[i].get_type()))
+            if(layout_id.has_value())
+            {
+                ctx.get_gc().add_persistent(&locals[offset], args[i].get_layout_id().value());
+            }
+
+            if(is_garbage_collected(arg_type))
             {
                 ctx.get_gc().add_temporary(&locals[offset]);
             }
+
             offset += args[i].create(&locals[offset]);
         }
     }
@@ -1308,6 +1333,25 @@ public:
 
                 // FIXME This is an error, but destructors cannot throw.
                 return;
+            }
+
+            if(args[i].get_layout_id().has_value())
+            {
+                try
+                {
+                    ctx.get_gc().remove_persistent(&locals[offset]);
+                }
+                catch(gc::gc_error& e)
+                {
+                    // FIXME This is an error, but destructors cannot throw.
+
+                    DEBUG_LOG("GC error during argument destruction while processing argument {}: {}", i, e.what());
+                }
+            }
+
+            if(is_garbage_collected(args[i].get_type()))
+            {
+                ctx.get_gc().remove_temporary(&locals[offset]);
             }
 
             offset += args[i].destroy(&locals[offset]);
@@ -1373,8 +1417,12 @@ value context::exec(
     }
     else if(ret_opcode == opcode::aret)
     {
+        auto sig = f.get_signature();
+
         void* addr = frame.stack.pop_addr<void>();
-        ret = value{addr};
+        ret = value{
+          {sig.return_type.first.base_type(), sig.return_type.second},
+          addr};
         // FIXME The caller is responsible for calling `gc.remove_temporary(addr)`.
     }
     else

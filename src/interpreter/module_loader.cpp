@@ -1212,6 +1212,33 @@ module_loader::module_loader(
         }
 
         auto& desc = std::get<module_::function_descriptor>(it.desc);
+
+        // resolve layout id's in the function signature. these are used for validation
+        // when functions are called from native code.
+
+        // FIXME This only works if the types are contained in the current module.
+        if(!ty::is_builtin_type(desc.signature.return_type.first.base_type()))
+        {
+            std::string type_name = fmt::format(
+              "{}.{}",
+              this->import_name,
+              desc.signature.return_type.first.base_type());
+
+            desc.signature.return_type.first.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+        }
+        for(auto& arg: desc.signature.arg_types)
+        {
+            if(!ty::is_builtin_type(arg.first.base_type()))
+            {
+                std::string type_name = fmt::format(
+                  "{}.{}",
+                  this->import_name,
+                  arg.first.base_type());
+
+                arg.first.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+            }
+        }
+
         if(desc.native)
         {
             auto& details = std::get<module_::native_function_details>(desc.details);

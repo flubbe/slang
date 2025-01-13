@@ -1552,6 +1552,50 @@ TEST(output, structs)
         slang::file_write_archive write_ar("return_struct.cmod");
         EXPECT_NO_THROW(write_ar & mod);
     }
+    {
+        const std::string test_input =
+          "struct S {\n"
+          " i: i32,\n"
+          " j: f32,\n"
+          " s: str\n"
+          "};\n"
+          "fn struct_arg(s: S) -> void\n"
+          "{\n"
+          " s.i = 1;\n"
+          " s.j = 2.3;\n"
+          " s.s = \"test\";\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+
+        slang::file_manager mgr;
+
+        ty::context type_ctx;
+        rs::context resolve_ctx{mgr};
+        cg::context codegen_ctx;
+        slang::instruction_emitter emitter{codegen_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(type_ctx.resolve_types());
+        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+        ASSERT_NO_THROW(emitter.run());
+
+        slang::module_::language_module mod = emitter.to_module();
+
+        slang::file_write_archive write_ar("struct_arg.cmod");
+        EXPECT_NO_THROW(write_ar & mod);
+    }
 }
 
 TEST(output, nested_structs)
