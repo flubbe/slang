@@ -36,7 +36,7 @@ A program consists of:
    The imports are accessible by prepending the import name, e.g. `std::print("Hello");`
    or `std::i32s{value: 12} as std::type`.
 2. Constants are declared as
-    ````
+    ```
     const <name> : <type> = <constant>;
     ```
     They are exported by the module and can be accessed from another module.
