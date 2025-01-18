@@ -230,43 +230,15 @@ namespace detail
 template<typename Tuple>
 std::vector<value> move_into_value_vector(Tuple&& tuple)
 {
-    static_assert(
-      utils::all_same_type_v<Tuple>,
-      "All tuple elements have to be of the same type.");
-
-    using T = std::decay_t<std::tuple_element_t<0, std::decay_t<Tuple>>>;
-    static_assert(
-      std::is_same_v<T, value>,
-      "All tuple elements have to be of type `value`.");
-
     return std::apply(
       [](auto&&... elems)
       {
           std::vector<value> result;
           result.reserve(sizeof...(elems));
-          (result.emplace_back(std::forward<value>(elems)), ...);
+          (result.emplace_back(value{std::move(elems)}), ...);
           return result;
       },
       std::forward<Tuple>(tuple));
-}
-
-/** Convert a variadic template argument list to a tuple with elements of type `value`. */
-template<typename T, typename... Args>
-std::tuple<value, Args...> to_tuple(T&& arg0, const Args&&... args)
-{
-    auto vs = to_tuple<Args...>(std::forward<Args>(args)...);
-    return std::tuple_cat<value, Args...>(std::move(arg0), std::move(vs));
-}
-
-template<typename T>
-std::tuple<value> to_tuple(T&& arg)
-{
-    return std::make_tuple<value>(value{std::move(arg)});
-}
-
-inline std::tuple<value> to_tuple()
-{
-    return {};
 }
 
 }    // namespace detail
@@ -291,7 +263,7 @@ value invoke(
       module_name,
       function_name,
       detail::move_into_value_vector(
-        detail::to_tuple(std::forward<Args>(args)...)));
+        std::make_tuple(args...)));
 }
 
 /**
@@ -314,7 +286,7 @@ value invoke(
       loader,
       fn,
       detail::move_into_value_vector(
-        detail::to_tuple(std::forward<Args>(args)...)));
+        std::make_tuple(args...)));
 }
 
 }    // namespace slang::interpreter

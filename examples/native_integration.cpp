@@ -84,7 +84,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     S s = S{&str, 123};
 
     // Invoke the function.
-    si::value res = ctx.invoke(*loader, function, {si::value{layout_id, &s}, si::value{3.141f}});
+    si::value res = si::invoke(ctx, *loader, function, si::value{layout_id, &s}, 3.141f);
 
     // Print the result.
     S* ret_s = static_cast<S*>(*res.get<void*>());
