@@ -280,31 +280,35 @@ bool basic_block::is_valid() const
 
 bool scope::contains(const std::string& name) const
 {
-    if(std::find_if(args.begin(), args.end(),
-                    [&name](const std::unique_ptr<value>& v) -> bool
-                    {
-                        if(!v->has_name())
-                        {
-                            throw codegen_error("Scope contains unnamed value.");
-                        }
+    if(std::find_if(
+         args.begin(),
+         args.end(),
+         [&name](const std::unique_ptr<value>& v) -> bool
+         {
+             if(!v->has_name())
+             {
+                 throw codegen_error("Scope contains unnamed value.");
+             }
 
-                        return *v->get_name() == name;
-                    })
+             return *v->get_name() == name;
+         })
        != args.end())
     {
         return true;
     }
 
-    if(std::find_if(locals.begin(), locals.end(),
-                    [&name](const std::unique_ptr<value>& v) -> bool
-                    {
-                        if(!v->has_name())
-                        {
-                            throw codegen_error("Scope contains unnamed value.");
-                        }
+    if(std::find_if(
+         locals.begin(),
+         locals.end(),
+         [&name](const std::unique_ptr<value>& v) -> bool
+         {
+             if(!v->has_name())
+             {
+                 throw codegen_error("Scope contains unnamed value.");
+             }
 
-                        return *v->get_name() == name;
-                    })
+             return *v->get_name() == name;
+         })
        != locals.end())
     {
         return true;
@@ -315,42 +319,48 @@ bool scope::contains(const std::string& name) const
 
 bool scope::contains_struct(const std::string& name, const std::optional<std::string>& import_path) const
 {
-    auto it = std::find_if(structs.begin(), structs.end(),
-                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-                           {
-                               return p.first == name
-                                      && p.second.get_import_path() == import_path;
-                           });
+    auto it = std::find_if(
+      structs.begin(),
+      structs.end(),
+      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+      {
+          return p.first == name
+                 && p.second.get_import_path() == import_path;
+      });
     return it != structs.end();
 }
 
 value* scope::get_value(const std::string& name)
 {
-    auto it = std::find_if(args.begin(), args.end(),
-                           [&name](const std::unique_ptr<value>& v) -> bool
-                           {
-                               if(!v->has_name())
-                               {
-                                   throw codegen_error("Scope contains unnamed value.");
-                               }
+    auto it = std::find_if(
+      args.begin(),
+      args.end(),
+      [&name](const std::unique_ptr<value>& v) -> bool
+      {
+          if(!v->has_name())
+          {
+              throw codegen_error("Scope contains unnamed value.");
+          }
 
-                               return *v->get_name() == name;
-                           });
+          return *v->get_name() == name;
+      });
     if(it != args.end())
     {
         return it->get();
     }
 
-    it = std::find_if(locals.begin(), locals.end(),
-                      [&name](const std::unique_ptr<value>& v) -> bool
-                      {
-                          if(!v->has_name())
-                          {
-                              throw codegen_error("Scope contains unnamed value.");
-                          }
+    it = std::find_if(
+      locals.begin(),
+      locals.end(),
+      [&name](const std::unique_ptr<value>& v) -> bool
+      {
+          if(!v->has_name())
+          {
+              throw codegen_error("Scope contains unnamed value.");
+          }
 
-                          return *v->get_name() == name;
-                      });
+          return *v->get_name() == name;
+      });
 
     if(it != locals.end())
     {
@@ -362,31 +372,35 @@ value* scope::get_value(const std::string& name)
 
 std::size_t scope::get_index(const std::string& name) const
 {
-    auto it = std::find_if(args.begin(), args.end(),
-                           [&name](const std::unique_ptr<value>& v) -> bool
-                           {
-                               if(!v->has_name())
-                               {
-                                   throw codegen_error("Scope contains unnamed value.");
-                               }
+    auto it = std::find_if(
+      args.begin(),
+      args.end(),
+      [&name](const std::unique_ptr<value>& v) -> bool
+      {
+          if(!v->has_name())
+          {
+              throw codegen_error("Scope contains unnamed value.");
+          }
 
-                               return *v->get_name() == name;
-                           });
+          return *v->get_name() == name;
+      });
     if(it != args.end())
     {
         return std::distance(args.begin(), it);
     }
 
-    it = std::find_if(locals.begin(), locals.end(),
-                      [&name](const std::unique_ptr<value>& v) -> bool
-                      {
-                          if(!v->has_name())
-                          {
-                              throw codegen_error("Scope contains unnamed value.");
-                          }
+    it = std::find_if(
+      locals.begin(),
+      locals.end(),
+      [&name](const std::unique_ptr<value>& v) -> bool
+      {
+          if(!v->has_name())
+          {
+              throw codegen_error("Scope contains unnamed value.");
+          }
 
-                          return *v->get_name() == name;
-                      });
+          return *v->get_name() == name;
+      });
 
     if(it != locals.end())
     {
@@ -424,17 +438,20 @@ void scope::add_local(std::unique_ptr<value> arg)
     locals.emplace_back(std::move(arg));
 }
 
-void scope::add_struct(std::string name,
-                       std::vector<std::pair<std::string, value>> members,
-                       std::uint8_t flags,
-                       std::optional<std::string> import_path)
+void scope::add_struct(
+  std::string name,
+  std::vector<std::pair<std::string, value>> members,
+  std::uint8_t flags,
+  std::optional<std::string> import_path)
 {
-    auto it = std::find_if(structs.begin(), structs.end(),
-                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-                           {
-                               return p.first == name
-                                      && p.second.get_import_path() == import_path;
-                           });
+    auto it = std::find_if(
+      structs.begin(),
+      structs.end(),
+      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+      {
+          return p.first == name
+                 && p.second.get_import_path() == import_path;
+      });
     if(it != structs.end())
     {
         if(import_path.has_value())
@@ -450,12 +467,14 @@ void scope::add_struct(std::string name,
 
 const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(structs.begin(), structs.end(),
-                           [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-                           {
-                               return p.first == name
-                                      && p.second.get_import_path() == import_path;
-                           });
+    auto it = std::find_if(
+      structs.begin(),
+      structs.end(),
+      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
+      {
+          return p.first == name
+                 && p.second.get_import_path() == import_path;
+      });
     if(it == structs.end())
     {
         if(import_path.has_value())
@@ -476,7 +495,6 @@ std::string function::to_string() const
     std::string buf;
     if(native)
     {
-
         buf = fmt::format("native ({}) {} @{}(", import_library, return_type->to_string(), name);
     }
     else
@@ -540,11 +558,13 @@ std::string struct_::to_string() const
 
 void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
 {
-    auto it = std::find_if(imports.begin(), imports.end(),
-                           [&name](const imported_symbol& s) -> bool
-                           {
-                               return name == s.name;
-                           });
+    auto it = std::find_if(
+      imports.begin(),
+      imports.end(),
+      [&name](const imported_symbol& s) -> bool
+      {
+          return name == s.name;
+      });
     if(it != imports.end())
     {
         // check whether the imports match.
@@ -571,11 +591,13 @@ void context::add_import(module_::symbol_type type, std::string import_path, std
 
 std::size_t context::get_import_index(module_::symbol_type type, std::string import_path, std::string name) const
 {
-    auto it = std::find_if(imports.begin(), imports.end(),
-                           [&name](const imported_symbol& s) -> bool
-                           {
-                               return name == s.name;
-                           });
+    auto it = std::find_if(
+      imports.begin(),
+      imports.end(),
+      [&name](const imported_symbol& s) -> bool
+      {
+          return name == s.name;
+      });
     if(it != imports.end())
     {
         if(it->import_path != import_path)
@@ -607,11 +629,13 @@ struct_* context::add_struct(std::string name,
                              std::uint8_t flags,
                              std::optional<std::string> import_path)
 {
-    if(std::find_if(types.begin(), types.end(),
-                    [&name](const std::unique_ptr<struct_>& t) -> bool
-                    {
-                        return t->get_name() == name;
-                    })
+    if(std::find_if(
+         types.begin(),
+         types.end(),
+         [&name](const std::unique_ptr<struct_>& t) -> bool
+         {
+             return t->get_name() == name;
+         })
        != types.end())
     {
         throw codegen_error(fmt::format("Type '{}' already defined.", name));
@@ -628,13 +652,15 @@ struct_* context::add_struct(std::string name,
 
 struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
 {
-    auto it = std::find_if(types.begin(), types.end(),
-                           [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
-                           {
-                               return t->get_name() == name
-                                      && ((!import_path.has_value() && !t->get_import_path().has_value())
-                                          || *import_path == *t->get_import_path());
-                           });
+    auto it = std::find_if(
+      types.begin(),
+      types.end(),
+      [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
+      {
+          return t->get_name() == name
+                 && ((!import_path.has_value() && !t->get_import_path().has_value())
+                     || *import_path == *t->get_import_path());
+      });
     if(it == types.end())
     {
         if(import_path.has_value())
@@ -758,7 +784,8 @@ void context::add_constant(std::string name, std::string s, std::optional<std::s
 std::size_t context::get_string(std::string str)
 {
     auto it = std::find_if(
-      constants.begin(), constants.end(),
+      constants.begin(),
+      constants.end(),
       [&str](const module_::constant_table_entry& t) -> bool
       {
           return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
@@ -783,7 +810,8 @@ std::optional<constant_table_entry> context::get_constant(
      * the import table.
      */
     auto it = std::find_if(
-      constants.cbegin(), constants.cend(),
+      constants.cbegin(),
+      constants.cend(),
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -794,7 +822,8 @@ std::optional<constant_table_entry> context::get_constant(
     }
 
     it = std::find_if(
-      imported_constants.cbegin(), imported_constants.cend(),
+      imported_constants.cbegin(),
+      imported_constants.cend(),
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -814,49 +843,43 @@ std::optional<constant_table_entry> context::get_constant(
     return std::nullopt;
 }
 
-prototype* context::add_prototype(std::string name,
-                                  value return_type,
-                                  std::vector<value> args, std::optional<std::string> import_path)
+void context::add_prototype(
+  std::string name,
+  value return_type,
+  std::vector<value> args,
+  std::optional<std::string> import_path)
 {
-    if(std::find_if(prototypes.begin(), prototypes.end(),
-                    [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-                    {
-                        if(p->get_name() != name)
-                        {
-                            return false;
-                        }
-                        if(p->get_import_path().has_value() && import_path.has_value())
-                        {
-                            return *p->get_import_path() == *import_path;
-                        }
-                        return !p->get_import_path().has_value() && !import_path.has_value();
-                    })
+    if(std::find_if(
+         prototypes.begin(),
+         prototypes.end(),
+         [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+         {
+             return p->get_name() == name
+                    && p->get_import_path() == import_path;
+         })
        != prototypes.end())
     {
         throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
     }
 
-    return prototypes.emplace_back(std::make_unique<prototype>(
-                                     std::move(name), std::move(return_type), std::move(args), std::move(import_path)))
-      .get();
+    prototypes.emplace_back(
+      std::make_unique<prototype>(
+        std::move(name),
+        std::move(return_type),
+        std::move(args),
+        std::move(import_path)));
 }
 
 const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(prototypes.begin(), prototypes.end(),
-                           [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-                           {
-                               if(import_path.has_value())
-                               {
-                                   return p->get_import_path().has_value()
-                                          && *p->get_import_path() == import_path
-                                          && p->get_name() == name;
-                               }
-                               else
-                               {
-                                   return !p->get_import_path().has_value() && p->get_name() == name;
-                               }
-                           });
+    auto it = std::find_if(
+      prototypes.begin(),
+      prototypes.end(),
+      [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+      {
+          return p->get_name() == name
+                 && p->get_import_path() == import_path;
+      });
     if(it == prototypes.end())
     {
         if(import_path.has_value())
@@ -872,11 +895,13 @@ function* context::create_function(std::string name,
                                    std::unique_ptr<value> return_type,
                                    std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(funcs.begin(), funcs.end(),
-                    [&name](const std::unique_ptr<function>& fn) -> bool
-                    {
-                        return fn->get_name() == name;
-                    })
+    if(std::find_if(
+         funcs.begin(),
+         funcs.end(),
+         [&name](const std::unique_ptr<function>& fn) -> bool
+         {
+             return fn->get_name() == name;
+         })
        != funcs.end())
     {
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
@@ -890,11 +915,13 @@ void context::create_native_function(std::string lib_name,
                                      std::unique_ptr<value> return_type,
                                      std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(funcs.begin(), funcs.end(),
-                    [&name](const std::unique_ptr<function>& fn) -> bool
-                    {
-                        return fn->get_name() == name;
-                    })
+    if(std::find_if(
+         funcs.begin(),
+         funcs.end(),
+         [&name](const std::unique_ptr<function>& fn) -> bool
+         {
+             return fn->get_name() == name;
+         })
        != funcs.end())
     {
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
@@ -959,11 +986,13 @@ value context::get_struct_member(
     const scope* s = get_global_scope();
     auto& members = s->get_struct(struct_name, import_path);
 
-    auto it = std::find_if(members.begin(), members.end(),
-                           [&member_name](const std::pair<std::string, value>& v)
-                           {
-                               return v.first == member_name;
-                           });
+    auto it = std::find_if(
+      members.begin(),
+      members.end(),
+      [&member_name](const std::pair<std::string, value>& v)
+      {
+          return v.first == member_name;
+      });
     if(it == members.end())
     {
         throw codegen_error(

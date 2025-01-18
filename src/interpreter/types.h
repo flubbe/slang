@@ -580,6 +580,9 @@ class value
     /** Type identifier, as `(type_name, is_array)`. */
     std::pair<std::string, bool> type;
 
+    /** Layout id. */
+    std::optional<std::size_t> layout_id;
+
     /** Pointer to the create function for this value. */
     void (value::*unbound_create_function)(std::byte*) const = nullptr;
 
@@ -742,6 +745,7 @@ public:
     : data{other.data}
     , size{other.size}
     , type{other.type}
+    , layout_id{other.layout_id}
     {
         bind(other.unbound_create_function, other.unbound_destroy_function);
     }
@@ -751,6 +755,7 @@ public:
     : data{std::move(other.data)}
     , size{other.size}
     , type{std::move(other.type)}
+    , layout_id{other.layout_id}
     {
         bind(other.unbound_create_function, other.unbound_destroy_function);
     }
@@ -761,6 +766,7 @@ public:
         data = other.data;
         size = other.size;
         type = other.type;
+        layout_id = other.layout_id;
         bind(other.unbound_create_function, other.unbound_destroy_function);
         return *this;
     }
@@ -771,6 +777,7 @@ public:
         data = std::move(other.data);
         size = other.size;
         type = std::move(other.type);
+        layout_id = other.layout_id;
         bind(other.unbound_create_function, other.unbound_destroy_function);
         return *this;
     }
@@ -784,6 +791,7 @@ public:
     : data{i}
     , size{sizeof(std::int32_t)}
     , type{"i32", false}
+    , layout_id{std::nullopt}
     {
         bind(&value::create_primitive_type<std::int32_t>, nullptr);
     }
@@ -797,6 +805,7 @@ public:
     : data{f}
     , size{sizeof(float)}
     , type{"f32", false}
+    , layout_id{std::nullopt}
     {
         bind(&value::create_primitive_type<float>, nullptr);
     }
@@ -813,6 +822,7 @@ public:
     : data{std::move(s)}
     , size{sizeof(std::string*)}
     , type{"str", false}
+    , layout_id{std::nullopt}
     {
         bind(&value::create_str, &value::destroy_str);
     }
@@ -826,6 +836,7 @@ public:
     : data{std::string{s}}
     , size{sizeof(std::string*)}
     , type{"str", false}
+    , layout_id{std::nullopt}
     {
         bind(&value::create_str, &value::destroy_str);
     }
@@ -855,14 +866,31 @@ public:
     explicit value(std::vector<std::string> string_vec);
 
     /**
-     * Construct an address value.
+     * Construct a value from an object.
      *
-     * @param addr The address.
+     * @param layout_id The type's layout id.
+     * @param obj The object.
      */
-    explicit value(void* addr)
+    explicit value(std::size_t layout_id, void* addr)
     : data{addr}
     , size{sizeof(void*)}
-    , type{"@addr", false}
+    , type{}
+    , layout_id{layout_id}
+    {
+        bind(&value::create_addr, &value::destroy_addr);
+    }
+
+    /**
+     * Construct a value from an object.
+     *
+     * @param type The object's type.
+     * @param obj The object.
+     */
+    explicit value(std::pair<std::string, bool> type, void* addr)
+    : data{addr}
+    , size{sizeof(void*)}
+    , type{std::move(type)}
+    , layout_id{std::nullopt}
     {
         bind(&value::create_addr, &value::destroy_addr);
     }
@@ -901,6 +929,12 @@ public:
     const std::pair<std::string, bool>& get_type() const
     {
         return type;
+    }
+
+    /** Get the value type's layout id. */
+    std::optional<std::size_t> get_layout_id() const
+    {
+        return layout_id;
     }
 
     /**
@@ -949,6 +983,7 @@ inline value::value(std::vector<std::int32_t> int_vec)
 : data{std::move(int_vec)}
 , size{sizeof(void*)}
 , type{"i32", true}
+, layout_id{std::nullopt}
 {
     bind(&value::create_vector_type<std::int32_t>, &value::destroy_vector_type<std::int32_t>);
 }
@@ -957,6 +992,7 @@ inline value::value(std::vector<float> float_vec)
 : data{std::move(float_vec)}
 , size{sizeof(void*)}
 , type{"f32", true}
+, layout_id{std::nullopt}
 {
     bind(&value::create_vector_type<float>, &value::destroy_vector_type<float>);
 }
@@ -965,6 +1001,7 @@ inline value::value(std::vector<std::string> string_vec)
 : data{std::move(string_vec)}
 , size{sizeof(void*)}
 , type{"str", true}
+, layout_id{std::nullopt}
 {
     bind(&value::create_vector_type<std::string>, &value::destroy_vector_type<std::string>);
 }

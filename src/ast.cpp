@@ -29,6 +29,40 @@ namespace ty = slang::typing;
 namespace slang::ast
 {
 
+/**
+ * Create a `cg::value` from a `type_info`.
+ *
+ * @param ti The type information.
+ * @param name An optional name for the value.
+ * @return A unique pointer to a `cg::value`.
+ */
+static std::unique_ptr<cg::value> type_info_to_value(
+  const ty::type_info& ti,
+  std::optional<std::string> name = std::nullopt)
+{
+    std::string base_type = ti.is_array() ? ti.get_element_type()->to_string()
+                                          : ti.to_string();
+
+    if(ty::is_builtin_type(base_type))
+    {
+        return std::make_unique<cg::value>(
+          cg::type{cg::to_type_class(base_type),
+                   ti.is_array()
+                     ? static_cast<std::size_t>(1)
+                     : static_cast<std::size_t>(0)},
+          std::move(name));
+    }
+
+    return std::make_unique<cg::value>(
+      cg::type{cg::type_class::struct_,
+               ti.is_array()
+                 ? static_cast<std::size_t>(1)
+                 : static_cast<std::size_t>(0),
+               std::move(base_type),
+               ti.get_import_path()},
+      std::move(name));
+}
+
 /*
  * expression.
  */
@@ -2467,120 +2501,74 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
         throw cg::codegen_error(loc, "Invalid memory context for prototype.");
     }
 
-    std::vector<std::unique_ptr<cg::value>> function_args;
-    for(auto& a: args)
+    if(args.size() != args_type_info.size())
     {
-        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
-        {
-            function_args.emplace_back(std::make_unique<cg::value>(
-              cg::type{cg::to_type_class(std::get<1>(a)->get_name().s),
-                       std::get<1>(a)->is_array()
-                         ? static_cast<std::size_t>(1)
-                         : static_cast<std::size_t>(0)},
-              std::get<0>(a).s));
-        }
-        else
-        {
-            function_args.emplace_back(std::make_unique<cg::value>(
-              cg::type{cg::type_class::struct_,
-                       std::get<1>(a)->is_array()
-                         ? static_cast<std::size_t>(1)
-                         : static_cast<std::size_t>(0),
-                       std::get<1>(a)->get_name().s},
-              std::get<0>(a).s));
-        }
+        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
     }
 
-    std::unique_ptr<cg::value> ret_val = ty::is_builtin_type(return_type->get_name().s)
-                                           ? std::make_unique<cg::value>(cg::type{cg::to_type_class(return_type->get_name().s),
-                                                                                  return_type->is_array()
-                                                                                    ? static_cast<std::size_t>(1)
-                                                                                    : static_cast<std::size_t>(0)})
-                                           : std::make_unique<cg::value>(cg::type{cg::type_class::struct_,
-                                                                                  return_type->is_array()
-                                                                                    ? static_cast<std::size_t>(1)
-                                                                                    : static_cast<std::size_t>(0),
-                                                                                  return_type->get_name().s});
+    std::vector<std::unique_ptr<cg::value>> function_args;
+    for(std::size_t i = 0; i < args.size(); ++i)
+    {
+        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
+    }
 
-    return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
+    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
+    return ctx.create_function(name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
 {
+    if(args.size() != args_type_info.size())
+    {
+        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
+    }
+
     std::vector<std::unique_ptr<cg::value>> function_args;
-    for(auto& a: args)
+    for(std::size_t i = 0; i < args.size(); ++i)
     {
-        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
-        {
-            function_args.emplace_back(
-              std::make_unique<cg::value>(
-                cg::type{cg::to_type_class(std::get<1>(a)->get_name().s),
-                         std::get<1>(a)->is_array()
-                           ? static_cast<std::size_t>(1)
-                           : static_cast<std::size_t>(0)},
-                std::get<0>(a).s));
-        }
-        else
-        {
-            function_args.emplace_back(
-              std::make_unique<cg::value>(
-                cg::type{cg::type_class::struct_,
-                         std::get<1>(a)->is_array()
-                           ? static_cast<std::size_t>(1)
-                           : static_cast<std::size_t>(0),
-                         std::get<1>(a)->get_name().s},
-                std::get<0>(a).s));
-        }
+        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
     }
 
-    std::unique_ptr<cg::value> ret;
-    if(ty::is_builtin_type(return_type->get_name().s))
-    {
-        ret = std::make_unique<cg::value>(
-          cg::type{cg::to_type_class(return_type->get_name().s),
-                   return_type->is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0)});
-    }
-    else
-    {
-        ret = std::make_unique<cg::value>(
-          cg::type{cg::type_class::struct_,
-                   return_type->is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0),
-                   return_type->get_name().s});
-    }
-
+    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
     ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
     std::vector<cg::value> prototype_arg_types;
-    std::transform(args.cbegin(), args.cend(), std::back_inserter(prototype_arg_types),
-                   [](const auto& arg) -> cg::value
-                   {
-                       if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
-                       {
-                           return cg::value{
-                             cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
-                                      std::get<1>(arg)->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)}};
-                       }
+    std::transform(
+      args.cbegin(),
+      args.cend(),
+      std::back_inserter(prototype_arg_types),
+      [](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> cg::value
+      {
+          if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
+          {
+              return cg::value{
+                cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
+                         std::get<1>(arg)->is_array()
+                           ? static_cast<std::size_t>(1)
+                           : static_cast<std::size_t>(0)}};
+          }
 
-                       return cg::value{
-                         cg::type{cg::type_class::struct_,
-                                  std::get<1>(arg)->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                                  std::get<1>(arg)->get_name().s}};
-                   });
+          return cg::value{
+            cg::type{cg::type_class::struct_,
+                     std::get<1>(arg)->is_array()
+                       ? static_cast<std::size_t>(1)
+                       : static_cast<std::size_t>(0),
+                     std::get<1>(arg)->get_name().s,
+                     std::get<1>(arg)->get_namespace_path()}};
+      });
 
     cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
                           ? cg::value{
                               cg::type{cg::to_type_class(return_type->get_name().s),
-                                       return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)}}
-                          : cg::value{cg::type{cg::type_class::struct_, return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0), return_type->get_name().s}};
+                                       return_type->is_array()
+                                         ? static_cast<std::size_t>(1)
+                                         : static_cast<std::size_t>(0)}}
+                          : cg::value{cg::type{cg::type_class::struct_, return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0), return_type->get_name().s, return_type->get_namespace_path()}};
 
-    ctx.add_prototype(name.s, std::move(ret_val), prototype_arg_types);
+    ctx.add_prototype(name.s, std::move(ret_val), std::move(prototype_arg_types));
 
     std::vector<ty::type_info> arg_types;
     std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
@@ -2598,20 +2586,18 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 
 void prototype_ast::type_check(ty::context& ctx)
 {
-    // add the arguments to the current scope.
+    // get the argument types and add them to the current scope.
     for(const auto& arg: args)
     {
-        ctx.add_variable(std::get<0>(arg),
-                         ctx.get_type(std::get<1>(arg)->get_name(),
-                                      std::get<1>(arg)->is_array(),
-                                      std::get<1>(arg)->get_namespace_path()));
+        args_type_info.push_back(ctx.get_type(std::get<1>(arg)->get_name(),
+                                              std::get<1>(arg)->is_array(),
+                                              std::get<1>(arg)->get_namespace_path()));
+
+        ctx.add_variable(std::get<0>(arg), args_type_info.back());
     }
 
-    // check the return type.
-    if(!ty::is_builtin_type(return_type->get_name().s) && !ctx.has_type(return_type->get_name().s))
-    {
-        throw ty::type_error(return_type->get_location(), fmt::format("Unknown return type '{}'.", return_type->get_name().s));
-    }
+    // get and check the return type.
+    return_type_info = ctx.get_type(return_type->get_name().s, return_type->is_array(), return_type->get_namespace_path());
 }
 
 std::string prototype_ast::to_string() const

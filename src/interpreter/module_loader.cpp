@@ -85,19 +85,19 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const std::pair<module_::variable_type, bool>& v)
+static std::size_t get_type_or_reference_size(const module_::variable_type& v)
 {
-    if(std::get<0>(v).base_type().length() == 0)
+    if(v.base_type().length() == 0)
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
 
-    if(std::get<1>(v) || std::get<0>(v).is_array())
+    if(v.is_array())
     {
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(std::get<0>(v).base_type());
+    auto built_in_it = type_properties_map.find(v.base_type());
     if(built_in_it != type_properties_map.end())
     {
         return built_in_it->second.first;
@@ -257,11 +257,11 @@ void module_loader::decode_structs()
         // check/store layout.
         if((desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0)
         {
-            desc.layout_id = ctx.get_gc().check_type_layout(fmt::format("{}.{}", import_name, name), layout);
+            desc.layout_id = ctx.get_gc().check_type_layout(make_type_name(import_name, name), layout);
         }
         else
         {
-            desc.layout_id = ctx.get_gc().register_type_layout(fmt::format("{}.{}", import_name, name), std::move(layout));
+            desc.layout_id = ctx.get_gc().register_type_layout(make_type_name(import_name, name), std::move(layout));
         }
 
         recorder->type(name, desc);
@@ -1161,6 +1161,41 @@ std::int32_t module_loader::decode_instruction(
     }
 }
 
+void module_loader::resolve_type(module_::variable_type& type) const
+{
+    if(ty::is_builtin_type(type.base_type()))
+    {
+        if(type.import_index.has_value())
+        {
+            throw interpreter_error(
+              fmt::format(
+                "Built-in type '{}' cannot have an import index.",
+                type.base_type()));
+        }
+    }
+    else if(type.import_index.has_value())
+    {
+        const module_::imported_symbol& imp_type = mod.header.imports.at(type.import_index.value());
+        const module_::imported_symbol& imp_pkg = mod.header.imports.at(imp_type.package_index);
+
+        std::string type_name = make_type_name(imp_pkg.name, imp_type.name);
+        if(imp_pkg.type != module_::symbol_type::package)
+        {
+            throw interpreter_error(
+              fmt::format(
+                "Could not resolve import '{}': Invalid symbol type for package.",
+                type_name));
+        }
+
+        type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+    }
+    else
+    {
+        // check that the type is contained in the current module.
+        type.layout_id = ctx.get_gc().get_type_layout_id(make_type_name(import_name, type.base_type()));
+    }
+};
+
 module_loader::module_loader(
   context& ctx,
   std::string import_name,
@@ -1212,6 +1247,22 @@ module_loader::module_loader(
         }
 
         auto& desc = std::get<module_::function_descriptor>(it.desc);
+
+        /*
+         * resolve layout id's in the function signature. these are used for validation
+         * when functions are called from native code.
+         */
+
+        resolve_type(desc.signature.return_type);
+        for(auto& arg: desc.signature.arg_types)
+        {
+            resolve_type(arg);
+        }
+
+        /*
+         * resolve native functions.
+         */
+
         if(desc.native)
         {
             auto& details = std::get<module_::native_function_details>(desc.details);

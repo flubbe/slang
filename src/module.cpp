@@ -109,6 +109,10 @@ archive& operator&(archive& ar, variable_type& ts)
         }
 
         ts.set_from_encoded(s);
+
+        vle_int i;
+        ar & i;
+        ts.import_index = i.i >= 0 ? std::make_optional(i.i) : std::nullopt;
     }
     else if(ar.is_writing())
     {
@@ -117,6 +121,9 @@ archive& operator&(archive& ar, variable_type& ts)
         {
             ar & c;
         }
+
+        vle_int i = ts.import_index.value_or(-1);
+        ar & i;
     }
     else
     {
@@ -156,10 +163,12 @@ std::size_t language_module::add_import(symbol_type type, std::string name, std:
     return header.imports.size() - 1;
 }
 
-void language_module::add_function(std::string name,
-                                   std::pair<std::string, bool> return_type,
-                                   std::vector<std::pair<std::string, bool>> arg_types,
-                                   std::size_t size, std::size_t entry_point, std::vector<variable_descriptor> locals)
+void language_module::add_function(
+  std::string name,
+  variable_type return_type,
+  std::vector<variable_type> arg_types,
+  std::size_t size, std::size_t entry_point,
+  std::vector<variable_descriptor> locals)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool
@@ -178,10 +187,11 @@ void language_module::add_function(std::string name,
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 
-void language_module::add_native_function(std::string name,
-                                          std::pair<std::string, bool> return_type,
-                                          std::vector<std::pair<std::string, bool>> arg_types,
-                                          std::string lib_name)
+void language_module::add_native_function(
+  std::string name,
+  variable_type return_type,
+  std::vector<variable_type> arg_types,
+  std::string lib_name)
 {
     if(std::find_if(header.exports.begin(), header.exports.end(),
                     [&name](const exported_symbol& s) -> bool

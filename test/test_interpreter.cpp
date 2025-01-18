@@ -913,6 +913,51 @@ TEST(interpreter, returned_struct)
     }
 }
 
+TEST(interpreter, struct_argument)
+{
+    {
+        slang::file_manager file_mgr;
+        file_mgr.add_search_path(".");
+        si::context ctx{file_mgr};
+
+        ASSERT_NO_THROW(ctx.resolve_module("struct_arg"));
+
+        // needs to match the definition inside the script.
+        struct S
+        {
+            std::int32_t i;
+            float j;
+            std::string* s;
+        };
+        S s;
+
+        std::size_t layout_id = 0;
+        ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("struct_arg", "S")));
+
+        ASSERT_NO_THROW(ctx.invoke("struct_arg", "struct_arg", {si::value{layout_id, &s}}));
+
+        // prevent garbage collection for `s.s`.
+        ctx.get_gc().add_root(s.s);
+
+        EXPECT_EQ(s.i, 1);
+        EXPECT_FLOAT_EQ(s.j, 2.3);
+        EXPECT_EQ(*s.s, "test");
+
+        ctx.get_gc().run();
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 1);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 1);
+
+        // collect `s.s`.
+        ctx.get_gc().remove_root(s.s);
+        ctx.get_gc().run();
+
+        EXPECT_EQ(ctx.get_gc().object_count(), 0);
+        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
+        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    }
+}
+
 TEST(interpreter, nested_structs)
 {
     {

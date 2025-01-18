@@ -22,6 +22,19 @@
 namespace slang::interpreter
 {
 
+/**
+ * Helper to create a unique type name.
+ *
+ * @param package_import_name Import name of the package containing the type.
+ * @param type_name The type name in the package.
+ */
+inline std::string make_type_name(
+  const std::string& package_import_name,
+  const std::string& type_name)
+{
+    return fmt::format("{}.{}", package_import_name, type_name);
+}
+
 /** Interpreter context. */
 class context
 {

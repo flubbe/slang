@@ -145,6 +145,11 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
 
+    - name: Run native integration examples
+      run: |
+        ./build/${{env.BUILD_TYPE}}/slang compile examples/native_integration
+        ./build/${{env.BUILD_TYPE}}/examples/native_integration
+
     - name: Clean up script tests
       run: |
         cd ${{github.workspace}}/test

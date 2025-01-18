@@ -274,6 +274,14 @@ class module_loader
       const module_::function_details& details,
       std::vector<std::byte>& code);
 
+    /**
+     * Resolve a type. For custom types, that means resolving or validating
+     * its layout id. For built-in types, this validates the given type.
+     *
+     * @param type The type to resolve.
+     */
+    void resolve_type(module_::variable_type& type) const;
+
 public:
     /** Defaulted and deleted constructors. */
     module_loader() = delete;

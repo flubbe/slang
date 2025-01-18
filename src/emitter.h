@@ -73,9 +73,10 @@ public:
      * @param arg_types The argument types.
      * @throws Throws an `emitter_error` if the function already exists.
      */
-    void add_function(const std::string& name,
-                      std::pair<std::string, bool> return_type,
-                      std::vector<std::pair<std::string, bool>> arg_types);
+    void add_function(
+      const std::string& name,
+      module_::variable_type return_type,
+      std::vector<module_::variable_type> arg_types);
 
     /**
      * Set the function's details (`size`, `offset` and `locals`).
@@ -85,10 +86,11 @@ public:
      * @param offset The function's offset / entry point.
      * @param locals The function's locals.
      */
-    void update_function(const std::string& name,
-                         std::size_t size,
-                         std::size_t offset,
-                         std::vector<module_::variable_descriptor> locals);
+    void update_function(
+      const std::string& name,
+      std::size_t size,
+      std::size_t offset,
+      std::vector<module_::variable_descriptor> locals);
 
     /**
      * Add a native function to the export table.
@@ -99,10 +101,11 @@ public:
      * @param import_library Name of the library this function is implemented in.
      * @throws Throws an `emitter_error` if the function already exists.
      */
-    void add_native_function(const std::string& name,
-                             std::pair<std::string, bool> return_type,
-                             std::vector<std::pair<std::string, bool>> arg_types,
-                             std::string import_library);
+    void add_native_function(
+      const std::string& name,
+      module_::variable_type return_type,
+      std::vector<module_::variable_type> arg_types,
+      std::string import_library);
 
     /**
      * Add a type to the export table.
@@ -110,7 +113,9 @@ public:
      * @param ctx The context used for type resolution.
      * @param type The type definition.
      */
-    void add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type);
+    void add_type(
+      const cg::context& ctx,
+      const std::unique_ptr<cg::struct_>& type);
 
     /**
      * Add a constant to the export table.
@@ -171,7 +176,9 @@ protected:
      * @param func The current function.
      * @param instr The instruction to emit.
      */
-    void emit_instruction(const std::unique_ptr<cg::function>& func, const std::unique_ptr<cg::instruction>& instr);
+    void emit_instruction(
+      const std::unique_ptr<cg::function>& func,
+      const std::unique_ptr<cg::instruction>& instr);
 
 public:
     /** Delete constructors. */

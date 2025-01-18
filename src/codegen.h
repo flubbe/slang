@@ -1475,7 +1475,11 @@ public:
      * @param arg_type The function's argument types.
      * @param import_path The import path of the module for imported functions.
      */
-    prototype(std::string name, value return_type, std::vector<value> arg_types, std::optional<std::string> import_path = std::nullopt)
+    prototype(
+      std::string name,
+      value return_type,
+      std::vector<value> arg_types,
+      std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
@@ -1550,7 +1554,10 @@ public:
      * @param return_type The function's return type.
      * @param args The function's argument list.
      */
-    function(std::string name, std::unique_ptr<value> return_type, std::vector<std::unique_ptr<value>> args)
+    function(
+      std::string name,
+      std::unique_ptr<value> return_type,
+      std::vector<std::unique_ptr<value>> args)
     : name{name}
     , native{false}
     , return_type{std::move(return_type)}
@@ -1630,11 +1637,14 @@ public:
     {
         std::vector<type> arg_types;
         auto& args = scope.get_args();
-        std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                       [](const auto& arg) -> type
-                       {
-                           return arg->get_type();
-                       });
+        std::transform(
+          args.cbegin(),
+          args.cend(),
+          std::back_inserter(arg_types),
+          [](const auto& arg) -> type
+          {
+              return arg->get_type();
+          });
         return {return_type->get_type(), std::move(arg_types)};
     }
 
@@ -2005,9 +2015,8 @@ public:
      * @param return_type The function's return type.
      * @param args The function's arguments.
      * @param import_path The import path for the prototype.
-     * @returns A representation of the prototype.
      */
-    prototype* add_prototype(
+    void add_prototype(
       std::string name,
       value return_type,
       std::vector<value> args,

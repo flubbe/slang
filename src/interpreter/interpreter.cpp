@@ -46,32 +46,30 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<module_::variable_type, bool>& return_type)
+static opcode get_return_opcode(const module_::variable_type& return_type)
 {
-    auto& name = std::get<0>(return_type);
-
-    if(std::get<1>(return_type))
+    if(return_type.is_array())
     {
         return opcode::aret;
     }
 
-    if(name.base_type() == "void")
+    if(return_type.base_type() == "void")
     {
         return opcode::ret;
     }
-    else if(name.base_type() == "i32")
+    else if(return_type.base_type() == "i32")
     {
         return opcode::iret;
     }
-    else if(name.base_type() == "f32")
+    else if(return_type.base_type() == "f32")
     {
         return opcode::fret;
     }
-    else if(name.base_type() == "str")
+    else if(return_type.base_type() == "str")
     {
         return opcode::sret;
     }
-    else if(name.base_type() == "@addr" || name.base_type() == "@array")
+    else if(return_type.base_type() == "@addr" || return_type.base_type() == "@array")
     {
         return opcode::aret;
     }
@@ -112,12 +110,13 @@ static bool is_garbage_collected(const std::pair<std::string, bool>& info)
  * function implementation.
  */
 
-function::function(module_::function_signature signature,
-                   std::size_t entry_point,
-                   std::size_t size,
-                   std::vector<module_::variable_descriptor> locals,
-                   std::size_t locals_size,
-                   std::size_t stack_size)
+function::function(
+  module_::function_signature signature,
+  std::size_t entry_point,
+  std::size_t size,
+  std::vector<module_::variable_descriptor> locals,
+  std::size_t locals_size,
+  std::size_t stack_size)
 : signature{std::move(signature)}
 , native{false}
 , entry_point_or_function{entry_point}
@@ -129,7 +128,9 @@ function::function(module_::function_signature signature,
     ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
-function::function(module_::function_signature signature, std::function<void(operand_stack&)> func)
+function::function(
+  module_::function_signature signature,
+  std::function<void(operand_stack&)> func)
 : signature{std::move(signature)}
 , native{true}
 , entry_point_or_function{std::move(func)}
@@ -141,7 +142,9 @@ function::function(module_::function_signature signature, std::function<void(ope
  * context implementation.
  */
 
-std::function<void(operand_stack&)> context::resolve_native_function(const std::string& name, const std::string& library_name) const
+std::function<void(operand_stack&)> context::resolve_native_function(
+  const std::string& name,
+  const std::string& library_name) const
 {
     auto mod_it = native_function_map.find(library_name);
     if(mod_it == native_function_map.end())
@@ -199,7 +202,7 @@ public:
                 {
                     ctx.get_gc().add_root(addr);
                     // FIXME We (likely) want to remove the temporaries from the GC here,
-                    //       instead of at the caller (see comment there).
+                    //       instead of at the call site (see comment there).
                 }
             }
         }
@@ -898,7 +901,6 @@ opcode context::exec(
 
                     std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
                 }
-
                 else
                 {
                     throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
@@ -1191,10 +1193,11 @@ opcode context::exec(
     }
 }
 
-void context::stack_trace_handler(interpreter_error& err,
-                                  const module_loader& loader,
-                                  std::size_t entry_point,
-                                  std::size_t offset)
+void context::stack_trace_handler(
+  interpreter_error& err,
+  const module_loader& loader,
+  std::size_t entry_point,
+  std::size_t offset)
 {
     // find the module name.
     for(auto& [mod_name, mod_loader]: loaders)
@@ -1232,6 +1235,9 @@ std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>&
 /** Function argument writing and destruction. */
 class arguments_scope
 {
+    /** Interpreter context. */
+    context& ctx;
+
     /** The arguments to manage. */
     const std::vector<value>& args;
 
@@ -1248,11 +1254,13 @@ public:
      * @param arg_types The argument types to validate against.
      * @param locals The locals storage to write into.
      */
-    arguments_scope(context& ctx,
-                    const std::vector<value>& args,
-                    const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
-                    std::vector<std::byte>& locals)
-    : args{args}
+    arguments_scope(
+      context& ctx,
+      const std::vector<value>& args,
+      const std::vector<module_::variable_type>& arg_types,
+      std::vector<std::byte>& locals)
+    : ctx{ctx}
+    , args{args}
     , locals{locals}
     {
         if(arg_types.size() != args.size())
@@ -1265,21 +1273,50 @@ public:
         std::size_t offset = 0;
         for(std::size_t i = 0; i < args.size(); ++i)
         {
-            if(std::get<0>(arg_types[i]) != std::get<0>(args[i].get_type()))
+            std::pair<std::string, bool> arg_type = args[i].get_type();
+            std::optional<std::size_t> layout_id = args[i].get_layout_id();
+
+            if(layout_id.has_value())
+            {
+                if(arg_types[i].layout_id != layout_id)
+                {
+                    if(arg_types[i].layout_id.has_value())
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Argument {} has wrong base type (expected type '{}' with id '{}', got id '{}').",
+                            i,
+                            arg_types[i].base_type(),
+                            arg_types[i].layout_id.value(),
+                            layout_id.value()));
+                    }
+                    else
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Argument {} has wrong base type (expected type '{}', got id '{}').",
+                            i,
+                            arg_types[i].base_type(),
+                            layout_id.value()));
+                    }
+                }
+            }
+            else if(arg_types[i].base_type() != std::get<0>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
                               i,
-                              std::get<0>(arg_types[i]).base_type(),
-                              std::get<0>(args[i].get_type())));
+                              arg_types[i].base_type(),
+                              std::get<0>(arg_type)));
             }
 
-            if(std::get<1>(arg_types[i]) != std::get<1>(args[i].get_type()))
+            if(arg_types[i].is_array() != std::get<1>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
                               i,
-                              std::get<1>(arg_types[i]), std::get<1>(args[i].get_type())));
+                              arg_types[i].is_array(),
+                              std::get<1>(arg_type)));
             }
 
             if(offset + args[i].get_size() > locals.size())
@@ -1288,10 +1325,16 @@ public:
                   "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
-            if(is_garbage_collected(args[i].get_type()))
+            if(layout_id.has_value())
+            {
+                ctx.get_gc().add_persistent(&locals[offset], layout_id.value());
+            }
+
+            if(is_garbage_collected(arg_type))
             {
                 ctx.get_gc().add_temporary(&locals[offset]);
             }
+
             offset += args[i].create(&locals[offset]);
         }
     }
@@ -1308,6 +1351,25 @@ public:
 
                 // FIXME This is an error, but destructors cannot throw.
                 return;
+            }
+
+            if(args[i].get_layout_id().has_value())
+            {
+                try
+                {
+                    ctx.get_gc().remove_persistent(&locals[offset]);
+                }
+                catch(gc::gc_error& e)
+                {
+                    // FIXME This is an error, but destructors cannot throw.
+
+                    DEBUG_LOG("GC error during argument destruction while processing argument {}: {}", i, e.what());
+                }
+            }
+
+            if(is_garbage_collected(args[i].get_type()))
+            {
+                ctx.get_gc().remove_temporary(&locals[offset]);
             }
 
             offset += args[i].destroy(&locals[offset]);
@@ -1373,9 +1435,13 @@ value context::exec(
     }
     else if(ret_opcode == opcode::aret)
     {
+        auto sig = f.get_signature();
+
         void* addr = frame.stack.pop_addr<void>();
-        ret = value{addr};
-        // FIXME The caller is responsible for calling `gc.remove_temporary(addr)`.
+        ret = value{
+          std::make_pair(sig.return_type.base_type(), sig.return_type.is_array()),
+          addr};
+        // NOTE The caller is responsible for calling `gc.remove_temporary(addr)`.
     }
     else
     {
@@ -1396,7 +1462,10 @@ value context::exec(
     return ret;
 }
 
-void context::register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func)
+void context::register_native_function(
+  const std::string& mod_name,
+  std::string fn_name,
+  std::function<void(operand_stack&)> func)
 {
     if(!func)
     {
@@ -1424,7 +1493,11 @@ void context::register_native_function(const std::string& mod_name, std::string 
     {
         if(native_mod_it->second.find(fn_name) != native_mod_it->second.end())
         {
-            throw interpreter_error(fmt::format("Cannot register native function: '{}' is already definded for module '{}'.", fn_name, mod_name));
+            throw interpreter_error(
+              fmt::format(
+                "Cannot register native function: '{}' is already definded for module '{}'.",
+                fn_name,
+                mod_name));
         }
 
         native_mod_it->second.insert({std::move(fn_name), std::move(func)});
@@ -1455,11 +1528,13 @@ module_loader* context::resolve_module(const std::string& import_name, std::shar
 
 std::string context::get_import_name(const module_loader& loader) const
 {
-    auto it = std::find_if(loaders.cbegin(), loaders.cend(),
-                           [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
-                           {
-                               return p.second.get() == &loader;
-                           });
+    auto it = std::find_if(
+      loaders.cbegin(),
+      loaders.cend(),
+      [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
+      {
+          return p.second.get() == &loader;
+      });
     if(it == loaders.cend())
     {
         throw interpreter_error("Unable to find name for loader.");

@@ -22,8 +22,8 @@ void register_builtin_type_layouts(gc::garbage_collector& gc)
     /*
      * layout for `i32s`, `f32s`.
      */
-    gc.register_type_layout("std.i32s", {});
-    gc.register_type_layout("std.f32s", {});
+    gc.register_type_layout(si::make_type_name("std", "i32s"), {});
+    gc.register_type_layout(si::make_type_name("std", "f32s"), {});
 
     static_assert(std::is_standard_layout_v<i32s>);
     static_assert(std::is_standard_layout_v<f32s>);
@@ -40,7 +40,7 @@ void register_builtin_type_layouts(gc::garbage_collector& gc)
     offset = utils::align(alignment, offset);
     layout.push_back(offset);
 
-    gc.register_type_layout("std.result", layout);
+    gc.register_type_layout(si::make_type_name("std", "result"), layout);
 
     static_assert(std::is_standard_layout_v<result>);
 }
