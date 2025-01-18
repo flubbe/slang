@@ -376,16 +376,11 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         }
         else
         {
+            auto cast_target_type = target_type->to_type();
             if(target_type->get_name().s == "str")
             {
-                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+                return std::make_unique<cg::value>(std::move(cast_target_type));
             }
-
-            auto cast_target_type = cg::type{
-              cg::type_class::struct_,
-              0,
-              target_type->get_name().s,
-              target_type->get_namespace_path()};
 
             // casts between non-builtin types are checked at run-time.
             ctx.generate_checkcast(cast_target_type);
@@ -430,7 +425,7 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
     }
 
     // casts for struct types. this is checked at run-time.
-    expr_type = ctx.get_type(target_type->get_name().s, false, target_type->get_namespace_path());    // no array casts.
+    expr_type = target_type->to_type_info(ctx);    // no array casts.
     ctx.set_expression_type(this, *expr_type);
 
     return expr_type;
@@ -902,7 +897,39 @@ std::string type_expression::to_string() const
         namespace_string += namespace_stack.back().s;
     }
 
-    return fmt::format("TypeExpression(name={}, namespaces=({}), array={})", get_name().s, namespace_string, is_array());
+    return fmt::format("TypeExpression(name={}, namespaces=({}), array={})", get_name().s, namespace_string, array);
+}
+
+cg::type type_expression::to_type() const
+{
+    if(ty::is_builtin_type(type_name.s))
+    {
+        if(namespace_stack.size() != 0)
+        {
+            throw cg::codegen_error(loc, fmt::format("Type '{}' cannot occur in a namespace.", type_name.s));
+        }
+
+        return cg::type{cg::to_type_class(type_name.s), array};
+    }
+
+    return cg::type{
+      cg::type_class::struct_,
+      array ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),    // FIXME Change if more array dimensions need to be supported.
+      type_name.s,
+      get_namespace_path()};
+}
+
+ty::type_info type_expression::to_type_info(ty::context& ctx) const
+{
+    return ctx.get_type(type_name.s, array, get_namespace_path());
+}
+
+ty::type_info type_expression::to_unresolved_type_info(ty::context& ctx) const
+{
+    return ctx.get_unresolved_type(
+      type_name,
+      array ? ty::type_class::tc_array : ty::type_class::tc_plain,
+      get_namespace_path());
 }
 
 /*
@@ -934,9 +961,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     else
     {
         v = std::make_unique<cg::value>(
-          cg::type{cg::type_class::struct_,
-                   type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                   type->get_name().s, type->get_namespace_path()},
+          type->to_type(),
           name.s);
         s->add_local(std::make_unique<cg::value>(*v));
     }
@@ -962,7 +987,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
 
 std::optional<ty::type_info> variable_declaration_expression::type_check(ty::context& ctx)
 {
-    auto var_type = ctx.get_type(type->get_name(), is_array(), type->get_namespace_path());
+    auto var_type = type->to_type_info(ctx);
     ctx.add_variable(name, var_type);
 
     if(expr)
@@ -1065,7 +1090,7 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::co
 
 std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
 {
-    auto const_type = ctx.get_type(type->get_name(), false, type->get_namespace_path());
+    auto const_type = type->to_type_info(ctx);
     ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
 
     auto rhs = expr->type_check(ctx);
@@ -1221,27 +1246,10 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     std::vector<std::pair<std::string, cg::value>> struct_members;
     for(auto& m: members)
     {
-        if(ty::is_builtin_type(m->get_type()->get_name().s))
-        {
-            cg::value v = {cg::type{
-                             cg::to_type_class(m->get_type()->get_name().s),
-                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                             m->get_namespace_path()},
-                           m->get_name().s};
+        cg::value v = {m->get_type()->to_type(),
+                       m->get_name().s};
 
-            struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
-        }
-        else
-        {
-            cg::value v = {cg::type{
-                             cg::type_class::struct_,
-                             m->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),
-                             m->get_type()->get_name().s,
-                             m->get_namespace_path()},
-                           m->get_name().s};
-
-            struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
-        }
+        struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
     }
 
     std::uint8_t flags = static_cast<std::uint8_t>(module_::struct_flags::none);
@@ -1267,9 +1275,7 @@ void struct_definition_expression::collect_names([[maybe_unused]] cg::context& c
     {
         struct_members.emplace_back(
           std::make_pair(m->get_name(),
-                         type_ctx.get_unresolved_type(m->get_type()->get_name(),
-                                                      m->get_type()->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
-                                                      m->get_type()->get_namespace_path())));
+                         m->get_type()->to_unresolved_type_info(type_ctx)));
     }
     type_ctx.add_struct(name, std::move(struct_members));
 }
@@ -2317,19 +2323,8 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
     }
 
     // custom type.
-    ctx.generate_anewarray(
-      cg::value{
-        cg::type{
-          cg::type_class::struct_,
-          0,
-          type_expr->get_name().s,
-          type_expr->get_namespace_path()}});
-    return std::make_unique<cg::value>(
-      cg::type{
-        cg::type_class::struct_,
-        1,
-        type_expr->get_name().s,
-        type_expr->get_namespace_path()});
+    ctx.generate_anewarray(cg::value{type_expr->to_type()});
+    return std::make_unique<cg::value>(type_expr->to_type());
 }
 
 std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
@@ -2551,37 +2546,23 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
                            : static_cast<std::size_t>(0)}};
           }
 
-          return cg::value{
-            cg::type{cg::type_class::struct_,
-                     std::get<1>(arg)->is_array()
-                       ? static_cast<std::size_t>(1)
-                       : static_cast<std::size_t>(0),
-                     std::get<1>(arg)->get_name().s,
-                     std::get<1>(arg)->get_namespace_path()}};
+          return cg::value{std::get<1>(arg)->to_type()};
       });
 
-    cg::value ret_val = ty::is_builtin_type(return_type->get_name().s)
-                          ? cg::value{
-                              cg::type{cg::to_type_class(return_type->get_name().s),
-                                       return_type->is_array()
-                                         ? static_cast<std::size_t>(1)
-                                         : static_cast<std::size_t>(0)}}
-                          : cg::value{cg::type{cg::type_class::struct_, return_type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0), return_type->get_name().s, return_type->get_namespace_path()}};
-
+    cg::value ret_val = cg::value{return_type->to_type()};
     ctx.add_prototype(name.s, std::move(ret_val), std::move(prototype_arg_types));
 
     std::vector<ty::type_info> arg_types;
-    std::transform(args.cbegin(), args.cend(), std::back_inserter(arg_types),
-                   [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
-                   { return type_ctx.get_unresolved_type(
-                       std::get<1>(arg)->get_name(),
-                       std::get<1>(arg)->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
-                       std::get<1>(arg)->get_namespace_path()); });
-    type_ctx.add_function(name, std::move(arg_types),
-                          type_ctx.get_unresolved_type(
-                            return_type->get_name(),
-                            return_type->is_array() ? ty::type_class::tc_array : ty::type_class::tc_plain,
-                            return_type->get_namespace_path()));
+    std::transform(
+      args.cbegin(),
+      args.cend(),
+      std::back_inserter(arg_types),
+      [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
+      { return std::get<1>(arg)->to_unresolved_type_info(type_ctx); });
+    type_ctx.add_function(
+      name,
+      std::move(arg_types),
+      return_type->to_unresolved_type_info(type_ctx));
 }
 
 void prototype_ast::type_check(ty::context& ctx)
@@ -2589,15 +2570,12 @@ void prototype_ast::type_check(ty::context& ctx)
     // get the argument types and add them to the current scope.
     for(const auto& arg: args)
     {
-        args_type_info.push_back(ctx.get_type(std::get<1>(arg)->get_name(),
-                                              std::get<1>(arg)->is_array(),
-                                              std::get<1>(arg)->get_namespace_path()));
-
+        args_type_info.push_back(std::get<1>(arg)->to_type_info(ctx));
         ctx.add_variable(std::get<0>(arg), args_type_info.back());
     }
 
     // get and check the return type.
-    return_type_info = ctx.get_type(return_type->get_name().s, return_type->is_array(), return_type->get_namespace_path());
+    return_type_info = return_type->to_type_info(ctx);
 }
 
 std::string prototype_ast::to_string() const

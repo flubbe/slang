@@ -26,6 +26,7 @@ namespace slang::codegen
 {
 class context;
 class function;
+class type;
 class value;
 }    // namespace slang::codegen
 
@@ -475,6 +476,15 @@ public:
 
     /** Return a readable representation of the type. */
     std::string to_string() const;
+
+    /** Convert the expression to a type. */
+    cg::type to_type() const;
+
+    /** Get the type info. */
+    ty::type_info to_type_info(ty::context& ctx) const;
+
+    /** Get unresolved type info. */
+    ty::type_info to_unresolved_type_info(ty::context& ctx) const;
 
     /** Return whether the type is an array. */
     bool is_array() const
