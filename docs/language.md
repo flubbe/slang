@@ -21,7 +21,9 @@ fn main(args: [str]) -> i32
 
 ## The syntax
 
-A program consists of:
+Single-line comments are introduced by `//`. Multi-line comments are of the form `/* comment */`.
+
+Ignoring comments, a program consists of:
 ```
 <import-statements>
 <constants>
@@ -77,10 +79,60 @@ A program consists of:
     5. `break` and `continue` statements:
         Break or continue a `while` loop.
     6. `return [<expression>]`: Return from a function.
+    7. `<expression>`: TODO
+        - Type casts: An expression type can be cast to another type
+            when adhering to type cast rules. Type casts are indicated
+            by `as` used after the to-be cast expression:
+            ```
+            <expression> as <type>
+            ```
+            Casting is allowed between `i32` and `f32`, and between any
+            struct and types marked with `#[allow_cast]` (see below).
 
-    TODO expressions, type casts    
+Statements and expressions can be decorated with _directives_:
+```
+#[directive(arg-name1=arg-1,...,arg_nameN=arg-N)]
+...
+```
+Directives can only appear in global scope, or in function scope
+(and not, for example, inside an `if`-block).
 
-5. TODO Directives.
+Currently, the following directives are used:
+```
+// Allow casting to and from this type. The type has to be empty.
+#[allow_cast]
+struct <name> {};
+
+// Indicate that there is a struct definition in C++ code that
+// is registered and checked in the interpreter.
+#[native]
+struct <name> {...}
+
+// Indicate that this function has a native implementation in "<lib-name>".
+#[native(lib="<lib-name>")]
+fn <name>(<arg-name1> : <arg-type1>, ..., <arg-nameN> : <arg-typeN>) -> <return-type>;
+
+fn test()
+{
+    // Disable compile-time constant evaluation for the next expression.
+    #[disable(const_eval)]
+    let t: i32 = 1*2 + 3;
+    ...
+}
+```
+Unknown directives are ignored.
+
+## Built-in types
+
+Built-in types are
+- `void`: Indicates `<no-type>`.
+- `i32`: A 32-bit integer.
+- `f32`: A 32-bit floating-point number.
+- `str`: A string.
+
+**Note:** The internal formats of numbers are not fixed right now. The implementation
+uses whatever the underlying C++ implementation provides, but e.g. `f32` is only tested with
+`IEE754` format.
 
 ## Modules
 
