@@ -110,12 +110,13 @@ static bool is_garbage_collected(const std::pair<std::string, bool>& info)
  * function implementation.
  */
 
-function::function(module_::function_signature signature,
-                   std::size_t entry_point,
-                   std::size_t size,
-                   std::vector<module_::variable_descriptor> locals,
-                   std::size_t locals_size,
-                   std::size_t stack_size)
+function::function(
+  module_::function_signature signature,
+  std::size_t entry_point,
+  std::size_t size,
+  std::vector<module_::variable_descriptor> locals,
+  std::size_t locals_size,
+  std::size_t stack_size)
 : signature{std::move(signature)}
 , native{false}
 , entry_point_or_function{entry_point}
@@ -127,7 +128,9 @@ function::function(module_::function_signature signature,
     ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
-function::function(module_::function_signature signature, std::function<void(operand_stack&)> func)
+function::function(
+  module_::function_signature signature,
+  std::function<void(operand_stack&)> func)
 : signature{std::move(signature)}
 , native{true}
 , entry_point_or_function{std::move(func)}
@@ -139,7 +142,9 @@ function::function(module_::function_signature signature, std::function<void(ope
  * context implementation.
  */
 
-std::function<void(operand_stack&)> context::resolve_native_function(const std::string& name, const std::string& library_name) const
+std::function<void(operand_stack&)> context::resolve_native_function(
+  const std::string& name,
+  const std::string& library_name) const
 {
     auto mod_it = native_function_map.find(library_name);
     if(mod_it == native_function_map.end())
@@ -197,7 +202,7 @@ public:
                 {
                     ctx.get_gc().add_root(addr);
                     // FIXME We (likely) want to remove the temporaries from the GC here,
-                    //       instead of at the caller (see comment there).
+                    //       instead of at the call site (see comment there).
                 }
             }
         }
@@ -1188,10 +1193,11 @@ opcode context::exec(
     }
 }
 
-void context::stack_trace_handler(interpreter_error& err,
-                                  const module_loader& loader,
-                                  std::size_t entry_point,
-                                  std::size_t offset)
+void context::stack_trace_handler(
+  interpreter_error& err,
+  const module_loader& loader,
+  std::size_t entry_point,
+  std::size_t offset)
 {
     // find the module name.
     for(auto& [mod_name, mod_loader]: loaders)
@@ -1321,7 +1327,7 @@ public:
 
             if(layout_id.has_value())
             {
-                ctx.get_gc().add_persistent(&locals[offset], args[i].get_layout_id().value());
+                ctx.get_gc().add_persistent(&locals[offset], layout_id.value());
             }
 
             if(is_garbage_collected(arg_type))
@@ -1433,9 +1439,9 @@ value context::exec(
 
         void* addr = frame.stack.pop_addr<void>();
         ret = value{
-          {sig.return_type.base_type(), sig.return_type.is_array()},
+          std::make_pair(sig.return_type.base_type(), sig.return_type.is_array()),
           addr};
-        // FIXME The caller is responsible for calling `gc.remove_temporary(addr)`.
+        // NOTE The caller is responsible for calling `gc.remove_temporary(addr)`.
     }
     else
     {
@@ -1456,7 +1462,10 @@ value context::exec(
     return ret;
 }
 
-void context::register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func)
+void context::register_native_function(
+  const std::string& mod_name,
+  std::string fn_name,
+  std::function<void(operand_stack&)> func)
 {
     if(!func)
     {
@@ -1484,7 +1493,11 @@ void context::register_native_function(const std::string& mod_name, std::string 
     {
         if(native_mod_it->second.find(fn_name) != native_mod_it->second.end())
         {
-            throw interpreter_error(fmt::format("Cannot register native function: '{}' is already definded for module '{}'.", fn_name, mod_name));
+            throw interpreter_error(
+              fmt::format(
+                "Cannot register native function: '{}' is already definded for module '{}'.",
+                fn_name,
+                mod_name));
         }
 
         native_mod_it->second.insert({std::move(fn_name), std::move(func)});
@@ -1515,11 +1528,13 @@ module_loader* context::resolve_module(const std::string& import_name, std::shar
 
 std::string context::get_import_name(const module_loader& loader) const
 {
-    auto it = std::find_if(loaders.cbegin(), loaders.cend(),
-                           [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
-                           {
-                               return p.second.get() == &loader;
-                           });
+    auto it = std::find_if(
+      loaders.cbegin(),
+      loaders.cend(),
+      [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
+      {
+          return p.second.get() == &loader;
+      });
     if(it == loaders.cend())
     {
         throw interpreter_error("Unable to find name for loader.");

@@ -932,7 +932,7 @@ TEST(interpreter, struct_argument)
         S s;
 
         std::size_t layout_id = 0;
-        ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id("struct_arg.S"));
+        ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("struct_arg", "S")));
 
         ASSERT_NO_THROW(ctx.invoke("struct_arg", "struct_arg", {si::value{layout_id, &s}}));
 

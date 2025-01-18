@@ -257,11 +257,11 @@ void module_loader::decode_structs()
         // check/store layout.
         if((desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0)
         {
-            desc.layout_id = ctx.get_gc().check_type_layout(fmt::format("{}.{}", import_name, name), layout);
+            desc.layout_id = ctx.get_gc().check_type_layout(make_type_name(import_name, name), layout);
         }
         else
         {
-            desc.layout_id = ctx.get_gc().register_type_layout(fmt::format("{}.{}", import_name, name), std::move(layout));
+            desc.layout_id = ctx.get_gc().register_type_layout(make_type_name(import_name, name), std::move(layout));
         }
 
         recorder->type(name, desc);
@@ -1161,6 +1161,41 @@ std::int32_t module_loader::decode_instruction(
     }
 }
 
+void module_loader::resolve_type(module_::variable_type& type) const
+{
+    if(ty::is_builtin_type(type.base_type()))
+    {
+        if(type.import_index.has_value())
+        {
+            throw interpreter_error(
+              fmt::format(
+                "Built-in type '{}' cannot have an import index.",
+                type.base_type()));
+        }
+    }
+    else if(type.import_index.has_value())
+    {
+        const module_::imported_symbol& imp_type = mod.header.imports.at(type.import_index.value());
+        const module_::imported_symbol& imp_pkg = mod.header.imports.at(imp_type.package_index);
+
+        std::string type_name = make_type_name(imp_pkg.name, imp_type.name);
+        if(imp_pkg.type != module_::symbol_type::package)
+        {
+            throw interpreter_error(
+              fmt::format(
+                "Could not resolve import '{}': Invalid symbol type for package.",
+                type_name));
+        }
+
+        type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+    }
+    else
+    {
+        // check that the type is contained in the current module.
+        type.layout_id = ctx.get_gc().get_type_layout_id(make_type_name(import_name, type.base_type()));
+    }
+};
+
 module_loader::module_loader(
   context& ctx,
   std::string import_name,
@@ -1198,51 +1233,6 @@ module_loader::module_loader(
     // decode the module.
     decode();
 
-    /** Helper to resolve a type to a layout id. */
-    auto resolve_layout_id = [this, &ctx](module_::variable_type& type) -> void
-    {
-        if(ty::is_builtin_type(type.base_type()))
-        {
-            if(type.import_index.has_value())
-            {
-                throw interpreter_error(
-                  fmt::format(
-                    "Built-in type '{}' cannot have an import index.",
-                    type.base_type()));
-            }
-        }
-        else if(type.import_index.has_value())
-        {
-            module_::imported_symbol& imp_type = mod.header.imports.at(type.import_index.value());
-            module_::imported_symbol& imp_pkg = mod.header.imports.at(imp_type.package_index);
-
-            std::string type_name = fmt::format(
-              "{}.{}",
-              imp_pkg.name,
-              imp_type.name);
-
-            if(imp_pkg.type != module_::symbol_type::package)
-            {
-                throw interpreter_error(
-                  fmt::format(
-                    "Could not resolve import '{}': Invalid symbol type for package.",
-                    type_name));
-            }
-
-            type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
-        }
-        else
-        {
-            // check that the type is contained in the current module.
-            std::string type_name = fmt::format(
-              "{}.{}",
-              this->import_name,
-              type.base_type());
-
-            type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
-        }
-    };
-
     // populate function map.
     for(auto& it: mod.header.exports)
     {
@@ -1263,10 +1253,10 @@ module_loader::module_loader(
          * when functions are called from native code.
          */
 
-        resolve_layout_id(desc.signature.return_type);
+        resolve_type(desc.signature.return_type);
         for(auto& arg: desc.signature.arg_types)
         {
-            resolve_layout_id(arg);
+            resolve_type(arg);
         }
 
         /*
