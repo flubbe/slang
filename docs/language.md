@@ -140,8 +140,8 @@ A list of implemented constants and functions:
 ## Integration with native code
 
 See the example consisting of
-- [examples/native_integration.cpp](examples/native_integration.cpp), 
-- [examples/native_integration.sl](examples/native_integration.sl)
-- [examples/CMakeLists.txt](examples/CMakeLists.txt).
+- [examples/native_integration.cpp](../examples/native_integration.cpp), 
+- [examples/native_integration.sl](../examples/native_integration.sl)
+- [examples/CMakeLists.txt](../examples/CMakeLists.txt).
 
 TODO 
