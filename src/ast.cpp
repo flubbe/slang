@@ -29,6 +29,40 @@ namespace ty = slang::typing;
 namespace slang::ast
 {
 
+/**
+ * Create a `cg::value` from a `type_info`.
+ *
+ * @param ti The type information.
+ * @param name An optional name for the value.
+ * @return A unique pointer to a `cg::value`.
+ */
+static std::unique_ptr<cg::value> type_info_to_value(
+  const ty::type_info& ti,
+  std::optional<std::string> name = std::nullopt)
+{
+    std::string base_type = ti.is_array() ? ti.get_element_type()->to_string()
+                                          : ti.to_string();
+
+    if(ty::is_builtin_type(base_type))
+    {
+        return std::make_unique<cg::value>(
+          cg::type{cg::to_type_class(base_type),
+                   ti.is_array()
+                     ? static_cast<std::size_t>(1)
+                     : static_cast<std::size_t>(0)},
+          std::move(name));
+    }
+
+    return std::make_unique<cg::value>(
+      cg::type{cg::type_class::struct_,
+               ti.is_array()
+                 ? static_cast<std::size_t>(1)
+                 : static_cast<std::size_t>(0),
+               std::move(base_type),
+               ti.get_import_path()},
+      std::move(name));
+}
+
 /*
  * expression.
  */
@@ -2475,106 +2509,27 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
     std::vector<std::unique_ptr<cg::value>> function_args;
     for(std::size_t i = 0; i < args.size(); ++i)
     {
-        const auto& a = args[i];
-        const auto& ti = args_type_info[i];
-
-        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
-        {
-            function_args.emplace_back(std::make_unique<cg::value>(
-              cg::type{cg::to_type_class(
-                         ti.is_array()
-                           ? ti.get_element_type()->to_string()
-                           : ti.to_string()),
-                       ti.is_array()
-                         ? static_cast<std::size_t>(1)
-                         : static_cast<std::size_t>(0)},
-              std::get<0>(a).s));
-        }
-        else
-        {
-            function_args.emplace_back(std::make_unique<cg::value>(
-              cg::type{cg::type_class::struct_,
-                       ti.is_array()
-                         ? static_cast<std::size_t>(1)
-                         : static_cast<std::size_t>(0),
-                       ti.is_array()
-                         ? ti.get_element_type()->to_string()
-                         : ti.to_string(),
-                       ti.get_import_path()},
-              std::get<0>(a).s));
-        }
+        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
     }
 
-    std::unique_ptr<cg::value> ret_val =
-      ty::is_builtin_type(return_type->get_name().s)
-        ? std::make_unique<cg::value>(
-            cg::type{cg::to_type_class(
-                       return_type_info.is_array()
-                         ? return_type_info.get_element_type()->to_string()
-                         : return_type_info.to_string()),
-                     return_type_info.is_array()
-                       ? static_cast<std::size_t>(1)
-                       : static_cast<std::size_t>(0)})
-        : std::make_unique<cg::value>(
-            cg::type{cg::type_class::struct_,
-                     return_type_info.is_array()
-                       ? static_cast<std::size_t>(1)
-                       : static_cast<std::size_t>(0),
-                     return_type_info.is_array()
-                       ? return_type_info.get_element_type()->to_string()
-                       : return_type_info.to_string(),
-                     return_type_info.get_import_path()});
-
-    return ctx.create_function(name.s, std::move(ret_val), std::move(function_args));
+    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
+    return ctx.create_function(name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
 {
+    if(args.size() != args_type_info.size())
+    {
+        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
+    }
+
     std::vector<std::unique_ptr<cg::value>> function_args;
-    for(auto& a: args)
+    for(std::size_t i = 0; i < args.size(); ++i)
     {
-        if(ty::is_builtin_type(std::get<1>(a)->get_name().s))
-        {
-            function_args.emplace_back(
-              std::make_unique<cg::value>(
-                cg::type{cg::to_type_class(std::get<1>(a)->get_name().s),
-                         std::get<1>(a)->is_array()
-                           ? static_cast<std::size_t>(1)
-                           : static_cast<std::size_t>(0)},
-                std::get<0>(a).s));
-        }
-        else
-        {
-            function_args.emplace_back(
-              std::make_unique<cg::value>(
-                cg::type{cg::type_class::struct_,
-                         std::get<1>(a)->is_array()
-                           ? static_cast<std::size_t>(1)
-                           : static_cast<std::size_t>(0),
-                         std::get<1>(a)->get_name().s},
-                std::get<0>(a).s));
-        }
+        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
     }
 
-    std::unique_ptr<cg::value> ret;
-    if(ty::is_builtin_type(return_type->get_name().s))
-    {
-        ret = std::make_unique<cg::value>(
-          cg::type{cg::to_type_class(return_type->get_name().s),
-                   return_type->is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0)});
-    }
-    else
-    {
-        ret = std::make_unique<cg::value>(
-          cg::type{cg::type_class::struct_,
-                   return_type->is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0),
-                   return_type->get_name().s});
-    }
-
+    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
     ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
