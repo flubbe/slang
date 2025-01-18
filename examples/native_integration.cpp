@@ -11,8 +11,10 @@
 #include <fmt/core.h>
 
 #include "interpreter/interpreter.h"
+#include "runtime/utils.h"
 
 namespace si = slang::interpreter;
+namespace rt = slang::runtime;
 
 /** A struct that is mirrored in the script. */
 struct S
@@ -43,9 +45,8 @@ static void register_native(si::context& ctx)
       "print",
       [&ctx](si::operand_stack& stack)
       {
-          std::string* s = stack.pop_addr<std::string>();
-          fmt::print("{}", *s);
-          ctx.get_gc().remove_temporary(s);
+          auto [gc_container] = rt::get_args<rt::gc_object<std::string>>(ctx, stack);
+          fmt::print("{}", *gc_container.get());
       });
 }
 

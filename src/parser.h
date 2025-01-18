@@ -237,7 +237,7 @@ protected:
     /** Parse an return statement. */
     std::unique_ptr<ast::return_statement> parse_return();
 
-    /** Directive evaluation. Ignores unknown directives. */
+    /** Push a directive onto the directive stack. */
     void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
 
     /** Pop last directive from directive stack. */

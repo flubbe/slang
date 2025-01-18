@@ -29,6 +29,9 @@ class function;
 class value;
 }    // namespace slang::codegen
 
+/*
+ * Forward declarations for type checking.
+ */
 namespace slang::typing
 {
 class context;
