@@ -79,5 +79,33 @@ if __name__ == "__main__":
             print("Assertion not triggered.")
             failures += 1
 
+    # Compile integration example.
+    if (
+        subprocess.call(
+            [
+                "./build/Debug/slang",
+                "compile",
+                str(Path("examples/native_integration")),
+            ],
+            cwd=_module_path.parent,
+        )
+        != 0
+    ):
+        print("Compilation failed for native_integration")
+        failures += 1
+
+    # Run integration example.
+    if (
+        subprocess.call(
+            [
+                "./build/Debug/examples/native_integration",
+            ],
+            cwd=_module_path.parent,
+        )
+        != 0
+    ):
+        print("native_integration example failed.")
+        failures += 1
+
     print(f"---- {failures} failures in examples ----")
     exit(0 if failures == 0 else 1)

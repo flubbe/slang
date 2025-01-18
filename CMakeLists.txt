@@ -42,4 +42,5 @@ add_executable(slang
 )
 target_link_libraries(slang fmt::fmt)
 
+add_subdirectory(examples)
 add_subdirectory(test)
