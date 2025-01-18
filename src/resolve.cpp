@@ -323,31 +323,31 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
                 std::vector<cg::value> prototype_arg_types;
                 std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
-                               [](const auto& arg)
+                               [](const module_::variable_type& arg)
                                {
-                                   if(ty::is_builtin_type(std::get<0>(arg).base_type()))
+                                   if(ty::is_builtin_type(arg.base_type()))
                                    {
                                        return cg::value{
-                                         cg::type{cg::to_type_class(std::get<0>(arg).base_type()),
-                                                  std::get<1>(arg)
+                                         cg::type{cg::to_type_class(arg.base_type()),
+                                                  arg.is_array()
                                                     ? static_cast<std::size_t>(1)
                                                     : static_cast<std::size_t>(0)}};
                                    }
 
                                    return cg::value{
                                      cg::type{cg::type_class::struct_,
-                                              std::get<1>(arg)
+                                              arg.is_array()
                                                 ? static_cast<std::size_t>(1)
                                                 : static_cast<std::size_t>(0),
-                                              std::get<0>(arg).base_type()}};
+                                              arg.base_type()}};
                                });
 
                 std::unique_ptr<cg::value> return_type;
-                if(ty::is_builtin_type(std::get<0>(desc.signature.return_type).base_type()))
+                if(ty::is_builtin_type(desc.signature.return_type.base_type()))
                 {
                     return_type = std::make_unique<cg::value>(
-                      cg::type{cg::to_type_class(std::get<0>(desc.signature.return_type).base_type()),
-                               std::get<1>(desc.signature.return_type)
+                      cg::type{cg::to_type_class(desc.signature.return_type.base_type()),
+                               desc.signature.return_type.is_array()
                                  ? static_cast<std::size_t>(1)
                                  : static_cast<std::size_t>(0)});
                 }
@@ -355,10 +355,10 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 {
                     return_type = std::make_unique<cg::value>(
                       cg::type{cg::type_class::struct_,
-                               std::get<1>(desc.signature.return_type)
+                               desc.signature.return_type.is_array()
                                  ? static_cast<std::size_t>(1)
                                  : static_cast<std::size_t>(0),
-                               std::get<0>(desc.signature.return_type).base_type()});
+                               desc.signature.return_type.base_type()});
                 }
 
                 ctx.add_prototype(it.first, *return_type, prototype_arg_types, import_path);
@@ -368,8 +368,8 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 {
                     // FIXME Type should not be resolved here
                     arg_types.emplace_back(type_ctx.get_type(
-                      std::get<0>(arg).base_type(),
-                      std::get<1>(arg),
+                      arg.base_type(),
+                      arg.is_array(),
                       import_path));
                 }
 

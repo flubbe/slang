@@ -814,49 +814,43 @@ std::optional<constant_table_entry> context::get_constant(
     return std::nullopt;
 }
 
-prototype* context::add_prototype(std::string name,
-                                  value return_type,
-                                  std::vector<value> args, std::optional<std::string> import_path)
+void context::add_prototype(
+  std::string name,
+  value return_type,
+  std::vector<value> args,
+  std::optional<std::string> import_path)
 {
-    if(std::find_if(prototypes.begin(), prototypes.end(),
-                    [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-                    {
-                        if(p->get_name() != name)
-                        {
-                            return false;
-                        }
-                        if(p->get_import_path().has_value() && import_path.has_value())
-                        {
-                            return *p->get_import_path() == *import_path;
-                        }
-                        return !p->get_import_path().has_value() && !import_path.has_value();
-                    })
+    if(std::find_if(
+         prototypes.begin(),
+         prototypes.end(),
+         [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+         {
+             return p->get_name() == name
+                    && p->get_import_path() == import_path;
+         })
        != prototypes.end())
     {
         throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
     }
 
-    return prototypes.emplace_back(std::make_unique<prototype>(
-                                     std::move(name), std::move(return_type), std::move(args), std::move(import_path)))
-      .get();
+    prototypes.emplace_back(
+      std::make_unique<prototype>(
+        std::move(name),
+        std::move(return_type),
+        std::move(args),
+        std::move(import_path)));
 }
 
 const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(prototypes.begin(), prototypes.end(),
-                           [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-                           {
-                               if(import_path.has_value())
-                               {
-                                   return p->get_import_path().has_value()
-                                          && *p->get_import_path() == import_path
-                                          && p->get_name() == name;
-                               }
-                               else
-                               {
-                                   return !p->get_import_path().has_value() && p->get_name() == name;
-                               }
-                           });
+    auto it = std::find_if(
+      prototypes.begin(),
+      prototypes.end(),
+      [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
+      {
+          return p->get_name() == name
+                 && p->get_import_path() == import_path;
+      });
     if(it == prototypes.end())
     {
         if(import_path.has_value())

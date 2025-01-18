@@ -85,19 +85,19 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const std::pair<module_::variable_type, bool>& v)
+static std::size_t get_type_or_reference_size(const module_::variable_type& v)
 {
-    if(std::get<0>(v).base_type().length() == 0)
+    if(v.base_type().length() == 0)
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
 
-    if(std::get<1>(v) || std::get<0>(v).is_array())
+    if(v.is_array())
     {
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(std::get<0>(v).base_type());
+    auto built_in_it = type_properties_map.find(v.base_type());
     if(built_in_it != type_properties_map.end())
     {
         return built_in_it->second.first;
@@ -1198,6 +1198,51 @@ module_loader::module_loader(
     // decode the module.
     decode();
 
+    /** Helper to resolve a type to a layout id. */
+    auto resolve_layout_id = [this, &ctx](module_::variable_type& type) -> void
+    {
+        if(ty::is_builtin_type(type.base_type()))
+        {
+            if(type.import_index.has_value())
+            {
+                throw interpreter_error(
+                  fmt::format(
+                    "Built-in type '{}' cannot have an import index.",
+                    type.base_type()));
+            }
+        }
+        else if(type.import_index.has_value())
+        {
+            module_::imported_symbol& imp_type = mod.header.imports.at(type.import_index.value());
+            module_::imported_symbol& imp_pkg = mod.header.imports.at(imp_type.package_index);
+
+            std::string type_name = fmt::format(
+              "{}.{}",
+              imp_pkg.name,
+              imp_type.name);
+
+            if(imp_pkg.type != module_::symbol_type::package)
+            {
+                throw interpreter_error(
+                  fmt::format(
+                    "Could not resolve import '{}': Invalid symbol type for package.",
+                    type_name));
+            }
+
+            type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+        }
+        else
+        {
+            // check that the type is contained in the current module.
+            std::string type_name = fmt::format(
+              "{}.{}",
+              this->import_name,
+              type.base_type());
+
+            type.layout_id = ctx.get_gc().get_type_layout_id(type_name);
+        }
+    };
+
     // populate function map.
     for(auto& it: mod.header.exports)
     {
@@ -1213,31 +1258,20 @@ module_loader::module_loader(
 
         auto& desc = std::get<module_::function_descriptor>(it.desc);
 
-        // resolve layout id's in the function signature. these are used for validation
-        // when functions are called from native code.
+        /*
+         * resolve layout id's in the function signature. these are used for validation
+         * when functions are called from native code.
+         */
 
-        // FIXME This only works if the types are contained in the current module.
-        if(!ty::is_builtin_type(desc.signature.return_type.first.base_type()))
-        {
-            std::string type_name = fmt::format(
-              "{}.{}",
-              this->import_name,
-              desc.signature.return_type.first.base_type());
-
-            desc.signature.return_type.first.layout_id = ctx.get_gc().get_type_layout_id(type_name);
-        }
+        resolve_layout_id(desc.signature.return_type);
         for(auto& arg: desc.signature.arg_types)
         {
-            if(!ty::is_builtin_type(arg.first.base_type()))
-            {
-                std::string type_name = fmt::format(
-                  "{}.{}",
-                  this->import_name,
-                  arg.first.base_type());
-
-                arg.first.layout_id = ctx.get_gc().get_type_layout_id(type_name);
-            }
+            resolve_layout_id(arg);
         }
+
+        /*
+         * resolve native functions.
+         */
 
         if(desc.native)
         {

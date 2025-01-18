@@ -303,8 +303,14 @@ class variable_type
 {
     friend class si::module_loader;
     friend class si::arguments_scope;
+    friend archive& operator&(archive& ar, variable_type& ts);
 
-    /** The decoded type string. */
+    /**
+     * The decoded type string.
+     *
+     * FIXME This could be an index into the export table,
+     *       and be combined with the `import_index`.
+     */
     std::string decoded_type_string;
 
     /** Array dimensions (if any). */
@@ -312,6 +318,9 @@ class variable_type
 
     /** Type layout id (not encoded/serialized). */
     std::optional<std::size_t> layout_id;
+
+    /** An index into the import header for imported types. */
+    std::optional<std::size_t> import_index;
 
 public:
     /** Default constructors. */
@@ -333,10 +342,12 @@ public:
     variable_type(
       std::string decoded_type_string,
       std::optional<std::size_t> array_dims = std::nullopt,
-      std::optional<std::size_t> layout_id = std::nullopt)
+      std::optional<std::size_t> layout_id = std::nullopt,
+      std::optional<std::size_t> import_index = std::nullopt)
     : decoded_type_string{std::move(decoded_type_string)}
     , array_dims{array_dims}
     , layout_id{layout_id}
+    , import_index{import_index}
     {
     }
 
@@ -345,7 +356,8 @@ public:
     {
         // TODO type layout id's should correspond to decoded_type_string
         return decoded_type_string == ts.decoded_type_string
-               && array_dims == ts.array_dims;
+               && array_dims == ts.array_dims
+               && import_index == ts.import_index;
     }
 
     /** Comparison. */
@@ -384,6 +396,12 @@ public:
     std::optional<std::size_t> get_array_dims() const
     {
         return array_dims;
+    }
+
+    /** Get the import name of the module defining the type. */
+    std::optional<std::size_t> get_import_index() const
+    {
+        return import_index;
     }
 };
 
@@ -450,10 +468,10 @@ inline archive& operator&(archive& ar, variable_descriptor& desc)
 struct function_signature
 {
     /** Return type. */
-    std::pair<variable_type, bool> return_type;
+    variable_type return_type;
 
     /** Argument type list. */
-    std::vector<std::pair<variable_type, bool>> arg_types;
+    std::vector<variable_type> arg_types;
 
     /** Default constructors. */
     function_signature() = default;
@@ -470,26 +488,11 @@ struct function_signature
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      */
-    function_signature(std::pair<std::string, bool> return_type,
-                       std::vector<std::pair<std::string, bool>> arg_types)
+    function_signature(variable_type return_type,
+                       std::vector<variable_type> arg_types)
+    : return_type{std::move(return_type)}
+    , arg_types{std::move(arg_types)}
     {
-        this->return_type = {variable_type{
-                               std::move(return_type.first),
-                               return_type.second
-                                 ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
-                                 : std::nullopt},
-                             return_type.second};
-
-        std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(this->arg_types),
-                       [](const auto& arg) -> std::pair<variable_type, bool>
-                       {
-                           return {variable_type{
-                                     arg.first,
-                                     arg.second
-                                       ? std::make_optional<std::size_t>(1)    // FIXME dummy array dimensions
-                                       : std::nullopt},
-                                   arg.second};
-                       });
     }
 };
 
@@ -1029,10 +1032,13 @@ public:
      * @param entry_point The entry point of the function.
      * @param locals The function's arguments and locals.
      */
-    void add_function(std::string name,
-                      std::pair<std::string, bool> return_type,
-                      std::vector<std::pair<std::string, bool>> arg_types,
-                      std::size_t size, std::size_t entry_point, std::vector<variable_descriptor> locals);
+    void add_function(
+      std::string name,
+      variable_type return_type,
+      std::vector<variable_type> arg_types,
+      std::size_t size,
+      std::size_t entry_point,
+      std::vector<variable_descriptor> locals);
 
     /**
      * Add a native function to the module.
@@ -1042,10 +1048,11 @@ public:
      * @param arg_types The function's argument types.
      * @param lib_name Name of the library to import the function from.
      */
-    void add_native_function(std::string name,
-                             std::pair<std::string, bool> return_type,
-                             std::vector<std::pair<std::string, bool>> arg_types,
-                             std::string lib_name);
+    void add_native_function(
+      std::string name,
+      variable_type return_type,
+      std::vector<variable_type> arg_types,
+      std::string lib_name);
 
     /**
      * Add a struct to the module.

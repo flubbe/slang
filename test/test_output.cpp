@@ -85,11 +85,11 @@ TEST(output, native_binding)
         {
             auto desc = std::get<slang::module_::function_descriptor>(header.exports[0].desc);
             EXPECT_EQ(desc.native, true);
-            EXPECT_EQ(desc.signature.return_type.first.base_type(), "void");
-            EXPECT_EQ(desc.signature.return_type.second, false);
+            EXPECT_EQ(desc.signature.return_type.base_type(), "void");
+            EXPECT_EQ(desc.signature.return_type.is_array(), false);
             ASSERT_EQ(desc.signature.arg_types.size(), 1);
-            EXPECT_EQ(desc.signature.arg_types[0].first.base_type(), "str");
-            EXPECT_EQ(desc.signature.arg_types[0].second, false);
+            EXPECT_EQ(desc.signature.arg_types[0].base_type(), "str");
+            EXPECT_EQ(desc.signature.arg_types[0].is_array(), false);
         }
 
         ASSERT_EQ(header.exports[1].type, slang::module_::symbol_type::function);
@@ -97,11 +97,11 @@ TEST(output, native_binding)
         {
             auto desc = std::get<slang::module_::function_descriptor>(header.exports[1].desc);
             EXPECT_EQ(desc.native, true);
-            EXPECT_EQ(desc.signature.return_type.first.base_type(), "void");
-            EXPECT_EQ(desc.signature.return_type.second, false);
+            EXPECT_EQ(desc.signature.return_type.base_type(), "void");
+            EXPECT_EQ(desc.signature.return_type.is_array(), false);
             ASSERT_EQ(desc.signature.arg_types.size(), 1);
-            EXPECT_EQ(desc.signature.arg_types[0].first.base_type(), "str");
-            EXPECT_EQ(desc.signature.arg_types[0].second, false);
+            EXPECT_EQ(desc.signature.arg_types[0].base_type(), "str");
+            EXPECT_EQ(desc.signature.arg_types[0].is_array(), false);
         }
 
         {
@@ -125,11 +125,11 @@ TEST(output, native_binding)
             {
                 auto desc = std::get<slang::module_::function_descriptor>(read_header.exports[0].desc);
                 EXPECT_EQ(desc.native, true);
-                EXPECT_EQ(desc.signature.return_type.first.base_type(), "void");
-                EXPECT_EQ(desc.signature.return_type.second, false);
+                EXPECT_EQ(desc.signature.return_type.base_type(), "void");
+                EXPECT_EQ(desc.signature.return_type.is_array(), false);
                 ASSERT_EQ(desc.signature.arg_types.size(), 1);
-                EXPECT_EQ(desc.signature.arg_types[0].first.base_type(), "str");
-                EXPECT_EQ(desc.signature.arg_types[0].second, false);
+                EXPECT_EQ(desc.signature.arg_types[0].base_type(), "str");
+                EXPECT_EQ(desc.signature.arg_types[0].is_array(), false);
             }
 
             ASSERT_EQ(read_header.exports[1].type, slang::module_::symbol_type::function);
@@ -137,11 +137,11 @@ TEST(output, native_binding)
             {
                 auto desc = std::get<slang::module_::function_descriptor>(read_header.exports[1].desc);
                 EXPECT_EQ(desc.native, true);
-                EXPECT_EQ(desc.signature.return_type.first.base_type(), "void");
-                EXPECT_EQ(desc.signature.return_type.second, false);
+                EXPECT_EQ(desc.signature.return_type.base_type(), "void");
+                EXPECT_EQ(desc.signature.return_type.is_array(), false);
                 ASSERT_EQ(desc.signature.arg_types.size(), 1);
-                EXPECT_EQ(desc.signature.arg_types[0].first.base_type(), "str");
-                EXPECT_EQ(desc.signature.arg_types[0].second, false);
+                EXPECT_EQ(desc.signature.arg_types[0].base_type(), "str");
+                EXPECT_EQ(desc.signature.arg_types[0].is_array(), false);
             }
         }
     }

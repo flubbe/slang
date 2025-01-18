@@ -1469,6 +1469,12 @@ class prototype_ast
     /** The function's return type as a pair. */
     std::unique_ptr<type_expression> return_type;
 
+    /** Argument type info. Set during type checking. */
+    std::vector<ty::type_info> args_type_info;
+
+    /** Return type info. Set during type checking. */
+    ty::type_info return_type_info;
+
 public:
     /** No default constructor. */
     prototype_ast() = delete;

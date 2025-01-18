@@ -46,32 +46,30 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @returns A return opcode.
  * @throws Throws an `interpreter_error` if the `return_type` is invalid.
  */
-static opcode get_return_opcode(const std::pair<module_::variable_type, bool>& return_type)
+static opcode get_return_opcode(const module_::variable_type& return_type)
 {
-    auto& name = std::get<0>(return_type);
-
-    if(std::get<1>(return_type))
+    if(return_type.is_array())
     {
         return opcode::aret;
     }
 
-    if(name.base_type() == "void")
+    if(return_type.base_type() == "void")
     {
         return opcode::ret;
     }
-    else if(name.base_type() == "i32")
+    else if(return_type.base_type() == "i32")
     {
         return opcode::iret;
     }
-    else if(name.base_type() == "f32")
+    else if(return_type.base_type() == "f32")
     {
         return opcode::fret;
     }
-    else if(name.base_type() == "str")
+    else if(return_type.base_type() == "str")
     {
         return opcode::sret;
     }
-    else if(name.base_type() == "@addr" || name.base_type() == "@array")
+    else if(return_type.base_type() == "@addr" || return_type.base_type() == "@array")
     {
         return opcode::aret;
     }
@@ -1253,7 +1251,7 @@ public:
     arguments_scope(
       context& ctx,
       const std::vector<value>& args,
-      const std::vector<std::pair<module_::variable_type, bool>>& arg_types,
+      const std::vector<module_::variable_type>& arg_types,
       std::vector<std::byte>& locals)
     : ctx{ctx}
     , args{args}
@@ -1274,31 +1272,45 @@ public:
 
             if(layout_id.has_value())
             {
-                if(arg_types[i].first.layout_id != layout_id)
+                if(arg_types[i].layout_id != layout_id)
                 {
-                    throw interpreter_error(
-                      fmt::format(
-                        "Argument {} has wrong base type (expected id '{}', got id '{}').",
-                        i,
-                        *layout_id,
-                        ctx.get_gc().get_type_layout_id(std::get<0>(arg_types[i]).base_type())));
+                    if(arg_types[i].layout_id.has_value())
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Argument {} has wrong base type (expected type '{}' with id '{}', got id '{}').",
+                            i,
+                            arg_types[i].base_type(),
+                            arg_types[i].layout_id.value(),
+                            layout_id.value()));
+                    }
+                    else
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Argument {} has wrong base type (expected type '{}', got id '{}').",
+                            i,
+                            arg_types[i].base_type(),
+                            layout_id.value()));
+                    }
                 }
             }
-            else if(std::get<0>(arg_types[i]).base_type() != std::get<0>(arg_type))
+            else if(arg_types[i].base_type() != std::get<0>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
                               i,
-                              std::get<0>(arg_types[i]).base_type(),
+                              arg_types[i].base_type(),
                               std::get<0>(arg_type)));
             }
 
-            if(std::get<1>(arg_types[i]) != std::get<1>(arg_type))
+            if(arg_types[i].is_array() != std::get<1>(arg_type))
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
                               i,
-                              std::get<1>(arg_types[i]), std::get<1>(arg_type)));
+                              arg_types[i].is_array(),
+                              std::get<1>(arg_type)));
             }
 
             if(offset + args[i].get_size() > locals.size())
@@ -1421,7 +1433,7 @@ value context::exec(
 
         void* addr = frame.stack.pop_addr<void>();
         ret = value{
-          {sig.return_type.first.base_type(), sig.return_type.second},
+          {sig.return_type.base_type(), sig.return_type.is_array()},
           addr};
         // FIXME The caller is responsible for calling `gc.remove_temporary(addr)`.
     }

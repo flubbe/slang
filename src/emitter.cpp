@@ -42,8 +42,8 @@ void emit(archive& ar, opcode op, T arg)
 
 void export_table_builder::add_function(
   const std::string& name,
-  std::pair<std::string, bool> return_type,
-  std::vector<std::pair<std::string, bool>> arg_types)
+  module_::variable_type return_type,
+  std::vector<module_::variable_type> arg_types)
 {
     if(std::find_if(export_table.begin(), export_table.end(),
                     [&name](const module_::exported_symbol& entry) -> bool
@@ -91,8 +91,8 @@ void export_table_builder::update_function(
 
 void export_table_builder::add_native_function(
   const std::string& name,
-  std::pair<std::string, bool> return_type,
-  std::vector<std::pair<std::string, bool>> arg_types,
+  module_::variable_type return_type,
+  std::vector<module_::variable_type> arg_types,
   std::string import_library)
 {
     if(std::find_if(export_table.begin(), export_table.end(),
@@ -206,25 +206,14 @@ void export_table_builder::write(module_::language_module& mod) const
         {
             const module_::function_descriptor& desc = std::get<module_::function_descriptor>(entry.desc);
 
-            std::pair<std::string, bool> return_type = {
-              std::get<0>(desc.signature.return_type).base_type(),
-              std::get<0>(desc.signature.return_type).is_array()};
-            std::vector<std::pair<std::string, bool>> arg_types;
-
-            std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(arg_types),
-                           [](const std::pair<module_::variable_type, bool>& t) -> std::pair<std::string, bool>
-                           {
-                               return std::make_pair(std::get<0>(t).base_type(), std::get<0>(t).is_array());
-                           });
-
             if(desc.native)
             {
                 const module_::native_function_details& details = std::get<module_::native_function_details>(desc.details);
 
                 mod.add_native_function(
                   entry.name,
-                  std::move(return_type),
-                  std::move(arg_types),
+                  std::move(desc.signature.return_type),
+                  std::move(desc.signature.arg_types),
                   details.library_name);
             }
             else
@@ -233,8 +222,8 @@ void export_table_builder::write(module_::language_module& mod) const
 
                 mod.add_function(
                   entry.name,
-                  std::move(return_type),
-                  std::move(arg_types),
+                  std::move(desc.signature.return_type),
+                  std::move(desc.signature.arg_types),
                   details.size,
                   details.offset,
                   details.locals);
@@ -349,6 +338,25 @@ void instruction_emitter::collect_imports()
             }
         }
     }
+}
+
+/**
+ * Get the import index of a type, or `std::nullopt` if it is not an import.
+ *
+ * @param ctx The codegen context holding the imports.
+ * @param v The value.
+ * @returns Returns an index into the context's import table, or `std::nullopt`.
+ */
+static std::optional<std::size_t> get_import_index_or_nullopt(cg::context& ctx, const cg::type& t)
+{
+    if(t.is_import())
+    {
+        return std::make_optional(ctx.get_import_index(
+          module_::symbol_type::type,
+          t.get_import_path().value(),
+          t.base_type().to_string()));
+    }
+    return std::nullopt;
 }
 
 void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& func, const std::unique_ptr<cg::instruction>& instr)
@@ -570,13 +578,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(args.size() == 2)
         {
-            // We intentionally do not resolve the types for the instruction, since
-            // we only need to know if it is a built-in type or an address.
-
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            module_::variable_type v_type = v->get_type().to_string();
+
+            module_::variable_type v_type = {
+              v->get_type().to_string(),
+              std::nullopt,
+              std::nullopt,
+              get_import_index_or_nullopt(ctx, v->get_type())};
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
@@ -588,20 +598,34 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         else if(args.size() == 3)
         {
-            // We intentionally do not resolve the types for the instruction, since
-            // we only need to know if it is a built-in type or an address.
-
             // get the duplicated value.
             cg::type_argument* v_arg = static_cast<cg::type_argument*>(args[0].get());
             const cg::value* v = v_arg->get_value();
-            module_::variable_type v_type = v->get_type().to_string();
+
+            module_::variable_type v_type = {
+              v->get_type().to_string(),
+              std::nullopt,
+              std::nullopt,
+              get_import_index_or_nullopt(ctx, v->get_type())};
 
             // get the stack arguments.
             cg::type_argument* stack_arg = static_cast<cg::type_argument*>(args[1].get());
-            module_::variable_type s_type1 = stack_arg->get_value()->get_type().to_string();
+            const cg::value* s1v = stack_arg->get_value();
+
+            module_::variable_type s_type1 = {
+              s1v->to_string(),
+              std::nullopt,
+              std::nullopt,
+              get_import_index_or_nullopt(ctx, s1v->get_type())};
 
             stack_arg = static_cast<cg::type_argument*>(args[2].get());
-            module_::variable_type s_type2 = stack_arg->get_value()->get_type().to_string();
+            const cg::value* s2v = stack_arg->get_value();
+
+            module_::variable_type s_type2 = {
+              s2v->to_string(),
+              std::nullopt,
+              std::nullopt,
+              get_import_index_or_nullopt(ctx, s2v->get_type())};
 
             // emit instruction.
             emit(instruction_buffer, opcode::dup_x2);
@@ -1116,16 +1140,29 @@ void instruction_emitter::run()
     for(auto& f: ctx.funcs)
     {
         auto [signature_ret_type, signature_arg_types] = f->get_signature();
-        std::pair<std::string, bool> return_type = {
-          signature_ret_type.base_type().to_string(),    // FIXME Store type.
-          signature_ret_type.is_array()};
-        std::vector<std::pair<std::string, bool>> arg_types;
+        module_::variable_type return_type = {
+          signature_ret_type.base_type().to_string(),
+          signature_ret_type.is_array()
+            ? std::make_optional(signature_ret_type.get_array_dims())
+            : std::nullopt,
+          std::nullopt,
+          get_import_index_or_nullopt(ctx, signature_ret_type)};
 
-        std::transform(signature_arg_types.cbegin(), signature_arg_types.cend(), std::back_inserter(arg_types),
-                       [](const cg::type& t) -> std::pair<std::string, bool>
-                       {
-                           return std::make_pair(t.base_type().to_string(), t.is_array());    // FIXME Store type.
-                       });
+        std::vector<module_::variable_type> arg_types;
+        std::transform(
+          signature_arg_types.cbegin(),
+          signature_arg_types.cend(),
+          std::back_inserter(arg_types),
+          [this](const cg::type& t) -> module_::variable_type
+          {
+              return {
+                t.base_type().to_string(),
+                t.is_array()
+                  ? std::make_optional(t.get_array_dims())
+                  : std::nullopt,
+                std::nullopt,
+                get_import_index_or_nullopt(ctx, t)};
+          });
 
         if(f->is_native())
         {
@@ -1190,8 +1227,11 @@ void instruction_emitter::run()
             unset_indices.erase(index);
 
             locals[index] = module_::variable_descriptor{
-              module_::variable_type{it->get_type().base_type().to_string(),
-                                     it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
+              module_::variable_type{
+                it->get_type().base_type().to_string(),
+                it->get_type().is_array() ? std::make_optional(1) : std::nullopt,
+                std::nullopt,
+                get_import_index_or_nullopt(ctx, it->get_type())}};
         }
 
         for(auto& it: func_locals)
@@ -1210,8 +1250,11 @@ void instruction_emitter::run()
             unset_indices.erase(index);
 
             locals[index] = module_::variable_descriptor{
-              module_::variable_type{it->get_type().base_type().to_string(),
-                                     it->get_type().is_array() ? std::make_optional(1) : std::nullopt}};
+              module_::variable_type{
+                it->get_type().base_type().to_string(),
+                it->get_type().is_array() ? std::make_optional(1) : std::nullopt,
+                std::nullopt,
+                get_import_index_or_nullopt(ctx, it->get_type())}};
         }
 
         if(unset_indices.size() != 0)
@@ -1332,7 +1375,9 @@ module_::language_module instruction_emitter::to_module() const
         mod.add_import(module_::symbol_type::package, it);
     }
 
-    // constants.
+    /*
+     * Constants.
+     */
     std::vector<cg::constant_table_entry> exported_constants;
     std::copy_if(
       ctx.constants.cbegin(),
@@ -1354,10 +1399,14 @@ module_::language_module instruction_emitter::to_module() const
       });
     mod.set_constant_table(constants);
 
-    // export table.
+    /*
+     * Exports.
+     */
     exports.write(mod);
 
-    // instructions.
+    /*
+     * Instructions.
+     */
     mod.set_binary(instruction_buffer.get_buffer());
 
     return mod;
