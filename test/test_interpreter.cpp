@@ -1074,7 +1074,7 @@ TEST(interpreter, invokation_api)
         si::context ctx{file_mgr};
         si::module_loader* loader{nullptr};
 
-        ASSERT_NO_THROW(loader = ctx.resolve_module("mod3"));
+        ASSERT_NO_THROW(loader = &ctx.resolve_module("mod3"));
         si::function& f = loader->get_function("f");
 
         si::value res;

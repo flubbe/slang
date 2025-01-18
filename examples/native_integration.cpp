@@ -69,18 +69,43 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Get the layout id of the struct we want to use.
     std::size_t layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("native_integration", "S"));
 
-    // Resolve the module name. This also loads the module.
-    si::module_loader* loader = ctx.resolve_module("native_integration");
+    try
+    {
+        // This will load the module when invoked first.
+        ctx.resolve_module("native_integration");
+    }
+    catch(const slang::file_error& err)
+    {
+        fmt::print("Error: {}\n", err.what());
+        return EXIT_FAILURE;
+    }
+
+    // The module is loaded here. This call just gets a reference.
+    si::module_loader& loader = ctx.resolve_module("native_integration");
 
     // Find the function to invoke.
-    si::function& function = loader->get_function("test");
+    if(!loader.has_function("test"))
+    {
+        fmt::print("Cannot find function 'test' in module.\n");
+        return EXIT_FAILURE;
+    }
+    si::function& function = loader.get_function("test");
 
-    // Set up argument.
+    // Set up argument for function call.
     std::string str = "Hello from native code!";
     S s = S{&str, 123};
 
     // Invoke the function.
-    si::value res = si::invoke(ctx, *loader, function, si::value{layout_id, &s}, 3.141f);
+    si::value res;
+    try
+    {
+        res = si::invoke(ctx, loader, function, si::value{layout_id, &s}, 3.141f);
+    }
+    catch(const si::interpreter_error& err)
+    {
+        fmt::print("Error: {}\n", err.what());
+        return EXIT_FAILURE;
+    }
 
     // Print the result.
     S* ret_s = static_cast<S*>(*res.get<void*>());

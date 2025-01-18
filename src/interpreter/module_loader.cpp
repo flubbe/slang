@@ -308,11 +308,11 @@ void module_loader::decode()
             throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
         }
 
-        module_loader* loader = ctx.resolve_module(mod.header.imports[it.package_index].name);
-        mod.header.imports[it.package_index].export_reference = loader;    // FIXME written for all symbols
+        module_loader& loader = ctx.resolve_module(mod.header.imports[it.package_index].name);
+        mod.header.imports[it.package_index].export_reference = &loader;    // FIXME written for all symbols
 
         // find the imported symbol.
-        module_::module_header& import_header = loader->mod.header;
+        module_::module_header& import_header = loader.mod.header;
         auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
                                    [&it](const module_::exported_symbol& exp) -> bool
                                    {
@@ -323,7 +323,7 @@ void module_loader::decode()
             throw interpreter_error(
               fmt::format(
                 "Error while resolving imports: Symbol '{}' is not exported by module '{}'.",
-                it.name, loader->get_path().string()));
+                it.name, loader.get_path().string()));
         }
         if(exp_it->type != it.type)
         {
@@ -331,7 +331,7 @@ void module_loader::decode()
               fmt::format(
                 "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
                 it.name,
-                loader->get_path().string(),
+                loader.get_path().string(),
                 slang::module_::to_string(it.type),
                 slang::module_::to_string(exp_it->type)));
         }
@@ -894,8 +894,8 @@ std::int32_t module_loader::decode_instruction(
                   imp_symbol.package_index));
             }
 
-            module_loader* loader = ctx.resolve_module(imp_package.name);
-            auto properties = loader->get_type_properties(imp_symbol.name);
+            module_loader& loader = ctx.resolve_module(imp_package.name);
+            auto properties = loader.get_type_properties(imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
@@ -970,8 +970,8 @@ std::int32_t module_loader::decode_instruction(
                   imp_symbol.package_index));
             }
 
-            module_loader* loader = ctx.resolve_module(imp_package.name);
-            auto properties = loader->get_type_properties(imp_symbol.name);
+            module_loader& loader = ctx.resolve_module(imp_package.name);
+            auto properties = loader.get_type_properties(imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
 
             recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
@@ -1045,8 +1045,8 @@ std::int32_t module_loader::decode_instruction(
                   imp_symbol.package_index));
             }
 
-            module_loader* loader = ctx.resolve_module(imp_package.name);
-            properties = loader->get_field_properties(imp_symbol.name, field_index.i);
+            module_loader& loader = ctx.resolve_module(imp_package.name);
+            properties = loader.get_field_properties(imp_symbol.name, field_index.i);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
@@ -1123,8 +1123,8 @@ std::int32_t module_loader::decode_instruction(
                   imp_symbol.package_index));
             }
 
-            module_loader* loader = ctx.resolve_module(imp_package.name);
-            auto properties = loader->get_type_properties(imp_symbol.name);
+            module_loader& loader = ctx.resolve_module(imp_package.name);
+            auto properties = loader.get_type_properties(imp_symbol.name);
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
             code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.flags), reinterpret_cast<std::byte*>(&properties.flags) + sizeof(properties.flags));
 

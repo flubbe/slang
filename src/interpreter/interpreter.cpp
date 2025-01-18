@@ -1504,12 +1504,12 @@ void context::register_native_function(
     }
 }
 
-module_loader* context::resolve_module(const std::string& import_name, std::shared_ptr<instruction_recorder> recorder)
+module_loader& context::resolve_module(const std::string& import_name, std::shared_ptr<instruction_recorder> recorder)
 {
     auto it = loaders.find(import_name);
     if(it != loaders.end())
     {
-        return it->second.get();
+        return *it->second.get();
     }
 
     std::string import_path = import_name;
@@ -1523,7 +1523,7 @@ module_loader* context::resolve_module(const std::string& import_name, std::shar
     fs::path resolved_path = file_mgr.resolve(fs_path);
 
     loaders.insert({import_name, std::make_unique<module_loader>(*this, import_name, resolved_path, recorder)});
-    return loaders[import_name].get();
+    return *loaders[import_name].get();
 }
 
 std::string context::get_import_name(const module_loader& loader) const
@@ -1549,10 +1549,10 @@ value context::invoke(const std::string& module_name, const std::string& functio
     {
         DEBUG_LOG("invoke: {}.{}", module_name, function_name);
 
-        module_loader* loader = resolve_module(module_name);
-        function& fn = loader->get_function(function_name);
+        module_loader& loader = resolve_module(module_name);
+        function& fn = loader.get_function(function_name);
 
-        return exec(*loader, fn, std::move(args));
+        return exec(loader, fn, std::move(args));
     }
     catch(interpreter_error& e)
     {
