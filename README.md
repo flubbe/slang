@@ -27,6 +27,10 @@ You can also have a look at the [instruction set](docs/instructions.md).
 To see how the language works, have a look at the [examples](examples) and also at 
 [test/test_compile_ir.cpp](test/test_compile_ir.cpp) and [test/test_output.cpp](test/test_output.cpp).
 
+For an example showing how the interpreter can be integrated into C++, have a look at
+[examples/native_integration.cpp](examples/native_integration.cpp), [examples/native_integration.sl](examples/native_integration.sl)
+and the necessary setup in [examples/CMakeLists.txt](examples/CMakeLists.txt).
+
 ## Getting started
 
 ### Building the project
