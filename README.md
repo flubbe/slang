@@ -31,6 +31,8 @@ For an example showing how the interpreter can be integrated into C++, have a lo
 [examples/native_integration.cpp](examples/native_integration.cpp), [examples/native_integration.sl](examples/native_integration.sl)
 and the necessary setup in [examples/CMakeLists.txt](examples/CMakeLists.txt).
 
+A preliminary (incomplete) documentation of the scripting language can be found [here](docs/language.md).
+
 ## Getting started
 
 ### Building the project
