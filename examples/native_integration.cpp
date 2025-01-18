@@ -10,14 +10,9 @@
 
 #include <fmt/core.h>
 
-#include "module.h"
-
-#include "archives/file.h"
-#include "runtime/runtime.h"
 #include "interpreter/interpreter.h"
 
 namespace si = slang::interpreter;
-namespace rt = slang::runtime;
 
 /** A struct that is mirrored in the script. */
 struct S
