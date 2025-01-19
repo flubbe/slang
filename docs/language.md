@@ -32,7 +32,7 @@ Ignoring comments, a program consists of:
 ```
 
 1. Import statements are of the form `import path::to::module`. The path
-   is resolved by the file manager by search its search paths. It picks
+   is resolved by the file manager by going through its search paths. It picks
    the first module found in that list.
 
    The imports are accessible by prepending the import name, e.g. `std::print("Hello");`
@@ -64,7 +64,22 @@ Ignoring comments, a program consists of:
     ```
     1. Statements:
         1. Empty statement `;`.
-        2. Variable declarations: `let <name> : <type> [=<expression>];`.
+        2. Variable declarations: `let <name> : <type> [=<expression>];`. 
+        
+            To initialize a custom type, use
+            ```
+            let <name> : <type> = <type>{<initializer-list>};
+            ```
+            where `<initializer-list>` is either listing the initial values in declaration order
+            of the type,
+            ```
+            {<value1>, ..., <valueN>}
+            ```
+            or providing named initializers:
+            ```
+            {<member-name1> : <value1>, ..., <member-nameN> : <valueN>}
+            ```
+            In the latter case, <code>&lt;member-name<i>i</i>&gt; : &lt;value<i>i</i>&gt;</code> can appear in any order.
         3. `if` statements:
             ```
             if(<condition>)
@@ -92,11 +107,11 @@ Ignoring comments, a program consists of:
 
 Statements and expressions can be decorated with _directives_:
 ```
-#[directive(arg-name1=arg-1,...,arg_nameN=arg-N)]
+#[directive(arg-name1=arg1,...,arg_nameN=argN)]
 ...
 ```
 Directives can only appear in global scope, or in function scope
-(and not, for example, inside an `if`-block).
+(and not, for example, inside an `<if-block>`).
 
 Currently, the following directives are used:
 ```
@@ -130,6 +145,12 @@ Built-in types are
 - `i32`: A 32-bit integer.
 - `f32`: A 32-bit floating-point number.
 - `str`: A string.
+- Arrays are declared as `let <name>: [<type>];`. They are of fixed length, and the length
+    can be accessed with `<name>.length`. A new array can be defined as
+    ```
+    let <name>: [<type>] = new <type>[<size>];
+    ```
+    **Note:** Arrays are one-dimensional.
 
 **Note:** The internal formats of numbers are not fixed right now. The implementation
 uses whatever the underlying C++ implementation provides, but e.g. `f32` is only tested with
