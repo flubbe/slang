@@ -62,32 +62,33 @@ Ignoring comments, a program consists of:
         <statement-or-expressionM>
     }
     ```
-    Statements are:
-    1. Empty statement `;`.
-    2. Variable declarations: `let <name> : <type> [=<expression>];`.
-    3. `if` statements:
-        ```
-        if(<condition>)
-        <if-block>
-        [else <else-block>]
-        ```
-    4. `while` statement:
-        ```
-        while(<condition>)
-        <while-block>
-        ```
-    5. `break` and `continue` statements:
-        Break or continue a `while` loop.
-    6. `return [<expression>]`: Return from a function.
-    7. `<expression>`: TODO
-        - Type casts: An expression type can be cast to another type
-            when adhering to type cast rules. Type casts are indicated
-            by `as` used after the to-be cast expression:
+    1. Statements:
+        1. Empty statement `;`.
+        2. Variable declarations: `let <name> : <type> [=<expression>];`.
+        3. `if` statements:
             ```
-            <expression> as <type>
+            if(<condition>)
+            <if-block>
+            [else <else-block>]
             ```
-            Casting is allowed between `i32` and `f32`, and between any
-            struct and types marked with `#[allow_cast]` (see below).
+        4. `while` statement:
+            ```
+            while(<condition>)
+            <while-block>
+            ```
+        5. `break` and `continue` statements:
+            Break or continue a `while` loop.
+        6. `return [<expression>]`: Return from a function.
+    2. Expressions: TODO
+    3. Type casts: 
+        An expression type can be cast to another type
+        when adhering to type cast rules. Type casts are indicated
+        by `as` used after the to-be cast expression:
+        ```
+        <expression> as <type>
+        ```
+        Casting is allowed between `i32` and `f32`, and between any
+        struct and types marked with `#[allow_cast]` (see below).
 
 Statements and expressions can be decorated with _directives_:
 ```
@@ -135,6 +136,8 @@ uses whatever the underlying C++ implementation provides, but e.g. `f32` is only
 `IEE754` format.
 
 ## Modules
+
+TODO
 
 ## The standard library
 
