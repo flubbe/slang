@@ -148,6 +148,24 @@ import std;
 Currently, there are only a hand full of functions and struct's implemented.
 These are:
 
+### Types
+- `#[allow_cast] struct type {}`: A generic type to cast to and from.
+- `#[native] struct result`: A result type.
+
+    _Members_:
+    - `ok: i32`: Indicates whether the operation returning the type was successful.
+    - `value: type`: If the operation was successful, this holds the result.
+
+        **Note:** Needs to be cast to the expected type.
+- `#[native] struct i32s`: Wrapper around an `i32`. 
+
+    _Members_:
+    - `value: i32`: An integer.
+- `#[native] struct f32s`: Wrapper around an `f32`.
+
+    _Members_:
+    - `value: f32`: A 32-bit floating point value.
+
 ### Output
 - `fn print(s: str) -> void`: Print a string to stdout.
 - `fn println(s: str) -> void`: Print a string to stdout and append a new-line character.
