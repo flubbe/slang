@@ -398,6 +398,12 @@ public:
         return array_dims;
     }
 
+    /** Get the type's layout id. */
+    std::optional<std::size_t> get_layout_id() const
+    {
+        return layout_id;
+    }
+
     /** Get the import name of the module defining the type. */
     std::optional<std::size_t> get_import_index() const
     {

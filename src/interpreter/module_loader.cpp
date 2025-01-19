@@ -25,13 +25,7 @@ static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
-/**
- * Check if a type is garbage collected.
- *
- * @param t The type string.
- * @returns Return whether a type is garbage collected.
- */
-static bool is_garbage_collected(const module_::variable_type& t)
+bool is_garbage_collected(const module_::variable_type& t)
 {
     if(t.base_type() == "void")
     {

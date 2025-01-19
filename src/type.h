@@ -219,11 +219,4 @@ std::string to_string(const type_info& t);
  */
 std::string to_string(const std::pair<token, bool>& t);
 
-/**
- * Convert a type to a string.
- *
- * @param t The type to convert, given as a pair of `(base_type, is_array)`.
- */
-std::string to_string(const std::pair<std::string, bool>& t);
-
 }    // namespace slang::typing

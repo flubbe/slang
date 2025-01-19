@@ -78,34 +78,6 @@ static opcode get_return_opcode(const module_::variable_type& return_type)
     return opcode::aret;
 }
 
-/**
- * Check if a type is garbage collected.
- *
- * @param t The type string.
- * @returns Return whether a type is garbage collected.
- */
-static bool is_garbage_collected(const module_::variable_type& t)
-{
-    if(t.base_type() == "void")
-    {
-        throw interpreter_error("Found void type in type info for garbage collector.");
-    }
-
-    // check for built-in non-gc types.
-    return t.is_array() || ty::is_reference_type(t.base_type());
-}
-
-/**
- * Check if a type is garbage collected.
- *
- * @param info The type info, given as a pair `(base_type, is_array)`.
- * @returns Return whether a type is garbage collected.
- */
-static bool is_garbage_collected(const std::pair<std::string, bool>& info)
-{
-    return std::get<1>(info) || is_garbage_collected(std::get<0>(info));
-}
-
 /*
  * function implementation.
  */
@@ -1273,7 +1245,7 @@ public:
         std::size_t offset = 0;
         for(std::size_t i = 0; i < args.size(); ++i)
         {
-            std::pair<std::string, bool> arg_type = args[i].get_type();
+            module_::variable_type arg_type = args[i].get_type();
             std::optional<std::size_t> layout_id = args[i].get_layout_id();
 
             if(layout_id.has_value())
@@ -1301,22 +1273,22 @@ public:
                     }
                 }
             }
-            else if(arg_types[i].base_type() != std::get<0>(arg_type))
+            else if(arg_types[i].base_type() != arg_type.base_type())
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
                               i,
                               arg_types[i].base_type(),
-                              std::get<0>(arg_type)));
+                              arg_type.base_type()));
             }
 
-            if(arg_types[i].is_array() != std::get<1>(arg_type))
+            if(arg_types[i].is_array() != arg_type.is_array())
             {
                 throw interpreter_error(
                   fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
                               i,
                               arg_types[i].is_array(),
-                              std::get<1>(arg_type)));
+                              arg_type.is_array()));
             }
 
             if(offset + args[i].get_size() > locals.size())
@@ -1438,9 +1410,7 @@ value context::exec(
         auto sig = f.get_signature();
 
         void* addr = frame.stack.pop_addr<void>();
-        ret = value{
-          std::make_pair(sig.return_type.base_type(), sig.return_type.is_array()),
-          addr};
+        ret = value{sig.return_type, addr};
         // NOTE The caller is responsible for calling `gc.remove_temporary(addr)`.
     }
     else
