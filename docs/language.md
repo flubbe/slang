@@ -68,7 +68,7 @@ Ignoring comments, a program consists of:
         
             To initialize a custom type, use
             ```
-            let <name> : <type> = <type>{<initializer-list>};
+            let <name> : <type> = <type> <initializer-list>;
             ```
             where `<initializer-list>` is either listing the initial values in declaration order
             of the type,
