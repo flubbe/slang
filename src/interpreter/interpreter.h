@@ -35,6 +35,14 @@ inline std::string make_type_name(
     return fmt::format("{}.{}", package_import_name, type_name);
 }
 
+/**
+ * Check if a type is garbage collected.
+ *
+ * @param t The type string.
+ * @returns Return whether a type is garbage collected.
+ */
+bool is_garbage_collected(const module_::variable_type& t);
+
 /** Interpreter context. */
 class context
 {

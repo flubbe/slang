@@ -174,14 +174,6 @@ std::string to_string(const std::pair<token, bool>& t)
       std::nullopt});
 }
 
-std::string to_string(const std::pair<std::string, bool>& t)
-{
-    return to_string(type_info{
-      {std::get<0>(t), {0, 0}},
-      std::get<1>(t) ? type_class::tc_array : type_class::tc_plain,
-      std::nullopt});
-}
-
 /*
  * Exceptions.
  */
