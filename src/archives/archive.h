@@ -303,7 +303,7 @@ public:
 struct vle_int
 {
     /** The integer. */
-    std::int64_t i;
+    std::int64_t i{0};
 
     /** Default constructors. */
     vle_int() = default;
