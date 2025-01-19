@@ -110,8 +110,6 @@ Statements and expressions can be decorated with _directives_:
 #[directive(arg-name1=arg1,...,arg_nameN=argN)]
 ...
 ```
-Directives can only appear in global scope, or in function scope
-(and not, for example, inside an `<if-block>`).
 
 Currently, the following directives are used:
 ```
