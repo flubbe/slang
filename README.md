@@ -67,3 +67,5 @@ fn main(args: [str]) -> i32
 
 The language has data type support for `i32`, `f32`, `str`, and custom `struct`'s. Arrays are also supported,
 though (currently) they have to be one-dimensional.
+
+See [the documentation](docs/language.md) for more details.

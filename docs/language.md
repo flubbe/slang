@@ -6,7 +6,7 @@ reflect this. For example, the syntax is chosen so that the parser can be
 made simpler, the garbage collector is using a synchronous mark-and-sweep
 algorithm, and the language is single-threaded.
 
-## A `Hello, World!` programm
+## A `Hello, World!` program
 
 ```
 // Import the standard library.
