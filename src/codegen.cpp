@@ -674,12 +674,17 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
     return it->get();
 }
 
+/** Same as `std::false_type`, but taking a parameter argument. */
+template<typename T>
+struct false_type : public std::false_type
+{
+};
+
 /** Helper to map types to `module_::constant_type` values. */
 template<typename T>
 struct constant_type_mapper
 {
-    static constexpr module_::constant_type value = module_::constant_type::i32;
-    static_assert(false, "Invalid constant type.");
+    static_assert(false_type<T>::value, "Invalid constant type.");
 };
 
 /** Map `std::int32_t` to `module_::constant_type::i32`. */

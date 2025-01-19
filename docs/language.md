@@ -152,7 +152,7 @@ Built-in types are
 
 **Note:** The internal formats of numbers are not fixed right now. The implementation
 uses whatever the underlying C++ implementation provides, but e.g. `f32` is only tested with
-`IEE754` format.
+`IEEE754` format.
 
 ## Modules
 
