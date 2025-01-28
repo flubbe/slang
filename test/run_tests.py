@@ -44,12 +44,19 @@ _script_tests: list[str] = [
     "test_const_import",
     "test_conversions",
     "test_eval_subexpr",
+    "test_invalid_main_signature1",
+    "test_invalid_main_signature2",
     "test_math",
     "test_operators",
     "test_strings",
     "test_structs",
 ]
-_script_expect_failure: list[str] = ["test_cast_fail", "test_array_fail3"]
+_script_expect_failure: list[str] = [
+    "test_array_fail3",
+    "test_cast_fail",
+    "test_invalid_main_signature1",
+    "test_invalid_main_signature2",
+]
 
 
 _lang_path = (_module_path / Path("..") / Path("lang")).absolute()

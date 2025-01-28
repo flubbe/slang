@@ -106,6 +106,10 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_eval_subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_eval_subexpr
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_invalid_main_signature1
+        ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_invalid_main_signature1
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_invalid_main_signature2
+        ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_invalid_main_signature2
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_math
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators

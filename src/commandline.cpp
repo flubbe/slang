@@ -786,12 +786,35 @@ void exec::invoke(const std::vector<std::string>& args)
         return;
     }
 
-    ctx.resolve_module(module_name);
+    si::module_loader& loader = ctx.resolve_module(module_name);
+    si::function& main_function = loader.get_function("main");
 
+    // validate function signature for 'main'.
+    const module_::function_signature& sig = main_function.get_signature();
+    if(sig.return_type.base_type() != "i32" || sig.return_type.is_array())
+    {
+        throw std::runtime_error(fmt::format(
+          "\nInvalid return type for 'main' expected 'i32', got '{}'.",
+          slang::module_::to_string(sig.return_type)));
+    }
+    if(sig.arg_types.size() != 1)
+    {
+        throw std::runtime_error(fmt::format(
+          "\nInvalid parameter count for 'main'. Expected 1 parameter, got {}.",
+          sig.arg_types.size()));
+    }
+    if(sig.arg_types[0].base_type() != "str" || !sig.arg_types[0].is_array())
+    {
+        throw std::runtime_error(fmt::format(
+          "\nInvalid parameter type for 'main'. Expected parameter of type '[str]', got '{}'.",
+          slang::module_::to_string(sig.arg_types[0])));
+    }
+
+    // call 'main'.
     si::value res = si::invoke(
       ctx,
-      module_name,
-      "main",
+      loader,
+      main_function,
       std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()});
 
     const int* return_value = res.get<int>();
