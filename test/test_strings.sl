@@ -14,5 +14,9 @@ fn main(args: [str]) -> i32
     let s3: str = std::string_concat(std::string_concat(std::string_concat(s1, ", "), s2), "!");
     std::assert(std::string_equals(s3, "Hello, World!"), "s3 == \"Hello, World!\"");
 
+    std::assert(std::string_length(s1) == 5, "s1.length == 5");
+    std::assert(std::string_length(s2) == 5, "s2.length == 5");
+    std::assert(std::string_length(s3) == 13, "s3.length == 13");
+
     return 0;
 }

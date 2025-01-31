@@ -152,6 +152,11 @@ static void register_std_lib(si::context& ctx, std::vector<std::string>& print_b
                                  {
                                      rt::array_copy(ctx, stack);
                                  });
+    ctx.register_native_function("slang", "string_length",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_length(ctx, stack);
+                                 });
     ctx.register_native_function("slang", "string_equals",
                                  [&ctx](si::operand_stack& stack)
                                  {

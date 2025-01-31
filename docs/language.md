@@ -192,6 +192,7 @@ These are:
 ### Arrays and strings
 - `fn array_copy(from: type, to: type) -> void`: Copy an array. The array 
     types have to match and `from.length <= to.length`.
+- `fn string_length(s: str) -> i32`: Get the length of a string.
 - `fn string_concat(s1: str, s2: str) -> str`: Concatenate two strings.
 - `fn string_equals(s1: str, s2: str) -> i32`: Compare two strings for equality. 
     Returns `1` if the strings compare equal, and `0` otherwise.

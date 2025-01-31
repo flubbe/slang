@@ -673,6 +673,11 @@ void exec::invoke(const std::vector<std::string>& args)
                                  {
                                      rt::array_copy(ctx, stack);
                                  });
+    ctx.register_native_function("slang", "string_length",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::string_length(ctx, stack);
+                                 });
     ctx.register_native_function("slang", "string_equals",
                                  [&ctx](si::operand_stack& stack)
                                  {
@@ -794,19 +799,19 @@ void exec::invoke(const std::vector<std::string>& args)
     if(sig.return_type.base_type() != "i32" || sig.return_type.is_array())
     {
         throw std::runtime_error(fmt::format(
-          "\nInvalid return type for 'main' expected 'i32', got '{}'.",
+          "Invalid return type for 'main' expected 'i32', got '{}'.",
           slang::module_::to_string(sig.return_type)));
     }
     if(sig.arg_types.size() != 1)
     {
         throw std::runtime_error(fmt::format(
-          "\nInvalid parameter count for 'main'. Expected 1 parameter, got {}.",
+          "Invalid parameter count for 'main'. Expected 1 parameter, got {}.",
           sig.arg_types.size()));
     }
     if(sig.arg_types[0].base_type() != "str" || !sig.arg_types[0].is_array())
     {
         throw std::runtime_error(fmt::format(
-          "\nInvalid parameter type for 'main'. Expected parameter of type '[str]', got '{}'.",
+          "Invalid parameter type for 'main'. Expected parameter of type '[str]', got '{}'.",
           slang::module_::to_string(sig.arg_types[0])));
     }
 

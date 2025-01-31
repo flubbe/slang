@@ -18,6 +18,25 @@ namespace gc = slang::gc;
 namespace slang::runtime
 {
 
+void string_length(si::context& ctx, si::operand_stack& stack)
+{
+    auto [container] = get_args<gc_object<std::string>>(ctx, stack);
+
+    std::string* s = container.get();
+    if(s == nullptr)
+    {
+        throw si::interpreter_error("string_length: argument cannot be null.");
+    }
+
+    auto type = ctx.get_gc().get_object_type(s);
+    if(type != gc::gc_object_type::str)
+    {
+        throw si::interpreter_error("string_length: argument is not a string.");
+    }
+
+    stack.push_i32(s->length());
+}
+
 void string_equals(si::context& ctx, si::operand_stack& stack)
 {
     auto [s1_container, s2_container] = get_args<gc_object<std::string>, gc_object<std::string>>(ctx, stack);

@@ -82,6 +82,14 @@ void array_copy(si::context& ctx, si::operand_stack& stack);
  */
 
 /**
+ * Get the length of a string.
+ *
+ * @param ctx The interpreter context.
+ * @param stack The operand stack.
+ */
+void string_length(si::context& ctx, si::operand_stack& stack);
+
+/**
  * Check strings for equality. Pushes `1` onto the stack if the strings are equal, and `0` otherwise.
  *
  * @param ctx The interpreter context.

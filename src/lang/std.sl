@@ -86,6 +86,15 @@ fn array_copy(from: type, to: type) -> void;
 fn string_concat(s1: str, s2: str) -> str;
 
 /**
+ * Get the length of a string.
+ *
+ * @param s The string.
+ * @return Returns the length of s.
+ */
+#[native(lib="slang")]
+fn string_length(s: str) -> i32;
+
+/**
  * Compare two strings for equality.
  *
  * @param s1 The first string.
