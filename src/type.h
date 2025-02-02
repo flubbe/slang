@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "token.h"
+#include "compiler/token.h"
 
 namespace slang::typing
 {

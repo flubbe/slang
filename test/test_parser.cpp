@@ -13,7 +13,7 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "parser.h"
+#include "compiler/parser.h"
 
 namespace
 {

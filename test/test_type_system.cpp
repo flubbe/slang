@@ -13,9 +13,9 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "parser.h"
-#include "codegen.h"
-#include "typing.h"
+#include "compiler/parser.h"
+#include "compiler/codegen.h"
+#include "compiler/typing.h"
 #include "resolve.h"
 
 namespace ast = slang::ast;

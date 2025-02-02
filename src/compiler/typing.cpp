@@ -13,7 +13,7 @@
 #include "ast.h"
 #include "package.h"
 #include "type.h"
-#include "typing.h"
+#include "compiler/typing.h"
 #include "utils.h"
 
 namespace ty = slang::typing;

@@ -14,7 +14,7 @@
 
 #include "filemanager.h"
 #include "module.h"
-#include "token.h"
+#include "compiler/token.h"
 
 /*
  * Forward declarations.

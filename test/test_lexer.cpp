@@ -13,7 +13,7 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "lexer.h"
+#include "compiler/lexer.h"
 
 namespace
 {

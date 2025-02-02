@@ -12,8 +12,8 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#include "codegen.h"
-#include "emitter.h"
+#include "compiler/codegen.h"
+#include "compiler/emitter.h"
 #include "module.h"
 #include "opcodes.h"
 

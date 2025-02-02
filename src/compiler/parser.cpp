@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <set>
 
-#include "parser.h"
+#include "compiler/parser.h"
 #include "type.h"
 
 namespace ty = slang::typing;

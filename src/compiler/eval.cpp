@@ -13,9 +13,9 @@
 #include <tuple>
 
 #include "ast.h"
-#include "codegen.h"
+#include "compiler/codegen.h"
 #include "module.h"
-#include "typing.h"
+#include "compiler/typing.h"
 #include "utils.h"
 
 namespace slang::ast

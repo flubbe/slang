@@ -14,7 +14,7 @@
 
 #include <fmt/core.h>
 
-#include "lexer.h"
+#include "compiler/lexer.h"
 
 namespace slang
 {

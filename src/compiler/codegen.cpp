@@ -11,7 +11,7 @@
 #include <fmt/core.h>
 
 #include "ast.h"
-#include "codegen.h"
+#include "compiler/codegen.h"
 #include "module.h"
 #include "opcodes.h"
 #include "utils.h"

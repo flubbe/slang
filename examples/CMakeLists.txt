@@ -23,7 +23,7 @@ add_executable(native_integration
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
     ../src/filemanager.cpp
-    ../src/gc.cpp
+    ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
     ../src/module.cpp
