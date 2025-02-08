@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "ast.h"
-#include "compiler/lexer.h"
+#include "lexer.h"
 
 namespace slang
 {

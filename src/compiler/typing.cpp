@@ -10,10 +10,11 @@
 
 #include <fmt/core.h>
 
+#include "shared/type_utils.h"
 #include "ast.h"
 #include "package.h"
 #include "type.h"
-#include "compiler/typing.h"
+#include "typing.h"
 #include "utils.h"
 
 namespace ty = slang::typing;

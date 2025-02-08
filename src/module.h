@@ -16,9 +16,10 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/core.h>
+
 #include "archives/archive.h"
 #include "archives/memory.h"
-#include "type.h" /* for slang::typing::is_reference_type */
 
 /* Forward declarations. */
 namespace slang::interpreter
@@ -33,7 +34,6 @@ namespace slang::module_
 {
 
 namespace si = slang::interpreter;
-namespace ty = slang::typing;
 
 /** A module error. */
 class module_error : public std::runtime_error
@@ -450,11 +450,7 @@ struct variable_descriptor : public symbol
      *
      * @param type The variable type.
      */
-    explicit variable_descriptor(variable_type type)
-    : type{std::move(type)}
-    {
-        reference = ty::is_reference_type(type.base_type());
-    }
+    explicit variable_descriptor(variable_type type);
 };
 
 /**
@@ -463,12 +459,7 @@ struct variable_descriptor : public symbol
  * @param ar The archive to use for serialization.
  * @param desc The variable descriptor.
  */
-inline archive& operator&(archive& ar, variable_descriptor& desc)
-{
-    ar & desc.type;
-    desc.reference = ty::is_reference_type(desc.type.base_type());
-    return ar;
-}
+archive& operator&(archive& ar, variable_descriptor& desc);
 
 /** Function signature. */
 struct function_signature

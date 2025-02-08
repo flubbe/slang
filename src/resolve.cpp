@@ -11,9 +11,10 @@
 #include <fmt/core.h>
 
 #include "compiler/codegen.h"
+#include "compiler/typing.h"
+#include "shared/type_utils.h"
 #include "package.h"
 #include "resolve.h"
-#include "compiler/typing.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;

@@ -11,7 +11,7 @@
 #include <fmt/core.h>
 
 #include "archives/memory.h"
-#include "interpreter/interpreter.h"
+#include "interpreter.h"
 #include "module.h"
 #include "opcodes.h"
 #include "package.h"
@@ -26,8 +26,6 @@
 
 namespace slang::interpreter
 {
-
-namespace ty = slang::typing;
 
 /*
  * Verify size assumptions for arrays.

@@ -12,7 +12,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "interpreter/types.h"
+#include "types.h"
 #include "module.h"
 
 namespace slang::interpreter

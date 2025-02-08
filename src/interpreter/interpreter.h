@@ -12,7 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "interpreter/module_loader.h"
+#include "module_loader.h"
+
 #include "filemanager.h"
 #include "gc.h"
 #include "module.h"

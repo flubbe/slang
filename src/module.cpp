@@ -12,10 +12,13 @@
 
 #include <fmt/core.h>
 
+#include "shared/type_utils.h" /* for slang::typing::is_reference_type */
 #include "module.h"
 
 namespace slang::module_
 {
+
+namespace ty = slang::typing;
 
 /*
  * type encoding and decoding.
@@ -141,6 +144,23 @@ std::string to_string(const variable_type& t)
         s += "[]";
     }
     return s;
+}
+
+/*
+ * variable_descriptor.
+ */
+
+variable_descriptor::variable_descriptor(variable_type type)
+: type{std::move(type)}
+{
+    reference = ty::is_reference_type(type.base_type());
+}
+
+archive& operator&(archive& ar, variable_descriptor& desc)
+{
+    ar & desc.type;
+    desc.reference = ty::is_reference_type(desc.type.base_type());
+    return ar;
 }
 
 /*

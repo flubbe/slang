@@ -8,7 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "interpreter/interpreter.h"
+#include "shared/type_utils.h"
+#include "interpreter.h"
 #include "package.h"
 
 namespace slang::interpreter
