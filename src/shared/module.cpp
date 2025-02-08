@@ -12,7 +12,7 @@
 
 #include <fmt/core.h>
 
-#include "shared/module.h"
+#include "module.h"
 #include "type_utils.h" /* for slang::typing::is_reference_type */
 
 namespace slang::module_
