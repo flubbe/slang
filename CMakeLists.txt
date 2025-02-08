@@ -14,22 +14,23 @@ find_package(fmt REQUIRED)
 
 add_executable(slang
     src/archives/file.cpp
-    src/ast.cpp
-    src/eval.cpp
-    src/codegen.cpp
-    src/commandline.cpp
-    src/compiler.cpp
-    src/emitter.cpp
-    src/filemanager.cpp
-    src/gc.cpp
+    src/compiler/ast.cpp
+    src/compiler/eval.cpp
+    src/compiler/codegen.cpp
+    src/compiler/emitter.cpp
+    src/compiler/lexer.cpp
+    src/compiler/parser.cpp
+    src/compiler/typing.cpp
+    src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/module_loader.cpp
-    src/lexer.cpp
+    src/shared/module.cpp
+    src/shared/opcodes.cpp
+    src/commandline.cpp
+    src/compiler.cpp
+    src/filemanager.cpp
     src/main.cpp
-    src/module.cpp
     src/package.cpp
-    src/parser.cpp
-    src/opcodes.cpp
     src/resolve.cpp
     src/runtime/arrays.cpp
     src/runtime/debug.cpp
@@ -37,7 +38,6 @@ add_executable(slang
     src/runtime/strings.cpp
     src/runtime/types.cpp
     src/runtime/utils.cpp
-    src/typing.cpp
     src/utils.cpp
 )
 target_link_libraries(slang fmt::fmt)

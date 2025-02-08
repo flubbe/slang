@@ -1,6 +1,6 @@
 # Virtual Machine Instructions
 
-The instructions set for the stack based virtual machine, as defined in [opcodes.h](../src/opcodes.h) and implemented in [module_loader.cpp](../src/interpreter/module_loader.cpp) and [interpreter.cpp](../src/interpreter/interpreter.cpp).
+The instructions set for the stack based virtual machine, as defined in [opcodes.h](../src/shared/opcodes.h) and implemented in [module_loader.cpp](../src/interpreter/module_loader.cpp) and [interpreter.cpp](../src/interpreter/interpreter.cpp).
 
 - `aconst_null`: Load a `null` reference onto the stack.
 - `iconst`: Load `i32` constant onto stack.

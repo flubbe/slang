@@ -14,7 +14,7 @@
 
 #include <fmt/core.h>
 
-#include "vector.h"
+#include "interpreter/vector.h"
 
 namespace si = slang::interpreter;
 

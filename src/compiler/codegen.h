@@ -21,8 +21,8 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
+#include "shared/module.h"
 #include "directive.h"
-#include "module.h"
 
 /*
  * Forward declarations.

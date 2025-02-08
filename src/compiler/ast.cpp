@@ -13,9 +13,10 @@
 #include <stack>
 #include <tuple>
 
+#include "shared/module.h"
+#include "shared/type_utils.h"
 #include "ast.h"
 #include "codegen.h"
-#include "module.h"
 #include "typing.h"
 #include "utils.h"
 

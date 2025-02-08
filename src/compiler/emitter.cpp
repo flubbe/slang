@@ -12,10 +12,10 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#include "shared/module.h"
+#include "shared/opcodes.h"
 #include "codegen.h"
 #include "emitter.h"
-#include "module.h"
-#include "opcodes.h"
 
 namespace cg = slang::codegen;
 

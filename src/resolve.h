@@ -12,9 +12,9 @@
 
 #include <stdexcept>
 
+#include "compiler/token.h"
+#include "shared/module.h"
 #include "filemanager.h"
-#include "module.h"
-#include "token.h"
 
 /*
  * Forward declarations.

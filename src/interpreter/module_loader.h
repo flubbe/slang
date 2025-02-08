@@ -12,8 +12,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "interpreter/types.h"
-#include "module.h"
+#include "shared/module.h"
+#include "types.h"
 
 namespace slang::interpreter
 {

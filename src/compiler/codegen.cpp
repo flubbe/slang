@@ -10,10 +10,11 @@
 
 #include <fmt/core.h>
 
+#include "shared/module.h"
+#include "shared/opcodes.h"
+#include "shared/type_utils.h"
 #include "ast.h"
 #include "codegen.h"
-#include "module.h"
-#include "opcodes.h"
 #include "utils.h"
 
 namespace slang::codegen

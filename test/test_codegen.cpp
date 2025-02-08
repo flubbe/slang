@@ -13,7 +13,7 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "codegen.h"
+#include "compiler/codegen.h"
 
 namespace cg = slang::codegen;
 

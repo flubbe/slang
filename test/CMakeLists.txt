@@ -26,7 +26,7 @@ target_compile_options(test_package PRIVATE
 
 add_executable(test_lexer
     test_lexer.cpp
-    ../src/lexer.cpp
+    ../src/compiler/lexer.cpp
 )
 target_link_libraries(test_lexer fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_lexer PRIVATE
@@ -36,13 +36,13 @@ target_compile_options(test_lexer PRIVATE
 
 add_executable(test_parser
     test_parser.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/parser.cpp
-    ../src/typing.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main)
@@ -53,13 +53,13 @@ target_compile_options(test_parser PRIVATE
 
 add_executable(test_codegen
     test_codegen.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/parser.cpp
-    ../src/typing.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main)
@@ -70,13 +70,13 @@ target_compile_options(test_codegen PRIVATE
 
 add_executable(test_compile_ir
     test_compile_ir.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/parser.cpp
-    ../src/typing.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)
@@ -88,15 +88,15 @@ target_compile_options(test_compile_ir PRIVATE
 add_executable(test_type_system
     test_type_system.cpp
     ../src/archives/file.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/parser.cpp
     ../src/resolve.cpp
-    ../src/typing.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main)
@@ -108,15 +108,15 @@ target_compile_options(test_type_system PRIVATE
 add_executable(test_resolve
     test_resolve.cpp
     ../src/archives/file.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/parser.cpp
     ../src/resolve.cpp
-    ../src/typing.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main)
@@ -128,17 +128,17 @@ target_compile_options(test_resolve PRIVATE
 add_executable(test_output
     test_output.cpp
     ../src/archives/file.cpp
-    ../src/ast.cpp
-    ../src/eval.cpp
-    ../src/codegen.cpp
-    ../src/emitter.cpp
+    ../src/compiler/ast.cpp
+    ../src/compiler/eval.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/emitter.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
-    ../src/lexer.cpp
-    ../src/module.cpp
-    ../src/opcodes.cpp
-    ../src/parser.cpp
     ../src/resolve.cpp
-    ../src/typing.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main)
@@ -177,12 +177,12 @@ add_executable(test_interpreter
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
-    ../src/filemanager.cpp
-    ../src/gc.cpp
+    ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
-    ../src/module.cpp
-    ../src/opcodes.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
+    ../src/filemanager.cpp
 )
 target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_interpreter PRIVATE

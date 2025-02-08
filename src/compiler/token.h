@@ -14,7 +14,7 @@
 #include <optional>
 #include <variant>
 
-#include "fmt/core.h"
+#include <fmt/core.h>
 
 namespace slang
 {

@@ -12,9 +12,9 @@
 #include <set>
 #include <tuple>
 
+#include "shared/module.h"
 #include "ast.h"
 #include "codegen.h"
-#include "module.h"
 #include "typing.h"
 #include "utils.h"
 

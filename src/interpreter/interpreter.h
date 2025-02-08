@@ -12,11 +12,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "interpreter/module_loader.h"
+#include "shared/module.h"
+#include "shared/opcodes.h"
+#include "module_loader.h"
 #include "filemanager.h"
 #include "gc.h"
-#include "module.h"
-#include "opcodes.h"
 #include "utils.h"
 
 namespace slang::interpreter
