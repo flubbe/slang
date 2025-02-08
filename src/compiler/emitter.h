@@ -13,7 +13,7 @@
 #include <set>
 
 #include "archives/memory.h"
-#include "module.h"
+#include "shared/module.h"
 
 /*
  * Forward declarations.

@@ -12,8 +12,8 @@
 
 #include <fmt/core.h>
 
-#include "shared/type_utils.h" /* for slang::typing::is_reference_type */
-#include "module.h"
+#include "shared/module.h"
+#include "type_utils.h" /* for slang::typing::is_reference_type */
 
 namespace slang::module_
 {

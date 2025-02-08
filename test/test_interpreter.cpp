@@ -11,11 +11,10 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "module.h"
-
 #include "archives/file.h"
-#include "runtime/runtime.h"
 #include "interpreter/interpreter.h"
+#include "runtime/runtime.h"
+#include "shared/module.h"
 
 namespace
 {

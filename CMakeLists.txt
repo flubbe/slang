@@ -24,13 +24,13 @@ add_executable(slang
     src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/module_loader.cpp
+    src/shared/module.cpp
+    src/shared/opcodes.cpp
     src/commandline.cpp
     src/compiler.cpp
     src/filemanager.cpp
     src/main.cpp
-    src/module.cpp
     src/package.cpp
-    src/opcodes.cpp
     src/resolve.cpp
     src/runtime/arrays.cpp
     src/runtime/debug.cpp

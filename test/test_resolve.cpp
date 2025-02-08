@@ -11,10 +11,10 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "compiler/parser.h"
 #include "compiler/codegen.h"
-#include "resolve.h"
+#include "compiler/parser.h"
 #include "compiler/typing.h"
+#include "resolve.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;

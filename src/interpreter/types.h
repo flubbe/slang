@@ -17,8 +17,8 @@
 #include <functional>
 #include <vector>
 
-#include "module.h"
-#include "opcodes.h"
+#include "shared/module.h"
+#include "shared/opcodes.h"
 #include "vector.h"
 
 namespace slang::interpreter

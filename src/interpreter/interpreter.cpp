@@ -11,9 +11,9 @@
 #include <fmt/core.h>
 
 #include "archives/memory.h"
+#include "shared/module.h"
+#include "shared/opcodes.h"
 #include "interpreter.h"
-#include "module.h"
-#include "opcodes.h"
 #include "package.h"
 #include "utils.h"
 #include "vector.h"

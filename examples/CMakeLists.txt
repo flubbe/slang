@@ -26,8 +26,8 @@ add_executable(native_integration
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
-    ../src/module.cpp
-    ../src/opcodes.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
 )
 target_link_libraries(native_integration fmt::fmt)
 target_compile_options(native_integration PRIVATE

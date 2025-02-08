@@ -13,12 +13,12 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "compiler/parser.h"
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/parser.h"
 #include "compiler/typing.h"
+#include "shared/module.h"
 #include "resolve.h"
-#include "module.h"
 
 #include "archives/file.h"
 

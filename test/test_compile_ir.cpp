@@ -13,8 +13,8 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
-#include "compiler/parser.h"
 #include "compiler/codegen.h"
+#include "compiler/parser.h"
 #include "compiler/typing.h"
 
 namespace ast = slang::ast;

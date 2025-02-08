@@ -12,15 +12,15 @@
 
 #include "archives/file.h"
 #include "compiler/codegen.h"
+#include "compiler/emitter.h"
+#include "compiler/parser.h"
+#include "compiler/typing.h"
+#include "interpreter/interpreter.h"
+#include "runtime/runtime.h"
+#include "shared/module.h"
 #include "commandline.h"
 #include "compiler.h"
-#include "compiler/emitter.h"
-#include "interpreter/interpreter.h"
-#include "module.h"
-#include "compiler/parser.h"
 #include "resolve.h"
-#include "runtime/runtime.h"
-#include "compiler/typing.h"
 #include "utils.h"
 
 namespace ast = slang::ast;

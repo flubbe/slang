@@ -42,7 +42,7 @@ add_executable(test_parser
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/module.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main)
@@ -59,7 +59,7 @@ add_executable(test_codegen
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/module.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main)
@@ -76,7 +76,7 @@ add_executable(test_compile_ir
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/module.cpp
+    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)
@@ -94,8 +94,8 @@ add_executable(test_type_system
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/module.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -114,8 +114,8 @@ add_executable(test_resolve
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/module.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -135,9 +135,9 @@ add_executable(test_output
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
-    ../src/module.cpp
-    ../src/opcodes.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -177,12 +177,12 @@ add_executable(test_interpreter
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
-    ../src/filemanager.cpp
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
-    ../src/module.cpp
-    ../src/opcodes.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
+    ../src/filemanager.cpp
 )
 target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_interpreter PRIVATE
