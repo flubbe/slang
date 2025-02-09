@@ -20,7 +20,6 @@
 #include "runtime/runtime.h"
 #include "shared/module.h"
 #include "commandline.h"
-#include "compiler.h"
 #include "resolve.h"
 #include "utils.h"
 
@@ -226,81 +225,6 @@ void pkg::invoke(const std::vector<std::string>& args)
 std::string pkg::get_description() const
 {
     return "Manage packages.";
-}
-
-/*
- * Package builds.
- */
-
-build::build(slang::package_manager& in_manager)
-: command{"build"}
-, manager{in_manager}
-{
-}
-
-void build::invoke(const std::vector<std::string>& args)
-{
-    if(args.size() != 1)
-    {
-        const std::string help_text =
-          "pkg_name consists of package identifiers, separated by ::. For example, std::utils "
-          "is a valid package name.\n\nWhen a package is built, all of its sub-packages are also built.";
-        slang::utils::print_usage_help("slang build pkg_name", help_text);
-        return;
-    }
-
-    const std::string package_name = args[0];
-    if(!package::is_valid_name(package_name))
-    {
-        throw std::runtime_error(fmt::format("Cannot build package '{}': The name is not a valid package name.", package_name));
-    }
-
-    if(!manager.exists(package_name))
-    {
-        throw std::runtime_error(fmt::format("Cannot build package '{}', since it does not exist.", package_name));
-    }
-
-    fmt::print("Building package '{}'...\n", package_name);
-
-    // get all module sources.
-    std::vector<package> pkgs{manager.open(package_name, false)};
-    std::vector<std::string> sub_package_names = manager.get_package_names(true, package_name);
-
-    fmt::print("Collected:\n");
-    fmt::print("    * {}\n", package_name);
-    for(auto& n: sub_package_names)
-    {
-        fmt::print("    * {}\n", n);
-        pkgs.push_back(manager.open(n, false));
-    }
-
-    slang::compiler compiler{manager};
-
-    // first pass.
-    compiler.setup(pkgs);
-    compiler.invoke_lexer();
-    compiler.collect_definitions();
-    pkgs = compiler.resolve_dependencies();
-
-    // second pass.
-    try
-    {
-        for(auto& p: pkgs)
-        {
-            compiler.compile_package(p);
-        }
-    }
-    catch(const slang::compiler_error& e)
-    {
-        fmt::print("{}\n", e.what());
-        fmt::print("Compilation failed.\n");
-        return;
-    }
-}
-
-std::string build::get_description() const
-{
-    return "Build a package.";
 }
 
 /*

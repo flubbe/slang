@@ -104,19 +104,6 @@ public:
     std::string get_description() const override;
 };
 
-/** Package builds. */
-class build : public command
-{
-    /** The package manager bound to this command. */
-    slang::package_manager& manager;
-
-public:
-    /** Constructor. */
-    explicit build(slang::package_manager& manager);
-    void invoke(const std::vector<std::string>& args) override;
-    std::string get_description() const override;
-};
-
 /** Compile single module. */
 class compile : public command
 {
