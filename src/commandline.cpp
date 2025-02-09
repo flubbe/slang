@@ -4,7 +4,7 @@
  * commands to be executed from the command line.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -16,6 +16,7 @@
 #include "compiler/parser.h"
 #include "compiler/typing.h"
 #include "interpreter/interpreter.h"
+#include "interpreter/invoke.h"
 #include "runtime/runtime.h"
 #include "shared/module.h"
 #include "commandline.h"
@@ -817,8 +818,6 @@ void exec::invoke(const std::vector<std::string>& args)
 
     // call 'main'.
     si::value res = si::invoke(
-      ctx,
-      loader,
       main_function,
       std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()});
 

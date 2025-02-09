@@ -4,7 +4,7 @@
  * interpreter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -81,13 +81,17 @@ static opcode get_return_opcode(const module_::variable_type& return_type)
  */
 
 function::function(
+  context& ctx,
+  module_loader& loader,
   module_::function_signature signature,
   std::size_t entry_point,
   std::size_t size,
   std::vector<module_::variable_descriptor> locals,
   std::size_t locals_size,
   std::size_t stack_size)
-: signature{std::move(signature)}
+: ctx{ctx}
+, loader{loader}
+, signature{std::move(signature)}
 , native{false}
 , entry_point_or_function{entry_point}
 , size{size}
@@ -99,13 +103,25 @@ function::function(
 }
 
 function::function(
+  context& ctx,
+  module_loader& loader,
   module_::function_signature signature,
   std::function<void(operand_stack&)> func)
-: signature{std::move(signature)}
+: ctx{ctx}
+, loader{loader}
+, signature{std::move(signature)}
 , native{true}
 , entry_point_or_function{std::move(func)}
 {
     ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
+}
+
+value function::invoke(const std::vector<value>& args)
+{
+    return ctx.invoke(
+      loader,
+      *this,
+      args);
 }
 
 /*

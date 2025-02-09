@@ -4,7 +4,7 @@
  * interpreter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -220,81 +220,5 @@ public:
         return gc;
     }
 };
-
-/*
- * Function invokation helpers.
- */
-
-namespace detail
-{
-
-/**
- * Helper for moving a tuple into a `std::vector<value>`.
- *
- * @tparam Tuple Tuple type.
- * @param tuple The tuple.
- * @returns A `std::vector<value>` with the tuple's contents.
- */
-template<typename Tuple>
-std::vector<value> move_into_value_vector(Tuple&& tuple)
-{
-    return std::apply(
-      [](auto&&... elems)
-      {
-          std::vector<value> result;
-          result.reserve(sizeof...(elems));
-          (result.emplace_back(value{std::move(elems)}), ...);
-          return result;
-      },
-      std::forward<Tuple>(tuple));
-}
-
-}    // namespace detail
-
-/**
- * Invoke a function.
- *
- * @param ctx Interpreter context.
- * @param module_name Name of the module that contains the function.
- * @param function_name Name of the function.
- * @param args Arguments that are passed to the function.
- * @returns The function's return value.
- */
-template<typename... Args>
-value invoke(
-  context& ctx,
-  const std::string& module_name,
-  const std::string& function_name,
-  Args&&... args)
-{
-    return ctx.invoke(
-      module_name,
-      function_name,
-      detail::move_into_value_vector(
-        std::make_tuple(args...)));
-}
-
-/**
- * Invoke a function.
- *
- * @param ctx Interpreter context.
- * @param loader Loader of the module that contains the function.
- * @param fn The function.
- * @param args Arguments that are passed to the function.
- * @returns The function's return value.
- */
-template<typename... Args>
-value invoke(
-  context& ctx,
-  const module_loader& loader,
-  const function& fn,
-  Args&&... args)
-{
-    return ctx.invoke(
-      loader,
-      fn,
-      detail::move_into_value_vector(
-        std::make_tuple(args...)));
-}
 
 }    // namespace slang::interpreter

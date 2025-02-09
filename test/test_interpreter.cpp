@@ -4,7 +4,7 @@
  * Interpreter tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -13,6 +13,7 @@
 
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
+#include "interpreter/invoke.h"
 #include "runtime/runtime.h"
 #include "shared/module.h"
 
@@ -1082,7 +1083,7 @@ TEST(interpreter, invokation_api)
         si::function& f = loader->get_function("f");
 
         si::value res;
-        ASSERT_NO_THROW(res = si::invoke(ctx, *loader, f, 1.0f));
+        ASSERT_NO_THROW(res = si::invoke(f, 1.0f));
         EXPECT_EQ(*res.get<int>(), 4);
 
         EXPECT_EQ(ctx.get_gc().object_count(), 0);

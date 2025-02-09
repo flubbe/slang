@@ -99,7 +99,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     si::value res;
     try
     {
-        res = si::invoke(ctx, loader, function, si::value{layout_id, &s}, 3.141f);
+        res = function(si::value{layout_id, &s}, 3.141f);
     }
     catch(const si::interpreter_error& err)
     {

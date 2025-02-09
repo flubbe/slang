@@ -4,7 +4,7 @@
  * module loader.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -1274,12 +1274,28 @@ module_loader::module_loader(
                 throw interpreter_error(fmt::format("Cannot resolve native function '{}' in module '{}'.", it.name, details.library_name));
             }
 
-            function_map.insert({it.name, function{desc.signature, func_it->second}});
+            function_map.insert(
+              {it.name,
+               function{
+                 ctx,
+                 *this,
+                 desc.signature,
+                 func_it->second}});
         }
         else
         {
             auto& details = std::get<module_::function_details>(desc.details);
-            function_map.insert({it.name, function{desc.signature, details.offset, details.size, details.locals, details.locals_size, details.stack_size}});
+            function_map.insert(
+              {it.name,
+               function{
+                 ctx,
+                 *this,
+                 desc.signature,
+                 details.offset,
+                 details.size,
+                 details.locals,
+                 details.locals_size,
+                 details.stack_size}});
         }
     }
 }
