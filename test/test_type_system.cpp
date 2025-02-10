@@ -1517,6 +1517,7 @@ TEST(type_system, examples)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
+        mgr.add_search_path(".");
         mgr.add_search_path("lang");
         ASSERT_TRUE(mgr.is_file("std.cmod"));
 
