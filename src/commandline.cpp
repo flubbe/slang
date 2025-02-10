@@ -262,7 +262,8 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         // get output file.
         output_file_it = std::find(args_copy.begin(), args_copy.end(), "-o");
-        if(output_file_it != args_copy.end())
+        bool output_file_specified = output_file_it != args_copy.end();
+        if(output_file_specified)
         {
             if(output_file_it + 1 == args_copy.end())
             {
@@ -308,7 +309,7 @@ void compile::invoke(const std::vector<std::string>& args)
             fmt::print("Info: Module path: {}\n", module_path.string());
         }
 
-        if(output_file_it != args_copy.end())
+        if(!output_file_specified)
         {
             output_file = module_path;
             output_file.replace_extension(package::module_ext);
