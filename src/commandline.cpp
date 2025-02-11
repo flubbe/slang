@@ -240,65 +240,33 @@ compile::compile(slang::package_manager& in_manager)
 void compile::invoke(const std::vector<std::string>& args)
 {
     bool display_help_and_exit = false;
-    fs::path module_path;
-    fs::path output_file;
+    argument_parser argparser{args};
 
-    if(args.size() < 1)
+    if(argparser.get_positional().size() < 1)
     {
         display_help_and_exit = true;
     }
 
-    auto verbose_it =
-      std::find(
-        args.begin(),
-        args.end(),
-        "--verbose");
-    bool verbose = (verbose_it != args.end());
+    bool verbose = argparser.has_flag("verbose");
 
-    std::vector<std::string> args_copy = args;
+    fs::path module_path;
+    fs::path output_file;
 
-    std::vector<std::string>::const_iterator output_file_it;
     if(!display_help_and_exit)
     {
         // get output file.
-        output_file_it = std::find(args_copy.begin(), args_copy.end(), "-o");
-        bool output_file_specified = output_file_it != args_copy.end();
-        if(output_file_specified)
+        std::optional<std::string> output_file_opt = argparser.get_option("o");
+        if(output_file_opt != std::nullopt)
         {
-            if(output_file_it + 1 == args_copy.end())
-            {
-                fmt::print(" -o <output-file>: Missing <output-file>.\n");
-                return;
-            }
-
-            if(verbose)
-            {
-                fmt::print("Info: Output file specified.\n");
-            }
-
-            output_file = *(output_file_it + 1);
+            output_file = *output_file_opt;
             if(!output_file.has_extension())
             {
                 output_file.replace_extension(package::module_ext);
             }
-
-            args_copy.erase(output_file_it + 1);
-            args_copy.erase(output_file_it);
         }
-
-        auto module_path_it = std::find_if(
-          args_copy.begin(), args_copy.end(),
-          [](const std::string& arg) -> bool
-          { return arg.substr(0, 2) != "--"; });
-        if(module_path_it == args_copy.end())
-        {
-            throw std::runtime_error("No module specified.");
-        }
-
-        module_path = fs::path{*module_path_it};
-        args_copy.erase(module_path_it);
 
         // get input file.
+        module_path = argparser.get_positional()[0].second;
         if(!module_path.has_extension())
         {
             module_path.replace_extension(package::source_ext);
@@ -309,7 +277,8 @@ void compile::invoke(const std::vector<std::string>& args)
             fmt::print("Info: Module path: {}\n", module_path.string());
         }
 
-        if(!output_file_specified)
+        // generate output file name, if necessary.
+        if(output_file_opt == std::nullopt)
         {
             output_file = module_path;
             output_file.replace_extension(package::module_ext);
@@ -331,15 +300,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     // Flags.
 
-    auto evaluate_constant_subexpressions_it =
-      std::find(
-        args.begin(),
-        args.end(),
-        "--no-eval-const-subexpr");
-    bool evaluate_constant_subexpressions =
-      (evaluate_constant_subexpressions_it == args.end())
-      || (evaluate_constant_subexpressions_it == output_file_it);
-
+    bool evaluate_constant_subexpressions = argparser.has_flag("no-eval-const-subexpr");
     if(verbose)
     {
         if(!evaluate_constant_subexpressions)
@@ -356,12 +317,7 @@ void compile::invoke(const std::vector<std::string>& args)
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
 
-    auto no_lang_it =
-      std::find(
-        args.begin(),
-        args.end(),
-        "--no-lang");
-    bool no_lang = no_lang_it != args.end();
+    bool no_lang = argparser.has_flag("no-lang");
 
     if(!no_lang)
     {
@@ -373,25 +329,19 @@ void compile::invoke(const std::vector<std::string>& args)
         file_mgr.add_search_path("lang");
     }
 
-    std::vector<std::string>::const_iterator search_path_it = args.begin();
-    while((search_path_it = std::find(
-             search_path_it,
-             args.end(),
-             "--search-path"))
-          != args.end())
+    std::optional<std::string> search_paths = argparser.get_option("search-path");
+    if(search_paths != std::nullopt)
     {
-        ++search_path_it;
-        if(search_path_it == args.end())
+        std::list<std::string> v = utils::split(*search_paths, ";");
+        for(auto& it: v)
         {
-            break;
-        }
+            if(verbose)
+            {
+                fmt::print("Info: Adding '{}' to search paths.\n", it);
+            }
 
-        if(verbose)
-        {
-            fmt::print("Info: Adding '{}' to search paths.\n", *search_path_it);
+            file_mgr.add_search_path(it);
         }
-
-        file_mgr.add_search_path(*search_path_it);
     }
 
     // Compile.
@@ -606,7 +556,9 @@ exec::exec(slang::package_manager& in_manager)
 
 void exec::invoke(const std::vector<std::string>& args)
 {
-    if(args.size() < 1)
+    argument_parser argparser{args};
+
+    if(argparser.get_positional().size() < 1)
     {
         const std::string help_text =
           "Execute the main function of the module `mod.cmod`.";
@@ -614,28 +566,11 @@ void exec::invoke(const std::vector<std::string>& args)
         return;
     }
 
-    auto separator = std::find(args.begin(), args.end(), "--");
-    std::vector<std::string> forwarded_args{
-      separator != args.end()
-        ? separator + 1
-        : args.end(),
-      args.end()};
+    bool verbose = argparser.has_flag("verbose");
+    bool disassemble = argparser.has_flag("disasm");
+    bool no_lang = argparser.has_flag("no-lang");
 
-    // Flags.
-
-    bool verbose = std::find(args.begin(), separator, "--verbose") != separator;
-    bool disassemble = std::find(args.begin(), separator, "--disasm") != separator;
-
-    auto module_path_it = std::find_if(
-      args.begin(), separator,
-      [](const std::string& arg) -> bool
-      { return arg.substr(0, 2) != "--"; });
-    if(module_path_it == separator)
-    {
-        throw std::runtime_error("No module specified.");
-    }
-
-    auto module_path = fs::absolute(fs::path(*module_path_it));
+    auto module_path = fs::absolute(fs::path{argparser.get_positional()[0].second});
     if(!module_path.has_extension())
     {
         module_path.replace_extension(package::module_ext);
@@ -644,13 +579,6 @@ void exec::invoke(const std::vector<std::string>& args)
     // Add search paths.
     slang::file_manager file_mgr;
     file_mgr.add_search_path(module_path.parent_path());
-
-    auto no_lang_it =
-      std::find(
-        args.begin(),
-        args.end(),
-        "--no-lang");
-    bool no_lang = no_lang_it != args.end();
 
     if(!no_lang)
     {
@@ -662,29 +590,30 @@ void exec::invoke(const std::vector<std::string>& args)
         file_mgr.add_search_path("lang");
     }
 
-    std::vector<std::string>::const_iterator search_path_it = args.begin();
-    while((search_path_it = std::find(
-             search_path_it,
-             args.end(),
-             "--search-path"))
-          != args.end())
+    std::optional<std::string> search_paths = argparser.get_option("search-path");
+    if(search_paths != std::nullopt)
     {
-        ++search_path_it;
-        if(search_path_it == args.end())
+        std::list<std::string> v = utils::split(*search_paths, ";");
+        for(auto& it: v)
         {
-            break;
-        }
+            if(verbose)
+            {
+                fmt::print("Info: Adding '{}' to search paths.\n", it);
+            }
 
-        if(verbose)
-        {
-            fmt::print("Info: Adding '{}' to search paths.\n", *search_path_it);
+            file_mgr.add_search_path(it);
         }
-
-        file_mgr.add_search_path(*search_path_it);
     }
 
-    // Get module name.
+    // Forwarded arguments.
+    auto separator = std::find(args.begin(), args.end(), "--");
+    std::vector<std::string> forwarded_args{
+      separator != args.end()
+        ? separator + 1
+        : args.end(),
+      args.end()};
 
+    // Get module name.
     if(!file_mgr.is_file(module_path))
     {
         throw std::runtime_error(fmt::format(
@@ -705,6 +634,7 @@ void exec::invoke(const std::vector<std::string>& args)
         fmt::print("Info: module name: {}\n", module_name.string());
     }
 
+    // Set up interpreter context.
     si::context ctx{file_mgr};
 
     if(verbose)
