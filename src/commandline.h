@@ -4,7 +4,7 @@
  * commands to be executed from the command line.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -54,6 +54,24 @@ class argument_parser
                 else
                 {
                     options.insert({arg.substr(2), std::nullopt});
+                }
+            }
+            else if(arg.compare(0, 1, "-") == 0)
+            {
+                if(arg.length() == 1)
+                {
+                    // invalid argument. ignore.
+                    continue;
+                }
+
+                if(i != args.size() - 1 && args[i + 1][0] != '-')
+                {
+                    // NOTE overwrites previous arguments.
+                    options.insert({arg.substr(1), args[i + 1]});
+                }
+                else
+                {
+                    options.insert({arg.substr(1), std::nullopt});
                 }
             }
             else
