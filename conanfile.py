@@ -24,6 +24,7 @@ class slangRecipe(ConanFile):
     generators = "CMakeToolchain", "CMakeDeps"
 
     def requirements(self):
+        self.requires("cxxopts/3.2.0")
         self.requires("fmt/[>=10.0.0 <11.0]")
         self.test_requires("gtest/[>=1.14.0 <2.0]")
 

@@ -9,6 +9,7 @@
  */
 
 #include <fmt/core.h>
+#include <cxxopts.hpp>
 
 #include "archives/file.h"
 #include "compiler/codegen.h"
@@ -240,14 +241,32 @@ compile::compile(slang::package_manager& in_manager)
 void compile::invoke(const std::vector<std::string>& args)
 {
     bool display_help_and_exit = false;
-    argument_parser argparser{args};
 
-    if(argparser.get_positional().size() < 1)
+    cxxopts::Options options("slang compile", "Compile a module.");
+
+    // clang-format off
+    options.add_options()
+        ("v,verbose", "Verbose output.")
+        ("o,output", "Output file.", cxxopts::value<std::string>())
+        ("n,no-lang", "Exclude default language modules.")
+        ("s,search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
+        ("no-eval-const-subexpr", "Disable constant subexpression evaluation");
+    // clang-format on
+
+    std::vector<char const* const> argv = {"slang compile"};
+    for(auto& arg: args)
+    {
+        argv.push_back(arg.data());
+    }
+    auto result = options.parse(argv.size(), argv.data());
+    auto unmatched = result.unmatched();
+
+    if(unmatched.size() < 1)
     {
         display_help_and_exit = true;
     }
 
-    bool verbose = argparser.has_flag("verbose");
+    bool verbose = result.count("verbose") > 0;
 
     fs::path module_path;
     fs::path output_file;
@@ -255,10 +274,10 @@ void compile::invoke(const std::vector<std::string>& args)
     if(!display_help_and_exit)
     {
         // get output file.
-        std::optional<std::string> output_file_opt = argparser.get_option("o");
-        if(output_file_opt != std::nullopt)
+        bool has_output = result.count("output") > 0;
+        if(has_output)
         {
-            output_file = *output_file_opt;
+            output_file = result["output"].as<std::string>();
             if(!output_file.has_extension())
             {
                 output_file.replace_extension(package::module_ext);
@@ -266,7 +285,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
 
         // get input file.
-        module_path = argparser.get_positional()[0].second;
+        module_path = unmatched[0];
         if(!module_path.has_extension())
         {
             module_path.replace_extension(package::source_ext);
@@ -278,7 +297,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
 
         // generate output file name, if necessary.
-        if(output_file_opt == std::nullopt)
+        if(!has_output)
         {
             output_file = module_path;
             output_file.replace_extension(package::module_ext);
@@ -292,15 +311,14 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(display_help_and_exit)
     {
-        const std::string help_text =
-          "Compile the module `mod.sl` into `mod.cmod`.";
-        slang::utils::print_usage_help("slang compile mod", help_text);
+        fmt::print("Usage: slang compile module.sl\n");
+        fmt::print("{}\n", options.help());
         return;
     }
 
     // Flags.
 
-    bool evaluate_constant_subexpressions = argparser.has_flag("no-eval-const-subexpr");
+    bool evaluate_constant_subexpressions = result.count("no-eval-const-subexpr") > 0;
     if(verbose)
     {
         if(!evaluate_constant_subexpressions)
@@ -317,7 +335,7 @@ void compile::invoke(const std::vector<std::string>& args)
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
 
-    bool no_lang = argparser.has_flag("no-lang");
+    bool no_lang = result.count("no-lang") > 0;
 
     if(!no_lang)
     {
@@ -329,10 +347,9 @@ void compile::invoke(const std::vector<std::string>& args)
         file_mgr.add_search_path("lang");
     }
 
-    std::optional<std::string> search_paths = argparser.get_option("search-path");
-    if(search_paths != std::nullopt)
+    if(result.count("search-path") > 0)
     {
-        std::list<std::string> v = utils::split(*search_paths, ";");
+        std::list<std::string> v = utils::split(result["search-path"].as<std::string>(), ";");
         for(auto& it: v)
         {
             if(verbose)
@@ -556,21 +573,36 @@ exec::exec(slang::package_manager& in_manager)
 
 void exec::invoke(const std::vector<std::string>& args)
 {
-    argument_parser argparser{args};
+    cxxopts::Options options("slang exec", "Execute a module.");
 
-    if(argparser.get_positional().size() < 1)
+    // clang-format off
+    options.add_options()
+        ("v,verbose", "Verbose output.")
+        ("d,disasm", "Show disassembly and exit.")
+        ("n,no-lang", "Exclude default language modules.")
+        ("s,search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>());
+    // clang-format on
+
+    std::vector<char const* const> argv = {"slang exec"};
+    for(auto& arg: args)
     {
-        const std::string help_text =
-          "Execute the main function of the module `mod.cmod`.";
-        slang::utils::print_usage_help("slang exec mod", help_text);
+        argv.push_back(arg.data());
+    }
+    auto result = options.parse(argv.size(), argv.data());
+    auto unmatched = result.unmatched();
+
+    if(unmatched.size() < 1)
+    {
+        fmt::print("Usage: slang exec module\n");
+        fmt::print("{}\n", options.help());
         return;
     }
 
-    bool verbose = argparser.has_flag("verbose");
-    bool disassemble = argparser.has_flag("disasm");
-    bool no_lang = argparser.has_flag("no-lang");
+    bool verbose = result.count("verbose") > 0;
+    bool disassemble = result.count("disasm") > 0;
+    bool no_lang = result.count("no-lang") > 0;
 
-    auto module_path = fs::absolute(fs::path{argparser.get_positional()[0].second});
+    auto module_path = fs::absolute(fs::path{unmatched[0]});
     if(!module_path.has_extension())
     {
         module_path.replace_extension(package::module_ext);
@@ -590,10 +622,9 @@ void exec::invoke(const std::vector<std::string>& args)
         file_mgr.add_search_path("lang");
     }
 
-    std::optional<std::string> search_paths = argparser.get_option("search-path");
-    if(search_paths != std::nullopt)
+    if(result.count("search-path") > 0)
     {
-        std::list<std::string> v = utils::split(*search_paths, ";");
+        std::list<std::string> v = utils::split(result["search-path"].as<std::string>(), ";");
         for(auto& it: v)
         {
             if(verbose)

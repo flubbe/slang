@@ -46,6 +46,7 @@ A preliminary (incomplete) documentation of the scripting language can be found 
 2. Manually:
 
     The project depends on
+    - [`cxxopts`](https://github.com/jarro2783/cxxopts) (==3.2.0)
     - [`fmt`](https://github.com/fmtlib/fmt) (>=10.0.0, <11.0)
     - [GoogleTest](https://github.com/google/googletest) (>=1.14.0, <2.0)
 
