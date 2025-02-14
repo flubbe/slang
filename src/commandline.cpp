@@ -253,7 +253,7 @@ void compile::invoke(const std::vector<std::string>& args)
         ("no-eval-const-subexpr", "Disable constant subexpression evaluation");
     // clang-format on
 
-    std::vector<char const* const> argv = {"slang compile"};
+    std::vector<const char*> argv = {"slang compile"};
     for(auto& arg: args)
     {
         argv.push_back(arg.data());
@@ -583,7 +583,7 @@ void exec::invoke(const std::vector<std::string>& args)
         ("s,search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>());
     // clang-format on
 
-    std::vector<char const* const> argv = {"slang exec"};
+    std::vector<const char*> argv = {"slang exec"};
     for(auto& arg: args)
     {
         argv.push_back(arg.data());
