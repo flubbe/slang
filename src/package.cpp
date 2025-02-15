@@ -21,16 +21,9 @@ namespace slang
  * package implementation.
  */
 
-package::package(const fs::path& in_path)
+package::package(const fs::path& path)
+: path{fs::exists(path) ? fs::canonical(path) : fs::absolute(path)}
 {
-    if(fs::exists(in_path))
-    {
-        path = fs::canonical(in_path);
-    }
-    else
-    {
-        path = fs::absolute(in_path);
-    }
 }
 
 bool package::contains_module(const std::string& module_name) const

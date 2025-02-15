@@ -1269,10 +1269,10 @@ void parser::pop_directive()
     directive_stack.pop_back();
 }
 
-void parser::parse(lexer& in_lexer)
+void parser::parse(lexer& lexer)
 {
-    m_lexer = &in_lexer;
-    auto start_location = m_lexer->get_location();
+    current_lexer = &lexer;
+    auto start_location = current_lexer->get_location();
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
     while((current_token = get_next_token(false)) != std::nullopt)
@@ -1286,7 +1286,7 @@ void parser::parse(lexer& in_lexer)
         exprs.emplace_back(parse_top_level_statement());
     }
 
-    if(!in_lexer.eof())
+    if(!lexer.eof())
     {
         throw parser_error("Not all tokens parsed.");
     }

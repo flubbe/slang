@@ -47,7 +47,7 @@ public:
      *
      * @param path Path to the package. Does not need to exist.
      */
-    explicit package(const fs::path& in_path);
+    explicit package(const fs::path& path);
 
     /**
      * Check if a given module is contained in this package.
@@ -126,10 +126,10 @@ public:
     /**
      * Construct a new package manager.
      *
-     * @param in_package_root The root path for this package manager.
+     * @param package_root The root path for this package manager.
      * @param create Whether to create the path if it does not exist.
      */
-    package_manager(const fs::path& in_package_root, bool create = false);
+    package_manager(const fs::path& package_root, bool create = false);
 
     /** Move constructor. */
     package_manager(package_manager&& other)

@@ -725,11 +725,11 @@ public:
     /**
      * Construct an import expression.
      *
-     * @param in_path The import path.
+     * @param path The import path.
      */
-    explicit import_expression(std::vector<token> in_path)
-    : expression{in_path[0].location}
-    , path{std::move(in_path)}
+    explicit import_expression(std::vector<token> path)
+    : expression{path[0].location}
+    , path{std::move(path)}
     {
     }
 
