@@ -188,7 +188,7 @@ void context::resolve_module(const fs::path& resolved_path)
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
-    const std::vector<std::string>& imports = type_ctx.get_imports();
+    const std::vector<std::string>& imports = type_ctx.get_imported_modules();
 
     for(auto& import: imports)
     {
@@ -368,20 +368,42 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
                 for(auto& arg: desc.signature.arg_types)
                 {
                     // FIXME Type should not be resolved here
-                    arg_types.emplace_back(type_ctx.get_type(
-                      arg.base_type(),
-                      arg.is_array(),
-                      import_path));
+                    if(ty::is_builtin_type(arg.base_type()))
+                    {
+                        arg_types.emplace_back(type_ctx.get_type(
+                          arg.base_type(),
+                          arg.is_array()));
+                    }
+                    else
+                    {
+                        arg_types.emplace_back(type_ctx.get_type(
+                          arg.base_type(),
+                          arg.is_array(),
+                          import_path));
+                    }
                 }
 
                 // FIXME Type should not be resolved here
-                ty::type_info resolved_return_type = type_ctx.get_type(
-                  return_type->get_type().to_string(),
-                  return_type->get_type().is_array(),
-                  import_path);
+                ty::type_info resolved_return_type;
+                if(ty::is_builtin_type(return_type->get_type().to_string()))
+                {
+                    resolved_return_type = type_ctx.get_type(
+                      return_type->get_type().to_string(),
+                      return_type->get_type().is_array());
+                }
+                else
+                {
+                    resolved_return_type = type_ctx.get_type(
+                      return_type->get_type().to_string(),
+                      return_type->get_type().is_array(),
+                      import_path);
+                }
 
-                type_ctx.add_function({it.first, {0, 0}},
-                                      std::move(arg_types), std::move(resolved_return_type), import_path);
+                type_ctx.add_function(
+                  {it.first, {0, 0}},
+                  std::move(arg_types),
+                  std::move(resolved_return_type),
+                  import_path);
             }
         }
     }

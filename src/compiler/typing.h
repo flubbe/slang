@@ -320,7 +320,7 @@ class context
     std::size_t anonymous_scope_id = 0;
 
     /** Imported modules. */
-    std::vector<std::string> imports;
+    std::vector<std::string> imported_modules;
 
     /** Imported functions, indexed by `(import_path, function_name)`. */
     std::unordered_map<
@@ -683,10 +683,10 @@ public:
      */
     bool has_expression_type(const ast::expression& expr) const;
 
-    /** Get the import list. */
-    const std::vector<std::string>& get_imports() const
+    /** Get the imported modules. */
+    const std::vector<std::string>& get_imported_modules() const
     {
-        return imports;
+        return imported_modules;
     }
 
     /** Get a string representation of the context. */

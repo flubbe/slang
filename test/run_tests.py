@@ -46,6 +46,7 @@ _script_tests: list[str] = [
     "test_eval_subexpr",
     "test_invalid_main_signature1",
     "test_invalid_main_signature2",
+    "test_import",  # just validate execution; return code is not forwarded.
     "test_math",
     "test_operators",
     "test_strings",
@@ -113,6 +114,7 @@ if __name__ == "__main__":
                 "./build/Debug/slang",
                 "compile",
                 f"test/{test_name}",
+                "--search-path=test",
             ],
             cwd=_module_path.parent,
             stdout=subprocess.PIPE,
@@ -163,6 +165,7 @@ if __name__ == "__main__":
                 "./build/Debug/slang",
                 "compile",
                 f"test/{test_name}",
+                "--search-path=test",
             ],
             cwd=_module_path.parent,
             stdout=subprocess.PIPE,
@@ -215,8 +218,10 @@ if __name__ == "__main__":
         )
         p.wait(timeout=5)
 
+        print(f" result = ", p.returncode, end="")
+
         result = (
-            p.returncode
+            p.returncode != 0
             if test_name not in _script_expect_failure
             else int(p.returncode == 0)
         )
