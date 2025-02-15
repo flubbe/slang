@@ -27,7 +27,9 @@ add_executable(slang
     src/interpreter/module_loader.cpp
     src/shared/module.cpp
     src/shared/opcodes.cpp
-    src/commandline.cpp
+    src/commandline/commandline.cpp
+    src/commandline/compile.cpp
+    src/commandline/exec.cpp
     src/filemanager.cpp
     src/main.cpp
     src/package.cpp

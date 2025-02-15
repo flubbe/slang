@@ -90,7 +90,7 @@ class parser
 {
 protected:
     /** The lexer common to all internal parse calls. */
-    lexer* m_lexer{nullptr};
+    lexer* current_lexer{nullptr};
 
     /** The parsed AST. */
     std::shared_ptr<ast::expression> ast;
@@ -114,12 +114,12 @@ protected:
      */
     std::optional<token> get_next_token(bool throw_on_eof = true)
     {
-        if(!m_lexer)
+        if(!current_lexer)
         {
             throw parser_error("No lexer set for parsing.");
         }
 
-        current_token = m_lexer->next();
+        current_token = current_lexer->next();
         if(current_token == std::nullopt && throw_on_eof)
         {
             throw syntax_error("Unexpected end of file.");
@@ -261,9 +261,9 @@ public:
     /**
      * Parse tokens from a lexer into an abstract syntax tree.
      *
-     * @param in_lexer The lexer to use.
+     * @param lexer The lexer to use.
      */
-    void parse(lexer& in_lexer);
+    void parse(lexer& lexer);
 
     /** Get the AST. */
     std::shared_ptr<ast::expression> get_ast() const

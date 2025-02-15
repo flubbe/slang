@@ -14,10 +14,26 @@
 #include <unordered_map>
 #include <vector>
 
+#include <cxxopts.hpp>
+
 #include "package.h"
 
 namespace slang::commandline
 {
+
+/**
+ * Set the command line.
+ *
+ * @param cmdline The command line.
+ */
+void set_command_line(const std::vector<std::string>& cmdline);
+
+/**
+ * Get the command line.
+ *
+ * @returns Returns a reference to the command line vector.
+ */
+const std::vector<std::string>& get_command_line();
 
 /** A generic commandline command. */
 class command
@@ -34,6 +50,35 @@ protected:
      */
     void validate_name() const;
 
+    /**
+     * Create a `cxxopts::Options` object using command line information,
+     * command name and command description.
+     *
+     * @returns A `cxxopts::Options` object.
+     */
+    cxxopts::Options make_cxxopts_options() const
+    {
+        const std::string program_name = fmt::format("{} {}", get_command_line()[0], get_name());
+        return cxxopts::Options(program_name, get_description());
+    }
+
+    /**
+     * Parse the command line.
+     *
+     * @param options A `cxxopts::Options` object.
+     * @return The parse result.
+     */
+    static cxxopts::ParseResult parse_args(cxxopts::Options& options, const std::vector<std::string>& args)
+    {
+        std::vector<const char*> argv = {{}};    // dummy first argument
+        for(auto& arg: args)
+        {
+            argv.push_back(arg.data());
+        }
+
+        return options.parse(argv.size(), argv.data());
+    };
+
 public:
     /**
      * Construct a command.
@@ -43,8 +88,8 @@ public:
      *
      * @throws Throws a std::runtime_error if the name is invalid.
      */
-    explicit command(const std::string& in_name)
-    : name{in_name}
+    explicit command(const std::string& name)
+    : name{name}
     {
         validate_name();
     }
@@ -90,19 +135,6 @@ public:
     {
         return name;
     }
-};
-
-/** Package management. */
-class pkg : public command
-{
-    /** The package manager bound to this command. */
-    slang::package_manager& manager;
-
-public:
-    /** Constructor. */
-    explicit pkg(slang::package_manager& manager);
-    void invoke(const std::vector<std::string>& args) override;
-    std::string get_description() const override;
 };
 
 /** Compile single module. */

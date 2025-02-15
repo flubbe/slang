@@ -4,8 +4,12 @@ This repository is for learning how to build a scripting language, that is, a co
 and an interpreter. It is far from complete and I am working on aspects of it every once
 in a while.
 
-The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline.cpp](src/commandline.cpp)) 
-is incomplete, but you can try:
+The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline)) 
+provides two commands:
+- `slang compile`: Compiles a source file into bytecode.
+- `slang exec`: Executes the main function from a compiled file.
+
+For example:
 ```bash
 $ slang compile src/lang/std.sl -o lang/std.cmod
 $ slang compile examples/hello_world.sl

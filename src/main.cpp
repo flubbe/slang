@@ -12,7 +12,7 @@
 
 #include <fmt/core.h>
 
-#include "commandline.h"
+#include "commandline/commandline.h"
 #include "package.h"
 #include "utils.h"
 
@@ -64,6 +64,7 @@ int main(int argc, char* argv[])
 {
     try
     {
+        slang::commandline::set_command_line({argv, argv + argc});
         std::vector<std::string> args{std::next(argv), argv + argc};
 
         // create root package manager.
@@ -73,7 +74,6 @@ int main(int argc, char* argv[])
         command_vector cmd_list;
         add_unique_command(cmd_list, std::make_unique<slang::commandline::compile>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::exec>(root_pm));
-        add_unique_command(cmd_list, std::make_unique<slang::commandline::pkg>(root_pm));
 
         if(args.size() == 0)
         {
