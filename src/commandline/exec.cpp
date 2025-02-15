@@ -388,13 +388,15 @@ void exec::invoke(const std::vector<std::string>& args)
         ("v,verbose", "Verbose output.")
         ("d,disasm", "Show disassembly and exit.")
         ("no-lang", "Exclude default language modules.")
-        ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>());
+        ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
+        ("filename", "The file to compile", cxxopts::value<std::string>());
     // clang-format on
 
+    options.parse_positional({"filename"});
+    options.positional_help("filename");
     auto result = parse_args(options, args);
-    auto unmatched = result.unmatched();
 
-    if(unmatched.size() < 1)
+    if(result.count("filename") < 1)
     {
         fmt::print("{}\n", options.help());
         return;
@@ -404,7 +406,7 @@ void exec::invoke(const std::vector<std::string>& args)
     bool disassemble = result.count("disasm") > 0;
     bool no_lang = result.count("no-lang") > 0;
 
-    auto module_path = fs::absolute(fs::path{unmatched[0]});
+    auto module_path = fs::absolute(fs::path{result["filename"].as<std::string>()});
     if(!module_path.has_extension())
     {
         module_path.replace_extension(package::module_ext);

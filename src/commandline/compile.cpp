@@ -43,13 +43,15 @@ void compile::invoke(const std::vector<std::string>& args)
         ("o,output", "Output file.", cxxopts::value<std::string>())
         ("no-lang", "Exclude default language modules.")
         ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
-        ("no-eval-const-subexpr", "Disable constant subexpression evaluation");
+        ("no-eval-const-subexpr", "Disable constant subexpression evaluation")
+        ("filename", "The file to compile", cxxopts::value<std::string>());
     // clang-format on
 
+    options.parse_positional({"filename"});
+    options.positional_help("filename");
     auto result = parse_args(options, args);
-    auto unmatched = result.unmatched();
 
-    if(unmatched.size() < 1)
+    if(result.count("filename") < 1)
     {
         display_help_and_exit = true;
     }
@@ -73,7 +75,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
 
         // get input file.
-        module_path = unmatched[0];
+        module_path = result["filename"].as<std::string>();
         if(!module_path.has_extension())
         {
             module_path.replace_extension(package::source_ext);

@@ -4,31 +4,16 @@
  * Program entry point.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <cstdlib>
 
+#include <cxxopts.hpp>
 #include <fmt/core.h>
 
 #include "commandline/commandline.h"
-#include "package.h"
-#include "utils.h"
-
-/**
- * Print the help when calling slang.
- */
-static void print_help(const std::vector<std::unique_ptr<slang::commandline::command>>& cmd_list)
-{
-    std::vector<std::pair<std::string, std::string>> cmd_help;
-    for(auto& c: cmd_list)
-    {
-        cmd_help.push_back({c->get_name(), c->get_description()});
-    }
-
-    slang::utils::print_command_help("Usage: slang command [args...]", cmd_help);
-}
 
 /** The command vector type. */
 using command_vector = std::vector<std::unique_ptr<slang::commandline::command>>;
@@ -75,28 +60,58 @@ int main(int argc, char* argv[])
         add_unique_command(cmd_list, std::make_unique<slang::commandline::compile>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::exec>(root_pm));
 
-        if(args.size() == 0)
+        cxxopts::Options options(argv[0], "slang command line interface.");
+
+        auto command_help = [&cmd_list]() -> std::string
         {
-            print_help(cmd_list);
+            std::string text = "  command   The command to execute. One of {";
+            for(std::size_t i = 0; i < cmd_list.size() - 1; ++i)
+            {
+                text += fmt::format("{}|", cmd_list[i]->get_name());
+            }
+            return fmt::format("{}{}}}.", text, cmd_list.back()->get_name());
+        };
+
+        options.add_options()("command", "", cxxopts::value<std::string>());
+
+        options.parse_positional({"command"});
+        options.positional_help("command");
+        auto result = options.parse(std::min(argc, 2), argv);    // only consider the first argument.
+
+        if(result.count("command") < 1)
+        {
+            fmt::print("{}", options.help());
+            fmt::print("Positional arguments:\n\n");
+            fmt::print("{}\n\n", command_help());
             return EXIT_SUCCESS;
         }
 
+        auto command = result["command"].as<std::string>();
         for(auto& cmd: cmd_list)
         {
-            if(args[0] == cmd->get_name())
+            if(command == cmd->get_name())
             {
                 cmd->invoke({std::next(args.begin()), args.end()});
                 return EXIT_SUCCESS;
             }
         }
 
-        print_help(cmd_list);
-        fmt::print("\nCommand '{}' not found.\n\n", args[0]);
+        fmt::print("{}", options.help());
+        fmt::print("Positional arguments:\n\n");
+        fmt::print("{}\n\n", command_help());
+
+        fmt::print("Error: Command '{}' not found.\n\n", args[0]);
+
         return EXIT_FAILURE;
     }
     catch(const std::runtime_error& e)
     {
         fmt::print("An error occured: {}\n", e.what());
+        return EXIT_FAILURE;
+    }
+    catch(const cxxopts::exceptions::exception& e)
+    {
+        fmt::print("{}\n", e.what());
         return EXIT_FAILURE;
     }
     catch(...)
