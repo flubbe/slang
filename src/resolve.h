@@ -14,6 +14,7 @@
 
 #include "compiler/token.h"
 #include "shared/module.h"
+#include "shared/module_resolver.h"
 #include "filemanager.h"
 
 /*
@@ -28,6 +29,11 @@ namespace slang::codegen
 {
 class context;
 }    // namespace slang::codegen
+
+namespace slang::interpreter
+{
+class module_loader;
+}    // namespace slang::interpreter
 
 namespace slang::resolve
 {
@@ -57,16 +63,6 @@ public:
     resolve_error(const token_location& loc, const std::string& message);
 };
 
-/** A module entry in the resolver's module list. */
-struct module_entry
-{
-    /** Resolved import path of the module. */
-    std::string resolved_path;
-
-    /** Whether module resolution is completed. */
-    bool is_resolved{false};
-};
-
 /** A constant descriptor. */
 struct constant_descriptor
 {
@@ -81,47 +77,75 @@ struct constant_descriptor
 class context
 {
     /** The associated file manager. */
-    file_manager& mgr;
+    file_manager& file_mgr;
 
-    /** Loaded module headers, indexed by resolved import path. */
-    std::unordered_map<std::string, module_::module_header> headers;
-
-    /** List of modules. */
-    std::vector<module_entry> modules;
-
-    /** Function imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
+    /** Map of resolvers. */
     std::unordered_map<
       std::string,
-      std::vector<std::pair<std::string, module_::function_descriptor>>>
-      imported_functions;
-
-    /** Type imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
-    std::unordered_map<
-      std::string,
-      std::vector<std::pair<std::string, module_::struct_descriptor>>>
-      imported_types;
-
-    /** Constant imports, indexed by resolved module path, as a pair `(name, descriptor)`. */
-    std::unordered_map<
-      std::string,
-      std::vector<std::pair<std::string, constant_descriptor>>>
-      imported_constants;
+      std::unique_ptr<module_::module_resolver>>
+      resolvers;
 
 protected:
     /**
-     * Get a module header from a resolved path.
+     * Resolve imports for a given module. Only loads a module if it is not
+     * already resolved.
      *
-     * @param resolved_path The resolved module path.
-     * @returns Returns the module header, or throws a `file_error` if the module could not be opened.
+     * @param import_path The module's import name.
+     * @returns A reference to the resolved module.
      */
-    module_::module_header& get_module_header(const fs::path& resolved_path);
+    module_::module_resolver& resolve_module(const std::string& import_path);
 
     /**
-     * Resolve imports for a given module.
+     * Add a constant to the type- and code generation contexts.
      *
-     * @param resolved_path The resolved module path.
+     * @param ctx Code generation context.
+     * @param type_ctx Type context.
+     * @param resolver Resolver for the module containing the constant.
+     * @param import_path Import path of the module containing the constant.
+     * @param name The constant's name.
+     * @param index Index into the module's constant table.
      */
-    void resolve_module(const fs::path& resolved_path);
+    void add_constant(
+      codegen::context& ctx,
+      typing::context& type_ctx,
+      const module_::module_resolver& resolver,
+      const std::string& import_path,
+      const std::string& name,
+      std::size_t index);
+
+    /**
+     * Add a function to the type- and code generation contexts.
+     *
+     * @param ctx Code generation context.
+     * @param type_ctx Type context.
+     * @param import_path Import path of the module containing the function.
+     * @param name The function's name.
+     * @param desc The function desciptor.
+     */
+    void add_function(
+      codegen::context& ctx,
+      typing::context& type_ctx,
+      const std::string& import_path,
+      const std::string& name,
+      const module_::function_descriptor& desc);
+
+    /**
+     * Add a type to the type- and code generation contexts.
+     *
+     * @param ctx Code generation context.
+     * @param type_ctx Type context.
+     * @param resolver Resolver for the module containing the constant.
+     * @param import_path Import path of the module containing the type.
+     * @param name The type's name.
+     * @param desc The type desciptor.
+     */
+    void add_type(
+      codegen::context& ctx,
+      typing::context& type_ctx,
+      const module_::module_resolver& resolver,
+      const std::string& import_path,
+      const std::string& name,
+      const module_::struct_descriptor& desc);
 
 public:
     /** Default constructors. */
@@ -136,10 +160,10 @@ public:
     /**
      * Construct a resolver context.
      *
-     * @param mgr The file manager used for path resolution.
+     * @param file_mgr The file manager used for path resolution.
      */
-    explicit context(file_manager& mgr)
-    : mgr{mgr}
+    explicit context(file_manager& file_mgr)
+    : file_mgr{file_mgr}
     {
     }
 

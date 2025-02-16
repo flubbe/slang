@@ -26,6 +26,7 @@ add_executable(native_integration
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
+    ../src/shared/module_resolver.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
 )

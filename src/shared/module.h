@@ -1112,6 +1112,7 @@ public:
     friend archive& operator&(archive& ar, language_module& mod);
     friend class si::context;
     friend class si::module_loader;
+    friend class module_resolver;
 };
 
 /**

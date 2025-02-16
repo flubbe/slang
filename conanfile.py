@@ -18,9 +18,6 @@ class slangRecipe(ConanFile):
     # Binary configuration
     settings = "os", "arch", "compiler", "build_type"
 
-    # Configure header-only library.
-    exports_sources = "include/*"
-
     generators = "CMakeToolchain", "CMakeDeps"
 
     def requirements(self):

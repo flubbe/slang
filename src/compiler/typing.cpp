@@ -4,7 +4,7 @@
  * type system context.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -286,7 +286,7 @@ void context::add_import(std::vector<token> path)
     auto transform = [](const token& p) -> std::string
     { return p.s; };
 
-    imports.emplace_back(utils::join(path, {transform}, package::delimiter));
+    imported_modules.emplace_back(utils::join(path, {transform}, package::delimiter));
 }
 
 void context::add_variable(
@@ -833,7 +833,7 @@ const function_signature& context::get_function_signature(const token& name, con
         }
 
         // check if the module was imported.
-        for(auto& it: imports)
+        for(auto& it: imported_modules)
         {
             if(it == *import_path)
             {
@@ -1029,7 +1029,7 @@ bool context::has_expression_type(const ast::expression& expr) const
 std::string context::to_string() const
 {
     std::string ret = "Imports:\n";
-    for(auto& it: imports)
+    for(auto& it: imported_modules)
     {
         ret += fmt::format("* {}\n", it);
     }
