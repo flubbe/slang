@@ -25,6 +25,7 @@ add_executable(slang
     src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/module_loader.cpp
+    src/shared/module_resolver.cpp
     src/shared/module.cpp
     src/shared/opcodes.cpp
     src/commandline/commandline.cpp
@@ -42,7 +43,7 @@ add_executable(slang
     src/runtime/utils.cpp
     src/utils.cpp
 )
-target_link_libraries(slang fmt::fmt cxxopts::cxxopts)
+target_link_libraries(slang cxxopts::cxxopts fmt::fmt)
 
 add_subdirectory(examples)
 add_subdirectory(test)

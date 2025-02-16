@@ -117,7 +117,11 @@ struct token
      * @param type The token's type. Defaults to token_type::unknown.
      * @param value The token's value. Defaults to std::nullopt.
      */
-    token(std::string s, token_location location, token_type type = token_type::unknown, std::optional<std::variant<int, float, std::string>> value = std::nullopt)
+    token(
+      std::string s,
+      token_location location,
+      token_type type = token_type::unknown,
+      std::optional<std::variant<int, float, std::string>> value = std::nullopt)
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}
