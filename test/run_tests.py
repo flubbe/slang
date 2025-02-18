@@ -218,8 +218,6 @@ if __name__ == "__main__":
         )
         p.wait(timeout=5)
 
-        print(f" result = ", p.returncode, end="")
-
         result = (
             p.returncode != 0
             if test_name not in _script_expect_failure

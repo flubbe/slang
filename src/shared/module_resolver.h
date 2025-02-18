@@ -93,9 +93,6 @@ protected:
     /** A recorder for module information. */
     std::shared_ptr<resolution_recorder> recorder;
 
-    /** Decode the module. */
-    void decode();
-
 public:
     /** Defaulted and deleted constructors. */
     module_resolver() = delete;

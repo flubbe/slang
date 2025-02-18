@@ -15,30 +15,6 @@
 namespace slang::module_
 {
 
-void module_resolver::decode()
-{
-    if(mod.is_decoded())
-    {
-        throw resolution_error("Tried to decode a module that already is decoded.");
-    }
-
-    recorder->section("Constant table");
-    for(auto& c: mod.header.constants)
-    {
-        recorder->constant(c);
-    }
-
-    /*
-     * resolve imports.
-     */
-    recorder->section("Import table");
-
-    for(auto& it: mod.header.imports)
-    {
-        recorder->record(it);
-    }
-}
-
 module_resolver::module_resolver(
   file_manager& file_mgr,
   fs::path path,
@@ -55,7 +31,7 @@ module_resolver::module_resolver(
     auto read_ar = file_mgr.open(this->path, slang::file_manager::open_mode::read);
     (*read_ar) & mod;
 
-    // populate type map before decoding the module.
+    // Record tables.
     this->recorder->section("Export table");
     for(auto& it: mod.header.exports)
     {
@@ -67,8 +43,17 @@ module_resolver::module_resolver(
         }
     }
 
-    // decode the module.
-    decode();
+    this->recorder->section("Constant table");
+    for(auto& c: mod.header.constants)
+    {
+        this->recorder->constant(c);
+    }
+
+    this->recorder->section("Import table");
+    for(auto& it: mod.header.imports)
+    {
+        this->recorder->record(it);
+    }
 }
 
 }    // namespace slang::module_

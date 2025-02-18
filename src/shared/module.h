@@ -4,7 +4,7 @@
  * compiled binary file (=module) support.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -689,9 +689,6 @@ struct field_descriptor
     /** The field's base type. */
     variable_type base_type;
 
-    /** Package in the import table for imported types. */
-    std::optional<std::size_t> package_index;
-
     /** Type size (not serialized). */
     std::size_t size{0};
 
@@ -718,8 +715,7 @@ struct field_descriptor
      * @param import_index Optional index into the import table. Only for imported types.
      */
     field_descriptor(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
-    : base_type{std::move(base_type), array ? std::make_optional(1) : std::nullopt}
-    , package_index{import_index}
+    : base_type{std::move(base_type), array ? std::make_optional(1) : std::nullopt, std::nullopt, import_index}
     {
     }
 
@@ -745,7 +741,6 @@ struct field_descriptor
 inline archive& operator&(archive& ar, field_descriptor& info)
 {
     ar & info.base_type;
-    ar & info.package_index;
     return ar;
 }
 
