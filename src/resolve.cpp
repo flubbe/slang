@@ -29,6 +29,28 @@ namespace slang::resolve
  */
 
 /**
+ * Return the type class of a `variable_type`.
+ *
+ * @param vt A `variable_type`.
+ * @return A `type_class`.
+ */
+static ty::type_class to_type_class(const module_::variable_type& vt)
+{
+    if(vt.is_array())
+    {
+        return ty::type_class::tc_array;
+    }
+    else if(ty::is_builtin_type(vt.base_type()))
+    {
+        return ty::type_class::tc_plain;
+    }
+    else
+    {
+        return ty::type_class::tc_struct;
+    }
+}
+
+/**
  * Convert a field given by a field descriptor to a `cg::value`.
  *
  * @param desc The field's variable type.
@@ -119,20 +141,18 @@ static ty::type_info to_type_info(
 
     return type_ctx.get_unresolved_type(
       {desc.base_type.base_type(), {0, 0}},
-      ty::is_builtin_type(desc.base_type.base_type())
-        ? ty::type_class::tc_plain
-        : ty::type_class::tc_struct,
+      to_type_class(desc.base_type),
       type_import_package);
 }
 
 /**
- * Convert a `variable_tye` to a `ty::type_info`.
+ * Convert a `variable_type` to a `ty::type_info`.
  *
  * @param type_ctx The type context for type lookups.
  * @param vt The variable type.
  * @param resolver The module resolver.
  * @param import_path The module's import path.
- * @return A `ty::type_info` with the field type.
+ * @return A `ty::type_info` with the variable type.
  */
 static ty::type_info to_type_info(
   ty::context& type_ctx,
