@@ -29,12 +29,13 @@ namespace slang::resolve
  */
 
 /**
- * Convert a `variable_tye` to a `cg::type_info`.
+ * Convert a field given by a field descriptor to a `cg::value`.
  *
- * @param vt The variable type.
- * @param resolver Resolver for the module.
+ * @param desc The field's variable type.
+ * @param resolver The module resolver.
  * @param import_path The module's import path.
- * @return A `cg::type_info` with the field type.
+ * @param name The field's name.
+ * @return A `cg::value` with the field information.
  */
 static cg::value to_value(
   const module_::variable_type& vt,
@@ -42,41 +43,86 @@ static cg::value to_value(
   const std::string& import_path,
   std::optional<std::string> name = std::nullopt)
 {
+    // Built-in types.
     if(ty::is_builtin_type(vt.base_type()))
     {
-        return cg::value{
-          cg::type{cg::to_type_class(vt.base_type()),
-                   vt.is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0)},
-          name};
+        return {cg::type{
+                  cg::to_type_class(vt.base_type()),
+                  vt.is_array()
+                    ? static_cast<std::size_t>(1)
+                    : static_cast<std::size_t>(0)},
+                name};
     }
 
-    std::optional<std::size_t> import_index = vt.get_import_index();
+    // Custom types.
     std::string type_import_package = import_path;
-    if(import_index.has_value())
+    if(vt.get_import_index().has_value())
     {
         // This is an imported type.
-        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(import_index.value());
+        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(vt.get_import_index().value());
         if(sym.type != module_::symbol_type::package)
         {
             throw resolve_error(
               fmt::format(
                 "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
-                import_index.value(),
+                vt.get_import_index().value(),
                 sym.name));
         }
         type_import_package = sym.name;
     }
 
     return cg::value{
-      cg::type{cg::type_class::struct_,
-               vt.is_array()
-                 ? static_cast<std::size_t>(1)
-                 : static_cast<std::size_t>(0),
-               vt.base_type(),
-               type_import_package},
+      cg::type{
+        cg::type_class::struct_,
+        vt.is_array()
+          ? static_cast<std::size_t>(1)
+          : static_cast<std::size_t>(0),
+        vt.base_type(),
+        type_import_package},
       name};
+}
+
+/**
+ * Convert a field given by a field descriptor to a `ty::type_info`.
+ *
+ * TODO This (likely) should be merged with the `to_type_info` for `variable_type`'s.
+ *      Note that both functions construct their return type differently (`get_type`
+ *      vs `get_unresolved_type`).
+ *
+ * @param type_ctx The type context for type lookups.
+ * @param desc The field descriptor.
+ * @param resolver The module resolver.
+ * @param import_path The module's import path.
+ * @return A `ty::type_info` with the field type.
+ */
+static ty::type_info to_type_info(
+  ty::context& type_ctx,
+  const module_::field_descriptor& desc,
+  const module_::module_resolver& resolver,
+  const std::string& import_path)
+{
+    std::string type_import_package = import_path;
+    if(desc.base_type.get_import_index().has_value())
+    {
+        // This is an imported type.
+        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(desc.base_type.get_import_index().value());
+        if(sym.type != module_::symbol_type::package)
+        {
+            throw resolve_error(
+              fmt::format(
+                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
+                desc.base_type.get_import_index().value(),
+                sym.name));
+        }
+        type_import_package = sym.name;
+    }
+
+    return type_ctx.get_unresolved_type(
+      {desc.base_type.base_type(), {0, 0}},
+      ty::is_builtin_type(desc.base_type.base_type())
+        ? ty::type_class::tc_plain
+        : ty::type_class::tc_struct,
+      type_import_package);
 }
 
 /**
@@ -304,7 +350,7 @@ void context::add_type(
         {
             members.push_back(std::make_pair<token, ty::type_info>(
               {member_name, {0, 0}},
-              to_type_info(type_ctx, member_type.base_type, resolver, import_path)));
+              to_type_info(type_ctx, member_type, resolver, import_path)));
         }
 
         type_ctx.add_struct({name, {0, 0}}, std::move(members), import_path);
