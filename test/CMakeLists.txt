@@ -94,9 +94,9 @@ add_executable(test_type_system
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/shared/module_resolver.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -115,9 +115,9 @@ add_executable(test_resolve
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/shared/module_resolver.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -137,10 +137,10 @@ add_executable(test_output
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/typing.cpp
-    ../src/shared/module_resolver.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -183,10 +183,10 @@ add_executable(test_interpreter
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp
-    ../src/shared/module_resolver.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
 )
 target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_interpreter PRIVATE

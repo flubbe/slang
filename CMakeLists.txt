@@ -25,7 +25,6 @@ add_executable(slang
     src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/module_loader.cpp
-    src/shared/module_resolver.cpp
     src/shared/module.cpp
     src/shared/opcodes.cpp
     src/commandline/commandline.cpp
@@ -33,6 +32,7 @@ add_executable(slang
     src/commandline/exec.cpp
     src/filemanager.cpp
     src/main.cpp
+    src/module_resolver.cpp
     src/package.cpp
     src/resolve.cpp
     src/runtime/arrays.cpp

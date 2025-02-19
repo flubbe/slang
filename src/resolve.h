@@ -14,8 +14,8 @@
 
 #include "compiler/token.h"
 #include "shared/module.h"
-#include "shared/module_resolver.h"
 #include "filemanager.h"
+#include "module_resolver.h"
 
 /*
  * Forward declarations.
