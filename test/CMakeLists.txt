@@ -250,7 +250,7 @@ add_compile_test(
     src/lang/std -o lang/std
 )
 set_tests_properties(
-    "build std (compile)" 
+    "build std (default, compile)" 
     PROPERTIES FIXTURES_SETUP 
     needs_std
 )
@@ -351,7 +351,7 @@ add_compile_test(
     test/example_package/hello
 )
 set_tests_properties(
-    "slang example_package/hello (compile)" 
+    "slang example_package/hello (default, compile)" 
     PROPERTIES FIXTURES_SETUP 
     example_package_hello
 )
@@ -362,12 +362,22 @@ add_compile_exec_test(
     test/test_import --search-path test
 )
 set_tests_properties(
-    "slang test_import (compile)" 
+    "slang test_import (default, compile)" 
     PROPERTIES FIXTURES_REQUIRED 
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (exec)" 
+    "slang test_import (--no-eval-const-subexpr, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    example_package_hello
+)
+set_tests_properties(
+    "slang test_import (default, exec)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    example_package_hello
+)
+set_tests_properties(
+    "slang test_import (--no-eval-const-subexpr, exec)" 
     PROPERTIES FIXTURES_REQUIRED 
     example_package_hello
 )
@@ -444,7 +454,7 @@ add_compile_test(
     examples/native_integration
 )
 set_tests_properties(
-    "slang native_integration (compile)" 
+    "slang native_integration (default, compile)" 
     PROPERTIES FIXTURES_SETUP 
     native_integration
 )
