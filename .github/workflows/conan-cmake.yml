@@ -119,6 +119,7 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
 
+        ./build/${{env.BUILD_TYPE}}/slang compile test/example_package/hello
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
 
@@ -152,6 +153,7 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
 
+        ./build/${{env.BUILD_TYPE}}/slang compile test/example_package/hello --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
 

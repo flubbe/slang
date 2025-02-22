@@ -740,7 +740,10 @@ opcode context::exec(
                     auto& details = std::get<module_::function_details>(desc->details);
 
                     // prepare stack frame
-                    stack_frame callee_frame{frame.constants, details.locals_size, details.stack_size};
+                    stack_frame callee_frame{
+                      callee_loader->get_module().get_header().constants,
+                      details.locals_size,
+                      details.stack_size};
 
                     auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
                     std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());

@@ -28,6 +28,7 @@ _compile_only_tests: list[str] = [
     "test_array_fail1",
     "test_array_fail2",
     "test_const_assign_fail",
+    "example_package/hello",
 ]
 _compile_only_expect_failure: list[str] = [
     "test_array_fail1",
