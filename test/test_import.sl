@@ -1,6 +1,6 @@
+import std;
 import test_const_export;
 import test_structs;
-import std;
 
 struct T {
     l: test_structs::L
@@ -8,8 +8,12 @@ struct T {
 
 fn main(args: [str]) -> i32
 {
+    // Test imported types and functions.
     let s: test_structs::L = test_structs::create_node("Test");
-    std::println(s.data);
+    std::assert(std::string_equals(s.data, "Test"), "s.data == \"Test\"");
 
-    return (test_const_export::NEGATIVE_PI as i32) == -3;
+    // Test imported constants.
+    std::assert((test_const_export::NEGATIVE_PI as i32) == -3, "(test_const_export::NEGATIVE_PI as i32) == -3");
+
+    return 0;
 }

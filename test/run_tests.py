@@ -46,7 +46,7 @@ _script_tests: list[str] = [
     "test_eval_subexpr",
     "test_invalid_main_signature1",
     "test_invalid_main_signature2",
-    "test_import",  # just validate execution; return code is not forwarded.
+    "test_import",
     "test_math",
     "test_operators",
     "test_strings",
