@@ -107,17 +107,13 @@ static cg::value to_value(
 /**
  * Convert a field given by a field descriptor to a `ty::type_info`.
  *
- * TODO This (likely) should be merged with the `to_type_info` for `variable_type`'s.
- *      Note that both functions construct their return type differently (`get_type`
- *      vs `get_unresolved_type`).
- *
  * @param type_ctx The type context for type lookups.
  * @param desc The field descriptor.
  * @param resolver The module resolver.
  * @param import_path The module's import path.
  * @return A `ty::type_info` with the field type.
  */
-static ty::type_info to_type_info(
+static ty::type_info to_unresolved_type_info(
   ty::context& type_ctx,
   const module_::field_descriptor& desc,
   const module_::module_resolver& resolver,
@@ -154,7 +150,7 @@ static ty::type_info to_type_info(
  * @param import_path The module's import path.
  * @return A `ty::type_info` with the variable type.
  */
-static ty::type_info to_type_info(
+static ty::type_info to_resolved_type_info(
   ty::context& type_ctx,
   const module_::variable_type& vt,
   const module_::module_resolver& resolver,
@@ -321,13 +317,13 @@ void context::add_function(
     std::vector<ty::type_info> arg_types;
     for(auto& arg: desc.signature.arg_types)
     {
-        arg_types.emplace_back(to_type_info(type_ctx, arg, resolver, import_path));
+        arg_types.emplace_back(to_resolved_type_info(type_ctx, arg, resolver, import_path));
     }
 
     type_ctx.add_function(
       {name, {0, 0}},
       std::move(arg_types),
-      to_type_info(type_ctx, desc.signature.return_type, resolver, import_path),
+      to_resolved_type_info(type_ctx, desc.signature.return_type, resolver, import_path),
       import_path);
 }
 
@@ -370,7 +366,7 @@ void context::add_type(
         {
             members.push_back(std::make_pair<token, ty::type_info>(
               {member_name, {0, 0}},
-              to_type_info(type_ctx, member_type, resolver, import_path)));
+              to_unresolved_type_info(type_ctx, member_type, resolver, import_path)));
         }
 
         type_ctx.add_struct({name, {0, 0}}, std::move(members), import_path);

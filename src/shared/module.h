@@ -28,7 +28,7 @@ class arguments_scope;
 class context;
 class module_loader;
 class operand_stack;
-};    // namespace slang::interpreter
+}    // namespace slang::interpreter
 
 namespace slang::module_
 {

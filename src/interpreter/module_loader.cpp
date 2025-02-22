@@ -208,9 +208,68 @@ void module_loader::decode_structs()
             {
                 if(struct_map.find(member_type.base_type.base_type()) == struct_map.end())
                 {
-                    throw interpreter_error(
-                      fmt::format("Cannot resolve size for type '{}': Type not found.",
-                                  member_type.base_type.base_type()));
+                    if(!member_type.base_type.import_index.has_value())
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Cannot resolve size for type '{}': Type not found.",
+                            member_type.base_type.base_type()));
+                    }
+
+                    std::size_t index = member_type.base_type.import_index.value();
+                    if(index >= mod.header.imports.size())
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Cannot resolve size for type '{}': Invalid import index {}.",
+                            member_type.base_type.base_type(),
+                            index));
+                    }
+
+                    if(std::get<const module_loader*>(mod.header.imports[index].export_reference) == nullptr)
+                    {
+                        // load the package containing the type definition.
+                        if(mod.header.imports[index].type != module_::symbol_type::type)
+                        {
+                            throw interpreter_error(
+                              fmt::format(
+                                "Cannot resolve size for type '{}': Import table entry {} is not a type.",
+                                member_type.base_type.base_type(),
+                                index));
+                        }
+
+                        std::size_t package_index = mod.header.imports[index].package_index;
+                        if(mod.header.imports[package_index].type != module_::symbol_type::package)
+                        {
+                            throw interpreter_error(
+                              fmt::format(
+                                "Cannot resolve size for type '{}': Import table entry {} is not a package.",
+                                member_type.base_type.base_type(),
+                                package_index));
+                        }
+
+                        module_loader& loader = ctx.resolve_module(mod.header.imports[package_index].name);
+                        mod.header.imports[package_index].export_reference = &loader;
+                    }
+
+                    // verify the type definition is loaded.
+                    std::size_t package_index = mod.header.imports[index].package_index;
+                    const module_loader* loader = std::get<const module_loader*>(mod.header.imports[package_index].export_reference);
+                    if(loader == nullptr)
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Could not resolve package for import '{}'.",
+                            member_type.base_type.base_type()));
+                    }
+                    if(loader->struct_map.find(member_type.base_type.base_type()) == loader->struct_map.end())
+                    {
+                        throw interpreter_error(
+                          fmt::format(
+                            "Cannot resolve size for type '{}': Type not found in import '{}'.",
+                            member_type.base_type.base_type(),
+                            mod.header.imports[package_index].name));
+                    }
                 }
 
                 // size and alignment are the same for both array and non-array types.
@@ -296,11 +355,21 @@ void module_loader::decode()
         // resolve the symbol's package.
         if(it.package_index >= mod.header.imports.size())
         {
-            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
+            throw interpreter_error(
+              fmt::format(
+                "Error while resolving imports for '{}': Import symbol '{}' has invalid package index ({} >= {}).",
+                import_name,
+                it.name,
+                it.package_index,
+                mod.header.imports.size()));
         }
         else if(mod.header.imports[it.package_index].type != module_::symbol_type::package)
         {
-            throw interpreter_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
+            throw interpreter_error(
+              fmt::format(
+                "Error while resolving imports for '{}': Import symbol '{}' refers to non-package import entry.",
+                import_name,
+                it.name));
         }
 
         module_loader& loader = ctx.resolve_module(mod.header.imports[it.package_index].name);
@@ -308,23 +377,27 @@ void module_loader::decode()
 
         // find the imported symbol.
         module_::module_header& import_header = loader.mod.header;
-        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
-                                   [&it](const module_::exported_symbol& exp) -> bool
-                                   {
-                                       return exp.name == it.name;
-                                   });
+        auto exp_it = std::find_if(
+          import_header.exports.begin(),
+          import_header.exports.end(),
+          [&it](const module_::exported_symbol& exp) -> bool
+          {
+              return exp.name == it.name;
+          });
         if(exp_it == import_header.exports.end())
         {
             throw interpreter_error(
               fmt::format(
-                "Error while resolving imports: Symbol '{}' is not exported by module '{}'.",
+                "Error while resolving imports for '{}': Symbol '{}' is not exported by module '{}'.",
+                import_name,
                 it.name, loader.get_path().string()));
         }
         if(exp_it->type != it.type)
         {
             throw interpreter_error(
               fmt::format(
-                "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
+                "Error while resolving imports for '{}': Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
+                import_name,
                 it.name,
                 loader.get_path().string(),
                 slang::module_::to_string(it.type),
@@ -434,7 +507,10 @@ void module_loader::decode()
             auto target_it = mod.jump_targets.find(id);
             if(target_it == mod.jump_targets.end())
             {
-                throw interpreter_error(fmt::format("Unable to resolve jump target for label '{}'.", id));
+                throw interpreter_error(
+                  fmt::format(
+                    "Unable to resolve jump target for label '{}'.",
+                    id));
             }
             std::memcpy(&code[origin], &target_it->second, sizeof(std::size_t));
         }
