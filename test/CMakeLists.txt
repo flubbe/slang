@@ -113,7 +113,10 @@ target_compile_options(test_type_system PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME type_system COMMAND test_type_system)
-set_tests_properties(type_system PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_tests_properties(type_system PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED needs_std
+)
 
 add_executable(test_resolve
     test_resolve.cpp
@@ -137,6 +140,10 @@ target_compile_options(test_resolve PRIVATE
 )
 add_test(NAME resolve COMMAND test_resolve)
 set_tests_properties(resolve PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_tests_properties(type_system PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED needs_std
+)
 
 add_executable(test_output
     test_output.cpp
@@ -161,7 +168,14 @@ target_compile_options(test_output PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME output COMMAND test_output)
-set_tests_properties(output PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_tests_properties(output PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED needs_std
+)
+set_tests_properties(output PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_SETUP output
+)
 
 add_executable(test_serialization
     test_serialization.cpp
@@ -211,6 +225,10 @@ target_compile_options(test_interpreter PRIVATE
 )
 add_test(NAME interpreter COMMAND test_interpreter)
 set_tests_properties(interpreter PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_tests_properties(type_system PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED output
+)
 
 add_executable(test_vector
     test_vector.cpp
