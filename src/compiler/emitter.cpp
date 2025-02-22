@@ -118,10 +118,12 @@ void export_table_builder::add_native_function(
 
 void export_table_builder::add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type)
 {
-    if(std::find_if(export_table.begin(), export_table.end(),
-                    [&type](const module_::exported_symbol& entry) -> bool
-                    { return entry.type == module_::symbol_type::type
-                             && entry.name == type->get_name(); })
+    if(std::find_if(
+         export_table.begin(),
+         export_table.end(),
+         [&type](const module_::exported_symbol& entry) -> bool
+         { return entry.type == module_::symbol_type::type
+                  && entry.name == type->get_name(); })
        != export_table.end())
     {
         throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", type->get_name()));
@@ -130,39 +132,44 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
     auto members = type->get_members();
     std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
 
-    std::transform(members.cbegin(), members.cend(), std::back_inserter(transformed_members),
-                   [&ctx](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
-                   {
-                       const auto& t = std::get<1>(m);
+    std::transform(
+      members.cbegin(),
+      members.cend(),
+      std::back_inserter(transformed_members),
+      [&ctx](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
+      {
+          const auto& t = std::get<1>(m);
 
-                       std::optional<std::size_t> import_index = std::nullopt;
-                       if(t.get_type().is_import())
-                       {
-                           // find the import index.
-                           auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                                         [&t](const cg::imported_symbol& s) -> bool
-                                                         {
-                                                             return s.type == module_::symbol_type::type
-                                                                    && s.name == t.get_type().base_type().to_string()
-                                                                    && s.import_path == t.get_type().base_type().get_import_path();
-                                                         });
-                           if(import_it == ctx.imports.end())
-                           {
-                               throw emitter_error(fmt::format(
-                                 "Type '{}' from package '{}' not found in import table.",
-                                 t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
-                           }
+          std::optional<std::size_t> import_index = std::nullopt;
+          if(t.get_type().is_import())
+          {
+              // find the import index.
+              auto import_it = std::find_if(
+                ctx.imports.begin(),
+                ctx.imports.end(),
+                [&t](const cg::imported_symbol& s) -> bool
+                {
+                    return s.type == module_::symbol_type::type
+                           && s.name == t.get_type().base_type().to_string()
+                           && s.import_path == t.get_type().base_type().get_import_path();
+                });
+              if(import_it == ctx.imports.end())
+              {
+                  throw emitter_error(fmt::format(
+                    "Type '{}' from package '{}' not found in import table.",
+                    t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+              }
 
-                           import_index = std::distance(ctx.imports.begin(), import_it);
-                       }
+              import_index = std::distance(ctx.imports.begin(), import_it);
+          }
 
-                       return std::make_pair(
-                         std::get<0>(m),
-                         module_::field_descriptor{
-                           t.get_type().base_type().to_string(),
-                           t.get_type().is_array(),
-                           import_index});
-                   });
+          return std::make_pair(
+            std::get<0>(m),
+            module_::field_descriptor{
+              t.get_type().base_type().to_string(),
+              t.get_type().is_array(),
+              import_index});
+      });
 
     export_table.emplace_back(
       module_::symbol_type::type,
@@ -1345,34 +1352,56 @@ module_::language_module instruction_emitter::to_module() const
     }
 
     // Write import table. Additional packages from the search above are appended.
+    std::vector<cg::imported_symbol> template_header;
+    auto add_symbol_to_template = [&template_header](const cg::imported_symbol& s)
+    {
+        if(std::find_if(
+             template_header.begin(),
+             template_header.end(),
+             [&s](const cg::imported_symbol& it)
+             {
+                 return s.type == it.type
+                        && s.name == it.name
+                        && s.import_path == it.import_path;
+             })
+           == template_header.end())
+        {
+            template_header.emplace_back(s);
+        }
+    };
+
     for(const auto& it: ctx.imports)
     {
-        std::uint32_t package_index = 0;
-
-        auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                      [&it](auto& s) -> bool
-                                      {
-                                          return s.type == module_::symbol_type::package && s.name == it.import_path;
-                                      });
-        if(import_it != ctx.imports.end())
-        {
-            package_index = std::distance(ctx.imports.begin(), import_it);
-        }
-        else
-        {
-            auto package_it = std::find(packages.begin(), packages.end(), it.import_path);
-            if(package_it == packages.end())
-            {
-                throw std::runtime_error(fmt::format("Package '{}' not found in package table.", it.import_path));
-            }
-            package_index = ctx.imports.size() + std::distance(packages.begin(), package_it);
-        }
-
-        mod.add_import(it.type, it.name, package_index);
+        add_symbol_to_template(it);
     }
     for(const auto& it: packages)
     {
-        mod.add_import(module_::symbol_type::package, it);
+        add_symbol_to_template({module_::symbol_type::package, it, std::string()});
+    }
+
+    for(const auto& it: template_header)
+    {
+        if(it.type == module_::symbol_type::package)
+        {
+            mod.add_import(it.type, it.name);
+        }
+        else
+        {
+            auto import_it = std::find_if(
+              template_header.begin(),
+              template_header.end(),
+              [&it](auto& s) -> bool
+              {
+                  return s.type == module_::symbol_type::package && s.name == it.import_path;
+              });
+
+            if(import_it == template_header.end())
+            {
+                throw std::runtime_error(fmt::format("Package '{}' not found in package table.", it.import_path));
+            }
+
+            mod.add_import(it.type, it.name, std::distance(template_header.begin(), import_it));
+        }
     }
 
     /*

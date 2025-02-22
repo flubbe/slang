@@ -96,6 +96,7 @@ add_executable(test_type_system
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -116,6 +117,7 @@ add_executable(test_resolve
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -138,6 +140,7 @@ add_executable(test_output
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/resolve.cpp
     ../src/utils.cpp
 )
@@ -183,6 +186,7 @@ add_executable(test_interpreter
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
+    ../src/module_resolver.cpp
 )
 target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_interpreter PRIVATE

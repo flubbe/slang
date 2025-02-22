@@ -32,6 +32,7 @@ add_executable(slang
     src/commandline/exec.cpp
     src/filemanager.cpp
     src/main.cpp
+    src/module_resolver.cpp
     src/package.cpp
     src/resolve.cpp
     src/runtime/arrays.cpp
@@ -42,7 +43,7 @@ add_executable(slang
     src/runtime/utils.cpp
     src/utils.cpp
 )
-target_link_libraries(slang fmt::fmt cxxopts::cxxopts)
+target_link_libraries(slang cxxopts::cxxopts fmt::fmt)
 
 add_subdirectory(examples)
 add_subdirectory(test)

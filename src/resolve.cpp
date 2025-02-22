@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -19,9 +19,172 @@
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
+namespace si = slang::interpreter;
 
 namespace slang::resolve
 {
+
+/*
+ * Helpers.
+ */
+
+/**
+ * Return the type class of a `variable_type`.
+ *
+ * @param vt A `variable_type`.
+ * @return A `type_class`.
+ */
+static ty::type_class to_type_class(const module_::variable_type& vt)
+{
+    if(vt.is_array())
+    {
+        return ty::type_class::tc_array;
+    }
+    else if(ty::is_builtin_type(vt.base_type()))
+    {
+        return ty::type_class::tc_plain;
+    }
+    else
+    {
+        return ty::type_class::tc_struct;
+    }
+}
+
+/**
+ * Convert a field given by a field descriptor to a `cg::value`.
+ *
+ * @param desc The field's variable type.
+ * @param resolver The module resolver.
+ * @param import_path The module's import path.
+ * @param name The field's name.
+ * @return A `cg::value` with the field information.
+ */
+static cg::value to_value(
+  const module_::variable_type& vt,
+  const module_::module_resolver& resolver,
+  const std::string& import_path,
+  std::optional<std::string> name = std::nullopt)
+{
+    // Built-in types.
+    if(ty::is_builtin_type(vt.base_type()))
+    {
+        return {cg::type{
+                  cg::to_type_class(vt.base_type()),
+                  vt.is_array()
+                    ? static_cast<std::size_t>(1)
+                    : static_cast<std::size_t>(0)},
+                name};
+    }
+
+    // Custom types.
+    std::string type_import_package = import_path;
+    if(vt.get_import_index().has_value())
+    {
+        // This is an imported type.
+        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(vt.get_import_index().value());
+        if(sym.type != module_::symbol_type::package)
+        {
+            throw resolve_error(
+              fmt::format(
+                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
+                vt.get_import_index().value(),
+                sym.name));
+        }
+        type_import_package = sym.name;
+    }
+
+    return cg::value{
+      cg::type{
+        cg::type_class::struct_,
+        vt.is_array()
+          ? static_cast<std::size_t>(1)
+          : static_cast<std::size_t>(0),
+        vt.base_type(),
+        type_import_package},
+      name};
+}
+
+/**
+ * Convert a field given by a field descriptor to a `ty::type_info`.
+ *
+ * @param type_ctx The type context for type lookups.
+ * @param desc The field descriptor.
+ * @param resolver The module resolver.
+ * @param import_path The module's import path.
+ * @return A `ty::type_info` with the field type.
+ */
+static ty::type_info to_unresolved_type_info(
+  ty::context& type_ctx,
+  const module_::field_descriptor& desc,
+  const module_::module_resolver& resolver,
+  const std::string& import_path)
+{
+    std::string type_import_package = import_path;
+    if(desc.base_type.get_import_index().has_value())
+    {
+        // This is an imported type.
+        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(desc.base_type.get_import_index().value());
+        if(sym.type != module_::symbol_type::package)
+        {
+            throw resolve_error(
+              fmt::format(
+                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
+                desc.base_type.get_import_index().value(),
+                sym.name));
+        }
+        type_import_package = sym.name;
+    }
+
+    return type_ctx.get_unresolved_type(
+      {desc.base_type.base_type(), {0, 0}},
+      to_type_class(desc.base_type),
+      type_import_package);
+}
+
+/**
+ * Convert a `variable_type` to a `ty::type_info`.
+ *
+ * @param type_ctx The type context for type lookups.
+ * @param vt The variable type.
+ * @param resolver The module resolver.
+ * @param import_path The module's import path.
+ * @return A `ty::type_info` with the variable type.
+ */
+static ty::type_info to_resolved_type_info(
+  ty::context& type_ctx,
+  const module_::variable_type& vt,
+  const module_::module_resolver& resolver,
+  const std::string& import_path)
+{
+    if(ty::is_builtin_type(vt.base_type()))
+    {
+        return type_ctx.get_type(
+          vt.base_type(),
+          vt.is_array());
+    }
+
+    std::optional<std::size_t> import_index = vt.get_import_index();
+    std::string type_import_package = import_path;
+    if(import_index.has_value())
+    {
+        // This is an imported type.
+        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(import_index.value());
+        if(sym.type != module_::symbol_type::package)
+        {
+            throw resolve_error(
+              fmt::format(
+                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
+                import_index.value(),
+                sym.name));
+        }
+        type_import_package = sym.name;
+    }
+
+    return type_ctx.get_type(
+      vt.base_type(),
+      vt.is_array(),
+      type_import_package);
+}
 
 /*
  * Exceptions.
@@ -36,352 +199,207 @@ resolve_error::resolve_error(const token_location& loc, const std::string& messa
  * resolver context.
  */
 
-module_::module_header& context::get_module_header(const fs::path& resolved_path)
+static module_::module_resolver& resolve_module(
+  file_manager& file_mgr,
+  std::unordered_map<
+    std::string,
+    std::unique_ptr<module_::module_resolver>>& resolvers,
+  const std::string& import_name)
 {
-    std::string path_str = resolved_path.string();
-    auto it = headers.find(path_str);
-    if(it != headers.end())
+    auto it = resolvers.find(import_name);
+    if(it != resolvers.end())
     {
-        return it->second;
+        throw resolve_error(fmt::format("Module '{}' is already resolved.", import_name));
     }
 
-    std::unique_ptr<slang::file_archive> ar = mgr.open(resolved_path, slang::file_manager::open_mode::read);
+    std::string import_path = import_name;
+    slang::utils::replace_all(import_path, package::delimiter, "/");
 
-    module_::module_header hdr;
-    (*ar) & hdr;
+    fs::path fs_path = fs::path{import_path};
+    if(!fs_path.has_extension())
+    {
+        fs_path = fs_path.replace_extension(package::module_ext);
+    }
+    fs::path resolved_path = file_mgr.resolve(fs_path);
 
-    auto insert_it = headers.insert({path_str, std::move(hdr)});
-    return insert_it.first->second;
+    resolvers.insert(
+      {import_name,
+       std::make_unique<module_::module_resolver>(
+         file_mgr,
+         resolved_path)});
+    return *resolvers[import_name].get();
 }
 
-/**
- * Convert an import name of the for `a::b::c` into a path `a/b/c`.
- *
- * @param import_name The import name.
- * @returns Returns a path for the import name.
- */
-static fs::path import_name_to_path(std::string import_name)
+module_::module_resolver& context::resolve_module(const std::string& import_name)
 {
-    slang::utils::replace_all(import_name, package::delimiter, "/");
-    return fs::path{import_name};
+    auto it = resolvers.find(import_name);
+    if(it != resolvers.end())
+    {
+        // module is already resolved.
+        return *it->second.get();
+    }
+
+    return slang::resolve::resolve_module(file_mgr, resolvers, import_name);
 }
 
-void context::resolve_module(const fs::path& resolved_path)
+void context::add_constant(
+  cg::context& ctx,
+  ty::context& type_ctx,
+  const module_::module_resolver& resolver,
+  const std::string& import_path,
+  const std::string& name,
+  std::size_t index)
 {
-    auto mod_it = std::find_if(modules.begin(), modules.end(),
-                               [&resolved_path](const module_entry& entry) -> bool
-                               { return entry.resolved_path == resolved_path.string(); });
-    if(mod_it != modules.end())
-    {
-        if(!mod_it->is_resolved)
-        {
-            throw resolve_error(fmt::format("Circular import for module '{}'.", resolved_path.string()));
-        }
+    const module_::module_header& header = resolver.get_module().get_header();
+    const module_::constant_table_entry& entry = header.constants.at(index);
 
-        return;
+    if(entry.type == module_::constant_type::i32)
+    {
+        ctx.add_constant(name, std::get<std::int32_t>(entry.data), import_path);
+        type_ctx.add_variable(
+          {name, {0, 0}},
+          type_ctx.get_unresolved_type({"i32", {0, 0}}, ty::type_class::tc_plain),
+          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+    }
+    else if(entry.type == module_::constant_type::f32)
+    {
+        ctx.add_constant(name, std::get<float>(entry.data), import_path);
+        type_ctx.add_variable(
+          {name, {0, 0}},
+          type_ctx.get_unresolved_type({"f32", {0, 0}}, ty::type_class::tc_plain),
+          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+    }
+    else if(entry.type == module_::constant_type::str)
+    {
+        ctx.add_constant(name, std::get<std::string>(entry.data), import_path);
+        type_ctx.add_variable(
+          {name, {0, 0}},
+          type_ctx.get_unresolved_type({"str", {0, 0}}, ty::type_class::tc_plain),
+          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+    }
+    else
+    {
+        throw resolve_error(
+          fmt::format(
+            "Constant '{}' has unknown type id {}.",
+            name,
+            static_cast<int>(entry.type)));
+    }
+}
+
+void context::add_function(
+  cg::context& ctx,
+  ty::context& type_ctx,
+  const module_::module_resolver& resolver,
+  const std::string& import_path,
+  const std::string& name,
+  const module_::function_descriptor& desc)
+{
+    std::vector<cg::value> prototype_arg_types;
+    std::transform(
+      desc.signature.arg_types.cbegin(),
+      desc.signature.arg_types.cend(),
+      std::back_inserter(prototype_arg_types),
+      [&resolver, &import_path](const module_::variable_type& arg)
+      {
+          return to_value(arg, resolver, import_path);
+      });
+
+    ctx.add_prototype(
+      name,
+      to_value(
+        desc.signature.return_type,
+        resolver,
+        import_path),
+      prototype_arg_types,
+      import_path);
+
+    std::vector<ty::type_info> arg_types;
+    for(auto& arg: desc.signature.arg_types)
+    {
+        arg_types.emplace_back(to_resolved_type_info(type_ctx, arg, resolver, import_path));
     }
 
-    modules.push_back({resolved_path.string(), false});
+    type_ctx.add_function(
+      {name, {0, 0}},
+      std::move(arg_types),
+      to_resolved_type_info(type_ctx, desc.signature.return_type, resolver, import_path),
+      import_path);
+}
 
-    module_::module_header& header = get_module_header(resolved_path);
-
-    for(auto& it: header.imports)
+void context::add_type(
+  cg::context& ctx,
+  ty::context& type_ctx,
+  const module_::module_resolver& resolver,
+  const std::string& import_path,
+  const std::string& name,
+  const module_::struct_descriptor& desc)
+{
+    // Add type to code generation context.
     {
-        if(it.type == module_::symbol_type::package)
-        {
-            // packages are loaded while resolving other symbols.
-            continue;
-        }
+        std::vector<std::pair<std::string, cg::value>> members;
+        std::transform(
+          desc.member_types.cbegin(),
+          desc.member_types.cend(),
+          std::back_inserter(members),
+          [&import_path, &resolver](
+            const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
+          {
+              return {
+                std::get<0>(member),
+                to_value(
+                  std::get<1>(member).base_type,
+                  resolver,
+                  import_path,
+                  std::get<0>(member))};
+          });
 
-        // resolve the symbol's package.
-        if(it.package_index >= header.imports.size())
-        {
-            throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' has invalid package index.", it.name));
-        }
-        else if(header.imports[it.package_index].type != module_::symbol_type::package)
-        {
-            throw resolve_error(fmt::format("Error while resolving imports: Import symbol '{}' refers to non-package import entry.", it.name));
-        }
-
-        fs::path resolved_import_path = mgr.resolve(
-          import_name_to_path(header.imports[it.package_index].name).replace_extension(package::module_ext));
-        resolve_module(resolved_import_path);
-
-        // find the imported symbol.
-        module_::module_header& import_header = get_module_header(resolved_import_path);
-
-        auto exp_it = std::find_if(import_header.exports.begin(), import_header.exports.end(),
-                                   [&it](const module_::exported_symbol& exp) -> bool
-                                   {
-                                       return exp.name == it.name;
-                                   });
-        if(exp_it == import_header.exports.end())
-        {
-            throw resolve_error(
-              fmt::format("Error while resolving imports: Symbol '{}' is not exported by module '{}'.",
-                          it.name, header.imports[it.package_index].name));
-        }
-        if(exp_it->type != it.type)
-        {
-            throw resolve_error(
-              fmt::format(
-                "Error while resolving imports: Symbol '{}' from module '{}' has wrong type (expected '{}', got '{}').",
-                it.name, header.imports[it.package_index].name,
-                slang::module_::to_string(it.type),
-                slang::module_::to_string(exp_it->type)));
-        }
+        ctx.add_import(module_::symbol_type::type, import_path, name);
+        ctx.add_struct(name, members, desc.flags, import_path);
+        ctx.get_global_scope()->add_struct(name, std::move(members), desc.flags, import_path);
     }
 
-    for(auto& it: header.exports)
+    // Add type to typing context.
     {
-        // resolve the symbol.
-        if(it.type == module_::symbol_type::function)
+        std::vector<std::pair<token, ty::type_info>> members;
+        for(auto& [member_name, member_type]: desc.member_types)
         {
-            if(imported_functions.find(resolved_path.string()) == imported_functions.end())
-            {
-                imported_functions.insert({resolved_path.string(), {}});
-            }
-            imported_functions[resolved_path.string()].push_back({it.name, std::get<module_::function_descriptor>(it.desc)});
+            members.push_back(std::make_pair<token, ty::type_info>(
+              {member_name, {0, 0}},
+              to_unresolved_type_info(type_ctx, member_type, resolver, import_path)));
         }
-        else if(it.type == module_::symbol_type::type)
-        {
-            if(imported_types.find(resolved_path.string()) == imported_types.end())
-            {
-                imported_types.insert({resolved_path.string(), {}});
-            }
-            imported_types[resolved_path.string()].push_back({it.name, std::get<module_::struct_descriptor>(it.desc)});
-        }
-        else if(it.type == module_::symbol_type::constant)
-        {
-            if(imported_constants.find(resolved_path.string()) == imported_constants.end())
-            {
-                imported_constants.insert({resolved_path.string(), {}});
-            }
 
-            std::size_t i = std::get<std::size_t>(it.desc);
-            if(i >= header.constants.size())
-            {
-                throw resolve_error(
-                  fmt::format(
-                    "Cannot resolve constant '{}': Index {} outside of constant table (size {}).",
-                    it.name, i, header.constants.size()));
-            }
-
-            const module_::constant_table_entry& entry = header.constants[i];
-            imported_constants[resolved_path.string()].push_back({it.name, {entry.type, entry.data}});
-        }
-        else
-        {
-            throw resolve_error(fmt::format("Cannot resolve symbol '{}' of type '{}'.", it.name, to_string(it.type)));
-        }
+        type_ctx.add_struct({name, {0, 0}}, std::move(members), import_path);
     }
-
-    mod_it = std::find_if(modules.begin(), modules.end(),
-                          [&resolved_path](const module_entry& entry) -> bool
-                          { return entry.resolved_path == resolved_path.string(); });
-    if(mod_it == modules.end())
-    {
-        throw resolve_error(fmt::format("Internal error: Resolved module '{}' not in modules list.", resolved_path.string()));
-    }
-    mod_it->is_resolved = true;
 }
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
-    const std::vector<std::string>& imports = type_ctx.get_imports();
+    const std::vector<std::string>& imports = type_ctx.get_imported_modules();
 
-    for(auto& import: imports)
+    for(auto& import_path: imports)
     {
-        if(import.size() == 0)
+        if(import_path.size() == 0)
         {
             throw resolve_error("Cannot resolve empty import.");
         }
 
-        std::string import_path = import_name_to_path(import);
+        module_::module_resolver& resolver = resolve_module(import_path);
+        const module_::module_header& header = resolver.get_module().get_header();
 
-        fs::path fs_path = fs::path{import_path}.replace_extension(package::module_ext);
-        fs::path resolved_path = mgr.resolve(fs_path);
-
-        resolve_module(resolved_path);
-
-        /*
-         * import constants.
-         */
-        auto imported_constants_it = imported_constants.find(resolved_path.string());
-        if(imported_constants_it != imported_constants.end())
+        for(auto& it: header.exports)
         {
-            for(auto& it: imported_constants_it->second)
+            if(it.type == module_::symbol_type::constant)
             {
-                auto& desc = it.second;
-
-                // Add constant to contexts.
-                // Note that we don't add the constant to the imports.
-                if(desc.type == module_::constant_type::i32)
-                {
-                    ctx.add_constant(it.first, std::get<std::int32_t>(desc.value), import_path);
-                    type_ctx.add_variable(
-                      {it.first, {0, 0}},
-                      type_ctx.get_unresolved_type({"i32", {0, 0}}, ty::type_class::tc_plain),
-                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
-                }
-                else if(desc.type == module_::constant_type::f32)
-                {
-                    ctx.add_constant(it.first, std::get<float>(desc.value), import_path);
-                    type_ctx.add_variable(
-                      {it.first, {0, 0}},
-                      type_ctx.get_unresolved_type({"f32", {0, 0}}, ty::type_class::tc_plain),
-                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
-                }
-                else if(desc.type == module_::constant_type::str)
-                {
-                    ctx.add_constant(it.first, std::get<std::string>(desc.value), import_path);
-                    type_ctx.add_variable(
-                      {it.first, {0, 0}},
-                      type_ctx.get_unresolved_type({"str", {0, 0}}, ty::type_class::tc_plain),
-                      import_path);    // FIXME for the typing context, constants and variables are the same right now.
-                }
-                else
-                {
-                    throw resolve_error(fmt::format("Constant '{}' has unknown type id {}.", it.first, static_cast<int>(desc.type)));
-                }
+                add_constant(ctx, type_ctx, resolver, import_path, it.name, std::get<std::size_t>(it.desc));
             }
-        }
-
-        /*
-         * import types.
-         */
-
-        auto imported_types_it = imported_types.find(resolved_path.string());
-        if(imported_types_it != imported_types.end())
-        {
-            for(auto& it: imported_types_it->second)
+            else if(it.type == module_::symbol_type::function)
             {
-                auto& desc = it.second;
-
-                // Add type to code generation context.
-                {
-                    std::vector<std::pair<std::string, cg::value>> members;
-                    std::transform(desc.member_types.cbegin(), desc.member_types.cend(), std::back_inserter(members),
-                                   [&import_path](const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
-                                   {
-                                       if(ty::is_builtin_type(std::get<1>(member).base_type.base_type()))
-                                       {
-                                           return {std::get<0>(member),
-                                                   cg::value{cg::type{cg::to_type_class(std::get<1>(member).base_type.base_type()),
-                                                                      std::get<1>(member).base_type.is_array()
-                                                                        ? static_cast<std::size_t>(1)
-                                                                        : static_cast<std::size_t>(0)},
-                                                             std::get<0>(member)}};
-                                       }
-
-                                       return {std::get<0>(member),
-                                               cg::value{cg::type{cg::type_class::struct_,
-                                                                  std::get<1>(member).base_type.is_array()
-                                                                    ? static_cast<std::size_t>(1)
-                                                                    : static_cast<std::size_t>(0),
-                                                                  std::get<1>(member).base_type.base_type(),
-                                                                  import_path},    // FIXME This can be an imported type
-                                                         std::get<0>(member)}};
-                                   });
-
-                    ctx.add_import(module_::symbol_type::type, import_path, it.first);
-                    ctx.add_struct(it.first, members, desc.flags, import_path);
-                    ctx.get_global_scope()->add_struct(it.first, std::move(members), desc.flags, import_path);
-                }
-
-                // Add type to typing context.
-                {
-                    std::vector<std::pair<token, ty::type_info>> members;
-                    for(auto& [member_name, member_type]: desc.member_types)
-                    {
-                        ty::type_info resolved_member_type = type_ctx.get_unresolved_type(
-                          {member_type.base_type.base_type(), {0, 0}},
-                          ty::is_builtin_type(member_type.base_type.base_type())
-                            ? ty::type_class::tc_plain
-                            : ty::type_class::tc_struct,
-                          import_path);    // FIXME This can be an imported type
-
-                        members.push_back(std::make_pair<token, ty::type_info>(
-                          {member_name, {0, 0}},
-                          std::move(resolved_member_type)));
-                    }
-
-                    type_ctx.add_struct({it.first, {0, 0}}, std::move(members), import_path);
-                }
+                add_function(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::function_descriptor>(it.desc));
             }
-        }
-
-        /*
-         * import functions.
-         */
-
-        auto imported_functions_it = imported_functions.find(resolved_path.string());
-        if(imported_functions_it != imported_functions.end())
-        {
-            for(auto& it: imported_functions_it->second)
+            else if(it.type == module_::symbol_type::type)
             {
-                auto& desc = it.second;
-
-                std::vector<cg::value> prototype_arg_types;
-                std::transform(desc.signature.arg_types.cbegin(), desc.signature.arg_types.cend(), std::back_inserter(prototype_arg_types),
-                               [](const module_::variable_type& arg)
-                               {
-                                   if(ty::is_builtin_type(arg.base_type()))
-                                   {
-                                       return cg::value{
-                                         cg::type{cg::to_type_class(arg.base_type()),
-                                                  arg.is_array()
-                                                    ? static_cast<std::size_t>(1)
-                                                    : static_cast<std::size_t>(0)}};
-                                   }
-
-                                   return cg::value{
-                                     cg::type{cg::type_class::struct_,
-                                              arg.is_array()
-                                                ? static_cast<std::size_t>(1)
-                                                : static_cast<std::size_t>(0),
-                                              arg.base_type()}};
-                               });
-
-                std::unique_ptr<cg::value> return_type;
-                if(ty::is_builtin_type(desc.signature.return_type.base_type()))
-                {
-                    return_type = std::make_unique<cg::value>(
-                      cg::type{cg::to_type_class(desc.signature.return_type.base_type()),
-                               desc.signature.return_type.is_array()
-                                 ? static_cast<std::size_t>(1)
-                                 : static_cast<std::size_t>(0)});
-                }
-                else
-                {
-                    return_type = std::make_unique<cg::value>(
-                      cg::type{cg::type_class::struct_,
-                               desc.signature.return_type.is_array()
-                                 ? static_cast<std::size_t>(1)
-                                 : static_cast<std::size_t>(0),
-                               desc.signature.return_type.base_type()});
-                }
-
-                ctx.add_prototype(it.first, *return_type, prototype_arg_types, import_path);
-
-                std::vector<ty::type_info> arg_types;
-                for(auto& arg: desc.signature.arg_types)
-                {
-                    // FIXME Type should not be resolved here
-                    arg_types.emplace_back(type_ctx.get_type(
-                      arg.base_type(),
-                      arg.is_array(),
-                      import_path));
-                }
-
-                // FIXME Type should not be resolved here
-                ty::type_info resolved_return_type = type_ctx.get_type(
-                  return_type->get_type().to_string(),
-                  return_type->get_type().is_array(),
-                  import_path);
-
-                type_ctx.add_function({it.first, {0, 0}},
-                                      std::move(arg_types), std::move(resolved_return_type), import_path);
+                add_type(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::struct_descriptor>(it.desc));
             }
         }
     }

@@ -169,11 +169,13 @@ archive& operator&(archive& ar, variable_descriptor& desc)
 
 std::size_t language_module::add_import(symbol_type type, std::string name, std::uint32_t package_index)
 {
-    auto it = std::find_if(header.imports.begin(), header.imports.end(),
-                           [type, &name](const imported_symbol& s) -> bool
-                           {
-                               return s.type == type && s.name == name;
-                           });
+    auto it = std::find_if(
+      header.imports.begin(),
+      header.imports.end(),
+      [type, &name](const imported_symbol& s) -> bool
+      {
+          return s.type == type && s.name == name;
+      });
     if(it != header.imports.end())
     {
         return std::distance(header.imports.begin(), it);
