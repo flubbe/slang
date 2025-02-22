@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.20)
+cmake_policy(SET CMP0110 NEW)
 
 project(slang CXX)
 
