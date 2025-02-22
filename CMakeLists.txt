@@ -3,6 +3,8 @@ cmake_policy(SET CMP0110 NEW)
 
 project(slang CXX)
 
+enable_testing()
+
 include_directories(
     src
     src/include
