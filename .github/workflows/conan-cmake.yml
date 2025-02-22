@@ -106,8 +106,6 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_eval_subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_eval_subexpr
-        ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test
-        ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_invalid_main_signature1
         ! ./build/${{env.BUILD_TYPE}}/slang exec test/test_invalid_main_signature1
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_invalid_main_signature2
@@ -120,6 +118,9 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_strings
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
+
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
 
     - name: Run script tests (no constant subexpression evaluation)
       run: |
@@ -142,8 +143,6 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_conversions
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_eval_subexpr --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_eval_subexpr
-        ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test --no-eval-const-subexpr
-        ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_math --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_math
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_operators --no-eval-const-subexpr
@@ -152,6 +151,9 @@ jobs:
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_strings
         ./build/${{env.BUILD_TYPE}}/slang compile test/test_structs --no-eval-const-subexpr
         ./build/${{env.BUILD_TYPE}}/slang exec test/test_structs
+
+        ./build/${{env.BUILD_TYPE}}/slang compile test/test_import --search-path=test --no-eval-const-subexpr
+        ./build/${{env.BUILD_TYPE}}/slang exec test/test_import
 
     - name: Run native integration examples
       run: |
