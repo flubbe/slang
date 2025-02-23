@@ -741,7 +741,7 @@ opcode context::exec(
 
                     // prepare stack frame
                     stack_frame callee_frame{
-                      callee_loader->get_module().get_header().constants,
+                      callee_loader->get_module().header.constants,
                       details.locals_size,
                       details.stack_size};
 

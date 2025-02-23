@@ -153,7 +153,7 @@ std::string to_string(const variable_type& t)
 variable_descriptor::variable_descriptor(variable_type type)
 : type{std::move(type)}
 {
-    reference = ty::is_reference_type(type.base_type());
+    reference = ty::is_reference_type(this->type.base_type());
 }
 
 archive& operator&(archive& ar, variable_descriptor& desc)

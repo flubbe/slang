@@ -184,7 +184,7 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
 std::optional<token> lexer::next()
 {
     std::string current_token;
-    token_type type;
+    token_type type = token_type::unknown;
     token_location loc;
 
     while(!eof())    // this loop is only here for catching comments
