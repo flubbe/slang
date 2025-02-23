@@ -238,7 +238,7 @@ public:
     /** Return the namespace path, or `std::nullopt` if empty. */
     std::optional<std::string> get_namespace_path() const
     {
-        if(namespace_stack.size() == 0)
+        if(namespace_stack.empty())
         {
             return std::nullopt;
         }

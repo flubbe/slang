@@ -170,7 +170,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
 
         input_buffer.resize(input_size);
-        input_ar->serialize(reinterpret_cast<std::byte*>(input_buffer.data()), input_size);
+        input_ar->serialize(reinterpret_cast<std::byte*>(input_buffer.data()), input_size);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     }
 
     slang::lexer lexer;

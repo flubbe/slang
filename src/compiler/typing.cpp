@@ -131,7 +131,7 @@ const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
         throw type_error(location, error_string);
     }
 
-    if(components.size() == 0)
+    if(components.empty())
     {
         auto error_string =
           name.has_value()
@@ -273,7 +273,7 @@ void context::add_base_type(std::string name, bool is_reference_type)
 
 void context::add_import(std::vector<token> path)
 {
-    if(path.size() == 0)
+    if(path.empty())
     {
         throw type_error("Typing context: Cannot add empty import.");
     }
@@ -518,7 +518,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
         err = fmt::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
     }
     /* 2. struct member access. */
-    else if(struct_stack.size() > 0)
+    else if(!struct_stack.empty())
     {
         for(auto [n, t]: struct_stack.back()->members)
         {
@@ -672,7 +672,7 @@ bool context::is_convertible(token_location loc, const type_info& from, const ty
     }
 
     auto struct_def = get_struct_definition(loc, to.to_string(), to.get_import_path());
-    if(struct_def->members.size() != 0)
+    if(!struct_def->members.empty())
     {
         return false;
     }
@@ -1003,7 +1003,7 @@ void context::push_struct_definition(const struct_definition* s)
 
 void context::pop_struct_definition()
 {
-    if(struct_stack.size() == 0)
+    if(struct_stack.empty())
     {
         throw std::runtime_error("Typing context: Struct stack is empty.");
     }

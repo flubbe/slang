@@ -1011,7 +1011,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
                 {
                     if(current_token->s == ":")
                     {
-                        if(initializers.size() != 0)
+                        if(!initializers.empty())
                         {
                             throw syntax_error(*current_token, "Unexpected ':' in anonymous struct initialization.");
                         }
@@ -1260,7 +1260,7 @@ void parser::push_directive(const token& name, [[maybe_unused]] const std::vecto
 
 void parser::pop_directive()
 {
-    if(directive_stack.size() == 0)
+    if(directive_stack.empty())
     {
         throw parser_error("Cannot pop directive: empty directive stack.");
     }

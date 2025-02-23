@@ -171,7 +171,7 @@ void visit_nodes(
 
     std::deque<T*> sorted_ast;
 
-    while(stack.size() > 0)
+    while(!stack.empty())
     {
         T* current = stack.top();
         stack.pop();

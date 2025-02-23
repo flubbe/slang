@@ -379,7 +379,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 
     for(auto& import_path: imports)
     {
-        if(import_path.size() == 0)
+        if(import_path.empty())
         {
             throw resolve_error("Cannot resolve empty import.");
         }

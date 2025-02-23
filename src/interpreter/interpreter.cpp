@@ -1584,7 +1584,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         std::string buf = e.what();
 
         auto stack_trace = e.get_stack_trace();
-        if(stack_trace.size() > 0)
+        if(!stack_trace.empty())
         {
             buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
         }
@@ -1613,7 +1613,7 @@ value context::invoke(const module_loader& loader, const function& fn, std::vect
         std::string buf = e.what();
 
         auto stack_trace = e.get_stack_trace();
-        if(stack_trace.size() > 0)
+        if(!stack_trace.empty())
         {
             buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
         }
