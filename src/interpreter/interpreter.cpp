@@ -261,13 +261,20 @@ opcode context::exec(
         ++call_stack_level;
         if(call_stack_level > max_call_stack_depth)
         {
-            throw interpreter_error(fmt::format("Function call exceeded maximum call stack depth ({}).", max_call_stack_depth));
+            throw interpreter_error(
+              fmt::format(
+                "Function call exceeded maximum call stack depth ({}).",
+                max_call_stack_depth));
         }
 
         const std::vector<std::byte>& binary = loader.get_module().get_binary();
         if(offset >= binary.size())
         {
-            throw interpreter_error(fmt::format("Entry point is outside the loaded code segment ({} >= {}).", offset, binary.size()));
+            throw interpreter_error(
+              fmt::format(
+                "Entry point is outside the loaded code segment ({} >= {}).",
+                offset,
+                binary.size()));
         }
 
         locals_scope ls{*this, locals, frame};
@@ -277,6 +284,16 @@ opcode context::exec(
         {
             auto instr = binary[offset];
             ++offset;
+
+            // validate opcode.
+            if(instr >= static_cast<std::byte>(opcode::opcode_count))
+            {
+                throw interpreter_error(
+                  fmt::format(
+                    "'{:02x}' is not an opcode.",
+                    std::to_integer<std::uint8_t>(instr)));
+            }
+            auto instr_opcode = static_cast<opcode>(instr);
 
             // return.
             if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
@@ -290,7 +307,7 @@ opcode context::exec(
                 gc.run();
 
                 --call_stack_level;
-                return static_cast<opcode>(instr);
+                return instr_opcode;
             }
 
             if(offset == function_end)
@@ -298,7 +315,7 @@ opcode context::exec(
                 throw interpreter_error(fmt::format("Execution reached function boundary."));
             }
 
-            switch(static_cast<opcode>(instr))
+            switch(instr_opcode)
             {
             case opcode::idup: [[fallthrough]];
             case opcode::fdup:
@@ -622,7 +639,11 @@ opcode context::exec(
 
                 if(i < 0)
                 {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
                 }
 
                 if(i + sizeof(std::uint32_t) > frame.locals.size())
@@ -642,7 +663,11 @@ opcode context::exec(
 
                 if(i < 0)
                 {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
                 }
 
                 if(i + sizeof(void*) > frame.locals.size())
@@ -664,7 +689,11 @@ opcode context::exec(
 
                 if(i < 0)
                 {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
                 }
 
                 if(i + sizeof(std::uint32_t) > frame.locals.size())
@@ -683,7 +712,11 @@ opcode context::exec(
 
                 if(i < 0)
                 {
-                    throw interpreter_error(fmt::format("'{}': Invalid offset '{}' for local.", to_string(static_cast<opcode>(instr)), i));
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
                 }
 
                 if(i + sizeof(std::string*) > frame.locals.size())
@@ -1163,7 +1196,11 @@ opcode context::exec(
                 break;
             } /* opcode::jmp */
             default:
-                throw interpreter_error(fmt::format("Opcode '{}' ({}) not implemented.", to_string(static_cast<opcode>(instr)), instr));
+                throw interpreter_error(
+                  fmt::format(
+                    "Opcode '{}' ({}) not implemented.",
+                    to_string(instr_opcode),
+                    instr));
             }
         }
 

@@ -51,6 +51,7 @@ static void register_native(si::context& ctx)
 }
 
 /** Entry point. */
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     // Set up file manager and search paths. These are used for module imports.
@@ -93,13 +94,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     // Set up argument for function call.
     std::string str = "Hello from native code!";
-    S s = S{&str, 123};
+    S s = S{&str, 123};    // NOLINT(readability-magic-numbers)
 
     // Invoke the function.
     si::value res;
     try
     {
-        res = function(si::value{layout_id, &s}, 3.141f);
+        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers)
     }
     catch(const si::interpreter_error& err)
     {

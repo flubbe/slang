@@ -88,7 +88,7 @@ const named_expression* expression::as_named_expression() const
     throw std::runtime_error("Expression is not a named expression.");
 }
 
-std::unique_ptr<cg::value> expression::evaluate(cg::context&) const
+std::unique_ptr<cg::value> expression::evaluate([[maybe_unused]] cg::context& ctx) const
 {
     return {};
 }
@@ -111,14 +111,16 @@ void expression::push_directive(
         auto arg_string = slang::utils::join(args, {transform}, ", ");
 
         // FIXME This should print the source instead of the AST.
+        constexpr std::size_t MAX_SUBSTRING_LENGTH = 80;    // FIXME arbitrary limit.
+
         auto expr_string = to_string();
         if(expr_string.empty())
         {
             expr_string = "<unknown>";
         }
-        else if(expr_string.size() > 80)    // arbitrary limit.
+        else if(expr_string.size() > MAX_SUBSTRING_LENGTH)
         {
-            expr_string = expr_string.substr(0, 80) + "...";
+            expr_string = expr_string.substr(0, MAX_SUBSTRING_LENGTH) + "...";
         }
 
         throw ty::type_error(
@@ -138,11 +140,7 @@ void expression::pop_directive(cg::context& ctx)
 
 bool expression::supports_directive(const std::string& name) const
 {
-    if(name == "disable")
-    {
-        return true;
-    }
-    return false;
+    return name == "disable";
 }
 
 /**
@@ -159,7 +157,7 @@ bool expression::supports_directive(const std::string& name) const
 template<typename T>
 void visit_nodes(
   T& expr,
-  std::function<void(T&)> visitor,
+  std::function<void(T&)>& visitor,
   bool visit_self,
   bool post_order)
 {
@@ -185,7 +183,7 @@ void visit_nodes(
 
         sorted_ast.emplace_back(current);
 
-        for(auto child: current->get_children())
+        for(auto* child: current->get_children())
         {
             stack.push(child);
         }
@@ -245,18 +243,18 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         {
             throw cg::codegen_error(loc, fmt::format("Cannot store into int_literal '{}'.", std::get<int>(*tok.value)));
         }
-        else if(tok.type == token_type::fp_literal)
+
+        if(tok.type == token_type::fp_literal)
         {
             throw cg::codegen_error(loc, fmt::format("Cannot store into fp_literal '{}'.", std::get<float>(*tok.value)));
         }
-        else if(tok.type == token_type::str_literal)
+
+        if(tok.type == token_type::str_literal)
         {
             throw cg::codegen_error(loc, fmt::format("Cannot store into str_literal '{}'.", std::get<std::string>(*tok.value)));
         }
-        else
-        {
-            throw cg::codegen_error(loc, fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(tok.type)));
-        }
+
+        throw cg::codegen_error(loc, fmt::format("Cannot store into unknown literal of type id '{}'.", static_cast<int>(tok.type)));
     }
 
     if(tok.type == token_type::int_literal)
@@ -264,20 +262,20 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         ctx.generate_const({cg::type{cg::type_class::i32, 0}}, *tok.value);
         return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
-    else if(tok.type == token_type::fp_literal)
+
+    if(tok.type == token_type::fp_literal)
     {
         ctx.generate_const({cg::type{cg::type_class::f32, 0}}, *tok.value);
         return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
     }
-    else if(tok.type == token_type::str_literal)
+
+    if(tok.type == token_type::str_literal)
     {
         ctx.generate_const({cg::type{cg::type_class::str, 0}}, *tok.value);
         return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
     }
-    else
-    {
-        throw cg::codegen_error(loc, fmt::format("Unable to generate code for literal of type id '{}'.", static_cast<int>(tok.type)));
-    }
+
+    throw cg::codegen_error(loc, fmt::format("Unable to generate code for literal of type id '{}'.", static_cast<int>(tok.type)));
 }
 
 std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
@@ -318,37 +316,31 @@ std::string literal_expression::to_string() const
         {
             return fmt::format("FloatLiteral(value={})", std::get<float>(*tok.value));
         }
-        else
-        {
-            return "FloatLiteral(<none>)";
-        }
+
+        return "FloatLiteral(<none>)";
     }
-    else if(tok.type == token_type::int_literal)
+
+    if(tok.type == token_type::int_literal)
     {
         if(tok.value)
         {
             return fmt::format("IntLiteral(value={})", std::get<int>(*tok.value));
         }
-        else
-        {
-            return "IntLiteral(<none>)";
-        }
+
+        return "IntLiteral(<none>)";
     }
-    else if(tok.type == token_type::str_literal)
+
+    if(tok.type == token_type::str_literal)
     {
         if(tok.value)
         {
             return fmt::format("StrLiteral(value=\"{}\")", std::get<std::string>(*tok.value));
         }
-        else
-        {
-            return "StrLiteral(<none>)";
-        }
+
+        return "StrLiteral(<none>)";
     }
-    else
-    {
-        return "UnknownLiteral";
-    }
+
+    return "UnknownLiteral";
 }
 
 /*
@@ -455,7 +447,11 @@ std::optional<ty::type_info> namespace_access_expression::type_check(ty::context
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
     expr_type = expr->type_check(ctx);
-    ctx.set_expression_type(this, *expr_type);
+    if(!expr_type.has_value())
+    {
+        throw std::runtime_error("Type check: Expression has no type in namespace access.");
+    }
+    ctx.set_expression_type(this, expr_type.value());
     return expr_type;
 }
 
@@ -531,7 +527,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         {
             throw cg::codegen_error(loc, fmt::format("Could not find name for element access in array access expression."));
         }
-        auto identifier_expr = rhs->as_named_expression();
+        auto* identifier_expr = rhs->as_named_expression();
 
         if(identifier_expr->get_name().s == "length")
         {
@@ -543,10 +539,8 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
             ctx.generate_arraylength();
             return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
-        else
-        {
-            throw cg::codegen_error(rhs->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
-        }
+
+        throw cg::codegen_error(rhs->get_location(), fmt::format("Unknown array property '{}'.", identifier_expr->get_name().s));
     }
 
     /*
@@ -614,7 +608,11 @@ std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
     expr_type = rhs->type_check(ctx);
     ctx.pop_struct_definition();
 
-    ctx.set_expression_type(this, *expr_type);
+    if(!expr_type.has_value())
+    {
+        throw std::runtime_error("Type check: Expression has no type in member access.");
+    }
+    ctx.set_expression_type(this, expr_type.value());
     return expr_type;
 }
 
@@ -711,24 +709,28 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
             ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
             return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
-        else if(const_v->type == module_::constant_type::f32)
+
+        if(const_v->type == module_::constant_type::f32)
         {
             ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
             return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
         }
-        else if(const_v->type == module_::constant_type::str)
+
+        if(const_v->type == module_::constant_type::str)
         {
             ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
             return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
         }
 
         throw cg::codegen_error(
-          fmt::format("Cannot load constant '{}{}' of unknown type {}.",
-                      import_path.has_value()
-                        ? fmt::format("{}::", *import_path)
-                        : "",
-                      name.s,
-                      static_cast<int>(const_v->type)));
+          loc,
+          fmt::format(
+            "Cannot load constant '{}{}' of unknown type {}.",
+            import_path.has_value()
+              ? fmt::format("{}::", *import_path)
+              : "",
+            name.s,
+            static_cast<int>(const_v->type)));
     }
 
     cg::value v = get_value(ctx);
@@ -737,11 +739,18 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     {
         if(ctx.is_struct_access())
         {
+            if(!v.get_name().has_value())
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format("Cannot access struct: No member name."));
+            }
+
             auto struct_type = ctx.get_accessed_struct();
             auto member_value = ctx.get_struct_member(
               loc,
               struct_type.to_string(),
-              *v.get_name(),
+              v.get_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
               struct_type.get_import_path());
 
             ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_type, member_value));
@@ -799,7 +808,7 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        auto base_type = t.get_element_type();
+        auto* base_type = t.get_element_type();
         expr_type = ctx.get_type(
           base_type->to_string(),
           base_type->is_array(),
@@ -846,15 +855,20 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
 
         throw cg::codegen_error(loc, fmt::format("Cannot find variable or constant '{}' in current scope.", name.s));
     }
-    else
+
+    auto struct_type = ctx.get_accessed_struct();
+    if(!struct_type.get_struct_name().has_value())
     {
-        auto struct_type = ctx.get_accessed_struct();
-        return ctx.get_struct_member(
+        throw cg::codegen_error(
           loc,
-          struct_type.get_struct_name().value(),
-          get_name().s,
-          struct_type.get_import_path());
+          fmt::format("Cannot access struct: No struct name."));
     }
+
+    return ctx.get_struct_member(
+      loc,
+      struct_type.get_struct_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
+      get_name().s,
+      struct_type.get_import_path());
 }
 
 /*
@@ -873,7 +887,7 @@ std::string type_expression::get_qualified_name() const
 
 std::optional<std::string> type_expression::get_namespace_path() const
 {
-    if(namespace_stack.size() == 0)
+    if(namespace_stack.empty())
     {
         return std::nullopt;
     }
@@ -889,7 +903,7 @@ std::optional<std::string> type_expression::get_namespace_path() const
 std::string type_expression::to_string() const
 {
     std::string namespace_string;
-    if(namespace_stack.size() > 0)
+    if(!namespace_stack.empty())
     {
         for(std::size_t i = 0; i < namespace_stack.size() - 1; ++i)
         {
@@ -905,12 +919,12 @@ cg::type type_expression::to_type() const
 {
     if(ty::is_builtin_type(type_name.s))
     {
-        if(namespace_stack.size() != 0)
+        if(!namespace_stack.empty())
         {
             throw cg::codegen_error(loc, fmt::format("Type '{}' cannot occur in a namespace.", type_name.s));
         }
 
-        return cg::type{cg::to_type_class(type_name.s), array};
+        return cg::type{cg::to_type_class(type_name.s), array ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)};
     }
 
     return cg::type{
@@ -1069,19 +1083,21 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::co
 
     if(t.to_string() == "i32")
     {
-        cg::constant_int* v_i32 = static_cast<cg::constant_int*>(v.get());
+        auto* v_i32 = static_cast<cg::constant_int*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         ctx.add_constant(name.s, v_i32->get_int());
         return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
-    else if(t.to_string() == "f32")
+
+    if(t.to_string() == "f32")
     {
-        cg::constant_float* v_f32 = static_cast<cg::constant_float*>(v.get());
+        auto* v_f32 = static_cast<cg::constant_float*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         ctx.add_constant(name.s, v_f32->get_float());
         return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
     }
-    else if(t.to_string() == "str")
+
+    if(t.to_string() == "str")
     {
-        cg::constant_str* v_str = static_cast<cg::constant_str*>(v.get());
+        auto* v_str = static_cast<cg::constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         ctx.add_constant(name.s, v_str->get_str());
         return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
     }
@@ -1144,7 +1160,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
-        auto& expr = exprs[i];
+        const auto& expr = exprs[i];
 
         // the top of the stack contains the array address.
         ctx.generate_dup(array_type);
@@ -1245,15 +1261,15 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     }
 
     std::vector<std::pair<std::string, cg::value>> struct_members;
-    for(auto& m: members)
+    for(const auto& m: members)
     {
         cg::value v = {m->get_type()->to_type(),
                        m->get_name().s};
 
-        struct_members.emplace_back(std::make_pair(m->get_name().s, std::move(v)));
+        struct_members.emplace_back(m->get_name().s, std::move(v));
     }
 
-    std::uint8_t flags = static_cast<std::uint8_t>(module_::struct_flags::none);
+    auto flags = static_cast<std::uint8_t>(module_::struct_flags::none);
     if(ctx.get_last_directive("allow_cast").has_value())
     {
         flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
@@ -1272,31 +1288,21 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 void struct_definition_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
     std::vector<std::pair<token, ty::type_info>> struct_members;
-    for(auto& m: members)
+    struct_members.reserve(members.size());
+    for(const auto& m: members)
     {
         struct_members.emplace_back(
-          std::make_pair(m->get_name(),
-                         m->get_type()->to_unresolved_type_info(type_ctx)));
+          m->get_name(),
+          m->get_type()->to_unresolved_type_info(type_ctx));
     }
     type_ctx.add_struct(name, std::move(struct_members));
 }
 
 bool struct_definition_expression::supports_directive(const std::string& name) const
 {
-    if(super::supports_directive(name))
-    {
-        return true;
-    }
-    else if(name == "allow_cast")
-    {
-        return true;
-    }
-    else if(name == "native")
-    {
-        return true;
-    }
-
-    return false;
+    return super::supports_directive(name)
+           || name == "allow_cast"
+           || name == "native";
 }
 
 std::optional<ty::type_info> struct_definition_expression::type_check(ty::context& ctx)
@@ -1314,7 +1320,7 @@ std::optional<ty::type_info> struct_definition_expression::type_check(ty::contex
 std::string struct_definition_expression::to_string() const
 {
     std::string ret = fmt::format("Struct(name={}, members=(", name.s);
-    if(members.size() > 0)
+    if(!members.empty())
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
@@ -1349,7 +1355,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
     }
     else
     {
-        auto type = ctx.get_type(name.s, get_namespace_path());
+        auto* type = ctx.get_type(name.s, get_namespace_path());
         struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
 
         t = &ctx.get_type(name.s, get_namespace_path())->get_members();
@@ -1386,7 +1392,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
 
 std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
 {
-    auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+    const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
     if(initializers.size() != struct_def->members.size())
     {
@@ -1431,7 +1437,7 @@ std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check
 std::string struct_anonymous_initializer_expression::to_string() const
 {
     std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
-    if(initializers.size() > 0)
+    if(!initializers.empty())
     {
         for(std::size_t i = 0; i < initializers.size() - 1; ++i)
         {
@@ -1466,7 +1472,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     }
     else
     {
-        auto type = ctx.get_type(name.s, get_namespace_path());
+        auto* type = ctx.get_type(name.s, get_namespace_path());
         struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
 
         t = &ctx.get_type(name.s, get_namespace_path())->get_members();
@@ -1521,7 +1527,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
 
 std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty::context& ctx)
 {
-    auto struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+    const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
     if(member_names.size() != struct_def->members.size())
     {
@@ -1602,7 +1608,7 @@ std::string struct_named_initializer_expression::to_string() const
     }
     else
     {
-        if(initializers.size() > 0)
+        if(!initializers.empty())
         {
             for(std::size_t i = 0; i < initializers.size() - 1; ++i)
             {
@@ -1732,7 +1738,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
      *    <binary-op>
      */
 
-    std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;
+    std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     if(!is_assignment && mc == memory_context::store)
@@ -1771,12 +1777,12 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                 auto t = v->get_type();
                 if(t.to_string() == "i32")
                 {
-                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());
+                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                     return v;
                 }
-                else if(t.to_string() == "f32")
+                if(t.to_string() == "f32")
                 {
-                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());
+                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                     return v;
                 }
 
@@ -1816,7 +1822,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             // comparisons are non-compound, so this must be a non-assignment operation.
             return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
         }
-        else if(!is_assignment)
+        if(!is_assignment)
         {
             // non-assignment operation.
             return lhs_value;
@@ -1873,7 +1879,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         return rhs_value;
     }
     /* Cases 2. (cont.), 5. (cont.) */
-    else if(lhs->is_array_element_access())
+    if(lhs->is_array_element_access())
     {
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
@@ -1909,16 +1915,13 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         return rhs_value;
     }
     /* Case 1. (cont.), 4. (cont.) */
-    else
+    // we might need to duplicate the value for chained assignments.
+    if(mc == memory_context::load)
     {
-        // we might need to duplicate the value for chained assignments.
-        if(mc == memory_context::load)
-        {
-            ctx.generate_dup(*rhs_value);
-        }
-
-        return lhs->generate_code(ctx, memory_context::store);
+        ctx.generate_dup(*rhs_value);
     }
+
+    return lhs->generate_code(ctx, memory_context::store);
 }
 
 std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
@@ -1951,7 +1954,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 
     auto rhs_type = ctx.get_expression_type(*rhs);
 
-    if(struct_def)
+    if(struct_def != nullptr)
     {
         ctx.pop_struct_definition();
 
@@ -2101,7 +2104,8 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
         return v;
     }
-    else if(op.s == "--")
+
+    if(op.s == "--")
     {
         auto v = operand->generate_code(ctx, mc);
         if(v->get_type().to_string() != "i32" && v->get_type().to_string() != "f32")
@@ -2143,12 +2147,12 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
             auto t = v->get_type();
             if(t.to_string() == "i32")
             {
-                ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());
+                ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                 return v;
             }
-            else if(t.to_string() == "f32")
+            if(t.to_string() == "f32")
             {
-                ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());
+                ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                 return v;
             }
 
@@ -2166,7 +2170,8 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     {
         return operand->generate_code(ctx, mc);
     }
-    else if(op.s == "-")
+
+    if(op.s == "-")
     {
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
@@ -2185,12 +2190,13 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(loc, fmt::format("Type error for unary operator '-': Expected 'i32' or 'f32', got '{}'.", v->get_type().to_string()));
         }
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
+        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
         ctx.generate_binary_op(cg::binary_op::op_sub, *v);
         return v;
     }
-    else if(op.s == "!")
+
+    if(op.s == "!")
     {
         auto v = operand->generate_code(ctx, memory_context::load);
         if(v->get_type().get_type_class() != cg::type_class::i32)
@@ -2203,7 +2209,8 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
 
         return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
     }
-    else if(op.s == "~")
+
+    if(op.s == "~")
     {
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
@@ -2217,7 +2224,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         std::vector<std::unique_ptr<cg::argument>> args;
         args.emplace_back(std::make_unique<cg::const_argument>(~0));
 
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));
+        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
         ctx.generate_binary_op(cg::binary_op::op_xor, *v);
         return v;
@@ -2503,6 +2510,7 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
     }
 
     std::vector<std::unique_ptr<cg::value>> function_args;
+    function_args.reserve(args.size());
     for(std::size_t i = 0; i < args.size(); ++i)
     {
         function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
@@ -2520,6 +2528,7 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     }
 
     std::vector<std::unique_ptr<cg::value>> function_args;
+    function_args.reserve(args.size());
     for(std::size_t i = 0; i < args.size(); ++i)
     {
         function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
@@ -2583,7 +2592,7 @@ std::string prototype_ast::to_string() const
 {
     std::string ret_type_str = return_type->to_string();
     std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, ret_type_str);
-    if(args.size() > 0)
+    if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
@@ -2609,7 +2618,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
     }
 
     std::unique_ptr<cg::value> v;
-    for(auto& expr: exprs)
+    for(const auto& expr: exprs)
     {
         v = expr->generate_code(ctx, memory_context::none);
 
@@ -2629,7 +2638,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
 
 void block::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
-    for(auto& expr: exprs)
+    for(const auto& expr: exprs)
     {
         expr->collect_names(ctx, type_ctx);
     }
@@ -2648,7 +2657,7 @@ std::optional<ty::type_info> block::type_check(ty::context& ctx)
 std::string block::to_string() const
 {
     std::string ret = "Block(exprs=(";
-    if(exprs.size() > 0)
+    if(!exprs.empty())
     {
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
@@ -2696,7 +2705,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             throw cg::codegen_error(loc, fmt::format("Internal error: Break-continue stack is not empty."));
         }
 
-        auto ip = ctx.get_insertion_point(true);
+        auto* ip = ctx.get_insertion_point(true);
         if(!ip->ends_with_return() && !ip->is_unreachable())
         {
             // for `void` return types, we insert a return instruction. otherwise, the
@@ -2723,9 +2732,15 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             throw cg::codegen_error(loc, "Expected 'lib=<identifier>' or 'lib=<string-literal>'.");
         }
 
+        if(directive.args[0].second.type == token_type::str_literal
+           && !directive.args[0].second.value.has_value())
+        {
+            throw cg::codegen_error(loc, "Directive argument has no value for <string-literal>.");
+        }
+
         std::string lib_name =
           (directive.args[0].second.type == token_type::str_literal)
-            ? std::get<std::string>(*directive.args[0].second.value)
+            ? std::get<std::string>(*directive.args[0].second.value)    // NOLINT(bugprone-unchecked-optional-access)
             : directive.args[0].second.s;
 
         prototype->generate_native_binding(lib_name, ctx);
@@ -2741,16 +2756,8 @@ void function_expression::collect_names(cg::context& ctx, ty::context& type_ctx)
 
 bool function_expression::supports_directive(const std::string& name) const
 {
-    if(super::supports_directive(name))
-    {
-        return true;
-    }
-    else if(name == "native")
-    {
-        return true;
-    }
-
-    return false;
+    return super::supports_directive(name)
+           || name == "native";
 }
 
 std::optional<ty::type_info> function_expression::type_check(ty::context& ctx)
@@ -2787,7 +2794,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
         throw cg::codegen_error(loc, "Cannot store into call expression.");
     }
 
-    for(auto& arg: args)
+    for(const auto& arg: args)
     {
         arg->generate_code(ctx, memory_context::load);
     }
@@ -2868,7 +2875,7 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 std::string call_expression::to_string() const
 {
     std::string ret = fmt::format("Call(callee={}, args=(", callee.s);
-    if(args.size() > 0)
+    if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
@@ -2965,10 +2972,8 @@ std::string return_statement::to_string() const
     {
         return fmt::format("Return(expr={})", expr->to_string());
     }
-    else
-    {
-        return "Return()";
-    }
+
+    return "Return()";
 }
 
 /*
@@ -2996,11 +3001,12 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     auto* function_insertion_point = ctx.get_insertion_point(true);
 
     // set up basic blocks.
-    auto if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     cg::basic_block* else_basic_block = nullptr;
-    auto merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
-    bool if_ends_with_return = false, else_ends_with_return = false;
+    bool if_ends_with_return = false;
+    bool else_ends_with_return = false;
 
     // code generation for if block.
     ctx.get_current_function(true)->append_basic_block(if_basic_block);
@@ -3092,9 +3098,9 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     }
 
     // set up basic blocks.
-    auto while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-    auto while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-    auto merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
     // while loop header.
     ctx.get_current_function(true)->append_basic_block(while_loop_header_basic_block);

@@ -533,6 +533,11 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
     /* 3. unqualified non-member access. */
     else
     {
+        if(current_scope == nullptr)
+        {
+            throw std::runtime_error("Typing context: No current scope.");
+        }
+
         for(scope* s = current_scope; s != nullptr; s = s->parent)
         {
             auto type = s->get_type(identifier.s);

@@ -19,6 +19,7 @@ namespace slang::commandline
  * global command line.
  */
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::vector<std::string> global_command_line;
 
 void set_command_line(const std::vector<std::string>& cmdline)
@@ -39,7 +40,7 @@ void command::validate_name() const
 {
     for(const auto& c: name)
     {
-        if(c != '_' && !std::isalpha(c))
+        if(c != '_' && (std::isalpha(c) == 0))
         {
             throw std::runtime_error(fmt::format("Invalid command name '{}'.", name));
         }

@@ -157,9 +157,10 @@ public:
     /**
      * Evaluate the compile-time constant.
      *
+     * @param ctx The context used for code generation.
      * @returns Returns the result of the evaluation, or a `nullptr` if evaluation failed.
      */
-    virtual std::unique_ptr<cg::value> evaluate(cg::context&) const;
+    virtual std::unique_ptr<cg::value> evaluate([[maybe_unused]] cg::context& ctx) const;
 
     /**
      * Generate IR.
