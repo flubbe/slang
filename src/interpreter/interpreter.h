@@ -89,7 +89,7 @@ class context
     value exec(
       const module_loader& loader,
       const function& f,
-      std::vector<value> args);
+      const std::vector<value>& args);
 
     /**
      * Execute a function.
@@ -195,7 +195,7 @@ public:
      * @param args The function's arguments.
      * @returns The function's return value.
      */
-    value invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args);
+    value invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args);
 
     /**
      * Invoke a function from a module.
@@ -205,7 +205,7 @@ public:
      * @param args The function's arguments.
      * @returns The function's return value.
      */
-    value invoke(const module_loader& loader, const function& fn, std::vector<value> args);
+    value invoke(const module_loader& loader, const function& fn, const std::vector<value>& args);
 
     /** Reset the interpreter. Needs to be called when an exception was thrown and caught. */
     void reset()

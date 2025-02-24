@@ -55,19 +55,23 @@ static opcode get_return_opcode(const module_::variable_type& return_type)
     {
         return opcode::ret;
     }
-    else if(return_type.base_type() == "i32")
+
+    if(return_type.base_type() == "i32")
     {
         return opcode::iret;
     }
-    else if(return_type.base_type() == "f32")
+
+    if(return_type.base_type() == "f32")
     {
         return opcode::fret;
     }
-    else if(return_type.base_type() == "str")
+
+    if(return_type.base_type() == "str")
     {
         return opcode::sret;
     }
-    else if(return_type.base_type() == "@addr" || return_type.base_type() == "@array")
+
+    if(return_type.base_type() == "@addr" || return_type.base_type() == "@array")
     {
         return opcode::aret;
     }
@@ -95,11 +99,11 @@ function::function(
 , native{false}
 , entry_point_or_function{entry_point}
 , size{size}
+, ret_opcode{::slang::interpreter::get_return_opcode(this->signature.return_type)}
 , locals{std::move(locals)}
 , locals_size{locals_size}
 , stack_size{stack_size}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 function::function(
@@ -112,8 +116,9 @@ function::function(
 , signature{std::move(signature)}
 , native{true}
 , entry_point_or_function{std::move(func)}
+, size{0}
+, ret_opcode{::slang::interpreter::get_return_opcode(this->signature.return_type)}
 {
-    ret_opcode = ::slang::interpreter::get_return_opcode(this->signature.return_type);
 }
 
 value function::invoke(const std::vector<value>& args)
@@ -165,6 +170,11 @@ class locals_scope
     bool needs_destruct{true};
 
 public:
+    /** Deleted constructors. */
+    locals_scope() = delete;
+    locals_scope(const locals_scope&) = delete;
+    locals_scope(locals_scope&&) = delete;
+
     /**
      * Create a scope for creating/destroying variables. If needed, adds the locals as
      * roots to the garbage collector.
@@ -178,12 +188,12 @@ public:
     , locals{locals}
     , frame{frame}
     {
-        for(auto& local: locals)
+        for(const auto& local: locals)
         {
             if(local.type.is_array() || local.reference)
             {
-                void* addr;
-                std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
+                void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
                     ctx.get_gc().add_root(addr);
@@ -199,9 +209,22 @@ public:
     {
         if(needs_destruct)
         {
-            destruct();
+            try
+            {
+                destruct();
+            }
+            catch(const interpreter_error& e)
+            {
+                // FIXME This is an error, but destructors cannot throw.
+
+                DEBUG_LOG("Error during locals destruction: {}", e.what());
+            }
         }
     }
+
+    /** Deleted assignment operators. */
+    locals_scope& operator=(const locals_scope&) = delete;
+    locals_scope& operator=(locals_scope&&) = delete;
 
     /**
      * Remove locals from the garbage collector, if needed.
@@ -216,12 +239,12 @@ public:
         }
         needs_destruct = false;
 
-        for(auto& local: locals)
+        for(const auto& local: locals)
         {
             if(local.type.is_array() || local.reference)
             {
-                void* addr;
-                std::memcpy(&addr, &frame.locals[local.offset], sizeof(void*));
+                void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
                     ctx.get_gc().remove_root(addr);
@@ -326,38 +349,38 @@ opcode context::exec(
             case opcode::adup:
             {
                 frame.stack.dup_addr();
-                void* addr;
-                std::memcpy(&addr, frame.stack.end(sizeof(void*)), sizeof(void*));
+                void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(static_cast<void*>(&addr), frame.stack.end(sizeof(void*)), sizeof(void*));
                 gc.add_temporary(addr);
                 break;
             } /* opcode::adup */
             case opcode::dup_x1:
             {
-                std::size_t size1 = read_unchecked<std::size_t>(binary, offset);
-                std::size_t size2 = read_unchecked<std::size_t>(binary, offset);
-                std::uint8_t needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+                auto size1 = read_unchecked<std::size_t>(binary, offset);
+                auto size2 = read_unchecked<std::size_t>(binary, offset);
+                auto needs_gc = read_unchecked<std::uint8_t>(binary, offset);
                 frame.stack.dup_x1(size1, size2);
 
-                if(needs_gc)
+                if(needs_gc != 0)
                 {
-                    void* addr;
-                    std::memcpy(&addr, frame.stack.end(2 * size1 + size2), size1);
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2), size1);
                     gc.add_temporary(addr);
                 }
                 break;
             } /* opcode::dup_x1 */
             case opcode::dup_x2:
             {
-                std::size_t size1 = read_unchecked<std::size_t>(binary, offset);
-                std::size_t size2 = read_unchecked<std::size_t>(binary, offset);
-                std::size_t size3 = read_unchecked<std::size_t>(binary, offset);
-                std::uint8_t needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+                auto size1 = read_unchecked<std::size_t>(binary, offset);
+                auto size2 = read_unchecked<std::size_t>(binary, offset);
+                auto size3 = read_unchecked<std::size_t>(binary, offset);
+                auto needs_gc = read_unchecked<std::uint8_t>(binary, offset);
                 frame.stack.dup_x2(size1, size2, size3);
 
-                if(needs_gc)
+                if(needs_gc != 0)
                 {
-                    void* addr;
-                    std::memcpy(&addr, frame.stack.end(2 * size1 + size2 + size3), size1);
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2 + size3), size1);
                     gc.add_temporary(addr);
                 }
                 break;
@@ -475,24 +498,30 @@ opcode context::exec(
                 frame.stack.push_addr<void>(nullptr);
                 break;
             } /* opcode::aconst_null */
-            case opcode::iconst: [[fallthrough]];
+            case opcode::iconst:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto i = read_unchecked<std::int32_t>(binary, offset);
+                frame.stack.push_i32(i);
+                break;
+            } /* opcode::iconst */
             case opcode::fconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::uint32_t i_u32 = read_unchecked<std::uint32_t>(binary, offset);
-                frame.stack.push_i32(i_u32);
+                auto f = read_unchecked<float>(binary, offset);
+                frame.stack.push_f32(f);
                 break;
-            } /* opcode::iconst, opcode::fconst */
+            } /* opcode::fconst */
             case opcode::sconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
+                auto i = read_unchecked<std::int64_t>(binary, offset);
                 if(i < 0 || static_cast<std::size_t>(i) >= frame.constants.size())
                 {
                     throw interpreter_error(fmt::format("Invalid index '{}' into constant table.", i));
                 }
 
-                auto str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
+                auto* str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
                 if(frame.constants[i].type != module_::constant_type::str)
                 {
                     throw interpreter_error(fmt::format("Entry {} of constant table is not a string.", i));
@@ -506,7 +535,7 @@ opcode context::exec(
             case opcode::iaload:
             {
                 std::int32_t array_index = frame.stack.pop_i32();
-                fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
                 if(arr == nullptr)
                 {
@@ -526,7 +555,7 @@ opcode context::exec(
             case opcode::faload:
             {
                 std::int32_t array_index = frame.stack.pop_i32();
-                fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
                 if(arr == nullptr)
                 {
@@ -546,7 +575,7 @@ opcode context::exec(
             case opcode::aaload:
             {
                 std::int32_t array_index = frame.stack.pop_i32();
-                fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 if(arr == nullptr)
                 {
@@ -570,7 +599,7 @@ opcode context::exec(
             {
                 std::int32_t v = frame.stack.pop_i32();
                 std::int32_t index = frame.stack.pop_i32();
-                fixed_vector<std::int32_t>* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
                 if(arr == nullptr)
                 {
@@ -591,7 +620,7 @@ opcode context::exec(
             {
                 float v = frame.stack.pop_f32();
                 std::int32_t index = frame.stack.pop_i32();
-                fixed_vector<float>* arr = frame.stack.pop_addr<fixed_vector<float>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
                 if(arr == nullptr)
                 {
@@ -612,7 +641,7 @@ opcode context::exec(
             {
                 void* obj = frame.stack.pop_addr<void>();
                 std::int32_t index = frame.stack.pop_i32();
-                fixed_vector<void*>* arr = frame.stack.pop_addr<fixed_vector<void*>>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 if(arr == nullptr)
                 {
@@ -631,11 +660,10 @@ opcode context::exec(
 
                 break;
             } /* opcode::aastore */
-            case opcode::iload: [[fallthrough]];
-            case opcode::fload:
+            case opcode::iload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
+                auto i = read_unchecked<std::int64_t>(binary, offset);
 
                 if(i < 0)
                 {
@@ -646,20 +674,44 @@ opcode context::exec(
                         i));
                 }
 
-                if(i + sizeof(std::uint32_t) > frame.locals.size())
+                if(i + sizeof(std::int32_t) > frame.locals.size())
                 {
                     throw interpreter_error("Invalid memory access.");
                 }
 
-                std::uint32_t v;
+                std::int32_t v;    // NOLINT(cppcoreguidelines-init-variables)
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
                 frame.stack.push_i32(v);
                 break;
-            } /* opcode::iload, opcode::fload */
+            } /* opcode::iload */
+            case opcode::fload:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto i = read_unchecked<std::int64_t>(binary, offset);
+
+                if(i < 0)
+                {
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
+                }
+
+                if(i + sizeof(float) > frame.locals.size())
+                {
+                    throw interpreter_error("Invalid memory access.");
+                }
+
+                float v;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(&v, &frame.locals[i], sizeof(v));
+                frame.stack.push_f32(v);
+                break;
+            } /* opcode::fload */
             case opcode::aload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
+                auto i = read_unchecked<std::int64_t>(binary, offset);
 
                 if(i < 0)
                 {
@@ -675,17 +727,16 @@ opcode context::exec(
                     throw interpreter_error("Invalid memory access.");
                 }
 
-                void* addr;
-                std::memcpy(&addr, &frame.locals[i], sizeof(addr));
+                void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(static_cast<void*>(&addr), &frame.locals[i], sizeof(addr));
                 gc.add_temporary(addr);
                 frame.stack.push_addr(addr);
                 break;
             } /* opcode::aload */
-            case opcode::istore: [[fallthrough]];
-            case opcode::fstore:
+            case opcode::istore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
+                auto i = read_unchecked<std::int64_t>(binary, offset);
 
                 if(i < 0)
                 {
@@ -696,7 +747,7 @@ opcode context::exec(
                         i));
                 }
 
-                if(i + sizeof(std::uint32_t) > frame.locals.size())
+                if(i + sizeof(std::int32_t) > frame.locals.size())
                 {
                     throw interpreter_error("Stack overflow.");
                 }
@@ -704,11 +755,34 @@ opcode context::exec(
                 std::int32_t v = frame.stack.pop_i32();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::istore, opcode::fstore */
+            } /* opcode::istore */
+            case opcode::fstore:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto i = read_unchecked<std::int64_t>(binary, offset);
+
+                if(i < 0)
+                {
+                    throw interpreter_error(
+                      fmt::format(
+                        "'{}': Invalid offset '{}' for local.",
+                        to_string(instr_opcode),
+                        i));
+                }
+
+                if(i + sizeof(float) > frame.locals.size())
+                {
+                    throw interpreter_error("Stack overflow.");
+                }
+
+                float v = frame.stack.pop_f32();
+                std::memcpy(&frame.locals[i], &v, sizeof(v));
+                break;
+            } /* opcode::fstore */
             case opcode::astore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::int64_t i = read_unchecked<std::int64_t>(binary, offset);
+                auto i = read_unchecked<std::int64_t>(binary, offset);
 
                 if(i < 0)
                 {
@@ -724,11 +798,11 @@ opcode context::exec(
                     throw interpreter_error("Stack overflow.");
                 }
 
-                auto obj = frame.stack.pop_addr<void>();
+                auto* obj = frame.stack.pop_addr<void>();
                 gc.remove_temporary(obj);
 
-                void* prev;
-                std::memcpy(&prev, &frame.locals[i], sizeof(prev));
+                void* prev;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(static_cast<void*>(&prev), &frame.locals[i], sizeof(prev));
                 if(obj != prev)
                 {
                     if(prev != nullptr)
@@ -741,26 +815,32 @@ opcode context::exec(
                     }
                 }
 
-                std::memcpy(&frame.locals[i], &obj, sizeof(obj));
+                std::memcpy(&frame.locals[i], static_cast<const void*>(&obj), sizeof(obj));
                 break;
             } /* opcode::astore */
             case opcode::invoke:
             {
                 /* no out-of-bounds read possible, since this is checked during decode.
                  * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-                module_loader const* callee_loader;
-                std::memcpy(&callee_loader, &binary[offset], sizeof(callee_loader));
-                offset += sizeof(callee_loader);
+                module_loader const* callee_loader;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(
+                  static_cast<void*>(&callee_loader),
+                  &binary[offset],
+                  sizeof(callee_loader));           // NOLINT(bugprone-sizeof-expression)
+                offset += sizeof(callee_loader);    // NOLINT(bugprone-sizeof-expression)
 
                 /* no out-of-bounds read possible, since this is checked during decode.
                  * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
-                module_::function_descriptor const* desc;
-                std::memcpy(&desc, &binary[offset], sizeof(desc));
-                offset += sizeof(desc);
+                module_::function_descriptor const* desc;    // NOLINT(cppcoreguidelines-init-variables)
+                std::memcpy(
+                  static_cast<void*>(&desc),
+                  &binary[offset],
+                  sizeof(desc));           // NOLINT(bugprone-sizeof-expression)
+                offset += sizeof(desc);    // NOLINT(bugprone-sizeof-expression)
 
                 if(desc->native)
                 {
-                    auto& details = std::get<module_::native_function_details>(desc->details);
+                    const auto& details = std::get<module_::native_function_details>(desc->details);
                     if(!details.func)
                     {
                         throw interpreter_error("Tried to invoke unresolved native function.");
@@ -770,7 +850,7 @@ opcode context::exec(
                 }
                 else
                 {
-                    auto& details = std::get<module_::function_details>(desc->details);
+                    const auto& details = std::get<module_::function_details>(desc->details);
 
                     // prepare stack frame
                     stack_frame callee_frame{
@@ -778,20 +858,20 @@ opcode context::exec(
                       details.locals_size,
                       details.stack_size};
 
-                    auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));
-                    std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());
+                    auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                    std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());      // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                     frame.stack.discard(details.args_size);
 
                     // clean up arguments in GC
                     // FIXME This (likely) should be done by the callee, after making them roots.
                     for(std::size_t i = 0; i < desc->signature.arg_types.size(); ++i)
                     {
-                        auto& arg = details.locals[i];
+                        const auto& arg = details.locals[i];
 
                         if(arg.type.is_array() || arg.reference)
                         {
-                            void* addr;
-                            std::memcpy(&addr, &callee_frame.locals[arg.offset], sizeof(addr));
+                            void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                            std::memcpy(static_cast<void*>(&addr), &callee_frame.locals[arg.offset], sizeof(addr));
                             gc.remove_temporary(addr);
                         }
                     }
@@ -811,9 +891,9 @@ opcode context::exec(
             case opcode::new_:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::size_t size = read_unchecked<std::size_t>(binary, offset);
-                std::size_t alignment = read_unchecked<std::size_t>(binary, offset);
-                std::size_t layout_id = read_unchecked<std::size_t>(binary, offset);
+                auto size = read_unchecked<std::size_t>(binary, offset);
+                auto alignment = read_unchecked<std::size_t>(binary, offset);
+                auto layout_id = read_unchecked<std::size_t>(binary, offset);
 
                 frame.stack.push_addr(gc.gc_new(layout_id, size, alignment, gc::gc_object::of_temporary));
 
@@ -822,7 +902,7 @@ opcode context::exec(
             case opcode::newarray:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::uint8_t type = read_unchecked<std::uint8_t>(binary, offset);
+                auto type = read_unchecked<std::uint8_t>(binary, offset);
 
                 std::int32_t size = frame.stack.pop_i32();
                 if(size < 0)
@@ -840,7 +920,7 @@ opcode context::exec(
                 }
                 else if(type == static_cast<std::uint8_t>(module_::array_type::str))
                 {
-                    auto array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
+                    auto* array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
                     for(std::string*& s: *array)
                     {
                         s = gc.gc_new<std::string>(gc::gc_object::of_none, false);
@@ -861,7 +941,7 @@ opcode context::exec(
             case opcode::anewarray:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::size_t layout_id = read_unchecked<std::size_t>(binary, offset);
+                auto layout_id = read_unchecked<std::size_t>(binary, offset);
 
                 std::int32_t length = frame.stack.pop_i32();
                 if(length < 0)
@@ -876,20 +956,20 @@ opcode context::exec(
             case opcode::arraylength:
             {
                 // convert to any fixed_vector type.
-                auto v = frame.stack.pop_addr<fixed_vector<void*>>();
+                auto* v = frame.stack.pop_addr<fixed_vector<void*>>();
                 if(v == nullptr)
                 {
                     throw interpreter_error("Null pointer access during arraylength.");
                 }
                 gc.remove_temporary(v);
-                frame.stack.push_i32(v->size());
+                frame.stack.push_i32(utils::numeric_cast<std::int32_t>(v->size()));
                 break;
             } /* opcode::arraylength */
             case opcode::setfield:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
-                std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+                auto field_size = read_unchecked<std::size_t>(binary, offset);
+                auto field_offset = read_unchecked<std::size_t>(binary, offset);
                 bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
                 if(field_size == sizeof(void*))
@@ -897,7 +977,7 @@ opcode context::exec(
                     // this block also gets executed if `sizeof(void*)==sizeof(std::int32_t)`.
 
                     void* v = frame.stack.pop_addr<void>();
-                    void* type_ref = frame.stack.pop_addr<void*>();
+                    void* type_ref = frame.stack.pop_addr<void>();
                     if(type_ref == nullptr)
                     {
                         throw interpreter_error("Null pointer access during setfield.");
@@ -909,19 +989,25 @@ opcode context::exec(
                         gc.remove_temporary(v);
                     }
 
-                    std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
+                    std::memcpy(
+                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<void*>(&v),
+                      sizeof(v));
                 }
                 else if(field_size == sizeof(std::int32_t))
                 {
                     std::int32_t v = frame.stack.pop_i32();
-                    void* type_ref = frame.stack.pop_addr<void*>();
+                    void* type_ref = frame.stack.pop_addr<void>();
                     if(type_ref == nullptr)
                     {
                         throw interpreter_error("Null pointer access during setfield.");
                     }
                     gc.remove_temporary(type_ref);
 
-                    std::memcpy(reinterpret_cast<std::byte*>(type_ref) + field_offset, &v, sizeof(v));
+                    std::memcpy(
+                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<void*>(&v),
+                      sizeof(v));
                 }
                 else
                 {
@@ -933,11 +1019,11 @@ opcode context::exec(
             case opcode::getfield:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::size_t field_size = read_unchecked<std::size_t>(binary, offset);
-                std::size_t field_offset = read_unchecked<std::size_t>(binary, offset);
+                auto field_size = read_unchecked<std::size_t>(binary, offset);
+                auto field_offset = read_unchecked<std::size_t>(binary, offset);
                 bool field_needs_gc = read_unchecked<bool>(binary, offset);
 
-                void* type_ref = frame.stack.pop_addr<void*>();
+                void* type_ref = frame.stack.pop_addr<void>();
                 if(type_ref == nullptr)
                 {
                     throw interpreter_error("Null pointer access during getfield.");
@@ -948,8 +1034,11 @@ opcode context::exec(
                 {
                     // this block also gets executed if `sizeof(void*)==sizeof(std::int32_t)`.
 
-                    void* v;
-                    std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
+                    void* v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
                     frame.stack.push_addr(v);
 
                     if(field_needs_gc)
@@ -959,8 +1048,11 @@ opcode context::exec(
                 }
                 else if(field_size == sizeof(std::int32_t))
                 {
-                    std::int32_t v;
-                    std::memcpy(&v, reinterpret_cast<std::byte*>(type_ref) + field_offset, sizeof(v));
+                    std::int32_t v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
                     frame.stack.push_i32(v);
                 }
                 else
@@ -972,8 +1064,8 @@ opcode context::exec(
             } /* opcode::getfield */
             case opcode::checkcast:
             {
-                std::size_t target_layout_id = read_unchecked<std::size_t>(binary, offset);
-                std::size_t flags = read_unchecked<std::size_t>(binary, offset);
+                auto target_layout_id = read_unchecked<std::size_t>(binary, offset);
+                auto flags = read_unchecked<std::size_t>(binary, offset);
 
                 if((flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) == 0)
                 {
@@ -1039,22 +1131,24 @@ opcode context::exec(
             case opcode::ishl:
             {
                 std::int32_t a = frame.stack.pop_i32();
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
-                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s); 
+                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
                     return s_u32 << a_u32; });
                 break;
             } /* opcode::ishl */
             case opcode::ishr:
             {
                 std::int32_t a = frame.stack.pop_i32();
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
-                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);
+                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
                     return s_u32 >> a_u32; });
                 break;
             } /* opcode::ishr */
@@ -1160,7 +1254,7 @@ opcode context::exec(
                 void* b = frame.stack.pop_addr<void>();
                 gc.remove_temporary(a);
                 gc.remove_temporary(b);
-                frame.stack.push_i32(b == a);
+                frame.stack.push_i32((b == a) ? 1 : 0);
                 break;
             } /* opcode::acmpeq */
             case opcode::acmpne:
@@ -1169,14 +1263,14 @@ opcode context::exec(
                 void* b = frame.stack.pop_addr<void>();
                 gc.remove_temporary(a);
                 gc.remove_temporary(b);
-                frame.stack.push_i32(b != a);
+                frame.stack.push_i32((b != a) ? 1 : 0);
                 break;
             } /* opcode::acmpne */
             case opcode::jnz:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                std::size_t then_offset = read_unchecked<std::size_t>(binary, offset);
-                std::size_t else_offset = read_unchecked<std::size_t>(binary, offset);
+                auto then_offset = read_unchecked<std::size_t>(binary, offset);
+                auto else_offset = read_unchecked<std::size_t>(binary, offset);
 
                 std::int32_t cond = frame.stack.pop_i32();
                 if(cond != 0)
@@ -1241,7 +1335,7 @@ void context::stack_trace_handler(
 std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace)
 {
     std::string buf;
-    for(auto& entry: stack_trace)
+    for(const auto& entry: stack_trace)
     {
         // resolve the offset to a function name.
         std::string func_name;
@@ -1271,6 +1365,11 @@ class arguments_scope
     std::vector<std::byte>& locals;
 
 public:
+    /** Deleted constructors. */
+    arguments_scope() = delete;
+    arguments_scope(const arguments_scope&) = delete;
+    arguments_scope(arguments_scope&&) = delete;
+
     /**
      * Construct an argument scope. Validates the argument types and creates
      * them in `locals`.
@@ -1292,8 +1391,9 @@ public:
         if(arg_types.size() != args.size())
         {
             throw interpreter_error(
-              fmt::format("Argument count does not match: Expected {}, got {}.",
-                          arg_types.size(), args.size()));
+              fmt::format(
+                "Argument count does not match: Expected {}, got {}.",
+                arg_types.size(), args.size()));
         }
 
         std::size_t offset = 0;
@@ -1313,36 +1413,36 @@ public:
                             "Argument {} has wrong base type (expected type '{}' with id '{}', got id '{}').",
                             i,
                             arg_types[i].base_type(),
-                            arg_types[i].layout_id.value(),
+                            arg_types[i].layout_id.value(),    // NOLINT(bugprone-unchecked-optional-access)
                             layout_id.value()));
                     }
-                    else
-                    {
-                        throw interpreter_error(
-                          fmt::format(
-                            "Argument {} has wrong base type (expected type '{}', got id '{}').",
-                            i,
-                            arg_types[i].base_type(),
-                            layout_id.value()));
-                    }
+
+                    throw interpreter_error(
+                      fmt::format(
+                        "Argument {} has wrong base type (expected type '{}', got id '{}').",
+                        i,
+                        arg_types[i].base_type(),
+                        layout_id.value()));
                 }
             }
             else if(arg_types[i].base_type() != arg_type.base_type())
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} has wrong base type (expected '{}', got '{}').",
-                              i,
-                              arg_types[i].base_type(),
-                              arg_type.base_type()));
+                  fmt::format(
+                    "Argument {} has wrong base type (expected '{}', got '{}').",
+                    i,
+                    arg_types[i].base_type(),
+                    arg_type.base_type()));
             }
 
             if(arg_types[i].is_array() != arg_type.is_array())
             {
                 throw interpreter_error(
-                  fmt::format("Argument {} has wrong array property (expected '{}', got '{}').",
-                              i,
-                              arg_types[i].is_array(),
-                              arg_type.is_array()));
+                  fmt::format(
+                    "Argument {} has wrong array property (expected '{}', got '{}').",
+                    i,
+                    arg_types[i].is_array(),
+                    arg_type.is_array()));
             }
 
             if(offset + args[i].get_size() > locals.size())
@@ -1395,18 +1495,31 @@ public:
 
             if(is_garbage_collected(args[i].get_type()))
             {
-                ctx.get_gc().remove_temporary(&locals[offset]);
+                try
+                {
+                    ctx.get_gc().remove_temporary(&locals[offset]);
+                }
+                catch(gc::gc_error& e)
+                {
+                    // FIXME This is an error, but destructors cannot throw.
+
+                    DEBUG_LOG("GC error during argument destruction while processing argument {}: {}", i, e.what());
+                }
             }
 
             offset += args[i].destroy(&locals[offset]);
         }
     }
+
+    /** Deleted assignment operators. */
+    arguments_scope& operator=(const arguments_scope&) = delete;
+    arguments_scope& operator=(arguments_scope&&) = delete;
 };
 
 value context::exec(
   const module_loader& loader,
   const function& f,
-  std::vector<value> args)
+  const std::vector<value>& args)
 {
     /*
      * allocate locals and decode arguments.
@@ -1416,23 +1529,28 @@ value context::exec(
       f.get_locals_size(),
       f.get_stack_size()};
 
-    auto& arg_types = f.get_signature().arg_types;
+    const auto& arg_types = f.get_signature().arg_types;
     arguments_scope arg_scope{*this, args, arg_types, frame.locals};
 
     /*
      * Execute the function.
      */
-    opcode ret_opcode;
-    if(f.is_native())
+
+    auto invoke_native = [&f, &frame]() -> opcode
     {
-        auto& func = f.get_function();
+        const auto& func = f.get_function();
         func(frame.stack);
-        ret_opcode = f.get_return_opcode();
-    }
-    else
+        return f.get_return_opcode();
+    };
+
+    auto invoke = [this, &loader, &f, &frame]() -> opcode
     {
-        ret_opcode = exec(loader, f.get_entry_point(), f.get_size(), f.get_locals(), frame);
-    }
+        return exec(loader, f.get_entry_point(), f.get_size(), f.get_locals(), frame);
+    };
+
+    opcode ret_opcode = f.is_native()
+                          ? invoke_native()
+                          : invoke();
 
     /*
      * Decode return value.
@@ -1452,7 +1570,7 @@ value context::exec(
     }
     else if(ret_opcode == opcode::sret)
     {
-        std::string* s = frame.stack.pop_addr<std::string>();
+        auto* s = frame.stack.pop_addr<std::string>();
         if(s != nullptr)
         {
             ret = value{*s};    // copy string
@@ -1461,7 +1579,7 @@ value context::exec(
     }
     else if(ret_opcode == opcode::aret)
     {
-        auto sig = f.get_signature();
+        const auto& sig = f.get_signature();
 
         void* addr = frame.stack.pop_addr<void>();
         ret = value{sig.return_type, addr};
@@ -1567,7 +1685,7 @@ std::string context::get_import_name(const module_loader& loader) const
     return it->first;
 }
 
-value context::invoke(const std::string& module_name, const std::string& function_name, std::vector<value> args)
+value context::invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args)
 {
     try
     {
@@ -1576,7 +1694,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         module_loader& loader = resolve_module(module_name);
         function& fn = loader.get_function(function_name);
 
-        return exec(loader, fn, std::move(args));
+        return exec(loader, fn, args);
     }
     catch(interpreter_error& e)
     {
@@ -1601,11 +1719,11 @@ value context::invoke(const std::string& module_name, const std::string& functio
     }
 }
 
-value context::invoke(const module_loader& loader, const function& fn, std::vector<value> args)
+value context::invoke(const module_loader& loader, const function& fn, const std::vector<value>& args)
 {
     try
     {
-        return exec(loader, fn, std::move(args));
+        return exec(loader, fn, args);
     }
     catch(interpreter_error& e)
     {

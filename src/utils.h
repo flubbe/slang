@@ -4,7 +4,7 @@
  * utility functions.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -65,7 +65,8 @@ std::string join(const std::vector<T>& v, std::function<std::string(const T&)> t
     {
         return {};
     }
-    else if(v.size() == 1)
+
+    if(v.size() == 1)
     {
         return transform(v[0]);
     }
@@ -132,6 +133,7 @@ void print_usage_help(const std::string& usage_text, const std::string& help_tex
 template<typename T>
 constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignment, T p)
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<T>((reinterpret_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
