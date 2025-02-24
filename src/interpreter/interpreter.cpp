@@ -1131,7 +1131,7 @@ opcode context::exec(
             case opcode::ishl:
             {
                 std::int32_t a = frame.stack.pop_i32();
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
@@ -1143,7 +1143,7 @@ opcode context::exec(
             case opcode::ishr:
             {
                 std::int32_t a = frame.stack.pop_i32();
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
@@ -1469,17 +1469,17 @@ public:
     ~arguments_scope()
     {
         std::size_t offset = 0;
-        for(std::size_t i = 0; i < args.size(); ++i)
+        for(const auto& arg: args)
         {
-            if(offset + args[i].get_size() > locals.size())
+            if(offset + arg.get_size() > locals.size())
             {
-                DEBUG_LOG("Stack overflow during argument destruction while processing argument {}.", i);
+                DEBUG_LOG("Stack overflow during argument destruction while processing argument.");
 
                 // FIXME This is an error, but destructors cannot throw.
                 return;
             }
 
-            if(args[i].get_layout_id().has_value())
+            if(arg.get_layout_id().has_value())
             {
                 try
                 {
@@ -1489,11 +1489,11 @@ public:
                 {
                     // FIXME This is an error, but destructors cannot throw.
 
-                    DEBUG_LOG("GC error during argument destruction while processing argument {}: {}", i, e.what());
+                    DEBUG_LOG("GC error during argument destruction while processing argument: {}", e.what());
                 }
             }
 
-            if(is_garbage_collected(args[i].get_type()))
+            if(is_garbage_collected(arg.get_type()))
             {
                 try
                 {
@@ -1503,11 +1503,11 @@ public:
                 {
                     // FIXME This is an error, but destructors cannot throw.
 
-                    DEBUG_LOG("GC error during argument destruction while processing argument {}: {}", i, e.what());
+                    DEBUG_LOG("GC error during argument destruction while processing argument: {}", e.what());
                 }
             }
 
-            offset += args[i].destroy(&locals[offset]);
+            offset += arg.destroy(&locals[offset]);
         }
     }
 
@@ -1651,7 +1651,7 @@ module_loader& context::resolve_module(const std::string& import_name, std::shar
     auto it = loaders.find(import_name);
     if(it != loaders.end())
     {
-        return *it->second.get();
+        return *it->second;
     }
 
     std::string import_path = import_name;
@@ -1701,7 +1701,7 @@ value context::invoke(const std::string& module_name, const std::string& functio
         // Update the error message with the stack trace.
         std::string buf = e.what();
 
-        auto stack_trace = e.get_stack_trace();
+        const auto& stack_trace = e.get_stack_trace();
         if(!stack_trace.empty())
         {
             buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
@@ -1730,7 +1730,7 @@ value context::invoke(const module_loader& loader, const function& fn, const std
         // Update the error message with the stack trace.
         std::string buf = e.what();
 
-        auto stack_trace = e.get_stack_trace();
+        const auto& stack_trace = e.get_stack_trace();
         if(!stack_trace.empty())
         {
             buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));

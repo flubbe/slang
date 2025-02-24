@@ -316,7 +316,8 @@ void context::add_function(
       import_path);
 
     std::vector<ty::type_info> arg_types;
-    for(auto& arg: desc.signature.arg_types)
+    arg_types.reserve(desc.signature.arg_types.size());
+    for(const auto& arg: desc.signature.arg_types)
     {
         arg_types.emplace_back(to_resolved_type_info(type_ctx, arg, resolver, import_path));
     }
@@ -363,7 +364,8 @@ void context::add_type(
     // Add type to typing context.
     {
         std::vector<std::pair<token, ty::type_info>> members;
-        for(auto& [member_name, member_type]: desc.member_types)
+        members.reserve(desc.member_types.size());
+        for(const auto& [member_name, member_type]: desc.member_types)
         {
             members.push_back(std::make_pair<token, ty::type_info>(
               {member_name, {0, 0}},
@@ -378,7 +380,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
     const std::vector<std::string>& imports = type_ctx.get_imported_modules();
 
-    for(auto& import_path: imports)
+    for(const auto& import_path: imports)
     {
         if(import_path.empty())
         {
@@ -388,7 +390,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
         module_::module_resolver& resolver = resolve_module(import_path);
         const module_::module_header& header = resolver.get_module().get_header();
 
-        for(auto& it: header.exports)
+        for(const auto& it: header.exports)
         {
             if(it.type == module_::symbol_type::constant)
             {
