@@ -53,17 +53,17 @@ void garbage_collector::mark_object(void* obj)
         }
 
         GC_LOG("mark_object {}: object layout", obj);
-        void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));
+        void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         for(auto offset: *it->second.layout)
         {
-            mark_object(*reinterpret_cast<void**>(static_cast<std::byte*>(mark_obj) + offset));
+            mark_object(*reinterpret_cast<void**>(static_cast<std::byte*>(mark_obj) + offset));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
 
         return;
     }
 
     gc_object& obj_info = it->second;
-    if(obj_info.flags & gc_object::of_reachable)
+    if((obj_info.flags & gc_object::of_reachable) != 0)
     {
         GC_LOG("mark_object: object {} unreachable", obj);
 
@@ -75,7 +75,7 @@ void garbage_collector::mark_object(void* obj)
 
     if(obj_info.type == gc_object_type::array_str || obj_info.type == gc_object_type::array_aref)
     {
-        auto array = static_cast<si::fixed_vector<void*>*>(obj_info.addr);
+        auto* array = static_cast<si::fixed_vector<void*>*>(obj_info.addr);
         for(void*& ref: *array)
         {
             mark_object(ref);
@@ -91,7 +91,7 @@ void garbage_collector::mark_object(void* obj)
         GC_LOG("mark_object: object layout");
         for(auto offset: *obj_info.layout)
         {
-            auto obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);
+            auto* obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
             mark_object(obj);
         }
     }
@@ -106,7 +106,7 @@ void garbage_collector::mark_object(void* obj)
  * @throws Throws a `gc_error` if the object size is larger than `allocated_bytes`.
  */
 template<typename T>
-void object_deleter(void* obj, std::size_t& allocated_bytes)
+void object_deleter(gsl::owner<void*> obj, std::size_t& allocated_bytes)
 {
     delete static_cast<T*>(obj);
 
@@ -233,7 +233,7 @@ void garbage_collector::run()
     // free unreachable objects.
     for(auto& [obj, obj_info]: objects)
     {
-        if(obj_info.flags & gc_object::of_reachable)
+        if((obj_info.flags & gc_object::of_reachable) != 0)
         {
             continue;
         }
@@ -244,7 +244,7 @@ void garbage_collector::run()
 
     for(auto it = objects.begin(); it != objects.end();)
     {
-        if(!(it->second.flags & gc_object::of_reachable))
+        if((it->second.flags & gc_object::of_reachable) == 0)
         {
             it = objects.erase(it);
         }
@@ -340,13 +340,11 @@ void garbage_collector::remove_persistent(void* obj)
     {
         throw gc_error(fmt::format("Reference at {} does not exist in GC persistent object set.", obj));
     }
-    else
+
+    --it->second.reference_count;
+    if(it->second.reference_count == 0)
     {
-        --it->second.reference_count;
-        if(it->second.reference_count == 0)
-        {
-            persistent_objects.erase(it);
-        }
+        persistent_objects.erase(it);
     }
 }
 
