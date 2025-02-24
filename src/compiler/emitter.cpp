@@ -69,7 +69,7 @@ void export_table_builder::add_function(
 
 void export_table_builder::update_function(
   const std::string& name,
-  std::size_t size,
+  std::size_t size,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t offset,
   std::vector<module_::variable_descriptor> locals)
 {
@@ -1187,13 +1187,15 @@ void instruction_emitter::run()
         if(it->is_import())
         {
             // Verify that the type is in the import table.
-            auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                          [&it](const cg::imported_symbol& s) -> bool
-                                          {
-                                              return s.type == module_::symbol_type::type
-                                                     && s.name == it->get_name()
-                                                     && s.import_path == it->get_import_path();
-                                          });
+            auto import_it = std::find_if(
+              ctx.imports.begin(),
+              ctx.imports.end(),
+              [&it](const cg::imported_symbol& s) -> bool
+              {
+                  return s.type == module_::symbol_type::type
+                         && s.name == it->get_name()
+                         && s.import_path == it->get_import_path();
+              });
             if(import_it == ctx.imports.end())
             {
                 throw std::runtime_error(fmt::format(

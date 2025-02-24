@@ -59,7 +59,10 @@ std::string join(const std::vector<std::string>& v, const std::string& separator
  * @return A string made of the vector's transformed elements joined together and separated bythe given separator.
  */
 template<typename T>
-std::string join(const std::vector<T>& v, std::function<std::string(const T&)> transform, const std::string& separator)
+std::string join(
+  const std::vector<T>& v,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::function<std::string(const T&)> transform,
+  const std::string& separator)
 {
     if(v.empty())
     {
@@ -87,7 +90,10 @@ std::string join(const std::vector<T>& v, std::function<std::string(const T&)> t
  * @param old_value The value to replace.
  * @param new_value The value to use as a replacement.
  */
-inline void replace_all(std::string& str, const std::string& old_value, const std::string& new_value)
+inline void replace_all(
+  std::string& str,
+  const std::string& old_value,    // NOLINT(bugprone-easily-swappable-parameters)
+  const std::string& new_value)
 {
     size_t i = 0;
     while((i = str.find(old_value, i)) != std::string::npos)

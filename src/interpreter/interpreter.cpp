@@ -272,7 +272,7 @@ static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offse
 
 opcode context::exec(
   const module_loader& loader,
-  std::size_t entry_point,
+  std::size_t entry_point,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t size,
   const std::vector<module_::variable_descriptor>& locals,
   stack_frame& frame)

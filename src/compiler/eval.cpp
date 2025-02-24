@@ -25,17 +25,19 @@ namespace slang::ast
  * literal_expression.
  */
 
-std::unique_ptr<cg::value> literal_expression::evaluate(cg::context&) const
+std::unique_ptr<cg::value> literal_expression::evaluate(cg::context& ctx) const
 {
     if(tok.type == token_type::int_literal)
     {
         return std::make_unique<cg::constant_int>(std::get<std::int32_t>(*tok.value));
     }
-    else if(tok.type == token_type::fp_literal)
+
+    if(tok.type == token_type::fp_literal)
     {
         return std::make_unique<cg::constant_float>(std::get<float>(*tok.value));
     }
-    else if(tok.type == token_type::str_literal)
+
+    if(tok.type == token_type::str_literal)
     {
         return std::make_unique<cg::constant_str>(std::get<std::string>(*tok.value));
     }
@@ -74,11 +76,13 @@ std::unique_ptr<cg::value> variable_reference_expression::evaluate(cg::context& 
     {
         return std::make_unique<cg::constant_int>(std::get<std::int32_t>(entry->data));
     }
-    else if(entry->type == module_::constant_type::f32)
+
+    if(entry->type == module_::constant_type::f32)
     {
         return std::make_unique<cg::constant_float>(std::get<float>(entry->data));
     }
-    else if(entry->type == module_::constant_type::str)
+
+    if(entry->type == module_::constant_type::str)
     {
         return std::make_unique<cg::constant_str>(std::get<std::string>(entry->data));
     }
@@ -122,14 +126,15 @@ struct binary_operation_helper
 
         if(lhs.to_string() == "i32")
         {
-            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);
-            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);
+            const auto* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            const auto* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_int>(func_i32(lhs_i32->get_int(), rhs_i32->get_int()));
         }
-        else if(lhs.to_string() == "f32")
+
+        if(lhs.to_string() == "f32")
         {
-            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);
-            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);
+            const auto* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            const auto* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_float>(func_f32(lhs_f32->get_float(), rhs_f32->get_float()));
         }
 
@@ -173,14 +178,15 @@ struct binary_comparison_helper
 
         if(lhs.to_string() == "i32")
         {
-            const cg::constant_int* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);
-            const cg::constant_int* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);
+            const auto* lhs_i32 = static_cast<const cg::constant_int*>(&lhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            const auto* rhs_i32 = static_cast<const cg::constant_int*>(&rhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_int>(func_i32(lhs_i32->get_int(), rhs_i32->get_int()));
         }
-        else if(lhs.to_string() == "f32")
+
+        if(lhs.to_string() == "f32")
         {
-            const cg::constant_float* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);
-            const cg::constant_float* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);
+            const auto* lhs_f32 = static_cast<const cg::constant_float*>(&lhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            const auto* rhs_f32 = static_cast<const cg::constant_float*>(&rhs);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_int>(func_f32(lhs_f32->get_float(), rhs_f32->get_float()));
         }
 
@@ -275,12 +281,12 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '%'."); }}},
       {"<<", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
-              { return a << (b & 0x1f); }, 
+              { return a << (b & 0x1f); }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '<<'."); }}},
       {">>", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
-              { return a >> (b & 0x1f); }, 
+              { return a >> (b & 0x1f); }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '>>'."); }}},
       {"&", {*this, 
@@ -407,12 +413,13 @@ struct unary_operation_helper
     {
         if(v.to_string() == "i32")
         {
-            const cg::constant_int* v_i32 = static_cast<const cg::constant_int*>(&v);
+            const auto* v_i32 = static_cast<const cg::constant_int*>(&v);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_int>(func_i32(v_i32->get_int()));
         }
-        else if(v.to_string() == "f32")
+
+        if(v.to_string() == "f32")
         {
-            const cg::constant_float* v_f32 = static_cast<const cg::constant_float*>(&v);
+            const auto* v_f32 = static_cast<const cg::constant_float*>(&v);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             return std::make_unique<cg::constant_float>(func_f32(v_f32->get_float()));
         }
 
