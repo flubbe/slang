@@ -52,6 +52,7 @@ A preliminary (incomplete) documentation of the scripting language can be found 
     The project depends on
     - [`cxxopts`](https://github.com/jarro2783/cxxopts) (==3.2.0)
     - [`fmt`](https://github.com/fmtlib/fmt) (>=10.0.0, <11.0)
+    - [`GSL`](https://github.com/microsoft/GSL) (==4.1.0)
     - [GoogleTest](https://github.com/google/googletest) (>=1.14.0, <2.0)
 
     Install/download these, and set up your compiler to point to the corresponding `include` directories.
