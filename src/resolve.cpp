@@ -40,14 +40,13 @@ static ty::type_class to_type_class(const module_::variable_type& vt)
     {
         return ty::type_class::tc_array;
     }
-    else if(ty::is_builtin_type(vt.base_type()))
+
+    if(ty::is_builtin_type(vt.base_type()))
     {
         return ty::type_class::tc_plain;
     }
-    else
-    {
-        return ty::type_class::tc_struct;
-    }
+
+    return ty::type_class::tc_struct;
 }
 
 /**
@@ -63,7 +62,7 @@ static cg::value to_value(
   const module_::variable_type& vt,
   const module_::module_resolver& resolver,
   const std::string& import_path,
-  std::optional<std::string> name = std::nullopt)
+  const std::optional<std::string>& name = std::nullopt)
 {
     // Built-in types.
     if(ty::is_builtin_type(vt.base_type()))
@@ -81,6 +80,7 @@ static cg::value to_value(
     if(vt.get_import_index().has_value())
     {
         // This is an imported type.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(vt.get_import_index().value());
         if(sym.type != module_::symbol_type::package)
         {
@@ -123,6 +123,7 @@ static ty::type_info to_unresolved_type_info(
     if(desc.base_type.get_import_index().has_value())
     {
         // This is an imported type.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(desc.base_type.get_import_index().value());
         if(sym.type != module_::symbol_type::package)
         {
@@ -236,7 +237,7 @@ module_::module_resolver& context::resolve_module(const std::string& import_name
     if(it != resolvers.end())
     {
         // module is already resolved.
-        return *it->second.get();
+        return *it->second;
     }
 
     return slang::resolve::resolve_module(file_mgr, resolvers, import_name);

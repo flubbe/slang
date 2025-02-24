@@ -40,9 +40,9 @@ std::size_t get_terminal_width()
 {
 #if IOCTL_AVAILABLE
     winsize ws;
-    if(ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) != 0
-       && ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0
-       && ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) != 0)
+    if(ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) != 0         // NOLINT(cppcoreguidelines-pro-type-vararg)
+       && ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0     // NOLINT(cppcoreguidelines-pro-type-vararg)
+       && ioctl(STDERR_FILENO, TIOCGWINSZ, &ws) != 0)    // NOLINT(cppcoreguidelines-pro-type-vararg)
     {
         return default_terminal_width;
     }
@@ -61,7 +61,8 @@ std::list<std::string> split(const std::string& s, const std::string& delimiter)
 
     // split s at <delimiter> occurences.
     std::list<std::string> components;
-    std::size_t current, last = 0;
+    std::size_t current = 0;
+    std::size_t last = 0;
     while((current = s.find(delimiter, last)) != std::string::npos)
     {
         components.push_back(s.substr(last, current - last));
@@ -81,7 +82,8 @@ std::string join(const std::vector<std::string>& v, const std::string& separator
     {
         return {};
     }
-    else if(v.size() == 1)
+
+    if(v.size() == 1)
     {
         return v[0];
     }
@@ -93,96 +95,6 @@ std::string join(const std::vector<std::string>& v, const std::string& separator
         res.append(*it);
     }
     return res;
-}
-
-std::list<std::string> wrap_text(const std::string& s, std::size_t line_len)
-{
-    // break text into paragraphs.
-    std::list<std::string> paragraphs = slang::utils::split(s, "\n");
-    std::list<std::string> lines;
-
-    for(auto& par: paragraphs)
-    {
-        if(par.empty())
-        {
-            lines.push_back({});
-            continue;
-        }
-
-        size_t curpos = 0;
-        size_t nextpos = 0;
-        std::string substr = par.substr(curpos, line_len + 1);
-
-        while(substr.length() == line_len + 1 && (nextpos = substr.rfind(' ')) != s.npos)
-        {
-            lines.push_back(par.substr(curpos, nextpos));
-            curpos += nextpos + 1;
-            substr = par.substr(curpos, line_len + 1);
-        }
-
-        if(curpos != par.length())
-        {
-            lines.push_back(par.substr(curpos, par.npos));
-        }
-    }
-
-    return lines;
-}
-
-void print_command_help(const std::string& info_text, const std::vector<std::pair<std::string, std::string>>& cmd_help)
-{
-    std::size_t indent = 0;
-    for(auto& c: cmd_help)
-    {
-        indent = std::max(indent, c.first.length());
-    }
-    indent = std::max(7ul, indent);    // max(strlen("Command"), indent)
-    indent += 3;                       // account for separation between first and second column
-
-    fmt::print("{}\n", info_text);
-    fmt::print("\n");
-
-    fmt::print("    {:<{}}   Description\n", "Command", indent - 3, "Description");
-    fmt::print("    {:-<{}}{:<{}}   -----------\n", "", 7, "", indent - 10);
-    for(auto& [cmd, desc]: cmd_help)
-    {
-        // use a width of at least 40 characters for descriptions.
-        int desc_len = std::max(40ul, slang::utils::get_terminal_width() - indent);
-        std::list<std::string> desc_lines = slang::utils::wrap_text(desc, desc_len);
-
-        fmt::print("    {:<{}}", cmd, indent);
-        if(!desc_lines.empty())
-        {
-            fmt::print("{}\n", desc_lines.front());
-            for(auto it = std::next(desc_lines.begin()); it != desc_lines.end(); ++it)
-            {
-                fmt::print("    {:<{}}{}\n", "", indent, *it);
-            }
-        }
-        else
-        {
-            fmt::print("\n");
-        }
-    }
-    fmt::print("\n");
-}
-
-constexpr std::size_t usage_help_indent = 4;
-
-void print_usage_help(const std::string& usage_text, const std::string& help_text)
-{
-    fmt::print("Usage: {}\n", usage_text);
-
-    std::list<std::string> lines = slang::utils::wrap_text(help_text, slang::utils::get_terminal_width() - usage_help_indent);
-    if(!lines.empty())
-    {
-        fmt::print("\n");
-        for(const auto& line: lines)
-        {
-            fmt::print("{:<{}}{}\n", "", usage_help_indent, line);
-        }
-        fmt::print("\n");
-    }
 }
 
 }    // namespace slang::utils

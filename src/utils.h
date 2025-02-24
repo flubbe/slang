@@ -104,31 +104,6 @@ inline void replace_all(
 }
 
 /**
- * Insert line breaks between words after at most len characters.
- * Preserves line breaks in the original string.
- *
- * @param s The string to insert line breaks into.
- * @param line_len The line length.
- */
-std::list<std::string> wrap_text(const std::string& s, std::size_t line_len);
-
-/**
- * Print help on commands in a two-column layout to stdout.
- *
- * @param info_text An info text to be printed before the command help.
- * @param cmd_help A vector consisting of pairs (command, help_text) to be formatted and printed to stdout.
- */
-void print_command_help(const std::string& info_text, const std::vector<std::pair<std::string, std::string>>& cmd_help);
-
-/**
- * Print usage help for a command.
- *
- * @param usage_text The usage (command line invokation) of the command.
- * @param help_text The explaining help text.
- */
-void print_usage_help(const std::string& usage_text, const std::string& help_text);
-
-/**
  * Align a parameter according to the specified alignment.
  *
  * @note The alignment must be a power of 2.
