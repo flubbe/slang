@@ -54,7 +54,7 @@ std::size_t get_terminal_width()
 
 std::list<std::string> split(const std::string& s, const std::string& delimiter)
 {
-    if(s.length() == 0)
+    if(s.empty())
     {
         return {};
     }
@@ -103,7 +103,7 @@ std::list<std::string> wrap_text(const std::string& s, std::size_t line_len)
 
     for(auto& par: paragraphs)
     {
-        if(par.length() == 0)
+        if(par.empty())
         {
             lines.push_back({});
             continue;

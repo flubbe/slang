@@ -168,7 +168,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
         token last_token = *current_token;    // store token for error reporting
         get_next_token();
 
-        if(current_token == std::nullopt)
+        if(!current_token.has_value())
         {
             throw syntax_error(last_token, "Expected ';'.");
         }
@@ -263,7 +263,7 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
     token_location loc = current_token->location;
     std::unique_ptr<ast::prototype_ast> proto = parse_prototype();
-    if(current_token == std::nullopt)
+    if(!current_token.has_value())
     {
         throw syntax_error("Unexpected end of file.");
     }
@@ -731,7 +731,7 @@ static std::unordered_map<std::string, int> bin_op_precedence = {
 
 int parser::get_token_precedence() const
 {
-    if(current_token == std::nullopt)
+    if(!current_token.has_value())
     {
         return -1;
     }
@@ -782,7 +782,7 @@ static std::unordered_map<std::string, associativity> bin_op_associativity = {
 
 std::optional<associativity> parser::get_token_associativity() const
 {
-    if(current_token == std::nullopt)
+    if(!current_token.has_value())
     {
         return std::nullopt;
     }
@@ -1113,7 +1113,7 @@ std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
     token tok = *current_token;
     get_next_token();
 
-    if(tok.value == std::nullopt)
+    if(!tok.value.has_value())
     {
         throw syntax_error(tok, fmt::format("Expected <literal>, got '{}'.", tok.s));
     }
@@ -1275,7 +1275,7 @@ void parser::parse(lexer& lexer)
     auto start_location = current_lexer->get_location();
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
-    while((current_token = get_next_token(false)) != std::nullopt)
+    while((current_token = get_next_token(false)).has_value())
     {
         // skip empty statements.
         if(current_token->s == ";")

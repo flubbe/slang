@@ -29,7 +29,7 @@ TEST(lexer, tokenize_whitespaces_identifiers)
     std::vector<slang::token> tokens;
     std::optional<slang::token> t;
 
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -80,7 +80,7 @@ TEST(lexer, single_line_comment)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -113,7 +113,7 @@ TEST(lexer, multi_line_comment)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -144,7 +144,7 @@ TEST(lexer, operators)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -195,7 +195,7 @@ TEST(lexer, int_literals)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -257,7 +257,7 @@ TEST(lexer, fp_literals)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -335,7 +335,7 @@ TEST(lexer, string_literals)
     std::vector<slang::token> tokens;
 
     std::optional<slang::token> t;
-    while((t = lexer.next()) != std::nullopt)
+    while((t = lexer.next()).has_value())
     {
         tokens.push_back(*t);
     }
@@ -423,7 +423,7 @@ TEST(lexer, example_program)
         slang::lexer lexer{test_string};
 
         std::optional<slang::token> t;
-        while((t = lexer.next()) != std::nullopt)
+        while((t = lexer.next()).has_value())
             ;
 
         EXPECT_TRUE(lexer.eof());

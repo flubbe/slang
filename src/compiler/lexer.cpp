@@ -59,9 +59,9 @@ static bool is_identifier(const std::optional<char>& c, bool first_char)
 
     if(first_char)
     {
-        return std::isalpha(*c) || *c == '_';
+        return std::isalpha(*c) != 0 || *c == '_';
     }
-    return std::isalnum(*c) || *c == '_';
+    return std::isalnum(*c) != 0 || *c == '_';
 }
 
 /**
@@ -77,7 +77,9 @@ static bool is_hexdigit(const std::optional<char>& c)
         return false;
     }
 
-    return std::isdigit(*c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    return std::isdigit(*c) != 0
+           || (c >= 'a' && c <= 'f')
+           || (c >= 'A' && c <= 'F');
 }
 
 /** The count of operators the lexer supports. */
@@ -88,7 +90,7 @@ constexpr std::size_t operator_count = 34;
  *
  * @note We treat the access operator `.` separately, since it could also start a floating-point literal.
  */
-static std::array<std::string, operator_count> operators = {
+static const std::array<std::string, operator_count> operators = {
   // clang-format off
   "+", "-", "*", "/", "%",             // arithmetic / prefixes
   "&&", "||", "!",                     // logical
@@ -107,7 +109,7 @@ static std::array<std::string, operator_count> operators = {
 constexpr std::size_t operator_chars_count = 14;
 
 /** The starting characters of the operators. */
-static std::array<char, operator_chars_count> operator_chars = {
+static const std::array<char, operator_chars_count> operator_chars = {
   // clang-format off
   '+', '-', '*', '/', '%', '&', '^', '|', '!', '~', '<', '>', '=', ':'
   // clang-format on
@@ -139,13 +141,15 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
     {
         return s.substr(1, s.length() - 2);    // remove quotes
     }
-    else if(type == token_type::int_literal)
+
+    if(type == token_type::int_literal)
     {
         try
         {
             if(s.substr(0, 2) == "0x")
             {
-                return std::stoi(s, nullptr, 16);
+                constexpr int BASE = 16;
+                return std::stoi(s, nullptr, BASE);
             }
             return std::stoi(s);
         }
@@ -199,8 +203,8 @@ std::optional<token> lexer::next()
 
         loc = get_location();
 
-        std::optional<char> c;
-        if(!(c = get()))
+        std::optional<char> c = get();
+        if(!c.has_value())
         {
             return std::nullopt;
         }
@@ -210,13 +214,16 @@ std::optional<token> lexer::next()
         {
             while(is_identifier(peek(), false))
             {
-                current_token += *get();
+                // NOTE peek() ensures that get() returns a valid value.
+                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
             }
 
             type = token_type::identifier;
             break;
         }
-        else if(*c == '/' && peek() != std::nullopt && *peek() == '/')    // single-line comment
+
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        if(*c == '/' && peek().has_value() && *peek() == '/')    // single-line comment
         {
             // skip single-line comment and retry.
             while((c = get()))
@@ -231,13 +238,15 @@ std::optional<token> lexer::next()
             current_token.clear();
             continue;
         }
-        else if(*c == '/' && peek() != std::nullopt && *peek() == '*')    // multi-line comment
+
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        if(*c == '/' && peek().has_value() && *peek() == '*')    // multi-line comment
         {
             // skip multi-line comment and retry.
             get();
             while((c = get()))
             {
-                if(*c == '*' && peek() != std::nullopt && peek() == '/')
+                if(*c == '*' && peek().has_value() && peek() == '/')
                 {
                     get();
                     break;
@@ -248,7 +257,8 @@ std::optional<token> lexer::next()
             current_token.clear();
             continue;
         }
-        else if(is_operator(c))
+
+        if(is_operator(c))
         {
             // match the longest operator.
             while((c = peek()))
@@ -263,23 +273,32 @@ std::optional<token> lexer::next()
 
             break;
         }
-        else if(*c == '(' || *c == ')' || *c == '[' || *c == ']' || *c == '{' || *c == '}')    // parentheses, brackets and braces
+
+        if(*c == '(' || *c == ')' || *c == '[' || *c == ']' || *c == '{' || *c == '}')    // parentheses, brackets and braces
         {
             break;
         }
-        else if(std::isdigit(*c) || (*c == '.' && peek() && std::isdigit(*peek())))    //  integer or floating-point literal
+
+        if(std::isdigit(*c) != 0
+           // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+           || (*c == '.' && peek().has_value() && std::isdigit(*peek()) != 0))    //  integer or floating-point literal
         {
-            if(*c == '0' && peek() && *peek() == 'x')
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+            if(*c == '0' && peek().has_value() && *peek() == 'x')
             {
-                current_token += *get();
-                while(peek() && (std::isdigit(*peek()) || is_hexdigit(peek())))
+                current_token += *get();                                                            // NOLINT(bugprone-unchecked-optional-access)
+                while(peek().has_value() && (std::isdigit(*peek()) != 0 || is_hexdigit(peek())))    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    current_token += *get();
+                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
-                if(peek() && std::isalpha(*peek()))
+                if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    throw lexical_error(fmt::format("{}: Expected non-alphabetic character, got '{}'.", to_string(loc), *peek()));
+                    throw lexical_error(
+                      fmt::format(
+                        "{}: Expected non-alphabetic character, got '{}'.",
+                        to_string(loc),
+                        *peek()));    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
                 type = token_type::int_literal;
@@ -288,56 +307,62 @@ std::optional<token> lexer::next()
 
             if(*c != '.')
             {
-                while(peek() && std::isdigit(*peek()))
+                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    current_token += *get();
+                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
                 type = token_type::int_literal;    // this might get adjusted below.
                 c = peek();
             }
 
-            if(*c == '.')
+            if(c.has_value() && *c == '.')
             {
-                current_token += *get();
-                while(peek() && std::isdigit(*peek()))
+                current_token += *get();                                   // NOLINT(bugprone-unchecked-optional-access)
+                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    current_token += *get();
+                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
                 type = token_type::fp_literal;
                 c = peek();
             }
 
-            if(*c == 'e' || *c == 'E')
+            if(c.has_value() && (*c == 'e' || *c == 'E'))
             {
-                current_token += *get();
+                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
 
-                if(peek() && (*peek() == '+' || *peek() == '-'))
+                if(peek().has_value() && (*peek() == '+' || *peek() == '-'))    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    current_token += *get();
+                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
-                while(peek() && std::isdigit(*peek()))
+                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
                 {
-                    current_token += *get();
+                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
                 type = token_type::fp_literal;
             }
 
-            if(peek() && std::isalpha(*peek()))
+            if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
             {
-                throw lexical_error(fmt::format("{}: Invalid suffix '{}' on numeric literal.", to_string(loc), *peek()));
+                throw lexical_error(
+                  fmt::format(
+                    "{}: Invalid suffix '{}' on numeric literal.",
+                    to_string(loc),
+                    *peek()));    // NOLINT(bugprone-unchecked-optional-access)
             }
 
             break;
         }
-        else if(*c == '.')    // element access. Needs to come after parsing floating-point literals.
+
+        if(*c == '.')    // element access. Needs to come after parsing floating-point literals.
         {
             break;
         }
-        else if(*c == '"')    // string literals.
+
+        if(*c == '"')    // string literals.
         {
             bool escaped = false;
             while((c = get()))
@@ -405,33 +430,43 @@ std::optional<token> lexer::next()
                 }
             }
 
-            if(peek() && std::isalpha(*peek()))
+            if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
             {
-                throw lexical_error(fmt::format("{}: Invalid suffix '{}' on string literal.", to_string(loc), *peek()));
+                throw lexical_error(
+                  fmt::format(
+                    "{}: Invalid suffix '{}' on string literal.",
+                    to_string(loc),
+                    *peek()));    // NOLINT(bugprone-unchecked-optional-access)
             }
 
             type = token_type::str_literal;
             break;
         }
-        else if(*c == ',')    // comma operator / separator.
+
+        if(*c == ',')    // comma operator / separator.
         {
             break;
         }
-        else if(*c == ';')    // statement end
+
+        if(*c == ';')    // statement end
         {
             break;
         }
-        else if(*c == '#')    // directives
+
+        if(*c == '#')    // directives
         {
             break;
         }
-        else
-        {
-            throw lexical_error(fmt::format("{}: Unexpected character '{}' (0x{:x})", to_string(loc), *c, static_cast<int>(*c)));
-        }
+
+        throw lexical_error(
+          fmt::format(
+            "{}: Unexpected character '{}' (0x{:x})",
+            to_string(loc),
+            *c,
+            static_cast<int>(*c)));
     }
 
-    if(current_token.length() == 0)
+    if(current_token.empty())
     {
         if(eof())
         {

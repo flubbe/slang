@@ -2918,7 +2918,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
 std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
 {
     auto sig = ctx.get_current_function();
-    if(sig == std::nullopt)
+    if(!sig.has_value())
     {
         throw ty::type_error(loc, "Cannot have return statement outside a function.");
     }

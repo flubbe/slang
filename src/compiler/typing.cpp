@@ -331,7 +331,7 @@ void context::add_variable(
 
         // check for existing names.
         auto tok = current_scope->find(name.s);
-        if(tok != std::nullopt)
+        if(tok.has_value())
         {
             throw type_error(
               name.location,
@@ -385,7 +385,7 @@ void context::add_function(
     {
         // check for existing names.
         auto tok = current_scope->find(name.s);
-        if(tok != std::nullopt)
+        if(tok.has_value())
         {
             throw type_error(
               name.location,
@@ -404,7 +404,7 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
 {
     // check for existing names.
     auto tok = global_scope.find(name.s);    // FIXME ignores import_path.
-    if(tok != std::nullopt)
+    if(tok.has_value())
     {
         throw type_error(
           name.location,
@@ -541,7 +541,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
         for(scope* s = current_scope; s != nullptr; s = s->parent)
         {
             auto type = s->get_type(identifier.s);
-            if(type != std::nullopt)
+            if(type.has_value())
             {
                 return *type;
             }
@@ -871,7 +871,7 @@ void context::enter_function_scope(token name)
         throw type_error(name.location, fmt::format("Cannot enter function scope '{}': No global scope.", name.s));
     }
 
-    if(named_scope != std::nullopt)
+    if(named_scope.has_value())
     {
         throw type_error(name.location, fmt::format("Nested functions are not allowed. Current scope: '{}'.", named_scope->s));
     }
@@ -883,7 +883,7 @@ void context::enter_function_scope(token name)
 
 std::optional<function_signature> context::get_current_function() const
 {
-    if(named_scope == std::nullopt)
+    if(!named_scope.has_value())
     {
         return std::nullopt;
     }

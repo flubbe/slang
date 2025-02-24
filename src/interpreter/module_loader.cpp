@@ -60,7 +60,7 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {
-    if(v.type.base_type().length() == 0)
+    if(v.type.base_type().empty())
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
@@ -82,7 +82,7 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_type& v)
 {
-    if(v.base_type().length() == 0)
+    if(v.base_type().empty())
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }

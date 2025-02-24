@@ -69,7 +69,7 @@ std::list<std::string> package::split(const std::string& s)
 
 bool package::is_valid_name(const std::string& name)
 {
-    if(name.length() == 0)
+    if(name.empty())
     {
         return false;
     }

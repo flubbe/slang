@@ -46,7 +46,7 @@ std::string variable_type::encode() const
     }
 
     // assume it is a struct.
-    if(decoded_type_string.length() == 0)
+    if(decoded_type_string.empty())
     {
         throw module_error("Cannot encode empty struct name.");
     }
