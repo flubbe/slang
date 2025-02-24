@@ -16,6 +16,9 @@
 #include "archives/archive.h"
 #include "archives/file.h"
 
+// NOTE There a lot of random/magic numbers in the tests.
+// NOLINTBEGIN(readability-magic-numbers)
+
 namespace
 {
 
@@ -29,7 +32,7 @@ std::vector<std::uint8_t> to_little_endian(std::uint16_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int16_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint16_t*>(&i));
+    return to_little_endian(*reinterpret_cast<std::uint16_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_little_endian(std::uint32_t i)
@@ -44,7 +47,7 @@ std::vector<std::uint8_t> to_little_endian(std::uint32_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int32_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint32_t*>(&i));
+    return to_little_endian(*reinterpret_cast<std::uint32_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_little_endian(std::uint64_t i)
@@ -63,13 +66,13 @@ std::vector<std::uint8_t> to_little_endian(std::uint64_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int64_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint64_t*>(&i));
+    return to_little_endian(*reinterpret_cast<std::uint64_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_little_endian(float f)
 {
     static_assert(sizeof(float) == sizeof(std::uint32_t), "Float has to be the same size as std::uint32_t.");
-    uint32_t i;
+    uint32_t i{0};
     std::memcpy(&i, &f, sizeof(i));
     return to_little_endian(i);
 }
@@ -77,7 +80,7 @@ std::vector<std::uint8_t> to_little_endian(float f)
 std::vector<std::uint8_t> to_little_endian(double d)
 {
     static_assert(sizeof(double) == sizeof(std::uint64_t), "Double has to be the same size as std::uint64_t.");
-    uint64_t i;
+    uint64_t i{0};
     std::memcpy(&i, &d, sizeof(i));
     return to_little_endian(i);
 }
@@ -92,7 +95,7 @@ std::vector<std::uint8_t> to_big_endian(std::uint16_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int16_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint16_t*>(&i));
+    return to_big_endian(*reinterpret_cast<std::uint16_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_big_endian(std::uint32_t i)
@@ -107,7 +110,7 @@ std::vector<std::uint8_t> to_big_endian(std::uint32_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int32_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint32_t*>(&i));
+    return to_big_endian(*reinterpret_cast<std::uint32_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_big_endian(std::uint64_t i)
@@ -126,13 +129,13 @@ std::vector<std::uint8_t> to_big_endian(std::uint64_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int64_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint64_t*>(&i));
+    return to_big_endian(*reinterpret_cast<std::uint64_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 }
 
 std::vector<std::uint8_t> to_big_endian(float f)
 {
     static_assert(sizeof(float) == sizeof(std::uint32_t), "Float has to be the same size as std::uint32_t.");
-    uint32_t i;
+    uint32_t i{0};
     std::memcpy(&i, &f, sizeof(i));
     return to_big_endian(i);
 }
@@ -140,7 +143,7 @@ std::vector<std::uint8_t> to_big_endian(float f)
 std::vector<std::uint8_t> to_big_endian(double d)
 {
     static_assert(sizeof(double) == sizeof(std::uint64_t), "Double has to be the same size as std::uint64_t.");
-    uint64_t i;
+    uint64_t i{0};
     std::memcpy(&i, &d, sizeof(d));
     return to_big_endian(i);
 }
@@ -229,12 +232,12 @@ TEST(serialization, big_endian_file_archive)
         EXPECT_EQ(ar.is_reading(), true);
         EXPECT_EQ(ar.is_writing(), false);
 
-        bool bo;
-        std::uint8_t by;
-        std::uint16_t w;
-        std::uint32_t dw;
-        float f;
-        double d;
+        bool bo{false};
+        std::uint8_t by{0};
+        std::uint16_t w{0};
+        std::uint32_t dw{0};
+        float f{0.f};
+        double d{0.0};
 
         ar & bo & by & w & dw & f & d;
 
@@ -325,12 +328,12 @@ TEST(serialization, little_endian_file_archive)
         EXPECT_EQ(ar.is_reading(), true);
         EXPECT_EQ(ar.is_writing(), false);
 
-        bool bo;
-        std::uint8_t by;
-        std::uint16_t w;
-        std::uint32_t dw;
-        float f;
-        double d;
+        bool bo{false};
+        std::uint8_t by{0};
+        std::uint16_t w{0};
+        std::uint32_t dw{0};
+        float f{0.f};
+        double d{0.0};
 
         ar & bo & by & w & dw & f & d;
 
@@ -414,3 +417,5 @@ TEST(serialization, vectors)
 }
 
 }    // namespace
+
+// NOLINTEND(readability-magic-numbers)

@@ -20,8 +20,8 @@ namespace
 
 TEST(package, name_component_validation)
 {
-    const std::pair<std::string, bool> names[] = {
-      {"in valid", false},
+    const std::array<std::pair<std::string, bool>, 15> names = {
+      std::make_pair("in valid", false),
       {"_valid", true},
       {"1nvalid", false},
       {"v4l1d", true},
@@ -45,8 +45,8 @@ TEST(package, name_component_validation)
 
 TEST(package, name_validation)
 {
-    const std::pair<std::string, bool> names[] = {
-      {"in valid", false},
+    const std::array<std::pair<std::string, bool>, 15> names = {
+      std::make_pair("in valid", false),
       {"_valid", true},
       {"1nvalid", false},
       {"v4l1d", true},

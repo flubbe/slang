@@ -24,7 +24,7 @@ namespace ty = slang::typing;
 namespace
 {
 
-static cg::context get_context()
+cg::context get_context()
 {
     cg::context ctx;
     ctx.evaluate_constant_subexpressions = false;
@@ -34,7 +34,7 @@ static cg::context get_context()
 TEST(compile_ir, empty)
 {
     // test: empty input
-    const std::string test_input = "";
+    const std::string test_input;
 
     slang::lexer lexer;
     slang::parser parser;

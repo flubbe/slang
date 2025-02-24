@@ -18,6 +18,9 @@
 
 namespace si = slang::interpreter;
 
+// NOTE There a lot of random/magic numbers in the tests.
+// NOLINTBEGIN(readability-magic-numbers)
+
 namespace
 {
 
@@ -62,8 +65,9 @@ TEST(fixed_vector, empty_vector)
     EXPECT_EQ(v.size(), 0);
 }
 
-static std::size_t constructor_count = 0;
-static std::size_t destructor_count = 0;
+std::size_t constructor_count = 0;    // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+std::size_t destructor_count = 0;     // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
 TEST(fixed_vector, construct)
 {
     struct S
@@ -80,6 +84,12 @@ TEST(fixed_vector, construct)
         {
             ++destructor_count;
         }
+
+        S(const S&) = default;
+        S(S&&) = default;
+
+        S& operator=(const S&) = default;
+        S& operator=(S&&) = default;
     };
 
     {
@@ -97,16 +107,16 @@ TEST(fixed_vector, begin_end)
     EXPECT_EQ(v.cend() - v.cbegin(), v.size());
 
     long ctr = 0;
-    for(auto it = v.begin(); it != v.end(); ++it)
+    for(const auto it: v)
     {
-        EXPECT_EQ(*it, ctr);
+        EXPECT_EQ(it, ctr);
         ++ctr;
     }
 
     ctr = 0;
-    for(auto it = v.cbegin(); it != v.cend(); ++it)
+    for(const auto it: v)
     {
-        EXPECT_EQ(*it, ctr);
+        EXPECT_EQ(it, ctr);
         ++ctr;
     }
 }
@@ -173,7 +183,7 @@ TEST(fixed_vector, assignment)
     si::fixed_vector<int> v2{v1};
     si::fixed_vector<int> v3{std::move(v1)};
 
-    EXPECT_EQ(v1.size(), 0);
+    EXPECT_EQ(v1.size(), 0);    // NOLINT(bugprone-use-after-move)
     EXPECT_EQ(v1.capacity(), 0);
     EXPECT_EQ(v1.max_size(), 0);
     EXPECT_TRUE(v1.empty());
@@ -202,7 +212,8 @@ TEST(fixed_vector, assignment)
     EXPECT_EQ(v3.at(3), -1);
     EXPECT_THROW(v3.at(4), std::out_of_range);
 
-    si::fixed_vector<int> v4, v5;
+    si::fixed_vector<int> v4;
+    si::fixed_vector<int> v5;
     v4 = v2;
     v5 = std::move(v3);
 
@@ -217,7 +228,7 @@ TEST(fixed_vector, assignment)
     EXPECT_EQ(v4.at(3), -1);
     EXPECT_THROW(v4.at(4), std::out_of_range);
 
-    ASSERT_EQ(v3.size(), 0);
+    ASSERT_EQ(v3.size(), 0);    // NOLINT(bugprone-use-after-move)
     EXPECT_EQ(v3.capacity(), 0);
     EXPECT_EQ(v3.max_size(), 0);
     EXPECT_TRUE(v3.empty());
@@ -314,12 +325,12 @@ TEST(fixed_vector, size_after_type_cast)
 {
     si::fixed_vector<int> v_int = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
-    auto v_char_ptr = reinterpret_cast<si::fixed_vector<char>*>(&v_int);
-    auto v_short_ptr = reinterpret_cast<si::fixed_vector<short>*>(&v_int);
-    auto v_long_ptr = reinterpret_cast<si::fixed_vector<long>*>(&v_int);
-    auto v_float_ptr = reinterpret_cast<si::fixed_vector<float>*>(&v_int);
-    auto v_double_ptr = reinterpret_cast<si::fixed_vector<double>*>(&v_int);
-    auto v_S_ptr = reinterpret_cast<si::fixed_vector<S>*>(&v_int);
+    auto* v_char_ptr = reinterpret_cast<si::fixed_vector<char>*>(&v_int);        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* v_short_ptr = reinterpret_cast<si::fixed_vector<short>*>(&v_int);      // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* v_long_ptr = reinterpret_cast<si::fixed_vector<long>*>(&v_int);        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* v_float_ptr = reinterpret_cast<si::fixed_vector<float>*>(&v_int);      // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* v_double_ptr = reinterpret_cast<si::fixed_vector<double>*>(&v_int);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* v_S_ptr = reinterpret_cast<si::fixed_vector<S>*>(&v_int);              // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
     EXPECT_EQ(v_int.size(), 10);
     EXPECT_EQ(v_char_ptr->size(), v_int.size());
@@ -331,3 +342,5 @@ TEST(fixed_vector, size_after_type_cast)
 }
 
 }    // namespace
+
+// NOLINTEND(readability-magic-numbers)

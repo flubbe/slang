@@ -28,14 +28,14 @@ TEST(codegen, initialize_context)
 TEST(codegen, create_function)
 {
     cg::context ctx = cg::context();
-    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
     fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
-    auto other_fn = ctx.create_function("test2", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {});
+    auto* other_fn = ctx.create_function("test2", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {});
     ASSERT_NE(other_fn, nullptr);
     ASSERT_NE(fn, other_fn);
 
@@ -51,7 +51,7 @@ TEST(codegen, create_function)
 TEST(codegen, insertion_points)
 {
     auto ctx = cg::context();
-    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
@@ -63,7 +63,7 @@ TEST(codegen, insertion_points)
     EXPECT_EQ(ctx.get_insertion_point(), fn_block);
 
     // scoped context.
-    auto block = cg::basic_block::create(ctx, "outer");
+    auto* block = cg::basic_block::create(ctx, "outer");
     {
         auto inner_ctx = cg::context();
         inner_ctx.set_insertion_point(block);
@@ -77,7 +77,7 @@ TEST(codegen, insertion_points)
 TEST(codegen, validate_basic_block)
 {
     auto ctx = cg::context();
-    auto fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
@@ -112,7 +112,7 @@ TEST(codegen, generate_function)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -145,7 +145,7 @@ TEST(codegen, generate_function)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -156,7 +156,7 @@ TEST(codegen, generate_function)
         ctx.set_insertion_point(block);
         EXPECT_EQ(ctx.get_insertion_point(), block);
 
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -31);
+        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -31);    // NOLINT(readability-magic-numbers)
         ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
 
         EXPECT_TRUE(block->is_valid());
@@ -180,7 +180,7 @@ TEST(codegen, generate_function)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -219,7 +219,7 @@ TEST(codegen, operators)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -269,7 +269,7 @@ TEST(codegen, conditional_branch)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -343,7 +343,7 @@ TEST(codegen, locals_store)
         std::vector<std::unique_ptr<cg::value>> args;
         args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
+        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -396,7 +396,7 @@ TEST(codegen, invoke)
         std::vector<std::unique_ptr<cg::value>> args_f;
         args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
+        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
@@ -428,7 +428,7 @@ TEST(codegen, invoke)
         args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
         args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
-        auto fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
+        auto* fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -487,7 +487,7 @@ TEST(codegen, invoke)
         std::vector<std::unique_ptr<cg::value>> args_f;
         args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
 
-        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
+        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
@@ -520,7 +520,7 @@ TEST(codegen, invoke)
         args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
         args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
 
-        auto fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
+        auto* fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -608,7 +608,7 @@ TEST(codegen, strings)
          * }
          */
 
-        auto fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}), {});
+        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}), {});
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
