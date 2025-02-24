@@ -218,18 +218,18 @@ std::string scope::get_qualified_name() const
 std::string scope::to_string() const
 {
     std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
-    for(auto& [name, type]: variables)
+    for(const auto& [name, type]: variables)
     {
         repr += fmt::format("[v]  name: {}, type: {}\n", name, ty::to_string(type.var_type));
     }
-    for(auto& [name, sig]: functions)
+    for(const auto& [name, sig]: functions)
     {
         repr += fmt::format("[fn] name: {}, signature: {}\n", name, sig.to_string());
     }
-    for(auto& [name, s]: structs)
+    for(const auto& [name, s]: structs)
     {
         repr += fmt::format("[s]  name: {}\n    members:\n", name);
-        for(auto& [n, t]: s.members)
+        for(const auto& [n, t]: s.members)
         {
             repr += fmt::format("     - name: {}, type: {}\n", n.s, ty::to_string(t));
         }
@@ -266,9 +266,9 @@ void context::add_base_type(std::string name, bool is_reference_type)
     }
 
     auto type_id = generate_type_id();
-    type_map.push_back({type_info{{name, {0, 0}}, type_class::tc_plain, type_id}, type_id});
+    type_map.emplace_back(type_info{{name, {0, 0}}, type_class::tc_plain, type_id}, type_id);
 
-    base_types.push_back(std::make_pair(std::move(name), is_reference_type));
+    base_types.emplace_back(std::move(name), is_reference_type);
 }
 
 void context::add_import(std::vector<token> path)
@@ -520,7 +520,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
     /* 2. struct member access. */
     else if(!struct_stack.empty())
     {
-        for(auto [n, t]: struct_stack.back()->members)
+        for(const auto& [n, t]: struct_stack.back()->members)
         {
             if(n.s == identifier.s)
             {
@@ -599,11 +599,11 @@ type_info context::get_type(const std::string& name, bool array, const std::opti
         {
             // add the array type to the type map.
             auto type_id = generate_type_id();
-            type_map.push_back({type_info{
-                                  token{name, {0, 0}},
-                                  array ? type_class::tc_array : type_class::tc_plain,
-                                  type_id, import_path},
-                                type_id});
+            type_map.emplace_back(type_info{
+                                    token{name, {0, 0}},
+                                    array ? type_class::tc_array : type_class::tc_plain,
+                                    type_id, import_path},
+                                  type_id);
             return type_map.back().first;
         }
     }
@@ -612,10 +612,8 @@ type_info context::get_type(const std::string& name, bool array, const std::opti
     {
         throw type_error(fmt::format("Unknown type '{}' from import '{}'.", name, *import_path));
     }
-    else
-    {
-        throw type_error(fmt::format("Unknown type '{}'.", name));
-    }
+
+    throw type_error(fmt::format("Unknown type '{}'.", name));
 }
 
 type_info context::get_unresolved_type(token name, type_class cls, std::optional<std::string> import_path)
@@ -671,13 +669,8 @@ bool context::is_convertible(token_location loc, const type_info& from, const ty
         return false;
     }
 
-    auto struct_def = get_struct_definition(loc, to.to_string(), to.get_import_path());
-    if(!struct_def->members.empty())
-    {
-        return false;
-    }
-
-    return true;
+    const auto* struct_def = get_struct_definition(loc, to.to_string(), to.get_import_path());
+    return struct_def->members.empty();
 }
 
 void context::resolve(type_info& ty)
@@ -711,22 +704,24 @@ void context::resolve(type_info& ty)
         {
             auto type_id = generate_type_id();
             ty.set_type_id(type_id);
-            type_map.push_back({ty, type_id});
+            type_map.emplace_back(ty, type_id);
             return;
         }
 
         if(ty.get_import_path().has_value())
         {
-            throw type_error(ty.get_location(),
-                             fmt::format("Cannot resolve type '{}' from '{}'.",
-                                         ty.to_string(), *ty.get_import_path()));
+            throw type_error(
+              ty.get_location(),
+              fmt::format(
+                "Cannot resolve type '{}' from '{}'.",
+                ty.to_string(), *ty.get_import_path()));
         }
-        else
-        {
-            throw type_error(ty.get_location(),
-                             fmt::format("Cannot resolve type '{}'.",
-                                         ty.to_string()));
-        }
+
+        throw type_error(
+          ty.get_location(),
+          fmt::format(
+            "Cannot resolve type '{}'.",
+            ty.to_string()));
     }
 
     ty.set_type_id(it->second);
@@ -737,29 +732,32 @@ void context::resolve_types()
     // add structs to type map.
     for(auto& s: global_scope.structs)
     {
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&s](const std::pair<type_info, std::uint64_t>& t) -> bool
-                               {
-                                   if(s.second.import_path != t.first.get_import_path())
-                                   {
-                                       return false;
-                                   }
+        auto it = std::find_if(
+          type_map.begin(),
+          type_map.end(),
+          [&s](const std::pair<type_info, std::uint64_t>& t) -> bool
+          {
+              if(s.second.import_path != t.first.get_import_path())
+              {
+                  return false;
+              }
 
-                                   if(s.first != t.first.to_string())
-                                   {
-                                       return false;
-                                   }
+              if(s.first != t.first.to_string())
+              {
+                  return false;
+              }
 
-                                   return !t.first.is_array();
-                               });
+              return !t.first.is_array();
+          });
         if(it == type_map.end())
         {
             auto type_id = generate_type_id();
-            type_map.push_back({type_info{s.second.name,
-                                          type_class::tc_plain,
-                                          type_id,
-                                          s.second.import_path},
-                                type_id});
+            type_map.emplace_back(
+              type_info{s.second.name,
+                        type_class::tc_plain,
+                        type_id,
+                        s.second.import_path},
+              type_id);
         }
     }
 
@@ -767,13 +765,14 @@ void context::resolve_types()
 
     // don't resolve built-in types and function types.
     std::vector<type_info> unresolved;
-    std::copy_if(unresolved_types.begin(),
-                 unresolved_types.end(),
-                 std::back_inserter(unresolved),
-                 [](const type_info& t) -> bool
-                 {
-                     return !is_builtin_type(t.to_string()) && !t.is_function_type();
-                 });
+    std::copy_if(
+      unresolved_types.begin(),
+      unresolved_types.end(),
+      std::back_inserter(unresolved),
+      [](const type_info& t) -> bool
+      {
+          return !is_builtin_type(t.to_string()) && !t.is_function_type();
+      });
     unresolved_types = std::move(unresolved);    // this clears the moved-from vector.
 
     // find all unresolved types.
@@ -838,30 +837,30 @@ const function_signature& context::get_function_signature(const token& name, con
         }
 
         // check if the module was imported.
-        for(auto& it: imported_modules)
+        for(const auto& it: imported_modules)
         {
             if(it == *import_path)
             {
                 throw type_error(name.location, fmt::format("Function '{}' not found in '{}'.", name.s, *import_path));
             }
         }
-        throw type_error(name.location,
-                         fmt::format("Cannot resolve function '{}' in module '{}', since the module is not imported.",
-                                     name.s, *import_path));
+        throw type_error(
+          name.location,
+          fmt::format(
+            "Cannot resolve function '{}' in module '{}', since the module is not imported.",
+            name.s, *import_path));
     }
-    else
-    {
-        for(scope* s = current_scope; s != nullptr; s = s->parent)
-        {
-            auto it = s->functions.find(name.s);
-            if(it != s->functions.end())
-            {
-                return it->second;
-            }
-        }
 
-        throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+    for(scope* s = current_scope; s != nullptr; s = s->parent)
+    {
+        auto it = s->functions.find(name.s);
+        if(it != s->functions.end())
+        {
+            return it->second;
+        }
     }
+
+    throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
 }
 
 void context::enter_function_scope(token name)
@@ -934,24 +933,24 @@ void context::exit_named_scope(const token& name)
 void context::enter_anonymous_scope(token_location loc)
 {
     token anonymous_scope;
-    anonymous_scope.location = std::move(loc);
+    anonymous_scope.location = loc;
     anonymous_scope.s = fmt::format("<anonymous@{}>", anonymous_scope_id);
     ++anonymous_scope_id;
 
     // check if the scope already exists.
-    auto it = std::find_if(current_scope->children.begin(), current_scope->children.end(),
-                           [&anonymous_scope](const scope& s) -> bool
-                           { return s.name.s == anonymous_scope.s; });
+    auto it = std::find_if(
+      current_scope->children.begin(),
+      current_scope->children.end(),
+      [&anonymous_scope](const scope& s) -> bool
+      { return s.name.s == anonymous_scope.s; });
     if(it != current_scope->children.end())
     {
         // this should never happen.
         throw type_error(anonymous_scope.location, fmt::format("Cannot enter anonymous scope: Name '{}' already exists.", anonymous_scope.s));
     }
-    else
-    {
-        current_scope->children.emplace_back(std::move(anonymous_scope), current_scope);
-        current_scope = &current_scope->children.back();
-    }
+
+    current_scope->children.emplace_back(std::move(anonymous_scope), current_scope);
+    current_scope = &current_scope->children.back();
 }
 
 void context::exit_anonymous_scope()
@@ -961,7 +960,9 @@ void context::exit_anonymous_scope()
         throw type_error(current_scope->name.location, "Cannot exit anonymous scope: No scope to leave.");
     }
 
-    if(current_scope->name.s.substr(0, 11) != "<anonymous@" || current_scope->name.s.back() != '>')
+    constexpr auto ANONYMOUS_SUBSTR_LENGTH = 11;
+    if(current_scope->name.s.substr(0, ANONYMOUS_SUBSTR_LENGTH) != "<anonymous@"
+       || current_scope->name.s.back() != '>')
     {
         throw type_error(current_scope->name.location, fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name.s));
     }
@@ -1034,13 +1035,13 @@ bool context::has_expression_type(const ast::expression& expr) const
 std::string context::to_string() const
 {
     std::string ret = "Imports:\n";
-    for(auto& it: imported_modules)
+    for(const auto& it: imported_modules)
     {
         ret += fmt::format("* {}\n", it);
     }
 
     ret += "\nType map:\n";
-    for(auto& it: type_map)
+    for(const auto& it: type_map)
     {
         ret += fmt::format("  {}, {}\n", it.first.to_string(), it.second);
     }
