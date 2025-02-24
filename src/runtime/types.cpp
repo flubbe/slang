@@ -31,7 +31,8 @@ void register_builtin_type_layouts(gc::garbage_collector& gc)
     /*
      * layout for `result`.
      */
-    std::size_t offset = 0, alignment = 0;
+    std::size_t offset = 0;
+    std::size_t alignment = 0;
     std::vector<std::size_t> layout;
 
     offset = sizeof(decltype(result::ok));

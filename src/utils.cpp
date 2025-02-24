@@ -77,7 +77,7 @@ std::list<std::string> split(const std::string& s, const std::string& delimiter)
 
 std::string join(const std::vector<std::string>& v, const std::string& separator)
 {
-    if(v.size() == 0)
+    if(v.empty())
     {
         return {};
     }
@@ -151,7 +151,7 @@ void print_command_help(const std::string& info_text, const std::vector<std::pai
         std::list<std::string> desc_lines = slang::utils::wrap_text(desc, desc_len);
 
         fmt::print("    {:<{}}", cmd, indent);
-        if(desc_lines.size() != 0)
+        if(!desc_lines.empty())
         {
             fmt::print("{}\n", desc_lines.front());
             for(auto it = std::next(desc_lines.begin()); it != desc_lines.end(); ++it)
@@ -174,7 +174,7 @@ void print_usage_help(const std::string& usage_text, const std::string& help_tex
     fmt::print("Usage: {}\n", usage_text);
 
     std::list<std::string> lines = slang::utils::wrap_text(help_text, slang::utils::get_terminal_width() - usage_help_indent);
-    if(lines.size() > 0)
+    if(!lines.empty())
     {
         fmt::print("\n");
         for(const auto& line: lines)

@@ -44,91 +44,91 @@ const auto builtin_atanf = std::atanf;
 const auto builtin_atan2f = std::atan2f;
 #endif
 
-void abs(si::context&, si::operand_stack& stack)
+void abs([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_fabsf(value); });
 }
 
-void sqrt(si::context&, si::operand_stack& stack)
+void sqrt([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_sqrtf(value); });
 }
 
-void ceil(si::context&, si::operand_stack& stack)
+void ceil([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_ceilf(value); });
 }
 
-void floor(si::context&, si::operand_stack& stack)
+void floor([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_floorf(value); });
 }
 
-void trunc(si::context&, si::operand_stack& stack)
+void trunc([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return std::truncf(value); });
 }
 
-void round(si::context&, si::operand_stack& stack)
+void round([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return std::roundf(value); });
 }
 
-void sin(si::context&, si::operand_stack& stack)
+void sin([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_sinf(value); });
 }
 
-void cos(si::context&, si::operand_stack& stack)
+void cos([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_cosf(value); });
 }
 
-void tan(si::context&, si::operand_stack& stack)
+void tan([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_tanf(value); });
 }
 
-void asin(si::context&, si::operand_stack& stack)
+void asin([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_asinf(value); });
 }
 
-void acos(si::context&, si::operand_stack& stack)
+void acos([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_acosf(value); });
 }
 
-void atan(si::context&, si::operand_stack& stack)
+void atan([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     stack.modify_top<float, float>(
       [](float value) -> float
       { return builtin_atanf(value); });
 }
 
-void atan2(si::context&, si::operand_stack& stack)
+void atan2([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     float y = stack.pop_f32();
     float x = stack.pop_f32();

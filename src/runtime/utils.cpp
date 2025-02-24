@@ -20,7 +20,7 @@ namespace slang::runtime
 
 gc_object_base::~gc_object_base()
 {
-    if(obj)
+    if(obj != nullptr)
     {
         ctx.get_gc().remove_temporary(obj);
         obj = nullptr;
@@ -29,7 +29,7 @@ gc_object_base::~gc_object_base()
 
 gc_object_base gc_pop(si::context& ctx, si::operand_stack& stack)
 {
-    return {ctx, stack.pop_addr<void*>()};
+    return {ctx, stack.pop_addr<void>()};
 }
 
 /*

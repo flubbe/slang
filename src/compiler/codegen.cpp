@@ -57,13 +57,13 @@ std::string to_string(binary_op op)
       "land",
       "lor"};
 
-    std::size_t idx = static_cast<std::size_t>(op);
+    auto idx = static_cast<std::size_t>(op);
     if(idx >= strs.size())
     {
         throw codegen_error("Invalid operator index in to_string(binary_op).");
     }
 
-    return strs[idx];
+    return strs[idx];    // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 /*
@@ -74,13 +74,13 @@ std::string to_string(type_cast tc)
 {
     static const std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
 
-    std::size_t idx = static_cast<std::size_t>(tc);
-    if(idx > strs.size())
+    auto idx = static_cast<std::size_t>(tc);
+    if(idx >= strs.size())
     {
         throw codegen_error("Invalid type cast index in to_string(type_cast).");
     }
 
-    return strs[idx];
+    return strs[idx];    // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 }
 
 /*
@@ -129,9 +129,9 @@ std::string type::to_string() const
     {
         if(is_array())
         {
-            return fmt::format("[{}]", struct_name.value());
+            return fmt::format("[{}]", struct_name.value_or("<unnamed-struct>"));
         }
-        return struct_name.value();
+        return struct_name.value_or("<unnamed-struct>");
     }
 
     throw std::runtime_error("Invalid type class.");
@@ -155,10 +155,12 @@ void value::validate() const
         {
             throw codegen_error("Type cannot be both: struct and reference.");
         }
-        else if(ty.is_void() && ty.is_array())
+
+        if(ty.is_void() && ty.is_array())
         {
             throw codegen_error("Type cannot be both: void and array.");
         }
+
         return;
     }
 
@@ -172,7 +174,7 @@ void value::validate() const
         throw codegen_error(fmt::format("Invalid value type '{}'.", ty.to_string()));
     }
 
-    if(!ty.get_struct_name().has_value() || ty.get_struct_name()->length() == 0)
+    if(!ty.get_struct_name().has_value() || ty.get_struct_name()->empty())
     {
         throw codegen_error("Empty struct type.");
     }
@@ -187,7 +189,7 @@ std::string value::to_string() const
 {
     if(has_name())
     {
-        return fmt::format("{} %{}", get_type().to_string(), *get_name());
+        return fmt::format("{} %{}", get_type().to_string(), get_name().value());    // NOLINT(bugprone-unchecked-optional-access)
     }
     return fmt::format("{}", get_type().to_string());
 }
@@ -202,15 +204,17 @@ std::string const_argument::to_string() const
 
     if(type_name == "i32")
     {
-        return fmt::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());
+        return fmt::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
-    else if(type_name == "f32")
+
+    if(type_name == "f32")
     {
-        return fmt::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());
+        return fmt::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
-    else if(type_name == "str")
+
+    if(type_name == "str")
     {
-        return fmt::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());
+        return fmt::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
     throw codegen_error(fmt::format("Unrecognized const_argument type."));
@@ -223,7 +227,7 @@ std::string const_argument::to_string() const
 std::string instruction::to_string() const
 {
     std::string buf;
-    if(args.size() > 0)
+    if(!args.empty())
     {
         buf = " ";
         for(std::size_t i = 0; i < args.size() - 1; ++i)
@@ -246,7 +250,7 @@ std::string basic_block::to_string() const
         return fmt::format("{}:\n unreachable", label);
     }
 
-    if(instrs.size() == 0)
+    if(instrs.empty())
     {
         return fmt::format("{}:", label);
     }
@@ -264,7 +268,7 @@ bool basic_block::is_valid() const
 {
     std::size_t branch_return_count = 0;
     bool last_instruction_branch_return = false;
-    for(auto& it: instrs)
+    for(const auto& it: instrs)
     {
         last_instruction_branch_return = it->is_branching() || it->is_return();
         if(last_instruction_branch_return)
@@ -418,9 +422,12 @@ void scope::add_argument(std::unique_ptr<value> arg)
         throw codegen_error("Cannot add unnamed argument to scope.");
     }
 
-    if(contains(*arg->get_name()))
+    if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
     {
-        throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
+        throw codegen_error(
+          fmt::format(
+            "Name '{}' already contained in scope.",
+            arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
     args.emplace_back(std::move(arg));
 }
@@ -432,9 +439,12 @@ void scope::add_local(std::unique_ptr<value> arg)
         throw codegen_error("Cannot add unnamed argument to scope.");
     }
 
-    if(contains(*arg->get_name()))
+    if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
     {
-        throw codegen_error(fmt::format("Name '{}' already contained in scope.", *arg->get_name()));
+        throw codegen_error(
+          fmt::format(
+            "Name '{}' already contained in scope.",
+            arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
     locals.emplace_back(std::move(arg));
 }
@@ -504,7 +514,7 @@ std::string function::to_string() const
     }
 
     const auto& args = scope.get_args();
-    if(args.size() > 0)
+    if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
@@ -520,11 +530,11 @@ std::string function::to_string() const
     if(!native)
     {
         buf += " {\n";
-        for(auto& v: scope.get_locals())
+        for(const auto& v: scope.get_locals())
         {
             buf += fmt::format("local {}\n", v->to_string());
         }
-        for(auto& b: instr_blocks)
+        for(const auto& b: instr_blocks)
         {
             buf += fmt::format("{}\n", b->to_string());
         }
@@ -541,7 +551,7 @@ std::string function::to_string() const
 std::string struct_::to_string() const
 {
     std::string buf = fmt::format("%{} = type {{\n", name);
-    if(members.size() > 0)
+    if(!members.empty())
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
@@ -774,17 +784,17 @@ void add_constant(
 
 void context::add_constant(std::string name, std::int32_t i, std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, name, i, import_path);
+    slang::codegen::add_constant(constants, imported_constants, std::move(name), i, std::move(import_path));
 }
 
 void context::add_constant(std::string name, float f, std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, name, f, import_path);
+    slang::codegen::add_constant(constants, imported_constants, std::move(name), f, std::move(import_path));
 }
 
 void context::add_constant(std::string name, std::string s, std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, name, std::move(s), import_path);
+    slang::codegen::add_constant(constants, imported_constants, std::move(name), std::move(s), std::move(import_path));
 }
 
 std::size_t context::get_string(std::string str)
@@ -963,7 +973,7 @@ void context::push_struct_access(type ty)
 
 void context::pop_struct_access()
 {
-    if(struct_access.size() > 0)
+    if(!struct_access.empty())
     {
         struct_access.pop_back();
     }
@@ -975,7 +985,7 @@ void context::pop_struct_access()
 
 type context::get_accessed_struct() const
 {
-    if(struct_access.size() == 0)
+    if(struct_access.empty())
     {
         throw codegen_error("Cannot get struct access name: No struct accessed.");
     }
@@ -990,7 +1000,7 @@ value context::get_struct_member(
   std::optional<std::string> import_path) const
 {
     const scope* s = get_global_scope();
-    auto& members = s->get_struct(struct_name, import_path);
+    const auto& members = s->get_struct(struct_name, std::move(import_path));
 
     auto it = std::find_if(
       members.begin(),
@@ -1066,7 +1076,7 @@ void context::generate_arraylength()
     insertion_point->add_instruction(std::make_unique<instruction>("arraylength"));
 }
 
-void context::generate_binary_op(binary_op op, value op_type)
+void context::generate_binary_op(binary_op op, const value& op_type)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1123,7 +1133,7 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     insertion_point->add_instruction(std::make_unique<instruction>("jnz", std::move(args)));
 }
 
-void context::generate_const(value vt, std::variant<int, float, std::string> v)
+void context::generate_const(const value& vt, std::variant<int, float, std::string> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1220,7 +1230,7 @@ void context::generate_load(std::unique_ptr<argument> arg, bool load_element)
     }
 }
 
-void context::generate_new(value vt)
+void context::generate_new(const value& vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1228,7 +1238,7 @@ void context::generate_new(value vt)
     insertion_point->add_instruction(std::make_unique<instruction>("new", std::move(args)));
 }
 
-void context::generate_newarray(value vt)
+void context::generate_newarray(const value& vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1236,7 +1246,7 @@ void context::generate_newarray(value vt)
     insertion_point->add_instruction(std::make_unique<instruction>("newarray", std::move(args)));
 }
 
-void context::generate_anewarray(value vt)
+void context::generate_anewarray(const value& vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1244,7 +1254,7 @@ void context::generate_anewarray(value vt)
     insertion_point->add_instruction(std::make_unique<instruction>("anewarray", std::move(args)));
 }
 
-void context::generate_pop(value vt)
+void context::generate_pop(const value& vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -1306,14 +1316,14 @@ std::string context::to_string() const
     std::string buf;
 
     // constants.
-    if(constants.size())
+    if(!constants.empty())
     {
         auto make_printable = [](const std::string& s) -> std::string
         {
             std::string str;
 
             // replace non-printable characters by their character codes.
-            for(auto& c: s)
+            for(const auto& c: s)
             {
                 if(!isalnum(c) && c != ' ')
                 {
@@ -1360,14 +1370,14 @@ std::string context::to_string() const
         print_constant(constants.size() - 1, constants.back(), false);
 
         // don't append a newline if the constant table is the only non-empty buffer.
-        if(types.size() != 0 || funcs.size() != 0)
+        if(!types.empty() || !funcs.empty())
         {
             buf += "\n";
         }
     }
 
     // types.
-    if(types.size() != 0)
+    if(!types.empty())
     {
         for(std::size_t i = 0; i < types.size() - 1; ++i)
         {
@@ -1376,14 +1386,14 @@ std::string context::to_string() const
         buf += fmt::format("{}", types.back()->to_string());
 
         // don't append a newline if there are no functions.
-        if(funcs.size() != 0)
+        if(!funcs.empty())
         {
             buf += "\n";
         }
     }
 
     // functions.
-    if(funcs.size() != 0)
+    if(!funcs.empty())
     {
         for(std::size_t i = 0; i < funcs.size() - 1; ++i)
         {
