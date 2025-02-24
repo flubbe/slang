@@ -37,25 +37,25 @@ class instruction_logger : public slang::interpreter::instruction_recorder
     std::size_t export_entries{0};
 
 public:
-    virtual void section(const std::string& name) override
+    void section(const std::string& name) override
     {
         fmt::print("--- {} ---\n", name);
     }
 
-    virtual void function(const std::string& name, const module_::function_details& details) override
+    void function(const std::string& name, const module_::function_details& details) override
     {
         fmt::print(
           "{:>4}: @{} (size {}, args {}, locals {})\n",
           details.offset, name, details.size, details.args_size, details.locals_size);
     }
 
-    virtual void type(const std::string& name, const module_::struct_descriptor& desc) override
+    void type(const std::string& name, const module_::struct_descriptor& desc) override
     {
         fmt::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
 
         for(std::size_t i = 0; i < desc.member_types.size(); ++i)
         {
-            auto& [member_name, member_type] = desc.member_types[i];
+            const auto& [member_name, member_type] = desc.member_types[i];
             fmt::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
                        to_string(member_type.base_type),
                        member_name,
@@ -70,7 +70,7 @@ public:
         fmt::print("}}\n");
     }
 
-    virtual void constant(const module_::constant_table_entry& c) override
+    void constant(const module_::constant_table_entry& c) override
     {
         fmt::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
         if(c.type == module_::constant_type::i32)
@@ -88,7 +88,7 @@ public:
         ++constant_entries;
     }
 
-    virtual void record(const module_::exported_symbol& s) override
+    void record(const module_::exported_symbol& s) override
     {
         fmt::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
         if(s.type == module_::symbol_type::constant)
@@ -99,43 +99,43 @@ public:
         ++export_entries;
     }
 
-    virtual void record(const module_::imported_symbol& s) override
+    void record(const module_::imported_symbol& s) override
     {
         fmt::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
         ++import_entries;
     }
 
-    virtual void label(std::int64_t index) override
+    void label(std::int64_t index) override
     {
         fmt::print("%{}:\n", index);
     }
 
-    virtual void record(opcode instr) override
+    void record(opcode instr) override
     {
         fmt::print("    {:>11}\n", to_string(instr));
     }
 
-    virtual void record(opcode instr, std::int64_t i) override
+    void record(opcode instr, std::int64_t i) override
     {
         fmt::print("    {:>11}    {}\n", to_string(instr), i);
     }
 
-    virtual void record(opcode instr, std::int64_t i1, std::int64_t i2) override
+    void record(opcode instr, std::int64_t i1, std::int64_t i2) override
     {
         fmt::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
     }
 
-    virtual void record(opcode instr, float f) override
+    void record(opcode instr, float f) override
     {
         fmt::print("    {:>11}    {}\n", to_string(instr), f);
     }
 
-    virtual void record(opcode instr, std::int64_t i, std::string s) override
+    void record(opcode instr, std::int64_t i, std::string s) override
     {
         fmt::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
     }
 
-    virtual void record(
+    void record(
       opcode instr,
       std::int64_t i,
       std::string s,
@@ -144,12 +144,12 @@ public:
         fmt::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
     }
 
-    virtual void record(opcode instr, std::string s1, std::string s2) override
+    void record(opcode instr, std::string s1, std::string s2) override
     {
         fmt::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
     }
 
-    virtual void record(opcode instr, std::string s1, std::string s2, std::string s3) override
+    void record(opcode instr, std::string s1, std::string s2, std::string s3) override
     {
         fmt::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
     }
@@ -182,14 +182,14 @@ static void runtime_setup(si::context& ctx, bool verbose)
     ctx.register_native_function("slang", "print",
                                  [&ctx](si::operand_stack& stack)
                                  {
-                                     std::string* s = stack.pop_addr<std::string>();
+                                     auto* s = stack.pop_addr<std::string>();
                                      fmt::print("{}", *s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
                                  [&ctx](si::operand_stack& stack)
                                  {
-                                     std::string* s = stack.pop_addr<std::string>();
+                                     auto* s = stack.pop_addr<std::string>();
                                      fmt::print("{}\n", *s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
@@ -457,7 +457,7 @@ void exec::invoke(const std::vector<std::string>& args)
     }
 
     auto module_name = module_path.filename().stem();
-    if(module_name.string().length() == 0)
+    if(module_name.string().empty())
     {
         throw std::runtime_error(fmt::format(
           "Trying to get module name from path '{}' produced empty string.",

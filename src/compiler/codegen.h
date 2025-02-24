@@ -323,7 +323,7 @@ public:
     /** Return whether the value has a name. */
     bool has_name() const
     {
-        return name != std::nullopt;
+        return name.has_value();
     }
 };
 
@@ -1063,13 +1063,13 @@ public:
     /** Return whether this block ends with a return statement. */
     bool ends_with_return() const
     {
-        return instrs.size() > 0 && instrs.back()->is_return();
+        return !instrs.empty() && instrs.back()->is_return();
     }
 
     /** Return whether this block ends with a branch statement. */
     bool ends_with_branch() const
     {
-        return instrs.size() > 0 && instrs.back()->is_branching();
+        return !instrs.empty() && instrs.back()->is_branching();
     }
 
     /** Mark the block as unreachable. */
@@ -1611,7 +1611,7 @@ public:
     /** Return whether the function ends with a return statement. */
     bool ends_with_return() const
     {
-        return instr_blocks.size() > 0 && instr_blocks.back()->ends_with_return();
+        return !instr_blocks.empty() && instr_blocks.back()->ends_with_return();
     }
 
     /** Create a local variable. */
@@ -1972,7 +1972,7 @@ public:
      */
     void add_constant(
       std::string name,
-      float i,
+      float f,
       std::optional<std::string> import_path = std::nullopt);
 
     /**
@@ -2106,7 +2106,7 @@ public:
      */
     void exit_scope(scope* s)
     {
-        if(current_scopes.size() == 0)
+        if(current_scopes.empty())
         {
             throw codegen_error("No scope to leave.");
         }
@@ -2122,7 +2122,7 @@ public:
     /** Get the current scope. */
     scope* get_scope()
     {
-        if(current_scopes.size() > 0)
+        if(!current_scopes.empty())
         {
             return current_scopes.back();
         }
@@ -2161,7 +2161,7 @@ public:
     /** Whether we are accessing a struct. */
     bool is_struct_access() const
     {
-        return struct_access.size() != 0;
+        return !struct_access.empty();
     }
 
     /**
@@ -2200,7 +2200,7 @@ public:
     /** Pop a directive from the directive stack. */
     void pop_directive()
     {
-        if(directive_stack.size() == 0)
+        if(directive_stack.empty())
         {
             throw codegen_error("No directive to pop.");
         }
@@ -2403,7 +2403,7 @@ public:
      */
     void pop_break_continue(std::optional<token_location> loc = std::nullopt)
     {
-        if(basic_block_brk_cnt.size() == 0)
+        if(basic_block_brk_cnt.empty())
         {
             if(loc.has_value())
             {
@@ -2425,7 +2425,7 @@ public:
      */
     std::pair<basic_block*, basic_block*> top_break_continue(std::optional<token_location> loc = std::nullopt)
     {
-        if(basic_block_brk_cnt.size() == 0)
+        if(basic_block_brk_cnt.empty())
         {
             if(loc.has_value())
             {
@@ -2518,7 +2518,7 @@ public:
      * @param op The binary operation to execute.
      * @param op_type The type specifier for the operation.
      */
-    void generate_binary_op(binary_op op, value op_type);
+    void generate_binary_op(binary_op op, const value& op_type);
 
     /**
      * Generate an unconditional branch instruction.
@@ -2563,7 +2563,7 @@ public:
      * @param vt The value type.
      * @param val The value.
      */
-    void generate_const(value vt, std::variant<int, float, std::string> val);
+    void generate_const(const value& vt, std::variant<int, float, std::string> val);
 
     /** Load 'null' onto the stack. */
     void generate_const_null();
@@ -2604,28 +2604,28 @@ public:
      *
      * @param vt The type.
      */
-    void generate_new(value vt);
+    void generate_new(const value& vt);
 
     /**
      * Create a new array of a given built-in type.
      *
      * @param vt The array type.
      */
-    void generate_newarray(value vt);
+    void generate_newarray(const value& vt);
 
     /**
      * Create a new array of a given custom type.
      *
      * @param vt The array type.
      */
-    void generate_anewarray(value vt);
+    void generate_anewarray(const value& vt);
 
     /**
      * Pop a value from the stack.
      *
      * @param vt The value type.
      */
-    void generate_pop(value vt);
+    void generate_pop(const value& vt);
 
     /**
      * Return from a function.

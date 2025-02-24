@@ -14,6 +14,7 @@
 
 #include "module.h"
 #include "type_utils.h" /* for slang::typing::is_reference_type */
+#include "utils.h"
 
 namespace slang::module_
 {
@@ -25,7 +26,7 @@ namespace ty = slang::typing;
  */
 
 /** Type encoding pairs as `(type, encoded_type)`. */
-static std::vector<std::pair<std::string, std::string>> type_encoding = {
+static const std::vector<std::pair<std::string, std::string>> type_encoding = {
   {"void", "v"},
   {"i32", "i"},
   {"f32", "f"},
@@ -46,7 +47,7 @@ std::string variable_type::encode() const
     }
 
     // assume it is a struct.
-    if(decoded_type_string.length() == 0)
+    if(decoded_type_string.empty())
     {
         throw module_error("Cannot encode empty struct name.");
     }
@@ -93,10 +94,10 @@ archive& operator&(archive& ar, variable_type& ts)
 {
     if(ar.is_reading())
     {
-        std::uint8_t c;
+        char c{0};
         std::string s;
 
-        do
+        do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
             ar & c;
             s += c;
@@ -104,7 +105,7 @@ archive& operator&(archive& ar, variable_type& ts)
 
         if(c == type_prefix)
         {
-            do
+            do    // NOLINT(cppcoreguidelines-avoid-do-while)
             {
                 ar & c;
                 s += c;
@@ -125,7 +126,9 @@ archive& operator&(archive& ar, variable_type& ts)
             ar & c;
         }
 
-        vle_int i = ts.import_index.value_or(-1);
+        vle_int i = ts.import_index.has_value()
+                      ? utils::numeric_cast<std::int64_t>(ts.import_index.value())
+                      : static_cast<std::int64_t>(-1);
         ar & i;
     }
     else
@@ -151,7 +154,8 @@ std::string to_string(const variable_type& t)
  */
 
 variable_descriptor::variable_descriptor(variable_type type)
-: type{std::move(type)}
+: symbol{0, 0}
+, type{std::move(type)}
 {
     reference = ty::is_reference_type(this->type.base_type());
 }
@@ -205,7 +209,7 @@ void language_module::add_function(
     function_descriptor desc{
       function_signature{std::move(return_type), std::move(arg_types)},
       false,
-      function_details{size, entry_point, locals}};
+      function_details{size, entry_point, std::move(locals)}};
     header.exports.emplace_back(symbol_type::function, name, std::move(desc));
 }
 

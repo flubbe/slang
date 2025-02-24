@@ -4,7 +4,7 @@
  * utility functions.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <list>
 #include <string>
 #include <utility>
@@ -58,13 +59,17 @@ std::string join(const std::vector<std::string>& v, const std::string& separator
  * @return A string made of the vector's transformed elements joined together and separated bythe given separator.
  */
 template<typename T>
-std::string join(const std::vector<T>& v, std::function<std::string(const T&)> transform, const std::string& separator)
+std::string join(
+  const std::vector<T>& v,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::function<std::string(const T&)> transform,
+  const std::string& separator)
 {
-    if(v.size() == 0)
+    if(v.empty())
     {
         return {};
     }
-    else if(v.size() == 1)
+
+    if(v.size() == 1)
     {
         return transform(v[0]);
     }
@@ -85,7 +90,10 @@ std::string join(const std::vector<T>& v, std::function<std::string(const T&)> t
  * @param old_value The value to replace.
  * @param new_value The value to use as a replacement.
  */
-inline void replace_all(std::string& str, const std::string& old_value, const std::string& new_value)
+inline void replace_all(
+  std::string& str,
+  const std::string& old_value,    // NOLINT(bugprone-easily-swappable-parameters)
+  const std::string& new_value)
 {
     size_t i = 0;
     while((i = str.find(old_value, i)) != std::string::npos)
@@ -94,31 +102,6 @@ inline void replace_all(std::string& str, const std::string& old_value, const st
         i += new_value.length();
     }
 }
-
-/**
- * Insert line breaks between words after at most len characters.
- * Preserves line breaks in the original string.
- *
- * @param s The string to insert line breaks into.
- * @param line_len The line length.
- */
-std::list<std::string> wrap_text(const std::string& s, std::size_t line_len);
-
-/**
- * Print help on commands in a two-column layout to stdout.
- *
- * @param info_text An info text to be printed before the command help.
- * @param cmd_help A vector consisting of pairs (command, help_text) to be formatted and printed to stdout.
- */
-void print_command_help(const std::string& info_text, const std::vector<std::pair<std::string, std::string>>& cmd_help);
-
-/**
- * Print usage help for a command.
- *
- * @param usage_text The usage (command line invokation) of the command.
- * @param help_text The explaining help text.
- */
-void print_usage_help(const std::string& usage_text, const std::string& help_text);
 
 /**
  * Align a parameter according to the specified alignment.
@@ -131,6 +114,7 @@ void print_usage_help(const std::string& usage_text, const std::string& help_tex
 template<typename T>
 constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignment, T p)
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<T>((reinterpret_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
@@ -173,5 +157,50 @@ struct all_same_type<std::tuple<>>
 
 template<typename... Args>
 constexpr bool all_same_type_v = all_same_type<Args...>::value;
+
+/*
+ * Safe casting.
+ */
+
+/**
+ * Safely cast a value to another type.
+ *
+ * @param value The value to cast.
+ * @returns Returns the input value for the new type.
+ * @throws Throws a `std::out_of_range` exception if the value does not fit into the target type.
+ */
+template<typename T, typename S>
+T numeric_cast(S value)
+{
+    static_assert(std::is_integral_v<T>, "T must be an integral type.");
+    static_assert(std::is_integral_v<S>, "S must be an integral type.");
+
+    if constexpr(std::is_signed_v<S> == std::is_signed_v<T>)
+    {
+        using ComparisonType = std::common_type_t<S, T>;
+        if(static_cast<ComparisonType>(value) < static_cast<ComparisonType>(std::numeric_limits<T>::min())
+           || static_cast<ComparisonType>(value) > static_cast<ComparisonType>(std::numeric_limits<T>::max()))
+        {
+            throw std::out_of_range("Value out of range of target type.");
+        }
+    }
+    else if constexpr(std::is_signed_v<S> && !std::is_signed_v<T>)
+    {
+        if(value < 0
+           || static_cast<std::make_unsigned_t<S>>(value) > std::numeric_limits<T>::max())
+        {
+            throw std::out_of_range("Value out of range of target type.");
+        }
+    }
+    else
+    {
+        if(value > static_cast<std::make_unsigned_t<T>>(std::numeric_limits<T>::max()))
+        {
+            throw std::out_of_range("Value out of range of target type.");
+        }
+    }
+
+    return static_cast<T>(value);
+}
 
 }    // namespace slang::utils

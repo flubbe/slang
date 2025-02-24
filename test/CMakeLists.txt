@@ -216,7 +216,7 @@ add_executable(test_interpreter
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_interpreter PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}

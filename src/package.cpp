@@ -69,7 +69,7 @@ std::list<std::string> package::split(const std::string& s)
 
 bool package::is_valid_name(const std::string& name)
 {
-    if(name.length() == 0)
+    if(name.empty())
     {
         return false;
     }
@@ -78,7 +78,7 @@ bool package::is_valid_name(const std::string& name)
     if(name.length() >= delimiter.length())
     {
         if(name.substr(0, delimiter.length()) == delimiter
-           || name.substr(name.length() - delimiter.length(), name.npos) == delimiter)
+           || name.substr(name.length() - delimiter.length(), std::string::npos) == delimiter)
         {
             return false;
         }
@@ -88,32 +88,22 @@ bool package::is_valid_name(const std::string& name)
     std::list<std::string> components = split(name);
 
     // validate components
-    for(const auto& c: components)
-    {
-        if(!is_valid_name_component(c))
-        {
-            return false;
-        }
-    }
-
-    return true;
+    return std::all_of(components.begin(), components.end(), is_valid_name_component);
 }
 
 bool package::is_valid_name_component(const std::string& name)
 {
     char ch = name[0];
-    if(ch != '_' && !std::isalpha(ch))
+    if(ch != '_' && std::isalpha(ch) == 0)
     {
         return false;
     }
 
-    if(!std::all_of(std::next(name.begin()), name.end(), [](char ch)
-                    { return ch == '_' || std::isalnum(ch); }))
-    {
-        return false;
-    }
-
-    return true;
+    return std::all_of(
+      std::next(name.begin()),
+      name.end(),
+      [](char ch)
+      { return ch == '_' || std::isalnum(ch) != 0; });
 }
 
 /*
@@ -283,6 +273,7 @@ std::vector<std::string> package_manager::get_package_names(bool include_sub_pac
     std::sort(package_name_components.begin(), package_name_components.end());
 
     std::vector<std::string> package_names;
+    package_names.reserve(package_name_components.size());
     for(auto& c: package_name_components)
     {
         package_names.push_back(slang::utils::join(c, package::delimiter));

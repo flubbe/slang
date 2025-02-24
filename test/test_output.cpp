@@ -1821,9 +1821,9 @@ TEST(output, null_access)
 TEST(output, multiple_modules)
 {
     {
-        const std::pair<std::string, std::string> module_inputs[] = {
-          {"mod1",
-           "fn f() -> i32 { return 2; }"},
+        const std::array<std::pair<std::string, std::string>, 3> module_inputs = {
+          std::make_pair("mod1",
+                         "fn f() -> i32 { return 2; }"),
           {"mod2",
            "import mod1;\n"
            "fn f(x: i32) -> f32 { return (mod1::f() * x) as f32; }\n"},
@@ -1831,7 +1831,7 @@ TEST(output, multiple_modules)
            "import mod2;\n"
            "fn f(x: f32) -> i32 { return (mod2::f(x as i32) * 2.0) as i32; }\n"}};
 
-        for(auto& s: module_inputs)
+        for(const auto& s: module_inputs)
         {
             slang::lexer lexer;
             slang::parser parser;

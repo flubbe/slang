@@ -235,14 +235,6 @@ class module_loader
     field_properties get_field_properties(const std::string& type_name, std::size_t field_index) const;
 
     /**
-     * Calculate the stack size delta from a function's signature.
-     *
-     * @param s The signature.
-     * @returns The stack size delta.
-     */
-    std::int32_t get_stack_delta(const module_::function_signature& s) const;
-
-    /**
      * Decode the structs. Set types sizes, alignments and offsets.
      */
     void decode_structs();
@@ -251,13 +243,6 @@ class module_loader
      * Decode a module.
      */
     void decode();
-
-    /**
-     * Decode the function's arguments and locals.
-     *
-     * @param desc The function descriptor.
-     */
-    void decode_locals(module_::function_descriptor& desc);
 
     /**
      * Decode an instruction.

@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include <gsl/gsl>
+
 #include "vector.h"
 
 namespace slang::gc
@@ -113,7 +115,7 @@ struct gc_object
     std::uint8_t flags{of_none};
 
     /** Object address. */
-    void* addr{nullptr};
+    gsl::owner<void*> addr{nullptr};
 
     /** Create an object from a type. */
     template<typename T>

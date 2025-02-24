@@ -22,15 +22,13 @@ bool file_manager::exists(const fs::path& p) const
         return fs::exists(p);
     }
 
-    for(auto& sp: search_paths)
-    {
-        if(fs::exists(sp / p))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::any_of(
+      search_paths.begin(),
+      search_paths.end(),
+      [&p](const auto& sp) -> bool
+      {
+          return fs::exists(sp / p);
+      });
 }
 
 bool file_manager::is_file(const fs::path& p) const
@@ -40,15 +38,13 @@ bool file_manager::is_file(const fs::path& p) const
         return fs::is_regular_file(p);
     }
 
-    for(auto& sp: search_paths)
-    {
-        if(fs::is_regular_file(sp / p))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::any_of(
+      search_paths.begin(),
+      search_paths.end(),
+      [&p](const auto& sp) -> bool
+      {
+          return fs::is_regular_file(sp / p);
+      });
 }
 
 bool file_manager::is_directory(const fs::path& p) const
@@ -58,15 +54,13 @@ bool file_manager::is_directory(const fs::path& p) const
         return fs::is_directory(p);
     }
 
-    for(auto& sp: search_paths)
-    {
-        if(fs::is_directory(sp / p))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::any_of(
+      search_paths.begin(),
+      search_paths.end(),
+      [&p](const auto& sp) -> bool
+      {
+          return fs::is_directory(sp / p);
+      });
 }
 
 fs::path file_manager::resolve(const fs::path& path) const
@@ -80,7 +74,7 @@ fs::path file_manager::resolve(const fs::path& path) const
         return fs::canonical(path);
     }
 
-    for(auto& sp: search_paths)
+    for(const auto& sp: search_paths)
     {
         if(fs::is_regular_file(sp / path))
         {
@@ -101,7 +95,7 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
     }
     else
     {
-        for(auto& sp: search_paths)
+        for(const auto& sp: search_paths)
         {
             if(fs::is_regular_file(sp / path))
             {
@@ -120,7 +114,8 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
     {
         return std::make_unique<file_read_archive>(resolved_path, endian::little);
     }
-    else if(mode == open_mode::write)
+
+    if(mode == open_mode::write)
     {
         return std::make_unique<file_write_archive>(resolved_path, endian::little);
     }

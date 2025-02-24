@@ -113,7 +113,7 @@ TEST(interpreter, module_and_functions)
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_i2f", {si::value{23}}));
     EXPECT_EQ(*res.get<float>(), 23.0);
-    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_f2i", {si::value{92.3f}}));
+    ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_f2i", {si::value{92.3f}}));    // NOLINT(readability-magic-numbers)
     EXPECT_EQ(*res.get<int>(), 92);
 
     EXPECT_EQ(ctx.get_gc().object_count(), 0);
@@ -129,21 +129,21 @@ TEST(interpreter, module_and_functions)
  * @param ctx The context to register the functions in.
  * @param print_buf Buffer for the print functions.
  */
-static void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
+void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
 {
     rt::register_builtin_type_layouts(ctx.get_gc());
 
     ctx.register_native_function("slang", "print",
                                  [&ctx, &print_buf](si::operand_stack& stack)
                                  {
-                                     std::string* s = stack.pop_addr<std::string>();
+                                     auto* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(*s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
                                  [&ctx, &print_buf](si::operand_stack& stack)
                                  {
-                                     std::string* s = stack.pop_addr<std::string>();
+                                     auto* s = stack.pop_addr<std::string>();
                                      print_buf.push_back(fmt::format("{}\n", *s));
                                      ctx.get_gc().remove_temporary(s);
                                  });
@@ -355,7 +355,7 @@ TEST(interpreter, control_flow)
     ASSERT_NO_THROW(res = ctx.invoke("control_flow", "test_if_else", {si::value{-1}}));
     EXPECT_EQ(*res.get<int>(), 0);
 
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{3.f}}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{3.f}}));    // NOLINT(readability-magic-numbers)
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 
@@ -363,7 +363,7 @@ TEST(interpreter, control_flow)
     EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 
-    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{2.2f}}));
+    ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{2.2f}}));    // NOLINT(readability-magic-numbers)
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf.back(), "World, hello!\n");
 
@@ -495,10 +495,10 @@ TEST(interpreter, return_arrays)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "return_array", {}));
 
-    auto v_ptr = reinterpret_cast<si::fixed_vector<int>* const*>(res.get<void*>());
+    const auto* v_ptr = reinterpret_cast<si::fixed_vector<int>* const*>(res.get<void*>());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     ASSERT_NE(v_ptr, nullptr);
 
-    auto v = *v_ptr;
+    auto* v = *v_ptr;
     ASSERT_EQ(v->size(), 2);
     EXPECT_EQ((*v)[0], 1);
     EXPECT_EQ((*v)[1], 2);
@@ -556,10 +556,10 @@ TEST(interpreter, return_str_array)
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "str_array", {}));
 
     {
-        auto array_ptr = reinterpret_cast<si::fixed_vector<std::string*>* const*>(res.get<void*>());
+        const auto* array_ptr = reinterpret_cast<si::fixed_vector<std::string*>* const*>(res.get<void*>());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         ASSERT_NE(array_ptr, nullptr);
 
-        auto array = *array_ptr;
+        auto* array = *array_ptr;
         ASSERT_EQ(array->size(), 3);
         EXPECT_EQ(*(*array)[0], "a");
         EXPECT_EQ(*(*array)[1], "test");
@@ -769,7 +769,7 @@ TEST(interpreter, structs)
         throw e;
     }
 
-    auto& header = mod.get_header();
+    const auto& header = mod.get_header();
     ASSERT_EQ(header.exports.size(), 2);
     EXPECT_EQ(header.exports[0].type, slang::module_::symbol_type::type);
     EXPECT_EQ(header.exports[0].name, "S");
@@ -777,7 +777,7 @@ TEST(interpreter, structs)
     EXPECT_EQ(header.exports[1].name, "T");
 
     {
-        auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[0].desc);
+        const auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[0].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "i");
         EXPECT_EQ(desc.member_types[0].second, slang::module_::field_descriptor("i32", false));
@@ -786,7 +786,7 @@ TEST(interpreter, structs)
     }
 
     {
-        auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[1].desc);
+        const auto& desc = std::get<slang::module_::struct_descriptor>(header.exports[1].desc);
         ASSERT_EQ(desc.member_types.size(), 2);
         EXPECT_EQ(desc.member_types[0].first, "s");
         EXPECT_EQ(desc.member_types[0].second, slang::module_::field_descriptor("S", false));
@@ -934,7 +934,7 @@ TEST(interpreter, struct_argument)
             float j;
             std::string* s;
         };
-        S s;
+        S s{0, 0.f, nullptr};
 
         std::size_t layout_id = 0;
         ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("struct_arg", "S")));

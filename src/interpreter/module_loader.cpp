@@ -60,7 +60,7 @@ static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {
-    if(v.type.base_type().length() == 0)
+    if(v.type.base_type().empty())
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
@@ -82,7 +82,7 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_type& v)
 {
-    if(v.base_type().length() == 0)
+    if(v.base_type().empty())
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
@@ -100,6 +100,77 @@ static std::size_t get_type_or_reference_size(const module_::variable_type& v)
 
     // FIXME Assume all other types are references.
     return sizeof(void*);
+}
+
+/**
+ * Calculate the stack size delta from a function's signature.
+ *
+ * @param s The signature.
+ * @returns The stack size delta.
+ */
+static std::int32_t get_stack_delta(const module_::function_signature& s)
+{
+    auto return_type_size = get_type_or_reference_size(s.return_type);
+    std::int32_t arg_size = 0;
+    for(const auto& it: s.arg_types)
+    {
+        arg_size += utils::numeric_cast<std::int32_t>(get_type_or_reference_size(it));
+        // NOTE stack contents are not aligned.
+    }
+    return utils::numeric_cast<std::int32_t>(return_type_size) - arg_size;
+}
+
+/**
+ * Decode the function's arguments and locals.
+ *
+ * @param desc The function descriptor.
+ */
+static void decode_locals(module_::function_descriptor& desc)
+{
+    if(desc.native)
+    {
+        throw interpreter_error("Cannot decode locals for native function.");
+    }
+    auto& details = std::get<module_::function_details>(desc.details);
+
+    details.args_size = 0;
+    details.locals_size = 0;
+
+    std::size_t arg_count = desc.signature.arg_types.size();
+    if(arg_count > details.locals.size())
+    {
+        throw interpreter_error("Function argument count exceeds locals count.");
+    }
+
+    // arguments.
+    for(std::size_t i = 0; i < arg_count; ++i)
+    {
+        auto& v = details.locals[i];
+        std::size_t size = get_type_or_reference_size(v);
+
+        v.offset = details.args_size;    // NOTE offsets are not aligned.
+        v.size = size;
+
+        details.args_size += v.size;
+        details.args_size = details.args_size;    // NOTE sizes are not aligned.
+    }
+    details.locals_size = details.args_size;
+
+    // locals.
+    for(std::size_t i = arg_count; i < details.locals.size(); ++i)
+    {
+        auto& v = details.locals[i];
+        std::size_t size = get_type_or_reference_size(v);
+
+        v.offset = details.locals_size;    // NOTE offsets are not aligned.
+        v.size = size;
+
+        details.locals_size += v.size;
+        details.locals_size = details.locals_size;    // NOTE sizes are not aligned.
+    }
+
+    // return type
+    details.return_size = get_type_or_reference_size(desc.signature.return_type);
 }
 
 type_properties module_loader::get_type_properties(const module_::variable_type& type) const
@@ -158,18 +229,6 @@ field_properties module_loader::get_field_properties(
 
     auto field_info = type_it->second.member_types.at(field_index);
     return {field_info.second.size, field_info.second.offset, is_garbage_collected(type_name)};
-}
-
-std::int32_t module_loader::get_stack_delta(const module_::function_signature& s) const
-{
-    auto return_type_size = get_type_or_reference_size(s.return_type);
-    std::int32_t arg_size = 0;
-    for(auto& it: s.arg_types)
-    {
-        arg_size += get_type_or_reference_size(it);
-        // NOTE stack contents are not aligned.
-    }
-    return return_type_size - arg_size;
 }
 
 void module_loader::decode_structs()
@@ -283,7 +342,7 @@ void module_loader::decode_structs()
             member_type.offset = utils::align(member_type.alignment, offset);
 
             // calculate member offset as `size_after - size_before`.
-            offset -= size;
+            offset -= utils::numeric_cast<int>(size);
 
             // update struct size and alignment.
             size += member_type.size;
@@ -292,7 +351,7 @@ void module_loader::decode_structs()
             alignment = std::max(alignment, member_type.alignment);
 
             // calculate member offset as `size_after - size_before`.
-            offset += size;
+            offset += utils::numeric_cast<int>(size);
 
             // update type layout.
             if(add_to_layout)
@@ -363,7 +422,8 @@ void module_loader::decode()
                 it.package_index,
                 mod.header.imports.size()));
         }
-        else if(mod.header.imports[it.package_index].type != module_::symbol_type::package)
+
+        if(mod.header.imports[it.package_index].type != module_::symbol_type::package)
         {
             throw interpreter_error(
               fmt::format(
@@ -471,13 +531,12 @@ void module_loader::decode()
 
         recorder->function(it.name, details);
 
-        std::byte instr;
-
         std::int32_t stack_size = 0;
         std::size_t max_stack_size = 0;
 
         while(ar.tell() < bytecode_end)
         {
+            std::byte instr{0};
             ar & instr;
 
             // don't store non-executable instructions.
@@ -520,54 +579,6 @@ void module_loader::decode()
     mod.decoded = true;
 }
 
-void module_loader::decode_locals(module_::function_descriptor& desc)
-{
-    if(desc.native)
-    {
-        throw interpreter_error("Cannot decode locals for native function.");
-    }
-    auto& details = std::get<module_::function_details>(desc.details);
-
-    details.args_size = 0;
-    details.locals_size = 0;
-
-    std::size_t arg_count = desc.signature.arg_types.size();
-    if(arg_count > details.locals.size())
-    {
-        throw interpreter_error("Function argument count exceeds locals count.");
-    }
-
-    // arguments.
-    for(std::size_t i = 0; i < arg_count; ++i)
-    {
-        auto& v = details.locals[i];
-        std::size_t size = get_type_or_reference_size(v);
-
-        v.offset = details.args_size;    // NOTE offsets are not aligned.
-        v.size = size;
-
-        details.args_size += v.size;
-        details.args_size = details.args_size;    // NOTE sizes are not aligned.
-    }
-    details.locals_size = details.args_size;
-
-    // locals.
-    for(std::size_t i = arg_count; i < details.locals.size(); ++i)
-    {
-        auto& v = details.locals[i];
-        std::size_t size = get_type_or_reference_size(v);
-
-        v.offset = details.locals_size;    // NOTE offsets are not aligned.
-        v.size = size;
-
-        details.locals_size += v.size;
-        details.locals_size = details.locals_size;    // NOTE sizes are not aligned.
-    }
-
-    // return type
-    details.return_size = get_type_or_reference_size(desc.signature.return_type);
-}
-
 std::int32_t module_loader::decode_instruction(
   archive& ar,
   std::byte instr,
@@ -604,7 +615,7 @@ std::int32_t module_loader::decode_instruction(
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - 2 * static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return -static_cast<std::int32_t>(sizeof(void*)) - (2 * static_cast<std::int32_t>(sizeof(std::int32_t)));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::aastore:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(void*));
@@ -641,7 +652,7 @@ std::int32_t module_loader::decode_instruction(
     case opcode::acmpeq: [[fallthrough]];
     case opcode::acmpne:
         recorder->record(static_cast<opcode>(instr));
-        return -2 * static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
+        return -(2 * static_cast<std::int32_t>(sizeof(void*))) + static_cast<std::int32_t>(sizeof(std::int32_t));
     case opcode::i2f: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
@@ -654,10 +665,13 @@ std::int32_t module_loader::decode_instruction(
     /* opcodes with one 1-byte argument. */
     case opcode::newarray:
     {
-        std::uint8_t i_u8;
+        std::uint8_t i_u8{0};
         ar & i_u8;
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u8), reinterpret_cast<std::byte*>(&i_u8) + sizeof(i_u8));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&i_u8),                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&i_u8) + sizeof(i_u8));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), static_cast<std::int64_t>(i_u8));
         return static_cast<std::int32_t>(sizeof(void*));
@@ -666,10 +680,13 @@ std::int32_t module_loader::decode_instruction(
     case opcode::iconst: [[fallthrough]];
     case opcode::fconst:
     {
-        std::uint32_t i_u32;
+        std::uint32_t i_u32{0};
         ar & i_u32;
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&i_u32), reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&i_u32),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&i_u32) + sizeof(i_u32));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         if(static_cast<opcode>(instr) == opcode::iconst)
         {
@@ -677,7 +694,7 @@ std::int32_t module_loader::decode_instruction(
         }
         else
         {
-            float f;
+            float f{0.0};
             std::memcpy(&f, &i_u32, sizeof(float));
             recorder->record(opcode::fconst, f);
         }
@@ -690,7 +707,10 @@ std::int32_t module_loader::decode_instruction(
         vle_int i;
         ar & i;
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&i.i), reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&i.i),                   // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&i.i) + sizeof(i.i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), i.i);
         return static_cast<std::int32_t>(sizeof(std::string*));
@@ -714,7 +734,10 @@ std::int32_t module_loader::decode_instruction(
         // store jump origin for later resolution and write zeros instead.
         std::size_t z = 0;
         mod.jump_origins.insert({code.size(), i.i});
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&z),                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&z) + sizeof(z));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), i.i);
         return 0;
@@ -722,16 +745,23 @@ std::int32_t module_loader::decode_instruction(
     /* opcodes with two VLE integers. */
     case opcode::jnz:
     {
-        vle_int i1, i2;
+        vle_int i1;
+        vle_int i2;
         ar & i1 & i2;
 
         // store jump origin for later resolution and write zeros instead.
         std::size_t z = 0;
         mod.jump_origins.insert({code.size(), i1.i});
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&z),                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&z) + sizeof(z));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         mod.jump_origins.insert({code.size(), i2.i});
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&z), reinterpret_cast<std::byte*>(&z) + sizeof(z));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&z),                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&z) + sizeof(z));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), i1.i, i2.i);
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
@@ -740,7 +770,8 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x1:
     {
         // type arguments.
-        module_::variable_type t1, t2;
+        module_::variable_type t1;
+        module_::variable_type t2;
         ar & t1 & t2;
 
         // "void" is not allowed.
@@ -754,11 +785,20 @@ std::int32_t module_loader::decode_instruction(
         auto properties2 = get_type_properties(t2);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1);
+        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2));
         return static_cast<std::int32_t>(properties1.size);
@@ -767,7 +807,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x2:
     {
         // type arguments.
-        module_::variable_type t1, t2, t3;
+        module_::variable_type t1;
+        module_::variable_type t2;
+        module_::variable_type t3;
         ar & t1 & t2 & t3;
 
         // "void" is not allowed.
@@ -782,12 +824,24 @@ std::int32_t module_loader::decode_instruction(
         auto properties3 = get_type_properties(t3);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1);
+        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
 
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties1.size), reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties2.size), reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&properties3.size), reinterpret_cast<std::byte*>(&properties3.size) + sizeof(properties3.size));
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&needs_gc), reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&properties3.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&properties3.size) + sizeof(properties3.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2), to_string(t3));
         return static_cast<std::int32_t>(properties1.size);
@@ -836,14 +890,14 @@ std::int32_t module_loader::decode_instruction(
               std::get<const module_loader*>(mod.header.imports[imp_symbol.package_index].export_reference);
             code.insert(
               code.end(),
-              reinterpret_cast<const std::byte*>(&loader_ptr),
-              reinterpret_cast<const std::byte*>(&loader_ptr) + sizeof(loader_ptr));
+              reinterpret_cast<const std::byte*>(&loader_ptr),                          // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<const std::byte*>(&loader_ptr) + sizeof(loader_ptr));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
 
             const module_::function_descriptor* desc_ptr = &desc;
             code.insert(
               code.end(),
-              reinterpret_cast<const std::byte*>(&desc_ptr),
-              reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
+              reinterpret_cast<const std::byte*>(&desc_ptr),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
 
             if(loader_ptr == nullptr)
             {
@@ -853,40 +907,42 @@ std::int32_t module_loader::decode_instruction(
             recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
             return get_stack_delta(desc.signature);
         }
-        else
+
+        /*
+         * i.i >= 0.
+         */
+
+        if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
         {
-            if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
-            {
-                throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
-            }
-
-            auto& exp_symbol = mod.header.exports[i.i];
-            if(exp_symbol.type != module_::symbol_type::function)
-            {
-                throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
-            }
-            auto& desc = std::get<module_::function_descriptor>(exp_symbol.desc);
-
-            const module_loader* loader_ptr = this;
-            code.insert(
-              code.end(),
-              reinterpret_cast<const std::byte*>(&loader_ptr),
-              reinterpret_cast<const std::byte*>(&loader_ptr) + sizeof(loader_ptr));
-
-            const module_::function_descriptor* desc_ptr = &desc;
-            code.insert(
-              code.end(),
-              reinterpret_cast<const std::byte*>(&desc_ptr),
-              reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));
-
-            if(desc.native && !static_cast<bool>(std::get<1>(desc.details).func))
-            {
-                throw interpreter_error("Native function was null during decode.");
-            }
-
-            recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
-            return get_stack_delta(desc.signature);
+            throw interpreter_error(fmt::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
         }
+
+        auto& exp_symbol = mod.header.exports[i.i];
+        if(exp_symbol.type != module_::symbol_type::function)
+        {
+            throw interpreter_error(fmt::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
+        }
+        auto& desc = std::get<module_::function_descriptor>(exp_symbol.desc);
+
+        const module_loader* loader_ptr = this;
+        code.insert(
+          code.end(),
+          reinterpret_cast<const std::byte*>(&loader_ptr),                          // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<const std::byte*>(&loader_ptr) + sizeof(loader_ptr));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
+
+        const module_::function_descriptor* desc_ptr = &desc;
+        code.insert(
+          code.end(),
+          reinterpret_cast<const std::byte*>(&desc_ptr),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
+
+        if(desc.native && !static_cast<bool>(std::get<1>(desc.details).func))
+        {
+            throw interpreter_error("Native function was null during decode.");
+        }
+
+        recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
+        return get_stack_delta(desc.signature);
     }
     /* opcodes that need to resolve a variable. */
     case opcode::iload: [[fallthrough]];
@@ -904,8 +960,11 @@ std::int32_t module_loader::decode_instruction(
             throw interpreter_error(fmt::format("Index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
         }
 
-        std::int64_t offset = details.locals[i.i].offset;
-        code.insert(code.end(), reinterpret_cast<std::byte*>(&offset), reinterpret_cast<std::byte*>(&offset) + sizeof(offset));
+        auto offset = utils::numeric_cast<std::int64_t>(details.locals[i.i].offset);
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&offset),                      // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&offset) + sizeof(offset));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
 
         recorder->record(static_cast<opcode>(instr), i.i);
 
@@ -918,12 +977,14 @@ std::int32_t module_loader::decode_instruction(
 
         if(is_ref)
         {
-            return is_store ? -static_cast<std::int32_t>(sizeof(void*)) : sizeof(void*);
+            return is_store
+                     ? -static_cast<std::int32_t>(sizeof(void*))
+                     : static_cast<std::int32_t>(sizeof(void*));
         }
-        else
-        {
-            return is_store ? -static_cast<std::int32_t>(sizeof(std::uint32_t)) : sizeof(std::uint32_t);    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
-        }
+
+        return is_store
+                 ? -static_cast<std::int32_t>(sizeof(std::uint32_t))
+                 : static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
     }
     /* new. */
     case opcode::new_:
@@ -935,7 +996,7 @@ std::int32_t module_loader::decode_instruction(
         {
             // imported type.
             std::size_t import_index = -i.i - 1;
-            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            if(import_index >= mod.header.imports.size())
             {
                 throw interpreter_error(fmt::format(
                   "Import index {} out of range ({} >= {}).",
@@ -967,9 +1028,18 @@ std::int32_t module_loader::decode_instruction(
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
             auto properties = loader.get_type_properties(imp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.size),                               // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.alignment),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
         }
@@ -992,9 +1062,18 @@ std::int32_t module_loader::decode_instruction(
             }
 
             auto properties = get_type_properties(exp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.alignment), reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.size),                               // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.alignment),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.alignment) + sizeof(properties.alignment));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
         }
@@ -1011,7 +1090,7 @@ std::int32_t module_loader::decode_instruction(
         {
             // imported type.
             std::size_t import_index = -i.i - 1;
-            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            if(import_index >= mod.header.imports.size())
             {
                 throw interpreter_error(fmt::format(
                   "Import index {} out of range ({} >= {}).",
@@ -1043,7 +1122,10 @@ std::int32_t module_loader::decode_instruction(
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
             auto properties = loader.get_type_properties(imp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
         }
@@ -1066,7 +1148,10 @@ std::int32_t module_loader::decode_instruction(
             }
 
             auto properties = get_type_properties(exp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
         }
@@ -1077,7 +1162,8 @@ std::int32_t module_loader::decode_instruction(
     case opcode::setfield: [[fallthrough]];
     case opcode::getfield:
     {
-        vle_int struct_index, field_index;
+        vle_int struct_index;
+        vle_int field_index;
         ar & struct_index & field_index;
 
         field_properties properties;
@@ -1086,7 +1172,7 @@ std::int32_t module_loader::decode_instruction(
         {
             // imported type.
             std::size_t import_index = -struct_index.i - 1;
-            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            if(import_index >= mod.header.imports.size())
             {
                 throw interpreter_error(fmt::format(
                   "Import index {} out of range ({} >= {}).",
@@ -1118,9 +1204,18 @@ std::int32_t module_loader::decode_instruction(
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
             properties = loader.get_field_properties(imp_symbol.name, field_index.i);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.size),                               // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.offset),                                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.needs_gc),                                   // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), struct_index.i, imp_symbol.name, field_index.i);
         }
@@ -1138,9 +1233,18 @@ std::int32_t module_loader::decode_instruction(
             }
 
             properties = get_field_properties(exp_symbol.name, field_index.i);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.size), reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.offset), reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.needs_gc), reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.size),                               // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.size) + sizeof(properties.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.offset),                                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.offset) + sizeof(properties.offset));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.needs_gc),                                   // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.needs_gc) + sizeof(properties.needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), struct_index.i, exp_symbol.name, field_index.i);
         }
@@ -1149,10 +1253,8 @@ std::int32_t module_loader::decode_instruction(
         {
             return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(properties.size);
         }
-        else
-        {
-            return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
-        }
+
+        return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
     }
     /* checkcast */
     case opcode::checkcast:
@@ -1164,7 +1266,7 @@ std::int32_t module_loader::decode_instruction(
         {
             // imported type.
             std::size_t import_index = -struct_index.i - 1;
-            if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
+            if(import_index >= mod.header.imports.size())
             {
                 throw interpreter_error(fmt::format(
                   "Import index {} out of range ({} >= {}).",
@@ -1196,8 +1298,14 @@ std::int32_t module_loader::decode_instruction(
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
             auto properties = loader.get_type_properties(imp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.flags), reinterpret_cast<std::byte*>(&properties.flags) + sizeof(properties.flags));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.flags),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.flags) + sizeof(properties.flags));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), struct_index.i, imp_symbol.name);
         }
@@ -1220,7 +1328,10 @@ std::int32_t module_loader::decode_instruction(
             }
 
             auto properties = get_type_properties(exp_symbol.name);
-            code.insert(code.end(), reinterpret_cast<std::byte*>(&properties.layout_id), reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&properties.layout_id),                                    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&properties.layout_id) + sizeof(properties.layout_id));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
             recorder->record(static_cast<opcode>(instr), struct_index.i, exp_symbol.name);
         }

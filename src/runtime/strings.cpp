@@ -34,7 +34,7 @@ void string_length(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("string_length: argument is not a string.");
     }
 
-    stack.push_i32(s->length());
+    stack.push_i32(utils::numeric_cast<std::int32_t>(s->length()));
 }
 
 void string_equals(si::context& ctx, si::operand_stack& stack)
@@ -59,7 +59,7 @@ void string_equals(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("string_equals: arguments are not strings.");
     }
 
-    stack.push_i32(*s1 == *s2);
+    stack.push_i32((*s1 == *s2) ? 1 : 0);
 }
 
 void string_concat(si::context& ctx, si::operand_stack& stack)
@@ -84,7 +84,7 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("string_concat: arguments are not strings.");
     }
 
-    std::string* str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
+    auto* str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
     *str = *s1 + *s2;
 
     stack.push_addr<std::string>(str);
@@ -93,7 +93,7 @@ void string_concat(si::context& ctx, si::operand_stack& stack)
 void i32_to_string(si::context& ctx, si::operand_stack& stack)
 {
     auto [i] = get_args<std::int32_t>(ctx, stack);
-    std::string* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
+    auto* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
     str->assign(fmt::format("{}", i));
     stack.push_addr<std::string>(str);
 }
@@ -101,7 +101,7 @@ void i32_to_string(si::context& ctx, si::operand_stack& stack)
 void f32_to_string(si::context& ctx, si::operand_stack& stack)
 {
     auto [f] = get_args<float>(ctx, stack);
-    std::string* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
+    auto* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
     str->assign(fmt::format("{}", f));
     stack.push_addr<std::string>(str);
 }
@@ -119,7 +119,7 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
     std::size_t result_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "result"));
     std::size_t i32s_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "i32s"));
 
-    result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
+    auto* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
       result_layout_id, sizeof(result), std::alignment_of_v<result>,
       gc::gc_object::of_temporary));
     stack.push_addr(r);
@@ -162,7 +162,7 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
     std::size_t result_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "result"));
     std::size_t f32s_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "f32s"));
 
-    result* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(
+    auto* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
       result_layout_id, sizeof(result), std::alignment_of_v<result>,
       gc::gc_object::of_temporary));
     stack.push_addr(r);

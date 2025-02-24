@@ -40,14 +40,13 @@ static ty::type_class to_type_class(const module_::variable_type& vt)
     {
         return ty::type_class::tc_array;
     }
-    else if(ty::is_builtin_type(vt.base_type()))
+
+    if(ty::is_builtin_type(vt.base_type()))
     {
         return ty::type_class::tc_plain;
     }
-    else
-    {
-        return ty::type_class::tc_struct;
-    }
+
+    return ty::type_class::tc_struct;
 }
 
 /**
@@ -63,7 +62,7 @@ static cg::value to_value(
   const module_::variable_type& vt,
   const module_::module_resolver& resolver,
   const std::string& import_path,
-  std::optional<std::string> name = std::nullopt)
+  const std::optional<std::string>& name = std::nullopt)
 {
     // Built-in types.
     if(ty::is_builtin_type(vt.base_type()))
@@ -81,6 +80,7 @@ static cg::value to_value(
     if(vt.get_import_index().has_value())
     {
         // This is an imported type.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(vt.get_import_index().value());
         if(sym.type != module_::symbol_type::package)
         {
@@ -123,6 +123,7 @@ static ty::type_info to_unresolved_type_info(
     if(desc.base_type.get_import_index().has_value())
     {
         // This is an imported type.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(desc.base_type.get_import_index().value());
         if(sym.type != module_::symbol_type::package)
         {
@@ -236,7 +237,7 @@ module_::module_resolver& context::resolve_module(const std::string& import_name
     if(it != resolvers.end())
     {
         // module is already resolved.
-        return *it->second.get();
+        return *it->second;
     }
 
     return slang::resolve::resolve_module(file_mgr, resolvers, import_name);
@@ -315,7 +316,8 @@ void context::add_function(
       import_path);
 
     std::vector<ty::type_info> arg_types;
-    for(auto& arg: desc.signature.arg_types)
+    arg_types.reserve(desc.signature.arg_types.size());
+    for(const auto& arg: desc.signature.arg_types)
     {
         arg_types.emplace_back(to_resolved_type_info(type_ctx, arg, resolver, import_path));
     }
@@ -362,7 +364,8 @@ void context::add_type(
     // Add type to typing context.
     {
         std::vector<std::pair<token, ty::type_info>> members;
-        for(auto& [member_name, member_type]: desc.member_types)
+        members.reserve(desc.member_types.size());
+        for(const auto& [member_name, member_type]: desc.member_types)
         {
             members.push_back(std::make_pair<token, ty::type_info>(
               {member_name, {0, 0}},
@@ -377,9 +380,9 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
     const std::vector<std::string>& imports = type_ctx.get_imported_modules();
 
-    for(auto& import_path: imports)
+    for(const auto& import_path: imports)
     {
-        if(import_path.size() == 0)
+        if(import_path.empty())
         {
             throw resolve_error("Cannot resolve empty import.");
         }
@@ -387,7 +390,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
         module_::module_resolver& resolver = resolve_module(import_path);
         const module_::module_header& header = resolver.get_module().get_header();
 
-        for(auto& it: header.exports)
+        for(const auto& it: header.exports)
         {
             if(it.type == module_::symbol_type::constant)
             {

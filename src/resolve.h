@@ -90,10 +90,10 @@ protected:
      * Resolve imports for a given module. Only loads a module if it is not
      * already resolved.
      *
-     * @param import_path The module's import name.
+     * @param import_name The module's import name.
      * @returns A reference to the resolved module.
      */
-    module_::module_resolver& resolve_module(const std::string& import_path);
+    module_::module_resolver& resolve_module(const std::string& import_name);
 
     /**
      * Add a constant to the type- and code generation contexts.

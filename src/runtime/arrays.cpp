@@ -43,8 +43,8 @@ void array_copy(si::context& ctx, si::operand_stack& stack)
     // copy array with bounds check.
     if(to_type == gc::gc_object_type::array_i32 || to_type == gc::gc_object_type::array_f32)
     {
-        auto from_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(from);
-        auto to_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(to);
+        auto* from_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(from);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        auto* to_array = reinterpret_cast<si::fixed_vector<std::int32_t>*>(to);        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
         if(to_array->size() < from_array->size())
         {
@@ -59,8 +59,8 @@ void array_copy(si::context& ctx, si::operand_stack& stack)
     else if(to_type == gc::gc_object_type::array_str
             || to_type == gc::gc_object_type::array_aref)
     {
-        auto from_array = reinterpret_cast<si::fixed_vector<void*>*>(from);
-        auto to_array = reinterpret_cast<si::fixed_vector<void*>*>(to);
+        auto* from_array = reinterpret_cast<si::fixed_vector<void*>*>(from);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        auto* to_array = reinterpret_cast<si::fixed_vector<void*>*>(to);        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
         if(to_array->size() < from_array->size())
         {

@@ -120,7 +120,7 @@ protected:
         }
 
         current_token = current_lexer->next();
-        if(current_token == std::nullopt && throw_on_eof)
+        if(!current_token.has_value() && throw_on_eof)
         {
             throw syntax_error("Unexpected end of file.");
         }
