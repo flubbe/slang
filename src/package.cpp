@@ -110,7 +110,14 @@ bool package::is_valid_name_component(const std::string& name)
  * package_manager implementation.
  */
 
-fs::path package_manager::get_path(const fs::path& path)
+/**
+ * Return the canonical form of the path. Creates the path if it does not exist.
+ *
+ * @param path The path to create.
+ * @throws `std::bad_alloc` on allocation failure and `fs::filesystem_error`
+ *         when path creation fails or the canonical path cannot be obtained.
+ */
+static fs::path get_path(const fs::path& path)
 {
     if(!fs::exists(path))
     {

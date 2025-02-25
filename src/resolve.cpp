@@ -243,7 +243,17 @@ module_::module_resolver& context::resolve_module(const std::string& import_name
     return slang::resolve::resolve_module(file_mgr, resolvers, import_name);
 }
 
-void context::add_constant(
+/**
+ * Add a constant to the type- and code generation contexts.
+ *
+ * @param ctx Code generation context.
+ * @param type_ctx Type context.
+ * @param resolver Resolver for the module containing the constant.
+ * @param import_path Import path of the module containing the constant.
+ * @param name The constant's name.
+ * @param index Index into the module's constant table.
+ */
+static void add_constant(
   cg::context& ctx,
   ty::context& type_ctx,
   const module_::module_resolver& resolver,
@@ -288,7 +298,17 @@ void context::add_constant(
     }
 }
 
-void context::add_function(
+/**
+ * Add a function to the type- and code generation contexts.
+ *
+ * @param ctx Code generation context.
+ * @param type_ctx Type context.
+ * @param resolver Resolver for the module containing the function.
+ * @param import_path Import path of the module containing the function.
+ * @param name The function's name.
+ * @param desc The function desciptor.
+ */
+static void add_function(
   cg::context& ctx,
   ty::context& type_ctx,
   const module_::module_resolver& resolver,
@@ -329,7 +349,17 @@ void context::add_function(
       import_path);
 }
 
-void context::add_type(
+/**
+ * Add a type to the type- and code generation contexts.
+ *
+ * @param ctx Code generation context.
+ * @param type_ctx Type context.
+ * @param resolver Resolver for the module containing the constant.
+ * @param import_path Import path of the module containing the type.
+ * @param name The type's name.
+ * @param desc The type desciptor.
+ */
+static void add_type(
   cg::context& ctx,
   ty::context& type_ctx,
   const module_::module_resolver& resolver,

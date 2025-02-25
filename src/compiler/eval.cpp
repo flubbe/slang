@@ -27,19 +27,24 @@ namespace slang::ast
 
 std::unique_ptr<cg::value> literal_expression::evaluate(cg::context& ctx) const
 {
+    if(!tok.value.has_value())
+    {
+        throw cg::codegen_error(loc, "Literal expression has no value.");
+    }
+
     if(tok.type == token_type::int_literal)
     {
-        return std::make_unique<cg::constant_int>(std::get<std::int32_t>(*tok.value));
+        return std::make_unique<cg::constant_int>(std::get<std::int32_t>(tok.value.value()));
     }
 
     if(tok.type == token_type::fp_literal)
     {
-        return std::make_unique<cg::constant_float>(std::get<float>(*tok.value));
+        return std::make_unique<cg::constant_float>(std::get<float>(tok.value.value()));
     }
 
     if(tok.type == token_type::str_literal)
     {
-        return std::make_unique<cg::constant_str>(std::get<std::string>(*tok.value));
+        return std::make_unique<cg::constant_str>(std::get<std::string>(tok.value.value()));
     }
 
     return {nullptr};

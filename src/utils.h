@@ -22,16 +22,6 @@ namespace slang::utils
 {
 
 /**
- * Try to get the terminal width. If the terminal width cannot be
- * determined, a default of default_terminal_width (80) is returned.
- * This can happen if none of stdin, stdout, stderr is attached to
- * a terminal (not our use-case).
- *
- * @return The terminal width.
- */
-std::size_t get_terminal_width();
-
-/**
  * Split a string at a delimiter.
  *
  * @param s The string to split.

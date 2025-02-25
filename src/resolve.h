@@ -95,60 +95,6 @@ protected:
      */
     module_::module_resolver& resolve_module(const std::string& import_name);
 
-    /**
-     * Add a constant to the type- and code generation contexts.
-     *
-     * @param ctx Code generation context.
-     * @param type_ctx Type context.
-     * @param resolver Resolver for the module containing the constant.
-     * @param import_path Import path of the module containing the constant.
-     * @param name The constant's name.
-     * @param index Index into the module's constant table.
-     */
-    void add_constant(
-      codegen::context& ctx,
-      typing::context& type_ctx,
-      const module_::module_resolver& resolver,
-      const std::string& import_path,
-      const std::string& name,
-      std::size_t index);
-
-    /**
-     * Add a function to the type- and code generation contexts.
-     *
-     * @param ctx Code generation context.
-     * @param type_ctx Type context.
-     * @param resolver Resolver for the module containing the function.
-     * @param import_path Import path of the module containing the function.
-     * @param name The function's name.
-     * @param desc The function desciptor.
-     */
-    void add_function(
-      codegen::context& ctx,
-      typing::context& type_ctx,
-      const module_::module_resolver& resolver,
-      const std::string& import_path,
-      const std::string& name,
-      const module_::function_descriptor& desc);
-
-    /**
-     * Add a type to the type- and code generation contexts.
-     *
-     * @param ctx Code generation context.
-     * @param type_ctx Type context.
-     * @param resolver Resolver for the module containing the constant.
-     * @param import_path Import path of the module containing the type.
-     * @param name The type's name.
-     * @param desc The type desciptor.
-     */
-    void add_type(
-      codegen::context& ctx,
-      typing::context& type_ctx,
-      const module_::module_resolver& resolver,
-      const std::string& import_path,
-      const std::string& name,
-      const module_::struct_descriptor& desc);
-
 public:
     /** Default constructors. */
     context() = delete;

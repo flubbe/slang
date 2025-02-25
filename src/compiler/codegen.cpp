@@ -1311,6 +1311,64 @@ std::string context::generate_label()
     return fmt::format("{}", label_count - 1);
 }
 
+/**
+ * Print strings potentially containing non-alphanumeric characters.
+ * These are replaced by their hex values.
+ *
+ * @param s The string to print.
+ * @returns A printable string.
+ */
+static std::string make_printable(const std::string& s)
+{
+    std::string str;
+
+    // replace non-printable characters by their character codes.
+    for(const auto& c: s)
+    {
+        if(isalnum(c) == 0 && c != ' ')
+        {
+            str += fmt::format("\\x{:02x}", c);
+        }
+        else
+        {
+            str += c;
+        }
+    }
+
+    return str;
+};
+
+/**
+ * Print a constant including its type.
+ *
+ * @param index The constant's index in the constant table.
+ * @param c The constant table entry.
+ * @returns A string containing the constant's information.
+ */
+static std::string print_constant(std::size_t index, const module_::constant_table_entry& c)
+{
+    std::string buf;
+
+    if(c.type == module_::constant_type::i32)
+    {
+        buf += fmt::format(".i32 @{} {}", index, std::get<std::int32_t>(c.data));
+    }
+    else if(c.type == module_::constant_type::f32)
+    {
+        buf += fmt::format(".f32 @{} {}", index, std::get<float>(c.data));
+    }
+    else if(c.type == module_::constant_type::str)
+    {
+        buf += fmt::format(".string @{} \"{}\"", index, make_printable(std::get<std::string>(c.data)));
+    }
+    else
+    {
+        buf += fmt::format(".<unknown> @{}", index);
+    }
+
+    return buf;
+};
+
 std::string context::to_string() const
 {
     std::string buf;
@@ -1318,56 +1376,11 @@ std::string context::to_string() const
     // constants.
     if(!constants.empty())
     {
-        auto make_printable = [](const std::string& s) -> std::string
-        {
-            std::string str;
-
-            // replace non-printable characters by their character codes.
-            for(const auto& c: s)
-            {
-                if(!isalnum(c) && c != ' ')
-                {
-                    str += fmt::format("\\x{:02x}", c);
-                }
-                else
-                {
-                    str += c;
-                }
-            }
-
-            return str;
-        };
-
-        auto print_constant = [&buf, &make_printable](std::size_t i, const module_::constant_table_entry& c, bool newline = true) -> void
-        {
-            if(c.type == module_::constant_type::i32)
-            {
-                buf += fmt::format(".i32 @{} {}", i, std::get<std::int32_t>(c.data));
-            }
-            else if(c.type == module_::constant_type::f32)
-            {
-                buf += fmt::format(".f32 @{} {}", i, std::get<float>(c.data));
-            }
-            else if(c.type == module_::constant_type::str)
-            {
-                buf += fmt::format(".string @{} \"{}\"", i, make_printable(std::get<std::string>(c.data)));
-            }
-            else
-            {
-                buf += fmt::format(".<unknown> @{}", i);
-            }
-
-            if(newline)
-            {
-                buf += "\n";
-            }
-        };
-
         for(std::size_t i = 0; i < constants.size() - 1; ++i)
         {
-            print_constant(i, constants[i]);
+            buf += fmt::format("{}\n", print_constant(i, constants[i]));
         }
-        print_constant(constants.size() - 1, constants.back(), false);
+        buf += print_constant(constants.size() - 1, constants.back());
 
         // don't append a newline if the constant table is the only non-empty buffer.
         if(!types.empty() || !funcs.empty())

@@ -714,7 +714,8 @@ void context::resolve(type_info& ty)
               ty.get_location(),
               fmt::format(
                 "Cannot resolve type '{}' from '{}'.",
-                ty.to_string(), *ty.get_import_path()));
+                ty.to_string(),
+                ty.get_import_path().value()));    // NOLINT(bugprone-unchecked-optional-access)
         }
 
         throw type_error(

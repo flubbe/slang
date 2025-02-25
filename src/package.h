@@ -112,16 +112,6 @@ class package_manager
     /** The root path for this package manager. The path is lazily created if not explicitly asked for. */
     fs::path package_root;
 
-    /**
-     * Return the canonical form of the path. Creates the path if it does not exist.
-     *
-     * @param path The path to create.
-     *
-     * @throws std::bad_alloc on allocation failure and fs::filesystem_error
-     *         when path creation fails or the canonical path cannot be obtained.
-     */
-    fs::path get_path(const fs::path& path);
-
 public:
     /**
      * Construct a new package manager.
