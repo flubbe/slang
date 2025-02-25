@@ -381,7 +381,7 @@ public:
     void set_from_encoded(const std::string& s);
 
     /** Return the base type. */
-    std::string base_type() const
+    const std::string& base_type() const noexcept
     {
         return decoded_type_string;
     }

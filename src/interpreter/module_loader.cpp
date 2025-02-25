@@ -26,11 +26,11 @@ static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
-bool is_garbage_collected(const module_::variable_type& t)
+bool is_garbage_collected(const module_::variable_type& t) noexcept
 {
     if(t.base_type() == "void")
     {
-        throw interpreter_error("Found void type in type info for garbage collector.");
+        return false;
     }
 
     // check for built-in non-gc types.
@@ -43,7 +43,7 @@ bool is_garbage_collected(const module_::variable_type& t)
  * @param info The type info.
  * @returns Return whether a type is garbage collected.
  */
-static bool is_garbage_collected(const slang::module_::field_descriptor& info)
+static bool is_garbage_collected(const slang::module_::field_descriptor& info) noexcept
 {
     return info.base_type.is_array() || is_garbage_collected(info.base_type);
 }

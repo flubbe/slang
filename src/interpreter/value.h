@@ -362,13 +362,13 @@ public:
     }
 
     /** Get the value's size. */
-    std::size_t get_size() const
+    std::size_t get_size() const noexcept
     {
         return size;
     }
 
     /** Get the value's type. */
-    const module_::variable_type& get_type() const
+    const module_::variable_type& get_type() const noexcept
     {
         return type;
     }

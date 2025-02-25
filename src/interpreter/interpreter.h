@@ -41,7 +41,7 @@ inline std::string make_type_name(
  * @param t The type string.
  * @returns Return whether a type is garbage collected.
  */
-bool is_garbage_collected(const module_::variable_type& t);
+bool is_garbage_collected(const module_::variable_type& t) noexcept;
 
 /** Interpreter context. */
 class context

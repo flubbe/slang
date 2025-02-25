@@ -88,10 +88,10 @@ function::function(
   context& ctx,
   module_loader& loader,
   module_::function_signature signature,
-  std::size_t entry_point,
+  std::size_t entry_point,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t size,
   std::vector<module_::variable_descriptor> locals,
-  std::size_t locals_size,
+  std::size_t locals_size,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_size)
 : ctx{ctx}
 , loader{loader}
@@ -1137,7 +1137,7 @@ opcode context::exec(
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
                   { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                    return s_u32 << a_u32; });
+                    return static_cast<std::int32_t>(s_u32 << a_u32); });
                 break;
             } /* opcode::ishl */
             case opcode::ishr:
@@ -1149,7 +1149,7 @@ opcode context::exec(
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
                   { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                    return s_u32 >> a_u32; });
+                    return static_cast<std::int32_t>(s_u32 >> a_u32); });
                 break;
             } /* opcode::ishr */
             case opcode::icmpl:
@@ -1507,7 +1507,14 @@ public:
                 }
             }
 
-            offset += arg.destroy(&locals[offset]);
+            try
+            {
+                offset += arg.destroy(&locals[offset]);
+            }
+            catch(std::exception& e)
+            {
+                DEBUG_LOG("GC error during argument destruction while processing argument: {}", e.what());
+            }
         }
     }
 

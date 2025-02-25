@@ -708,7 +708,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
               utils::numeric_cast<std::int64_t>(
                 exports.get_index(
                   module_::symbol_type::function,
-                  v->get_name().value()))};
+                  v->get_name().value_or("<invalid-name>")))};
             emit(instruction_buffer, opcode::invoke);
             instruction_buffer & index;
             return;
@@ -726,14 +726,17 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
           });
         if(import_it == ctx.prototypes.end())
         {
-            throw emitter_error(fmt::format("Could not resolve imported function '{}'.", *arg->get_value()->get_name()));
+            throw emitter_error(
+              fmt::format(
+                "Could not resolve imported function '{}'.",
+                arg->get_value()->get_name().value_or("<invalid-name>")));
         }
 
         vle_int index{
           -utils::numeric_cast<std::int64_t>(
             ctx.get_import_index(
               module_::symbol_type::function,
-              *(*import_it)->get_import_path(),
+              (*import_it)->get_import_path().value_or("<invalid-import-path>"),
               (*import_it)->get_name()))
           - 1};
         emit(instruction_buffer, opcode::invoke);
@@ -785,7 +788,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 {
                     throw emitter_error(fmt::format(
                       "Cannot find type '{}' from package '{}' in import table.",
-                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
+                      (*struct_it)->get_name(),
+                      (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
                 struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
             }
@@ -813,7 +817,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
           });
         if(field_it == members.end())
         {
-            throw emitter_error(fmt::format("Could not resolve field '{}' in struct '{}'.", *arg->get_member().get_name(), arg->get_struct_name()));
+            throw emitter_error(
+              fmt::format(
+                "Could not resolve field '{}' in struct '{}'.",
+                arg->get_member().get_name().value_or("<invalid-name>"),
+                arg->get_struct_name()));
         }
         field_index = std::distance(members.begin(), field_it);
 
@@ -851,9 +859,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                                               });
                 if(import_it == ctx.imports.end())
                 {
-                    throw emitter_error(fmt::format(
-                      "Cannot find type '{}' from package '{}' in import table.",
-                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
+                    throw emitter_error(
+                      fmt::format(
+                        "Cannot find type '{}' from package '{}' in import table.",
+                        (*struct_it)->get_name(),
+                        (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
                 struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
             }
@@ -878,11 +888,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             members.cend(),
             [arg](const std::pair<std::string, cg::value>& m) -> bool
             {
-                return m.first == *arg->get_member().get_name();
+                return m.first == arg->get_member().get_name().value_or("<invalid-name>");
             });
         if(field_it == members.cend())
         {
-            throw emitter_error(fmt::format("Could not resolve field '{}' in struct '{}'.", *arg->get_member().get_name(), arg->get_struct_name()));
+            throw emitter_error(
+              fmt::format(
+                "Could not resolve field '{}' in struct '{}'.",
+                arg->get_member().get_name().value_or("<invalid-name>"),
+                arg->get_struct_name()));
         }
         field_index = std::distance(members.begin(), field_it);
 
@@ -1021,9 +1035,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                   });
                 if(import_it == ctx.imports.end())
                 {
-                    throw emitter_error(fmt::format(
-                      "Cannot find type '{}' from package '{}' in import table.",
-                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
+                    throw emitter_error(
+                      fmt::format(
+                        "Cannot find type '{}' from package '{}' in import table.",
+                        (*struct_it)->get_name(),
+                        (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
                 struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
             }
@@ -1063,25 +1079,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         const auto& args = instr->get_args();
         auto type_class = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().get_type_class();    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
-        module_::array_type type;
-        if(type_class == cg::type_class::i32)
+        module_::array_type type = [&type_class, &args]() -> module_::array_type
         {
-            type = module_::array_type::i32;
-        }
-        else if(type_class == cg::type_class::f32)
-        {
-            type = module_::array_type::f32;
-        }
-        else if(type_class == cg::type_class::str)
-        {
-            type = module_::array_type::str;
-        }
-        else
-        {
+            if(type_class == cg::type_class::i32)
+            {
+                return module_::array_type::i32;
+            }
+
+            if(type_class == cg::type_class::f32)
+            {
+                return module_::array_type::f32;
+            }
+
+            if(type_class == cg::type_class::str)
+            {
+                return module_::array_type::str;
+            }
+
             throw std::runtime_error(fmt::format(
               "Unknown array type '{}' for newarray.",
               static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type().to_string()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        }
+        }();
 
         emit(instruction_buffer, opcode::newarray);
         instruction_buffer & type;
@@ -1120,9 +1138,11 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                                               });
                 if(import_it == ctx.imports.end())
                 {
-                    throw emitter_error(fmt::format(
-                      "Cannot find type '{}' from package '{}' in import table.",
-                      (*struct_it)->get_name(), *(*struct_it)->get_import_path()));
+                    throw emitter_error(
+                      fmt::format(
+                        "Cannot find type '{}' from package '{}' in import table.",
+                        (*struct_it)->get_name(),
+                        (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
                 struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
             }
@@ -1198,9 +1218,11 @@ void instruction_emitter::run()
               });
             if(import_it == ctx.imports.end())
             {
-                throw std::runtime_error(fmt::format(
-                  "Type '{}' from package '{}' not found in import table.",
-                  it->get_name(), *it->get_import_path()));
+                throw std::runtime_error(
+                  fmt::format(
+                    "Type '{}' from package '{}' not found in import table.",
+                    it->get_name(),
+                    it->get_import_path().value_or("<invalid-import-path>")));
             }
         }
         else
@@ -1292,7 +1314,7 @@ void instruction_emitter::run()
                 throw emitter_error(fmt::format("Unnamed variable in function '{}'.", f->get_name()));
             }
 
-            std::size_t index = s->get_index(*it->get_name());
+            std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
             if(unset_indices.find(index) == unset_indices.end())
             {
                 throw emitter_error(fmt::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
@@ -1315,7 +1337,7 @@ void instruction_emitter::run()
                 throw emitter_error(fmt::format("Unnamed variable in function '{}'.", f->get_name()));
             }
 
-            std::size_t index = s->get_index(*it->get_name());
+            std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
             if(unset_indices.find(index) == unset_indices.end())
             {
                 throw emitter_error(fmt::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
