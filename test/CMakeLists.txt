@@ -47,7 +47,7 @@ add_executable(test_parser
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_parser PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -65,7 +65,7 @@ add_executable(test_codegen
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_codegen PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -83,7 +83,7 @@ add_executable(test_compile_ir
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_compile_ir PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -105,7 +105,7 @@ add_executable(test_type_system
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_type_system PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -131,7 +131,7 @@ add_executable(test_resolve
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_resolve PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -160,7 +160,7 @@ add_executable(test_output
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_output PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}

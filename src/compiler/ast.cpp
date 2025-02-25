@@ -13,6 +13,8 @@
 #include <stack>
 #include <tuple>
 
+#include <gsl/gsl>
+
 #include "shared/module.h"
 #include "shared/type_utils.h"
 #include "ast.h"
@@ -1057,7 +1059,7 @@ void constant_declaration_expression::push_directive(
     super::push_directive(ctx, name, args);
 }
 
-std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     if(!expr->is_const_eval(ctx))
     {
@@ -1766,35 +1768,39 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
           "disable",
           "const_eval",
           disable_const_eval);
-        ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
-        if(ctx.evaluate_constant_subexpressions
-           && is_const_eval(ctx))
         {
-            auto v = evaluate(ctx);
-            if(v)
+            // Reset constant expression evaluation on scope exit.
+            auto _ = gsl::finally(
+              [&ctx, ctx_const_eval]
+              { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
+            ctx.evaluate_constant_subexpressions = !disable_const_eval;
+
+            if(ctx.evaluate_constant_subexpressions
+               && is_const_eval(ctx))
             {
-                auto t = v->get_type();
-                if(t.to_string() == "i32")
+                auto v = evaluate(ctx);
+                if(v)
                 {
-                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                    return v;
-                }
-                if(t.to_string() == "f32")
-                {
-                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                    return v;
+                    auto t = v->get_type();
+                    if(t.to_string() == "i32")
+                    {
+                        ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                        return v;
+                    }
+                    if(t.to_string() == "f32")
+                    {
+                        ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                        return v;
+                    }
+
+                    // fall-through
                 }
 
+                fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
                 // fall-through
             }
-
-            fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
-            // fall-through
         }
-
-        // FIXME This should be done via a mechanism like scope_exit.
-        ctx.evaluate_constant_subexpressions = ctx_const_eval;
 
         lhs_value = lhs->generate_code(ctx, memory_context::load);
         rhs_value = rhs->generate_code(ctx, memory_context::load);
@@ -2136,35 +2142,39 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
       "disable",
       "const_eval",
       disable_const_eval);
-    ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
-    if(ctx.evaluate_constant_subexpressions
-       && is_const_eval(ctx))
     {
-        auto v = evaluate(ctx);
-        if(v)
+        // Reset constant expression evaluation on scope exit.
+        auto _ = gsl::finally(
+          [&ctx, ctx_const_eval]
+          { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
+        ctx.evaluate_constant_subexpressions = !disable_const_eval;
+
+        if(ctx.evaluate_constant_subexpressions
+           && is_const_eval(ctx))
         {
-            auto t = v->get_type();
-            if(t.to_string() == "i32")
+            auto v = evaluate(ctx);
+            if(v)
             {
-                ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                return v;
-            }
-            if(t.to_string() == "f32")
-            {
-                ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                return v;
+                auto t = v->get_type();
+                if(t.to_string() == "i32")
+                {
+                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                    return v;
+                }
+                if(t.to_string() == "f32")
+                {
+                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                    return v;
+                }
+
+                // fall-through
             }
 
+            fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
             // fall-through
         }
-
-        fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
-        // fall-through
     }
-
-    // FIXME This should be done via a mechanism like scope_exit.
-    ctx.evaluate_constant_subexpressions = ctx_const_eval;
 
     if(op.s == "+")
     {

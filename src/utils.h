@@ -10,12 +10,15 @@
 
 #pragma once
 
-#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
-#include <limits>
 #include <list>
+#include <limits>
+#include <stdexcept>
 #include <string>
-#include <utility>
+#include <tuple>
+#include <type_traits>
 #include <vector>
 
 namespace slang::utils
@@ -105,7 +108,7 @@ template<typename T>
 constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignment, T p)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    return reinterpret_cast<T>((reinterpret_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
+    return reinterpret_cast<T>((reinterpret_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
 /**
@@ -119,7 +122,7 @@ constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignmen
 template<typename T>
 constexpr std::enable_if_t<std::is_integral_v<T>, T> align(std::size_t alignment, T p)
 {
-    return static_cast<T>((static_cast<uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
+    return static_cast<T>((static_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
 /*
