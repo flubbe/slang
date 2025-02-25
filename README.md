@@ -58,6 +58,13 @@ A preliminary (incomplete) documentation of the scripting language can be found 
     Install/download these, and set up your compiler to point to the corresponding `include` directories.
     Then use `CMake` to build the project.
 
+### Running the tests
+
+Run the tests using `ctest`. Assuming a debug build, run:
+```
+$ ctest --test-dir build/Debug
+```
+
 ### The scripting language
 
 A simple _Hello, World_ application looks like
