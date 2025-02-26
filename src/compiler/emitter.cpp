@@ -1414,8 +1414,8 @@ module_::language_module instruction_emitter::to_module() const
     {
         if(it.type == module_::symbol_type::package)
         {
-            auto p_it = std::find(packages.begin(), packages.end(), it.name);
-            if(p_it != packages.end())
+            auto p_it = std::find(packages.cbegin(), packages.cend(), it.name);
+            if(p_it != packages.cend())
             {
                 packages.erase(p_it);
             }
@@ -1423,15 +1423,17 @@ module_::language_module instruction_emitter::to_module() const
         else
         {
             // ensure we import the symbol's package.
-            auto p_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                     [&it](auto& s) -> bool
-                                     {
-                                         return s.type == module_::symbol_type::package && s.name == it.import_path;
-                                     });
-            if(p_it == ctx.imports.end())
+            auto p_it = std::find_if(
+              ctx.imports.cbegin(),
+              ctx.imports.cend(),
+              [&it](const auto& s) -> bool
+              {
+                  return s.type == module_::symbol_type::package && s.name == it.import_path;
+              });
+            if(p_it == ctx.imports.cend())
             {
-                auto p_it = std::find(packages.begin(), packages.end(), it.name);
-                if(p_it == packages.end())
+                auto p_it = std::find(packages.cbegin(), packages.cend(), it.name);
+                if(p_it == packages.cend())
                 {
                     packages.push_back(it.import_path);
                 }
@@ -1444,15 +1446,15 @@ module_::language_module instruction_emitter::to_module() const
     auto add_symbol_to_template = [&template_header](const cg::imported_symbol& s)
     {
         if(std::find_if(
-             template_header.begin(),
-             template_header.end(),
+             template_header.cbegin(),
+             template_header.cend(),
              [&s](const cg::imported_symbol& it)
              {
                  return s.type == it.type
                         && s.name == it.name
                         && s.import_path == it.import_path;
              })
-           == template_header.end())
+           == template_header.cend())
         {
             template_header.emplace_back(s);
         }
@@ -1464,7 +1466,7 @@ module_::language_module instruction_emitter::to_module() const
     }
     for(const auto& it: packages)
     {
-        add_symbol_to_template({module_::symbol_type::package, it, std::string()});
+        add_symbol_to_template({module_::symbol_type::package, it, std::string{}});
     }
 
     for(const auto& it: template_header)
@@ -1476,19 +1478,19 @@ module_::language_module instruction_emitter::to_module() const
         else
         {
             auto import_it = std::find_if(
-              template_header.begin(),
-              template_header.end(),
-              [&it](auto& s) -> bool
+              template_header.cbegin(),
+              template_header.cend(),
+              [&it](const auto& s) -> bool
               {
                   return s.type == module_::symbol_type::package && s.name == it.import_path;
               });
 
-            if(import_it == template_header.end())
+            if(import_it == template_header.cend())
             {
                 throw std::runtime_error(fmt::format("Package '{}' not found in package table.", it.import_path));
             }
 
-            mod.add_import(it.type, it.name, std::distance(template_header.begin(), import_it));
+            mod.add_import(it.type, it.name, std::distance(template_header.cbegin(), import_it));
         }
     }
 
