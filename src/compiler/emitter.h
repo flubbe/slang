@@ -126,6 +126,16 @@ public:
     void add_constant(std::string name, std::size_t i);
 
     /**
+     * Add a macro to the export table.
+     *
+     * @param name The macro's name.
+     * @param desc Macro descriptor.
+     */
+    void add_macro(
+      std::string name,
+      module_::macro_descriptor desc);
+
+    /**
      * Get the index of a symbol.
      *
      * @param t The symbol type.

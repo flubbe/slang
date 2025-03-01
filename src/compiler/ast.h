@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -209,6 +209,13 @@ public:
      * @returns True if the directive is supported, and false otherwise.
      */
     virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
+
+    /**
+     * Expand macros stored in the context.
+     *
+     * @param ctx THe code generation context.
+     */
+    void expand_macros(cg::context& ctx);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -1989,6 +1996,46 @@ public:
     {
         return "Continue()";
     }
+};
+
+/** Macros. */
+class macro_expression : public expression
+{
+    /** The macro's name. */
+    token name;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** No default constructor. */
+    macro_expression() = delete;
+
+    /** Copy and move constructors. */
+    macro_expression(const macro_expression&) = delete;
+    macro_expression(macro_expression&&) = default;
+
+    /** Default assignment operators. */
+    macro_expression& operator=(const macro_expression&) = delete;
+    macro_expression& operator=(macro_expression&&) = default;
+
+    /**
+     * Construct a macro expression.
+     *
+     * @param loc The location.
+     */
+    explicit macro_expression(
+      token_location loc,
+      token name)
+    : expression{std::move(loc)}
+    , name{std::move(name)}
+    {
+    }
+
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    bool supports_directive(const std::string& name) const override;
+    std::string to_string() const override;
 };
 
 }    // namespace slang::ast

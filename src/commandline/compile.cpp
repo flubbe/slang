@@ -201,6 +201,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     ast->collect_names(codegen_ctx, type_ctx);
     resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
+    ast->expand_macros(codegen_ctx);
     type_ctx.resolve_types();
     ast->type_check(type_ctx);
     ast->generate_code(codegen_ctx);

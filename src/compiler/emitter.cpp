@@ -192,6 +192,23 @@ void export_table_builder::add_constant(std::string name, std::size_t i)
     export_table.emplace_back(module_::symbol_type::constant, std::move(name), i);
 }
 
+void export_table_builder::add_macro(std::string name, module_::macro_descriptor desc)
+{
+    if(std::find_if(export_table.begin(), export_table.end(),
+                    [&name](const module_::exported_symbol& entry) -> bool
+                    { return entry.type == module_::symbol_type::macro
+                             && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add macro to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(
+      module_::symbol_type::macro,
+      name,
+      std::move(desc));
+}
+
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
 {
     auto it = std::find_if(export_table.begin(), export_table.end(),
@@ -245,6 +262,10 @@ void export_table_builder::write(module_::language_module& mod) const
         else if(entry.type == module_::symbol_type::constant)
         {
             mod.add_constant(entry.name, std::get<std::size_t>(entry.desc));
+        }
+        else if(entry.type == module_::symbol_type::macro)
+        {
+            mod.add_macro(entry.name, std::get<module_::macro_descriptor>(entry.desc));
         }
         else
         {
@@ -1273,6 +1294,58 @@ void instruction_emitter::run()
               f->get_name(),
               std::move(return_type),
               std::move(arg_types));
+        }
+    }
+
+    // exported macros.
+    for(auto& m: ctx.macros)
+    {
+        if(m->is_import())
+        {
+            // Macros are only valid at compile-time, so
+            // they should not appear in the import table.
+            auto import_it = std::find_if(
+              ctx.imports.cbegin(),
+              ctx.imports.cend(),
+              [&m](const cg::imported_symbol& s) -> bool
+              {
+                  return s.type == module_::symbol_type::macro
+                         && s.name == m->get_name()
+                         && s.import_path == m->get_import_path();
+              });
+            if(import_it != ctx.imports.cend())
+            {
+                throw std::runtime_error(
+                  fmt::format(
+                    "Macro '{}' from package '{}' should not appear in import table.",
+                    m->get_name(),
+                    m->get_import_path().value_or("<invalid-import-path>")));
+            }
+        }
+        else
+        {
+            std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
+            std::transform(
+              m->get_directives().cbegin(),
+              m->get_directives().cend(),
+              std::back_inserter(directives),
+              [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
+              {
+                  std::vector<std::pair<std::string, std::string>> args;
+                  std::transform(
+                    d.args.cbegin(),
+                    d.args.cend(),
+                    std::back_inserter(args),
+                    [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
+                    {
+                        return std::make_pair(arg.first.s, arg.second.s);
+                    });
+                  return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
+              });
+
+            exports.add_macro(
+              m->get_name(),
+              module_::macro_descriptor{std::move(directives)});
         }
     }
 

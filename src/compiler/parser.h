@@ -4,7 +4,7 @@
  * the parser. generates an AST from the lexer output.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -236,6 +236,9 @@ protected:
 
     /** Parse an return statement. */
     std::unique_ptr<ast::return_statement> parse_return();
+
+    /** Parse a macro. */
+    std::unique_ptr<ast::macro_expression> parse_macro();
 
     /** Push a directive onto the directive stack. */
     void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);

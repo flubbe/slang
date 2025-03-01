@@ -943,7 +943,56 @@ void context::create_native_function(std::string lib_name,
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    funcs.emplace_back(std::make_unique<function>(std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
+    funcs.emplace_back(
+      std::make_unique<function>(
+        std::move(lib_name),
+        std::move(name),
+        std::move(return_type),
+        std::move(args)));
+}
+
+void context::add_macro(
+  std::string name,
+  std::optional<std::string> import_path)
+{
+    if(std::find_if(
+         macros.begin(),
+         macros.end(),
+         [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
+         {
+             return m->get_name() == name
+                    && m->get_import_path() == import_path;
+         })
+       != macros.end())
+    {
+        throw codegen_error(fmt::format("Macro '{}' already defined.", name));
+    }
+
+    macros.emplace_back(
+      std::make_unique<macro>(
+        std::move(name),
+        directive_stack,
+        std::move(import_path)));
+}
+
+macro* context::get_macro(
+  std::string name,
+  std::optional<std::string> import_path)
+{
+    auto it = std::find_if(
+      macros.begin(),
+      macros.end(),
+      [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
+      {
+          return m->get_name() == name
+                 && m->get_import_path() == import_path;
+      });
+    if(it == macros.end())
+    {
+        throw codegen_error(fmt::format("Macro '{}' not found.", name));
+    }
+
+    return it->get();
 }
 
 void context::set_insertion_point(basic_block* ip)

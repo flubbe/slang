@@ -75,12 +75,13 @@ inline std::string to_string(const token_location& loc)
  */
 enum class token_type
 {
-    unknown,     /** Unknown token type. */
-    delimiter,   /** A delimiter, e.g. + - * / % ! & | ^ . :: < > ( ) { } [ ] ; */
-    identifier,  /** starts with A-Z, a-z or _ and continues with A-Z, a-z, _, 0-9 */
-    int_literal, /** integer literal */
-    fp_literal,  /** floating-point literal */
-    str_literal  /** a quoted string (including the quotes) */
+    unknown,          /** Unknown token type. */
+    delimiter,        /** A delimiter, e.g. + - * / % ! & | ^ . :: < > ( ) { } [ ] ; */
+    identifier,       /** starts with A-Z, a-z or _ and continues with A-Z, a-z, _, 0-9 */
+    macro_identifier, /** Same as `identifier`, but ending with ! */
+    int_literal,      /** integer literal */
+    fp_literal,       /** floating-point literal */
+    str_literal       /** a quoted string (including the quotes) */
 };
 
 /**

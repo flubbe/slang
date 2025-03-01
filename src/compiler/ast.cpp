@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -128,8 +128,12 @@ void expression::push_directive(
         throw ty::type_error(
           name.location,
           fmt::format(
-            "Directive '{}' with arguments '{}' is not supported by the expression with AST '{}'.",
-            name.s, arg_string, expr_string));
+            "Directive '{}'{} is not supported by the expression with AST '{}'.",
+            name.s,
+            !arg_string.empty()
+              ? fmt::format(" with arguments '{}'", arg_string)
+              : std::string{},
+            expr_string));
     }
 
     ctx.push_directive({name, args});
@@ -143,6 +147,11 @@ void expression::pop_directive(cg::context& ctx)
 bool expression::supports_directive(const std::string& name) const
 {
     return name == "disable";
+}
+
+void expression::expand_macros(cg::context& ctx)
+{
+    // TODO
 }
 
 /**
@@ -3198,6 +3207,34 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
     return nullptr;
+}
+
+/*
+ * macro_expression.
+ */
+
+void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+{
+    ctx.add_macro(name.s);
+}
+
+std::unique_ptr<cg::value> macro_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    // empty, as macros don't generate code.
+    return nullptr;
+}
+
+bool macro_expression::supports_directive(const std::string& name) const
+{
+    return super::supports_directive(name)
+           || name == "builtin";
+}
+
+std::string macro_expression::to_string() const
+{
+    return fmt::format("Macro(name={})", name.s);
 }
 
 }    // namespace slang::ast

@@ -4,7 +4,7 @@
  * the parser. generates an AST from the lexer output.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -37,7 +37,8 @@ static const std::set<std::string> keywords = {
   "struct", "null",
   "fn", "return", 
   "if", "else", 
-  "while", "break", "continue"
+  "while", "break", "continue",
+  "macro"
 };
 // clang-format on
 
@@ -56,7 +57,8 @@ static bool is_keyword(const std::string& s)
 static void validate_identifier_name(const token& tok)
 {
     // we probably already know this, but validate anyway.
-    if(tok.type != token_type::identifier)
+    if(tok.type != token_type::identifier
+       && tok.type != token_type::macro_identifier)
     {
         throw syntax_error(tok, fmt::format("Expected <identifier>, got '{}'.", tok.s));
     }
@@ -151,6 +153,11 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
     if(current_token->s == "fn")
     {
         return parse_definition();
+    }
+
+    if(current_token->s == "macro")
+    {
+        return parse_macro();
     }
 
     throw syntax_error(*current_token, fmt::format("Unexpected token '{}'", current_token->s));
@@ -1256,6 +1263,38 @@ std::unique_ptr<ast::return_statement> parser::parse_return()
     }
 
     return std::make_unique<ast::return_statement>(loc, std::move(expr));
+}
+
+std::unique_ptr<ast::macro_expression> parser::parse_macro()
+{
+    token_location loc = current_token->location;
+    get_next_token();    // skip 'macro'.
+
+    if(current_token->type != token_type::macro_identifier)
+    {
+        throw syntax_error(*current_token, "Expected <macro-identifier>.");
+    }
+
+    token name = *current_token;
+    validate_identifier_name(name);
+    get_next_token();
+
+    if(current_token->s != "{")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected '{{', got '{}'.", current_token->s));
+    }
+    get_next_token();
+
+    // TODO Parse macro definition.
+
+    if(current_token->s != "}")
+    {
+        throw syntax_error(*current_token, fmt::format("Expected '}', got '{}'.", current_token->s));
+    }
+
+    // don't skip closing brace, as this is done by the caller.
+
+    return std::make_unique<ast::macro_expression>(loc, std::move(name));
 }
 
 void parser::push_directive(const token& name, [[maybe_unused]] const std::vector<std::pair<token, token>>& args)

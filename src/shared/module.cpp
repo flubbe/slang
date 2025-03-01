@@ -270,4 +270,19 @@ void language_module::add_constant(std::string name, std::size_t i)
     header.exports.emplace_back(symbol_type::constant, name, i);
 }
 
+void language_module::add_macro(std::string name, macro_descriptor desc)
+{
+    if(std::find_if(header.exports.begin(), header.exports.end(),
+                    [&name](const exported_symbol& s) -> bool
+                    {
+                        return s.type == symbol_type::macro && s.name == name;
+                    })
+       != header.exports.end())
+    {
+        throw module_error(fmt::format("Cannot add macro: '{}' already defined.", name));
+    }
+
+    header.exports.emplace_back(symbol_type::macro, name, std::move(desc));
+}
+
 }    // namespace slang::module_
