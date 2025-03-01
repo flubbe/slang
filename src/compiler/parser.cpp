@@ -930,8 +930,8 @@ std::unique_ptr<ast::expression> parser::parse_new()
 // identifierexpr ::= identifier
 //                  | identifier ('++' | '--')
 //                  | identifier '[' primary ']'
-//                  | identifier '(' expression* ')'
-//                  | identifier '(' expression* ')' '[' primary ']'
+//                  | (identifier | macro_identifier) '(' expression* ')'
+//                  | (identifier | macro_identifier) '(' expression* ')' '[' primary ']'
 //                  | identifier '::' identifierexpr
 //                  | identifier '.' identifierexpr
 //                  | identifier '{' primary* '}'
@@ -996,7 +996,8 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
     {
         get_next_token();    // skip "::"
 
-        if(current_token->type != token_type::identifier)
+        if(current_token->type != token_type::identifier
+           && current_token->type != token_type::macro_identifier)
         {
             throw syntax_error(*current_token, "Expected <identifier>.");
         }
@@ -1073,7 +1074,27 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 
         if(named_initializers)
         {
-            return std::make_unique<ast::struct_named_initializer_expression>(std::move(identifier), std::move(member_names), std::move(initializers));
+            std::vector<std::unique_ptr<ast::named_initializer>> named_initializer_vector;
+            named_initializer_vector.reserve(member_names.size());
+            for(std::size_t i = 0; i < member_names.size(); ++i)
+            {
+                if(!member_names[i]->is_named_expression())
+                {
+                    throw parser_error(
+                      fmt::format(
+                        "{}: Unnamed member in initializer expression.",
+                        ::slang::to_string(member_names[i]->get_location())));
+                }
+
+                const auto* named_member_expr = member_names[i]->as_named_expression();
+                named_initializer_vector.emplace_back(
+                  std::make_unique<ast::named_initializer>(
+                    named_member_expr->get_name(), std::move(initializers[i])));
+            }
+
+            return std::make_unique<ast::struct_named_initializer_expression>(
+              std::move(identifier),
+              std::move(named_initializer_vector));
         }
 
         return std::make_unique<ast::struct_anonymous_initializer_expression>(std::move(identifier), std::move(initializers));

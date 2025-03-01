@@ -167,8 +167,12 @@ public:
      *
      * @param ctx The context to use for code generation.
      * @returns The value of this expression or nullptr.
+     * @note The default implementation does not generate code.
+     * @throws The default implementation throws `std::runtime_error`.
      */
-    virtual std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const = 0;
+    virtual std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const;
 
     /**
      * Name collection.
@@ -1169,16 +1173,104 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> exprs;
+        std::transform(
+          initializers.begin(),
+          initializers.end(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<expression>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        std::transform(
+          initializers.cbegin(),
+          initializers.cend(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<expression>& initializer) -> const expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+};
+
+/** An initializer for named struct initialization. */
+class named_initializer : public named_expression
+{
+    /** Initializer expression. */
+    std::unique_ptr<expression> expr;
+
+public:
+    /** Set the super class. */
+    using super = named_initializer;
+
+    /** No default constructor. */
+    named_initializer() = delete;
+
+    /** Copy and move constructors. */
+    named_initializer(const named_initializer&) = delete;
+    named_initializer(named_initializer&&) = default;
+
+    /** Assignment operators. */
+    named_initializer& operator=(const named_initializer&) = delete;
+    named_initializer& operator=(named_initializer&&) = default;
+
+    /**
+     * Construct a new named initializer.
+     *
+     * @param name The initialized member's name.
+     * @param expr The initializer expression.
+     */
+    named_initializer(token name, std::unique_ptr<expression> expr)
+    : named_expression{name.location, std::move(name)}
+    , expr{std::move(expr)}
+    {
+    }
+
+    /** Generates code for the initializing expression. */
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+
+    /** Returns the type of the initializing expression. */
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+
+    std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
+
+    /** Return the initializer expression. */
+    expression* get_expression()
+    {
+        return expr.get();
+    }
+
+    /** Return the initializer expression. */
+    const expression* get_expression() const
+    {
+        return expr.get();
+    }
 };
 
 /** Named struct initialization. */
 class struct_named_initializer_expression : public named_expression
 {
-    /** Initialized member names. */
-    std::vector<std::unique_ptr<expression>> member_names;
-
-    /** Initializers. */
-    std::vector<std::unique_ptr<expression>> initializers;
+    /** Initialized members. */
+    std::vector<std::unique_ptr<named_initializer>> initializers;
 
 public:
     /** Set the super class. */
@@ -1199,12 +1291,12 @@ public:
      * Construct a named struct initialization.
      *
      * @param name The struct's name.
-     * @param member_names The initialized member names.
-     * @param members The struct's members.
+     * @param initializers The named initializer expressions.
      */
-    struct_named_initializer_expression(token name, std::vector<std::unique_ptr<expression>> member_names, std::vector<std::unique_ptr<expression>> initializers)
+    struct_named_initializer_expression(
+      token name,
+      std::vector<std::unique_ptr<named_initializer>> initializers)
     : named_expression{name.location, std::move(name)}
-    , member_names{std::move(member_names)}
     , initializers{std::move(initializers)}
     {
     }
@@ -1212,6 +1304,37 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        // FIXME The names should be included, but just adding them
+        //       leads to namespace-related issues.
+        std::vector<expression*> exprs;
+        std::transform(
+          initializers.begin(),
+          initializers.end(),
+          std::back_inserter(exprs),
+          [](std::unique_ptr<named_initializer>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        // FIXME The names should be included, but just adding them
+        //       leads to namespace-related issues.
+        std::vector<const expression*> exprs;
+        std::transform(
+          initializers.cbegin(),
+          initializers.cend(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<named_initializer>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
 };
 
 /** Binary operators. */
@@ -1516,10 +1639,11 @@ public:
      * @param args The function's arguments as a vector of pairs `(name, type)`.
      * @param return_type The function's return type.
      */
-    prototype_ast(token_location loc,
-                  token name,
-                  std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
-                  std::unique_ptr<type_expression> return_type)
+    prototype_ast(
+      token_location loc,
+      token name,
+      std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
+      std::unique_ptr<type_expression> return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}
@@ -1647,11 +1771,21 @@ public:
 
     std::vector<expression*> get_children() override
     {
-        return {body.get()};
+        // FIXME The prototype should be included.
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
     }
     std::vector<const expression*> get_children() const override
     {
-        return {body.get()};
+        // FIXME The prototype should be included.
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
     }
 };
 
