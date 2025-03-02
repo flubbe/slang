@@ -38,6 +38,7 @@ add_test(NAME lexer COMMAND test_lexer)
 
 add_executable(test_parser
     test_parser.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp
     ../src/compiler/codegen.cpp
@@ -56,6 +57,7 @@ add_test(NAME parser COMMAND test_parser)
 
 add_executable(test_codegen
     test_codegen.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp
     ../src/compiler/codegen.cpp
@@ -74,6 +76,7 @@ add_test(NAME codegen COMMAND test_codegen)
 
 add_executable(test_compile_ir
     test_compile_ir.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp
     ../src/compiler/codegen.cpp
@@ -92,6 +95,7 @@ add_test(NAME compile_ir COMMAND test_compile_ir)
 
 add_executable(test_type_system
     test_type_system.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp
@@ -118,6 +122,7 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_resolve
     test_resolve.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp
@@ -145,6 +150,7 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_output
     test_output.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
     ../src/compiler/ast.cpp
     ../src/compiler/eval.cpp

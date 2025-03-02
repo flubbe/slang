@@ -16,6 +16,7 @@
 #include "ast.h"
 #include "codegen.h"
 #include "utils.h"
+#include "builtins/macros.h"
 
 namespace slang::codegen
 {
@@ -41,35 +42,7 @@ std::unique_ptr<ast::expression> macro::expand(
 {
     if(name == "format!")
     {
-        if(desc.directives.size() != 1)
-        {
-            throw codegen_error(loc, fmt::format("Expected 1 directive for 'format!', got {}.", desc.directives.size()));
-        }
-
-        if(desc.directives[0].first != "builtin" || !desc.directives[0].second.args.empty())
-        {
-            throw codegen_error(
-              loc,
-              fmt::format(
-                "Expected 'builtin' directive for 'format' with 0 arguments, got '{}' with {} arguments.",
-                desc.directives[0].first, desc.directives[0].second.args.size()));
-        }
-
-        if(args.empty())
-        {
-            throw codegen_error(loc, "Cannot evaluate macro 'format!' with no arguments. Consider removing it.");
-        }
-
-        // TODO - [ ] Format string parsing
-        //      - [ ] Type conversions?
-
-        if(args.size() == 1)
-        {
-            // FIXME We might want a copy?
-            return std::make_unique<ast::literal_expression>(args[0].location, args[0]);
-        }
-
-        throw std::runtime_error("not implemented");
+        return slang::codegen::macros::expand_builtin_format(desc, loc, args);
     }
 
     throw std::runtime_error("not implemented");
