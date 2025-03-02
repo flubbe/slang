@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -35,7 +35,9 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
  * Macros.
  */
 
-ast::expression* macro::evaluate(token_location loc, std::vector<ast::expression*> args) const
+std::unique_ptr<ast::expression> macro::expand(
+  token_location loc,
+  const std::vector<token>& args) const
 {
     if(name == "format!")
     {
@@ -44,7 +46,7 @@ ast::expression* macro::evaluate(token_location loc, std::vector<ast::expression
             throw codegen_error(loc, fmt::format("Expected 1 directive for 'format!', got {}.", desc.directives.size()));
         }
 
-        if(desc.directives[0].first != "builtin" || desc.directives[0].second.args.size() != 0)
+        if(desc.directives[0].first != "builtin" || !desc.directives[0].second.args.empty())
         {
             throw codegen_error(
               loc,
@@ -53,7 +55,7 @@ ast::expression* macro::evaluate(token_location loc, std::vector<ast::expression
                 desc.directives[0].first, desc.directives[0].second.args.size()));
         }
 
-        if(args.size() == 0)
+        if(args.empty())
         {
             throw codegen_error(loc, "Cannot evaluate macro 'format!' with no arguments. Consider removing it.");
         }
@@ -64,7 +66,7 @@ ast::expression* macro::evaluate(token_location loc, std::vector<ast::expression
         if(args.size() == 1)
         {
             // FIXME We might want a copy?
-            return args[0];
+            return std::make_unique<ast::literal_expression>(args[0].location, args[0]);
         }
 
         throw std::runtime_error("not implemented");

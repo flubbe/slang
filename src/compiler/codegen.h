@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -1856,15 +1856,15 @@ public:
     }
 
     /**
-     * Evaluate the macro.
+     * Expand the macro.
      *
-     * @param loc The location of the evaluation.
-     * @param args The macro arguments.
+     * @param loc The location of the expansion.
+     * @param tokens Tokens the macro operates on.
      * @returns The AST of the evaluation.
      */
-    ast::expression* evaluate(
+    std::unique_ptr<ast::expression> expand(
       token_location loc,
-      std::vector<ast::expression*> args) const;
+      const std::vector<token>& args) const;
 };
 
 /**

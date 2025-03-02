@@ -192,6 +192,8 @@ void compile::invoke(const std::vector<std::string>& args)
         return;
     }
 
+    const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
+
     ty::context type_ctx;
     rs::context resolve_ctx{file_mgr};
     cg::context codegen_ctx;
@@ -200,8 +202,10 @@ void compile::invoke(const std::vector<std::string>& args)
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
     ast->collect_names(codegen_ctx, type_ctx);
-    resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
-    ast->expand_macros(codegen_ctx);
+    do    // NOLINT(cppcoreguidelines-avoid-do-while)
+    {
+        resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
+    } while(ast->expand_macros(module_macro_asts, codegen_ctx));
     type_ctx.resolve_types();
     ast->type_check(type_ctx);
     ast->generate_code(codegen_ctx);

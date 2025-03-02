@@ -417,6 +417,13 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             throw resolve_error("Cannot resolve empty import.");
         }
 
+        auto it = resolvers.find(import_path);
+        if(it != resolvers.end())
+        {
+            // module is already resolved.
+            continue;
+        }
+
         module_::module_resolver& resolver = resolve_module(import_path);
         const module_::module_header& header = resolver.get_module().get_header();
 

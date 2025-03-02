@@ -110,19 +110,25 @@ public:
         return false;
     }
 
-    /** Whether this expression is a macro evaluation. */
-    virtual bool is_macro_evaluation() const
+    /** Whether this expression is a macro expression. */
+    virtual bool is_macro_expression() const
+    {
+        return false;
+    }
+
+    /** Whether this expression is a macro invokation. */
+    virtual bool is_macro_invokation() const
     {
         return false;
     }
 
     /**
-     * Get the expression as a call expression.
+     * Get the expression as a macro invokation expression.
      *
      * @note Updates the expression's namespace path.
      * @throws Throws a `std::runtime_error` if the expression is not a call expression.
      */
-    virtual class call_expression* as_call_expression();
+    virtual class macro_invokation* as_macro_invokation();
 
     /**
      * Get the expression as a struct member access expression.
@@ -229,11 +235,15 @@ public:
     virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
 
     /**
-     * Expand macros stored in the context.
+     * Expand macros stored.
      *
-     * @param ctx THe code generation context.
+     * @param macro_asts The module's macros as AST's.
+     * @param codegen_ctx Code generation context.
+     * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
-    void expand_macros(cg::context& ctx);
+    bool expand_macros(
+      const std::vector<expression*>& macro_asts,
+      cg::context& codegen_ctx);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -646,17 +656,17 @@ public:
         return expr->needs_pop();
     }
 
-    bool is_macro_evaluation() const override
+    bool is_macro_invokation() const override
     {
-        return expr->is_macro_evaluation();
+        return expr->is_macro_invokation();
     }
 
-    call_expression* as_call_expression() override
+    macro_invokation* as_macro_invokation() override
     {
         auto expr_namespace_stack = namespace_stack;
         expr_namespace_stack.push_back(name.s);
         expr->set_namespace(std::move(expr_namespace_stack));
-        return expr->as_call_expression();
+        return expr->as_macro_invokation();
     }
 
     bool is_const_eval(cg::context& ctx) const override
@@ -833,6 +843,11 @@ public:
     bool needs_pop() const override
     {
         return expr->needs_pop();
+    }
+
+    bool is_macro_expression() const override
+    {
+        return expr->is_macro_expression();
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1842,9 +1857,6 @@ class call_expression : public expression
     /** The return type. Set during type checking. */
     ty::type_info return_type;
 
-    /** The evaluated macro for macro call expressions. */
-    expression* eval_macro{nullptr};
-
 public:
     /** Set the super class. */
     using super = expression;
@@ -1865,8 +1877,12 @@ public:
      *
      * @param callee The callee's name.
      * @param args The argument expressions.
+     * @param index_expr Index expression for array access.
      */
-    call_expression(token callee, std::vector<std::unique_ptr<expression>> args, std::unique_ptr<expression> index_expr = nullptr)
+    call_expression(
+      token callee,
+      std::vector<std::unique_ptr<expression>> args,
+      std::unique_ptr<expression> index_expr = nullptr)
     : expression{callee.location}
     , callee{std::move(callee)}
     , args{std::move(args)}
@@ -1877,16 +1893,6 @@ public:
     bool needs_pop() const override
     {
         return return_type.to_string() != "void";
-    }
-
-    bool is_macro_evaluation() const override
-    {
-        return callee.type == token_type::macro_identifier;
-    }
-
-    call_expression* as_call_expression() override
-    {
-        return this;
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1941,15 +1947,86 @@ public:
         }
         return children;
     }
+};
+
+/** Macro invokation. */
+class macro_invokation : public named_expression
+{
+    /** Tokens the macro operates on. */
+    std::vector<token> tokens;
+
+    /** An optional index expression for return value array access. */
+    std::unique_ptr<expression> index_expr;
+
+    /** Macro expansion. */
+    std::unique_ptr<expression> expansion;
+
+public:
+    /** Set the super class. */
+    using super = named_expression;
+
+    /** No default constructor. */
+    macro_invokation() = delete;
+
+    /** Copy and move constructors. */
+    macro_invokation(const macro_invokation&) = delete;
+    macro_invokation(macro_invokation&&) = default;
+
+    /** Default assignment operators. */
+    macro_invokation& operator=(const macro_invokation&) = delete;
+    macro_invokation& operator=(macro_invokation&&) = default;
 
     /**
-     * Set the evaluated macro.
+     * Construct a macro invokation.
      *
-     * @param eval The evaluated macro AST.
+     * @param name The macro's name.
+     * @param tokens Tokens the macro operates on.
+     * @param index_expr Index expression for array access.
      */
-    void set_eval_macro(expression* eval)
+    macro_invokation(
+      token name,
+      std::vector<token> tokens,
+      std::unique_ptr<expression> index_expr = nullptr)
+    : named_expression{name.location, std::move(name)}
+    , tokens{std::move(tokens)}
+    , index_expr{std::move(index_expr)}
     {
-        eval_macro = eval;
+    }
+
+    bool is_macro_invokation() const override
+    {
+        return true;
+    }
+
+    macro_invokation* as_macro_invokation() override
+    {
+        return this;
+    }
+
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::string to_string() const override;
+
+    /** Get the tokens the macro operates on. */
+    const std::vector<token> get_tokens() const
+    {
+        return tokens;
+    }
+
+    /** Whether this macro is expanded. */
+    bool has_expansion() const
+    {
+        return static_cast<bool>(expansion);
+    }
+
+    /**
+     * Set the macro expansion.
+     *
+     * @param exp The expansion.
+     */
+    void set_expansion(std::unique_ptr<expression> exp)
+    {
+        expansion = std::move(exp);
     }
 };
 
@@ -2243,6 +2320,11 @@ public:
     : expression{std::move(loc)}
     , name{std::move(name)}
     {
+    }
+
+    bool is_macro_expression() const override
+    {
+        return true;
     }
 
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;

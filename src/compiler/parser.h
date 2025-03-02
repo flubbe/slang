@@ -104,6 +104,9 @@ protected:
     /** Directive stack with entries `(name, restore_function)`. */
     std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
 
+    /** Macro AST's. Point into the parsed AST. */
+    std::vector<ast::expression*> macro_asts;
+
     /**
      * Get the next token and store it in the token buffer `current_token`.
      *
@@ -272,6 +275,18 @@ public:
     std::shared_ptr<ast::expression> get_ast() const
     {
         return ast;
+    }
+
+    /** Get the macros (pointers into the AST). */
+    std::vector<ast::expression*>& get_macro_asts()
+    {
+        return macro_asts;
+    }
+
+    /** Get the macros (pointers into the AST). */
+    const std::vector<ast::expression*>& get_macro_asts() const
+    {
+        return macro_asts;
     }
 };
 

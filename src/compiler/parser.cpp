@@ -950,9 +950,57 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
           std::make_unique<ast::variable_reference_expression>(std::move(identifier)), std::move(postfix_op));
     }
 
-    if(current_token->s == "(")    // function call.
+    if(current_token->s == "(")    // function call or macro invokation.
     {
         get_next_token();    // skip "("
+
+        if(identifier.type == token_type::macro_identifier)
+        {
+            // macro invokation.
+            // capture tokens to forward them to the macro.
+            std::vector<token> tokens;
+            std::size_t bracket_level = 1;
+
+            while(bracket_level != 0)
+            {
+                tokens.push_back(current_token.value());
+                get_next_token();
+
+                if(current_token->s == "(")
+                {
+                    ++bracket_level;
+                }
+                else if(current_token->s == ")")
+                {
+                    --bracket_level;
+                }
+            }
+
+            get_next_token();    // skip ")"
+
+            if(current_token->s == "[")    // array access.
+            {
+                get_next_token();    // skip '['
+                auto index_expression = parse_expression();
+                if(current_token->s != "]")
+                {
+                    throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
+                }
+
+                get_next_token();    // skip ']'
+
+                return std::make_unique<ast::macro_invokation>(
+                  std::move(identifier),
+                  std::move(tokens),
+                  std::move(index_expression));
+            }
+
+            return std::make_unique<ast::macro_invokation>(
+              std::move(identifier),
+              std::move(tokens));
+        }
+
+        // function call.
 
         std::vector<std::unique_ptr<ast::expression>> args;
         if(current_token->s != ")")
@@ -1364,6 +1412,12 @@ void parser::parse(lexer& lexer)
         }
 
         exprs.emplace_back(parse_top_level_statement());
+
+        // Add macros.
+        if(exprs.back()->is_macro_expression())
+        {
+            macro_asts.emplace_back(exprs.back().get());
+        }
     }
 
     if(!lexer.eof())

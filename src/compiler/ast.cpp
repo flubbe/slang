@@ -70,9 +70,9 @@ static std::unique_ptr<cg::value> type_info_to_value(
  * expression.
  */
 
-call_expression* expression::as_call_expression()
+macro_invokation* expression::as_macro_invokation()
 {
-    throw std::runtime_error("Expression is not a call expression");
+    throw std::runtime_error("Expression is not a macro invokation.");
 }
 
 access_expression* expression::as_access_expression()
@@ -161,28 +161,55 @@ bool expression::supports_directive(const std::string& name) const
     return name == "disable";
 }
 
-void expression::expand_macros(cg::context& ctx)
+bool expression::expand_macros(
+  const std::vector<expression*>& macro_asts,
+  cg::context& codegen_ctx)
 {
+    std::size_t macro_expansion_count = 0;
+
     // replace macro nodes by the macro AST.
-    auto visitor = [&ctx](expression& e)
+    auto visitor = [&macro_asts,
+                    &codegen_ctx,
+                    &macro_expansion_count](expression& e)
     {
-        if(!e.is_macro_evaluation())
+        if(!e.is_macro_invokation())
         {
             return;
         }
 
-        auto* call_expr = e.as_call_expression();
-        auto* m = ctx.get_macro(
-          call_expr->get_callee().s,
-          call_expr->get_namespace_path());
+        auto* macro_expr = e.as_macro_invokation();
+        if(macro_expr->has_expansion())
+        {
+            return;
+        }
 
-        call_expr->set_eval_macro(m->evaluate(e.loc, call_expr->get_args()));
+        ++macro_expansion_count;
+
+        if(!macro_expr->get_namespace_path().has_value())
+        {
+            // expand local macro.
+            // TODO
+
+            throw std::runtime_error("expression::expand_macros: Local macro expansion not implemented.");
+        }
+        else
+        {
+            // expand imported macro.
+
+            auto* m = codegen_ctx.get_macro(
+              macro_expr->get_name().s,
+              macro_expr->get_namespace_path());
+
+            macro_expr->set_expansion(m->expand(e.loc, macro_expr->get_tokens()));
+        }
     };
 
     visit_nodes(
       visitor,
       true,
       false);
+
+    return macro_expansion_count != 0;
 }
 
 /**
@@ -2857,17 +2884,6 @@ std::string function_expression::to_string() const
 
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
-    if(callee.type == token_type::macro_identifier)
-    {
-        // Code generation for macros.
-        if(!eval_macro)
-        {
-            throw cg::codegen_error(loc, "Macro was not evaluated.");
-        }
-
-        return eval_macro->generate_code(ctx, mc);
-    }
-
     // Code generation for function calls.
     if(mc == memory_context::store)
     {
@@ -2894,17 +2910,6 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
 
 std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 {
-    if(callee.type == token_type::macro_identifier)
-    {
-        // Type checking for macros.
-        if(!eval_macro)
-        {
-            throw ty::type_error(callee.location, "Macro was not evaluated.");
-        }
-
-        return eval_macro->type_check(ctx);
-    }
-
     auto sig = ctx.get_function_signature(callee, get_namespace_path());
     return_type = sig.ret_type;
 
@@ -2981,6 +2986,44 @@ std::string call_expression::to_string() const
     }
     ret += "))";
     return ret;
+}
+
+/*
+ * macro_invokation.
+ */
+
+std::unique_ptr<cg::value> macro_invokation::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    // Code generation for macros.
+    if(!expansion)
+    {
+        throw cg::codegen_error(loc, "Macro was not expanded.");
+    }
+
+    return expansion->generate_code(ctx, mc);
+}
+
+std::optional<ty::type_info> macro_invokation::type_check(ty::context& ctx)
+{
+    // Type checking for macros.
+    if(!expansion)
+    {
+        throw cg::codegen_error(loc, "Macro was not expanded.");
+    }
+
+    return expansion->type_check(ctx);
+}
+
+std::string macro_invokation::to_string() const
+{
+    auto transform = [](const token& t) -> std::string
+    { return t.s; };
+
+    return fmt::format(
+      "MacroInvokation(callee={}, tokens=({}))",
+      get_name().s, utils::join(tokens, {transform}, " "));
 }
 
 /*
