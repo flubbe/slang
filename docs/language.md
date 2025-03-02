@@ -104,6 +104,14 @@ Ignoring comments, a program consists of:
         ```
         Casting is allowed between `i32` and `f32`, and between any
         struct and types marked with `#[allow_cast]` (see below).
+5. Macros are exported by the module and can be accessed from another module.
+    They are defined via
+    ```
+    macro <name!> {
+        ...
+    }
+    ```
+    **Note:** Currently _only_ the built-in macro `format!` is supported.
 
 Statements and expressions can be decorated with _directives_:
 ```
