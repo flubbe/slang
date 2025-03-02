@@ -39,9 +39,7 @@ public:
     }
 };
 
-/**
- * The lexer. Generates tokens from an input string.
- */
+/** The lexer. Generates tokens from an input string. */
 class lexer
 {
     /** Lexer input. */

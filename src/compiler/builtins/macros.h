@@ -23,16 +23,14 @@ namespace slang::codegen::macros
 /**
  * Expand the built-in 'format!' macro.
  *
- * TODO Parse expressions.
- *
  * @param desc Macro descriptor.
  * @param loc Location of the macro invokation.
- * @param tokens Tokens the macro operates on.
+ * @param exprs Expressions the macro operates on.
  * @returns The expanded macro.
  */
 std::unique_ptr<ast::expression> expand_builtin_format(
   const module_::macro_descriptor& desc,
   token_location loc,
-  const std::vector<token>& tokens);
+  const std::vector<std::unique_ptr<ast::expression>>& exprs);
 
 }    // namespace slang::codegen::macros

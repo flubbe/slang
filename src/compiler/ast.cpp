@@ -70,9 +70,22 @@ static std::unique_ptr<cg::value> type_info_to_value(
  * expression.
  */
 
-macro_invokation* expression::as_macro_invokation()
+std::unique_ptr<expression> expression::clone() const
+{
+    auto cloned_expr = std::make_unique<expression>(loc);
+    cloned_expr->namespace_stack = namespace_stack;
+    cloned_expr->expr_type = expr_type;
+    return cloned_expr;
+}
+
+macro_invocation* expression::as_macro_invocation()
 {
     throw std::runtime_error("Expression is not a macro invokation.");
+}
+
+literal_expression* expression::as_literal()
+{
+    throw std::runtime_error("Expression is not a literal.");
 }
 
 access_expression* expression::as_access_expression()
@@ -172,12 +185,12 @@ bool expression::expand_macros(
                     &codegen_ctx,
                     &macro_expansion_count](expression& e)
     {
-        if(!e.is_macro_invokation())
+        if(!e.is_macro_invocation())
         {
             return;
         }
 
-        auto* macro_expr = e.as_macro_invokation();
+        auto* macro_expr = e.as_macro_invocation();
         if(macro_expr->has_expansion())
         {
             return;
@@ -200,7 +213,7 @@ bool expression::expand_macros(
               macro_expr->get_name().s,
               macro_expr->get_namespace_path());
 
-            macro_expr->set_expansion(m->expand(e.loc, macro_expr->get_tokens()));
+            macro_expr->set_expansion(m->expand(e.loc, macro_expr->get_exprs()));
         }
     };
 
@@ -210,6 +223,11 @@ bool expression::expand_macros(
       false);
 
     return macro_expansion_count != 0;
+}
+
+std::string expression::to_string() const
+{
+    throw std::runtime_error("Expression has to string conversion");
 }
 
 /**
@@ -296,8 +314,28 @@ void expression::visit_nodes(
 }
 
 /*
+ * named_expression.
+ */
+
+std::unique_ptr<expression> named_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<named_expression>();
+    *static_cast<named_expression::super*>(cloned_expr.get()) = *static_cast<const named_expression::super*>(this);
+    cloned_expr->name = name;
+    return cloned_expr;
+}
+
+/*
  * literal_expression.
  */
+
+std::unique_ptr<expression> literal_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<literal_expression>();
+    *static_cast<literal_expression::super*>(cloned_expr.get()) = *static_cast<const literal_expression::super*>(this);
+    cloned_expr->tok = tok;
+    return cloned_expr;
+}
 
 std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -413,8 +451,25 @@ std::string literal_expression::to_string() const
 }
 
 /*
+ * type_expression.
+ */
+
+std::unique_ptr<type_expression> type_expression::clone() const
+{
+    return std::make_unique<type_expression>(*this);
+}
+
+/*
  * type_cast_expression.
  */
+
+std::unique_ptr<expression> type_cast_expression::clone() const
+{
+    return std::make_unique<type_cast_expression>(
+      loc,
+      expr->clone(),
+      target_type->clone());
+}
 
 std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -502,6 +557,13 @@ std::string type_cast_expression::to_string() const
  * namespace_access_expression.
  */
 
+std::unique_ptr<expression> namespace_access_expression::clone() const
+{
+    return std::make_unique<namespace_access_expression>(
+      name,
+      expr->clone());
+}
+
 std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto expr_namespace_stack = namespace_stack;
@@ -571,6 +633,15 @@ access_expression::access_expression(std::unique_ptr<ast::expression> lhs, std::
 , lhs{std::move(lhs)}
 , rhs{std::move(rhs)}
 {
+}
+
+std::unique_ptr<expression> access_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<access_expression>(
+      lhs->clone(),
+      rhs->clone());
+    cloned_expr->lhs_type = lhs_type;
+    return cloned_expr;
 }
 
 std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -694,6 +765,11 @@ std::string access_expression::to_string() const
  * import_expression.
  */
 
+std::unique_ptr<expression> import_expression::clone() const
+{
+    return std::make_unique<import_expression>(path);
+}
+
 std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     // import expressions are handled by the import resolver.
@@ -716,6 +792,14 @@ std::string import_expression::to_string() const
 /*
  * directive_expression.
  */
+
+std::unique_ptr<expression> directive_expression::clone() const
+{
+    return std::make_unique<directive_expression>(
+      name,
+      args,
+      expr->clone());
+}
 
 std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -753,6 +837,13 @@ std::string directive_expression::to_string() const
 /*
  * variable_reference_expression.
  */
+
+std::unique_ptr<expression> variable_reference_expression::clone() const
+{
+    return std::make_unique<variable_reference_expression>(
+      name,
+      element_expr ? element_expr->clone() : nullptr);
+}
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1022,6 +1113,15 @@ ty::type_info type_expression::to_unresolved_type_info(ty::context& ctx) const
  * variable_declaration_expression.
  */
 
+std::unique_ptr<expression> variable_declaration_expression::clone() const
+{
+    return std::make_unique<variable_declaration_expression>(
+      loc,
+      name,
+      type->clone(),
+      expr ? expr->clone() : nullptr);
+}
+
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1113,6 +1213,15 @@ std::string variable_declaration_expression::to_string() const
 /*
  * constant_declaration_expression.
  */
+
+std::unique_ptr<expression> constant_declaration_expression::clone() const
+{
+    return std::make_unique<constant_declaration_expression>(
+      loc,
+      name,
+      type->clone(),
+      expr->clone());
+}
 
 void constant_declaration_expression::push_directive(
   cg::context& ctx,
@@ -1215,6 +1324,20 @@ std::string constant_declaration_expression::to_string() const
 /*
  * array_initializer_expression.
  */
+
+std::unique_ptr<expression> array_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_exprs;
+    cloned_exprs.reserve(exprs.size());
+    for(const auto& e: exprs)
+    {
+        cloned_exprs.emplace_back(e->clone());
+    }
+
+    return std::make_unique<array_initializer_expression>(
+      loc,
+      std::move(cloned_exprs));
+}
 
 std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
@@ -1319,6 +1442,23 @@ std::string array_initializer_expression::to_string() const
  * struct_definition_expression.
  */
 
+std::unique_ptr<expression> struct_definition_expression::clone() const
+{
+    std::vector<std::unique_ptr<variable_declaration_expression>> cloned_members;
+    cloned_members.reserve(members.size());
+    for(const auto& m: members)
+    {
+        cloned_members.emplace_back(
+          static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            m->clone().release()));
+    }
+
+    return std::make_unique<struct_definition_expression>(
+      loc,
+      name,
+      std::move(cloned_members));
+}
+
 std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1407,6 +1547,21 @@ std::string struct_definition_expression::to_string() const
 /*
  * struct_anonymous_initializer_expression.
  */
+
+std::unique_ptr<expression> struct_anonymous_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_initializers;
+    cloned_initializers.reserve(initializers.size());
+    for(const auto& m: initializers)
+    {
+        cloned_initializers.emplace_back(
+          m->clone());
+    }
+
+    return std::make_unique<struct_anonymous_initializer_expression>(
+      name,
+      std::move(cloned_initializers));
+}
 
 std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1525,6 +1680,13 @@ std::string struct_anonymous_initializer_expression::to_string() const
  * named_initializer.
  */
 
+std::unique_ptr<expression> named_initializer::clone() const
+{
+    return std::make_unique<named_initializer>(
+      name,
+      expr->clone());
+}
+
 std::unique_ptr<cg::value> named_initializer::generate_code(
   cg::context& ctx,
   memory_context mc) const
@@ -1545,6 +1707,22 @@ std::string named_initializer::to_string() const
 /*
  * struct_named_initializer_expression.
  */
+
+std::unique_ptr<expression> struct_named_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<named_initializer>> cloned_initializers;
+    cloned_initializers.reserve(initializers.size());
+    for(const auto& initializer: initializers)
+    {
+        cloned_initializers.emplace_back(
+          static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            initializer->clone().release()));
+    }
+
+    return std::make_unique<struct_named_initializer_expression>(
+      name,
+      std::move(cloned_initializers));
+}
 
 std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1711,6 +1889,15 @@ std::string struct_named_initializer_expression::to_string() const
 /*
  * binary_expression.
  */
+
+std::unique_ptr<expression> binary_expression::clone() const
+{
+    return std::make_unique<binary_expression>(
+      loc,
+      op,
+      lhs->clone(),
+      rhs->clone());
+}
 
 /**
  * Classify a binary operator. If the operator is a compound assignment, the given operator
@@ -2165,6 +2352,14 @@ std::string binary_expression::to_string() const
  * unary_expression.
  */
 
+std::unique_ptr<expression> unary_expression::clone() const
+{
+    return std::make_unique<unary_expression>(
+      loc,
+      op,
+      operand->clone());
+}
+
 std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2386,6 +2581,14 @@ std::string unary_expression::to_string() const
  * new_expression.
  */
 
+std::unique_ptr<expression> new_expression::clone() const
+{
+    return std::make_unique<new_expression>(
+      loc,
+      type_expr->clone(),
+      expr->clone());
+}
+
 std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2479,6 +2682,11 @@ std::string new_expression::to_string() const
  * null_expression.
  */
 
+std::unique_ptr<expression> null_expression::clone() const
+{
+    return std::make_unique<null_expression>(loc);
+}
+
 std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2506,6 +2714,13 @@ std::string null_expression::to_string() const
 /*
  * postfix_expression.
  */
+
+std::unique_ptr<expression> postfix_expression::clone() const
+{
+    return std::make_unique<postfix_expression>(
+      identifier->clone(),
+      op);
+}
 
 std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2591,6 +2806,25 @@ std::string postfix_expression::to_string() const
 /*
  * prototype.
  */
+
+std::unique_ptr<prototype_ast> prototype_ast::clone() const
+{
+    std::vector<std::pair<token, std::unique_ptr<type_expression>>> cloned_args;
+    cloned_args.reserve(args.size());
+    for(const auto& arg: args)
+    {
+        cloned_args.emplace_back(
+          std::make_pair(
+            arg.first,
+            arg.second->clone()));
+    }
+
+    return std::make_unique<prototype_ast>(
+      loc,
+      name,
+      std::move(cloned_args),
+      return_type->clone());
+}
 
 cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2705,6 +2939,20 @@ std::string prototype_ast::to_string() const
  * block.
  */
 
+std::unique_ptr<expression> block::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_exprs;
+    cloned_exprs.reserve(exprs.size());
+    for(const auto& e: exprs)
+    {
+        cloned_exprs.emplace_back(e->clone());
+    }
+
+    return std::make_unique<block>(
+      loc,
+      std::move(cloned_exprs));
+}
+
 std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -2767,6 +3015,14 @@ std::string block::to_string() const
 /*
  * function_expression.
  */
+
+std::unique_ptr<expression> function_expression::clone() const
+{
+    return std::make_unique<function_expression>(
+      loc,
+      prototype->clone(),
+      std::unique_ptr<block>(static_cast<block*>(body->clone().release())));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+}
 
 std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2882,6 +3138,21 @@ std::string function_expression::to_string() const
  * call_expression.
  */
 
+std::unique_ptr<expression> call_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_args;
+    cloned_args.reserve(args.size());
+    for(const auto& arg: args)
+    {
+        cloned_args.emplace_back(arg->clone());
+    }
+
+    return std::make_unique<call_expression>(
+      callee,
+      std::move(cloned_args),
+      index_expr ? index_expr->clone() : nullptr);
+}
+
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // Code generation for function calls.
@@ -2989,10 +3260,25 @@ std::string call_expression::to_string() const
 }
 
 /*
- * macro_invokation.
+ * macro_invocation.
  */
 
-std::unique_ptr<cg::value> macro_invokation::generate_code(
+std::unique_ptr<expression> macro_invocation::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_exprs;
+    cloned_exprs.reserve(exprs.size());
+    for(const auto& expr: exprs)
+    {
+        cloned_exprs.emplace_back(expr->clone());
+    }
+
+    return std::make_unique<macro_invocation>(
+      name,
+      std::move(cloned_exprs),
+      index_expr ? index_expr->clone() : nullptr);
+}
+
+std::unique_ptr<cg::value> macro_invocation::generate_code(
   cg::context& ctx,
   memory_context mc) const
 {
@@ -3005,7 +3291,7 @@ std::unique_ptr<cg::value> macro_invokation::generate_code(
     return expansion->generate_code(ctx, mc);
 }
 
-std::optional<ty::type_info> macro_invokation::type_check(ty::context& ctx)
+std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
 {
     // Type checking for macros.
     if(!expansion)
@@ -3016,19 +3302,33 @@ std::optional<ty::type_info> macro_invokation::type_check(ty::context& ctx)
     return expansion->type_check(ctx);
 }
 
-std::string macro_invokation::to_string() const
+std::string macro_invocation::to_string() const
 {
-    auto transform = [](const token& t) -> std::string
-    { return t.s; };
+    std::string ret = fmt::format(
+      "MacroInvocation(callee={}, exprs=(", get_name().s);
 
-    return fmt::format(
-      "MacroInvokation(callee={}, tokens=({}))",
-      get_name().s, utils::join(tokens, {transform}, " "));
+    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+    {
+        ret += fmt::format("{}, ", exprs[i]->to_string());
+    }
+    if(exprs.size() > 0)
+    {
+        ret += fmt::format("{}", exprs.back()->to_string());
+    }
+    ret += "))";
+    return ret;
 }
 
 /*
  * return_statement.
  */
+
+std::unique_ptr<expression> return_statement::clone() const
+{
+    return std::make_unique<return_statement>(
+      loc,
+      expr ? expr->clone() : nullptr);
+}
 
 std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -3118,6 +3418,15 @@ std::string return_statement::to_string() const
 /*
  * if_statement.
  */
+
+std::unique_ptr<expression> if_statement::clone() const
+{
+    return std::make_unique<if_statement>(
+      loc,
+      condition->clone(),
+      if_block->clone(),
+      else_block ? else_block->clone() : nullptr);
+}
 
 std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -3229,6 +3538,14 @@ std::string if_statement::to_string() const
  * while_statement.
  */
 
+std::unique_ptr<expression> while_statement::clone() const
+{
+    return std::make_unique<while_statement>(
+      loc,
+      condition->clone(),
+      while_block->clone());
+}
+
 std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -3311,6 +3628,11 @@ std::string while_statement::to_string() const
  * break_statement.
  */
 
+std::unique_ptr<expression> break_statement::clone() const
+{
+    return std::make_unique<break_statement>(loc);
+}
+
 std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
@@ -3322,6 +3644,11 @@ std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[ma
  * continue_statement.
  */
 
+std::unique_ptr<expression> continue_statement::clone() const
+{
+    return std::make_unique<continue_statement>(loc);
+}
+
 std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
@@ -3332,6 +3659,11 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
 /*
  * macro_expression.
  */
+
+std::unique_ptr<expression> macro_expression::clone() const
+{
+    return std::make_unique<macro_expression>(loc, name);
+}
 
 void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {

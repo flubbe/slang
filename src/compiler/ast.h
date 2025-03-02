@@ -68,11 +68,9 @@ protected:
     std::optional<ty::type_info> expr_type;
 
 public:
-    /** No default constructor. */
-    expression() = delete;
-
-    /** Copy and move constructors. */
-    expression(const expression&) = delete;
+    /** Default constructors. */
+    expression() = default;
+    expression(const expression&) = default;
     expression(expression&&) = default;
 
     /**
@@ -86,38 +84,47 @@ public:
     }
 
     /** Default assignments. */
-    expression& operator=(const expression&) = delete;
+    expression& operator=(const expression&) = default;
     expression& operator=(expression&&) = default;
 
     /** Default destructor. */
     virtual ~expression() = default;
 
+    /** Clone this expression. */
+    [[nodiscard]]
+    virtual std::unique_ptr<expression> clone() const;
+
     /** Whether this expression needs stack cleanup. */
+    [[nodiscard]]
     virtual bool needs_pop() const
     {
         return false;
     }
 
     /** Whether this expression is an access of an array element. */
+    [[nodiscard]]
     virtual bool is_array_element_access() const
     {
         return false;
     }
 
     /** Whether this expression is a struct member access. */
+    [[nodiscard]]
     virtual bool is_struct_member_access() const
     {
         return false;
     }
 
     /** Whether this expression is a macro expression. */
+    [[nodiscard]]
     virtual bool is_macro_expression() const
     {
         return false;
     }
 
     /** Whether this expression is a macro invokation. */
-    virtual bool is_macro_invokation() const
+    [[nodiscard]]
+    virtual bool is_macro_invocation() const
     {
         return false;
     }
@@ -128,7 +135,21 @@ public:
      * @note Updates the expression's namespace path.
      * @throws Throws a `std::runtime_error` if the expression is not a call expression.
      */
-    virtual class macro_invokation* as_macro_invokation();
+    virtual class macro_invocation* as_macro_invocation();
+
+    /** Whether this is a literal. */
+    [[nodiscard]]
+    virtual bool is_literal() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a literal expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a literal expression.
+     */
+    virtual class literal_expression* as_literal();
 
     /**
      * Get the expression as a struct member access expression.
@@ -142,9 +163,11 @@ public:
      *
      * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
      */
+    [[nodiscard]]
     virtual const class access_expression* as_access_expression() const;
 
     /** Whether this expression is a `named_expression`. */
+    [[nodiscard]]
     virtual bool is_named_expression() const
     {
         return false;
@@ -162,6 +185,7 @@ public:
      *
      * @throws Throws a `std::runtime_error` if the expression is not a named expression.
      */
+    [[nodiscard]]
     virtual const class named_expression* as_named_expression() const;
 
     /**
@@ -169,6 +193,7 @@ public:
      *
      * @param ctx The context in which to check evaluation.
      */
+    [[nodiscard]]
     virtual bool is_const_eval(cg::context&) const
     {
         return false;
@@ -232,6 +257,7 @@ public:
      * @param name Name of the directive.
      * @returns True if the directive is supported, and false otherwise.
      */
+    [[nodiscard]]
     virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
 
     /**
@@ -265,12 +291,14 @@ public:
     }
 
     /** Get the namespace stack. */
+    [[nodiscard]]
     const std::vector<std::string>& get_namespace() const
     {
         return namespace_stack;
     }
 
     /** Return the namespace path, or `std::nullopt` if empty. */
+    [[nodiscard]]
     std::optional<std::string> get_namespace_path() const
     {
         if(namespace_stack.empty())
@@ -294,21 +322,25 @@ public:
     }
 
     /** Get a readable string representation of the node. */
-    virtual std::string to_string() const = 0;
+    [[nodiscard]]
+    virtual std::string to_string() const;
 
     /** Get the expression's location. */
+    [[nodiscard]]
     const token_location& get_location() const
     {
         return loc;
     }
 
     /** Get all child nodes. */
+    [[nodiscard]]
     virtual std::vector<expression*> get_children()
     {
         return {};
     }
 
     /** Get all child nodes. */
+    [[nodiscard]]
     virtual std::vector<const expression*> get_children() const
     {
         return {};
@@ -352,15 +384,13 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    named_expression() = delete;
-
-    /** Copy and move constructors. */
-    named_expression(const named_expression&) = delete;
+    /** Default constructors. */
+    named_expression() = default;
+    named_expression(const named_expression&) = default;
     named_expression(named_expression&&) = default;
 
     /** Default assignment operators. */
-    named_expression& operator=(const named_expression&) = delete;
+    named_expression& operator=(const named_expression&) = default;
     named_expression& operator=(named_expression&&) = default;
 
     /**
@@ -374,6 +404,8 @@ public:
     , name{std::move(name)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_named_expression() const override
     {
@@ -407,15 +439,13 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    literal_expression() = delete;
-
-    /** Copy and move constructors. */
-    literal_expression(const literal_expression&) = delete;
+    /** Default constructors. */
+    literal_expression() = default;
+    literal_expression(const literal_expression&) = default;
     literal_expression(literal_expression&&) = default;
 
     /** Default assignment operators. */
-    literal_expression& operator=(const literal_expression&) = delete;
+    literal_expression& operator=(const literal_expression&) = default;
     literal_expression& operator=(literal_expression&&) = default;
 
     /**
@@ -430,9 +460,21 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     bool is_const_eval(cg::context&) const override
     {
         return true;
+    }
+
+    bool is_literal() const override
+    {
+        return true;
+    }
+
+    literal_expression* as_literal() override
+    {
+        return this;
     }
 
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
@@ -464,13 +506,13 @@ class type_expression
     bool array{false};
 
 public:
-    /** Default and deleted constructors. */
-    type_expression() = delete;
-    type_expression(const type_expression&) = delete;
+    /** Default constructors. */
+    type_expression() = default;
+    type_expression(const type_expression&) = default;
     type_expression(type_expression&&) = default;
 
     /** Default assignments. */
-    type_expression& operator=(const type_expression&) = delete;
+    type_expression& operator=(const type_expression&) = default;
     type_expression& operator=(type_expression&&) = default;
 
     /**
@@ -488,6 +530,8 @@ public:
     , array{is_array}
     {
     }
+
+    std::unique_ptr<type_expression> clone() const;
 
     /** Get the location. */
     token_location get_location() const
@@ -560,15 +604,21 @@ public:
      * @param expr The expression.
      * @param target_type The target type.
      */
-    type_cast_expression(token_location loc, std::unique_ptr<expression> expr, std::unique_ptr<type_expression> target_type)
-    : named_expression{std::move(loc),
-                       expr->is_named_expression()
-                         ? static_cast<named_expression*>(expr.get())->get_name()
-                         : token{"<none>", {0, 0}}}    // FIXME we might not have a name.
+    type_cast_expression(
+      token_location loc,
+      std::unique_ptr<expression> expr,
+      std::unique_ptr<type_expression> target_type)
+    : named_expression{
+        std::move(loc),
+        expr->is_named_expression()
+          ? static_cast<named_expression*>(expr.get())->get_name()
+          : token{"<none>", {0, 0}}}    // FIXME we might not have a name.
     , expr{std::move(expr)}
     , target_type{std::move(target_type)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_struct_member_access() const override
     {
@@ -627,10 +677,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    namespace_access_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    namespace_access_expression() = default;
     namespace_access_expression(const namespace_access_expression&) = delete;
     namespace_access_expression(namespace_access_expression&&) = default;
 
@@ -644,29 +692,33 @@ public:
      * @param name The scope's name.
      * @param expr An expression.
      */
-    namespace_access_expression(token name, std::unique_ptr<expression> expr)
+    namespace_access_expression(
+      token name,
+      std::unique_ptr<expression> expr)
     : expression{name.location}
     , name{std::move(name)}
     , expr{std::move(expr)}
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     bool needs_pop() const override
     {
         return expr->needs_pop();
     }
 
-    bool is_macro_invokation() const override
+    bool is_macro_invocation() const override
     {
-        return expr->is_macro_invokation();
+        return expr->is_macro_invocation();
     }
 
-    macro_invokation* as_macro_invokation() override
+    macro_invocation* as_macro_invocation() override
     {
         auto expr_namespace_stack = namespace_stack;
         expr_namespace_stack.push_back(name.s);
         expr->set_namespace(std::move(expr_namespace_stack));
-        return expr->as_macro_invokation();
+        return expr->as_macro_invocation();
     }
 
     bool is_const_eval(cg::context& ctx) const override
@@ -712,10 +764,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
+    /** Defaulted and deleted constructors. */
     access_expression() = delete;
-
-    /** Copy and move constructors. */
     access_expression(const access_expression&) = delete;
     access_expression(access_expression&&) = default;
 
@@ -730,6 +780,8 @@ public:
      * @param rhs Right-hand side of the access expression.
      */
     access_expression(std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs);
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_struct_member_access() const override
     {
@@ -797,6 +849,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::string to_string() const override;
@@ -840,6 +894,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     bool needs_pop() const override
     {
         return expr->needs_pop();
@@ -875,10 +931,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    variable_reference_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    variable_reference_expression() = default;
     variable_reference_expression(const variable_reference_expression&) = delete;
     variable_reference_expression(variable_reference_expression&&) = default;
 
@@ -892,11 +946,15 @@ public:
      * @param name The variable's name.
      * @param element_expr An optional expression for array element access.
      */
-    variable_reference_expression(token name, std::unique_ptr<expression> element_expr = nullptr)
+    variable_reference_expression(
+      token name,
+      std::unique_ptr<expression> element_expr = nullptr)
     : named_expression{name.location, std::move(name)}
     , element_expr{std::move(element_expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_array_element_access() const override
     {
@@ -944,10 +1002,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    variable_declaration_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    variable_declaration_expression() = default;
     variable_declaration_expression(const variable_declaration_expression&) = delete;
     variable_declaration_expression(variable_declaration_expression&&) = default;
 
@@ -969,6 +1025,8 @@ public:
     , expr{std::move(expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1017,10 +1075,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    constant_declaration_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    constant_declaration_expression() = default;
     constant_declaration_expression(const constant_declaration_expression&) = delete;
     constant_declaration_expression(constant_declaration_expression&&) = default;
 
@@ -1036,15 +1092,18 @@ public:
      * @param type The constant's type.
      * @param expr The initializer expression.
      */
-    constant_declaration_expression(token_location loc,
-                                    token name,
-                                    std::unique_ptr<ast::type_expression> type,
-                                    std::unique_ptr<ast::expression> expr)
+    constant_declaration_expression(
+      token_location loc,
+      token name,
+      std::unique_ptr<ast::type_expression> type,
+      std::unique_ptr<ast::expression> expr)
     : named_expression{std::move(loc), std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     void push_directive(
       cg::context& ctx,
@@ -1095,11 +1154,15 @@ public:
     /**
      * Construct an array initializer expression.
      */
-    array_initializer_expression(token_location loc, std::vector<std::unique_ptr<ast::expression>> exprs)
+    array_initializer_expression(
+      token_location loc,
+      std::vector<std::unique_ptr<expression>> exprs)
     : expression{std::move(loc)}
     , exprs{std::move(exprs)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1157,11 +1220,16 @@ public:
      * @param name The struct's name.
      * @param members The struct's members.
      */
-    struct_definition_expression(token_location loc, token name, std::vector<std::unique_ptr<variable_declaration_expression>> members)
+    struct_definition_expression(
+      token_location loc,
+      token name,
+      std::vector<std::unique_ptr<variable_declaration_expression>> members)
     : named_expression{std::move(loc), std::move(name)}
     , members{std::move(members)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -1203,10 +1271,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    struct_anonymous_initializer_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructor. */
+    struct_anonymous_initializer_expression() = default;
     struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression&) = delete;
     struct_anonymous_initializer_expression(struct_anonymous_initializer_expression&&) = default;
 
@@ -1221,11 +1287,15 @@ public:
      * @param name The struct's name.
      * @param members The struct's members.
      */
-    struct_anonymous_initializer_expression(token name, std::vector<std::unique_ptr<expression>> initializers)
+    struct_anonymous_initializer_expression(
+      token name,
+      std::vector<std::unique_ptr<expression>> initializers)
     : named_expression{name.location, std::move(name)}
     , initializers{std::move(initializers)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1291,6 +1361,8 @@ public:
     , expr{std::move(expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     /** Generates code for the initializing expression. */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1358,6 +1430,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -1403,10 +1477,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    binary_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    binary_expression() = default;
     binary_expression(const binary_expression&) = delete;
     binary_expression(binary_expression&&) = default;
 
@@ -1422,13 +1494,19 @@ public:
      * @param lhs The left-hand side.
      * @param rhs The right-hand side.
      */
-    binary_expression(token_location loc, token op, std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs)
+    binary_expression(
+      token_location loc,
+      token op,
+      std::unique_ptr<expression> lhs,
+      std::unique_ptr<expression> rhs)
     : expression{std::move(loc)}
     , op{std::move(op)}
     , lhs{std::move(lhs)}
     , rhs{std::move(rhs)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool needs_pop() const override;
 
@@ -1480,12 +1558,17 @@ public:
      * @param op The operator.
      * @param operand The operand.
      */
-    unary_expression(token_location loc, token op, std::unique_ptr<expression> operand)
+    unary_expression(
+      token_location loc,
+      token op,
+      std::unique_ptr<expression> operand)
     : expression{std::move(loc)}
     , op{std::move(op)}
     , operand{std::move(operand)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_const_eval(cg::context& ctx) const override;
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
@@ -1516,10 +1599,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    new_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    new_expression() = default;
     new_expression(const new_expression&) = delete;
     new_expression(new_expression&&) = default;
 
@@ -1544,6 +1625,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -1565,15 +1648,13 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    null_expression() = delete;
-
-    /** Copy and move constructors. */
-    null_expression(const null_expression&) = delete;
+    /** Defaulted constructors. */
+    null_expression() = default;
+    null_expression(const null_expression&) = default;
     null_expression(null_expression&&) = default;
 
     /** Assignment operators. */
-    null_expression& operator=(const null_expression&) = delete;
+    null_expression& operator=(const null_expression&) = default;
     null_expression& operator=(null_expression&&) = default;
 
     /**
@@ -1585,6 +1666,8 @@ public:
     : expression{std::move(loc)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1604,10 +1687,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    postfix_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructor. */
+    postfix_expression() = default;
     postfix_expression(const postfix_expression&) = delete;
     postfix_expression(postfix_expression&&) = default;
 
@@ -1627,6 +1708,8 @@ public:
     , op{std::move(op)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool needs_pop() const override
     {
@@ -1704,6 +1787,8 @@ public:
     {
     }
 
+    std::unique_ptr<prototype_ast> clone() const;
+
     cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const;
@@ -1726,10 +1811,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    block() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructor. */
+    block() = default;
     block(const block&) = delete;
     block(block&&) = default;
 
@@ -1743,11 +1826,15 @@ public:
      * @param loc The location.
      * @param exprs The program expressions.
      */
-    block(token_location loc, std::vector<std::unique_ptr<expression>> exprs)
+    block(
+      token_location loc,
+      std::vector<std::unique_ptr<expression>> exprs)
     : expression{std::move(loc)}
     , exprs{std::move(exprs)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -1809,12 +1896,17 @@ public:
      * @param prototype The function's prototype.
      * @param body The function's body.
      */
-    function_expression(token_location loc, std::unique_ptr<prototype_ast> prototype, std::unique_ptr<block> body)
+    function_expression(
+      token_location loc,
+      std::unique_ptr<prototype_ast> prototype,
+      std::unique_ptr<block> body)
     : expression{std::move(loc)}
     , prototype{std::move(prototype)}
     , body{std::move(body)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -1861,10 +1953,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    call_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    call_expression() = default;
     call_expression(const call_expression&) = delete;
     call_expression(call_expression&&) = default;
 
@@ -1889,6 +1979,8 @@ public:
     , index_expr{std::move(index_expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool needs_pop() const override
     {
@@ -1950,10 +2042,10 @@ public:
 };
 
 /** Macro invokation. */
-class macro_invokation : public named_expression
+class macro_invocation : public named_expression
 {
-    /** Tokens the macro operates on. */
-    std::vector<token> tokens;
+    /** Expressions the macro operates on. */
+    std::vector<std::unique_ptr<ast::expression>> exprs;
 
     /** An optional index expression for return value array access. */
     std::unique_ptr<expression> index_expr;
@@ -1965,40 +2057,40 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    macro_invokation() = delete;
-
-    /** Copy and move constructors. */
-    macro_invokation(const macro_invokation&) = delete;
-    macro_invokation(macro_invokation&&) = default;
+    /** Defaulted and deleted constructors. */
+    macro_invocation() = default;
+    macro_invocation(const macro_invocation&) = delete;
+    macro_invocation(macro_invocation&&) = default;
 
     /** Default assignment operators. */
-    macro_invokation& operator=(const macro_invokation&) = delete;
-    macro_invokation& operator=(macro_invokation&&) = default;
+    macro_invocation& operator=(const macro_invocation&) = delete;
+    macro_invocation& operator=(macro_invocation&&) = default;
 
     /**
      * Construct a macro invokation.
      *
      * @param name The macro's name.
-     * @param tokens Tokens the macro operates on.
+     * @param exprs Expressions the macro operates on.
      * @param index_expr Index expression for array access.
      */
-    macro_invokation(
+    macro_invocation(
       token name,
-      std::vector<token> tokens,
+      std::vector<std::unique_ptr<ast::expression>> exprs,
       std::unique_ptr<expression> index_expr = nullptr)
     : named_expression{name.location, std::move(name)}
-    , tokens{std::move(tokens)}
+    , exprs{std::move(exprs)}
     , index_expr{std::move(index_expr)}
     {
     }
 
-    bool is_macro_invokation() const override
+    std::unique_ptr<expression> clone() const override;
+
+    bool is_macro_invocation() const override
     {
         return true;
     }
 
-    macro_invokation* as_macro_invokation() override
+    macro_invocation* as_macro_invocation() override
     {
         return this;
     }
@@ -2007,10 +2099,14 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
-    /** Get the tokens the macro operates on. */
-    const std::vector<token> get_tokens() const
+    /**
+     * Get the tokens the macro operates on.
+     *
+     * @return The expressions.
+     */
+    const std::vector<std::unique_ptr<ast::expression>>& get_exprs() const
     {
-        return tokens;
+        return exprs;
     }
 
     /** Whether this macro is expanded. */
@@ -2044,10 +2140,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    return_statement() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    return_statement() = default;
     return_statement(const return_statement&) = delete;
     return_statement(return_statement&&) = default;
 
@@ -2061,11 +2155,15 @@ public:
      * @param loc The location.
      * @param expr The returned expression (if any).
      */
-    return_statement(token_location loc, std::unique_ptr<ast::expression> expr)
+    return_statement(
+      token_location loc,
+      std::unique_ptr<ast::expression> expr)
     : expression{std::move(loc)}
     , expr{std::move(expr)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2105,10 +2203,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    if_statement() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    if_statement() = default;
     if_statement(const if_statement&) = delete;
     if_statement(if_statement&&) = default;
 
@@ -2124,13 +2220,19 @@ public:
      * @param if_block The block to be executed if the condition was true.
      * @param else_block The block to be executed if the condition was false.
      */
-    if_statement(token_location loc, std::unique_ptr<ast::expression> condition, std::unique_ptr<ast::expression> if_block, std::unique_ptr<ast::expression> else_block)
+    if_statement(
+      token_location loc,
+      std::unique_ptr<ast::expression> condition,
+      std::unique_ptr<ast::expression> if_block,
+      std::unique_ptr<ast::expression> else_block)
     : expression{std::move(loc)}
     , condition{std::move(condition)}
     , if_block{std::move(if_block)}
     , else_block{std::move(else_block)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2177,10 +2279,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    while_statement() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    while_statement() = default;
     while_statement(const while_statement&) = delete;
     while_statement(while_statement&&) = default;
 
@@ -2195,12 +2295,17 @@ public:
      * @param condition The condition.
      * @param while_block The block to be executed while the condition is true.
      */
-    while_statement(token_location loc, std::unique_ptr<ast::expression> condition, std::unique_ptr<ast::expression> while_block)
+    while_statement(
+      token_location loc,
+      std::unique_ptr<ast::expression> condition,
+      std::unique_ptr<ast::expression> while_block)
     : expression{std::move(loc)}
     , condition{std::move(condition)}
     , while_block{std::move(while_block)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2244,6 +2349,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
     std::string to_string() const override
@@ -2280,6 +2387,8 @@ public:
     {
     }
 
+    std::unique_ptr<expression> clone() const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
     std::string to_string() const override
@@ -2298,10 +2407,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    macro_expression() = delete;
-
-    /** Copy and move constructors. */
+    /** Defaulted and deleted constructors. */
+    macro_expression() = default;
     macro_expression(const macro_expression&) = delete;
     macro_expression(macro_expression&&) = default;
 
@@ -2321,6 +2428,8 @@ public:
     , name{std::move(name)}
     {
     }
+
+    std::unique_ptr<expression> clone() const override;
 
     bool is_macro_expression() const override
     {

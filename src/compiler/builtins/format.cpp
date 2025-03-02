@@ -128,7 +128,7 @@ static std::vector<format_string_placeholder> get_format_string_placeholders(
 std::unique_ptr<ast::expression> expand_builtin_format(
   const module_::macro_descriptor& desc,
   token_location loc,
-  const std::vector<token>& tokens)
+  const std::vector<std::unique_ptr<ast::expression>>& exprs)
 {
     /*
      * Validate macro definition.
@@ -153,31 +153,40 @@ std::unique_ptr<ast::expression> expand_builtin_format(
             desc.directives[0].first, desc.directives[0].second.args.size()));
     }
 
-    if(tokens.empty())
+    if(exprs.empty())
     {
         throw codegen_error(loc, "Cannot evaluate macro 'format!' with no arguments. Consider removing it.");
     }
 
-    if(tokens[0].type != token_type::str_literal)
+    if(!exprs[0]->is_literal())
     {
-        throw codegen_error(tokens[0].location, "Expected <string-literal>.");
+        throw codegen_error(loc, "Cannot evaluate macro 'format!': Expected <string-literal> as its first argument.");
+    }
+
+    auto* format_expr = exprs[0]->as_literal();
+    const auto& format_token = format_expr->get_token();
+    if(format_token.type != token_type::str_literal)
+    {
+        throw codegen_error(format_token.location, "Expected <string-literal>.");
     }
 
     // Get format placeholders.
-    auto format_placeholders = get_format_string_placeholders(tokens[0].location, tokens[0].s);
+    auto format_placeholders = get_format_string_placeholders(format_token.location, format_token.s);
 
-    if(2 * format_placeholders.size() + 1 != tokens.size())
+    if(format_placeholders.size() + 1 != exprs.size())
     {
         if(!format_placeholders.empty())
         {
-            throw codegen_error(loc, "Unmatched format placeholders or syntax error in macro invokation.");
+            throw codegen_error(
+              loc,
+              "Unmatched format placeholders or syntax error in macro invokation.");
         }
     }
 
     // String only.
-    if(tokens.size() == 1)
+    if(exprs.size() == 1)
     {
-        return std::make_unique<ast::literal_expression>(tokens[0].location, tokens[0]);
+        return std::make_unique<ast::literal_expression>(format_token.location, format_token);
     }
 
     std::unique_ptr<ast::expression> lhs;
@@ -188,20 +197,13 @@ std::unique_ptr<ast::expression> expand_builtin_format(
     {
         auto& fph = format_placeholders[i];
 
-        std::size_t token_index = 2 * (i + 1);
-        const auto& tok = tokens[token_index];
-
-        if(tokens[token_index - 1].s != ",")
-        {
-            throw codegen_error(
-              tok.location,
-              fmt::format(
-                "Expected ';', got '{}'.",
-                tokens[token_index - 1].s));
-        }
+        std::size_t expr_index = i + 1;
+        const auto& expr = exprs[expr_index];
 
         // get string fragment.
-        std::string fragment = tokens[0].s.substr(last_string_fragment_end, fph.start - last_string_fragment_end);
+        std::string fragment = format_token.s.substr(
+          last_string_fragment_end,
+          fph.start - last_string_fragment_end);
         last_string_fragment_end = fph.end;
 
         if(!fragment.empty())
@@ -233,76 +235,35 @@ std::unique_ptr<ast::expression> expand_builtin_format(
         std::unique_ptr<ast::expression> conversion_ast;
         if(fph.type == 'd')
         {
-            // The token is an integer literal or identifier.
-            if(tok.type == token_type::identifier)
-            {
-                auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-                conversion_args.emplace_back(
-                  std::make_unique<ast::variable_reference_expression>(
-                    tok));
+            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
+            conversion_args.emplace_back(expr->clone());
 
-                conversion_ast = std::make_unique<ast::namespace_access_expression>(
-                  token{"std", loc},
-                  std::make_unique<ast::call_expression>(
-                    token{"i32_to_string", loc},
-                    std::move(conversion_args)));
-            }
-            else if(tok.type == token_type::int_literal)
-            {
-                conversion_ast = std::make_unique<ast::literal_expression>(
-                  tok.location,
-                  token{tok.s, tok.location, token_type::str_literal, tok.s});
-            }
-            else
-            {
-                throw codegen_error(
-                  loc,
-                  fmt::format(
-                    "Expected <literal> or <identifier>, got '{}'.",
-                    tok.s));
-            }
+            conversion_ast = std::make_unique<ast::namespace_access_expression>(
+              token{"std", loc},
+              std::make_unique<ast::call_expression>(
+                token{"i32_to_string", loc},
+                std::move(conversion_args)));
         }
         else if(fph.type == 'f')
         {
-            // The token is an floating-point literal or identifier.
-            if(tok.type == token_type::identifier)
-            {
-                auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-                conversion_args.emplace_back(
-                  std::make_unique<ast::variable_reference_expression>(
-                    tok));
+            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
+            conversion_args.emplace_back(expr->clone());
 
-                conversion_ast = std::make_unique<ast::namespace_access_expression>(
-                  token{"std", loc},
-                  std::make_unique<ast::call_expression>(
-                    token{"f32_to_string", loc},
-                    std::move(conversion_args)));
-            }
-            else if(tok.type == token_type::fp_literal)
-            {
-                conversion_ast = std::make_unique<ast::literal_expression>(
-                  tok.location,
-                  token{tok.s, tok.location, token_type::str_literal, tok.s});
-            }
-            else
-            {
-                throw codegen_error(
-                  loc,
-                  fmt::format(
-                    "Expected <literal> or <identifier>, got '{}'.",
-                    tok.s));
-            }
+            conversion_ast = std::make_unique<ast::namespace_access_expression>(
+              token{"std", loc},
+              std::make_unique<ast::call_expression>(
+                token{"f32_to_string", loc},
+                std::move(conversion_args)));
         }
         else if(fph.type == 's')
         {
             // No conversion needed.
-            conversion_ast = std::make_unique<ast::literal_expression>(
-              tok.location, tok);
+            conversion_ast = expr->clone();
         }
         else
         {
             throw codegen_error(
-              tok.location,
+              expr->get_location(),
               fmt::format(
                 "Unknown format specified '{}'.",
                 fph.type));

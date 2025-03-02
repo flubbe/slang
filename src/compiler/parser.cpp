@@ -954,54 +954,6 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
     {
         get_next_token();    // skip "("
 
-        if(identifier.type == token_type::macro_identifier)
-        {
-            // macro invokation.
-            // capture tokens to forward them to the macro.
-            std::vector<token> tokens;
-            std::size_t bracket_level = 1;
-
-            while(bracket_level != 0)
-            {
-                tokens.push_back(current_token.value());
-                get_next_token();
-
-                if(current_token->s == "(")
-                {
-                    ++bracket_level;
-                }
-                else if(current_token->s == ")")
-                {
-                    --bracket_level;
-                }
-            }
-
-            get_next_token();    // skip ")"
-
-            if(current_token->s == "[")    // array access.
-            {
-                get_next_token();    // skip '['
-                auto index_expression = parse_expression();
-                if(current_token->s != "]")
-                {
-                    throw syntax_error(*current_token, fmt::format("Expected ']', got '{}'.", current_token->s));
-                }
-
-                get_next_token();    // skip ']'
-
-                return std::make_unique<ast::macro_invokation>(
-                  std::move(identifier),
-                  std::move(tokens),
-                  std::move(index_expression));
-            }
-
-            return std::make_unique<ast::macro_invokation>(
-              std::move(identifier),
-              std::move(tokens));
-        }
-
-        // function call.
-
         std::vector<std::unique_ptr<ast::expression>> args;
         if(current_token->s != ")")
         {
@@ -1034,7 +986,18 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 
             get_next_token();    // skip ']'
 
+            if(identifier.type == token_type::macro_identifier)
+            {
+                return std::make_unique<ast::macro_invocation>(
+                  std::move(identifier), std::move(args), std::move(index_expression));
+            }
+
             return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args), std::move(index_expression));
+        }
+
+        if(identifier.type == token_type::macro_identifier)
+        {
+            return std::make_unique<ast::macro_invocation>(std::move(identifier), std::move(args));
         }
 
         return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args));

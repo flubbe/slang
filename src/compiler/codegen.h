@@ -1859,12 +1859,12 @@ public:
      * Expand the macro.
      *
      * @param loc The location of the expansion.
-     * @param tokens Tokens the macro operates on.
+     * @param exprs Expressions the macro operates on.
      * @returns The AST of the evaluation.
      */
     std::unique_ptr<ast::expression> expand(
       token_location loc,
-      const std::vector<token>& args) const;
+      const std::vector<std::unique_ptr<ast::expression>>& exprs) const;
 };
 
 /**

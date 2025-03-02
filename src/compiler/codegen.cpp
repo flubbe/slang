@@ -38,11 +38,11 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
 
 std::unique_ptr<ast::expression> macro::expand(
   token_location loc,
-  const std::vector<token>& args) const
+  const std::vector<std::unique_ptr<ast::expression>>& exprs) const
 {
     if(name == "format!")
     {
-        return slang::codegen::macros::expand_builtin_format(desc, loc, args);
+        return slang::codegen::macros::expand_builtin_format(desc, loc, exprs);
     }
 
     throw std::runtime_error("not implemented");
