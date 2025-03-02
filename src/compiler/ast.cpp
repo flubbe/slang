@@ -1750,9 +1750,8 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         ctx.generate_new(struct_type);
     }
 
-    for(std::size_t i = 0; i < initializers.size(); ++i)
+    for(const auto& initializer: initializers)
     {
-        const auto& initializer = initializers[i];
         const auto& member_name = initializer->get_name().s;
 
         auto it = std::find_if(
@@ -1776,16 +1775,23 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)
         {
-            throw cg::codegen_error(loc,
-                                    fmt::format("Code generation for '{}.{}' initialization returned no type.",
-                                                name.s, member_name));
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Code generation for '{}.{}' initialization returned no type.",
+                name.s, member_name));
         }
         if(!initializer_value->get_type().is_null()
            && initializer_value->get_type().to_string() != member_type.get_type().to_string())
         {
-            throw cg::codegen_error(loc,
-                                    fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                                                name.s, member_name, initializer_value->get_type().to_string(), member_type.get_type().to_string()));
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                name.s,
+                member_name,
+                initializer_value->get_type().to_string(),
+                member_type.get_type().to_string()));
         }
 
         ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
@@ -1808,9 +1814,8 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
     }
 
     std::vector<std::string> initialized_member_names;    // used in check for duplicates
-    for(std::size_t i = 0; i < initializers.size(); ++i)
+    for(const auto& initializer: initializers)
     {
-        const auto& initializer = initializers[i];
         const auto& member_name = initializer->get_name().s;
 
         if(std::find_if(
@@ -1820,9 +1825,12 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
              { return name == member_name; })
            != initialized_member_names.end())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Multiple initializations of struct member '{}::{}'.",
-                                             name.s, member_name));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Multiple initializations of struct member '{}::{}'.",
+                name.s,
+                member_name));
         }
         initialized_member_names.push_back(member_name);
 
@@ -2814,9 +2822,8 @@ std::unique_ptr<prototype_ast> prototype_ast::clone() const
     for(const auto& arg: args)
     {
         cloned_args.emplace_back(
-          std::make_pair(
-            arg.first,
-            arg.second->clone()));
+          arg.first,
+          arg.second->clone());
     }
 
     return std::make_unique<prototype_ast>(
@@ -3311,7 +3318,7 @@ std::string macro_invocation::to_string() const
     {
         ret += fmt::format("{}, ", exprs[i]->to_string());
     }
-    if(exprs.size() > 0)
+    if(!exprs.empty())
     {
         ret += fmt::format("{}", exprs.back()->to_string());
     }

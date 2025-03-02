@@ -60,6 +60,7 @@ protected:
      *
      * @return The next character, or std::nullopt if the end of the stream was reached.
      */
+    [[nodiscard]]
     std::optional<char> peek() const
     {
         if(position >= input.end())
@@ -115,7 +116,7 @@ protected:
 
 public:
     /** Default tab size (4). */
-    inline static constexpr std::size_t default_tab_size{4};
+    static constexpr std::size_t default_tab_size{4};
 
     /** Construct a new lexer instance. */
     lexer()
@@ -128,8 +129,8 @@ public:
      *
      * @param str The input string.
      */
-    lexer(const std::string& str)
-    : input{str}
+    lexer(std::string str)
+    : input{std::move(str)}
     , position{input.begin()}
     {
     }
@@ -159,6 +160,7 @@ public:
      *
      * @return Whether we are at the input string's end.
      */
+    [[nodiscard]]
     bool eof() const
     {
         return position >= input.end();
@@ -192,6 +194,7 @@ public:
      *
      * @return The current horizontal tab size.
      */
+    [[nodiscard]]
     std::size_t get_tab_size() const
     {
         return tab_size;
@@ -202,6 +205,7 @@ public:
      *
      * @return The current location.
      */
+    [[nodiscard]]
     token_location get_location() const
     {
         return location;
@@ -212,6 +216,7 @@ public:
      *
      * @return The lexer's input string.
      */
+    [[nodiscard]]
     const std::string& get_input() const
     {
         return input;
