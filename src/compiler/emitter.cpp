@@ -1324,28 +1324,7 @@ void instruction_emitter::run()
         }
         else
         {
-            std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
-            std::transform(
-              m->get_directives().cbegin(),
-              m->get_directives().cend(),
-              std::back_inserter(directives),
-              [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
-              {
-                  std::vector<std::pair<std::string, std::string>> args;
-                  std::transform(
-                    d.args.cbegin(),
-                    d.args.cend(),
-                    std::back_inserter(args),
-                    [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
-                    {
-                        return std::make_pair(arg.first.s, arg.second.s);
-                    });
-                  return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
-              });
-
-            exports.add_macro(
-              m->get_name(),
-              module_::macro_descriptor{std::move(directives)});
+            exports.add_macro(m->get_name(), m->get_desc());
         }
     }
 

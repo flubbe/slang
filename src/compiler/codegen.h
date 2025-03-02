@@ -1791,13 +1791,11 @@ class macro
     /** The macro name. */
     std::string name;
 
-    /** Directives attached to the macro. */
-    std::vector<directive> directives;
+    /** The macro descriptor. */
+    module_::macro_descriptor desc;
 
-    /** Optional import path. */
+    /** Import path. */
     std::optional<std::string> import_path;
-
-    // TODO Add AST or token stream for this macro.
 
 public:
     /** Constructors. */
@@ -1816,15 +1814,15 @@ public:
      * Create a new macro.
      *
      * @param name The macro's name.
-     * @param directives Directive list.
+     * @param desc Macro descriptor.
      * @param import_path Optional import path.
      */
     explicit macro(
       std::string name,
-      std::vector<directive> directives,
+      module_::macro_descriptor desc,
       std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
-    , directives{std::move(directives)}
+    , desc{std::move(desc)}
     , import_path{std::move(import_path)}
     {
     }
@@ -1836,11 +1834,11 @@ public:
         return name;
     }
 
-    /** Get the directive list. */
+    /** Get the descriptor. */
     [[nodiscard]]
-    const std::vector<directive>& get_directives() const
+    const module_::macro_descriptor& get_desc() const
     {
-        return directives;
+        return desc;
     }
 
     /** Get the import path. */
@@ -1856,6 +1854,17 @@ public:
     {
         return import_path.has_value();
     }
+
+    /**
+     * Evaluate the macro.
+     *
+     * @param loc The location of the evaluation.
+     * @param args The macro arguments.
+     * @returns The AST of the evaluation.
+     */
+    ast::expression* evaluate(
+      token_location loc,
+      std::vector<ast::expression*> args) const;
 };
 
 /**
@@ -2254,10 +2263,12 @@ public:
      *
      * @throws Throws a `codegen_error` if the macro already exists.
      * @param name The macro name.
+     * @param desc The macro descriptor.
      * @param import_path Import path of the macro, or `std::nullopt`.
      */
     void add_macro(
       std::string name,
+      module_::macro_descriptor desc,
       std::optional<std::string> import_path = std::nullopt);
 
     /**

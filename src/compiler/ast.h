@@ -110,10 +110,24 @@ public:
         return false;
     }
 
+    /** Whether this expression is a macro evaluation. */
+    virtual bool is_macro_evaluation() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a call expression.
+     *
+     * @note Updates the expression's namespace path.
+     * @throws Throws a `std::runtime_error` if the expression is not a call expression.
+     */
+    virtual class call_expression* as_call_expression();
+
     /**
      * Get the expression as a struct member access expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
+     * @throws Throws a `std::runtime_error` if the expression is not a struct member access expression.
      */
     virtual class access_expression* as_access_expression();
 
@@ -627,9 +641,22 @@ public:
     {
     }
 
-    virtual bool needs_pop() const override
+    bool needs_pop() const override
     {
         return expr->needs_pop();
+    }
+
+    bool is_macro_evaluation() const override
+    {
+        return expr->is_macro_evaluation();
+    }
+
+    call_expression* as_call_expression() override
+    {
+        auto expr_namespace_stack = namespace_stack;
+        expr_namespace_stack.push_back(name.s);
+        expr->set_namespace(std::move(expr_namespace_stack));
+        return expr->as_call_expression();
     }
 
     bool is_const_eval(cg::context& ctx) const override
@@ -642,6 +669,21 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return expr->get_children();
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        exprs.reserve(expr->get_children().size());
+        for(auto& c: expr->get_children())
+        {
+            exprs.emplace_back(c);
+        }
+        return exprs;
+    }
 };
 
 /** Access expression. */
@@ -1307,8 +1349,6 @@ public:
 
     std::vector<expression*> get_children() override
     {
-        // FIXME The names should be included, but just adding them
-        //       leads to namespace-related issues.
         std::vector<expression*> exprs;
         std::transform(
           initializers.begin(),
@@ -1322,8 +1362,6 @@ public:
     }
     std::vector<const expression*> get_children() const override
     {
-        // FIXME The names should be included, but just adding them
-        //       leads to namespace-related issues.
         std::vector<const expression*> exprs;
         std::transform(
           initializers.cbegin(),
@@ -1804,6 +1842,9 @@ class call_expression : public expression
     /** The return type. Set during type checking. */
     ty::type_info return_type;
 
+    /** The evaluated macro for macro call expressions. */
+    expression* eval_macro{nullptr};
+
 public:
     /** Set the super class. */
     using super = expression;
@@ -1836,6 +1877,16 @@ public:
     bool needs_pop() const override
     {
         return return_type.to_string() != "void";
+    }
+
+    bool is_macro_evaluation() const override
+    {
+        return callee.type == token_type::macro_identifier;
+    }
+
+    call_expression* as_call_expression() override
+    {
+        return this;
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1871,6 +1922,34 @@ public:
             children.emplace_back(index_expr.get());
         }
         return children;
+    }
+
+    /** Return the callee's token/name. */
+    token get_callee() const
+    {
+        return callee;
+    }
+
+    /** Return the argument expressions. */
+    std::vector<expression*> get_args() const
+    {
+        std::vector<expression*> children;
+        children.reserve(args.size());
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+
+    /**
+     * Set the evaluated macro.
+     *
+     * @param eval The evaluated macro AST.
+     */
+    void set_eval_macro(expression* eval)
+    {
+        eval_macro = eval;
     }
 };
 

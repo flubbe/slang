@@ -434,6 +434,14 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             {
                 add_type(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::struct_descriptor>(it.desc));
             }
+            else if(it.type == module_::symbol_type::macro)
+            {
+                ctx.add_macro(it.name, std::get<module_::macro_descriptor>(it.desc), import_path);
+            }
+            else
+            {
+                throw resolve_error(fmt::format("Found unknown symbol type '{}'.", static_cast<int>(it.type)));
+            }
         }
     }
 }

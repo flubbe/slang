@@ -70,6 +70,11 @@ static std::unique_ptr<cg::value> type_info_to_value(
  * expression.
  */
 
+call_expression* expression::as_call_expression()
+{
+    throw std::runtime_error("Expression is not a call expression");
+}
+
 access_expression* expression::as_access_expression()
 {
     throw std::runtime_error("Expression is not an access expression.");
@@ -159,25 +164,19 @@ bool expression::supports_directive(const std::string& name) const
 void expression::expand_macros(cg::context& ctx)
 {
     // replace macro nodes by the macro AST.
-    auto visitor = [](expression& e)
+    auto visitor = [&ctx](expression& e)
     {
-        fmt::print("{}\n", e.to_string());
-
-        if(!e.is_named_expression())
+        if(!e.is_macro_evaluation())
         {
             return;
         }
 
-        named_expression* named_expr = e.as_named_expression();
-        token name = named_expr->get_name();
-        if(name.type != token_type::macro_identifier)
-        {
-            return;
-        }
+        auto* call_expr = e.as_call_expression();
+        auto* m = ctx.get_macro(
+          call_expr->get_callee().s,
+          call_expr->get_namespace_path());
 
-        // TODO filter call nodes.
-        // TODO insert macro.
-        fmt::print("Found macro node {}\n", name.s);
+        call_expr->set_eval_macro(m->evaluate(e.loc, call_expr->get_args()));
     };
 
     visit_nodes(
@@ -1251,11 +1250,12 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
         {
             if(*t != *expr_type)
             {
-                throw ty::type_error(loc,
-                                     fmt::format(
-                                       "Initializer types do not match. Found '{}' and '{}'.",
-                                       ty::to_string(*t),
-                                       ty::to_string(*expr_type)));
+                throw ty::type_error(
+                  loc,
+                  fmt::format(
+                    "Initializer types do not match. Found '{}' and '{}'.",
+                    ty::to_string(*t),
+                    ty::to_string(*expr_type)));
             }
         }
         else
@@ -2857,6 +2857,18 @@ std::string function_expression::to_string() const
 
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    if(callee.type == token_type::macro_identifier)
+    {
+        // Code generation for macros.
+        if(!eval_macro)
+        {
+            throw cg::codegen_error(loc, "Macro was not evaluated.");
+        }
+
+        return eval_macro->generate_code(ctx, mc);
+    }
+
+    // Code generation for function calls.
     if(mc == memory_context::store)
     {
         throw cg::codegen_error(loc, "Cannot store into call expression.");
@@ -2882,6 +2894,17 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
 
 std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 {
+    if(callee.type == token_type::macro_identifier)
+    {
+        // Type checking for macros.
+        if(!eval_macro)
+        {
+            throw ty::type_error(callee.location, "Macro was not evaluated.");
+        }
+
+        return eval_macro->type_check(ctx);
+    }
+
     auto sig = ctx.get_function_signature(callee, get_namespace_path());
     return_type = sig.ret_type;
 
@@ -3269,7 +3292,29 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
 
 void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
-    ctx.add_macro(name.s);
+    std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
+    std::transform(
+      ctx.get_directives().cbegin(),
+      ctx.get_directives().cend(),
+      std::back_inserter(directives),
+      [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
+      {
+          std::vector<std::pair<std::string, std::string>> args;
+          std::transform(
+            d.args.cbegin(),
+            d.args.cend(),
+            std::back_inserter(args),
+            [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
+            {
+                return std::make_pair(arg.first.s, arg.second.s);
+            });
+          return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
+      });
+
+    ctx.add_macro(
+      name.s,
+      module_::macro_descriptor{std::move(directives)},
+      get_namespace_path());
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(

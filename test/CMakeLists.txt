@@ -321,6 +321,11 @@ add_compile_exec_fail_test(
     test/test_invalid_main_signature2
 )
 add_compile_exec_test(
+    "slang macros"
+    TRUE
+    test/test_macros
+)
+add_compile_exec_test(
     "slang math"
     TRUE
     test/test_math

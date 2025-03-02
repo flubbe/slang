@@ -32,6 +32,48 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
 }
 
 /*
+ * Macros.
+ */
+
+ast::expression* macro::evaluate(token_location loc, std::vector<ast::expression*> args) const
+{
+    if(name == "format!")
+    {
+        if(desc.directives.size() != 1)
+        {
+            throw codegen_error(loc, fmt::format("Expected 1 directive for 'format!', got {}.", desc.directives.size()));
+        }
+
+        if(desc.directives[0].first != "builtin" || desc.directives[0].second.args.size() != 0)
+        {
+            throw codegen_error(
+              loc,
+              fmt::format(
+                "Expected 'builtin' directive for 'format' with 0 arguments, got '{}' with {} arguments.",
+                desc.directives[0].first, desc.directives[0].second.args.size()));
+        }
+
+        if(args.size() == 0)
+        {
+            throw codegen_error(loc, "Cannot evaluate macro 'format!' with no arguments. Consider removing it.");
+        }
+
+        // TODO - [ ] Format string parsing
+        //      - [ ] Type conversions?
+
+        if(args.size() == 1)
+        {
+            // FIXME We might want a copy?
+            return args[0];
+        }
+
+        throw std::runtime_error("not implemented");
+    }
+
+    throw std::runtime_error("not implemented");
+}
+
+/*
  * Binary operators.
  */
 
@@ -953,6 +995,7 @@ void context::create_native_function(std::string lib_name,
 
 void context::add_macro(
   std::string name,
+  module_::macro_descriptor desc,
   std::optional<std::string> import_path)
 {
     if(std::find_if(
@@ -971,7 +1014,7 @@ void context::add_macro(
     macros.emplace_back(
       std::make_unique<macro>(
         std::move(name),
-        directive_stack,
+        module_::macro_descriptor{std::move(desc.directives)},
         std::move(import_path)));
 }
 
