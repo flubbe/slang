@@ -4,7 +4,7 @@
  * the lexer.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -218,7 +218,16 @@ std::optional<token> lexer::next()
                 current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
             }
 
-            type = token_type::identifier;
+            if(peek() == '!')
+            {
+                current_token += *get();
+                type = token_type::macro_identifier;
+            }
+            else
+            {
+                type = token_type::identifier;
+            }
+
             break;
         }
 

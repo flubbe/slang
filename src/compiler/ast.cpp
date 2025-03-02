@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -70,6 +70,11 @@ static std::unique_ptr<cg::value> type_info_to_value(
  * expression.
  */
 
+macro_invokation* expression::as_macro_invokation()
+{
+    throw std::runtime_error("Expression is not a macro invokation.");
+}
+
 access_expression* expression::as_access_expression()
 {
     throw std::runtime_error("Expression is not an access expression.");
@@ -93,6 +98,13 @@ const named_expression* expression::as_named_expression() const
 std::unique_ptr<cg::value> expression::evaluate([[maybe_unused]] cg::context& ctx) const
 {
     return {};
+}
+
+std::unique_ptr<cg::value> expression::generate_code(
+  [[maybe_unused]] cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
+{
+    throw std::runtime_error(fmt::format("{}: Expression does not generate code.", ::slang::to_string(loc)));
 }
 
 void expression::push_directive(
@@ -128,8 +140,12 @@ void expression::push_directive(
         throw ty::type_error(
           name.location,
           fmt::format(
-            "Directive '{}' with arguments '{}' is not supported by the expression with AST '{}'.",
-            name.s, arg_string, expr_string));
+            "Directive '{}'{} is not supported by the expression with AST '{}'.",
+            name.s,
+            !arg_string.empty()
+              ? fmt::format(" with arguments '{}'", arg_string)
+              : std::string{},
+            expr_string));
     }
 
     ctx.push_directive({name, args});
@@ -143,6 +159,57 @@ void expression::pop_directive(cg::context& ctx)
 bool expression::supports_directive(const std::string& name) const
 {
     return name == "disable";
+}
+
+bool expression::expand_macros(
+  const std::vector<expression*>& macro_asts,
+  cg::context& codegen_ctx)
+{
+    std::size_t macro_expansion_count = 0;
+
+    // replace macro nodes by the macro AST.
+    auto visitor = [&macro_asts,
+                    &codegen_ctx,
+                    &macro_expansion_count](expression& e)
+    {
+        if(!e.is_macro_invokation())
+        {
+            return;
+        }
+
+        auto* macro_expr = e.as_macro_invokation();
+        if(macro_expr->has_expansion())
+        {
+            return;
+        }
+
+        ++macro_expansion_count;
+
+        if(!macro_expr->get_namespace_path().has_value())
+        {
+            // expand local macro.
+            // TODO
+
+            throw std::runtime_error("expression::expand_macros: Local macro expansion not implemented.");
+        }
+        else
+        {
+            // expand imported macro.
+
+            auto* m = codegen_ctx.get_macro(
+              macro_expr->get_name().s,
+              macro_expr->get_namespace_path());
+
+            macro_expr->set_expansion(m->expand(e.loc, macro_expr->get_tokens()));
+        }
+    };
+
+    visit_nodes(
+      visitor,
+      true,
+      false);
+
+    return macro_expansion_count != 0;
 }
 
 /**
@@ -660,7 +727,9 @@ std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx,
 
 void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
+    expr->push_directive(ctx, name, args);
     expr->collect_names(ctx, type_ctx);
+    expr->pop_directive(ctx);
 }
 
 std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
@@ -1208,11 +1277,12 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
         {
             if(*t != *expr_type)
             {
-                throw ty::type_error(loc,
-                                     fmt::format(
-                                       "Initializer types do not match. Found '{}' and '{}'.",
-                                       ty::to_string(*t),
-                                       ty::to_string(*expr_type)));
+                throw ty::type_error(
+                  loc,
+                  fmt::format(
+                    "Initializer types do not match. Found '{}' and '{}'.",
+                    ty::to_string(*t),
+                    ty::to_string(*expr_type)));
             }
         }
         else
@@ -1452,6 +1522,27 @@ std::string struct_anonymous_initializer_expression::to_string() const
 }
 
 /*
+ * named_initializer.
+ */
+
+std::unique_ptr<cg::value> named_initializer::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    return expr->generate_code(ctx, mc);
+}
+
+std::optional<ty::type_info> named_initializer::type_check(ty::context& ctx)
+{
+    return expr->type_check(ctx);
+}
+
+std::string named_initializer::to_string() const
+{
+    return fmt::format("NamedInitializer(name={}, expr={})", get_name().s, expr->to_string());
+}
+
+/*
  * struct_named_initializer_expression.
  */
 
@@ -1481,25 +1572,23 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         ctx.generate_new(struct_type);
     }
 
-    for(std::size_t i = 0; i < member_names.size(); ++i)
+    for(std::size_t i = 0; i < initializers.size(); ++i)
     {
         const auto& initializer = initializers[i];
-        const auto& member_name_expr = member_names[i];
+        const auto& member_name = initializer->get_name().s;
 
-        if(!member_name_expr->is_named_expression())
-        {
-            throw ty::type_error(member_name_expr->get_location(),
-                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
-        }
-        auto member_name = member_name_expr->as_named_expression()->get_name().s;
-
-        auto it = std::find_if(t->cbegin(), t->cend(),
-                               [&member_name](const auto& m) -> bool
-                               { return m.first == member_name; });
+        auto it = std::find_if(
+          t->cbegin(),
+          t->cend(),
+          [&member_name](const std::pair<std::string, cg::value>& m) -> bool
+          { return m.first == member_name; });
         if(it == t->cend())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Struct '{}' has no member '{}'.",
+                name.s, member_name));
         }
 
         const auto& member_type = it->second;
@@ -1531,27 +1620,26 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
 {
     const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
-    if(member_names.size() != struct_def->members.size())
+    if(initializers.size() != struct_def->members.size())
     {
-        throw ty::type_error(name.location, fmt::format("Struct '{}' has {} members, but {} are initialized.", name.s, struct_def->members.size(), member_names.size()));
+        throw ty::type_error(
+          name.location,
+          fmt::format(
+            "Struct '{}' has {} members, but {} are initialized.",
+            name.s, struct_def->members.size(), initializers.size()));
     }
 
-    std::vector<std::string> initialized_member_names;
-    for(std::size_t i = 0; i < member_names.size(); ++i)
+    std::vector<std::string> initialized_member_names;    // used in check for duplicates
+    for(std::size_t i = 0; i < initializers.size(); ++i)
     {
-        const auto& member_name_expr = member_names[i];
         const auto& initializer = initializers[i];
+        const auto& member_name = initializer->get_name().s;
 
-        if(!member_name_expr->is_named_expression())
-        {
-            throw ty::type_error(member_name_expr->get_location(),
-                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
-        }
-        auto member_name = member_name_expr->as_named_expression()->get_name().s;
-
-        if(std::find_if(initialized_member_names.begin(), initialized_member_names.end(),
-                        [&member_name](auto& name) -> bool
-                        { return name == member_name; })
+        if(std::find_if(
+             initialized_member_names.begin(),
+             initialized_member_names.end(),
+             [&member_name](auto& name) -> bool
+             { return name == member_name; })
            != initialized_member_names.end())
         {
             throw ty::type_error(name.location,
@@ -1560,14 +1648,11 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         }
         initialized_member_names.push_back(member_name);
 
-        if(member_name_expr->is_array_element_access())    // this is an array access.
-        {
-            throw ty::type_error(name.location, fmt::format("Cannot access array elements in struct initializer."));
-        }
-
-        auto it = std::find_if(struct_def->members.begin(), struct_def->members.end(),
-                               [&member_name](const auto& m) -> bool
-                               { return m.first.s == member_name; });
+        auto it = std::find_if(
+          struct_def->members.begin(),
+          struct_def->members.end(),
+          [&member_name](const auto& m) -> bool
+          { return m.first.s == member_name; });
         if(it == struct_def->members.end())
         {
             throw ty::type_error(name.location, fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
@@ -1604,22 +1689,22 @@ std::string struct_named_initializer_expression::to_string() const
 {
     std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", name.s);
 
-    if(member_names.size() != initializers.size())
+    if(!initializers.empty())
     {
-        ret += "<name/initializer mismatch>";
-    }
-    else
-    {
-        if(!initializers.empty())
+        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
         {
-            for(std::size_t i = 0; i < initializers.size() - 1; ++i)
-            {
-                ret += fmt::format("name={}, expr={}, ", member_names[i]->to_string(), initializers[i]->to_string());
-            }
-            ret += fmt::format("name={}, expr={}", member_names.back()->to_string(), initializers.back()->to_string());
+            ret += fmt::format(
+              "name={}, expr={}, ",
+              initializers[i]->get_name().s,
+              initializers[i]->get_expression()->to_string());
         }
-        ret += ")";
+        ret += fmt::format(
+          "name={}, expr={}",
+          initializers.back()->get_name().s,
+          initializers.back()->get_expression()->to_string());
     }
+    ret += ")";
+
     return ret;
 }
 
@@ -2799,6 +2884,7 @@ std::string function_expression::to_string() const
 
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // Code generation for function calls.
     if(mc == memory_context::store)
     {
         throw cg::codegen_error(loc, "Cannot store into call expression.");
@@ -2829,7 +2915,12 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 
     if(sig.arg_types.size() != args.size())
     {
-        throw ty::type_error(callee.location, fmt::format("Wrong number of arguments in function call. Expected {}, got {}.", sig.arg_types.size(), args.size()));
+        throw ty::type_error(
+          callee.location,
+          fmt::format(
+            "Wrong number of arguments in function call. Expected {}, got {}.",
+            sig.arg_types.size(),
+            args.size()));
     }
 
     for(std::size_t i = 0; i < args.size(); ++i)
@@ -2895,6 +2986,44 @@ std::string call_expression::to_string() const
     }
     ret += "))";
     return ret;
+}
+
+/*
+ * macro_invokation.
+ */
+
+std::unique_ptr<cg::value> macro_invokation::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    // Code generation for macros.
+    if(!expansion)
+    {
+        throw cg::codegen_error(loc, "Macro was not expanded.");
+    }
+
+    return expansion->generate_code(ctx, mc);
+}
+
+std::optional<ty::type_info> macro_invokation::type_check(ty::context& ctx)
+{
+    // Type checking for macros.
+    if(!expansion)
+    {
+        throw cg::codegen_error(loc, "Macro was not expanded.");
+    }
+
+    return expansion->type_check(ctx);
+}
+
+std::string macro_invokation::to_string() const
+{
+    auto transform = [](const token& t) -> std::string
+    { return t.s; };
+
+    return fmt::format(
+      "MacroInvokation(callee={}, tokens=({}))",
+      get_name().s, utils::join(tokens, {transform}, " "));
 }
 
 /*
@@ -3198,6 +3327,56 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
     return nullptr;
+}
+
+/*
+ * macro_expression.
+ */
+
+void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+{
+    std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
+    std::transform(
+      ctx.get_directives().cbegin(),
+      ctx.get_directives().cend(),
+      std::back_inserter(directives),
+      [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
+      {
+          std::vector<std::pair<std::string, std::string>> args;
+          std::transform(
+            d.args.cbegin(),
+            d.args.cend(),
+            std::back_inserter(args),
+            [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
+            {
+                return std::make_pair(arg.first.s, arg.second.s);
+            });
+          return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
+      });
+
+    ctx.add_macro(
+      name.s,
+      module_::macro_descriptor{std::move(directives)},
+      get_namespace_path());
+}
+
+std::unique_ptr<cg::value> macro_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    // empty, as macros don't generate code.
+    return nullptr;
+}
+
+bool macro_expression::supports_directive(const std::string& name) const
+{
+    return super::supports_directive(name)
+           || name == "builtin";
+}
+
+std::string macro_expression::to_string() const
+{
+    return fmt::format("Macro(name={})", name.s);
 }
 
 }    // namespace slang::ast

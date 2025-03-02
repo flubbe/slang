@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -110,10 +110,30 @@ public:
         return false;
     }
 
+    /** Whether this expression is a macro expression. */
+    virtual bool is_macro_expression() const
+    {
+        return false;
+    }
+
+    /** Whether this expression is a macro invokation. */
+    virtual bool is_macro_invokation() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a macro invokation expression.
+     *
+     * @note Updates the expression's namespace path.
+     * @throws Throws a `std::runtime_error` if the expression is not a call expression.
+     */
+    virtual class macro_invokation* as_macro_invokation();
+
     /**
      * Get the expression as a struct member access expression.
      *
-     * @throws Throws a `std::runtime_error` if the expression is a struct member access expression.
+     * @throws Throws a `std::runtime_error` if the expression is not a struct member access expression.
      */
     virtual class access_expression* as_access_expression();
 
@@ -167,8 +187,12 @@ public:
      *
      * @param ctx The context to use for code generation.
      * @returns The value of this expression or nullptr.
+     * @note The default implementation does not generate code.
+     * @throws The default implementation throws `std::runtime_error`.
      */
-    virtual std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const = 0;
+    virtual std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const;
 
     /**
      * Name collection.
@@ -209,6 +233,17 @@ public:
      * @returns True if the directive is supported, and false otherwise.
      */
     virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
+
+    /**
+     * Expand macros stored.
+     *
+     * @param macro_asts The module's macros as AST's.
+     * @param codegen_ctx Code generation context.
+     * @returns `true` if macros were expanded and `false` if no macros were expanded.
+     */
+    bool expand_macros(
+      const std::vector<expression*>& macro_asts,
+      cg::context& codegen_ctx);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -616,9 +651,22 @@ public:
     {
     }
 
-    virtual bool needs_pop() const override
+    bool needs_pop() const override
     {
         return expr->needs_pop();
+    }
+
+    bool is_macro_invokation() const override
+    {
+        return expr->is_macro_invokation();
+    }
+
+    macro_invokation* as_macro_invokation() override
+    {
+        auto expr_namespace_stack = namespace_stack;
+        expr_namespace_stack.push_back(name.s);
+        expr->set_namespace(std::move(expr_namespace_stack));
+        return expr->as_macro_invokation();
     }
 
     bool is_const_eval(cg::context& ctx) const override
@@ -631,6 +679,21 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return expr->get_children();
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        exprs.reserve(expr->get_children().size());
+        for(auto& c: expr->get_children())
+        {
+            exprs.emplace_back(c);
+        }
+        return exprs;
+    }
 };
 
 /** Access expression. */
@@ -780,6 +843,11 @@ public:
     bool needs_pop() const override
     {
         return expr->needs_pop();
+    }
+
+    bool is_macro_expression() const override
+    {
+        return expr->is_macro_expression();
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1162,16 +1230,104 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> exprs;
+        std::transform(
+          initializers.begin(),
+          initializers.end(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<expression>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        std::transform(
+          initializers.cbegin(),
+          initializers.cend(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<expression>& initializer) -> const expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+};
+
+/** An initializer for named struct initialization. */
+class named_initializer : public named_expression
+{
+    /** Initializer expression. */
+    std::unique_ptr<expression> expr;
+
+public:
+    /** Set the super class. */
+    using super = named_initializer;
+
+    /** No default constructor. */
+    named_initializer() = delete;
+
+    /** Copy and move constructors. */
+    named_initializer(const named_initializer&) = delete;
+    named_initializer(named_initializer&&) = default;
+
+    /** Assignment operators. */
+    named_initializer& operator=(const named_initializer&) = delete;
+    named_initializer& operator=(named_initializer&&) = default;
+
+    /**
+     * Construct a new named initializer.
+     *
+     * @param name The initialized member's name.
+     * @param expr The initializer expression.
+     */
+    named_initializer(token name, std::unique_ptr<expression> expr)
+    : named_expression{name.location, std::move(name)}
+    , expr{std::move(expr)}
+    {
+    }
+
+    /** Generates code for the initializing expression. */
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+
+    /** Returns the type of the initializing expression. */
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+
+    std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        return {expr.get()};
+    }
+
+    std::vector<const expression*> get_children() const override
+    {
+        return {expr.get()};
+    }
+
+    /** Return the initializer expression. */
+    expression* get_expression()
+    {
+        return expr.get();
+    }
+
+    /** Return the initializer expression. */
+    const expression* get_expression() const
+    {
+        return expr.get();
+    }
 };
 
 /** Named struct initialization. */
 class struct_named_initializer_expression : public named_expression
 {
-    /** Initialized member names. */
-    std::vector<std::unique_ptr<expression>> member_names;
-
-    /** Initializers. */
-    std::vector<std::unique_ptr<expression>> initializers;
+    /** Initialized members. */
+    std::vector<std::unique_ptr<named_initializer>> initializers;
 
 public:
     /** Set the super class. */
@@ -1192,12 +1348,12 @@ public:
      * Construct a named struct initialization.
      *
      * @param name The struct's name.
-     * @param member_names The initialized member names.
-     * @param members The struct's members.
+     * @param initializers The named initializer expressions.
      */
-    struct_named_initializer_expression(token name, std::vector<std::unique_ptr<expression>> member_names, std::vector<std::unique_ptr<expression>> initializers)
+    struct_named_initializer_expression(
+      token name,
+      std::vector<std::unique_ptr<named_initializer>> initializers)
     : named_expression{name.location, std::move(name)}
-    , member_names{std::move(member_names)}
     , initializers{std::move(initializers)}
     {
     }
@@ -1205,6 +1361,33 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
+
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> exprs;
+        std::transform(
+          initializers.begin(),
+          initializers.end(),
+          std::back_inserter(exprs),
+          [](std::unique_ptr<named_initializer>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        std::transform(
+          initializers.cbegin(),
+          initializers.cend(),
+          std::back_inserter(exprs),
+          [](const std::unique_ptr<named_initializer>& initializer) -> expression*
+          {
+              return initializer.get();
+          });
+        return exprs;
+    }
 };
 
 /** Binary operators. */
@@ -1509,10 +1692,11 @@ public:
      * @param args The function's arguments as a vector of pairs `(name, type)`.
      * @param return_type The function's return type.
      */
-    prototype_ast(token_location loc,
-                  token name,
-                  std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
-                  std::unique_ptr<type_expression> return_type)
+    prototype_ast(
+      token_location loc,
+      token name,
+      std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
+      std::unique_ptr<type_expression> return_type)
     : loc{std::move(loc)}
     , name{std::move(name)}
     , args{std::move(args)}
@@ -1640,11 +1824,21 @@ public:
 
     std::vector<expression*> get_children() override
     {
-        return {body.get()};
+        // FIXME The prototype should be included.
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
     }
     std::vector<const expression*> get_children() const override
     {
-        return {body.get()};
+        // FIXME The prototype should be included.
+        if(body)
+        {
+            return {body.get()};
+        }
+        return {};
     }
 };
 
@@ -1683,8 +1877,12 @@ public:
      *
      * @param callee The callee's name.
      * @param args The argument expressions.
+     * @param index_expr Index expression for array access.
      */
-    call_expression(token callee, std::vector<std::unique_ptr<expression>> args, std::unique_ptr<expression> index_expr = nullptr)
+    call_expression(
+      token callee,
+      std::vector<std::unique_ptr<expression>> args,
+      std::unique_ptr<expression> index_expr = nullptr)
     : expression{callee.location}
     , callee{std::move(callee)}
     , args{std::move(args)}
@@ -1730,6 +1928,105 @@ public:
             children.emplace_back(index_expr.get());
         }
         return children;
+    }
+
+    /** Return the callee's token/name. */
+    token get_callee() const
+    {
+        return callee;
+    }
+
+    /** Return the argument expressions. */
+    std::vector<expression*> get_args() const
+    {
+        std::vector<expression*> children;
+        children.reserve(args.size());
+        for(auto& e: args)
+        {
+            children.emplace_back(e.get());
+        }
+        return children;
+    }
+};
+
+/** Macro invokation. */
+class macro_invokation : public named_expression
+{
+    /** Tokens the macro operates on. */
+    std::vector<token> tokens;
+
+    /** An optional index expression for return value array access. */
+    std::unique_ptr<expression> index_expr;
+
+    /** Macro expansion. */
+    std::unique_ptr<expression> expansion;
+
+public:
+    /** Set the super class. */
+    using super = named_expression;
+
+    /** No default constructor. */
+    macro_invokation() = delete;
+
+    /** Copy and move constructors. */
+    macro_invokation(const macro_invokation&) = delete;
+    macro_invokation(macro_invokation&&) = default;
+
+    /** Default assignment operators. */
+    macro_invokation& operator=(const macro_invokation&) = delete;
+    macro_invokation& operator=(macro_invokation&&) = default;
+
+    /**
+     * Construct a macro invokation.
+     *
+     * @param name The macro's name.
+     * @param tokens Tokens the macro operates on.
+     * @param index_expr Index expression for array access.
+     */
+    macro_invokation(
+      token name,
+      std::vector<token> tokens,
+      std::unique_ptr<expression> index_expr = nullptr)
+    : named_expression{name.location, std::move(name)}
+    , tokens{std::move(tokens)}
+    , index_expr{std::move(index_expr)}
+    {
+    }
+
+    bool is_macro_invokation() const override
+    {
+        return true;
+    }
+
+    macro_invokation* as_macro_invokation() override
+    {
+        return this;
+    }
+
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::string to_string() const override;
+
+    /** Get the tokens the macro operates on. */
+    const std::vector<token> get_tokens() const
+    {
+        return tokens;
+    }
+
+    /** Whether this macro is expanded. */
+    bool has_expansion() const
+    {
+        return static_cast<bool>(expansion);
+    }
+
+    /**
+     * Set the macro expansion.
+     *
+     * @param exp The expansion.
+     */
+    void set_expansion(std::unique_ptr<expression> exp)
+    {
+        expansion = std::move(exp);
     }
 };
 
@@ -1989,6 +2286,51 @@ public:
     {
         return "Continue()";
     }
+};
+
+/** Macros. */
+class macro_expression : public expression
+{
+    /** The macro's name. */
+    token name;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** No default constructor. */
+    macro_expression() = delete;
+
+    /** Copy and move constructors. */
+    macro_expression(const macro_expression&) = delete;
+    macro_expression(macro_expression&&) = default;
+
+    /** Default assignment operators. */
+    macro_expression& operator=(const macro_expression&) = delete;
+    macro_expression& operator=(macro_expression&&) = default;
+
+    /**
+     * Construct a macro expression.
+     *
+     * @param loc The location.
+     */
+    explicit macro_expression(
+      token_location loc,
+      token name)
+    : expression{std::move(loc)}
+    , name{std::move(name)}
+    {
+    }
+
+    bool is_macro_expression() const override
+    {
+        return true;
+    }
+
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    bool supports_directive(const std::string& name) const override;
+    std::string to_string() const override;
 };
 
 }    // namespace slang::ast

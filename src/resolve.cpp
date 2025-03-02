@@ -417,6 +417,13 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             throw resolve_error("Cannot resolve empty import.");
         }
 
+        auto it = resolvers.find(import_path);
+        if(it != resolvers.end())
+        {
+            // module is already resolved.
+            continue;
+        }
+
         module_::module_resolver& resolver = resolve_module(import_path);
         const module_::module_header& header = resolver.get_module().get_header();
 
@@ -433,6 +440,14 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             else if(it.type == module_::symbol_type::type)
             {
                 add_type(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::struct_descriptor>(it.desc));
+            }
+            else if(it.type == module_::symbol_type::macro)
+            {
+                ctx.add_macro(it.name, std::get<module_::macro_descriptor>(it.desc), import_path);
+            }
+            else
+            {
+                throw resolve_error(fmt::format("Found unknown symbol type '{}'.", static_cast<int>(it.type)));
             }
         }
     }

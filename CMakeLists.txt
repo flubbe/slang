@@ -21,6 +21,7 @@ find_package(Microsoft.GSL REQUIRED)
 
 add_executable(slang
     src/archives/file.cpp
+    src/compiler/builtins/format.cpp
     src/compiler/ast.cpp
     src/compiler/eval.cpp
     src/compiler/codegen.cpp
