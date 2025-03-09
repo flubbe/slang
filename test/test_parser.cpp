@@ -1557,6 +1557,57 @@ TEST(parser, macro_definition)
         lexer.set_input(test_input);
         ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
     }
+    {
+        const std::string test_input =
+          "macro test! {\n"
+          "    ($a: expr..., $b: expr) => {\n"    // ellipsis not on last argument
+          "    };\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "macro sum! {\n"
+          "    () => {\n"
+          "        return 0;\n"
+          "    }\n"    // missing semicolon
+          "    ($a: expr) => {\n"
+          "       return $a;\n"
+          "    };\n"
+          "    ($a: expr, $b: expr...) => {\n"
+          "        return $a + sum!($b);\n"
+          "    };\n"
+          "}";
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
+    {
+        const std::string test_input =
+          "macro sum! {\n"
+          "    () => {\n"
+          "        return 0;\n"
+          "    };\n"
+          "    ($a: expr) => {\n"
+          "       return $a;\n"
+          "    };\n"
+          "    ($a: expr, $b: expr...) {\n"    // missing "=>"
+          "        return $a + sum!($b);\n"
+          "    };\n"
+          "}";
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+    }
 }
 
 }    // namespace
