@@ -1,5 +1,19 @@
 import std;
 
+macro sum! {
+    () => {
+        return 0;
+    };
+
+    ($a: expr) => {
+        return $a;
+    };
+
+    ($a: expr, $b: expr...) => {
+        return $a + sum!($b);
+    };
+}
+
 fn main(args: [str]) -> i32
 {
     std::assert(

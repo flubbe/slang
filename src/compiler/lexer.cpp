@@ -83,7 +83,7 @@ static bool is_hexdigit(const std::optional<char>& c)
 }
 
 /** The count of operators the lexer supports. */
-constexpr std::size_t operator_count = 34;
+constexpr std::size_t operator_count = 36;
 
 /**
  * Supported operators.
@@ -101,7 +101,8 @@ static const std::array<std::string, operator_count> operators = {
   "&=", "|=", "<<=", ">>=",
   "++", "--",                          // increment, decrement
   "::",                                // namespace access
-  "->"                                 // return type annotation
+  "->",                                // return type annotation
+  "=>",                                // macro definition.
   // clang-format on
 };
 
@@ -210,7 +211,26 @@ std::optional<token> lexer::next()
         }
 
         current_token = {*c};
-        if(is_identifier(c, true))
+
+        bool macro_identifier = false;
+        if(*c == '$')    // macro identifiers.
+        {
+            c = get();    // NOLINT(bugprone-unchecked-optional-access)
+            current_token += *c;
+
+            if(!is_identifier(c, true))
+            {
+                throw lexical_error(
+                  fmt::format(
+                    "{}: Expected identifier, got '{}'.",
+                    to_string(loc),
+                    *c));    // NOLINT(bugprone-unchecked-optional-access)
+            }
+
+            macro_identifier = true;
+        }
+
+        if(is_identifier(c, true) || macro_identifier)
         {
             while(is_identifier(peek(), false))
             {
@@ -218,10 +238,14 @@ std::optional<token> lexer::next()
                 current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
             }
 
-            if(peek() == '!')
+            if(macro_identifier)
             {
-                current_token += *get();
                 type = token_type::macro_identifier;
+            }
+            else if(peek() == '!')
+            {
+                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                type = token_type::macro_name;
             }
             else
             {
@@ -366,8 +390,25 @@ std::optional<token> lexer::next()
             break;
         }
 
-        if(*c == '.')    // element access. Needs to come after parsing floating-point literals.
+        if(*c == '.')    // element access or ellipsis. Needs to come after parsing floating-point literals.
         {
+            if(peek().has_value() && *peek() == '.')    // NOLINT(bugprone-unchecked-optional-access)
+            {
+                // ellipsis.
+                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+
+                if(peek().has_value() && *peek() != '.')    // NOLINT(bugprone-unchecked-optional-access)
+                {
+                    throw lexical_error(
+                      fmt::format(
+                        "{}: Expected '.', got '{}'.",
+                        to_string(loc),
+                        *peek()));    // NOLINT(bugprone-unchecked-optional-access)
+                }
+
+                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+            }
+
             break;
         }
 

@@ -352,12 +352,15 @@ public:
      * @param visitor The visitor function.
      * @param visit_self Whether to visit the current node.
      * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
+     * @param filter An optional filter that returns `true` if a node
+     *               should be traversed. Defaults to traversing all nodes.
      * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(expression&)> visitor,
       bool visit_self,
-      bool post_order = false);
+      bool post_order = false,
+      std::function<bool(const expression&)> filter = nullptr);
 
     /**
      * Visit all nodes in this expression tree using pre-order or post-order traversal.
@@ -365,12 +368,15 @@ public:
      * @param visitor The visitor function.
      * @param visit_self Whether to visit the current node.
      * @param post_order Whether to visit the nodes in post-order. Default is pre-order.
+     * @param filter An optional filter that returns `true` if a node
+     *               should be traversed. Defaults to traversing all nodes.
      * @throws Throws a `std::runtime_error` if any child node is `nullptr`.
      */
     void visit_nodes(
       std::function<void(const expression&)> visitor,
       bool visit_self,
-      bool post_order = false) const;
+      bool post_order = false,
+      std::function<bool(const expression&)> filter = nullptr) const;
 };
 
 /** Any expression with a name. */
@@ -405,24 +411,28 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_named_expression() const override
     {
         return true;
     }
 
+    [[nodiscard]]
     named_expression* as_named_expression() override
     {
         return this;
     }
 
+    [[nodiscard]]
     const named_expression* as_named_expression() const override
     {
         return this;
     }
 
     /** Get the name. */
+    [[nodiscard]]
     token get_name() const
     {
         return name;
@@ -460,18 +470,21 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_const_eval(cg::context&) const override
     {
         return true;
     }
 
+    [[nodiscard]]
     bool is_literal() const override
     {
         return true;
     }
 
+    [[nodiscard]]
     literal_expression* as_literal() override
     {
         return this;
@@ -481,7 +494,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
     /** Get the token. */
     const token& get_token() const
@@ -531,15 +544,17 @@ public:
     {
     }
 
-    std::unique_ptr<type_expression> clone() const;
+    [[nodiscard]] std::unique_ptr<type_expression> clone() const;
 
     /** Get the location. */
+    [[nodiscard]]
     token_location get_location() const
     {
         return loc;
     }
 
     /** Returns the type name. */
+    [[nodiscard]]
     token get_name() const
     {
         return type_name;
@@ -549,24 +564,25 @@ public:
      * Return the qualified type name, that is, the type name with its namespace path
      * prepended, if not empty.
      */
-    std::string get_qualified_name() const;
+    [[nodiscard]] std::string get_qualified_name() const;
 
     /** Return the namespace path, or `std::nullopt` if empty. */
     std::optional<std::string> get_namespace_path() const;
 
     /** Return a readable representation of the type. */
-    std::string to_string() const;
+    [[nodiscard]] std::string to_string() const;
 
     /** Convert the expression to a type. */
-    cg::type to_type() const;
+    [[nodiscard]] cg::type to_type() const;
 
     /** Get the type info. */
-    ty::type_info to_type_info(ty::context& ctx) const;
+    [[nodiscard]] ty::type_info to_type_info(ty::context& ctx) const;
 
     /** Get unresolved type info. */
-    ty::type_info to_unresolved_type_info(ty::context& ctx) const;
+    [[nodiscard]] ty::type_info to_unresolved_type_info(ty::context& ctx) const;
 
     /** Return whether the type is an array. */
+    [[nodiscard]]
     bool is_array() const
     {
         return array;
@@ -618,33 +634,39 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_struct_member_access() const override
     {
         return expr->is_struct_member_access();
     }
 
+    [[nodiscard]]
     access_expression* as_access_expression() override
     {
         return expr->as_access_expression();
     }
 
+    [[nodiscard]]
     const access_expression* as_access_expression() const override
     {
         return expr->as_access_expression();
     }
 
+    [[nodiscard]]
     bool is_named_expression() const override
     {
         return expr->is_named_expression();
     }
 
+    [[nodiscard]]
     named_expression* as_named_expression() override
     {
         return expr->as_named_expression();
     }
 
+    [[nodiscard]]
     const named_expression* as_named_expression() const override
     {
         return expr->as_named_expression();
@@ -652,12 +674,14 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {expr.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {expr.get()};
@@ -701,18 +725,21 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool needs_pop() const override
     {
         return expr->needs_pop();
     }
 
+    [[nodiscard]]
     bool is_macro_invocation() const override
     {
         return expr->is_macro_invocation();
     }
 
+    [[nodiscard]]
     macro_invocation* as_macro_invocation() override
     {
         auto expr_namespace_stack = namespace_stack;
@@ -721,6 +748,7 @@ public:
         return expr->as_macro_invocation();
     }
 
+    [[nodiscard]]
     bool is_const_eval(cg::context& ctx) const override
     {
         return expr->is_const_eval(ctx);
@@ -730,12 +758,14 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return expr->get_children();
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> exprs;
@@ -781,18 +811,21 @@ public:
      */
     access_expression(std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs);
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_struct_member_access() const override
     {
         return true;
     }
 
+    [[nodiscard]]
     virtual access_expression* as_access_expression() override
     {
         return this;
     }
 
+    [[nodiscard]]
     virtual const access_expression* as_access_expression() const override
     {
         return this;
@@ -808,9 +841,10 @@ public:
      */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
     /** Return the accessed struct's type info. */
+    [[nodiscard]]
     ty::type_info get_struct_type() const
     {
         return lhs_type;
@@ -849,11 +883,11 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 };
 
 /** Directives. Directives have names and contain a list of key-value pairs as arguments. */
@@ -894,13 +928,15 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool needs_pop() const override
     {
         return expr->needs_pop();
     }
 
+    [[nodiscard]]
     bool is_macro_expression() const override
     {
         return expr->is_macro_expression();
@@ -909,12 +945,14 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {expr.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {expr.get()};
@@ -954,20 +992,22 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_array_element_access() const override
     {
         return static_cast<bool>(element_expr);
     }
 
-    bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         if(element_expr)
@@ -976,6 +1016,7 @@ public:
         }
         return {};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         if(element_expr)
@@ -986,7 +1027,7 @@ public:
     }
 
     /** Get the value of the object. */
-    cg::value get_value(cg::context& ctx) const;
+    [[nodiscard]] cg::value get_value(cg::context& ctx) const;
 };
 
 /** Variable declaration. */
@@ -1026,12 +1067,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         if(expr)
@@ -1040,6 +1082,7 @@ public:
         }
         return {};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         if(expr)
@@ -1050,12 +1093,14 @@ public:
     }
 
     /** Get the variable's type. */
+    [[nodiscard]]
     const std::unique_ptr<ast::type_expression>& get_type() const
     {
         return type;
     }
 
     /** Whether this variable is an array. */
+    [[nodiscard]]
     bool is_array() const
     {
         return type->is_array();
@@ -1103,7 +1148,7 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     void push_directive(
       cg::context& ctx,
@@ -1112,18 +1157,21 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {expr.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {expr.get()};
     }
 
     /** Get the constant's type. */
+    [[nodiscard]]
     const std::unique_ptr<ast::type_expression>& get_type() const
     {
         return type;
@@ -1162,12 +1210,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
@@ -1179,6 +1228,7 @@ public:
         }
         return children;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
@@ -1229,14 +1279,15 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    bool supports_directive(const std::string& name) const override;
+    [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
@@ -1248,6 +1299,7 @@ public:
         }
         return children;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
@@ -1295,12 +1347,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> exprs;
@@ -1314,6 +1367,7 @@ public:
           });
         return exprs;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> exprs;
@@ -1362,7 +1416,7 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     /** Generates code for the initializing expression. */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1370,25 +1424,29 @@ public:
     /** Returns the type of the initializing expression. */
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
 
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {expr.get()};
     }
 
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {expr.get()};
     }
 
     /** Return the initializer expression. */
+    [[nodiscard]]
     expression* get_expression()
     {
         return expr.get();
     }
 
     /** Return the initializer expression. */
+    [[nodiscard]]
     const expression* get_expression() const
     {
         return expr.get();
@@ -1430,12 +1488,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> exprs;
@@ -1449,6 +1508,7 @@ public:
           });
         return exprs;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> exprs;
@@ -1506,21 +1566,23 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    bool needs_pop() const override;
+    [[nodiscard]] bool needs_pop() const override;
 
-    bool is_const_eval(cg::context& ctx) const override;
-    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {lhs.get(), rhs.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {lhs.get(), rhs.get()};
@@ -1568,19 +1630,21 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    bool is_const_eval(cg::context& ctx) const override;
-    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {operand.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {operand.get()};
@@ -1625,16 +1689,18 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {expr.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {expr.get()};
@@ -1667,11 +1733,11 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 };
 
 /** Postfix operator expression. */
@@ -1709,8 +1775,9 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool needs_pop() const override
     {
         return true;
@@ -1718,12 +1785,14 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {identifier.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {identifier.get()};
@@ -1787,14 +1856,15 @@ public:
     {
     }
 
-    std::unique_ptr<prototype_ast> clone() const;
+    [[nodiscard]] std::unique_ptr<prototype_ast> clone() const;
 
-    cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
+    [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const;
     void type_check(ty::context& ctx);
-    std::string to_string() const;
+    [[nodiscard]] std::string to_string() const;
 
+    [[nodiscard]]
     const token& get_name() const
     {
         return name;
@@ -1834,13 +1904,14 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
@@ -1852,6 +1923,7 @@ public:
         }
         return children;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
@@ -1906,14 +1978,15 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
-    bool supports_directive(const std::string& name) const override;
+    [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         // FIXME The prototype should be included.
@@ -1923,6 +1996,7 @@ public:
         }
         return {};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         // FIXME The prototype should be included.
@@ -1980,8 +2054,9 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool needs_pop() const override
     {
         return return_type.to_string() != "void";
@@ -1989,8 +2064,9 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
@@ -2006,6 +2082,7 @@ public:
         }
         return children;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
@@ -2023,12 +2100,14 @@ public:
     }
 
     /** Return the callee's token/name. */
+    [[nodiscard]]
     token get_callee() const
     {
         return callee;
     }
 
     /** Return the argument expressions. */
+    [[nodiscard]]
     std::vector<expression*> get_args() const
     {
         std::vector<expression*> children;
@@ -2083,13 +2162,15 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_macro_invocation() const override
     {
         return true;
     }
 
+    [[nodiscard]]
     macro_invocation* as_macro_invocation() override
     {
         return this;
@@ -2097,19 +2178,21 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
     /**
      * Get the tokens the macro operates on.
      *
      * @return The expressions.
      */
+    [[nodiscard]]
     const std::vector<std::unique_ptr<ast::expression>>& get_exprs() const
     {
         return exprs;
     }
 
     /** Whether this macro is expanded. */
+    [[nodiscard]]
     bool has_expansion() const
     {
         return static_cast<bool>(expansion);
@@ -2163,12 +2246,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         if(expr)
@@ -2177,6 +2261,7 @@ public:
         }
         return {};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         if(expr)
@@ -2232,12 +2317,13 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
@@ -2251,6 +2337,7 @@ public:
         }
         return children;
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
@@ -2305,16 +2392,18 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     std::vector<expression*> get_children() override
     {
         return {condition.get(), while_block.get()};
     }
+    [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
         return {condition.get(), while_block.get()};
@@ -2349,10 +2438,11 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return "Break()";
@@ -2387,13 +2477,73 @@ public:
     {
     }
 
-    std::unique_ptr<expression> clone() const override;
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return "Continue()";
+    }
+};
+
+/** Macro branch. */
+class macro_branch : public expression
+{
+    /** Arguments. */
+    std::vector<std::pair<token, token>> args;
+
+    /** Whether the arguments end with a list. */
+    bool args_end_with_list{false};
+
+    /** Body. */
+    std::unique_ptr<block> body;
+
+public:
+    using super = expression;
+
+    /** Defaulted and deleted constructors. */
+    macro_branch() = default;
+    macro_branch(const macro_branch&) = delete;
+    macro_branch(macro_branch&&) = default;
+
+    /** Default assignment operators. */
+    macro_branch& operator=(const macro_branch&) = delete;
+    macro_branch& operator=(macro_branch&&) = default;
+
+    /**
+     * Construct a macro branch.
+     *
+     * @param args Macro arguments.
+     * @param args_end_with_list Whether the arguments end with a list.
+     * @param body Branch body.
+     */
+    macro_branch(
+      std::vector<std::pair<token, token>> args,
+      bool args_end_with_list,
+      std::unique_ptr<block> body)
+    : args{std::move(args)}
+    , args_end_with_list{args_end_with_list}
+    , body{std::move(body)}
+    {
+    }
+
+    [[nodiscard]]
+    std::unique_ptr<expression> clone() const override;
+
+    [[nodiscard]]
+    std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        return {body.get()};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        return {body.get()};
     }
 };
 
@@ -2402,6 +2552,9 @@ class macro_expression : public expression
 {
     /** The macro's name. */
     token name;
+
+    /** The macro's branches. */
+    std::vector<std::unique_ptr<macro_branch>> branches;
 
 public:
     /** Set the super class. */
@@ -2420,17 +2573,23 @@ public:
      * Construct a macro expression.
      *
      * @param loc The location.
+     * @param name The macro's name.
+     * @param branches The macro's branches.
      */
-    explicit macro_expression(
+    macro_expression(
       token_location loc,
-      token name)
+      token name,
+      std::vector<std::unique_ptr<macro_branch>> branches)
     : expression{std::move(loc)}
     , name{std::move(name)}
+    , branches{std::move(branches)}
     {
     }
 
+    [[nodiscard]]
     std::unique_ptr<expression> clone() const override;
 
+    [[nodiscard]]
     bool is_macro_expression() const override
     {
         return true;
@@ -2438,8 +2597,31 @@ public:
 
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    bool supports_directive(const std::string& name) const override;
-    std::string to_string() const override;
+    [[nodiscard]] bool supports_directive(const std::string& name) const override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> exprs;
+        exprs.reserve(branches.size());
+        for(auto& b: branches)
+        {
+            exprs.emplace_back(b.get());
+        }
+        return exprs;
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> exprs;
+        exprs.reserve(branches.size());
+        for(auto& b: branches)
+        {
+            exprs.emplace_back(b.get());
+        }
+        return exprs;
+    }
 };
 
 }    // namespace slang::ast

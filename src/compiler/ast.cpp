@@ -217,10 +217,16 @@ bool expression::expand_macros(
         }
     };
 
+    auto filter = [](const expression& e) -> bool
+    {
+        return !e.is_macro_expression();
+    };
+
     visit_nodes(
       visitor,
       true,
-      false);
+      false,
+      filter);
 
     return macro_expansion_count != 0;
 }
@@ -239,6 +245,8 @@ std::string expression::to_string() const
  * @param visitor The visitor function.
  * @param visit_self Whether to visit the expression itself.
  * @param post_order Whether to visit the nodes in post-order.
+ * @param filter An optional filter that returns `true` if a node
+ *               should be traversed. Defaults to traversing all nodes.
  * @tparam T The expression type. Must be a subclass of `expression`.
  */
 template<typename T>
@@ -246,7 +254,8 @@ void visit_nodes(
   T& expr,
   std::function<void(T&)>& visitor,
   bool visit_self,
-  bool post_order)
+  bool post_order,
+  std::function<bool(std::add_const_t<T>&)> filter = nullptr)
 {
     static_assert(
       std::is_same_v<std::decay_t<T>, expression>
@@ -268,11 +277,14 @@ void visit_nodes(
             throw std::runtime_error("Null expression in AST.");
         }
 
-        sorted_ast.emplace_back(current);
-
-        for(auto* child: current->get_children())
+        if(!filter || filter(*current))
         {
-            stack.push(child);
+            sorted_ast.emplace_back(current);
+
+            for(auto* child: current->get_children())
+            {
+                stack.push(child);
+            }
         }
     }
 
@@ -300,17 +312,19 @@ void visit_nodes(
 void expression::visit_nodes(
   std::function<void(expression&)> visitor,
   bool visit_self,
-  bool post_order)
+  bool post_order,
+  std::function<bool(const expression&)> filter)
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
 }
 
 void expression::visit_nodes(
   std::function<void(const expression&)> visitor,
   bool visit_self,
-  bool post_order) const
+  bool post_order,
+  std::function<bool(const expression&)> filter) const
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
 }
 
 /*
@@ -3664,12 +3678,52 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
 }
 
 /*
+ * macro_branch.
+ */
+
+std::unique_ptr<expression> macro_branch::clone() const
+{
+    return std::make_unique<macro_branch>(
+      args,
+      args_end_with_list,
+      std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+}
+
+std::string macro_branch::to_string() const
+{
+    std::string ret = fmt::format("MacroBranch(args=(");
+    if(!args.empty())
+    {
+        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        {
+            const auto& arg = args[i];
+            ret += fmt::format("(name={}, type={}), ", arg.first.s, arg.second.s);
+        }
+        ret += fmt::format("(name={}, type={})", args.back().first.s, args.back().second.s);
+    }
+    ret += fmt::format(
+      "), args_end_with_list={}, body={})",
+      args_end_with_list ? "true" : "false",
+      body->to_string());
+    return ret;
+}
+
+/*
  * macro_expression.
  */
 
 std::unique_ptr<expression> macro_expression::clone() const
 {
-    return std::make_unique<macro_expression>(loc, name);
+    std::vector<std::unique_ptr<macro_branch>> cloned_branches;
+    cloned_branches.reserve(branches.size());
+    for(const auto& branch: branches)
+    {
+        cloned_branches.emplace_back(
+          static_cast<macro_branch*>(branch->clone().release())    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        );
+    }
+
+    return std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
 }
 
 void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -3715,7 +3769,18 @@ bool macro_expression::supports_directive(const std::string& name) const
 
 std::string macro_expression::to_string() const
 {
-    return fmt::format("Macro(name={})", name.s);
+    std::string ret = fmt::format("Macro(name={}, branches=(", name.s);
+    if(!branches.empty())
+    {
+        for(std::size_t i = 0; i < branches.size() - 1; ++i)
+        {
+            const auto& branch = branches[i];
+            ret += fmt::format("{}, ", branch->to_string());
+        }
+        ret += fmt::format("{}", branches.back()->to_string());
+    }
+    ret += "))";
+    return ret;
 }
 
 }    // namespace slang::ast

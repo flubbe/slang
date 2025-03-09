@@ -1133,7 +1133,7 @@ TEST(parser, struct_member_access)
         slang::parser parser;
 
         lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(lexer), slang::lexical_error);
     }
 }
 
@@ -1449,6 +1449,113 @@ TEST(parser, struct_array_access)
         // clang-format on
 
         EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+}
+
+TEST(parser, macro_definition)
+{
+    {
+        const std::string test_input =
+          "macro sum! {\n"
+          "    () => {\n"
+          "        return 0;\n"
+          "    };\n"
+          "    ($a: expr) => {\n"
+          "       return $a;\n"
+          "    };\n"
+          "    ($a: expr, $b: expr...) => {\n"
+          "        return $a + sum!($b);\n"
+          "    };\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        // clang-format off
+        const std::string expected =
+        "Block("
+          "exprs=("
+            "Macro("
+              "name=sum!, "
+              "branches=("
+                "MacroBranch("
+                  "args=(), "
+                  "args_end_with_list=false, "
+                  "body=Block("
+                    "exprs=("
+                      "Return("
+                        "expr=IntLiteral("
+                          "value=0"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                "), "
+                "MacroBranch("
+                  "args=("
+                    "(name=$a, type=expr)"
+                  "), "
+                  "args_end_with_list=false, "
+                  "body=Block("
+                    "exprs=("
+                      "Return("
+                        "expr=VariableReference("
+                          "name=$a"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                "), "
+                "MacroBranch("
+                  "args=("
+                    "(name=$a, type=expr), "
+                    "(name=$b, type=expr)"
+                  "), "
+                  "args_end_with_list=true, "
+                  "body=Block("
+                    "exprs=("
+                      "Return("
+                        "expr=Binary("
+                          "op=\"+\", "
+                          "lhs=VariableReference("
+                            "name=$a"
+                          "), "
+                          "rhs=MacroInvocation("
+                            "callee=sum!, "
+                            "exprs=("
+                              "VariableReference("
+                                "name=$b"
+                              ")"
+                            ")"
+                          ")"
+                        ")"
+                      ")"
+                    ")"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")"
+        ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
+          "macro test! {\n"
+          "    ($a: expr..., $b: expr...) => {\n"    // two ellipses
+          "    };\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
     }
 }
 

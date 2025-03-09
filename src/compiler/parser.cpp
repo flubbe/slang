@@ -58,7 +58,8 @@ static void validate_identifier_name(const token& tok)
 {
     // we probably already know this, but validate anyway.
     if(tok.type != token_type::identifier
-       && tok.type != token_type::macro_identifier)
+       && tok.type != token_type::macro_identifier
+       && tok.type != token_type::macro_name)
     {
         throw syntax_error(tok, fmt::format("Expected <identifier>, got '{}'.", tok.s));
     }
@@ -511,7 +512,7 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 
         if(current_token->s != ",")
         {
-            throw syntax_error(*current_token, fmt::format("Expected '}' or ',', got '{}'.", current_token->s));
+            throw syntax_error(*current_token, fmt::format("Expected '}}' or ',', got '{}'.", current_token->s));
         }
 
         get_next_token();    // skip ','.
@@ -705,7 +706,9 @@ std::unique_ptr<ast::expression> parser::parse_primary()
 {
     std::unique_ptr<ast::expression> expr;
 
-    if(current_token->type == token_type::identifier)
+    if(current_token->type == token_type::identifier
+       || current_token->type == token_type::macro_identifier
+       || current_token->type == token_type::macro_name)
     {
         expr = parse_identifier_expression();
     }
@@ -930,8 +933,8 @@ std::unique_ptr<ast::expression> parser::parse_new()
 // identifierexpr ::= identifier
 //                  | identifier ('++' | '--')
 //                  | identifier '[' primary ']'
-//                  | (identifier | macro_identifier) '(' expression* ')'
-//                  | (identifier | macro_identifier) '(' expression* ')' '[' primary ']'
+//                  | (identifier | macro_name) '(' expression* ')'
+//                  | (identifier | macro_name) '(' expression* ')' '[' primary ']'
 //                  | identifier '::' identifierexpr
 //                  | identifier '.' identifierexpr
 //                  | identifier '{' primary* '}'
@@ -986,7 +989,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 
             get_next_token();    // skip ']'
 
-            if(identifier.type == token_type::macro_identifier)
+            if(identifier.type == token_type::macro_name)
             {
                 return std::make_unique<ast::macro_invocation>(
                   std::move(identifier), std::move(args), std::move(index_expression));
@@ -995,7 +998,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
             return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args), std::move(index_expression));
         }
 
-        if(identifier.type == token_type::macro_identifier)
+        if(identifier.type == token_type::macro_name)
         {
             return std::make_unique<ast::macro_invocation>(std::move(identifier), std::move(args));
         }
@@ -1008,7 +1011,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
         get_next_token();    // skip "::"
 
         if(current_token->type != token_type::identifier
-           && current_token->type != token_type::macro_identifier)
+           && current_token->type != token_type::macro_name)
         {
             throw syntax_error(*current_token, "Expected <identifier>.");
         }
@@ -1076,7 +1079,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 
                 if(current_token->s != ",")
                 {
-                    throw syntax_error(*current_token, "Expected '}' or ','.");
+                    throw syntax_error(*current_token, "Expected '}}' or ','.");
                 }
                 get_next_token();
             }
@@ -1302,9 +1305,9 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
     token_location loc = current_token->location;
     get_next_token();    // skip 'macro'.
 
-    if(current_token->type != token_type::macro_identifier)
+    if(current_token->type != token_type::macro_name)
     {
-        throw syntax_error(*current_token, "Expected <macro-identifier>.");
+        throw syntax_error(*current_token, "Expected <macro-name>.");
     }
 
     token name = *current_token;
@@ -1317,16 +1320,106 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
     }
     get_next_token();
 
-    // TODO Parse macro definition.
+    std::vector<std::unique_ptr<ast::macro_branch>> branches;
+    while(current_token->s == "(")
+    {
+        branches.emplace_back(parse_macro_branch());
+    }
 
     if(current_token->s != "}")
     {
-        throw syntax_error(*current_token, fmt::format("Expected '}', got '{}'.", current_token->s));
+        throw syntax_error(*current_token, fmt::format("Expected '}}', got '{}'.", current_token->s));
     }
 
     // don't skip closing brace, as this is done by the caller.
 
-    return std::make_unique<ast::macro_expression>(loc, std::move(name));
+    return std::make_unique<ast::macro_expression>(loc, std::move(name), std::move(branches));
+}
+
+std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
+{
+    get_next_token();    // skip '('.
+
+    std::vector<std::pair<token, token>> args;
+    bool args_end_with_list = false;
+
+    while(current_token->s != ")")
+    {
+        if(current_token->type != token_type::macro_identifier)
+        {
+            throw syntax_error(
+              *current_token,
+              fmt::format("Expected <macro-identifier>, got '{}'.", current_token->s));
+        }
+        token arg_name = *current_token;
+        get_next_token();
+
+        if(current_token->s != ":")
+        {
+            throw syntax_error(
+              *current_token,
+              fmt::format("Expected ':', got '{}'.", current_token->s));
+        }
+        get_next_token();
+
+        if(current_token->s != "expr")
+        {
+            throw syntax_error(
+              *current_token,
+              fmt::format("Expected 'expr', got '{}'.", current_token->s));
+        }
+        token type_name = *current_token;
+        get_next_token();
+
+        args.emplace_back(std::move(arg_name), std::move(type_name));
+
+        if(current_token->s == "...")
+        {
+            // has to be the last token in the argument list.
+            args_end_with_list = true;
+
+            get_next_token();
+            if(current_token->s != ")")
+            {
+                throw syntax_error(
+                  *current_token,
+                  fmt::format("Expected ')', got '{}'.", current_token->s));
+            }
+
+            break;
+        }
+
+        if(current_token->s == ",")
+        {
+            get_next_token();
+        }
+    }
+
+    // skip ')'.
+    get_next_token();
+
+    if(current_token->s != "=>")
+    {
+        throw syntax_error(
+          *current_token,
+          fmt::format("Expected '=>', got '{}'.", current_token->s));
+    }
+    get_next_token();    // skip "=>".
+
+    auto block = parse_block();
+
+    if(current_token->s != ";")
+    {
+        throw syntax_error(
+          *current_token,
+          fmt::format("Expected ';', got '{}'.", current_token->s));
+    }
+    get_next_token(false);    // skip ";".
+
+    return std::make_unique<ast::macro_branch>(
+      std::move(args),
+      args_end_with_list,
+      std::move(block));
 }
 
 void parser::push_directive(const token& name, [[maybe_unused]] const std::vector<std::pair<token, token>>& args)

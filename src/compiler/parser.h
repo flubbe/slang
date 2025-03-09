@@ -243,6 +243,9 @@ protected:
     /** Parse a macro. */
     std::unique_ptr<ast::macro_expression> parse_macro();
 
+    /** Parse a macro branch. */
+    std::unique_ptr<ast::macro_branch> parse_macro_branch();
+
     /** Push a directive onto the directive stack. */
     void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
 
