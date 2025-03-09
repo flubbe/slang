@@ -215,8 +215,8 @@ std::optional<token> lexer::next()
         bool macro_identifier = false;
         if(*c == '$')    // macro identifiers.
         {
-            c = get();    // NOLINT(bugprone-unchecked-optional-access)
-            current_token += *c;
+            c = get();
+            current_token += *c;    // NOLINT(bugprone-unchecked-optional-access)
 
             if(!is_identifier(c, true))
             {

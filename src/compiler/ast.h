@@ -101,6 +101,34 @@ public:
         return false;
     }
 
+    /** Whether this expression is a variable declaration. */
+    [[nodiscard]]
+    virtual bool is_variable_declaration() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a variable declaration.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a variable declaration.
+     */
+    virtual class variable_declaration_expression* as_variable_declaration();
+
+    /** Whether this expression is a variable reference. */
+    [[nodiscard]]
+    virtual bool is_variable_reference() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a variable reference.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a variable reference.
+     */
+    virtual class variable_reference_expression* as_variable_reference();
+
     /** Whether this expression is an access of an array element. */
     [[nodiscard]]
     virtual bool is_array_element_access() const
@@ -122,6 +150,27 @@ public:
         return false;
     }
 
+    /**
+     * Get the expression as a macro expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a macro expression.
+     */
+    virtual class macro_expression* as_macro_expression();
+
+    /** Whether this expression is a macro branch. */
+    [[nodiscard]]
+    virtual bool is_macro_branch() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a macro branch.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     */
+    virtual class macro_branch* as_macro_branch();
+
     /** Whether this expression is a macro invokation. */
     [[nodiscard]]
     virtual bool is_macro_invocation() const
@@ -133,7 +182,7 @@ public:
      * Get the expression as a macro invokation expression.
      *
      * @note Updates the expression's namespace path.
-     * @throws Throws a `std::runtime_error` if the expression is not a call expression.
+     * @throws Throws a `std::runtime_error` if the expression is not a macro invocation.
      */
     virtual class macro_invocation* as_macro_invocation();
 
@@ -263,13 +312,13 @@ public:
     /**
      * Expand macros stored.
      *
-     * @param macro_asts The module's macros as AST's.
      * @param codegen_ctx Code generation context.
+     * @param macro_asts The module's macros as AST's.
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
     bool expand_macros(
-      const std::vector<expression*>& macro_asts,
-      cg::context& codegen_ctx);
+      cg::context& codegen_ctx,
+      const std::vector<expression*>& macro_asts);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -962,6 +1011,8 @@ public:
 /** Variable references. */
 class variable_reference_expression : public named_expression
 {
+    friend class macro_expression;
+
     /** An optional expression for element access. */
     std::unique_ptr<expression> element_expr;
 
@@ -993,6 +1044,18 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+
+    [[nodiscard]]
+    bool is_variable_reference() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]]
+    variable_reference_expression* as_variable_reference() override
+    {
+        return this;
+    }
 
     [[nodiscard]]
     bool is_array_element_access() const override
@@ -1033,6 +1096,8 @@ public:
 /** Variable declaration. */
 class variable_declaration_expression : public named_expression
 {
+    friend class macro_expression;
+
     /** The variable's type. */
     std::unique_ptr<ast::type_expression> type;
 
@@ -1068,6 +1133,17 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+
+    [[nodiscard]]
+    bool is_variable_declaration() const override
+    {
+        return true;
+    }
+    [[nodiscard]]
+    variable_declaration_expression* as_variable_declaration() override
+    {
+        return this;
+    }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2491,6 +2567,8 @@ public:
 /** Macro branch. */
 class macro_branch : public expression
 {
+    friend class macro_expression;
+
     /** Arguments. */
     std::vector<std::pair<token, token>> args;
 
@@ -2533,6 +2611,18 @@ public:
     std::unique_ptr<expression> clone() const override;
 
     [[nodiscard]]
+    bool is_macro_branch() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]]
+    macro_branch* as_macro_branch() override
+    {
+        return this;
+    }
+
+    [[nodiscard]]
     std::string to_string() const override;
 
     [[nodiscard]]
@@ -2548,11 +2638,8 @@ public:
 };
 
 /** Macros. */
-class macro_expression : public expression
+class macro_expression : public named_expression
 {
-    /** The macro's name. */
-    token name;
-
     /** The macro's branches. */
     std::vector<std::unique_ptr<macro_branch>> branches;
 
@@ -2580,8 +2667,7 @@ public:
       token_location loc,
       token name,
       std::vector<std::unique_ptr<macro_branch>> branches)
-    : expression{std::move(loc)}
-    , name{std::move(name)}
+    : named_expression{std::move(loc), std::move(name)}
     , branches{std::move(branches)}
     {
     }
@@ -2593,6 +2679,12 @@ public:
     bool is_macro_expression() const override
     {
         return true;
+    }
+
+    [[nodiscard]]
+    macro_expression* as_macro_expression() override
+    {
+        return this;
     }
 
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -2622,6 +2714,17 @@ public:
         }
         return exprs;
     }
+
+    /**
+     * Expand the macro given a macro invocation.
+     *
+     * @param ctx The code generation context.
+     * @param invocation The macro invocation expression/context.
+     * @return The macro expansion AST for the invocation.
+     */
+    std::unique_ptr<expression> expand(
+      cg::context& ctx,
+      const macro_invocation& invocation) const;
 };
 
 }    // namespace slang::ast

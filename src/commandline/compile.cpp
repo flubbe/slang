@@ -205,7 +205,7 @@ void compile::invoke(const std::vector<std::string>& args)
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
-    } while(ast->expand_macros(module_macro_asts, codegen_ctx));
+    } while(ast->expand_macros(codegen_ctx, module_macro_asts));
     type_ctx.resolve_types();
     ast->type_check(type_ctx);
     ast->generate_code(codegen_ctx);

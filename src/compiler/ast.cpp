@@ -78,6 +78,26 @@ std::unique_ptr<expression> expression::clone() const
     return cloned_expr;
 }
 
+macro_expression* expression::as_macro_expression()
+{
+    throw std::runtime_error("Expression is not a macro.");
+}
+
+macro_branch* expression::as_macro_branch()
+{
+    throw std::runtime_error("Expression is not a macro branch.");
+}
+
+variable_declaration_expression* expression::as_variable_declaration()
+{
+    throw std::runtime_error("Expression is not a variable declaration.");
+}
+
+variable_reference_expression* expression::as_variable_reference()
+{
+    throw std::runtime_error("Expression is not a variable reference.");
+}
+
 macro_invocation* expression::as_macro_invocation()
 {
     throw std::runtime_error("Expression is not a macro invokation.");
@@ -175,8 +195,8 @@ bool expression::supports_directive(const std::string& name) const
 }
 
 bool expression::expand_macros(
-  const std::vector<expression*>& macro_asts,
-  cg::context& codegen_ctx)
+  cg::context& codegen_ctx,
+  const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count = 0;
 
@@ -196,25 +216,55 @@ bool expression::expand_macros(
             return;
         }
 
-        ++macro_expansion_count;
-
         if(!macro_expr->get_namespace_path().has_value())
         {
             // expand local macro.
-            // TODO
+            auto it = std::find_if(
+              macro_asts.begin(),
+              macro_asts.end(),
+              [macro_expr](const expression* m) -> bool
+              {
+                  if(!m->is_macro_expression())
+                  {
+                      throw cg::codegen_error(
+                        m->get_location(),
+                        fmt::format("Non-macro expression in macro list."));
+                  }
 
-            throw std::runtime_error("expression::expand_macros: Local macro expansion not implemented.");
+                  if(!m->is_named_expression())
+                  {
+                      throw cg::codegen_error(
+                        m->get_location(),
+                        fmt::format("Unnamed expression in macro list."));
+                  }
+
+                  return macro_expr->get_name().s == m->as_named_expression()->get_name().s;
+              });
+
+            if(it == macro_asts.end())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  fmt::format(
+                    "Macro '{}' not found.",
+                    macro_expr->get_name().s));
+            }
+
+            macro_expr->set_expansion(
+              (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
         }
         else
         {
             // expand imported macro.
-
             auto* m = codegen_ctx.get_macro(
               macro_expr->get_name().s,
               macro_expr->get_namespace_path());
 
-            macro_expr->set_expansion(m->expand(e.loc, macro_expr->get_exprs()));
+            macro_expr->set_expansion(
+              m->expand(codegen_ctx, *macro_expr));
         }
+
+        ++macro_expansion_count;
     };
 
     auto filter = [](const expression& e) -> bool
@@ -224,8 +274,8 @@ bool expression::expand_macros(
 
     visit_nodes(
       visitor,
-      true,
-      false,
+      true,  /* visit this node */
+      false, /* pre-order traversal */
       filter);
 
     return macro_expansion_count != 0;
@@ -3726,7 +3776,9 @@ std::unique_ptr<expression> macro_expression::clone() const
     return std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
 }
 
-void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void macro_expression::collect_names(
+  cg::context& ctx,
+  [[maybe_unused]] ty::context& type_ctx) const
 {
     std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
     std::transform(
@@ -3754,8 +3806,8 @@ void macro_expression::collect_names(cg::context& ctx, ty::context& type_ctx) co
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
 {
     // empty, as macros don't generate code.
     return nullptr;
@@ -3781,6 +3833,52 @@ std::string macro_expression::to_string() const
     }
     ret += "))";
     return ret;
+}
+
+std::unique_ptr<expression> macro_expression::expand(
+  cg::context& ctx,
+  const macro_invocation& invocation) const
+{
+    auto cloned_expr = clone();
+
+    const std::string prefix = fmt::format("${}", ctx.generate_macro_invocation_id());
+    auto visitor = [&prefix](expression& e) -> void
+    {
+        if(e.is_macro_branch())
+        {
+            // rename arguments.
+            auto* expr = e.as_macro_branch();
+            for(auto& arg: expr->args)
+            {
+                std::get<0>(arg).s = fmt::format("{}{}", prefix, std::get<0>(arg).s);
+            }
+        }
+        else if(e.is_variable_declaration())
+        {
+            // rename variable.
+            auto* expr = e.as_variable_declaration();
+            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+        }
+        else if(e.is_variable_reference())
+        {
+            // rename variable.
+            auto* expr = e.as_variable_reference();
+            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+        }
+    };
+
+    cloned_expr->visit_nodes(
+      visitor,
+      false /* don't visit this node */
+    );
+
+    // Expand with the invocation expressions.
+    // TODO
+
+    // Handle returned values.
+    // TODO
+
+    throw std::runtime_error("macro_expression::expand: not implemented.");
 }
 
 }    // namespace slang::ast

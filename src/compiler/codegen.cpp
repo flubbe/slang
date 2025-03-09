@@ -37,15 +37,18 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
  */
 
 std::unique_ptr<ast::expression> macro::expand(
-  token_location loc,
-  const std::vector<std::unique_ptr<ast::expression>>& exprs) const
+  [[maybe_unused]] context& ctx,
+  const ast::macro_invocation& macro_expr) const
 {
     if(name == "format!")
     {
-        return slang::codegen::macros::expand_builtin_format(desc, loc, exprs);
+        return slang::codegen::macros::expand_builtin_format(
+          desc,
+          macro_expr.get_location(),
+          macro_expr.get_exprs());
     }
 
-    throw std::runtime_error("not implemented");
+    throw std::runtime_error("macro::expand: not implemented");
 }
 
 /*
@@ -1011,6 +1014,11 @@ macro* context::get_macro(
     }
 
     return it->get();
+}
+
+std::size_t context::generate_macro_invocation_id()
+{
+    return macro_invocation_id++;
 }
 
 void context::set_insertion_point(basic_block* ip)

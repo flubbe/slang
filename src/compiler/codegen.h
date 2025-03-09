@@ -36,7 +36,8 @@ class export_table_builder; /* emitter.h */
 
 namespace slang::ast
 {
-class expression; /* ast.h */
+class expression;       /* ast.h */
+class macro_invocation; /* ast.h */
 }    // namespace slang::ast
 
 namespace slang::codegen
@@ -1858,13 +1859,13 @@ public:
     /**
      * Expand the macro.
      *
-     * @param loc The location of the expansion.
-     * @param exprs Expressions the macro operates on.
+     * @param ctx The code generation context.
+     * @param macro_expr The macro invocation expression.
      * @returns The AST of the evaluation.
      */
     std::unique_ptr<ast::expression> expand(
-      token_location loc,
-      const std::vector<std::unique_ptr<ast::expression>>& exprs) const;
+      context& ctx,
+      const ast::macro_invocation& macro_expr) const;
 };
 
 /**
@@ -2021,6 +2022,9 @@ class context
 
     /** List of macros. */
     std::vector<std::unique_ptr<macro>> macros;
+
+    /** Macro invocation id (to make identifiers unique for each invocation). */
+    std::size_t macro_invocation_id{0};
 
     /** The basic blocks for `break` and `continue` statements. */
     std::vector<std::pair<basic_block*, basic_block*>> basic_block_brk_cnt;
@@ -2282,6 +2286,10 @@ public:
     macro* get_macro(
       std::string name,
       std::optional<std::string> import_path = std::nullopt);
+
+    /** Generate a unique macro invocation id. */
+    [[nodiscard]]
+    std::size_t generate_macro_invocation_id();
 
     /**
      * Set instruction insertion point.
