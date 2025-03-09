@@ -57,6 +57,7 @@ enum class symbol_type : std::uint8_t
     function = 1,
     type = 2,
     constant = 3,
+    macro = 4,
 };
 
 /**
@@ -73,7 +74,8 @@ inline archive& operator&(archive& ar, symbol_type& s)
     if(i != static_cast<std::uint8_t>(symbol_type::package)
        && i != static_cast<std::uint8_t>(symbol_type::function)
        && i != static_cast<std::uint8_t>(symbol_type::type)
-       && i != static_cast<std::uint8_t>(symbol_type::constant))
+       && i != static_cast<std::uint8_t>(symbol_type::constant)
+       && i != static_cast<std::uint8_t>(symbol_type::macro))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -91,6 +93,7 @@ inline std::string to_string(symbol_type s)
     case symbol_type::function: return "function";
     case symbol_type::type: return "type";
     case symbol_type::constant: return "constant";
+    case symbol_type::macro: return "macro";
     }
     return "<unknown>";
 }
@@ -683,6 +686,82 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
     return ar;
 }
 
+/** A directive. */
+struct directive_descriptor
+{
+    /** The directive's arguments. */
+    std::vector<std::pair<std::string, std::string>> args;
+
+    /** Default constructors. */
+    directive_descriptor() = default;
+    directive_descriptor(const directive_descriptor&) = default;
+    directive_descriptor(directive_descriptor&&) = default;
+
+    /** Default assignments. */
+    directive_descriptor& operator=(const directive_descriptor&) = default;
+    directive_descriptor& operator=(directive_descriptor&&) = default;
+
+    /**
+     * Construct a directive descriptor.
+     *
+     * @param args Directive arguments.
+     */
+    explicit directive_descriptor(std::vector<std::pair<std::string, std::string>> args)
+    : args{std::move(args)}
+    {
+    }
+};
+
+/**
+ * Serializer for directive descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The directive descriptor.
+ */
+inline archive& operator&(archive& ar, directive_descriptor& desc)
+{
+    ar & desc.args;
+    return ar;
+}
+
+/** Macro descriptor. */
+struct macro_descriptor
+{
+    /** Directive list. */
+    std::vector<std::pair<std::string, directive_descriptor>> directives;
+
+    /** Default constructors. */
+    macro_descriptor() = default;
+    macro_descriptor(const macro_descriptor&) = default;
+    macro_descriptor(macro_descriptor&&) = default;
+
+    /** Default assignments. */
+    macro_descriptor& operator=(const macro_descriptor&) = default;
+    macro_descriptor& operator=(macro_descriptor&&) = default;
+
+    /**
+     * Construct a macro descriptor.
+     *
+     * @param directives Directive list.
+     */
+    explicit macro_descriptor(std::vector<std::pair<std::string, directive_descriptor>> directives)
+    : directives{std::move(directives)}
+    {
+    }
+};
+
+/**
+ * Serializer for macro descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The macro descriptor.
+ */
+inline archive& operator&(archive& ar, macro_descriptor& desc)
+{
+    ar & desc.directives;
+    return ar;
+}
+
 /** Field descriptor. */
 struct field_descriptor
 {
@@ -736,11 +815,11 @@ struct field_descriptor
  * Serializer for field descriptors.
  *
  * @param ar The archive to use for serialization.
- * @param info The type descriptor.
+ * @param desc The field descriptor.
  */
-inline archive& operator&(archive& ar, field_descriptor& info)
+inline archive& operator&(archive& ar, field_descriptor& desc)
 {
-    ar & info.base_type;
+    ar & desc.base_type;
     return ar;
 }
 
@@ -846,8 +925,13 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Function, struct descriptor or constant table index. */
-    std::variant<function_descriptor, struct_descriptor, std::size_t> desc;
+    /** Function, struct descriptor, constant table index or macro descriptor. */
+    std::variant<
+      function_descriptor,
+      struct_descriptor,
+      std::size_t,
+      macro_descriptor>
+      desc;
 
     /** Default constructors. */
     exported_symbol() = default;
@@ -867,7 +951,11 @@ struct exported_symbol
      */
     exported_symbol(symbol_type type,
                     std::string name,
-                    std::variant<function_descriptor, struct_descriptor, std::size_t> desc)
+                    std::variant<function_descriptor,
+                                 struct_descriptor,
+                                 std::size_t,
+                                 macro_descriptor>
+                      desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -934,6 +1022,20 @@ inline archive& operator&(archive& ar, exported_symbol& s)
         {
             std::size_t i = std::get<std::size_t>(s.desc);
             ar & i;
+        }
+    }
+    else if(s.type == symbol_type::macro)
+    {
+        if(ar.is_reading())
+        {
+            macro_descriptor desc;
+            ar & desc;
+            s.desc = std::move(desc);
+        }
+        else if(ar.is_writing())
+        {
+            auto& desc = std::get<macro_descriptor>(s.desc);
+            ar & desc;
         }
     }
     else
@@ -1065,6 +1167,14 @@ public:
      * @param i An index into the constant table.
      */
     void add_constant(std::string name, std::size_t i);
+
+    /**
+     * Add a macro to the module.
+     *
+     * @param name The macro's name.
+     * @param desc The macro descriptor.
+     */
+    void add_macro(std::string name, macro_descriptor desc);
 
     /**
      * Set the constant table.

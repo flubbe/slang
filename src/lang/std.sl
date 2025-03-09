@@ -2,7 +2,7 @@
  * Standard Library.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -74,6 +74,20 @@ fn array_copy(from: type, to: type) -> void;
 /*
  * Strings.
  */
+
+/**
+ * String formatting macro.
+ *
+ * Examples:
+ * 
+ * `format!("Hello, {}!", "World")` => `"Hello, World!"`
+ * `format!("{}", 123)` => `"123"`
+ * `format!("{:.2f}", 1.234)` => `"1.23"`
+ */
+#[builtin]
+macro format! {
+    /* compiler built-in. */
+}
 
 /**
  * Concatenate two strings.

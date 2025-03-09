@@ -4,7 +4,7 @@
  * Lexer tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -20,9 +20,9 @@ namespace
 
 TEST(lexer, tokenize_whitespaces_identifiers)
 {
-    constexpr auto TOKEN_COUNT = 7;    // tokens count in the following string.
+    constexpr auto TOKEN_COUNT = 8;    // tokens count in the following string.
     const std::string test_string =
-      "a a_b _AB\t_12ab\nh\ru_789\vt";
+      "a a_b! $_b _AB\t_12ab\nh\ru_789\vt";
 
     slang::lexer lexer{test_string};
     lexer.set_tab_size(4);
@@ -46,29 +46,33 @@ TEST(lexer, tokenize_whitespaces_identifiers)
     EXPECT_EQ(tokens[0].type, slang::token_type::identifier);
     EXPECT_EQ(tokens[0].location, slang::token_location(1, 1));
 
-    EXPECT_EQ(tokens[1].s, "a_b");
-    EXPECT_EQ(tokens[1].type, slang::token_type::identifier);
+    EXPECT_EQ(tokens[1].s, "a_b!");
+    EXPECT_EQ(tokens[1].type, slang::token_type::macro_name);
     EXPECT_EQ(tokens[1].location, slang::token_location(1, 3));
 
-    EXPECT_EQ(tokens[2].s, "_AB");
-    EXPECT_EQ(tokens[2].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[2].location, slang::token_location(1, 7));
+    EXPECT_EQ(tokens[2].s, "$_b");
+    EXPECT_EQ(tokens[2].type, slang::token_type::macro_identifier);
+    EXPECT_EQ(tokens[2].location, slang::token_location(1, 8));
 
-    EXPECT_EQ(tokens[3].s, "_12ab");
+    EXPECT_EQ(tokens[3].s, "_AB");
     EXPECT_EQ(tokens[3].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[3].location, slang::token_location(1, 14));
+    EXPECT_EQ(tokens[3].location, slang::token_location(1, 12));
 
-    EXPECT_EQ(tokens[4].s, "h");
+    EXPECT_EQ(tokens[4].s, "_12ab");
     EXPECT_EQ(tokens[4].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[4].location, slang::token_location(2, 1));
+    EXPECT_EQ(tokens[4].location, slang::token_location(1, 19));
 
-    EXPECT_EQ(tokens[5].s, "u_789");
+    EXPECT_EQ(tokens[5].s, "h");
     EXPECT_EQ(tokens[5].type, slang::token_type::identifier);
     EXPECT_EQ(tokens[5].location, slang::token_location(2, 1));
 
-    EXPECT_EQ(tokens[6].s, "t");
+    EXPECT_EQ(tokens[6].s, "u_789");
     EXPECT_EQ(tokens[6].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[6].location, slang::token_location(3, 6));
+    EXPECT_EQ(tokens[6].location, slang::token_location(2, 1));
+
+    EXPECT_EQ(tokens[7].s, "t");
+    EXPECT_EQ(tokens[7].type, slang::token_type::identifier);
+    EXPECT_EQ(tokens[7].location, slang::token_location(3, 6));
 }
 
 TEST(lexer, single_line_comment)
