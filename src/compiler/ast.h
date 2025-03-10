@@ -2622,8 +2622,8 @@ public:
         return this;
     }
 
-    [[nodiscard]]
-    std::string to_string() const override;
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
     std::vector<expression*> get_children() override
@@ -2634,6 +2634,27 @@ public:
     std::vector<const expression*> get_children() const override
     {
         return {body.get()};
+    }
+
+    /** Get the macro branch arguments. */
+    [[nodiscard]]
+    const std::vector<std::pair<token, token>>& get_args() const
+    {
+        return args;
+    }
+
+    /** Whether this macro branch ens with an expression list capture.  */
+    [[nodiscard]]
+    bool ends_with_list_capture() const
+    {
+        return args_end_with_list;
+    }
+
+    /** Get the macro branch body. */
+    [[nodiscard]]
+    const std::unique_ptr<block>& get_body() const
+    {
+        return body;
     }
 };
 

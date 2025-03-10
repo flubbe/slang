@@ -2,20 +2,19 @@ import std;
 
 macro sum! {
     () => {
-        return 0;
+        0;
     };
 
     ($a: expr) => {
-        return $a;
+        $a;
     };
 
     ($a: expr, $b: expr...) => {
-        return $a + sum!($b);
+        $a + sum!($b);
     };
 }
 
-fn main(args: [str]) -> i32
-{
+fn test_format() -> void {
     std::assert(
         std::string_equals(
             std::format!("Test"), 
@@ -33,6 +32,16 @@ fn main(args: [str]) -> i32
             std::format!("Test: {d}", s/2),
             "Test: 21"),
         "Test: 21");
+}
 
+fn test_macro() -> void {
+    let s1: i32 = sum!();
+    std::assert(s1 == 0, "s1 == 0");
+}
+
+fn main(args: [str]) -> i32
+{
+    test_format();
+    test_macro();
     return 0;
 }

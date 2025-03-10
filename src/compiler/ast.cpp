@@ -3370,6 +3370,18 @@ std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
+    if(expansion->is_macro_branch())
+    {
+        macro_branch* branch = expansion->as_macro_branch();
+        const std::vector<expression*> exprs = branch->get_body()->get_children();
+        if(exprs.empty())
+        {
+            return {};
+        }
+
+        return exprs.back()->type_check(ctx);
+    }
+
     return expansion->type_check(ctx);
 }
 
@@ -3739,6 +3751,13 @@ std::unique_ptr<expression> macro_branch::clone() const
       std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 }
 
+std::unique_ptr<cg::value> macro_branch::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    return body->generate_code(ctx, memory_context::none);
+}
+
 std::string macro_branch::to_string() const
 {
     std::string ret = fmt::format("MacroBranch(args=(");
@@ -3835,6 +3854,95 @@ std::string macro_expression::to_string() const
     return ret;
 }
 
+/**
+ * Get the best-matching macro branch for a macro invocation.
+ *
+ * @param macro_expr The macro expression.
+ * @param invocation The macro invocation.
+ * @returns Returns a matching macro branch.
+ * @throws Throws `cg::codegen_error` if `macro_expr` is not a macro expression,
+ *         multiple matches were found, or no matches were found.
+ */
+static macro_branch* get_matching_branch(
+  std::unique_ptr<ast::expression>& macro_expr,
+  const macro_invocation& invocation)
+{
+    if(!macro_expr->is_macro_expression())
+    {
+        throw cg::codegen_error(
+          macro_expr->get_location(),
+          "Cannot match macro branches for non-macro expression.");
+    }
+
+    std::pair<macro_branch*, std::size_t> match{nullptr, 0};
+    std::pair<macro_branch*, std::size_t> tie{nullptr, 0};
+
+    auto update_match = [&match, &tie](macro_branch* mb, std::size_t score) -> void
+    {
+        if(match.second < score)
+        {
+            match = std::make_pair(mb, score);
+            tie = {nullptr, 0};
+        }
+        else if(match.second == score)
+        {
+            tie = std::make_pair(mb, score);
+        }
+    };
+
+    for(auto* b: macro_expr->get_children())
+    {
+        if(!b->is_macro_branch())
+        {
+            throw cg::codegen_error(
+              b->get_location(),
+              "Macro contains non-branch expression.");
+        }
+        auto* mb = b->as_macro_branch();
+
+        // check if arguments match exactly.
+        if(invocation.get_exprs().size() == mb->get_args().size())
+        {
+            if(!mb->ends_with_list_capture())
+            {
+                // arguments match exactly.
+                update_match(mb, 3);
+            }
+            else
+            {
+                update_match(mb, 2);
+            }
+        }
+        else if(invocation.get_exprs().size() > mb->get_args().size()
+                && mb->ends_with_list_capture())
+        {
+            update_match(mb, 1);
+        }
+    }
+
+    if(tie.first != nullptr)
+    {
+        throw cg::codegen_error(
+          match.first->get_location(),
+          fmt::format(
+            "Macro branches at {} and {} both match.",
+            slang::to_string(match.first->get_location()),
+            slang::to_string(tie.first->get_location())));
+    }
+
+    if(match.first == nullptr)
+    {
+        throw cg::codegen_error(
+          invocation.get_location(),
+          fmt::format(
+            "Could not match branch for macro '{}' defined at {}.",
+            macro_expr->as_named_expression()->get_name().s,
+            slang::to_string(macro_expr->get_location())));
+    }
+
+    return match.first;
+}
+
 std::unique_ptr<expression> macro_expression::expand(
   cg::context& ctx,
   const macro_invocation& invocation) const
@@ -3842,7 +3950,7 @@ std::unique_ptr<expression> macro_expression::expand(
     auto cloned_expr = clone();
 
     const std::string prefix = fmt::format("${}", ctx.generate_macro_invocation_id());
-    auto visitor = [&prefix](expression& e) -> void
+    auto rename_visitor = [&prefix](expression& e) -> void
     {
         if(e.is_macro_branch())
         {
@@ -3855,30 +3963,96 @@ std::unique_ptr<expression> macro_expression::expand(
         }
         else if(e.is_variable_declaration())
         {
-            // rename variable.
+            // rename macro variable.
             auto* expr = e.as_variable_declaration();
-            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+            if(expr->get_name().type == token_type::macro_identifier)
+            {
+                expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+            }
         }
         else if(e.is_variable_reference())
         {
-            // rename variable.
+            // rename macro variable.
             auto* expr = e.as_variable_reference();
-            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+            if(expr->get_name().type == token_type::macro_identifier)
+            {
+                expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
+            }
         }
     };
 
     cloned_expr->visit_nodes(
-      visitor,
+      rename_visitor,
       false /* don't visit this node */
     );
 
+    // Get matching macro branch for the argument list.
+    std::unique_ptr<macro_branch> branch =
+      std::unique_ptr<macro_branch>{
+        static_cast<macro_branch*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          get_matching_branch(cloned_expr, invocation)->clone().release())};
+
+    std::unordered_map<std::string, size_t> arg_pos;
+    for(std::size_t i = 0; i < branch->get_args().size(); ++i)
+    {
+        const auto& arg = branch->get_args()[i];
+
+        // FIXME Move this out.
+        if(std::find_if(
+             arg_pos.begin(),
+             arg_pos.end(),
+             [arg](const auto& p) -> bool
+             {
+                 return arg.first.s == p.first;
+             })
+           != arg_pos.end())
+        {
+            throw cg::codegen_error(
+              arg.first.location,
+              fmt::format(
+                "Argument '{}' was already defined.",
+                arg.first.s));
+        }
+
+        arg_pos.insert({arg.first.s, i});
+    }
+
     // Expand with the invocation expressions.
-    // TODO
+    auto expand_visitor = [&invocation, &branch, &arg_pos](expression& e) -> void
+    {
+        if(e.is_variable_reference())
+        {
+            // if the variable is one of the arguments, expand with the
+            // corresponding invocation item.
 
-    // Handle returned values.
-    // TODO
+            // TODO expression lists.
+            // TODO scopes?
 
-    throw std::runtime_error("macro_expression::expand: not implemented.");
+            auto* ref_expr = e.as_variable_reference();
+            auto it = std::find_if(
+              arg_pos.begin(),
+              arg_pos.end(),
+              [ref_expr](const auto& p) -> bool
+              {
+                  ref_expr->get_name().s == p.first;
+              });
+            if(it == arg_pos.end())
+            {
+                // not an argument.
+                return;
+            }
+
+            // expand.
+            throw std::runtime_error("macro_expression::expand: argument expansion not implemented.");
+        }
+    };
+
+    cloned_expr->visit_nodes(
+      expand_visitor,
+      false /* don't visit this node. */
+    );
+
+    return branch;
 }
 
 }    // namespace slang::ast
