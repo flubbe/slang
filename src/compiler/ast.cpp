@@ -3746,6 +3746,7 @@ std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [
 std::unique_ptr<expression> macro_branch::clone() const
 {
     return std::make_unique<macro_branch>(
+      get_location(),
       args,
       args_end_with_list,
       std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -3923,7 +3924,7 @@ static macro_branch* get_matching_branch(
     if(tie.first != nullptr)
     {
         throw cg::codegen_error(
-          match.first->get_location(),
+          invocation.get_location(),
           fmt::format(
             "Macro branches at {} and {} both match.",
             slang::to_string(match.first->get_location()),

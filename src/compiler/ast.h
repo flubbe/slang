@@ -79,7 +79,7 @@ public:
      * @param loc The expression location.
      */
     explicit expression(token_location loc)
-    : loc{std::move(loc)}
+    : loc{loc}
     {
     }
 
@@ -455,7 +455,7 @@ public:
      * @param tok The name token.
      */
     named_expression(token_location loc, token name)
-    : expression{std::move(loc)}
+    : expression{loc}
     , name{std::move(name)}
     {
     }
@@ -514,7 +514,7 @@ public:
      * @param tok The token.
      */
     literal_expression(token_location loc, token tok)
-    : expression{std::move(loc)}
+    : expression{loc}
     , tok{std::move(tok)}
     {
     }
@@ -586,7 +586,7 @@ public:
      * @param is_array Whether the type is an array type.
      */
     type_expression(token_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
-    : loc{std::move(loc)}
+    : loc{loc}
     , type_name{std::move(type_name)}
     , namespace_stack{std::move(namespace_stack)}
     , array{is_array}
@@ -674,7 +674,7 @@ public:
       std::unique_ptr<expression> expr,
       std::unique_ptr<type_expression> target_type)
     : named_expression{
-        std::move(loc),
+        loc,
         expr->is_named_expression()
           ? static_cast<named_expression*>(expr.get())->get_name()
           : token{"<none>", {0, 0}}}    // FIXME we might not have a name.
@@ -1126,7 +1126,7 @@ public:
      * @param expr An optional initializer expression.
      */
     variable_declaration_expression(token_location loc, token name, std::unique_ptr<ast::type_expression> type, std::unique_ptr<ast::expression> expr)
-    : named_expression{std::move(loc), std::move(name)}
+    : named_expression{loc, std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
     {
@@ -1218,7 +1218,7 @@ public:
       token name,
       std::unique_ptr<ast::type_expression> type,
       std::unique_ptr<ast::expression> expr)
-    : named_expression{std::move(loc), std::move(name)}
+    : named_expression{loc, std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
     {
@@ -1281,7 +1281,7 @@ public:
     array_initializer_expression(
       token_location loc,
       std::vector<std::unique_ptr<expression>> exprs)
-    : expression{std::move(loc)}
+    : expression{loc}
     , exprs{std::move(exprs)}
     {
     }
@@ -1350,7 +1350,7 @@ public:
       token_location loc,
       token name,
       std::vector<std::unique_ptr<variable_declaration_expression>> members)
-    : named_expression{std::move(loc), std::move(name)}
+    : named_expression{loc, std::move(name)}
     , members{std::move(members)}
     {
     }
@@ -1635,7 +1635,7 @@ public:
       token op,
       std::unique_ptr<expression> lhs,
       std::unique_ptr<expression> rhs)
-    : expression{std::move(loc)}
+    : expression{loc}
     , op{std::move(op)}
     , lhs{std::move(lhs)}
     , rhs{std::move(rhs)}
@@ -1700,7 +1700,7 @@ public:
       token_location loc,
       token op,
       std::unique_ptr<expression> operand)
-    : expression{std::move(loc)}
+    : expression{loc}
     , op{std::move(op)}
     , operand{std::move(operand)}
     {
@@ -1759,7 +1759,7 @@ public:
       token_location loc,
       std::unique_ptr<type_expression> type_expr,
       std::unique_ptr<expression> expr)
-    : expression{std::move(loc)}
+    : expression{loc}
     , type_expr{std::move(type_expr)}
     , expr{std::move(expr)}
     {
@@ -1805,7 +1805,7 @@ public:
      * @param loc The location.
      */
     explicit null_expression(token_location loc)
-    : expression{std::move(loc)}
+    : expression{loc}
     {
     }
 
@@ -1925,7 +1925,7 @@ public:
       token name,
       std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
       std::unique_ptr<type_expression> return_type)
-    : loc{std::move(loc)}
+    : loc{loc}
     , name{std::move(name)}
     , args{std::move(args)}
     , return_type{std::move(return_type)}
@@ -1975,7 +1975,7 @@ public:
     block(
       token_location loc,
       std::vector<std::unique_ptr<expression>> exprs)
-    : expression{std::move(loc)}
+    : expression{loc}
     , exprs{std::move(exprs)}
     {
     }
@@ -2048,7 +2048,7 @@ public:
       token_location loc,
       std::unique_ptr<prototype_ast> prototype,
       std::unique_ptr<block> body)
-    : expression{std::move(loc)}
+    : expression{loc}
     , prototype{std::move(prototype)}
     , body{std::move(body)}
     {
@@ -2317,7 +2317,7 @@ public:
     return_statement(
       token_location loc,
       std::unique_ptr<ast::expression> expr)
-    : expression{std::move(loc)}
+    : expression{loc}
     , expr{std::move(expr)}
     {
     }
@@ -2386,7 +2386,7 @@ public:
       std::unique_ptr<ast::expression> condition,
       std::unique_ptr<ast::expression> if_block,
       std::unique_ptr<ast::expression> else_block)
-    : expression{std::move(loc)}
+    : expression{loc}
     , condition{std::move(condition)}
     , if_block{std::move(if_block)}
     , else_block{std::move(else_block)}
@@ -2462,7 +2462,7 @@ public:
       token_location loc,
       std::unique_ptr<ast::expression> condition,
       std::unique_ptr<ast::expression> while_block)
-    : expression{std::move(loc)}
+    : expression{loc}
     , condition{std::move(condition)}
     , while_block{std::move(while_block)}
     {
@@ -2510,7 +2510,7 @@ public:
      * @param loc The location.
      */
     explicit break_statement(token_location loc)
-    : expression{std::move(loc)}
+    : expression{loc}
     {
     }
 
@@ -2549,7 +2549,7 @@ public:
      * @param loc The location.
      */
     explicit continue_statement(token_location loc)
-    : expression{std::move(loc)}
+    : expression{loc}
     {
     }
 
@@ -2593,15 +2593,18 @@ public:
     /**
      * Construct a macro branch.
      *
+     * @param loc The branch location.
      * @param args Macro arguments.
      * @param args_end_with_list Whether the arguments end with a list.
      * @param body Branch body.
      */
     macro_branch(
+      token_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
       std::unique_ptr<block> body)
-    : args{std::move(args)}
+    : expression{loc}
+    , args{std::move(args)}
     , args_end_with_list{args_end_with_list}
     , body{std::move(body)}
     {
@@ -2688,7 +2691,7 @@ public:
       token_location loc,
       token name,
       std::vector<std::unique_ptr<macro_branch>> branches)
-    : named_expression{std::move(loc), std::move(name)}
+    : named_expression{loc, std::move(name)}
     , branches{std::move(branches)}
     {
     }

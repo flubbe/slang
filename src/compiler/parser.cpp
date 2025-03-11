@@ -1338,6 +1338,7 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
 
 std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
 {
+    auto location = current_token->location;
     get_next_token();    // skip '('.
 
     std::vector<std::pair<token, token>> args;
@@ -1417,6 +1418,7 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
     get_next_token(false);    // skip ";".
 
     return std::make_unique<ast::macro_branch>(
+      location,
       std::move(args),
       args_end_with_list,
       std::move(block));
