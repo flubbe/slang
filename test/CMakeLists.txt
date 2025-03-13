@@ -346,6 +346,21 @@ add_compile_fail_test(
     FALSE
     test/test_macros_fail2
 )
+add_compile_fail_test(
+    "slang macros fail 3"
+    FALSE
+    test/test_macros_fail3
+)
+add_compile_fail_test(
+    "slang macros fail 4"
+    FALSE
+    test/test_macros_fail4
+)
+add_compile_fail_test(
+    "slang macros fail 5"
+    FALSE
+    test/test_macros_fail5
+)
 add_compile_exec_test(
     "slang math"
     TRUE

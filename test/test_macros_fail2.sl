@@ -1,5 +1,3 @@
-import std;
-
 macro sum! {
     () => {
         0;

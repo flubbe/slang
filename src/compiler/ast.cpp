@@ -4066,19 +4066,13 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_variable_declaration();
-            if(expr->get_name().type == token_type::macro_identifier)
-            {
-                expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
-            }
+            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
         }
         else if(e.is_variable_reference())
         {
             // rename macro variable.
             auto* expr = e.as_variable_reference();
-            if(expr->get_name().type == token_type::macro_identifier)
-            {
-                expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
-            }
+            expr->name.s = fmt::format("{}{}", prefix, expr->name.s);
         }
     };
 
