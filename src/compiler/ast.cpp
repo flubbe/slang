@@ -911,7 +911,8 @@ std::unique_ptr<expression> variable_reference_expression::clone() const
 {
     return std::make_unique<variable_reference_expression>(
       name,
-      element_expr ? element_expr->clone() : nullptr);
+      element_expr ? element_expr->clone() : nullptr,
+      expansion ? expansion->clone() : nullptr);
 }
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -3419,7 +3420,8 @@ std::unique_ptr<expression> macro_invocation::clone() const
     return std::make_unique<macro_invocation>(
       name,
       std::move(cloned_exprs),
-      index_expr ? index_expr->clone() : nullptr);
+      index_expr ? index_expr->clone() : nullptr,
+      expansion ? expansion->clone() : nullptr);
 }
 
 std::unique_ptr<cg::value> macro_invocation::generate_code(

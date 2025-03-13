@@ -1046,12 +1046,15 @@ public:
      *
      * @param name The variable's name.
      * @param element_expr An optional expression for array element access.
+     * @param expansion A macro expansion.
      */
     variable_reference_expression(
       token name,
-      std::unique_ptr<expression> element_expr = nullptr)
+      std::unique_ptr<expression> element_expr = nullptr,
+      std::unique_ptr<expression> expansion = nullptr)
     : named_expression{name.location, std::move(name)}
     , element_expr{std::move(element_expr)}
+    , expansion{std::move(expansion)}
     {
     }
 
@@ -2272,14 +2275,17 @@ public:
      * @param name The macro's name.
      * @param exprs Expressions the macro operates on.
      * @param index_expr Index expression for array access.
+     * @param expansion A macro expansion.
      */
     macro_invocation(
       token name,
       std::vector<std::unique_ptr<ast::expression>> exprs,
-      std::unique_ptr<expression> index_expr = nullptr)
+      std::unique_ptr<expression> index_expr = nullptr,
+      std::unique_ptr<expression> expansion = nullptr)
     : named_expression{name.location, std::move(name)}
     , exprs{std::move(exprs)}
     , index_expr{std::move(index_expr)}
+    , expansion{std::move(expansion)}
     {
     }
 
