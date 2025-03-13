@@ -169,7 +169,16 @@ public:
      *
      * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
      */
+    [[nodiscard]]
     virtual class macro_branch* as_macro_branch();
+
+    /**
+     * Get the expression as a macro branch.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     */
+    [[nodiscard]]
+    virtual const class macro_branch* as_macro_branch() const;
 
     /** Whether this expression is a macro invokation. */
     [[nodiscard]]
@@ -1016,6 +1025,9 @@ class variable_reference_expression : public named_expression
     /** An optional expression for element access. */
     std::unique_ptr<expression> element_expr;
 
+    /** Expansions for macro names. */
+    std::unique_ptr<expression> expansion;
+
 public:
     /** Set the super class. */
     using super = named_expression;
@@ -1073,24 +1085,57 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        if(element_expr)
+        if(element_expr && expansion)
+        {
+            return {element_expr.get(), expansion.get()};
+        }
+        else if(element_expr)
         {
             return {element_expr.get()};
+        }
+        else if(expansion)
+        {
+            return {expansion.get()};
         }
         return {};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        if(element_expr)
+        if(element_expr && expansion)
+        {
+            return {element_expr.get(), expansion.get()};
+        }
+        else if(element_expr)
         {
             return {element_expr.get()};
+        }
+        else if(expansion)
+        {
+            return {expansion.get()};
         }
         return {};
     }
 
     /** Get the value of the object. */
     [[nodiscard]] cg::value get_value(cg::context& ctx) const;
+
+    /** Whether this variable was expanded by an expression. */
+    [[nodiscard]]
+    bool has_expansion() const
+    {
+        return static_cast<bool>(expansion);
+    }
+
+    /**
+     * Set the expansion.
+     *
+     * @param exp The expansion.
+     */
+    void set_expansion(std::unique_ptr<expression> exp)
+    {
+        expansion = std::move(exp);
+    }
 };
 
 /** Variable declaration. */
@@ -2256,6 +2301,55 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(
+          exprs.size()
+          + static_cast<std::size_t>(index_expr != nullptr)
+          + static_cast<std::size_t>(expansion != nullptr));
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        if(expansion)
+        {
+            children.emplace_back(expansion.get());
+        }
+
+        return children;
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(
+          exprs.size()
+          + static_cast<std::size_t>(index_expr != nullptr)
+          + static_cast<std::size_t>(expansion != nullptr));
+
+        for(auto& e: exprs)
+        {
+            children.emplace_back(e.get());
+        }
+        if(index_expr)
+        {
+            children.emplace_back(index_expr.get());
+        }
+        if(expansion)
+        {
+            children.emplace_back(expansion.get());
+        }
+
+        return children;
+    }
+
     /**
      * Get the tokens the macro operates on.
      *
@@ -2621,6 +2715,12 @@ public:
 
     [[nodiscard]]
     macro_branch* as_macro_branch() override
+    {
+        return this;
+    }
+
+    [[nodiscard]]
+    virtual const class macro_branch* as_macro_branch() const override
     {
         return this;
     }

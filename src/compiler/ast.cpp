@@ -88,6 +88,11 @@ macro_branch* expression::as_macro_branch()
     throw std::runtime_error("Expression is not a macro branch.");
 }
 
+const macro_branch* expression::as_macro_branch() const
+{
+    throw std::runtime_error("Expression is not a macro branch.");
+}
+
 variable_declaration_expression* expression::as_variable_declaration()
 {
     throw std::runtime_error("Expression is not a variable declaration.");
@@ -911,6 +916,12 @@ std::unique_ptr<expression> variable_reference_expression::clone() const
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // check for macro expansions first.
+    if(expansion)
+    {
+        return expansion->generate_code(ctx, mc);
+    }
+
     // check if we're loading a constant.
     std::optional<std::string> import_path = get_namespace_path();
     std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
@@ -1028,7 +1039,21 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
 
-        auto t = ctx.get_identifier_type(name, get_namespace_path());
+        ty::type_info t;
+        if(expansion)
+        {
+            std::optional<ty::type_info> opt_t = expansion->type_check(ctx);
+            if(!opt_t.has_value())
+            {
+                throw ty::type_error(loc, "Expression has no type.");
+            }
+            t = opt_t.value();
+        }
+        else
+        {
+            t = ctx.get_identifier_type(name, get_namespace_path());
+        }
+
         if(!t.is_array())
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
@@ -1043,8 +1068,21 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
     }
     else
     {
-        expr_type = ctx.get_identifier_type(name, get_namespace_path());
-        ctx.set_expression_type(this, *expr_type);
+        if(expansion)
+        {
+            expr_type = expansion->type_check(ctx);
+            if(!expr_type.has_value())
+            {
+                throw ty::type_error(loc, "Expression has no type.");
+            }
+
+            ctx.set_expression_type(this, *expr_type);
+        }
+        else
+        {
+            expr_type = ctx.get_identifier_type(name, get_namespace_path());
+            ctx.set_expression_type(this, *expr_type);
+        }
     }
 
     return expr_type;
@@ -1052,11 +1090,23 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
 
 std::string variable_reference_expression::to_string() const
 {
+    std::string ret = fmt::format("VariableReference(name={}", name.s);
+
     if(element_expr)
     {
-        return fmt::format("VariableReference(name={}, element_expr={})", name.s, element_expr->to_string());
+        ret += fmt::format(
+          ", element_expr={}",
+          element_expr->to_string());
     }
-    return fmt::format("VariableReference(name={})", name.s);
+    if(expansion)
+    {
+        ret += fmt::format(
+          ", expansion={}",
+          expansion->to_string());
+    }
+    ret += ")";
+
+    return ret;
 }
 
 cg::value variable_reference_expression::get_value(cg::context& ctx) const
@@ -3026,28 +3076,51 @@ std::unique_ptr<expression> block::clone() const
 
 std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
-    if(mc != memory_context::none)
+    if(mc == memory_context::none)
     {
-        throw cg::codegen_error(loc, "Invalid memory context for code block.");
-    }
-
-    std::unique_ptr<cg::value> v;
-    for(const auto& expr: exprs)
-    {
-        v = expr->generate_code(ctx, memory_context::none);
-
-        // non-assigning expressions need cleanup.
-        if(expr->needs_pop())
+        for(const auto& expr: exprs)
         {
-            if(!v)
-            {
-                throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-            }
+            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 
-            ctx.generate_pop(*v);
+            // non-assigning expressions need cleanup.
+            if(expr->needs_pop())
+            {
+                if(!v)
+                {
+                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
+                }
+
+                ctx.generate_pop(*v);
+            }
         }
+
+        return nullptr;
     }
-    return nullptr;
+
+    if(mc == memory_context::load)
+    {
+        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        {
+            const auto& expr = exprs[i];
+            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
+
+            // non-assigning expressions need cleanup.
+            if(expr->needs_pop())
+            {
+                if(!v)
+                {
+                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
+                }
+
+                ctx.generate_pop(*v);
+            }
+        }
+
+        // the last expression is loaded.
+        return exprs.back()->generate_code(ctx, memory_context::load);
+    }
+
+    throw cg::codegen_error(loc, "Invalid memory context for code block.");
 }
 
 void block::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -3379,10 +3452,27 @@ std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
             return {};
         }
 
-        return exprs.back()->type_check(ctx);
+        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        {
+            exprs[i]->type_check(ctx);
+        }
+
+        auto expr_type = exprs.back()->type_check(ctx);
+        if(expr_type.has_value())
+        {
+            ctx.set_expression_type(this, expr_type.value());
+        }
+
+        return expr_type;
     }
 
-    return expansion->type_check(ctx);
+    auto expr_type = expansion->type_check(ctx);
+    if(expr_type.has_value())
+    {
+        ctx.set_expression_type(this, expr_type.value());
+    }
+
+    return expr_type;
 }
 
 std::string macro_invocation::to_string() const
@@ -3390,13 +3480,17 @@ std::string macro_invocation::to_string() const
     std::string ret = fmt::format(
       "MacroInvocation(callee={}, exprs=(", get_name().s);
 
-    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
-    {
-        ret += fmt::format("{}, ", exprs[i]->to_string());
-    }
     if(!exprs.empty())
     {
+        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        {
+            ret += fmt::format("{}, ", exprs[i]->to_string());
+        }
         ret += fmt::format("{}", exprs.back()->to_string());
+    }
+    if(expansion)
+    {
+        ret += fmt::format("), expansion=({}", expansion->to_string());
     }
     ret += "))";
     return ret;
@@ -3756,7 +3850,7 @@ std::unique_ptr<cg::value> macro_branch::generate_code(
   cg::context& ctx,
   memory_context mc) const
 {
-    return body->generate_code(ctx, memory_context::none);
+    return body->generate_code(ctx, mc);
 }
 
 std::string macro_branch::to_string() const
@@ -3864,8 +3958,8 @@ std::string macro_expression::to_string() const
  * @throws Throws `cg::codegen_error` if `macro_expr` is not a macro expression,
  *         multiple matches were found, or no matches were found.
  */
-static macro_branch* get_matching_branch(
-  std::unique_ptr<ast::expression>& macro_expr,
+static const macro_branch* get_matching_branch(
+  const macro_expression* macro_expr,
   const macro_invocation& invocation)
 {
     if(!macro_expr->is_macro_expression())
@@ -3875,10 +3969,10 @@ static macro_branch* get_matching_branch(
           "Cannot match macro branches for non-macro expression.");
     }
 
-    std::pair<macro_branch*, std::size_t> match{nullptr, 0};
-    std::pair<macro_branch*, std::size_t> tie{nullptr, 0};
+    std::pair<const macro_branch*, std::size_t> match{nullptr, 0};
+    std::pair<const macro_branch*, std::size_t> tie{nullptr, 0};
 
-    auto update_match = [&match, &tie](macro_branch* mb, std::size_t score) -> void
+    auto update_match = [&match, &tie](const macro_branch* mb, std::size_t score) -> void
     {
         if(match.second < score)
         {
@@ -3948,7 +4042,11 @@ std::unique_ptr<expression> macro_expression::expand(
   cg::context& ctx,
   const macro_invocation& invocation) const
 {
-    auto cloned_expr = clone();
+    // Get matching macro branch for the argument list.
+    std::unique_ptr<macro_branch> branch =
+      std::unique_ptr<macro_branch>{
+        static_cast<macro_branch*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          get_matching_branch(this, invocation)->clone().release())};
 
     const std::string prefix = fmt::format("${}", ctx.generate_macro_invocation_id());
     auto rename_visitor = [&prefix](expression& e) -> void
@@ -3982,16 +4080,10 @@ std::unique_ptr<expression> macro_expression::expand(
         }
     };
 
-    cloned_expr->visit_nodes(
+    branch->visit_nodes(
       rename_visitor,
-      false /* don't visit this node */
+      true /* visit this node */
     );
-
-    // Get matching macro branch for the argument list.
-    std::unique_ptr<macro_branch> branch =
-      std::unique_ptr<macro_branch>{
-        static_cast<macro_branch*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-          get_matching_branch(cloned_expr, invocation)->clone().release())};
 
     std::unordered_map<std::string, size_t> arg_pos;
     for(std::size_t i = 0; i < branch->get_args().size(); ++i)
@@ -4035,7 +4127,7 @@ std::unique_ptr<expression> macro_expression::expand(
               arg_pos.end(),
               [ref_expr](const auto& p) -> bool
               {
-                  ref_expr->get_name().s == p.first;
+                  return ref_expr->get_name().s == p.first;
               });
             if(it == arg_pos.end())
             {
@@ -4043,12 +4135,11 @@ std::unique_ptr<expression> macro_expression::expand(
                 return;
             }
 
-            // expand.
-            throw std::runtime_error("macro_expression::expand: argument expansion not implemented.");
+            ref_expr->set_expansion(invocation.get_exprs().at(it->second)->clone());
         }
     };
 
-    cloned_expr->visit_nodes(
+    branch->visit_nodes(
       expand_visitor,
       false /* don't visit this node. */
     );

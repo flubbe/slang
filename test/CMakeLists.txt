@@ -331,6 +331,11 @@ add_compile_exec_test(
     TRUE
     test/test_macros
 )
+add_compile_exec_test(
+    "slang macros recursive"
+    TRUE
+    test/test_macros_recursive
+)
 add_compile_fail_test(
     "slang macros fail 1"
     FALSE
