@@ -15,8 +15,8 @@
 #include <utility>
 #include <vector>
 
-#include "directive.h"
-#include "type.h"
+#include "compiler/directive.h"
+#include "compiler/type.h"
 #include "utils.h"
 
 /*

@@ -8,10 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <set>
-#include <stdexcept>
-#include <unordered_map>
-
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "codegen.h"

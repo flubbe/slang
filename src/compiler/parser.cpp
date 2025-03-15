@@ -8,7 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <unordered_map>
 #include <set>
 
 #include "shared/type_utils.h"

@@ -13,7 +13,7 @@
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "shared/type_utils.h"
-#include "ast.h"
+#include "ast/ast.h"
 #include "codegen.h"
 #include "utils.h"
 #include "builtins/macros.h"

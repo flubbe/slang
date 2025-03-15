@@ -11,7 +11,7 @@
 #include <fmt/core.h>
 
 #include "shared/type_utils.h"
-#include "ast.h"
+#include "ast/ast.h"
 #include "package.h"
 #include "type.h"
 #include "typing.h"

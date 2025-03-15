@@ -13,7 +13,7 @@
 #include <memory>
 #include <vector>
 
-#include "compiler/ast.h"
+#include "compiler/ast/ast.h"
 #include "compiler/codegen.h"
 #include "shared/module.h"
 
