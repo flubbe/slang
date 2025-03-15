@@ -108,10 +108,28 @@ Ignoring comments, a program consists of:
     They are defined via
     ```
     macro <name!> {
+        <macro-branch1>
+        <macro-branch2>
         ...
+        <macro-branchN>
     }
     ```
-    **Note:** Currently _only_ the built-in macro `format!` is supported.
+    where <code>&lt;macro-branch<i>i</i>&gt;</code> is of the form
+    ```
+    (<arg1> : <arg-type1>, ..., <argM> : <arg-typeM>) => {
+        <statement-or-expression1>
+        ...
+        <statement-or-expressionM>
+    };
+    ```
+    The argument type <code>&lt;arg-type<i>i</i>&gt;</code> is `expr` to match an expression, or `expr...` to match
+    an expression list. The latter is only valid for the last argument type.
+    
+    The argument list can be empty.
+
+    _Built-in macros:_
+    
+    Currently the only built-in macro is `std::format!`.
 
 Statements and expressions can be decorated with _directives_:
 ```
