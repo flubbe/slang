@@ -180,6 +180,29 @@ public:
     [[nodiscard]]
     virtual const class macro_branch* as_macro_branch() const;
 
+    /** Whether the expression is a macro expression list. */
+    [[nodiscard]]
+    virtual bool is_macro_expression_list() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a macro expression list.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a macro expression list.
+     */
+    [[nodiscard]]
+    virtual class macro_expression_list* as_macro_expression_list();
+
+    /**
+     * Get the expression as a macro expression list.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a macro expression list.
+     */
+    [[nodiscard]]
+    virtual const class macro_expression_list* as_macro_expression_list() const;
+
     /** Whether this expression is a macro invokation. */
     [[nodiscard]]
     virtual bool is_macro_invocation() const
@@ -1128,6 +1151,12 @@ public:
     bool has_expansion() const
     {
         return static_cast<bool>(expansion);
+    }
+
+    /** Get the expansion. The expansion can be `nullptr`. */
+    const std::unique_ptr<expression>& get_expansion() const
+    {
+        return expansion;
     }
 
     /**
@@ -2764,6 +2793,82 @@ public:
     const std::unique_ptr<block>& get_body() const
     {
         return body;
+    }
+};
+
+/**
+ * An expression list for macro expansion.
+ *
+ * NOTE Temporary expression during macro expansion.
+ */
+class macro_expression_list : public expression
+{
+    /** The expression list. */
+    std::vector<std::unique_ptr<expression>> expr_list;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Defaulted and deleted constructors. */
+    macro_expression_list() = default;
+    macro_expression_list(const macro_expression_list&) = delete;
+    macro_expression_list(macro_expression_list&&) = default;
+
+    /** Default assignment operators. */
+    macro_expression_list& operator=(const macro_expression_list&) = delete;
+    macro_expression_list& operator=(macro_expression_list&&) = default;
+
+    /**
+     * Construct a macro expression list.
+     *
+     * @param loc The expression location.
+     * @param expr_list The expression list.
+     */
+    macro_expression_list(
+      token_location loc,
+      std::vector<std::unique_ptr<expression>> expr_list)
+    : expression{loc}
+    , expr_list{std::move(expr_list)}
+    {
+    }
+
+    [[nodiscard]]
+    std::unique_ptr<expression> clone() const override;
+
+    [[nodiscard]]
+    bool is_macro_expression_list() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]]
+    macro_expression_list* as_macro_expression_list() override
+    {
+        return this;
+    }
+
+    [[nodiscard]]
+    const macro_expression_list* as_macro_expression_list() const override
+    {
+        return this;
+    }
+
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::string to_string() const override;
+
+    /** Get the expression list. */
+    std::vector<std::unique_ptr<expression>>& get_expr_list()
+    {
+        return expr_list;
+    }
+
+    /** Get the expression list. */
+    const std::vector<std::unique_ptr<expression>>& get_expr_list() const
+    {
+        return expr_list;
     }
 };
 

@@ -25,7 +25,7 @@ namespace slang::ast
  * literal_expression.
  */
 
-std::unique_ptr<cg::value> literal_expression::evaluate(cg::context& ctx) const
+std::unique_ptr<cg::value> literal_expression::evaluate([[maybe_unused]] cg::context& ctx) const
 {
     if(!tok.value.has_value())
     {
