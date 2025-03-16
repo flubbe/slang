@@ -525,12 +525,24 @@ struct constant_serializer
     /** The constant to serialize. */
     const T& c;
 
+    /** Delete default constructors. */
+    constant_serializer() = delete;
+    constant_serializer(const constant_serializer&) = delete;
+    constant_serializer(constant_serializer&&) = delete;
+
+    /** Delete assignments. */
+    constant_serializer& operator=(const constant_serializer&) = delete;
+    constant_serializer& operator=(constant_serializer&&) = delete;
+
+    /** Default destructor. */
+    ~constant_serializer() = default;
+
     /**
      * Construct a constant serializer.
      *
      * @param c The constant to serialize.
      */
-    constant_serializer(const T& c)
+    explicit constant_serializer(const T& c)
     : c{c}
     {
     }

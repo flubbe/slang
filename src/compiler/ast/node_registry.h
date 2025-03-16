@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 #include <fmt/core.h>
 
@@ -31,41 +32,41 @@ class expression;
 /** Identifiers. */
 enum class node_identifier : std::uint8_t
 {
-    null, /** The null object. */
+    null = 0, /** The null object. */
 
-    expression,
-    named_expression,
-    literal_expression,
-    type_cast_expression,
-    namespace_access_expression,
-    access_expression,
-    import_expression,
-    directive_expression,
-    variable_reference_expression,
-    variable_declaration_expression,
-    constant_declaration_expression,
-    array_initializer_expression,
-    struct_definition_expression,
-    struct_anonymous_initializer_expression,
-    named_initializer,
-    struct_named_initializer_expression,
-    binary_expression,
-    unary_expression,
-    new_expression,
-    null_expression,
-    postfix_expression,
-    block,
-    function_expression,
-    call_expression,
-    macro_invocation,
-    return_statement,
-    if_statement,
-    while_statement,
-    break_statement,
-    continue_statement,
-    macro_branch,
-    macro_expression_list,
-    macro_expression,
+    expression = 1,
+    named_expression = 2,
+    literal_expression = 3,
+    type_cast_expression = 4,
+    namespace_access_expression = 5,
+    access_expression = 6,
+    import_expression = 7,
+    directive_expression = 8,
+    variable_reference_expression = 9,
+    variable_declaration_expression = 10,
+    constant_declaration_expression = 11,
+    array_initializer_expression = 12,
+    struct_definition_expression = 13,
+    struct_anonymous_initializer_expression = 14,
+    named_initializer = 15,
+    struct_named_initializer_expression = 16,
+    binary_expression = 17,
+    unary_expression = 18,
+    new_expression = 19,
+    null_expression = 20,
+    postfix_expression = 21,
+    block = 22,
+    function_expression = 23,
+    call_expression = 24,
+    macro_invocation = 25,
+    return_statement = 26,
+    if_statement = 27,
+    while_statement = 28,
+    break_statement = 29,
+    continue_statement = 30,
+    macro_branch = 31,
+    macro_expression_list = 32,
+    macro_expression = 33,
 
     last = macro_expression
 };
@@ -79,9 +80,9 @@ enum class node_identifier : std::uint8_t
  */
 inline archive& operator&(archive& ar, node_identifier& i)
 {
-    std::uint8_t i_u8 = static_cast<std::uint8_t>(i);
+    auto i_u8 = static_cast<std::uint8_t>(i);
     ar & i_u8;
-    if(i > node_identifier::last)
+    if(i_u8 > static_cast<std::uint8_t>(node_identifier::last))
     {
         throw serialization_error(
           fmt::format(
@@ -114,17 +115,44 @@ std::unique_ptr<T> construct(node_identifier id)
     return std::unique_ptr<T>{static_cast<T*>(construct(id).release())};
 }
 
-template<typename T>
+/** AST expression serializer. */
+template<
+  typename T,
+  typename = std::enable_if_t<
+    (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
+    && std::is_base_of_v<expression, typename T::element_type>>>
 struct expression_serializer
 {
+    /** Reference to the expression. */
     T& expr;
 
-public:
-    expression_serializer(T& expr)
+    /** Delete default constructors. */
+    expression_serializer() = delete;
+    expression_serializer(const expression_serializer&) = delete;
+    expression_serializer(expression_serializer&&) = delete;
+
+    /** Delete assignments. */
+    expression_serializer& operator=(const expression_serializer) = delete;
+    expression_serializer& operator=(expression_serializer&&) = delete;
+
+    /** Default destructor. */
+    ~expression_serializer() = default;
+
+    /**
+     * Create an expression serializer.
+     *
+     * @param expr Reference to the expression to be serialized.
+     */
+    explicit expression_serializer(T& expr)
     : expr{expr}
     {
     }
 
+    /**
+     * Expression serializer.
+     *
+     * @param ar The archive to use for serialization.
+     */
     void serialize(archive& ar)
     {
         auto id = static_cast<std::uint8_t>(expr ? expr->get_id() : node_identifier::null);
@@ -153,24 +181,57 @@ public:
     }
 };
 
+/**
+ * Expression serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param expr The expression to serialize.
+ */
 template<typename T>
-archive& operator&(archive& ar, expression_serializer<T> e)
+archive& operator&(archive& ar, expression_serializer<T> expr)
 {
-    e.serialize(ar);
+    expr.serialize(ar);
     return ar;
 }
 
-template<typename T>
+/** AST expression serializer, vector version. */
+template<
+  typename T,
+  typename = std::enable_if_t<
+    (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
+    && std::is_base_of_v<expression, typename T::element_type>>>
 struct expression_vector_serializer
 {
+    /** Reference to the expression vector. */
     std::vector<T>& exprs;
 
-public:
-    expression_vector_serializer(std::vector<T>& exprs)
+    /** Delete default constructors. */
+    expression_vector_serializer() = delete;
+    expression_vector_serializer(const expression_vector_serializer&) = delete;
+    expression_vector_serializer(expression_vector_serializer&&) = delete;
+
+    /** Delete assignments. */
+    expression_vector_serializer& operator=(const expression_vector_serializer) = delete;
+    expression_vector_serializer& operator=(expression_vector_serializer&&) = delete;
+
+    /** Default destructor. */
+    ~expression_vector_serializer() = default;
+
+    /**
+     * Create a serializer for a vector of expressions.
+     *
+     * @param exprs Vector of expressions.
+     */
+    explicit expression_vector_serializer(std::vector<T>& exprs)
     : exprs{exprs}
     {
     }
 
+    /**
+     * Expression serializer.
+     *
+     * @param ar The archive to use for serialization.
+     */
     void serialize(archive& ar)
     {
         vle_int len{utils::numeric_cast<std::int64_t>(exprs.size())};
@@ -220,10 +281,16 @@ public:
     }
 };
 
+/**
+ * Expression serializer, vector version.
+ *
+ * @param ar The archive to use for serialization.
+ * @param expr Vector of expression to serialize.
+ */
 template<typename T>
-archive& operator&(archive& ar, expression_vector_serializer<T> e)
+archive& operator&(archive& ar, expression_vector_serializer<T> exprs)
 {
-    e.serialize(ar);
+    exprs.serialize(ar);
     return ar;
 }
 
