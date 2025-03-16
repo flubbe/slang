@@ -13,6 +13,7 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
+#include "archives/file.h"
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
 #include "compiler/parser.h"
@@ -20,8 +21,6 @@
 #include "compiler/ast/node_registry.h"
 #include "shared/module.h"
 #include "resolve.h"
-
-#include "archives/file.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
@@ -1864,43 +1863,6 @@ TEST(output, multiple_modules)
             slang::file_write_archive write_ar(fmt::format("{}.cmod", s.first));
             EXPECT_NO_THROW(write_ar & mod);
         }
-    }
-}
-
-TEST(output, ast_serialization)
-{
-    {
-        const std::string test_input =
-          "macro sum! {\n"
-          "    () => {\n"
-          "        return 0;\n"
-          "    };\n"
-          "    ($a: expr) => {\n"
-          "       return $a;\n"
-          "    };\n"
-          "    ($a: expr, $b: expr...) => {\n"
-          "        return $a + sum!($b);\n"
-          "    };\n"
-          "}";
-
-        slang::lexer lexer;
-        slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        {
-            slang::file_write_archive write_ar{"macro_ast.bin"};
-            auto ast = parser.get_ast();
-            ASSERT_NO_THROW(write_ar & ast::expression_serializer{ast});
-        }
-
-        slang::file_read_archive read_ar{"macro_ast.bin"};
-        std::shared_ptr<ast::expression> root;
-        ASSERT_NO_THROW(read_ar & ast::expression_serializer{root});
-        ASSERT_NE(root, nullptr);
-
-        EXPECT_EQ(parser.get_ast()->to_string(), root->to_string());
     }
 }
 

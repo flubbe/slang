@@ -166,12 +166,12 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_output
     test_output.cpp
-    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
@@ -194,9 +194,6 @@ add_test(NAME output COMMAND test_output)
 set_tests_properties(output PROPERTIES 
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
-)
-set_tests_properties(output PROPERTIES 
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_SETUP output
 )
 
@@ -210,6 +207,37 @@ target_compile_options(test_serialization PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME serialization COMMAND test_serialization)
+
+add_executable(test_ast_serialization
+    test_ast_serialization.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/builtins/format.cpp
+    ../src/archives/file.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
+    ../src/resolve.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_ast_serialization fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_ast_serialization PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME ast_serialization COMMAND test_ast_serialization)
+set_tests_properties(ast_serialization PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED needs_std
+)
 
 add_executable(test_filemanager
     test_filemanager.cpp

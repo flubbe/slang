@@ -2986,7 +2986,7 @@ std::unique_ptr<expression> postfix_expression::clone() const
 void postfix_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    ar & identifier;
+    ar& expression_serializer{identifier};
     ar & op;
 }
 
