@@ -13,10 +13,11 @@
 
 #include <gsl/gsl>
 
-#include "shared/module.h"
-#include "shared/type_utils.h"
+#include "compiler/builtins/macros.h"
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
+#include "shared/module.h"
+#include "shared/type_utils.h"
 #include "ast.h"
 #include "node_registry.h"
 #include "utils.h"
@@ -277,8 +278,38 @@ bool expression::expand_macros(
               macro_expr->get_name().s,
               macro_expr->get_namespace_path());
 
-            macro_expr->set_expansion(
-              m->expand(codegen_ctx, *macro_expr));
+            // check for built-in macros.
+            if(m->get_import_path().value_or("<invalid-import-path>") == "std"
+               && m->get_name() == "format!")
+            {
+                macro_expr->set_expansion(
+                  slang::codegen::macros::expand_builtin_format(
+                    m->get_desc(),
+                    macro_expr->get_location(),
+                    macro_expr->get_exprs()));
+            }
+            else
+            {
+                if(!m->get_desc().serialized_ast.has_value())
+                {
+                    throw cg::codegen_error(
+                      macro_expr->get_location(),
+                      fmt::format(
+                        "Could not load macro '{}' (no data).",
+                        macro_expr->get_name().s));
+                }
+
+                memory_read_archive ar{
+                  m->get_desc().serialized_ast.value(),
+                  true,
+                  endian::little};
+
+                std::unique_ptr<expression> macro_ast;
+                ar& expression_serializer{macro_ast};
+
+                macro_expr->set_expansion(
+                  macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+            }
         }
 
         ++macro_expansion_count;
@@ -814,18 +845,20 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     // validate expression.
     if(lhs_value_type.is_array())
     {
-        throw cg::codegen_error(loc,
-                                fmt::format(
-                                  "Cannot load array '{}' as an object.",
-                                  lhs_value->get_name().value_or("<none>")));
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot load array '{}' as an object.",
+            lhs_value->get_name().value_or("<none>")));
     }
 
     if(!lhs_value_type.is_struct())
     {
-        throw cg::codegen_error(loc,
-                                fmt::format(
-                                  "Cannot access members of non-struct type '{}'.",
-                                  lhs_value_type.to_string()));
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot access members of non-struct type '{}'.",
+            lhs_value_type.to_string()));
     }
 
     // generate access instructions for rhs.

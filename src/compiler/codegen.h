@@ -1855,17 +1855,6 @@ public:
     {
         return import_path.has_value();
     }
-
-    /**
-     * Expand the macro.
-     *
-     * @param ctx The code generation context.
-     * @param macro_expr The macro invocation expression.
-     * @returns The AST of the evaluation.
-     */
-    std::unique_ptr<ast::expression> expand(
-      context& ctx,
-      const ast::macro_invocation& macro_expr) const;
 };
 
 /**

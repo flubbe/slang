@@ -8,9 +8,10 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "shared/module.h"
+#include "archives/archive.h"
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
+#include "shared/module.h"
 #include "ast.h"
 #include "node_registry.h"
 
@@ -170,9 +171,15 @@ void macro_expression::collect_names(
           return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
       });
 
+    memory_write_archive ar{true, endian::little};
+    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
+    ar& expression_serializer{cloned_expr};
+
     ctx.add_macro(
       name.s,
-      module_::macro_descriptor{std::move(directives)},
+      module_::macro_descriptor{
+        std::move(directives),
+        ar.get_buffer()},
       get_namespace_path());
 }
 

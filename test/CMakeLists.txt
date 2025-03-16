@@ -409,6 +409,16 @@ add_compile_fail_test(
     test/test_macros_fail5
 )
 add_compile_exec_test(
+    "slang test_macro_import"
+    TRUE
+    test/test_macro_import --search-path test
+)
+set_tests_properties(
+    "slang test_macro_import (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_macros
+)
+add_compile_exec_test(
     "slang math"
     TRUE
     test/test_math

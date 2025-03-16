@@ -760,8 +760,8 @@ struct macro_descriptor
     /** Directive list. */
     std::vector<std::pair<std::string, directive_descriptor>> directives;
 
-    /** Macro AST. */
-    // TODO
+    /** Serialized macro AST, or `std::nullopt` (for built-in macros). */
+    std::optional<std::vector<std::byte>> serialized_ast;
 
     /** Default constructors. */
     macro_descriptor() = default;
@@ -779,9 +779,13 @@ struct macro_descriptor
      * Construct a macro descriptor.
      *
      * @param directives Directive list.
+     * @param serialized_ast The serialized macro AST, or `std::nullopt` for built-in macros.
      */
-    explicit macro_descriptor(std::vector<std::pair<std::string, directive_descriptor>> directives)
+    macro_descriptor(
+      std::vector<std::pair<std::string, directive_descriptor>> directives,
+      std::optional<std::vector<std::byte>> serialized_ast)
     : directives{std::move(directives)}
+    , serialized_ast{std::move(serialized_ast)}
     {
     }
 };
@@ -795,6 +799,7 @@ struct macro_descriptor
 inline archive& operator&(archive& ar, macro_descriptor& desc)
 {
     ar & desc.directives;
+    ar & desc.serialized_ast;
     return ar;
 }
 

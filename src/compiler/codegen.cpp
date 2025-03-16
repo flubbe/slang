@@ -33,25 +33,6 @@ codegen_error::codegen_error(const token_location& loc, const std::string& messa
 }
 
 /*
- * Macros.
- */
-
-std::unique_ptr<ast::expression> macro::expand(
-  [[maybe_unused]] context& ctx,
-  const ast::macro_invocation& macro_expr) const
-{
-    if(name == "format!")
-    {
-        return slang::codegen::macros::expand_builtin_format(
-          desc,
-          macro_expr.get_location(),
-          macro_expr.get_exprs());
-    }
-
-    throw std::runtime_error("macro::expand: not implemented");
-}
-
-/*
  * Binary operators.
  */
 
@@ -992,7 +973,7 @@ void context::add_macro(
     macros.emplace_back(
       std::make_unique<macro>(
         std::move(name),
-        module_::macro_descriptor{std::move(desc.directives)},
+        std::move(desc),
         std::move(import_path)));
 }
 

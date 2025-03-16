@@ -59,7 +59,7 @@ static void run_test(
     }
 
     slang::file_read_archive read_ar{filename};
-    std::shared_ptr<ast::expression> root;
+    std::unique_ptr<ast::expression> root;
     ASSERT_NO_THROW(read_ar & ast::expression_serializer{root});
     ASSERT_NE(root, nullptr);
 
