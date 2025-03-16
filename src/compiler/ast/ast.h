@@ -2462,6 +2462,8 @@ public:
 /** Macro invokation. */
 class macro_invocation : public named_expression
 {
+    friend class expression;
+
     /** Expressions the macro operates on. */
     std::vector<std::unique_ptr<ast::expression>> exprs;
 

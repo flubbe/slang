@@ -309,6 +309,19 @@ bool expression::expand_macros(
 
                 macro_expr->set_expansion(
                   macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+
+                macro_expr->expansion->visit_nodes(
+                  [&macro_expr](expression& e) -> void
+                  {
+                      if(e.is_macro_invocation()
+                         && !e.get_namespace_path().has_value())
+                      {
+                          // Set the namespace to the import's name (stored in macro_expr).
+                          e.set_namespace(macro_expr->get_namespace());
+                      }
+                  },
+                  true,
+                  false);
             }
         }
 
