@@ -25,10 +25,12 @@ add_executable(slang
     src/compiler/ast/ast.cpp
     src/compiler/ast/eval.cpp
     src/compiler/ast/macros.cpp
+    src/compiler/ast/node_registry.cpp
     src/compiler/codegen.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
     src/compiler/parser.cpp
+    src/compiler/token.cpp
     src/compiler/typing.cpp
     src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp

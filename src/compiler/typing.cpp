@@ -26,6 +26,23 @@ namespace slang::typing
  * type implementation.
  */
 
+archive& operator&(archive& ar, type_class& cls)
+{
+    auto i = static_cast<std::uint8_t>(cls);
+    ar & i;
+
+    if(i > static_cast<std::uint8_t>(type_class::last))
+    {
+        throw serialization_error(
+          fmt::format(
+            "Type class out of range ({} >= {}).",
+            i,
+            static_cast<std::uint8_t>(type_class::last)));
+    }
+
+    return ar;
+}
+
 type_info::type_info(
   const token& base,
   type_class cls,
@@ -68,6 +85,13 @@ bool type_info::operator==(const type_info& other) const
 bool type_info::operator!=(const type_info& other) const
 {
     return !(*this == other);
+}
+
+void type_info::serialize(archive& ar)
+{
+    ar & location;
+    ar & name;
+    ar & cls;
 }
 
 type_info* type_info::get_element_type()
@@ -156,6 +180,17 @@ std::uint64_t type_info::get_type_id() const
     }
 
     return *type_id;
+}
+
+std::string type_info::to_string() const
+{
+    if(is_array())
+    {
+        return fmt::format(
+          "[{}]",
+          get_element_type()->to_string());
+    }
+    return *name;
 }
 
 /*

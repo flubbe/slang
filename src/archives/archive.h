@@ -4,7 +4,7 @@
  * portable archive and serialization support.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -460,6 +460,38 @@ archive& operator&(archive& ar, std::optional<T>& o)
 }
 
 /**
+ * Serialize `std::unique_ptr`.
+ *
+ * @param ar The archive to use.
+ * @param ptr The unique pointer to be serialized.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, std::unique_ptr<T>& ptr)
+{
+    bool has_value = (ptr != nullptr);
+    ar & has_value;
+
+    if(!has_value)
+    {
+        if(ar.is_reading())
+        {
+            ptr = nullptr;
+        }
+        return ar;
+    }
+
+    if(ar.is_reading())
+    {
+        ptr = std::make_unique<T>();
+    }
+
+    ar&(*ptr);
+
+    return ar;
+}
+
+/**
  * Serialize `std::pair`.
  *
  * @param ar The archive to use.
@@ -471,6 +503,58 @@ archive& operator&(archive& ar, std::pair<S, T>& p)
 {
     ar& std::get<0>(p);
     ar& std::get<1>(p);
+    return ar;
+}
+
+/** Serialization helper type for writing constants. */
+template<typename T>
+struct constant_serializer
+{
+    /** The constant to serialize. */
+    const T& c;
+
+    /**
+     * Construct a constant serializer.
+     *
+     * @param c The constant to serialize.
+     */
+    constant_serializer(const T& c)
+    : c{c}
+    {
+    }
+};
+
+/**
+ * Serializer for constants.
+ *
+ * @note The constant is copied during serialization.
+ *
+ * @param ar The archive to use for serialization.
+ * @param c Wrapper around the constant to serialize.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, constant_serializer<T>& c)
+{
+    std::remove_cv_t<std::remove_reference_t<T>> copy = c.c;
+    ar & copy;
+    return ar;
+}
+
+/**
+ * Serializer for constants.
+ *
+ * @note The constant is copied during serialization.
+ *
+ * @param ar The archive to use for serialization.
+ * @param c Wrapper around the constant to serialize.
+ * @returns The input archive.
+ */
+template<typename T>
+archive& operator&(archive& ar, const constant_serializer<T>& c)
+{
+    std::remove_cv_t<std::remove_reference_t<T>> copy = c.c;
+    ar & copy;
     return ar;
 }
 

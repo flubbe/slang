@@ -18,6 +18,7 @@
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
 #include "ast.h"
+#include "node_registry.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
@@ -70,6 +71,13 @@ std::unique_ptr<expression> expression::clone() const
     cloned_expr->namespace_stack = namespace_stack;
     cloned_expr->expr_type = expr_type;
     return cloned_expr;
+}
+
+void expression::serialize(archive& ar)
+{
+    ar & loc;
+    ar & namespace_stack;
+    ar & expr_type;
 }
 
 macro_expression* expression::as_macro_expression()
@@ -398,6 +406,12 @@ std::unique_ptr<expression> named_expression::clone() const
     return cloned_expr;
 }
 
+void named_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & name;
+}
+
 /*
  * literal_expression.
  */
@@ -408,6 +422,12 @@ std::unique_ptr<expression> literal_expression::clone() const
     *static_cast<literal_expression::super*>(cloned_expr.get()) = *static_cast<const literal_expression::super*>(this);
     cloned_expr->tok = tok;
     return cloned_expr;
+}
+
+void literal_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & tok;
 }
 
 std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -532,6 +552,14 @@ std::unique_ptr<type_expression> type_expression::clone() const
     return std::make_unique<type_expression>(*this);
 }
 
+void type_expression::serialize(archive& ar)
+{
+    ar & loc;
+    ar & type_name;
+    ar & namespace_stack;
+    ar & array;
+}
+
 /*
  * type_cast_expression.
  */
@@ -542,6 +570,13 @@ std::unique_ptr<expression> type_cast_expression::clone() const
       loc,
       expr->clone(),
       target_type->clone());
+}
+
+void type_cast_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+    ar & target_type;
 }
 
 std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -637,6 +672,13 @@ std::unique_ptr<expression> namespace_access_expression::clone() const
       expr->clone());
 }
 
+void namespace_access_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & name;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     auto expr_namespace_stack = namespace_stack;
@@ -715,6 +757,14 @@ std::unique_ptr<expression> access_expression::clone() const
       rhs->clone());
     cloned_expr->lhs_type = lhs_type;
     return cloned_expr;
+}
+
+void access_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
+    ar & lhs_type;
 }
 
 std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -843,6 +893,12 @@ std::unique_ptr<expression> import_expression::clone() const
     return std::make_unique<import_expression>(path);
 }
 
+void import_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & path;
+}
+
 std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     // import expressions are handled by the import resolver.
@@ -872,6 +928,13 @@ std::unique_ptr<expression> directive_expression::clone() const
       name,
       args,
       expr->clone());
+}
+
+void directive_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & args;
+    ar& expression_serializer{expr};
 }
 
 std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -917,6 +980,13 @@ std::unique_ptr<expression> variable_reference_expression::clone() const
       name,
       element_expr ? element_expr->clone() : nullptr,
       expansion ? expansion->clone() : nullptr);
+}
+
+void variable_reference_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{element_expr};
+    ar& expression_serializer{expansion};
 }
 
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -1239,6 +1309,13 @@ std::unique_ptr<expression> variable_declaration_expression::clone() const
       expr ? expr->clone() : nullptr);
 }
 
+void variable_declaration_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1338,6 +1415,13 @@ std::unique_ptr<expression> constant_declaration_expression::clone() const
       name,
       type->clone(),
       expr->clone());
+}
+
+void constant_declaration_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type;
+    ar& expression_serializer{expr};
 }
 
 void constant_declaration_expression::push_directive(
@@ -1454,6 +1538,12 @@ std::unique_ptr<expression> array_initializer_expression::clone() const
     return std::make_unique<array_initializer_expression>(
       loc,
       std::move(cloned_exprs));
+}
+
+void array_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{exprs};
 }
 
 std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
@@ -1576,6 +1666,12 @@ std::unique_ptr<expression> struct_definition_expression::clone() const
       std::move(cloned_members));
 }
 
+void struct_definition_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{members};
+}
+
 std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1678,6 +1774,12 @@ std::unique_ptr<expression> struct_anonymous_initializer_expression::clone() con
     return std::make_unique<struct_anonymous_initializer_expression>(
       name,
       std::move(cloned_initializers));
+}
+
+void struct_anonymous_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{initializers};
 }
 
 std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -1804,6 +1906,12 @@ std::unique_ptr<expression> named_initializer::clone() const
       expr->clone());
 }
 
+void named_initializer::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> named_initializer::generate_code(
   cg::context& ctx,
   memory_context mc) const
@@ -1839,6 +1947,12 @@ std::unique_ptr<expression> struct_named_initializer_expression::clone() const
     return std::make_unique<struct_named_initializer_expression>(
       name,
       std::move(cloned_initializers));
+}
+
+void struct_named_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{initializers};
 }
 
 std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -2022,6 +2136,14 @@ std::unique_ptr<expression> binary_expression::clone() const
       op,
       lhs->clone(),
       rhs->clone());
+}
+
+void binary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
 }
 
 /**
@@ -2485,6 +2607,13 @@ std::unique_ptr<expression> unary_expression::clone() const
       operand->clone());
 }
 
+void unary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{operand};
+}
+
 std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2714,6 +2843,13 @@ std::unique_ptr<expression> new_expression::clone() const
       expr->clone());
 }
 
+void new_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type_expr;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2847,6 +2983,13 @@ std::unique_ptr<expression> postfix_expression::clone() const
       op);
 }
 
+void postfix_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & identifier;
+    ar & op;
+}
+
 std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2948,6 +3091,16 @@ std::unique_ptr<prototype_ast> prototype_ast::clone() const
       name,
       std::move(cloned_args),
       return_type->clone());
+}
+
+void prototype_ast::serialize(archive& ar)
+{
+    ar & loc;
+    ar & name;
+    ar & args;
+    ar & return_type;
+    ar & args_type_info;
+    ar & return_type_info;
 }
 
 cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
@@ -3077,6 +3230,12 @@ std::unique_ptr<expression> block::clone() const
       std::move(cloned_exprs));
 }
 
+void block::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{exprs};
+}
+
 std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::none)
@@ -3169,6 +3328,26 @@ std::unique_ptr<expression> function_expression::clone() const
       loc,
       prototype->clone(),
       std::unique_ptr<block>(static_cast<block*>(body->clone().release())));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+}
+
+void function_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    bool has_prototype = static_cast<bool>(prototype);
+    ar & has_prototype;
+    if(has_prototype)
+    {
+        if(!static_cast<bool>(prototype))
+        {
+            prototype = std::make_unique<prototype_ast>();
+        }
+        prototype->serialize(ar);
+    }
+    else
+    {
+        prototype = {};
+    }
+    ar& expression_serializer{body};
 }
 
 std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -3300,6 +3479,15 @@ std::unique_ptr<expression> call_expression::clone() const
       index_expr ? index_expr->clone() : nullptr);
 }
 
+void call_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & callee;
+    ar& expression_vector_serializer{args};
+    ar& expression_serializer{index_expr};
+    ar & return_type;
+}
+
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // Code generation for function calls.
@@ -3426,6 +3614,14 @@ std::unique_ptr<expression> macro_invocation::clone() const
       expansion ? expansion->clone() : nullptr);
 }
 
+void macro_invocation::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{exprs};
+    ar& expression_serializer{index_expr};
+    ar& expression_serializer{expansion};
+}
+
 std::unique_ptr<cg::value> macro_invocation::generate_code(
   cg::context& ctx,
   memory_context mc) const
@@ -3509,6 +3705,12 @@ std::unique_ptr<expression> return_statement::clone() const
     return std::make_unique<return_statement>(
       loc,
       expr ? expr->clone() : nullptr);
+}
+
+void return_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
 }
 
 std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, memory_context mc) const
@@ -3607,6 +3809,14 @@ std::unique_ptr<expression> if_statement::clone() const
       condition->clone(),
       if_block->clone(),
       else_block ? else_block->clone() : nullptr);
+}
+
+void if_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{condition};
+    ar& expression_serializer{if_block};
+    ar& expression_serializer{else_block};
 }
 
 std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
@@ -3725,6 +3935,13 @@ std::unique_ptr<expression> while_statement::clone() const
       loc,
       condition->clone(),
       while_block->clone());
+}
+
+void while_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{condition};
+    ar& expression_serializer{while_block};
 }
 
 std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const

@@ -28,6 +28,7 @@ add_test(NAME package COMMAND test_package)
 add_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/token.cpp
 )
 target_link_libraries(test_lexer fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_lexer PRIVATE
@@ -42,9 +43,11 @@ add_executable(test_parser
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -62,9 +65,11 @@ add_executable(test_codegen
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -82,9 +87,11 @@ add_executable(test_compile_ir
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -103,9 +110,11 @@ add_executable(test_type_system
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
@@ -131,9 +140,11 @@ add_executable(test_resolve
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
@@ -160,10 +171,12 @@ add_executable(test_output
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp

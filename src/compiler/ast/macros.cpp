@@ -12,6 +12,7 @@
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
 #include "ast.h"
+#include "node_registry.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
@@ -30,6 +31,14 @@ std::unique_ptr<expression> macro_branch::clone() const
       args,
       args_end_with_list,
       std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+}
+
+void macro_branch::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & args;
+    ar & args_end_with_list;
+    ar & body;
 }
 
 std::unique_ptr<cg::value> macro_branch::generate_code(
@@ -72,6 +81,12 @@ std::unique_ptr<expression> macro_expression_list::clone() const
     }
 
     return std::make_unique<macro_expression_list>(loc, std::move(cloned_expr_list));
+}
+
+void macro_expression_list::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & expr_list;
 }
 
 void macro_expression_list::collect_names(
@@ -124,6 +139,12 @@ std::unique_ptr<expression> macro_expression::clone() const
     }
 
     return std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
+}
+
+void macro_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{branches};
 }
 
 void macro_expression::collect_names(

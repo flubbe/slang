@@ -15,8 +15,10 @@
 #include <utility>
 #include <vector>
 
+#include "archives/archive.h"
 #include "compiler/directive.h"
 #include "compiler/type.h"
+#include "node_registry.h"
 #include "utils.h"
 
 /*
@@ -78,7 +80,7 @@ public:
      *
      * @param loc The expression location.
      */
-    explicit expression(token_location loc)
+    expression(token_location loc)
     : loc{loc}
     {
     }
@@ -90,9 +92,23 @@ public:
     /** Default destructor. */
     virtual ~expression() = default;
 
+    /** Get the node id. */
+    [[nodiscard]]
+    virtual node_identifier get_id() const
+    {
+        return node_identifier::expression;
+    }
+
     /** Clone this expression. */
     [[nodiscard]]
     virtual std::unique_ptr<expression> clone() const;
+
+    /**
+     * Serialize the expression.
+     *
+     * @param ar The archive to use for serialization.
+     */
+    virtual void serialize(archive& ar);
 
     /** Whether this expression needs stack cleanup. */
     [[nodiscard]]
@@ -103,9 +119,9 @@ public:
 
     /** Whether this expression is a variable declaration. */
     [[nodiscard]]
-    virtual bool is_variable_declaration() const
+    bool is_variable_declaration() const
     {
-        return false;
+        return get_id() == node_identifier::variable_declaration_expression;
     }
 
     /**
@@ -117,9 +133,9 @@ public:
 
     /** Whether this expression is a variable reference. */
     [[nodiscard]]
-    virtual bool is_variable_reference() const
+    bool is_variable_reference() const
     {
-        return false;
+        return get_id() == node_identifier::variable_reference_expression;
     }
 
     /**
@@ -184,7 +200,7 @@ public:
     [[nodiscard]]
     virtual bool is_macro_expression_list() const
     {
-        return false;
+        return get_id() == node_identifier::macro_expression_list;
     }
 
     /**
@@ -220,9 +236,9 @@ public:
 
     /** Whether this is a literal. */
     [[nodiscard]]
-    virtual bool is_literal() const
+    bool is_literal() const
     {
-        return false;
+        return get_id() == node_identifier::literal_expression;
     }
 
     /**
@@ -460,6 +476,19 @@ public:
       std::function<bool(const expression&)> filter = nullptr) const;
 };
 
+/**
+ * `expression` serializer.
+ *
+ * @param ar The archive to use.
+ * @param expr The expression to serialize.
+ * @return Returns the input archive.
+ */
+inline archive& operator&(archive& ar, expression& expr)
+{
+    expr.serialize(ar);
+    return ar;
+}
+
 /** Any expression with a name. */
 class named_expression : public expression
 {
@@ -492,10 +521,16 @@ public:
     {
     }
 
-    [[nodiscard]] std::unique_ptr<expression> clone() const override;
-
     [[nodiscard]]
-    bool is_named_expression() const override
+    node_identifier get_id() const override
+    {
+        return node_identifier::named_expression;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    [[nodiscard]] bool is_named_expression() const override
     {
         return true;
     }
@@ -551,16 +586,17 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::literal_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_const_eval(cg::context&) const override
-    {
-        return true;
-    }
-
-    [[nodiscard]]
-    bool is_literal() const override
     {
         return true;
     }
@@ -626,6 +662,7 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<type_expression> clone() const;
+    void serialize(archive& ar);
 
     /** Get the location. */
     [[nodiscard]]
@@ -670,6 +707,19 @@ public:
     }
 };
 
+/**
+ * `type_expression` serializer.
+ *
+ * @param ar The archive to use.
+ * @param expr The type expression to serialize.
+ * @return Returns the input archive.
+ */
+inline archive& operator&(archive& ar, type_expression& expr)
+{
+    expr.serialize(ar);
+    return ar;
+}
+
 /** A type cast expression. */
 class type_cast_expression : public named_expression
 {
@@ -683,8 +733,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    type_cast_expression() = delete;
+    /** Default constructor. */
+    type_cast_expression() = default;
 
     /** Copy and move constructors. */
     type_cast_expression(const type_cast_expression&) = delete;
@@ -715,7 +765,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::type_cast_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_struct_member_access() const override
@@ -806,7 +863,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::namespace_access_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool needs_pop() const override
@@ -876,7 +940,7 @@ public:
     using super = expression;
 
     /** Defaulted and deleted constructors. */
-    access_expression() = delete;
+    access_expression() = default;
     access_expression(const access_expression&) = delete;
     access_expression(access_expression&&) = default;
 
@@ -892,7 +956,14 @@ public:
      */
     access_expression(std::unique_ptr<expression> lhs, std::unique_ptr<expression> rhs);
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::access_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_struct_member_access() const override
@@ -942,8 +1013,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    import_expression() = delete;
+    /** Default constructor. */
+    import_expression() = default;
 
     /** Copy and move constructors. */
     import_expression(const import_expression&) = delete;
@@ -964,7 +1035,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::import_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -984,8 +1062,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    directive_expression() = delete;
+    /** Default constructor. */
+    directive_expression() = default;
 
     /** Copy and move constructors. */
     directive_expression(const directive_expression&) = delete;
@@ -1009,7 +1087,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::directive_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool needs_pop() const override
@@ -1081,13 +1166,14 @@ public:
     {
     }
 
-    [[nodiscard]] std::unique_ptr<expression> clone() const override;
-
     [[nodiscard]]
-    bool is_variable_reference() const override
+    node_identifier get_id() const override
     {
-        return true;
+        return node_identifier::variable_reference_expression;
     }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     variable_reference_expression* as_variable_reference() override
@@ -1209,13 +1295,15 @@ public:
     {
     }
 
-    [[nodiscard]] std::unique_ptr<expression> clone() const override;
-
     [[nodiscard]]
-    bool is_variable_declaration() const override
+    node_identifier get_id() const override
     {
-        return true;
+        return node_identifier::variable_declaration_expression;
     }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
     [[nodiscard]]
     variable_declaration_expression* as_variable_declaration() override
     {
@@ -1301,7 +1389,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::constant_declaration_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     void push_directive(
       cg::context& ctx,
@@ -1341,8 +1436,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    array_initializer_expression() = delete;
+    /** Default constructor. */
+    array_initializer_expression() = default;
 
     /** Copy and move constructors. */
     array_initializer_expression(const array_initializer_expression&) = delete;
@@ -1363,7 +1458,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::array_initializer_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1405,8 +1507,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    struct_definition_expression() = delete;
+    /** Default constructor. */
+    struct_definition_expression() = default;
 
     /** Copy and move constructors. */
     struct_definition_expression(const struct_definition_expression&) = delete;
@@ -1432,7 +1534,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::struct_definition_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -1500,7 +1609,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::struct_anonymous_initializer_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1544,10 +1660,10 @@ class named_initializer : public named_expression
 
 public:
     /** Set the super class. */
-    using super = named_initializer;
+    using super = named_expression;
 
-    /** No default constructor. */
-    named_initializer() = delete;
+    /** Default constructor. */
+    named_initializer() = default;
 
     /** Copy and move constructors. */
     named_initializer(const named_initializer&) = delete;
@@ -1569,7 +1685,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::named_initializer;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     /** Generates code for the initializing expression. */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1616,8 +1739,8 @@ public:
     /** Set the super class. */
     using super = named_expression;
 
-    /** No default constructor. */
-    struct_named_initializer_expression() = delete;
+    /** Default constructor. */
+    struct_named_initializer_expression() = default;
 
     /** Copy and move constructors. */
     struct_named_initializer_expression(const struct_named_initializer_expression&) = delete;
@@ -1641,7 +1764,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::struct_named_initializer_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1719,7 +1849,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::binary_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]] bool needs_pop() const override;
 
@@ -1755,8 +1892,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    unary_expression() = delete;
+    /** Default constructor. */
+    unary_expression() = default;
 
     /** Copy and move constructors. */
     unary_expression(const unary_expression&) = delete;
@@ -1783,7 +1920,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::unary_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
@@ -1842,7 +1986,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::new_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1884,6 +2035,12 @@ public:
     explicit null_expression(token_location loc)
     : expression{loc}
     {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::null_expression;
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
@@ -1928,7 +2085,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::postfix_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool needs_pop() const override
@@ -1978,8 +2142,8 @@ class prototype_ast
     ty::type_info return_type_info;
 
 public:
-    /** No default constructor. */
-    prototype_ast() = delete;
+    /** Default constructor. */
+    prototype_ast() = default;
 
     /** Copy and move constructors. */
     prototype_ast(const prototype_ast&) = delete;
@@ -2010,6 +2174,7 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<prototype_ast> clone() const;
+    void serialize(archive& ar);
 
     [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
@@ -2057,7 +2222,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::block;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -2103,8 +2275,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    function_expression() = delete;
+    /** Default constructor. */
+    function_expression() = default;
 
     /** Copy and move constructors. */
     function_expression(const function_expression&) = delete;
@@ -2131,7 +2303,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::function_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
@@ -2207,7 +2386,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::call_expression;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool needs_pop() const override
@@ -2318,7 +2504,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::macro_invocation;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_macro_invocation() const override
@@ -2451,7 +2644,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::return_statement;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2522,7 +2722,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::if_statement;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2597,7 +2804,14 @@ public:
     {
     }
 
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::while_statement;
+    }
+
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2622,8 +2836,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    break_statement() = delete;
+    /** Default constructor. */
+    break_statement() = default;
 
     /** Copy and move constructors. */
     break_statement(const break_statement&) = delete;
@@ -2641,6 +2855,12 @@ public:
     explicit break_statement(token_location loc)
     : expression{loc}
     {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::break_statement;
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
@@ -2661,8 +2881,8 @@ public:
     /** Set the super class. */
     using super = expression;
 
-    /** No default constructor. */
-    continue_statement() = delete;
+    /** Default constructor. */
+    continue_statement() = default;
 
     /** Copy and move constructors. */
     continue_statement(const continue_statement&) = delete;
@@ -2680,6 +2900,12 @@ public:
     explicit continue_statement(token_location loc)
     : expression{loc}
     {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::continue_statement;
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
@@ -2740,7 +2966,14 @@ public:
     }
 
     [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::macro_branch;
+    }
+
+    [[nodiscard]]
     std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_macro_branch() const override
@@ -2834,13 +3067,14 @@ public:
     }
 
     [[nodiscard]]
-    std::unique_ptr<expression> clone() const override;
+    node_identifier get_id() const override
+    {
+        return node_identifier::macro_expression_list;
+    }
 
     [[nodiscard]]
-    bool is_macro_expression_list() const override
-    {
-        return true;
-    }
+    std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     macro_expression_list* as_macro_expression_list() override
@@ -2880,7 +3114,7 @@ class macro_expression : public named_expression
 
 public:
     /** Set the super class. */
-    using super = expression;
+    using super = named_expression;
 
     /** Defaulted and deleted constructors. */
     macro_expression() = default;
@@ -2908,7 +3142,14 @@ public:
     }
 
     [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::macro_expression;
+    }
+
+    [[nodiscard]]
     std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
 
     [[nodiscard]]
     bool is_macro_expression() const override
