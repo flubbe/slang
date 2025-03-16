@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "token.h"
@@ -84,10 +85,11 @@ public:
      * @param type_id The type's id, or `std::nullopt` for an unresolved type.
      * @param import_path Optional import path.
      */
-    type_info(const token& base,
-              type_class cls,
-              std::optional<std::uint64_t> type_id,
-              std::optional<std::string> import_path = std::nullopt);
+    type_info(
+      const token& base,
+      type_class cls,
+      std::optional<std::uint64_t> type_id,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return if two types are equal.
@@ -195,7 +197,10 @@ public:
      * @param cls The type class.
      * @param import_path The import path, or `std::nullopt` for the current module.
      */
-    static type_info make_unresolved(token base, type_class cls, std::optional<std::string> import_path)
+    static type_info make_unresolved(
+      token base,
+      type_class cls,
+      std::optional<std::string> import_path)
     {
         return {std::move(base), cls, std::nullopt, std::move(import_path)};
     }

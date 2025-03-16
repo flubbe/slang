@@ -13,15 +13,18 @@
 #include <stdexcept>
 #include <cstddef>
 #include <cstdint>
-#include <string>
+#include <memory>
 #include <optional>
+#include <string>
 #include <vector>
+
+#include "utils.h"
 
 namespace slang
 {
 
 /** The endianness of the system. Only 'big' and 'little' are supported. */
-enum class endian
+enum class endian    // NOLINT(performance-enum-size)
 {
 #if defined(_MSC_VER) && !defined(__clang__)
     little = 0,
@@ -52,10 +55,10 @@ static_assert(
   sizeof(float) == 4, "Only 4-byte floats are supported.");
 
 static_assert(
-  sizeof(double) == 8, "Only 8-byte doubles are supported.");
+  sizeof(double) == 8, "Only 8-byte doubles are supported.");    // NOLINT(readability-magic-numbers)
 
 static_assert(
-  sizeof(std::size_t) == 8, "Only 8-byte std::size_t's are supported.");
+  sizeof(std::size_t) == 8, "Only 8-byte std::size_t's are supported.");    // NOLINT(readability-magic-numbers)
 
 /** A serialization error. */
 class serialization_error : public std::runtime_error
@@ -144,24 +147,28 @@ public:
     virtual std::size_t size() = 0;
 
     /** Return the target byte order for this archive. Only used/relevant for persistent archives. */
+    [[nodiscard]]
     endian get_target_byte_order() const
     {
         return target_byte_order;
     }
 
     /** Returns whether this is a read archive. */
+    [[nodiscard]]
     bool is_reading() const
     {
         return read;
     }
 
     /** Returns whether this is a write archive. */
+    [[nodiscard]]
     bool is_writing() const
     {
         return write;
     }
 
     /** Return whether this is a persistent archive. */
+    [[nodiscard]]
     bool is_persistent() const
     {
         return persistent;
@@ -192,7 +199,7 @@ public:
             {
                 for(std::size_t i = c; i > 0; --i)
                 {
-                    serialize_bytes(&buffer[i - 1], 1);
+                    serialize_bytes(&buffer[i - 1], 1);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 }
             }
         }
@@ -201,77 +208,77 @@ public:
     /** Serializa a bool. */
     archive& operator&(bool& b)
     {
-        serialize(reinterpret_cast<std::byte*>(&b), 1);
+        serialize(reinterpret_cast<std::byte*>(&b), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a char. */
     archive& operator&(char& c)
     {
-        serialize(reinterpret_cast<std::byte*>(&c), 1);
+        serialize(reinterpret_cast<std::byte*>(&c), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a byte. */
     archive& operator&(std::byte& b)
     {
-        serialize(reinterpret_cast<std::byte*>(&b), 1);
+        serialize(&b, 1);
         return *this;
     }
 
     /** Serialize a std::int8_t. */
     archive& operator&(std::int8_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 1);
+        serialize(reinterpret_cast<std::byte*>(&i), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::uint8_t. */
     archive& operator&(std::uint8_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 1);
+        serialize(reinterpret_cast<std::byte*>(&i), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::int16_t. */
     archive& operator&(std::int16_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 2);
+        serialize(reinterpret_cast<std::byte*>(&i), 2);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::uint16_t. */
     archive& operator&(std::uint16_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 2);
+        serialize(reinterpret_cast<std::byte*>(&i), 2);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::int32_t. */
     archive& operator&(std::int32_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 4);
+        serialize(reinterpret_cast<std::byte*>(&i), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::uint32_t. */
     archive& operator&(std::uint32_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 4);
+        serialize(reinterpret_cast<std::byte*>(&i), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a std::int64_t. */
     archive& operator&(std::int64_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);
+        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
         return *this;
     }
 
     /** Serialize a std::int64_t. */
     archive& operator&(std::uint64_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);
+        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
         return *this;
     }
 
@@ -279,7 +286,7 @@ public:
     /** Serialize a std::size_t. */
     archive& operator&(std::size_t& i)
     {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);
+        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
         return *this;
     }
 #endif
@@ -287,14 +294,14 @@ public:
     /** Serialize a float. */
     archive& operator&(float& f)
     {
-        serialize(reinterpret_cast<std::byte*>(&f), 4);
+        serialize(reinterpret_cast<std::byte*>(&f), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         return *this;
     }
 
     /** Serialize a double. */
     archive& operator&(double& d)
     {
-        serialize(reinterpret_cast<std::byte*>(&d), 8);
+        serialize(reinterpret_cast<std::byte*>(&d), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
         return *this;
     }
 };
@@ -305,12 +312,15 @@ struct vle_int
     /** The integer. */
     std::int64_t i{0};
 
-    /** Default constructors. */
+    /** Defaulted constructors. */
     vle_int() = default;
     vle_int(const vle_int&) = default;
     vle_int(vle_int&&) = default;
 
-    /** Default assignments. */
+    /** Defaulted destructor. */
+    ~vle_int() = default;
+
+    /** Defaulted assignments. */
     vle_int& operator=(const vle_int&) = default;
     vle_int& operator=(vle_int&&) = default;
 
@@ -320,7 +330,7 @@ struct vle_int
      *
      * @param i The integer.
      */
-    vle_int(std::int64_t i)
+    explicit vle_int(std::int64_t i)
     : i{i}
     {
     }
@@ -333,6 +343,7 @@ struct vle_int
  * @param i The VLE integer.
  * @returns The input archive.
  */
+// NOLINTBEGIN(readability-magic-numbers)
 inline archive& operator&(archive& ar, vle_int& i)
 {
     std::uint64_t v = std::abs(i.i);
@@ -344,7 +355,7 @@ inline archive& operator&(archive& ar, vle_int& i)
     ar & b0;
 
     i.i = 0;
-    if(b0 & 0x40)    // continuation bit
+    if((b0 & 0x40) != 0)    // continuation bit
     {
         std::uint8_t b = 0;
         v >>= 6;
@@ -357,26 +368,27 @@ inline archive& operator&(archive& ar, vle_int& i)
             i.i = (i.i << 7) | (b & 0x7f);
             v >>= 7;
 
-            if(!(b & 0x80))
+            if((b & 0x80) == 0)
             {
                 break;
             }
         }
 
-        if(b & 0x80)
+        if((b & 0x80) != 0)
         {
             throw serialization_error("Inconsistent VLE integer encoding (continuation bit is set, exceeding maximum integer size).");
         }
     }
     i.i = (i.i << 6) | (b0 & 0x3f);
 
-    if(b0 & 0x80)
+    if((b0 & 0x80) != 0)
     {
         i.i = -i.i;
     }
 
     return ar;
 }
+// NOLINTEND(readability-magic-numbers)
 
 /**
  * Serialize a string.
@@ -387,7 +399,7 @@ inline archive& operator&(archive& ar, vle_int& i)
  */
 inline archive& operator&(archive& ar, std::string& s)
 {
-    vle_int len = s.length();
+    vle_int len{utils::numeric_cast<std::int64_t>(s.length())};
     ar & len;
     if(ar.is_reading())
     {
@@ -410,7 +422,7 @@ inline archive& operator&(archive& ar, std::string& s)
 template<typename T>
 archive& operator&(archive& ar, std::vector<T>& v)
 {
-    vle_int len = v.size();
+    vle_int len{utils::numeric_cast<std::int64_t>(v.size())};
     ar & len;
     if(ar.is_reading())
     {

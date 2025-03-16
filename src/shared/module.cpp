@@ -126,9 +126,9 @@ archive& operator&(archive& ar, variable_type& ts)
             ar & c;
         }
 
-        vle_int i = ts.import_index.has_value()
-                      ? utils::numeric_cast<std::int64_t>(ts.import_index.value())
-                      : static_cast<std::int64_t>(-1);
+        vle_int i{ts.import_index.has_value()
+                    ? utils::numeric_cast<std::int64_t>(ts.import_index.value())
+                    : static_cast<std::int64_t>(-1)};
         ar & i;
     }
     else
