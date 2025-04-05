@@ -29,9 +29,9 @@ namespace slang::utils
  *
  * @param s The string to split.
  * @param delimiter The delimiter that separates the string's components.
- * @return A list of components of the original string.
+ * @return A vector of components of the original string.
  */
-std::list<std::string> split(const std::string& s, const std::string& delimiter);
+std::vector<std::string> split(const std::string& s, const std::string& delimiter);
 
 /**
  * Join a vector of strings.

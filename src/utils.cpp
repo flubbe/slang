@@ -17,7 +17,7 @@
 namespace slang::utils
 {
 
-std::list<std::string> split(const std::string& s, const std::string& delimiter)
+std::vector<std::string> split(const std::string& s, const std::string& delimiter)
 {
     if(s.empty())
     {
@@ -25,7 +25,7 @@ std::list<std::string> split(const std::string& s, const std::string& delimiter)
     }
 
     // split s at <delimiter> occurences.
-    std::list<std::string> components;
+    std::vector<std::string> components;
     std::size_t current = 0;
     std::size_t last = 0;
     while((current = s.find(delimiter, last)) != std::string::npos)
