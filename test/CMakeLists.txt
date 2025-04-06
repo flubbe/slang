@@ -419,6 +419,16 @@ set_tests_properties(
     test_macros
 )
 add_compile_exec_test(
+    "slang test_macro_transitive_import"
+    TRUE
+    test/test_macro_transitive_import --search-path test
+)
+set_tests_properties(
+    "slang test_macro_transitive_import (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_macro_import
+)
+add_compile_exec_test(
     "slang math"
     TRUE
     test/test_math

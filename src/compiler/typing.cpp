@@ -190,7 +190,7 @@ std::string type_info::to_string() const
           "[{}]",
           get_element_type()->to_string());
     }
-    return *name;
+    return name.value_or("<none>");
 }
 
 /*
@@ -322,6 +322,20 @@ void context::add_import(std::vector<token> path)
     { return p.s; };
 
     imported_modules.emplace_back(utils::join(path, {transform}, package::delimiter));
+}
+
+bool context::has_import(const std::vector<token>& path)
+{
+    auto transform = [](const token& p) -> std::string
+    { return p.s; };
+
+    std::string module_path = utils::join(path, {transform}, package::delimiter);
+
+    return std::find(
+             imported_modules.cbegin(),
+             imported_modules.cend(),
+             module_path)
+           != imported_modules.cend();
 }
 
 void context::add_variable(

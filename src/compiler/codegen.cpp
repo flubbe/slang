@@ -978,7 +978,7 @@ void context::add_macro(
 }
 
 macro* context::get_macro(
-  std::string name,
+  const token& name,
   std::optional<std::string> import_path)
 {
     auto it = std::find_if(
@@ -986,12 +986,25 @@ macro* context::get_macro(
       macros.end(),
       [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
       {
-          return m->get_name() == name
+          return m->get_name() == name.s
                  && m->get_import_path() == import_path;
       });
     if(it == macros.end())
     {
-        throw codegen_error(fmt::format("Macro '{}' not found.", name));
+        if(import_path.has_value())
+        {
+            throw codegen_error(
+              name.location,
+              fmt::format(
+                "Macro '{}::{}' not found.",
+                import_path.value(),
+                name.s));
+        }
+        throw codegen_error(
+          name.location,
+          fmt::format(
+            "Macro '{}' not found.",
+            name.s));
     }
 
     return it->get();

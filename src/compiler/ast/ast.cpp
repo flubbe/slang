@@ -275,7 +275,7 @@ bool expression::expand_macros(
         {
             // expand imported macro.
             auto* m = codegen_ctx.get_macro(
-              macro_expr->get_name().s,
+              macro_expr->get_name(),
               macro_expr->get_namespace_path());
 
             // check for built-in macros.
@@ -313,6 +313,13 @@ bool expression::expand_macros(
                 macro_expr->expansion->visit_nodes(
                   [&macro_expr](expression& e) -> void
                   {
+                      // skip namespace expressions, as they "behave like macro invocations".
+                      // FIXME Do we want this behavior?
+                      if(e.get_id() == ast::node_identifier::namespace_access_expression)
+                      {
+                          return;
+                      }
+
                       if(e.is_macro_invocation()
                          && !e.get_namespace_path().has_value())
                       {

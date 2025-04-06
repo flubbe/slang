@@ -396,7 +396,7 @@ public:
 
     /** Return the namespace path, or `std::nullopt` if empty. */
     [[nodiscard]]
-    std::optional<std::string> get_namespace_path() const
+    virtual std::optional<std::string> get_namespace_path() const
     {
         if(namespace_stack.empty())
         {
@@ -827,17 +827,14 @@ public:
 };
 
 /** Scope expression. */
-class namespace_access_expression : public expression
+class namespace_access_expression : public named_expression
 {
-    /** The scope name. */
-    token name;
-
     /** The remaining expression. */
     std::unique_ptr<expression> expr;
 
 public:
     /** Set the super class. */
-    using super = expression;
+    using super = named_expression;
 
     /** Defaulted and deleted constructors. */
     namespace_access_expression() = default;
@@ -857,8 +854,7 @@ public:
     namespace_access_expression(
       token name,
       std::unique_ptr<expression> expr)
-    : expression{name.location}
-    , name{std::move(name)}
+    : named_expression{name.location, std::move(name)}
     , expr{std::move(expr)}
     {
     }
@@ -899,6 +895,11 @@ public:
         return expr->is_const_eval(ctx);
     }
 
+    std::optional<std::string> get_namespace_path() const override
+    {
+        return expr->get_namespace_path();
+    }
+
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -920,6 +921,12 @@ public:
             exprs.emplace_back(c);
         }
         return exprs;
+    }
+
+    /** Return the contained expression. */
+    std::unique_ptr<expression>& get_expr()
+    {
+        return expr;
     }
 };
 

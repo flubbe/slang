@@ -2273,8 +2273,19 @@ public:
      */
     [[nodiscard]]
     macro* get_macro(
-      std::string name,
+      const token& name,
       std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Get the macro list.
+     *
+     * @returns Returns the macro list.
+     */
+    [[nodiscard]]
+    std::vector<std::unique_ptr<macro>>& get_macros()
+    {
+        return macros;
+    }
 
     /** Generate a unique macro invocation id. */
     [[nodiscard]]

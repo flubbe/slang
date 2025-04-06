@@ -10,6 +10,7 @@
 
 #include <fmt/core.h>
 
+#include "compiler/ast/ast.h"
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
 #include "shared/type_utils.h"
@@ -321,7 +322,7 @@ static void add_function(
       desc.signature.arg_types.cbegin(),
       desc.signature.arg_types.cend(),
       std::back_inserter(prototype_arg_types),
-      [&resolver, &import_path](const module_::variable_type& arg)
+      [&resolver, &import_path](const module_::variable_type& arg) -> cg::value
       {
           return to_value(arg, resolver, import_path);
       });
@@ -451,6 +452,77 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             }
         }
     }
+}
+
+bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
+{
+    bool needs_import_resolution = false;
+
+    for(auto& m: ctx.get_macros())
+    {
+        const auto& desc = m->get_desc();
+        if(!desc.serialized_ast.has_value())
+        {
+            throw resolve_error(
+              fmt::format(
+                "Macro '{}' has empty AST.",
+                m->get_name()));
+        }
+
+        memory_read_archive ar{
+          desc.serialized_ast.value(),
+          true,
+          endian::little};
+
+        std::unique_ptr<ast::expression> macro_ast;
+        ar& ast::expression_serializer{macro_ast};
+
+        // update namespace information.
+        macro_ast->visit_nodes(
+          [](ast::expression& e) -> void
+          {
+              if(e.get_id() != ast::node_identifier::namespace_access_expression)
+              {
+                  return;
+              }
+
+              // this updates the namespace information.
+              (void)e.as_macro_invocation();
+          },
+          false,
+          false);
+
+        macro_ast->visit_nodes(
+          [&type_ctx, &needs_import_resolution](ast::expression& e) -> void
+          {
+              // update namespaces if necessary.
+              if(e.is_macro_invocation()
+                 && e.get_namespace_path().has_value())
+              {
+                  // FIXME Hack, since the `add_import` with the correct signature does not exist.
+                  std::vector<std::string> namespace_path = utils::split(e.get_namespace_path().value(), "::");
+                  std::vector<token> namespace_path_tokens;
+                  std::transform(
+                    namespace_path.cbegin(),
+                    namespace_path.cend(),
+                    std::back_inserter(namespace_path_tokens),
+                    [](const std::string& s) -> token
+                    {
+                        return {s, {0, 0}};
+                    });
+
+                  if(!type_ctx.has_import(namespace_path_tokens))
+                  {
+                      type_ctx.add_import(std::move(namespace_path_tokens));
+                      needs_import_resolution = true;
+                  }
+              }
+          },
+          true,
+          false);
+    }
+
+    return needs_import_resolution;
 }
 
 }    // namespace slang::resolve

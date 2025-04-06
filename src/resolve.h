@@ -119,9 +119,21 @@ public:
      * Resolve imports from a type context.
      *
      * @param ctx The code generation context.
-     * @param ctx The typing context.
+     * @param type_ctx The typing context.
      */
     void resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+
+    /**
+     * Resolve macros.
+     *
+     * @note Macro resolution might lead to additional imports being needed. That is,
+     *       if the function returns `true`, import resolution needs to be run.
+     *
+     * @param ctx The code generation context.
+     * @param type_ctx The typing context.
+     * @returns `true` if macros were resolved, and `false` otherwise.
+     */
+    static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
 };
 
 }    // namespace slang::resolve

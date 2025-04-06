@@ -409,6 +409,14 @@ public:
     void add_import(std::vector<token> path);
 
     /**
+     * Check if the import exists in the context.
+     *
+     * @param path The import path.
+     * @returns Return `true` if the import exists, `false` otherwise.
+     */
+    bool has_import(const std::vector<token>& path);
+
+    /**
      * Add a variable to the context.
      *
      * FIXME This also handles constants, which mandates having the `import_path` argument.

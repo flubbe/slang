@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include "archives/memory.h"
+#include "compiler/ast/ast.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "codegen.h"
@@ -15,6 +17,7 @@
 #include "utils.h"
 
 namespace cg = slang::codegen;
+namespace ast = slang::ast;
 
 namespace slang
 {
@@ -392,6 +395,41 @@ void instruction_emitter::collect_imports()
                 }
             }
         }
+    }
+
+    for(auto& m: ctx.macros)
+    {
+        const auto& desc = m->get_desc();
+        if(!desc.serialized_ast.has_value())
+        {
+            throw emitter_error(
+              fmt::format(
+                "Macro '{}' has empty AST.",
+                m->get_name()));
+        }
+
+        memory_read_archive ar{
+          desc.serialized_ast.value(),
+          true,
+          endian::little};
+
+        std::unique_ptr<ast::expression> macro_ast;
+        ar& ast::expression_serializer{macro_ast};
+
+        macro_ast->visit_nodes(
+          [this](const ast::expression& e) -> void
+          {
+              if(e.is_macro_invocation()
+                 && e.get_namespace_path().has_value())
+              {
+                  ctx.add_import(
+                    module_::symbol_type::macro,
+                    e.get_namespace_path().value(),    // NOLINT(bugprone-unchecked-optional-access)
+                    e.as_named_expression()->get_name().s);
+              }
+          },
+          true,
+          false);
     }
 }
 

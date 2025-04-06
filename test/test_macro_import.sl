@@ -1,6 +1,12 @@
 import std;
 import test_macros;
 
+macro two! {
+    () => {
+        test_macros::sum!(1, 1);
+    };
+}
+
 fn main(args: [str]) -> i32 {
     let s1: i32 = test_macros::sum!();
     std::assert(s1 == 0, "s1 == 0");
@@ -13,6 +19,9 @@ fn main(args: [str]) -> i32 {
 
     let s4: i32 = test_macros::sum!(1, 2, 3);
     std::assert(s4 == 6, "s4 == 6");
+
+    let t: i32 = two!();
+    std::assert(t == 2, "t == 2");
 
     return 0;
 }
