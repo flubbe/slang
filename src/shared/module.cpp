@@ -37,9 +37,11 @@ static constexpr char type_prefix = 'C';
 
 std::string variable_type::encode() const
 {
-    auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
-                           [this](const std::pair<std::string, std::string>& p) -> bool
-                           { return p.first == decoded_type_string; });
+    auto it = std::find_if(
+      type_encoding.begin(),
+      type_encoding.end(),
+      [this](const std::pair<std::string, std::string>& p) -> bool
+      { return p.first == decoded_type_string; });
 
     if(it != type_encoding.end())
     {
@@ -68,9 +70,11 @@ void variable_type::set_from_encoded(const std::string& s)
     base_s = s.substr(array_dim_indicator_end);
     array_dims = array_dim_indicator_end > 0 ? std::make_optional(array_dim_indicator_end) : std::nullopt;
 
-    auto it = std::find_if(type_encoding.begin(), type_encoding.end(),
-                           [&base_s](const std::pair<std::string, std::string>& p) -> bool
-                           { return p.second == base_s; });
+    auto it = std::find_if(
+      type_encoding.begin(),
+      type_encoding.end(),
+      [&base_s](const std::pair<std::string, std::string>& p) -> bool
+      { return p.second == base_s; });
 
     if(it != type_encoding.end())
     {
@@ -156,8 +160,8 @@ std::string to_string(const variable_type& t)
 variable_descriptor::variable_descriptor(variable_type type)
 : symbol{0, 0}
 , type{std::move(type)}
+, reference{ty::is_reference_type(this->type.base_type())}
 {
-    reference = ty::is_reference_type(this->type.base_type());
 }
 
 archive& operator&(archive& ar, variable_descriptor& desc)
@@ -196,11 +200,13 @@ void language_module::add_function(
   std::size_t size, std::size_t entry_point,
   std::vector<variable_descriptor> locals)
 {
-    if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& s) -> bool
-                    {
-                        return s.type == symbol_type::function && s.name == name;
-                    })
+    if(std::find_if(
+         header.exports.begin(),
+         header.exports.end(),
+         [&name](const exported_symbol& s) -> bool
+         {
+             return s.type == symbol_type::function && s.name == name;
+         })
        != header.exports.end())
     {
         throw module_error(fmt::format("Cannot add function: Symbol '{}' already defined.", name));
@@ -219,11 +225,13 @@ void language_module::add_native_function(
   std::vector<variable_type> arg_types,
   std::string lib_name)
 {
-    if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& s) -> bool
-                    {
-                        return s.type == symbol_type::function && s.name == name;
-                    })
+    if(std::find_if(
+         header.exports.begin(),
+         header.exports.end(),
+         [&name](const exported_symbol& s) -> bool
+         {
+             return s.type == symbol_type::function && s.name == name;
+         })
        != header.exports.end())
     {
         throw module_error(fmt::format("Cannot add native function: '{}' already defined.", name));
@@ -241,11 +249,13 @@ void language_module::add_struct(
   std::vector<std::pair<std::string, field_descriptor>> members,
   uint8_t flags)
 {
-    if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& s) -> bool
-                    {
-                        return s.type == symbol_type::type && s.name == name;
-                    })
+    if(std::find_if(
+         header.exports.begin(),
+         header.exports.end(),
+         [&name](const exported_symbol& s) -> bool
+         {
+             return s.type == symbol_type::type && s.name == name;
+         })
        != header.exports.end())
     {
         throw module_error(fmt::format("Cannot add type: '{}' already defined.", name));
@@ -257,11 +267,13 @@ void language_module::add_struct(
 
 void language_module::add_constant(std::string name, std::size_t i)
 {
-    if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& s) -> bool
-                    {
-                        return s.type == symbol_type::constant && s.name == name;
-                    })
+    if(std::find_if(
+         header.exports.begin(),
+         header.exports.end(),
+         [&name](const exported_symbol& s) -> bool
+         {
+             return s.type == symbol_type::constant && s.name == name;
+         })
        != header.exports.end())
     {
         throw module_error(fmt::format("Cannot add constant: '{}' already defined.", name));
@@ -272,11 +284,13 @@ void language_module::add_constant(std::string name, std::size_t i)
 
 void language_module::add_macro(std::string name, macro_descriptor desc)
 {
-    if(std::find_if(header.exports.begin(), header.exports.end(),
-                    [&name](const exported_symbol& s) -> bool
-                    {
-                        return s.type == symbol_type::macro && s.name == name;
-                    })
+    if(std::find_if(
+         header.exports.begin(),
+         header.exports.end(),
+         [&name](const exported_symbol& s) -> bool
+         {
+             return s.type == symbol_type::macro && s.name == name;
+         })
        != header.exports.end())
     {
         throw module_error(fmt::format("Cannot add macro: '{}' already defined.", name));
