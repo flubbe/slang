@@ -300,7 +300,7 @@ public:
     garbage_collector& operator=(garbage_collector&&) = default;
 
     /** Destructor. */
-    virtual ~garbage_collector()
+    ~garbage_collector()
     {
         reset();
     }

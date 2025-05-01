@@ -75,6 +75,7 @@ public:
     }
 
     /** Get the module data. */
+    [[nodiscard]]
     const module_::language_module& get_module() const
     {
         return mod;

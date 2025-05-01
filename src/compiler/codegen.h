@@ -982,7 +982,7 @@ public:
     instruction(instruction&&) = default;
 
     /** Destructor. */
-    virtual ~instruction() = default;
+    ~instruction() = default;
 
     /** Default assignments. */
     instruction& operator=(const instruction&) = default;
@@ -1012,14 +1012,14 @@ public:
 
     /** Returns whether the instruction is branching. */
     [[nodiscard]]
-    virtual bool is_branching() const
+    bool is_branching() const
     {
         return name == "jmp" || name == "jnz";
     }
 
     /** Returns whether the instruction is a return instruction. */
     [[nodiscard]]
-    virtual bool is_return() const
+    bool is_return() const
     {
         return name == "ret";
     }
@@ -1088,7 +1088,7 @@ public:
     basic_block(basic_block&&) = delete;
 
     /** Destructor. */
-    virtual ~basic_block()
+    ~basic_block()
     {
         // clear references to this block.
         set_inserting_context(nullptr);
@@ -1213,7 +1213,7 @@ public:
     struct_(struct_&&) = default;
 
     /** Destructor. */
-    virtual ~struct_() = default;
+    ~struct_() = default;
 
     /** Default assignment. */
     struct_& operator=(const struct_&) = default;
@@ -1305,7 +1305,7 @@ public:
     scope(scope&&) = default;
 
     /** Destructor. */
-    virtual ~scope() = default;
+    ~scope() = default;
 
     /** Assignments. */
     scope& operator=(const scope&) = delete;
@@ -2064,7 +2064,7 @@ public:
     context(context&&) = default;
 
     /** Destructor. */
-    virtual ~context()
+    ~context()
     {
         set_insertion_point(nullptr);
     }

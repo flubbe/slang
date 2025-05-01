@@ -63,16 +63,6 @@ public:
     resolve_error(const token_location& loc, const std::string& message);
 };
 
-/** A constant descriptor. */
-struct constant_descriptor
-{
-    /** The constant type. */
-    module_::constant_type type;
-
-    /** The constant's value. */
-    std::variant<std::int32_t, float, std::string> value;
-};
-
 /** Resolver context. */
 class context
 {
