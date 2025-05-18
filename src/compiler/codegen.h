@@ -1855,6 +1855,13 @@ public:
     {
         return import_path.has_value();
     }
+
+    /** Whether this is a transitive import. */
+    [[nodiscard]]
+    bool is_transitive_import() const
+    {
+        return is_import() && name.substr(0, 1) == "$";
+    }
 };
 
 /**

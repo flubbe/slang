@@ -15,6 +15,7 @@
 #include "shared/type_utils.h"
 #include "ast/ast.h"
 #include "codegen.h"
+#include "resolve.h"
 #include "utils.h"
 #include "builtins/macros.h"
 
@@ -22,6 +23,7 @@ namespace slang::codegen
 {
 
 namespace ty = slang::typing;
+namespace rs = slang::resolve;
 
 /*
  * Exceptions.
@@ -601,7 +603,10 @@ void context::add_import(module_::symbol_type type, std::string import_path, std
     }
 }
 
-std::size_t context::get_import_index(module_::symbol_type type, std::string import_path, std::string name) const
+std::size_t context::get_import_index(
+  module_::symbol_type type,
+  std::string import_path,
+  std::string name) const
 {
     auto it = std::find_if(
       imports.begin(),
@@ -636,10 +641,11 @@ std::size_t context::get_import_index(module_::symbol_type type, std::string imp
                   import_path));
 }
 
-struct_* context::add_struct(std::string name,
-                             std::vector<std::pair<std::string, value>> members,
-                             std::uint8_t flags,
-                             std::optional<std::string> import_path)
+struct_* context::add_struct(
+  std::string name,
+  std::vector<std::pair<std::string, value>> members,
+  std::uint8_t flags,
+  std::optional<std::string> import_path)
 {
     if(std::find_if(
          types.begin(),
@@ -989,25 +995,27 @@ macro* context::get_macro(
           return m->get_name() == name.s
                  && m->get_import_path() == import_path;
       });
-    if(it == macros.end())
+
+    if(it != macros.end())
     {
-        if(import_path.has_value())
-        {
-            throw codegen_error(
-              name.location,
-              fmt::format(
-                "Macro '{}::{}' not found.",
-                import_path.value(),
-                name.s));
-        }
+        return it->get();
+    }
+
+    // macro was not found.
+    if(import_path.has_value())
+    {
         throw codegen_error(
           name.location,
           fmt::format(
-            "Macro '{}' not found.",
+            "Macro '{}::{}' not found.",
+            import_path.value(),
             name.s));
     }
-
-    return it->get();
+    throw codegen_error(
+      name.location,
+      fmt::format(
+        "Macro '{}' not found.",
+        name.s));
 }
 
 std::size_t context::generate_macro_invocation_id()

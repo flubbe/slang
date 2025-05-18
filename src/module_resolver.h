@@ -44,6 +44,9 @@ protected:
     /** The module's path. */
     fs::path path;
 
+    /** Whether this is a transitive import. */
+    bool transitive;
+
     /** Module. */
     module_::language_module mod;
 
@@ -62,16 +65,30 @@ public:
      *
      * @param file_mgr The file manager to use.
      * @param path The module's path.
-     * @param recorder An optional recorder.
+     * @param transitive Whether the module is a transitive import.
      */
     module_resolver(
       file_manager& file_mgr,
-      fs::path path);
+      fs::path path,
+      bool transitive);
 
     /** Get the module's path. */
     fs::path get_path() const
     {
         return path;
+    }
+
+    /** Whether this module is a transitive import. */
+    [[nodiscard]]
+    bool is_transitive() const
+    {
+        return transitive;
+    }
+
+    /** Make the module an explicit import (instead of a transitive one). */
+    void make_explicit()
+    {
+        transitive = false;
     }
 
     /** Get the module data. */

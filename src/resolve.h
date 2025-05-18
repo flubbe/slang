@@ -38,6 +38,25 @@ class module_loader;
 namespace slang::resolve
 {
 
+/**
+ * Generate an import name.
+ *
+ * @param name The name of the symbol.
+ * @param transitive Whether this is a transitive import.
+ * @returns Returns the import name.
+ */
+inline std::string make_import_name(
+  const std::string& name,
+  bool transitive)
+{
+    if(transitive)
+    {
+        return std::string("$") + name;
+    }
+
+    return name;
+}
+
 /** A resolve error. */
 class resolve_error : public std::runtime_error
 {
@@ -81,15 +100,19 @@ protected:
      * already resolved.
      *
      * @param import_name The module's import name.
+     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
      * @returns A reference to the resolved module.
      */
-    module_::module_resolver& resolve_module(const std::string& import_name);
+    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
 
 public:
     /** Default constructors. */
     context() = delete;
     context(const context&) = default;
     context(context&&) = default;
+
+    /** Default destructor. */
+    ~context() = default;
 
     /** Default assignments. */
     context& operator=(const context&) = delete;

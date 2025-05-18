@@ -20,10 +20,12 @@
 #include "shared/type_utils.h"
 #include "ast.h"
 #include "node_registry.h"
+#include "resolve.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
+namespace rs = slang::resolve;
 
 namespace slang::ast
 {
@@ -214,6 +216,7 @@ bool expression::supports_directive(const std::string& name) const
 
 bool expression::expand_macros(
   cg::context& codegen_ctx,
+  ty::context& type_ctx,
   const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count = 0;
@@ -221,6 +224,7 @@ bool expression::expand_macros(
     // replace macro nodes by the macro AST.
     auto visitor = [&macro_asts,
                     &codegen_ctx,
+                    &type_ctx,
                     &macro_expansion_count](expression& e)
     {
         if(!e.is_macro_invocation())
@@ -310,22 +314,50 @@ bool expression::expand_macros(
                 macro_expr->set_expansion(
                   macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
 
+                // adjust local namespaces and transitive import names.
                 macro_expr->expansion->visit_nodes(
-                  [&macro_expr](expression& e) -> void
+                  [&macro_expr, &type_ctx](expression& e) -> void
                   {
                       // skip namespace expressions, as they "behave like macro invocations".
                       // FIXME Do we want this behavior?
                       if(e.get_id() == ast::node_identifier::namespace_access_expression)
                       {
+                          if(e.is_macro_invocation())
+                          {
+                              auto* m = e.as_macro_invocation();
+
+                              // TODO We might need to load the package / resolve symbols.
+
+                              m->name.s = rs::make_import_name(
+                                m->name.s,
+                                type_ctx.is_transitive_import(
+                                  m->get_namespace_path().value()));
+                          }
+
+                          // TODO Check for function invocations. These might result in package imports.
+
                           return;
                       }
 
-                      if(e.is_macro_invocation()
-                         && !e.get_namespace_path().has_value())
+                      if(e.is_macro_invocation())
                       {
-                          // Set the namespace to the import's name (stored in macro_expr).
-                          e.set_namespace(macro_expr->get_namespace());
+                          if(!e.get_namespace_path().has_value())
+                          {
+                              // Set the namespace to the import's name (stored in macro_expr).
+                              e.set_namespace(macro_expr->get_namespace());
+                          }
+
+                          auto* m = e.as_macro_invocation();
+
+                          // TODO We might need to load the package / resolve symbols.
+
+                          m->name.s = rs::make_import_name(
+                            m->name.s,
+                            type_ctx.is_transitive_import(
+                              m->get_namespace_path().value()));
                       }
+
+                      // TODO Check for function invocations. These might result in package imports.
                   },
                   true,
                   false);
@@ -420,9 +452,9 @@ void visit_nodes(
     }
     else
     {
-        for(auto it = sorted_ast.begin(); it != sorted_ast.end(); ++it)
+        for(auto* it: sorted_ast)
         {
-            visitor(**it);
+            visitor(*it);
         }
     }
 }
@@ -960,7 +992,7 @@ std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg:
 
 void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
-    type_ctx.add_import(path);
+    type_ctx.add_import(path, false);
 }
 
 std::string import_expression::to_string() const

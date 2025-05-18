@@ -304,6 +304,16 @@ struct scope
     std::string to_string() const;
 };
 
+/** An imported module. */
+struct imported_module
+{
+    /** Module path. */
+    std::string path;
+
+    /** Whether this is a transitive import. */
+    bool transitive;
+};
+
 /** Type system context. */
 class context
 {
@@ -320,7 +330,7 @@ class context
     std::size_t anonymous_scope_id = 0;
 
     /** Imported modules. */
-    std::vector<std::string> imported_modules;
+    std::vector<imported_module> imported_modules;
 
     /** Imported functions, indexed by `(import_path, function_name)`. */
     std::unordered_map<
@@ -401,12 +411,23 @@ public:
     /**
      * Add an import to the context.
      *
-     * @throws A type_error if the import is not in the global scope.
-     * @throws A type_error if the import is already added.
+     * @throws A `type_error` if the import is not in the global scope.
+     * @throws A `type_error` if the import is already added.
      *
      * @param path The import path.
+     * @param transitive Whether this is a transitive import.
      */
-    void add_import(std::vector<token> path);
+    void add_import(std::vector<token> path, bool transitive);
+
+    /**
+     * Return whether an import is transitive.
+     *
+     * @throws A `type_error` if the import does not exist.
+     *
+     * @param namespace_path The namespace path of the module.
+     * @returns Return `true` if the import is transitive, `false` otherwise.
+     */
+    bool is_transitive_import(const std::string& namespace_path) const;
 
     /**
      * Check if the import exists in the context.
@@ -692,7 +713,7 @@ public:
     bool has_expression_type(const ast::expression& expr) const;
 
     /** Get the imported modules. */
-    const std::vector<std::string>& get_imported_modules() const
+    const std::vector<imported_module>& get_imported_modules() const
     {
         return imported_modules;
     }

@@ -408,6 +408,11 @@ add_compile_fail_test(
     FALSE
     test/test_macros_fail5
 )
+add_compile_fail_test(
+    "slang macros fail 6"
+    FALSE
+    test/test_macros_fail6 --search-path test
+)
 add_compile_exec_test(
     "slang test_macro_import"
     TRUE

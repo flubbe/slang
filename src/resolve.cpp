@@ -206,7 +206,8 @@ static module_::module_resolver& resolve_module(
   std::unordered_map<
     std::string,
     std::unique_ptr<module_::module_resolver>>& resolvers,
-  const std::string& import_name)
+  const std::string& import_name,
+  bool transitive)
 {
     auto it = resolvers.find(import_name);
     if(it != resolvers.end())
@@ -228,20 +229,28 @@ static module_::module_resolver& resolve_module(
       {import_name,
        std::make_unique<module_::module_resolver>(
          file_mgr,
-         resolved_path)});
+         resolved_path,
+         transitive)});
     return *resolvers[import_name].get();
 }
 
-module_::module_resolver& context::resolve_module(const std::string& import_name)
+module_::module_resolver& context::resolve_module(
+  const std::string& import_name,
+  bool transitive)
 {
     auto it = resolvers.find(import_name);
     if(it != resolvers.end())
     {
         // module is already resolved.
+        if(it->second->is_transitive() && !transitive)
+        {
+            it->second->make_explicit();
+        }
+
         return *it->second;
     }
 
-    return slang::resolve::resolve_module(file_mgr, resolvers, import_name);
+    return slang::resolve::resolve_module(file_mgr, resolvers, import_name, transitive);
 }
 
 /**
@@ -409,42 +418,44 @@ static void add_type(
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
-    const std::vector<std::string>& imports = type_ctx.get_imported_modules();
+    const std::vector<ty::imported_module>& imports = type_ctx.get_imported_modules();
 
-    for(const auto& import_path: imports)
+    for(const auto& import: imports)
     {
-        if(import_path.empty())
+        if(import.path.empty())
         {
             throw resolve_error("Cannot resolve empty import.");
         }
 
-        auto it = resolvers.find(import_path);
+        auto it = resolvers.find(import.path);
         if(it != resolvers.end())
         {
             // module is already resolved.
             continue;
         }
 
-        module_::module_resolver& resolver = resolve_module(import_path);
+        module_::module_resolver& resolver = resolve_module(import.path, import.transitive);
         const module_::module_header& header = resolver.get_module().get_header();
 
         for(const auto& it: header.exports)
         {
+            const std::string import_name = make_import_name(it.name, import.transitive);
+
             if(it.type == module_::symbol_type::constant)
             {
-                add_constant(ctx, type_ctx, resolver, import_path, it.name, std::get<std::size_t>(it.desc));
+                add_constant(ctx, type_ctx, resolver, import.path, import_name, std::get<std::size_t>(it.desc));
             }
             else if(it.type == module_::symbol_type::function)
             {
-                add_function(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::function_descriptor>(it.desc));
+                add_function(ctx, type_ctx, resolver, import.path, import_name, std::get<module_::function_descriptor>(it.desc));
             }
             else if(it.type == module_::symbol_type::type)
             {
-                add_type(ctx, type_ctx, resolver, import_path, it.name, std::get<module_::struct_descriptor>(it.desc));
+                add_type(ctx, type_ctx, resolver, import.path, import_name, std::get<module_::struct_descriptor>(it.desc));
             }
             else if(it.type == module_::symbol_type::macro)
             {
-                ctx.add_macro(it.name, std::get<module_::macro_descriptor>(it.desc), import_path);
+                ctx.add_macro(import_name, std::get<module_::macro_descriptor>(it.desc), import.path);
             }
             else
             {
@@ -486,16 +497,23 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
                   return;
               }
 
+              if(!e.is_macro_invocation())
+              {
+                  return;
+              }
+
               // this updates the namespace information.
               (void)e.as_macro_invocation();
+
+              // TODO Function calls need to be resolved.
           },
           false,
           false);
 
+        // Add import from macro AST to type context.
         macro_ast->visit_nodes(
-          [&type_ctx, &needs_import_resolution](ast::expression& e) -> void
+          [&type_ctx, &needs_import_resolution](const ast::expression& e) -> void
           {
-              // update namespaces if necessary.
               if(e.is_macro_invocation()
                  && e.get_namespace_path().has_value())
               {
@@ -513,10 +531,12 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
 
                   if(!type_ctx.has_import(namespace_path_tokens))
                   {
-                      type_ctx.add_import(std::move(namespace_path_tokens));
+                      type_ctx.add_import(std::move(namespace_path_tokens), true);
                       needs_import_resolution = true;
                   }
               }
+
+              // TODO Function calls need to be resolved.
           },
           true,
           false);
