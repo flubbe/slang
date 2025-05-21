@@ -7,6 +7,12 @@ macro two! {
     };
 }
 
+macro test! {
+    () => {
+        test_macros::test_format();
+    };
+}
+
 fn main(args: [str]) -> i32 {
     let s1: i32 = test_macros::sum!();
     std::assert(s1 == 0, "s1 == 0");

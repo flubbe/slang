@@ -420,6 +420,18 @@ public:
     void add_import(std::vector<token> path, bool transitive);
 
     /**
+     * Add an import to the context. The function is idempotent, i.e. it
+     * can be called multiple times.
+     *
+     * @throws A `std::runtime_error` if an already-imported non-transitive package
+     *         is being re-imported as transitive.
+     *
+     * @param path The import path.
+     * @param transitive Whether this is a transitive import.
+     */
+    void add_import(std::string path, bool transitive);
+
+    /**
      * Return whether an import is transitive.
      *
      * @throws A `type_error` if the import does not exist.

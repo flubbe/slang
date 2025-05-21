@@ -413,6 +413,11 @@ add_compile_fail_test(
     FALSE
     test/test_macros_fail6 --search-path test
 )
+add_compile_fail_test(
+    "slang macros fail 7"
+    FALSE
+    test/test_macros_fail7 --search-path test
+)
 add_compile_exec_test(
     "slang test_macro_import"
     TRUE

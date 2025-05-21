@@ -641,6 +641,59 @@ std::size_t context::get_import_index(
                   import_path));
 }
 
+void context::make_import_explicit(
+  const std::string& import_path)
+{
+    for(auto& m: macros)
+    {
+        if(m->get_import_path() == import_path)
+        {
+            m->set_transitive(false);
+        }
+    }
+
+    for(auto& c: imported_constants)
+    {
+        if(c.import_path == import_path)
+        {
+            if(c.name.value().at(0) == '$')
+            {
+                c.name = c.name.value().substr(1);
+            }
+        }
+    }
+
+    for(auto& sym: imports)
+    {
+        if(sym.import_path == import_path)
+        {
+            if(sym.name.at(0) == '$')
+            {
+                sym.name = sym.name.substr(1);
+            }
+        }
+    }
+
+    for(auto& it: prototypes)
+    {
+        if(it->get_import_path() == import_path)
+        {
+            it->make_import_explicit();
+        }
+    }
+
+    for(auto& it: types)
+    {
+        if(it->get_import_path() == import_path)
+        {
+            if(it->name.at(0) == '$')
+            {
+                it->name = it->name.substr(1);
+            }
+        }
+    }
+}
+
 struct_* context::add_struct(
   std::string name,
   std::vector<std::pair<std::string, value>> members,

@@ -83,6 +83,11 @@ void expression::serialize(archive& ar)
     ar & expr_type;
 }
 
+call_expression* expression::as_call_expression()
+{
+    throw std::runtime_error("Expression is not a call expression.");
+}
+
 macro_expression* expression::as_macro_expression()
 {
     throw std::runtime_error("Expression is not a macro.");
@@ -219,13 +224,15 @@ bool expression::expand_macros(
   ty::context& type_ctx,
   const std::vector<expression*>& macro_asts)
 {
-    std::size_t macro_expansion_count = 0;
+    std::size_t macro_expansion_count{0};
+    std::vector<ast::macro_invocation*> expanded_macros; /* does not include locally defined macros */
 
     // replace macro nodes by the macro AST.
-    auto visitor = [&macro_asts,
-                    &codegen_ctx,
-                    &type_ctx,
-                    &macro_expansion_count](expression& e)
+    auto macro_expansion_visitor =
+      [&macro_asts,
+       &codegen_ctx,
+       &macro_expansion_count,
+       &expanded_macros](expression& e)
     {
         if(!e.is_macro_invocation())
         {
@@ -314,57 +321,57 @@ bool expression::expand_macros(
                 macro_expr->set_expansion(
                   macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
 
-                // adjust local namespaces and transitive import names.
-                macro_expr->expansion->visit_nodes(
-                  [&macro_expr, &type_ctx](expression& e) -> void
-                  {
-                      // skip namespace expressions, as they "behave like macro invocations".
-                      // FIXME Do we want this behavior?
-                      if(e.get_id() == ast::node_identifier::namespace_access_expression)
-                      {
-                          if(e.is_macro_invocation())
-                          {
-                              auto* m = e.as_macro_invocation();
-
-                              // TODO We might need to load the package / resolve symbols.
-
-                              m->name.s = rs::make_import_name(
-                                m->name.s,
-                                type_ctx.is_transitive_import(
-                                  m->get_namespace_path().value()));
-                          }
-
-                          // TODO Check for function invocations. These might result in package imports.
-
-                          return;
-                      }
-
-                      if(e.is_macro_invocation())
-                      {
-                          if(!e.get_namespace_path().has_value())
-                          {
-                              // Set the namespace to the import's name (stored in macro_expr).
-                              e.set_namespace(macro_expr->get_namespace());
-                          }
-
-                          auto* m = e.as_macro_invocation();
-
-                          // TODO We might need to load the package / resolve symbols.
-
-                          m->name.s = rs::make_import_name(
-                            m->name.s,
-                            type_ctx.is_transitive_import(
-                              m->get_namespace_path().value()));
-                      }
-
-                      // TODO Check for function invocations. These might result in package imports.
-                  },
-                  true,
-                  false);
+                expanded_macros.push_back(macro_expr);
             }
         }
 
         ++macro_expansion_count;
+    };
+
+    auto function_import_visitor = [&codegen_ctx, &type_ctx](expression& e)
+    {
+        if(!e.is_macro_invocation())
+        {
+            return;
+        }
+
+        auto* macro_expr = e.as_macro_invocation();
+        if(!macro_expr->has_expansion())
+        {
+            return;
+        }
+
+        // adjust local namespaces and transitive import names.
+        macro_expr->expansion->visit_nodes(
+          [&macro_expr, &codegen_ctx, &type_ctx](expression& e) -> void
+          {
+              if(!e.is_call_expression())
+              {
+                  return;
+              }
+
+              // function calls can never be made for transitive imports.
+
+              if(e.get_id() != ast::node_identifier::namespace_access_expression
+                 && !e.get_namespace_path().has_value())
+              {
+                  // Set the namespace to the import's name (stored in macro_expr).
+                  e.set_namespace(macro_expr->get_namespace());
+              }
+
+              auto* c = e.as_call_expression();
+              auto path = c->get_namespace_path().value();
+              if(type_ctx.is_transitive_import(path))
+              {
+                  // make import explicit.
+                  type_ctx.add_import(path, false);
+                  codegen_ctx.make_import_explicit(path);
+              }
+
+              // TODO We might need to load the package / resolve symbols.
+          },
+          true,
+          false);
     };
 
     auto filter = [](const expression& e) -> bool
@@ -373,10 +380,44 @@ bool expression::expand_macros(
     };
 
     visit_nodes(
-      visitor,
+      macro_expansion_visitor,
       true,  /* visit this node */
       false, /* pre-order traversal */
       filter);
+
+    visit_nodes(
+      function_import_visitor,
+      true,  /* visit this node */
+      false, /* pre-order traversal */
+      filter);
+
+    for(auto& macro_expr: expanded_macros)
+    {
+        // adjust local namespaces and transitive import names.
+        macro_expr->expansion->visit_nodes(
+          [&macro_expr, &type_ctx](expression& e) -> void
+          {
+              if(e.is_macro_invocation())
+              {
+                  if(e.get_id() != ast::node_identifier::namespace_access_expression
+                     && !e.get_namespace_path().has_value())
+                  {
+                      // Set the namespace to the import's name (stored in macro_expr).
+                      e.set_namespace(macro_expr->get_namespace());
+                  }
+
+                  auto* m = e.as_macro_invocation();
+                  m->name.s = rs::make_import_name(
+                    m->name.s,
+                    type_ctx.is_transitive_import(
+                      m->get_namespace_path().value()));
+
+                  // TODO We might need to load the package / resolve symbols.
+              }
+          },
+          true,
+          false);
+    }
 
     return macro_expansion_count != 0;
 }

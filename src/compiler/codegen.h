@@ -1194,6 +1194,8 @@ public:
 /** A user-defined type. */
 class struct_
 {
+    friend class context;
+
     /** The type's name. */
     std::string name;
 
@@ -1227,10 +1229,11 @@ public:
      * @param flags THe type's flags.
      * @param import_path The import path of the module for imported types.
      */
-    struct_(std::string name,
-            std::vector<std::pair<std::string, value>> members,
-            std::uint8_t flags = 0,
-            std::optional<std::string> import_path = std::nullopt)
+    struct_(
+      std::string name,
+      std::vector<std::pair<std::string, value>> members,
+      std::uint8_t flags = 0,
+      std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
     , flags{flags}
@@ -1611,6 +1614,15 @@ public:
     {
         return import_path;
     }
+
+    /** Make the import explicit. */
+    void make_import_explicit()
+    {
+        if(name.at(0) == '$')
+        {
+            name = name.substr(1);
+        }
+    }
 };
 
 /** A function.*/
@@ -1862,6 +1874,20 @@ public:
     {
         return is_import() && name.substr(0, 1) == "$";
     }
+
+    /** Set transitivity. */
+    void set_transitive(bool transitive)
+    {
+        bool transitive_name = name.substr(0, 1) == "$";
+        if(transitive_name && !transitive)
+        {
+            name = name.substr(1);
+        }
+        else if(!transitive_name && transitive)
+        {
+            name = std::string{"$"} + name;
+        }
+    }
 };
 
 /**
@@ -2108,6 +2134,14 @@ public:
       module_::symbol_type type,
       std::string import_path,
       std::string name) const;
+
+    /**
+     * Make a transitive import explicit. No-op if the import was already explicit.
+     *
+     * @param import_path The import path of the macros.
+     */
+    void make_import_explicit(
+      const std::string& import_path);
 
     /**
      * Create a struct.

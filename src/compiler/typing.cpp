@@ -341,13 +341,17 @@ void context::add_import(std::vector<token> path, bool transitive)
         throw type_error(path[0].location, fmt::format("Import statement can only occur in the global scope."));
     }
 
-    std::string module_path = ::ty::to_string(path);
+    add_import(::ty::to_string(path), transitive);
+}
+
+void context::add_import(std::string path, bool transitive)
+{
     auto it = std::find_if(
       imported_modules.begin(),
       imported_modules.end(),
-      [&module_path](const imported_module& m) -> bool
+      [&path](const imported_module& m) -> bool
       {
-          return module_path == m.path;
+          return path == m.path;
       });
 
     if(it != imported_modules.end())
@@ -355,13 +359,109 @@ void context::add_import(std::vector<token> path, bool transitive)
         if(!transitive && it->transitive)
         {
             it->transitive = false;
+
+            /*
+             * update all symbols imported from this package.
+             *
+             * 1. update constants.
+             */
+
+            auto c_mod_it = imported_constants.find(path);
+            if(c_mod_it != imported_constants.end())
+            {
+                for(auto& sym: c_mod_it->second)
+                {
+                    if(sym.name.s.at(0) != '$')
+                    {
+                        throw type_error(
+                          fmt::format(
+                            "Inconsistent transitivity information for import '{}::{}'.",
+                            path, sym.name.s));
+                    }
+                    sym.name.s = sym.name.s.substr(1);
+                }
+            }
+
+            /*
+             * 2. update functions.
+             */
+
+            auto fn_mod_it = imported_functions.find(path);
+            if(fn_mod_it != imported_functions.end())
+            {
+                std::vector<std::string> fn_names;
+
+                // first part: update stored names and store keys.
+                for(auto& fn: fn_mod_it->second)
+                {
+                    if(fn.first.at(0) != '$' || fn.second.name.s.at(0) != '$')
+                    {
+                        throw type_error(
+                          fmt::format(
+                            "Inconsistent transitivity information for import '{}::{}'.",
+                            path, fn.second.name.s));
+                    }
+
+                    fn.second.name.s = fn.second.name.s.substr(1);
+                    fn_names.emplace_back(fn.first);
+                }
+
+                // second part: update keys.
+                for(auto& key: fn_names)
+                {
+                    auto node = fn_mod_it->second.extract(key);
+                    node.key() = node.key().substr(1);
+                    fn_mod_it->second.insert(std::move(node));
+                }
+            }
+
+            /*
+             * 3. update types/structs.
+             */
+
+            std::vector<std::string> struct_names;
+
+            // first part: update stored names and store keys.
+            for(auto& it: global_scope.structs)
+            {
+                if(it.second.import_path != path)
+                {
+                    continue;
+                }
+
+                if(it.first.at(0) != '$' || it.second.name.s.at(0) != '$')
+                {
+                    throw type_error(
+                      fmt::format(
+                        "Inconsistent transitivity information for import '{}::{}'.",
+                        path, it.second.name.s));
+                }
+
+                it.second.name.s = it.second.name.s.substr(1);
+                struct_names.emplace_back(it.first);
+            }
+
+            // second part: update keys.
+            for(auto& key: struct_names)
+            {
+                auto node = global_scope.structs.extract(key);
+                node.key() = node.key().substr(1);
+                global_scope.structs.insert(std::move(node));
+            }
+        }
+        else if(transitive && !it->transitive)
+        {
+            throw std::runtime_error(
+              fmt::format(
+                "Tried to make non-transitive import '{}' transitive.",
+                path));
         }
     }
     else
     {
         imported_modules.emplace_back(
           imported_module{
-            module_path,
+            path,
             transitive});
     }
 }

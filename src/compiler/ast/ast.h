@@ -159,6 +159,20 @@ public:
         return false;
     }
 
+    /** Whether this is a function call expression. */
+    [[nodiscard]]
+    virtual bool is_call_expression() const
+    {
+        return false;
+    }
+
+    /**
+     * Get the expression as a call expression.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a call expression.
+     */
+    virtual class call_expression* as_call_expression();
+
     /** Whether this expression is a macro expression. */
     [[nodiscard]]
     virtual bool is_macro_expression() const
@@ -874,6 +888,21 @@ public:
     bool needs_pop() const override
     {
         return expr->needs_pop();
+    }
+
+    [[nodiscard]]
+    bool is_call_expression() const override
+    {
+        return expr->is_call_expression();
+    }
+
+    [[nodiscard]]
+    call_expression* as_call_expression() override
+    {
+        auto expr_namespace_stack = namespace_stack;
+        expr_namespace_stack.push_back(name.s);
+        expr->set_namespace(std::move(expr_namespace_stack));
+        return expr->as_call_expression();
     }
 
     [[nodiscard]]
@@ -2399,6 +2428,18 @@ public:
     node_identifier get_id() const override
     {
         return node_identifier::call_expression;
+    }
+
+    [[nodiscard]]
+    bool is_call_expression() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]]
+    call_expression* as_call_expression() override
+    {
+        return this;
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
