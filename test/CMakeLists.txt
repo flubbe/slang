@@ -376,67 +376,67 @@ add_compile_exec_fail_test(
 add_compile_exec_test(
     "slang macros"
     TRUE
-    test/test_macros
+    test/macros/test_macros
 )
 add_compile_exec_test(
-    "slang macros recursive"
+    "slang macros recursion"
     TRUE
-    test/test_macros_recursive
+    test/macros/test_recursion
 )
 add_compile_fail_test(
     "slang macros fail 1"
     FALSE
-    test/test_macros_fail1
+    test/macros/test_fail1
 )
 add_compile_fail_test(
     "slang macros fail 2"
     FALSE
-    test/test_macros_fail2
+    test/macros/test_fail2
 )
 add_compile_fail_test(
     "slang macros fail 3"
     FALSE
-    test/test_macros_fail3
+    test/macros/test_fail3
 )
 add_compile_fail_test(
     "slang macros fail 4"
     FALSE
-    test/test_macros_fail4
+    test/macros/test_fail4
 )
 add_compile_fail_test(
     "slang macros fail 5"
     FALSE
-    test/test_macros_fail5
+    test/macros/test_fail5
 )
 add_compile_fail_test(
     "slang macros fail 6"
     FALSE
-    test/test_macros_fail6 --search-path test
+    test/macros/test_fail6 --search-path test/macros
 )
 add_compile_fail_test(
     "slang macros fail 7"
     FALSE
-    test/test_macros_fail7 --search-path test
+    test/macros/test_fail7 --search-path test/macros
 )
 add_compile_exec_test(
-    "slang test_macro_import"
+    "slang macro import"
     TRUE
-    test/test_macro_import --search-path test
+    test/macros/test_import --search-path test/macros
 )
 set_tests_properties(
-    "slang test_macro_import (default, compile)" 
+    "slang macro import (default, compile)" 
     PROPERTIES FIXTURES_REQUIRED 
     test_macros
 )
 add_compile_exec_test(
-    "slang test_macro_transitive_import"
+    "slang macro transitive import"
     TRUE
-    test/test_macro_transitive_import --search-path test
+    test/macros/test_transitive_import --search-path test/macros
 )
 set_tests_properties(
-    "slang test_macro_transitive_import (default, compile)" 
+    "slang macro transitive import (default, compile)" 
     PROPERTIES FIXTURES_REQUIRED 
-    test_macro_import
+    test_import
 )
 add_compile_exec_test(
     "slang math"
