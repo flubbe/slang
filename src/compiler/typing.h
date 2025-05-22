@@ -447,7 +447,7 @@ public:
      * @param path The import path.
      * @returns Return `true` if the import exists, `false` otherwise.
      */
-    bool has_import(const std::vector<token>& path);
+    bool has_import(const std::string& path);
 
     /**
      * Add a variable to the context.

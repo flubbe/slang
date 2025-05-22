@@ -2524,9 +2524,12 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
           cg::type_class::struct_,
           0,
           struct_type_info.to_string(),
-          struct_type_info.get_import_path()};    // FIXME get as cg::type directly?
+          struct_type_info.get_import_path()};
 
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, *lhs_store_value));
+        ctx.generate_set_field(
+          std::make_unique<cg::field_access_argument>(
+            struct_type,
+            *lhs_store_value));
         return rhs_value;
     }
     /* Cases 2. (cont.), 5. (cont.) */

@@ -482,15 +482,14 @@ bool context::is_transitive_import(const std::string& namespace_path) const
         namespace_path));
 }
 
-bool context::has_import(const std::vector<token>& path)
+bool context::has_import(const std::string& path)
 {
-    const std::string module_path = ::ty::to_string(path);
     return std::find_if(
              imported_modules.cbegin(),
              imported_modules.cend(),
-             [&module_path](const imported_module& m) -> bool
+             [&path](const imported_module& m) -> bool
              {
-                 return module_path == m.path;
+                 return path == m.path;
              })
            != imported_modules.cend();
 }

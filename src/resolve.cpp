@@ -517,21 +517,9 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
               if(e.is_macro_invocation()
                  && e.get_namespace_path().has_value())
               {
-                  // FIXME Hack, since the `add_import` with the correct signature does not exist.
-                  std::vector<std::string> namespace_path = utils::split(e.get_namespace_path().value(), "::");
-                  std::vector<token> namespace_path_tokens;
-                  std::transform(
-                    namespace_path.cbegin(),
-                    namespace_path.cend(),
-                    std::back_inserter(namespace_path_tokens),
-                    [](const std::string& s) -> token
-                    {
-                        return {s, {0, 0}};
-                    });
-
-                  if(!type_ctx.has_import(namespace_path_tokens))
+                  if(!type_ctx.has_import(e.get_namespace_path().value()))
                   {
-                      type_ctx.add_import(std::move(namespace_path_tokens), true);
+                      type_ctx.add_import(e.get_namespace_path().value(), true);
                       needs_import_resolution = true;
                   }
               }

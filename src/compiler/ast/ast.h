@@ -737,7 +737,7 @@ inline archive& operator&(archive& ar, type_expression& expr)
 }
 
 /** A type cast expression. */
-class type_cast_expression : public named_expression
+class type_cast_expression : public expression
 {
     /** The expression. */
     std::unique_ptr<expression> expr;
@@ -747,7 +747,7 @@ class type_cast_expression : public named_expression
 
 public:
     /** Set the super class. */
-    using super = named_expression;
+    using super = expression;
 
     /** Default constructor. */
     type_cast_expression() = default;
@@ -771,11 +771,7 @@ public:
       token_location loc,
       std::unique_ptr<expression> expr,
       std::unique_ptr<type_expression> target_type)
-    : named_expression{
-        loc,
-        expr->is_named_expression()
-          ? static_cast<named_expression*>(expr.get())->get_name()
-          : token{"<none>", {0, 0}}}    // FIXME we might not have a name.
+    : expression{loc}
     , expr{std::move(expr)}
     , target_type{std::move(target_type)}
     {

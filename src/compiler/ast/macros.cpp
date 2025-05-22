@@ -420,7 +420,6 @@ std::unique_ptr<expression> macro_expression::expand(
     {
         const auto& arg = branch->get_args()[i];
 
-        // FIXME Move this out.
         if(std::find_if(
              arg_pos.begin(),
              arg_pos.end(),
