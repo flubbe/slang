@@ -429,14 +429,24 @@ set_tests_properties(
     test_macros
 )
 add_compile_exec_test(
-    "slang macro transitive import"
+    "slang macro transitive import 1"
     TRUE
-    test/macros/test_transitive_import --search-path test/macros
+    test/macros/test_transitive_import1 --search-path test/macros
 )
 set_tests_properties(
-    "slang macro transitive import (default, compile)" 
+    "slang macro transitive import 1 (default, compile)" 
     PROPERTIES FIXTURES_REQUIRED 
     test_import
+)
+add_compile_exec_test(
+    "slang macro transitive import 2"
+    TRUE
+    test/macros/test_transitive_import2 --search-path test/macros
+)
+set_tests_properties(
+    "slang macro transitive import 2 (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_transitive_import1
 )
 add_compile_exec_test(
     "slang math"

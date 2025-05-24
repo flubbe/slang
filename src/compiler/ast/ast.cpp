@@ -350,7 +350,8 @@ bool expression::expand_macros(
                   return;
               }
 
-              // function calls can never be made for transitive imports.
+              // function calls can never be made for transitive imports,
+              // that is, all modules have to be explicit imports here.
 
               if(e.get_id() != ast::node_identifier::namespace_access_expression
                  && !e.get_namespace_path().has_value())
@@ -361,14 +362,18 @@ bool expression::expand_macros(
 
               auto* c = e.as_call_expression();
               auto path = c->get_namespace_path().value();
-              if(type_ctx.is_transitive_import(path))
+              if(!type_ctx.has_import(path))
+              {
+                  type_ctx.add_import(path, false);
+
+                  // TODO Do we need to validate that `path` is part of an import statement?
+              }
+              else if(type_ctx.is_transitive_import(path))
               {
                   // make import explicit.
                   type_ctx.add_import(path, false);
                   codegen_ctx.make_import_explicit(path);
               }
-
-              // TODO We might need to load the package / resolve symbols.
           },
           true,
           false);
@@ -411,8 +416,6 @@ bool expression::expand_macros(
                     m->name.s,
                     type_ctx.is_transitive_import(
                       m->get_namespace_path().value()));
-
-                  // TODO We might need to load the package / resolve symbols.
               }
           },
           true,
