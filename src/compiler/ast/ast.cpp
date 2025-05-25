@@ -4,27 +4,22 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <unordered_map>
 #include <set>
 #include <stack>
-#include <tuple>
 
 #include <gsl/gsl>
 
+#include "compiler/codegen.h"
+#include "compiler/typing.h"
 #include "shared/module.h"
 #include "shared/type_utils.h"
 #include "ast.h"
-#include "codegen.h"
-#include "typing.h"
+#include "node_registry.h"
 #include "utils.h"
-
-/*
- * Code generation from AST.
- */
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
@@ -70,6 +65,71 @@ static std::unique_ptr<cg::value> type_info_to_value(
  * expression.
  */
 
+std::unique_ptr<expression> expression::clone() const
+{
+    auto cloned_expr = std::make_unique<expression>(loc);
+    cloned_expr->namespace_stack = namespace_stack;
+    cloned_expr->expr_type = expr_type;
+    return cloned_expr;
+}
+
+void expression::serialize(archive& ar)
+{
+    ar & loc;
+    ar & namespace_stack;
+    ar & expr_type;
+}
+
+call_expression* expression::as_call_expression()
+{
+    throw std::runtime_error("Expression is not a call expression.");
+}
+
+macro_expression* expression::as_macro_expression()
+{
+    throw std::runtime_error("Expression is not a macro.");
+}
+
+macro_branch* expression::as_macro_branch()
+{
+    throw std::runtime_error("Expression is not a macro branch.");
+}
+
+const macro_branch* expression::as_macro_branch() const
+{
+    throw std::runtime_error("Expression is not a macro branch.");
+}
+
+macro_expression_list* expression::as_macro_expression_list()
+{
+    throw std::runtime_error("Expression is not a macro expression list.");
+}
+
+const macro_expression_list* expression::as_macro_expression_list() const
+{
+    throw std::runtime_error("Expression is not a macro expression list.");
+}
+
+variable_declaration_expression* expression::as_variable_declaration()
+{
+    throw std::runtime_error("Expression is not a variable declaration.");
+}
+
+variable_reference_expression* expression::as_variable_reference()
+{
+    throw std::runtime_error("Expression is not a variable reference.");
+}
+
+macro_invocation* expression::as_macro_invocation()
+{
+    throw std::runtime_error("Expression is not a macro invokation.");
+}
+
+literal_expression* expression::as_literal()
+{
+    throw std::runtime_error("Expression is not a literal.");
+}
+
 access_expression* expression::as_access_expression()
 {
     throw std::runtime_error("Expression is not an access expression.");
@@ -93,6 +153,13 @@ const named_expression* expression::as_named_expression() const
 std::unique_ptr<cg::value> expression::evaluate([[maybe_unused]] cg::context& ctx) const
 {
     return {};
+}
+
+std::unique_ptr<cg::value> expression::generate_code(
+  [[maybe_unused]] cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
+{
+    throw std::runtime_error(fmt::format("{}: Expression does not generate code.", ::slang::to_string(loc)));
 }
 
 void expression::push_directive(
@@ -128,8 +195,12 @@ void expression::push_directive(
         throw ty::type_error(
           name.location,
           fmt::format(
-            "Directive '{}' with arguments '{}' is not supported by the expression with AST '{}'.",
-            name.s, arg_string, expr_string));
+            "Directive '{}'{} is not supported by the expression with AST '{}'.",
+            name.s,
+            !arg_string.empty()
+              ? fmt::format(" with arguments '{}'", arg_string)
+              : std::string{},
+            expr_string));
     }
 
     ctx.push_directive({name, args});
@@ -145,6 +216,11 @@ bool expression::supports_directive(const std::string& name) const
     return name == "disable";
 }
 
+std::string expression::to_string() const
+{
+    throw std::runtime_error("Expression has no string conversion");
+}
+
 /**
  * Templated visit helper. Implements DFS to walk the AST.
  * The visitor function is called for each node in the AST.
@@ -154,6 +230,8 @@ bool expression::supports_directive(const std::string& name) const
  * @param visitor The visitor function.
  * @param visit_self Whether to visit the expression itself.
  * @param post_order Whether to visit the nodes in post-order.
+ * @param filter An optional filter that returns `true` if a node
+ *               should be traversed. Defaults to traversing all nodes.
  * @tparam T The expression type. Must be a subclass of `expression`.
  */
 template<typename T>
@@ -161,7 +239,8 @@ void visit_nodes(
   T& expr,
   std::function<void(T&)>& visitor,
   bool visit_self,
-  bool post_order)
+  bool post_order,
+  std::function<bool(std::add_const_t<T>&)> filter = nullptr)
 {
     static_assert(
       std::is_same_v<std::decay_t<T>, expression>
@@ -183,11 +262,14 @@ void visit_nodes(
             throw std::runtime_error("Null expression in AST.");
         }
 
-        sorted_ast.emplace_back(current);
-
-        for(auto* child: current->get_children())
+        if(!filter || filter(*current))
         {
-            stack.push(child);
+            sorted_ast.emplace_back(current);
+
+            for(auto* child: current->get_children())
+            {
+                stack.push(child);
+            }
         }
     }
 
@@ -205,9 +287,9 @@ void visit_nodes(
     }
     else
     {
-        for(auto it = sorted_ast.begin(); it != sorted_ast.end(); ++it)
+        for(auto* it: sorted_ast)
         {
-            visitor(**it);
+            visitor(*it);
         }
     }
 }
@@ -215,22 +297,56 @@ void visit_nodes(
 void expression::visit_nodes(
   std::function<void(expression&)> visitor,
   bool visit_self,
-  bool post_order)
+  bool post_order,
+  std::function<bool(const expression&)> filter)
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
 }
 
 void expression::visit_nodes(
   std::function<void(const expression&)> visitor,
   bool visit_self,
-  bool post_order) const
+  bool post_order,
+  std::function<bool(const expression&)> filter) const
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order);
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
+}
+
+/*
+ * named_expression.
+ */
+
+std::unique_ptr<expression> named_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<named_expression>();
+    *static_cast<named_expression::super*>(cloned_expr.get()) = *static_cast<const named_expression::super*>(this);
+    cloned_expr->name = name;
+    return cloned_expr;
+}
+
+void named_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & name;
 }
 
 /*
  * literal_expression.
  */
+
+std::unique_ptr<expression> literal_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<literal_expression>();
+    *static_cast<literal_expression::super*>(cloned_expr.get()) = *static_cast<const literal_expression::super*>(this);
+    cloned_expr->tok = tok;
+    return cloned_expr;
+}
+
+void literal_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & tok;
+}
 
 std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -346,8 +462,40 @@ std::string literal_expression::to_string() const
 }
 
 /*
+ * type_expression.
+ */
+
+std::unique_ptr<type_expression> type_expression::clone() const
+{
+    return std::make_unique<type_expression>(*this);
+}
+
+void type_expression::serialize(archive& ar)
+{
+    ar & loc;
+    ar & type_name;
+    ar & namespace_stack;
+    ar & array;
+}
+
+/*
  * type_cast_expression.
  */
+
+std::unique_ptr<expression> type_cast_expression::clone() const
+{
+    return std::make_unique<type_cast_expression>(
+      loc,
+      expr->clone(),
+      target_type->clone());
+}
+
+void type_cast_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+    ar & target_type;
+}
 
 std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -435,8 +583,23 @@ std::string type_cast_expression::to_string() const
  * namespace_access_expression.
  */
 
+std::unique_ptr<expression> namespace_access_expression::clone() const
+{
+    return std::make_unique<namespace_access_expression>(
+      name,
+      expr->clone());
+}
+
+void namespace_access_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & name;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
@@ -445,9 +608,8 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
 
 std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
 {
-    auto expr_namespace_stack = namespace_stack;
-    expr_namespace_stack.push_back(name.s);
-    expr->set_namespace(std::move(expr_namespace_stack));
+    update_namespace();
+
     expr_type = expr->type_check(ctx);
     if(!expr_type.has_value())
     {
@@ -506,6 +668,23 @@ access_expression::access_expression(std::unique_ptr<ast::expression> lhs, std::
 {
 }
 
+std::unique_ptr<expression> access_expression::clone() const
+{
+    auto cloned_expr = std::make_unique<access_expression>(
+      lhs->clone(),
+      rhs->clone());
+    cloned_expr->lhs_type = lhs_type;
+    return cloned_expr;
+}
+
+void access_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
+    ar & lhs_type;
+}
+
 std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     // validate expression.
@@ -553,18 +732,20 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     // validate expression.
     if(lhs_value_type.is_array())
     {
-        throw cg::codegen_error(loc,
-                                fmt::format(
-                                  "Cannot load array '{}' as an object.",
-                                  lhs_value->get_name().value_or("<none>")));
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot load array '{}' as an object.",
+            lhs_value->get_name().value_or("<none>")));
     }
 
     if(!lhs_value_type.is_struct())
     {
-        throw cg::codegen_error(loc,
-                                fmt::format(
-                                  "Cannot access members of non-struct type '{}'.",
-                                  lhs_value_type.to_string()));
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot access members of non-struct type '{}'.",
+            lhs_value_type.to_string()));
     }
 
     // generate access instructions for rhs.
@@ -627,6 +808,17 @@ std::string access_expression::to_string() const
  * import_expression.
  */
 
+std::unique_ptr<expression> import_expression::clone() const
+{
+    return std::make_unique<import_expression>(path);
+}
+
+void import_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & path;
+}
+
 std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     // import expressions are handled by the import resolver.
@@ -635,7 +827,7 @@ std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg:
 
 void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
-    type_ctx.add_import(path);
+    type_ctx.add_import(path, false);
 }
 
 std::string import_expression::to_string() const
@@ -650,6 +842,21 @@ std::string import_expression::to_string() const
  * directive_expression.
  */
 
+std::unique_ptr<expression> directive_expression::clone() const
+{
+    return std::make_unique<directive_expression>(
+      name,
+      args,
+      expr->clone());
+}
+
+void directive_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & args;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     expr->push_directive(ctx, name, args);
@@ -660,7 +867,9 @@ std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx,
 
 void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
+    expr->push_directive(ctx, name, args);
     expr->collect_names(ctx, type_ctx);
+    expr->pop_directive(ctx);
 }
 
 std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
@@ -685,8 +894,29 @@ std::string directive_expression::to_string() const
  * variable_reference_expression.
  */
 
+std::unique_ptr<expression> variable_reference_expression::clone() const
+{
+    return std::make_unique<variable_reference_expression>(
+      name,
+      element_expr ? element_expr->clone() : nullptr,
+      expansion ? expansion->clone() : nullptr);
+}
+
+void variable_reference_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{element_expr};
+    ar& expression_serializer{expansion};
+}
+
 std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // check for macro expansions first.
+    if(expansion)
+    {
+        return expansion->generate_code(ctx, mc);
+    }
+
     // check if we're loading a constant.
     std::optional<std::string> import_path = get_namespace_path();
     std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
@@ -804,7 +1034,21 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
             throw ty::type_error(loc, "Expected <integer> for array element access.");
         }
 
-        auto t = ctx.get_identifier_type(name, get_namespace_path());
+        ty::type_info t;
+        if(expansion)
+        {
+            std::optional<ty::type_info> opt_t = expansion->type_check(ctx);
+            if(!opt_t.has_value())
+            {
+                throw ty::type_error(loc, "Expression has no type.");
+            }
+            t = opt_t.value();
+        }
+        else
+        {
+            t = ctx.get_identifier_type(name, get_namespace_path());
+        }
+
         if(!t.is_array())
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
@@ -819,8 +1063,19 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
     }
     else
     {
-        expr_type = ctx.get_identifier_type(name, get_namespace_path());
-        ctx.set_expression_type(this, *expr_type);
+        if(expansion)
+        {
+            expr_type = expansion->type_check(ctx);
+            if(expr_type.has_value())
+            {
+                ctx.set_expression_type(this, *expr_type);
+            }
+        }
+        else
+        {
+            expr_type = ctx.get_identifier_type(name, get_namespace_path());
+            ctx.set_expression_type(this, *expr_type);
+        }
     }
 
     return expr_type;
@@ -828,11 +1083,23 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
 
 std::string variable_reference_expression::to_string() const
 {
+    std::string ret = fmt::format("VariableReference(name={}", name.s);
+
     if(element_expr)
     {
-        return fmt::format("VariableReference(name={}, element_expr={})", name.s, element_expr->to_string());
+        ret += fmt::format(
+          ", element_expr={}",
+          element_expr->to_string());
     }
-    return fmt::format("VariableReference(name={})", name.s);
+    if(expansion)
+    {
+        ret += fmt::format(
+          ", expansion={}",
+          expansion->to_string());
+    }
+    ret += ")";
+
+    return ret;
 }
 
 cg::value variable_reference_expression::get_value(cg::context& ctx) const
@@ -953,6 +1220,22 @@ ty::type_info type_expression::to_unresolved_type_info(ty::context& ctx) const
  * variable_declaration_expression.
  */
 
+std::unique_ptr<expression> variable_declaration_expression::clone() const
+{
+    return std::make_unique<variable_declaration_expression>(
+      loc,
+      name,
+      type->clone(),
+      expr ? expr->clone() : nullptr);
+}
+
+void variable_declaration_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1044,6 +1327,22 @@ std::string variable_declaration_expression::to_string() const
 /*
  * constant_declaration_expression.
  */
+
+std::unique_ptr<expression> constant_declaration_expression::clone() const
+{
+    return std::make_unique<constant_declaration_expression>(
+      loc,
+      name,
+      type->clone(),
+      expr->clone());
+}
+
+void constant_declaration_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type;
+    ar& expression_serializer{expr};
+}
 
 void constant_declaration_expression::push_directive(
   cg::context& ctx,
@@ -1147,6 +1446,26 @@ std::string constant_declaration_expression::to_string() const
  * array_initializer_expression.
  */
 
+std::unique_ptr<expression> array_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_exprs;
+    cloned_exprs.reserve(exprs.size());
+    for(const auto& e: exprs)
+    {
+        cloned_exprs.emplace_back(e->clone());
+    }
+
+    return std::make_unique<array_initializer_expression>(
+      loc,
+      std::move(cloned_exprs));
+}
+
+void array_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{exprs};
+}
+
 std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     std::unique_ptr<cg::value> v;
@@ -1208,11 +1527,12 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
         {
             if(*t != *expr_type)
             {
-                throw ty::type_error(loc,
-                                     fmt::format(
-                                       "Initializer types do not match. Found '{}' and '{}'.",
-                                       ty::to_string(*t),
-                                       ty::to_string(*expr_type)));
+                throw ty::type_error(
+                  loc,
+                  fmt::format(
+                    "Initializer types do not match. Found '{}' and '{}'.",
+                    ty::to_string(*t),
+                    ty::to_string(*expr_type)));
             }
         }
         else
@@ -1248,6 +1568,29 @@ std::string array_initializer_expression::to_string() const
 /*
  * struct_definition_expression.
  */
+
+std::unique_ptr<expression> struct_definition_expression::clone() const
+{
+    std::vector<std::unique_ptr<variable_declaration_expression>> cloned_members;
+    cloned_members.reserve(members.size());
+    for(const auto& m: members)
+    {
+        cloned_members.emplace_back(
+          static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            m->clone().release()));
+    }
+
+    return std::make_unique<struct_definition_expression>(
+      loc,
+      name,
+      std::move(cloned_members));
+}
+
+void struct_definition_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{members};
+}
 
 std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1337,6 +1680,27 @@ std::string struct_definition_expression::to_string() const
 /*
  * struct_anonymous_initializer_expression.
  */
+
+std::unique_ptr<expression> struct_anonymous_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_initializers;
+    cloned_initializers.reserve(initializers.size());
+    for(const auto& m: initializers)
+    {
+        cloned_initializers.emplace_back(
+          m->clone());
+    }
+
+    return std::make_unique<struct_anonymous_initializer_expression>(
+      name,
+      std::move(cloned_initializers));
+}
+
+void struct_anonymous_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{initializers};
+}
 
 std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1452,8 +1816,64 @@ std::string struct_anonymous_initializer_expression::to_string() const
 }
 
 /*
+ * named_initializer.
+ */
+
+std::unique_ptr<expression> named_initializer::clone() const
+{
+    return std::make_unique<named_initializer>(
+      name,
+      expr->clone());
+}
+
+void named_initializer::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+}
+
+std::unique_ptr<cg::value> named_initializer::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    return expr->generate_code(ctx, mc);
+}
+
+std::optional<ty::type_info> named_initializer::type_check(ty::context& ctx)
+{
+    return expr->type_check(ctx);
+}
+
+std::string named_initializer::to_string() const
+{
+    return fmt::format("NamedInitializer(name={}, expr={})", get_name().s, expr->to_string());
+}
+
+/*
  * struct_named_initializer_expression.
  */
+
+std::unique_ptr<expression> struct_named_initializer_expression::clone() const
+{
+    std::vector<std::unique_ptr<named_initializer>> cloned_initializers;
+    cloned_initializers.reserve(initializers.size());
+    for(const auto& initializer: initializers)
+    {
+        cloned_initializers.emplace_back(
+          static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            initializer->clone().release()));
+    }
+
+    return std::make_unique<struct_named_initializer_expression>(
+      name,
+      std::move(cloned_initializers));
+}
+
+void struct_named_initializer_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{initializers};
+}
 
 std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -1481,25 +1901,22 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         ctx.generate_new(struct_type);
     }
 
-    for(std::size_t i = 0; i < member_names.size(); ++i)
+    for(const auto& initializer: initializers)
     {
-        const auto& initializer = initializers[i];
-        const auto& member_name_expr = member_names[i];
+        const auto& member_name = initializer->get_name().s;
 
-        if(!member_name_expr->is_named_expression())
-        {
-            throw ty::type_error(member_name_expr->get_location(),
-                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
-        }
-        auto member_name = member_name_expr->as_named_expression()->get_name().s;
-
-        auto it = std::find_if(t->cbegin(), t->cend(),
-                               [&member_name](const auto& m) -> bool
-                               { return m.first == member_name; });
+        auto it = std::find_if(
+          t->cbegin(),
+          t->cend(),
+          [&member_name](const std::pair<std::string, cg::value>& m) -> bool
+          { return m.first == member_name; });
         if(it == t->cend())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Struct '{}' has no member '{}'.",
+                name.s, member_name));
         }
 
         const auto& member_type = it->second;
@@ -1509,16 +1926,23 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         auto initializer_value = initializer->generate_code(ctx, memory_context::load);
         if(!initializer_value)
         {
-            throw cg::codegen_error(loc,
-                                    fmt::format("Code generation for '{}.{}' initialization returned no type.",
-                                                name.s, member_name));
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Code generation for '{}.{}' initialization returned no type.",
+                name.s, member_name));
         }
         if(!initializer_value->get_type().is_null()
            && initializer_value->get_type().to_string() != member_type.get_type().to_string())
         {
-            throw cg::codegen_error(loc,
-                                    fmt::format("Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
-                                                name.s, member_name, initializer_value->get_type().to_string(), member_type.get_type().to_string()));
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
+                name.s,
+                member_name,
+                initializer_value->get_type().to_string(),
+                member_type.get_type().to_string()));
         }
 
         ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
@@ -1531,43 +1955,41 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
 {
     const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
-    if(member_names.size() != struct_def->members.size())
+    if(initializers.size() != struct_def->members.size())
     {
-        throw ty::type_error(name.location, fmt::format("Struct '{}' has {} members, but {} are initialized.", name.s, struct_def->members.size(), member_names.size()));
+        throw ty::type_error(
+          name.location,
+          fmt::format(
+            "Struct '{}' has {} members, but {} are initialized.",
+            name.s, struct_def->members.size(), initializers.size()));
     }
 
-    std::vector<std::string> initialized_member_names;
-    for(std::size_t i = 0; i < member_names.size(); ++i)
+    std::vector<std::string> initialized_member_names;    // used in check for duplicates
+    for(const auto& initializer: initializers)
     {
-        const auto& member_name_expr = member_names[i];
-        const auto& initializer = initializers[i];
+        const auto& member_name = initializer->get_name().s;
 
-        if(!member_name_expr->is_named_expression())
-        {
-            throw ty::type_error(member_name_expr->get_location(),
-                                 fmt::format("Struct members cannot be initialized using <unnamed-expression>."));
-        }
-        auto member_name = member_name_expr->as_named_expression()->get_name().s;
-
-        if(std::find_if(initialized_member_names.begin(), initialized_member_names.end(),
-                        [&member_name](auto& name) -> bool
-                        { return name == member_name; })
+        if(std::find_if(
+             initialized_member_names.begin(),
+             initialized_member_names.end(),
+             [&member_name](auto& name) -> bool
+             { return name == member_name; })
            != initialized_member_names.end())
         {
-            throw ty::type_error(name.location,
-                                 fmt::format("Multiple initializations of struct member '{}::{}'.",
-                                             name.s, member_name));
+            throw ty::type_error(
+              name.location,
+              fmt::format(
+                "Multiple initializations of struct member '{}::{}'.",
+                name.s,
+                member_name));
         }
         initialized_member_names.push_back(member_name);
 
-        if(member_name_expr->is_array_element_access())    // this is an array access.
-        {
-            throw ty::type_error(name.location, fmt::format("Cannot access array elements in struct initializer."));
-        }
-
-        auto it = std::find_if(struct_def->members.begin(), struct_def->members.end(),
-                               [&member_name](const auto& m) -> bool
-                               { return m.first.s == member_name; });
+        auto it = std::find_if(
+          struct_def->members.begin(),
+          struct_def->members.end(),
+          [&member_name](const auto& m) -> bool
+          { return m.first.s == member_name; });
         if(it == struct_def->members.end())
         {
             throw ty::type_error(name.location, fmt::format("Struct '{}' has no member '{}'.", name.s, member_name));
@@ -1604,28 +2026,45 @@ std::string struct_named_initializer_expression::to_string() const
 {
     std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", name.s);
 
-    if(member_names.size() != initializers.size())
+    if(!initializers.empty())
     {
-        ret += "<name/initializer mismatch>";
-    }
-    else
-    {
-        if(!initializers.empty())
+        for(std::size_t i = 0; i < initializers.size() - 1; ++i)
         {
-            for(std::size_t i = 0; i < initializers.size() - 1; ++i)
-            {
-                ret += fmt::format("name={}, expr={}, ", member_names[i]->to_string(), initializers[i]->to_string());
-            }
-            ret += fmt::format("name={}, expr={}", member_names.back()->to_string(), initializers.back()->to_string());
+            ret += fmt::format(
+              "name={}, expr={}, ",
+              initializers[i]->get_name().s,
+              initializers[i]->get_expression()->to_string());
         }
-        ret += ")";
+        ret += fmt::format(
+          "name={}, expr={}",
+          initializers.back()->get_name().s,
+          initializers.back()->get_expression()->to_string());
     }
+    ret += ")";
+
     return ret;
 }
 
 /*
  * binary_expression.
  */
+
+std::unique_ptr<expression> binary_expression::clone() const
+{
+    return std::make_unique<binary_expression>(
+      loc,
+      op,
+      lhs->clone(),
+      rhs->clone());
+}
+
+void binary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
+}
 
 /**
  * Classify a binary operator. If the operator is a compound assignment, the given operator
@@ -1879,9 +2318,12 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
           cg::type_class::struct_,
           0,
           struct_type_info.to_string(),
-          struct_type_info.get_import_path()};    // FIXME get as cg::type directly?
+          struct_type_info.get_import_path()};
 
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, *lhs_store_value));
+        ctx.generate_set_field(
+          std::make_unique<cg::field_access_argument>(
+            struct_type,
+            *lhs_store_value));
         return rhs_value;
     }
     /* Cases 2. (cont.), 5. (cont.) */
@@ -2079,6 +2521,21 @@ std::string binary_expression::to_string() const
 /*
  * unary_expression.
  */
+
+std::unique_ptr<expression> unary_expression::clone() const
+{
+    return std::make_unique<unary_expression>(
+      loc,
+      op,
+      operand->clone());
+}
+
+void unary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{operand};
+}
 
 std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2301,6 +2758,21 @@ std::string unary_expression::to_string() const
  * new_expression.
  */
 
+std::unique_ptr<expression> new_expression::clone() const
+{
+    return std::make_unique<new_expression>(
+      loc,
+      type_expr->clone(),
+      expr->clone());
+}
+
+void new_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & type_expr;
+    ar& expression_serializer{expr};
+}
+
 std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2394,6 +2866,11 @@ std::string new_expression::to_string() const
  * null_expression.
  */
 
+std::unique_ptr<expression> null_expression::clone() const
+{
+    return std::make_unique<null_expression>(loc);
+}
+
 std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2421,6 +2898,20 @@ std::string null_expression::to_string() const
 /*
  * postfix_expression.
  */
+
+std::unique_ptr<expression> postfix_expression::clone() const
+{
+    return std::make_unique<postfix_expression>(
+      identifier->clone(),
+      op);
+}
+
+void postfix_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{identifier};
+    ar & op;
+}
 
 std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2506,6 +2997,34 @@ std::string postfix_expression::to_string() const
 /*
  * prototype.
  */
+
+std::unique_ptr<prototype_ast> prototype_ast::clone() const
+{
+    std::vector<std::pair<token, std::unique_ptr<type_expression>>> cloned_args;
+    cloned_args.reserve(args.size());
+    for(const auto& arg: args)
+    {
+        cloned_args.emplace_back(
+          arg.first,
+          arg.second->clone());
+    }
+
+    return std::make_unique<prototype_ast>(
+      loc,
+      name,
+      std::move(cloned_args),
+      return_type->clone());
+}
+
+void prototype_ast::serialize(archive& ar)
+{
+    ar & loc;
+    ar & name;
+    ar & args;
+    ar & return_type;
+    ar & args_type_info;
+    ar & return_type_info;
+}
 
 cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2620,30 +3139,73 @@ std::string prototype_ast::to_string() const
  * block.
  */
 
+std::unique_ptr<expression> block::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_exprs;
+    cloned_exprs.reserve(exprs.size());
+    for(const auto& e: exprs)
+    {
+        cloned_exprs.emplace_back(e->clone());
+    }
+
+    return std::make_unique<block>(
+      loc,
+      std::move(cloned_exprs));
+}
+
+void block::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{exprs};
+}
+
 std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
-    if(mc != memory_context::none)
+    if(mc == memory_context::none)
     {
-        throw cg::codegen_error(loc, "Invalid memory context for code block.");
-    }
-
-    std::unique_ptr<cg::value> v;
-    for(const auto& expr: exprs)
-    {
-        v = expr->generate_code(ctx, memory_context::none);
-
-        // non-assigning expressions need cleanup.
-        if(expr->needs_pop())
+        for(const auto& expr: exprs)
         {
-            if(!v)
-            {
-                throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-            }
+            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 
-            ctx.generate_pop(*v);
+            // non-assigning expressions need cleanup.
+            if(expr->needs_pop())
+            {
+                if(!v)
+                {
+                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
+                }
+
+                ctx.generate_pop(*v);
+            }
         }
+
+        return nullptr;
     }
-    return nullptr;
+
+    if(mc == memory_context::load)
+    {
+        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        {
+            const auto& expr = exprs[i];
+            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
+
+            // non-assigning expressions need cleanup.
+            if(expr->needs_pop())
+            {
+                if(!v)
+                {
+                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
+                }
+
+                ctx.generate_pop(*v);
+            }
+        }
+
+        // the last expression is loaded.
+        return exprs.back()->generate_code(ctx, memory_context::load);
+    }
+
+    throw cg::codegen_error(loc, "Invalid memory context for code block.");
 }
 
 void block::collect_names(cg::context& ctx, ty::context& type_ctx) const
@@ -2682,6 +3244,34 @@ std::string block::to_string() const
 /*
  * function_expression.
  */
+
+std::unique_ptr<expression> function_expression::clone() const
+{
+    return std::make_unique<function_expression>(
+      loc,
+      prototype->clone(),
+      std::unique_ptr<block>(static_cast<block*>(body->clone().release())));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+}
+
+void function_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    bool has_prototype = static_cast<bool>(prototype);
+    ar & has_prototype;
+    if(has_prototype)
+    {
+        if(!static_cast<bool>(prototype))
+        {
+            prototype = std::make_unique<prototype_ast>();
+        }
+        prototype->serialize(ar);
+    }
+    else
+    {
+        prototype = {};
+    }
+    ar& expression_serializer{body};
+}
 
 std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2797,8 +3387,33 @@ std::string function_expression::to_string() const
  * call_expression.
  */
 
+std::unique_ptr<expression> call_expression::clone() const
+{
+    std::vector<std::unique_ptr<expression>> cloned_args;
+    cloned_args.reserve(args.size());
+    for(const auto& arg: args)
+    {
+        cloned_args.emplace_back(arg->clone());
+    }
+
+    return std::make_unique<call_expression>(
+      callee,
+      std::move(cloned_args),
+      index_expr ? index_expr->clone() : nullptr);
+}
+
+void call_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & callee;
+    ar& expression_vector_serializer{args};
+    ar& expression_serializer{index_expr};
+    ar & return_type;
+}
+
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // Code generation for function calls.
     if(mc == memory_context::store)
     {
         throw cg::codegen_error(loc, "Cannot store into call expression.");
@@ -2829,7 +3444,12 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 
     if(sig.arg_types.size() != args.size())
     {
-        throw ty::type_error(callee.location, fmt::format("Wrong number of arguments in function call. Expected {}, got {}.", sig.arg_types.size(), args.size()));
+        throw ty::type_error(
+          callee.location,
+          fmt::format(
+            "Wrong number of arguments in function call. Expected {}, got {}.",
+            sig.arg_types.size(),
+            args.size()));
     }
 
     for(std::size_t i = 0; i < args.size(); ++i)
@@ -2900,6 +3520,19 @@ std::string call_expression::to_string() const
 /*
  * return_statement.
  */
+
+std::unique_ptr<expression> return_statement::clone() const
+{
+    return std::make_unique<return_statement>(
+      loc,
+      expr ? expr->clone() : nullptr);
+}
+
+void return_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+}
 
 std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -2989,6 +3622,23 @@ std::string return_statement::to_string() const
 /*
  * if_statement.
  */
+
+std::unique_ptr<expression> if_statement::clone() const
+{
+    return std::make_unique<if_statement>(
+      loc,
+      condition->clone(),
+      if_block->clone(),
+      else_block ? else_block->clone() : nullptr);
+}
+
+void if_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{condition};
+    ar& expression_serializer{if_block};
+    ar& expression_serializer{else_block};
+}
 
 std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -3100,6 +3750,21 @@ std::string if_statement::to_string() const
  * while_statement.
  */
 
+std::unique_ptr<expression> while_statement::clone() const
+{
+    return std::make_unique<while_statement>(
+      loc,
+      condition->clone(),
+      while_block->clone());
+}
+
+void while_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{condition};
+    ar& expression_serializer{while_block};
+}
+
 std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -3182,6 +3847,11 @@ std::string while_statement::to_string() const
  * break_statement.
  */
 
+std::unique_ptr<expression> break_statement::clone() const
+{
+    return std::make_unique<break_statement>(loc);
+}
+
 std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
@@ -3192,6 +3862,11 @@ std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[ma
 /*
  * continue_statement.
  */
+
+std::unique_ptr<expression> continue_statement::clone() const
+{
+    return std::make_unique<continue_statement>(loc);
+}
 
 std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
 {

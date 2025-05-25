@@ -179,7 +179,7 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     if(type.is_array())
     {
         // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
-        return {0, sizeof(void*), std::size_t(std::alignment_of_v<void*>), 0};
+        return {0, sizeof(void*), std::size_t{std::alignment_of_v<void*>}, 0};
     }
 
     // built-in types.

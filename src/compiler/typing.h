@@ -304,6 +304,16 @@ struct scope
     std::string to_string() const;
 };
 
+/** An imported module. */
+struct imported_module
+{
+    /** Module path. */
+    std::string path;
+
+    /** Whether this is a transitive import. */
+    bool transitive;
+};
+
 /** Type system context. */
 class context
 {
@@ -320,7 +330,7 @@ class context
     std::size_t anonymous_scope_id = 0;
 
     /** Imported modules. */
-    std::vector<std::string> imported_modules;
+    std::vector<imported_module> imported_modules;
 
     /** Imported functions, indexed by `(import_path, function_name)`. */
     std::unordered_map<
@@ -334,6 +344,15 @@ class context
       std::string,
       std::vector<variable_type>>
       imported_constants;
+
+    /** Imported macros, indexed by `(import_path, macro_name)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<std::string>>
+      imported_macros;
+
+    /** Local macros. */
+    std::vector<std::string> macros;
 
     /** Struct/type stack, for member/type lookups. */
     std::vector<const struct_definition*> struct_stack;
@@ -401,12 +420,43 @@ public:
     /**
      * Add an import to the context.
      *
-     * @throws A type_error if the import is not in the global scope.
-     * @throws A type_error if the import is already added.
+     * @throws A `type_error` if the import is not in the global scope.
+     * @throws A `type_error` if the import is already added.
      *
      * @param path The import path.
+     * @param transitive Whether this is a transitive import.
      */
-    void add_import(std::vector<token> path);
+    void add_import(std::vector<token> path, bool transitive);
+
+    /**
+     * Add an import to the context. The function is idempotent, i.e. it
+     * can be called multiple times.
+     *
+     * @throws A `std::runtime_error` if an already-imported non-transitive package
+     *         is being re-imported as transitive.
+     *
+     * @param path The import path.
+     * @param transitive Whether this is a transitive import.
+     */
+    void add_import(std::string path, bool transitive);
+
+    /**
+     * Return whether an import is transitive.
+     *
+     * @throws A `type_error` if the import does not exist.
+     *
+     * @param namespace_path The namespace path of the module.
+     * @returns Return `true` if the import is transitive, `false` otherwise.
+     */
+    bool is_transitive_import(const std::string& namespace_path) const;
+
+    /**
+     * Check if the import exists in the context.
+     *
+     * @param path The import path.
+     * @returns Return `true` if the import exists, `false` otherwise.
+     */
+    bool has_import(const std::string& path);
 
     /**
      * Add a variable to the context.
@@ -465,6 +515,25 @@ public:
      * @returns True if the type exists within the current scope.
      */
     bool has_type(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
+
+    /**
+     * Add a macro name.
+     *
+     * @throws A type_error if the macro already exists.
+     *
+     * @param name The macro's name.
+     * @param import_path Optional import path.
+     */
+    void add_macro(std::string name, std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Check if the context contains a macro.
+     *
+     * @param name The macro's name.
+     * @param import_path Optional import path.
+     * @returns True if the macro exists.
+     */
+    bool has_macro(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Check if the context contains a specific type.
@@ -684,7 +753,7 @@ public:
     bool has_expression_type(const ast::expression& expr) const;
 
     /** Get the imported modules. */
-    const std::vector<std::string>& get_imported_modules() const
+    const std::vector<imported_module>& get_imported_modules() const
     {
         return imported_modules;
     }

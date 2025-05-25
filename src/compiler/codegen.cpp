@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -13,14 +13,17 @@
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "shared/type_utils.h"
-#include "ast.h"
+#include "ast/ast.h"
 #include "codegen.h"
+#include "resolve.h"
 #include "utils.h"
+#include "builtins/macros.h"
 
 namespace slang::codegen
 {
 
 namespace ty = slang::typing;
+namespace rs = slang::resolve;
 
 /*
  * Exceptions.
@@ -600,7 +603,10 @@ void context::add_import(module_::symbol_type type, std::string import_path, std
     }
 }
 
-std::size_t context::get_import_index(module_::symbol_type type, std::string import_path, std::string name) const
+std::size_t context::get_import_index(
+  module_::symbol_type type,
+  std::string import_path,
+  std::string name) const
 {
     auto it = std::find_if(
       imports.begin(),
@@ -635,10 +641,64 @@ std::size_t context::get_import_index(module_::symbol_type type, std::string imp
                   import_path));
 }
 
-struct_* context::add_struct(std::string name,
-                             std::vector<std::pair<std::string, value>> members,
-                             std::uint8_t flags,
-                             std::optional<std::string> import_path)
+void context::make_import_explicit(
+  const std::string& import_path)
+{
+    for(auto& m: macros)
+    {
+        if(m->get_import_path() == import_path)
+        {
+            m->set_transitive(false);
+        }
+    }
+
+    for(auto& c: imported_constants)
+    {
+        if(c.import_path == import_path)
+        {
+            if(c.name.value().at(0) == '$')
+            {
+                c.name = c.name.value().substr(1);
+            }
+        }
+    }
+
+    for(auto& sym: imports)
+    {
+        if(sym.import_path == import_path)
+        {
+            if(sym.name.at(0) == '$')
+            {
+                sym.name = sym.name.substr(1);
+            }
+        }
+    }
+
+    for(auto& it: prototypes)
+    {
+        if(it->get_import_path() == import_path)
+        {
+            it->make_import_explicit();
+        }
+    }
+
+    for(auto& it: types)
+    {
+        if(it->get_import_path() == import_path)
+        {
+            if(it->name.at(0) == '$')
+            {
+                it->name = it->name.substr(1);
+            }
+        }
+    }
+}
+
+struct_* context::add_struct(
+  std::string name,
+  std::vector<std::pair<std::string, value>> members,
+  std::uint8_t flags,
+  std::optional<std::string> import_path)
 {
     if(std::find_if(
          types.begin(),
@@ -943,7 +1003,77 @@ void context::create_native_function(std::string lib_name,
         throw codegen_error(fmt::format("Function '{}' already defined.", name));
     }
 
-    funcs.emplace_back(std::make_unique<function>(std::move(lib_name), std::move(name), std::move(return_type), std::move(args)));
+    funcs.emplace_back(
+      std::make_unique<function>(
+        std::move(lib_name),
+        std::move(name),
+        std::move(return_type),
+        std::move(args)));
+}
+
+void context::add_macro(
+  std::string name,
+  module_::macro_descriptor desc,
+  std::optional<std::string> import_path)
+{
+    if(std::find_if(
+         macros.begin(),
+         macros.end(),
+         [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
+         {
+             return m->get_name() == name
+                    && m->get_import_path() == import_path;
+         })
+       != macros.end())
+    {
+        throw codegen_error(fmt::format("Macro '{}' already defined.", name));
+    }
+
+    macros.emplace_back(
+      std::make_unique<macro>(
+        std::move(name),
+        std::move(desc),
+        std::move(import_path)));
+}
+
+macro* context::get_macro(
+  const token& name,
+  std::optional<std::string> import_path)
+{
+    auto it = std::find_if(
+      macros.begin(),
+      macros.end(),
+      [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
+      {
+          return m->get_name() == name.s
+                 && m->get_import_path() == import_path;
+      });
+
+    if(it != macros.end())
+    {
+        return it->get();
+    }
+
+    // macro was not found.
+    if(import_path.has_value())
+    {
+        throw codegen_error(
+          name.location,
+          fmt::format(
+            "Macro '{}::{}' not found.",
+            import_path.value(),
+            name.s));
+    }
+    throw codegen_error(
+      name.location,
+      fmt::format(
+        "Macro '{}' not found.",
+        name.s));
+}
+
+std::size_t context::generate_macro_invocation_id()
+{
+    return macro_invocation_id++;
 }
 
 void context::set_insertion_point(basic_block* ip)

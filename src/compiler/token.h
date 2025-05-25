@@ -4,7 +4,7 @@
  * token helpers.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -14,7 +14,7 @@
 #include <optional>
 #include <variant>
 
-#include <fmt/core.h>
+#include "archives/archive.h"
 
 namespace slang
 {
@@ -60,32 +60,53 @@ struct token_location
 };
 
 /**
+ * `token_location` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param loc The token location to serialize.
+ */
+archive& operator&(archive& ar, token_location& loc);
+
+/**
  * Convert a token location to a string.
  *
  * @param loc The token location.
  * @return A string of the form "(line, col)".
  */
-inline std::string to_string(const token_location& loc)
-{
-    return fmt::format("{}:{}", loc.line, loc.col);
-}
+std::string to_string(const token_location& loc);
 
-/**
- * Token type.
- */
+/** Token type. */
 enum class token_type
 {
-    unknown,     /** Unknown token type. */
-    delimiter,   /** A delimiter, e.g. + - * / % ! & | ^ . :: < > ( ) { } [ ] ; */
-    identifier,  /** starts with A-Z, a-z or _ and continues with A-Z, a-z, _, 0-9 */
-    int_literal, /** integer literal */
-    fp_literal,  /** floating-point literal */
-    str_literal  /** a quoted string (including the quotes) */
+    unknown,          /** Unknown token type. */
+    delimiter,        /** A delimiter, e.g. + - * / % ! & | ^ . :: < > ( ) { } [ ] ; */
+    identifier,       /** starts with A-Z, a-z or _ and continues with A-Z, a-z, _, 0-9 */
+    macro_identifier, /** Same as `identifier`, but starting with $ */
+    macro_name,       /** Same as `identifier`, but ending with ! */
+    int_literal,      /** integer literal */
+    fp_literal,       /** floating-point literal */
+    str_literal,      /** a quoted string (including the quotes) */
+
+    last = str_literal /** Last element. */
 };
 
 /**
- * An evaluated token.
+ * Convert a `token_type` to a string.
+ *
+ * @param t The token type.
+ * @return Returns s astring representation of the token type.
  */
+std::string to_string(token_type ty);
+
+/**
+ * `token_type` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param ty The token type to serialize.
+ */
+archive& operator&(archive& ar, token_type& ty);
+
+/** An evaluated token. */
 struct token
 {
     /** The token. */
@@ -97,7 +118,10 @@ struct token
     /** Token type. */
     token_type type;
 
-    /** Evaluated token, for token_type::int_literal, token_type::fp_literal and token_type::string_literal. */
+    /**
+     * Evaluated token, for `token_type::int_literal`,
+     * `token_type::fp_literal` and `token_type::string_literal.`
+     */
     std::optional<std::variant<int, float, std::string>> value;
 
     /** Default constructors. */
@@ -129,5 +153,14 @@ struct token
     {
     }
 };
+
+/**
+ * `token` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param cls The type class to serialize.
+ * @returns The input archive.
+ */
+archive& operator&(archive& ar, token& tok);
 
 }    // namespace slang

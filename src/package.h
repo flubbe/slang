@@ -80,7 +80,7 @@ public:
      *
      * @return The components of the input string.
      */
-    static std::list<std::string> split(const std::string& s);
+    static std::vector<std::string> split(const std::string& s);
 
     /**
      * Check whether the supplied package name is valid.

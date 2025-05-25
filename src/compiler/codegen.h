@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -36,7 +36,8 @@ class export_table_builder; /* emitter.h */
 
 namespace slang::ast
 {
-class expression; /* ast.h */
+class expression;       /* ast.h */
+class macro_invocation; /* ast.h */
 }    // namespace slang::ast
 
 namespace slang::codegen
@@ -68,7 +69,7 @@ public:
 };
 
 /** Type classes. */
-enum class type_class
+enum class type_class : std::uint8_t
 {
     void_,   /** Void type. */
     null,    /** Null type. */
@@ -110,6 +111,9 @@ public:
     type(const type&) = default;
     type(type&&) = default;
 
+    /** Defaulted destructor. */
+    ~type() = default;
+
     /** Default assignments. */
     type& operator=(const type&) = default;
     type& operator=(type&&) = default;
@@ -149,48 +153,56 @@ public:
     }
 
     /** Get the type class. */
+    [[nodiscard]]
     type_class get_type_class() const
     {
         return ty;
     }
 
     /** Return whether the type is an array. */
+    [[nodiscard]]
     bool is_array() const
     {
         return array_dims != 0;
     }
 
     /** Return whether this is a void type. */
+    [[nodiscard]]
     bool is_void() const
     {
         return ty == type_class::void_;
     }
 
     /** Return whether this is a null type. */
+    [[nodiscard]]
     bool is_null() const
     {
         return ty == type_class::null;
     }
 
     /** Return whether this is a struct type. */
+    [[nodiscard]]
     bool is_struct() const
     {
         return ty == type_class::struct_;
     }
 
     /** Whether this is a reference type (i.e., either an array or a struct). */
+    [[nodiscard]]
     bool is_reference() const
     {
         return is_array() || is_struct();
     }
 
     /** Whether this type is imported. */
+    [[nodiscard]]
     bool is_import() const
     {
         return import_path.has_value();
     }
 
     /** Return the array dimensions (0 for scalar types). */
+    [[nodiscard]]
     std::size_t get_array_dims() const
     {
         return array_dims;
@@ -201,6 +213,7 @@ public:
      *
      * @throws Throws a `codegen_error` if the type is not an array.
      */
+    [[nodiscard]]
     type deref() const
     {
         if(!is_array())
@@ -212,24 +225,28 @@ public:
     }
 
     /** Get the base type. */
+    [[nodiscard]]
     type base_type() const
     {
         return {ty, 0, struct_name, import_path};
     }
 
     /** Return the struct's name, or `std::nullopt` if not a struct. */
-    std::optional<std::string> get_struct_name() const
+    [[nodiscard]]
+    const std::optional<std::string>& get_struct_name() const
     {
         return struct_name;
     }
 
     /** Return the type's import path for external types, or `std::nullopt`. */
-    std::optional<std::string> get_import_path() const
+    [[nodiscard]]
+    const std::optional<std::string>& get_import_path() const
     {
         return import_path;
     }
 
     /** Get a readable string representation of the type. */
+    [[nodiscard]]
     std::string to_string() const;
 };
 
@@ -256,6 +273,9 @@ public:
     value(const value&) = default;
     value(value&&) = default;
 
+    /** Default destructor. */
+    ~value() = default;
+
     /** Default assignments. */
     value& operator=(const value&) = default;
     value& operator=(value&&) = default;
@@ -273,9 +293,8 @@ public:
         validate();
     }
 
-    /**
-     * Copy the type into a new value.
-     */
+    /** Copy the type into a new value. */
+    [[nodiscard]]
     value copy_type() const
     {
         return {ty, std::nullopt};
@@ -286,17 +305,18 @@ public:
      *
      * @throws Throws a `codegen_error` if the value is not an array.
      */
+    [[nodiscard]]
     value deref() const
     {
         return {ty.deref()};
     }
 
-    /**
-     * Get the value as a readable string.
-     */
+    /** Get the value as a readable string. */
+    [[nodiscard]]
     std::string to_string() const;
 
     /** Get the value's type. */
+    [[nodiscard]]
     type get_type() const
     {
         return ty;
@@ -309,7 +329,8 @@ public:
     }
 
     /** Get the value's name. */
-    std::optional<std::string> get_name() const
+    [[nodiscard]]
+    const std::optional<std::string>& get_name() const
     {
         return name;
     }
@@ -321,6 +342,7 @@ public:
     }
 
     /** Return whether the value has a name. */
+    [[nodiscard]]
     bool has_name() const
     {
         return name.has_value();
@@ -339,6 +361,9 @@ public:
     constant_int(const constant_int&) = default;
     constant_int(constant_int&&) = default;
 
+    /** Default destructor. */
+    ~constant_int() = default;
+
     /** Default assignments. */
     constant_int& operator=(const constant_int&) = default;
     constant_int& operator=(constant_int&&) = default;
@@ -356,6 +381,7 @@ public:
     }
 
     /** Get the integer. */
+    [[nodiscard]]
     int get_int() const
     {
         return i;
@@ -374,6 +400,9 @@ public:
     constant_float(const constant_float&) = default;
     constant_float(constant_float&&) = default;
 
+    /** Default destructor. */
+    ~constant_float() = default;
+
     /** Default assignments. */
     constant_float& operator=(const constant_float&) = default;
     constant_float& operator=(constant_float&&) = default;
@@ -391,6 +420,7 @@ public:
     }
 
     /** Get the floating point value. */
+    [[nodiscard]]
     float get_float() const
     {
         return f;
@@ -412,6 +442,9 @@ public:
     constant_str(const constant_str&) = default;
     constant_str(constant_str&&) = default;
 
+    /** Default destructor. */
+    ~constant_str() = default;
+
     /** Default assignments. */
     constant_str& operator=(const constant_str&) = default;
     constant_str& operator=(constant_str&&) = default;
@@ -429,6 +462,7 @@ public:
     }
 
     /** Get the string value. */
+    [[nodiscard]]
     std::string get_str() const
     {
         return s;
@@ -451,15 +485,14 @@ public:
     }
 
     /** Get the index into the constant table. A value of -1 indicates "no index". */
+    [[nodiscard]]
     int get_constant_index() const
     {
         return constant_index;
     }
 };
 
-/**
- * An instruction argument.
- */
+/** An instruction argument. */
 class argument
 {
 public:
@@ -481,9 +514,11 @@ public:
     }
 
     /** Get a string representation of the argument. */
+    [[nodiscard]]
     virtual std::string to_string() const = 0;
 
     /** Get the argument type. */
+    [[nodiscard]]
     virtual const value* get_value() const = 0;
 };
 
@@ -501,6 +536,9 @@ public:
     const_argument(const const_argument&) = delete;
     const_argument(const_argument&&) = default;
 
+    /** Default destructor. */
+    ~const_argument() override = default;
+
     /** Default and deleted assignments. */
     const_argument& operator=(const const_argument&) = delete;
     const_argument& operator=(const_argument&&) = default;
@@ -511,8 +549,7 @@ public:
      * @param i The constant integer.
      */
     explicit const_argument(int i)
-    : argument()
-    , type{std::make_unique<constant_int>(i)}
+    : type{std::make_unique<constant_int>(i)}
     {
     }
 
@@ -522,8 +559,7 @@ public:
      * @param f The floating-point value.
      */
     const_argument(float f)
-    : argument()
-    , type{std::make_unique<constant_float>(f)}
+    : type{std::make_unique<constant_float>(f)}
     {
     }
 
@@ -535,14 +571,14 @@ public:
      * @param s The string.
      */
     const_argument(std::string s)
-    : argument()
-    , type{std::make_unique<constant_str>(s)}
+    : type{std::make_unique<constant_str>(s)}
     {
     }
 
     void register_const(class context& ctx) override;
-    std::string to_string() const override;
+    [[nodiscard]] std::string to_string() const override;
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return type.get();
@@ -566,6 +602,9 @@ public:
     function_argument(const function_argument&) = delete;
     function_argument(function_argument&&) = default;
 
+    /** Default destructor. */
+    ~function_argument() override = default;
+
     /** Defaulted and deleted assignments. */
     function_argument& operator=(const function_argument&) = delete;
     function_argument& operator=(function_argument&&) = default;
@@ -577,8 +616,7 @@ public:
      * @param import_path The import path of the function, or `std::nullopt`.
      */
     function_argument(std::string name, std::optional<std::string> import_path)
-    : argument()
-    , name{std::make_unique<value>(type{type_class::fn, 0}, std::move(name))}
+    : name{std::make_unique<value>(type{type_class::fn, 0}, std::move(name))}
     , import_path{std::move(import_path)}
     {
     }
@@ -594,11 +632,13 @@ public:
     }
 
     /** Get the import path. */
+    [[nodiscard]]
     const std::optional<std::string>& get_import_path() const
     {
         return import_path;
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         if(import_path.has_value())
@@ -609,15 +649,14 @@ public:
         return fmt::format("@{}", *name->get_name());
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return name.get();
     }
 };
 
-/**
- * Type argument.
- */
+/** Type argument. */
 class type_argument : public argument
 {
     /** The type. */
@@ -632,6 +671,9 @@ public:
     type_argument(const type_argument&) = default;
     type_argument(type_argument&&) = default;
 
+    /** Default destructor. */
+    ~type_argument() override = default;
+
     /** Default assignments. */
     type_argument& operator=(const type_argument&) = default;
     type_argument& operator=(type_argument&&) = default;
@@ -642,8 +684,7 @@ public:
      * @param v Value containing the type information to use.
      */
     explicit type_argument(value vt)
-    : argument()
-    , vt{vt.copy_type()}
+    : vt{vt.copy_type()}
     {
     }
 
@@ -658,11 +699,13 @@ public:
     }
 
     /** Get the import path. */
+    [[nodiscard]]
     const std::optional<std::string>& get_import_path() const
     {
         return import_path;
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         if(import_path.has_value())
@@ -673,15 +716,14 @@ public:
         return vt.to_string();
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return &vt;
     }
 };
 
-/**
- * A variable instruction argument.
- */
+/** A variable instruction argument. */
 class variable_argument : public argument
 {
     /** The variable. */
@@ -693,6 +735,9 @@ public:
     variable_argument(const variable_argument&) = delete;
     variable_argument(variable_argument&&) = default;
 
+    /** Default destructor. */
+    ~variable_argument() override = default;
+
     /** Default assignments. */
     variable_argument& operator=(const variable_argument&) = delete;
     variable_argument& operator=(variable_argument&&) = default;
@@ -703,25 +748,24 @@ public:
      * @param v The variable.
      */
     explicit variable_argument(std::unique_ptr<value> v)
-    : argument()
-    , var{std::move(v)}
+    : var{std::move(v)}
     {
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return fmt::format("{}", var->to_string());
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return var.get();
     }
 };
 
-/**
- * A label argument for jump instructions.
- */
+/** A label argument for jump instructions. */
 class label_argument : public argument
 {
     /** The label. */
@@ -733,6 +777,9 @@ public:
     label_argument(const label_argument&) = default;
     label_argument(label_argument&&) = default;
 
+    /** Default destructor. */
+    ~label_argument() override = default;
+
     /** Default assignments. */
     label_argument& operator=(const label_argument&) = default;
     label_argument& operator=(label_argument&&) = default;
@@ -743,22 +790,24 @@ public:
      * @param label The label.
      */
     explicit label_argument(std::string label)
-    : argument()
-    , label{std::move(label)}
+    : label{std::move(label)}
     {
     }
 
     /** Return the label. */
+    [[nodiscard]]
     const std::string& get_label() const
     {
         return label;
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return fmt::format("%{}", label);
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         throw codegen_error(fmt::format("Cannot get type from label '{}'.", to_string()));
@@ -766,7 +815,7 @@ public:
 };
 
 /** Type casts. */
-enum class type_cast
+enum class type_cast : std::uint8_t
 {
     i32_to_f32, /* i32 to f32 */
     f32_to_i32, /* f32 to i32 */
@@ -797,6 +846,9 @@ public:
     cast_argument(const cast_argument&) = delete;
     cast_argument(cast_argument&&) = default;
 
+    /** Default destructor. */
+    ~cast_argument() override = default;
+
     /** Default assignments. */
     cast_argument& operator=(const cast_argument&) = delete;
     cast_argument& operator=(cast_argument&&) = default;
@@ -807,8 +859,7 @@ public:
      * @param cast The cast type.
      */
     explicit cast_argument(type_cast cast)
-    : argument()
-    , cast{cast}
+    : cast{cast}
     {
         if(cast == type_cast::i32_to_f32)
         {
@@ -825,25 +876,26 @@ public:
     }
 
     /** Return the cast type. */
+    [[nodiscard]]
     type_cast get_cast() const
     {
         return cast;
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return fmt::format("{}", ::slang::codegen::to_string(cast));
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return v.get();
     }
 };
 
-/**
- * Field access argument.
- */
+/** Field access argument. */
 class field_access_argument : public argument
 {
     /** The struct information. */
@@ -862,6 +914,9 @@ public:
     field_access_argument& operator=(const field_access_argument&) = delete;
     field_access_argument& operator=(field_access_argument&&) = default;
 
+    /** Default destructor. */
+    ~field_access_argument() override = default;
+
     /**
      * Construct a field access.
      *
@@ -876,28 +931,33 @@ public:
     }
 
     /** Return the struct name. */
+    [[nodiscard]]
     std::string get_struct_name() const
     {
         return *struct_type.get_struct_name();
     }
 
     /** Return the struct's import path. */
+    [[nodiscard]]
     std::optional<std::string> get_import_path() const
     {
         return struct_type.get_import_path();
     }
 
     /** Return the field's member. */
+    [[nodiscard]]
     value get_member() const
     {
         return member;
     }
 
+    [[nodiscard]]
     std::string to_string() const override
     {
         return fmt::format("%{}, {}", get_struct_name(), member.to_string());
     }
 
+    [[nodiscard]]
     const value* get_value() const override
     {
         return nullptr;
@@ -922,7 +982,7 @@ public:
     instruction(instruction&&) = default;
 
     /** Destructor. */
-    virtual ~instruction() = default;
+    ~instruction() = default;
 
     /** Default assignments. */
     instruction& operator=(const instruction&) = default;
@@ -951,30 +1011,35 @@ public:
     }
 
     /** Returns whether the instruction is branching. */
-    virtual bool is_branching() const
+    [[nodiscard]]
+    bool is_branching() const
     {
         return name == "jmp" || name == "jnz";
     }
 
     /** Returns whether the instruction is a return instruction. */
-    virtual bool is_return() const
+    [[nodiscard]]
+    bool is_return() const
     {
         return name == "ret";
     }
 
     /** Get the instruction name. */
+    [[nodiscard]]
     const std::string& get_name() const
     {
         return name;
     }
 
     /** Get the instruction's arguments. */
+    [[nodiscard]]
     const std::vector<std::unique_ptr<argument>>& get_args() const
     {
         return args;
     }
 
     /** Get instruction representation as string. */
+    [[nodiscard]]
     std::string to_string() const;
 };
 
@@ -1023,7 +1088,7 @@ public:
     basic_block(basic_block&&) = delete;
 
     /** Destructor. */
-    virtual ~basic_block()
+    ~basic_block()
     {
         // clear references to this block.
         set_inserting_context(nullptr);
@@ -1046,27 +1111,32 @@ public:
     }
 
     /** Get string representation of block. */
+    [[nodiscard]]
     std::string to_string() const;
 
     /** Get the inserting context. May return nullptr. */
+    [[nodiscard]]
     class context* get_inserting_context() const
     {
         return inserting_context;
     }
 
     /** Get the block label. */
+    [[nodiscard]]
     std::string get_label() const
     {
         return label;
     }
 
     /** Return whether this block ends with a return statement. */
+    [[nodiscard]]
     bool ends_with_return() const
     {
         return !instrs.empty() && instrs.back()->is_return();
     }
 
     /** Return whether this block ends with a branch statement. */
+    [[nodiscard]]
     bool ends_with_branch() const
     {
         return !instrs.empty() && instrs.back()->is_branching();
@@ -1083,6 +1153,7 @@ public:
      *
      * Currently this is done by checking if the block is explicitly marked as unreachable.
      */
+    [[nodiscard]]
     bool is_unreachable() const
     {
         return unreachable;
@@ -1094,9 +1165,11 @@ public:
      * A block is valid if it contains a single return or branch instruction,
      * located at its end.
      */
+    [[nodiscard]]
     bool is_valid() const;
 
     /** Get the block's instructions. */
+    [[nodiscard]]
     const std::vector<std::unique_ptr<instruction>>& get_instructions() const
     {
         return instrs;
@@ -1121,6 +1194,8 @@ public:
 /** A user-defined type. */
 class struct_
 {
+    friend class context;
+
     /** The type's name. */
     std::string name;
 
@@ -1140,7 +1215,7 @@ public:
     struct_(struct_&&) = default;
 
     /** Destructor. */
-    virtual ~struct_() = default;
+    ~struct_() = default;
 
     /** Default assignment. */
     struct_& operator=(const struct_&) = default;
@@ -1154,10 +1229,11 @@ public:
      * @param flags THe type's flags.
      * @param import_path The import path of the module for imported types.
      */
-    struct_(std::string name,
-            std::vector<std::pair<std::string, value>> members,
-            std::uint8_t flags = 0,
-            std::optional<std::string> import_path = std::nullopt)
+    struct_(
+      std::string name,
+      std::vector<std::pair<std::string, value>> members,
+      std::uint8_t flags = 0,
+      std::optional<std::string> import_path = std::nullopt)
     : name{std::move(name)}
     , members{std::move(members)}
     , flags{flags}
@@ -1166,36 +1242,42 @@ public:
     }
 
     /** Get the type's name. */
+    [[nodiscard]]
     std::string get_name() const
     {
         return name;
     }
 
     /** Get the type's members. */
+    [[nodiscard]]
     const std::vector<std::pair<std::string, value>>& get_members() const
     {
         return members;
     }
 
     /** Get the type's flags. */
+    [[nodiscard]]
     std::uint8_t get_flags() const
     {
         return flags;
     }
 
     /** Return whether this is an imported type. */
+    [[nodiscard]]
     bool is_import() const
     {
         return import_path.has_value();
     }
 
     /** Return the import path. */
+    [[nodiscard]]
     const std::optional<std::string>& get_import_path() const
     {
         return import_path;
     }
 
     /** String representation of a type. */
+    [[nodiscard]]
     std::string to_string() const;
 };
 
@@ -1226,7 +1308,7 @@ public:
     scope(scope&&) = default;
 
     /** Destructor. */
-    virtual ~scope() = default;
+    ~scope() = default;
 
     /** Assignments. */
     scope& operator=(const scope&) = delete;
@@ -1260,6 +1342,7 @@ public:
      * @returns True if the name exists.
      * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
      */
+    [[nodiscard]]
     bool contains(const std::string& name) const;
 
     /**
@@ -1269,6 +1352,7 @@ public:
      * @param import_path An optional import path.
      * @returns True if the struct exists.
      */
+    [[nodiscard]]
     bool contains_struct(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
@@ -1278,6 +1362,7 @@ public:
      * @returns The variable or nullptr.
      * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
      */
+    [[nodiscard]]
     value* get_value(const std::string& name);
 
     /**
@@ -1290,6 +1375,7 @@ public:
      * @param name Name or the local or the argument.
      * @throws A `codegen_error` the the name could not be found.
      */
+    [[nodiscard]]
     std::size_t get_index(const std::string& name) const;
 
     /**
@@ -1319,18 +1405,21 @@ public:
      * @param flags The struct's flags.
      * @throws Throws a `codegen_error` if the name is already registered as a type in this scope.
      */
-    void add_struct(std::string name,
-                    std::vector<std::pair<std::string, value>> members,
-                    std::uint8_t flags,
-                    std::optional<std::string> import_path = std::nullopt);
+    void add_struct(
+      std::string name,
+      std::vector<std::pair<std::string, value>> members,
+      std::uint8_t flags,
+      std::optional<std::string> import_path = std::nullopt);
 
     /** Get the arguments for this scope. */
+    [[nodiscard]]
     const std::vector<std::unique_ptr<value>>& get_args() const
     {
         return args;
     }
 
     /** Get the locals for this scope. */
+    [[nodiscard]]
     const std::vector<std::unique_ptr<value>>& get_locals() const
     {
         return locals;
@@ -1345,23 +1434,27 @@ public:
      * @returns Returns the struct definition.
      * @throws Throws a `codegen_error` if the struct is not found.
      */
+    [[nodiscard]]
     const std::vector<std::pair<std::string, value>>&
       get_struct(const std::string& name,
                  std::optional<std::string> import_path = std::nullopt) const;
 
     /** Get the outer scope. */
+    [[nodiscard]]
     scope* get_outer()
     {
         return outer;
     }
 
     /** Get the outer scope. */
+    [[nodiscard]]
     const scope* get_outer() const
     {
         return outer;
     }
 
     /** Get a string representation of the scope. */
+    [[nodiscard]]
     std::string to_string() const
     {
         if(outer)
@@ -1488,39 +1581,51 @@ public:
     }
 
     /** Get the function's name. */
+    [[nodiscard]]
     const std::string& get_name() const
     {
         return name;
     }
 
     /** Get the function's return type. */
+    [[nodiscard]]
     const value& get_return_type() const
     {
         return return_type;
     }
 
     /** Get the function's argument types. */
+    [[nodiscard]]
     const std::vector<value>& get_arg_types() const
     {
         return arg_types;
     }
 
     /** Return whether this is an imported function. */
+    [[nodiscard]]
     bool is_import() const
     {
         return import_path.has_value();
     }
 
     /** Return the import path. */
+    [[nodiscard]]
     const std::optional<std::string>& get_import_path() const
     {
         return import_path;
     }
+
+    /** Make the import explicit. */
+    void make_import_explicit()
+    {
+        if(name.at(0) == '$')
+        {
+            name = name.substr(1);
+        }
+    }
 };
 
-/**
- * A relocatable function.
- */
+/** A function.*/
 class function
 {
     /** The function's name. */
@@ -1593,6 +1698,7 @@ public:
     function& operator=(function&&) = delete;
 
     /** Get the function's name. */
+    [[nodiscard]]
     const std::string& get_name() const
     {
         return name;
@@ -1609,6 +1715,7 @@ public:
     }
 
     /** Return whether the function ends with a return statement. */
+    [[nodiscard]]
     bool ends_with_return() const
     {
         return !instr_blocks.empty() && instr_blocks.back()->ends_with_return();
@@ -1627,12 +1734,14 @@ public:
     }
 
     /** Get the function's scope. */
+    [[nodiscard]]
     const class scope* get_scope() const
     {
         return &scope;
     }
 
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
+    [[nodiscard]]
     std::pair<type, std::vector<type>> get_signature() const
     {
         std::vector<type> arg_types;
@@ -1649,6 +1758,7 @@ public:
     }
 
     /** Return whether this is a native function. */
+    [[nodiscard]]
     bool is_native() const
     {
         return native;
@@ -1661,6 +1771,7 @@ public:
      *
      * @returns The import library name.
      */
+    [[nodiscard]]
     std::string get_import_library() const
     {
         if(!native)
@@ -1676,17 +1787,112 @@ public:
      *
      * @returns The function's basic blocks.
      */
+    [[nodiscard]]
     const std::list<basic_block*>& get_basic_blocks() const
     {
         return instr_blocks;
     }
 
     /** String representation of function. */
+    [[nodiscard]]
     std::string to_string() const;
 };
 
+/** A macro. */
+class macro
+{
+    /** The macro name. */
+    std::string name;
+
+    /** The macro descriptor. */
+    module_::macro_descriptor desc;
+
+    /** Import path. */
+    std::optional<std::string> import_path;
+
+public:
+    /** Constructors. */
+    macro() = delete;
+    macro(const macro&) = default;
+    macro(macro&&) = default;
+
+    /** Destructor. */
+    ~macro() = default;
+
+    /** Assignments. */
+    macro& operator=(const macro&) = default;
+    macro& operator=(macro&&) = default;
+
+    /**
+     * Create a new macro.
+     *
+     * @param name The macro's name.
+     * @param desc Macro descriptor.
+     * @param import_path Optional import path.
+     */
+    explicit macro(
+      std::string name,
+      module_::macro_descriptor desc,
+      std::optional<std::string> import_path = std::nullopt)
+    : name{std::move(name)}
+    , desc{std::move(desc)}
+    , import_path{std::move(import_path)}
+    {
+    }
+
+    /** Get the macro's name. */
+    [[nodiscard]]
+    const std::string& get_name() const
+    {
+        return name;
+    }
+
+    /** Get the descriptor. */
+    [[nodiscard]]
+    const module_::macro_descriptor& get_desc() const
+    {
+        return desc;
+    }
+
+    /** Get the import path. */
+    [[nodiscard]]
+    const std::optional<std::string> get_import_path() const
+    {
+        return import_path;
+    }
+
+    /** Return whether this is an import. */
+    [[nodiscard]]
+    bool is_import() const
+    {
+        return import_path.has_value();
+    }
+
+    /** Whether this is a transitive import. */
+    [[nodiscard]]
+    bool is_transitive_import() const
+    {
+        return is_import() && name.substr(0, 1) == "$";
+    }
+
+    /** Set transitivity. */
+    void set_transitive(bool transitive)
+    {
+        bool transitive_name = name.substr(0, 1) == "$";
+        if(transitive_name && !transitive)
+        {
+            name = name.substr(1);
+        }
+        else if(!transitive_name && transitive)
+        {
+            name = std::string{"$"} + name;
+        }
+    }
+};
+
 /**
- * A binary operation. Reads two alike values from the stack and puts a value of the same type onto the stack.
+ * A binary operation. Reads two alike values from the stack and puts
+ * a value of the same type onto the stack.
  */
 enum class binary_op
 {
@@ -1836,6 +2042,12 @@ class context
     /** The currently compiled function, or `nullptr`. */
     function* current_function{nullptr};
 
+    /** List of macros. */
+    std::vector<std::unique_ptr<macro>> macros;
+
+    /** Macro invocation id (to make identifiers unique for each invocation). */
+    std::size_t macro_invocation_id{0};
+
     /** The basic blocks for `break` and `continue` statements. */
     std::vector<std::pair<basic_block*, basic_block*>> basic_block_brk_cnt;
 
@@ -1885,7 +2097,7 @@ public:
     context(context&&) = default;
 
     /** Destructor. */
-    virtual ~context()
+    ~context()
     {
         set_insertion_point(nullptr);
     }
@@ -1917,10 +2129,19 @@ public:
      * @return The symbol's index in the import table.
      * @throws Throws a `codegen_error` if the symbol is not found.
      */
+    [[nodiscard]]
     std::size_t get_import_index(
       module_::symbol_type type,
       std::string import_path,
       std::string name) const;
+
+    /**
+     * Make a transitive import explicit. No-op if the import was already explicit.
+     *
+     * @param import_path The import path of the macros.
+     */
+    void make_import_explicit(
+      const std::string& import_path);
 
     /**
      * Create a struct.
@@ -1947,6 +2168,7 @@ public:
      * @param name The struct name.
      * @param import_path Import path.
      */
+    [[nodiscard]]
     struct_* get_type(
       const std::string& name,
       std::optional<std::string> import_path = std::nullopt);
@@ -1993,6 +2215,7 @@ public:
      * @param str The string.
      * @returns An index into the constant table.
      */
+    [[nodiscard]]
     std::size_t get_string(std::string str);
 
     /**
@@ -2002,6 +2225,7 @@ public:
      * @param import_path The constant's import path.
      * @returns Returns a `constant_table_entry` if the constant was found, and `std::nullopt` otherwise.
      */
+    [[nodiscard]]
     std::optional<constant_table_entry> get_constant(
       const std::string& name,
       const std::optional<std::string>& import_path = std::nullopt);
@@ -2031,6 +2255,7 @@ public:
      * @param import_path The import path of the function, or `std::nullopt`.
      * @returns A reference the the function's prototype.
      */
+    [[nodiscard]]
     const prototype& get_prototype(
       const std::string& name,
       std::optional<std::string> import_path) const;
@@ -2045,6 +2270,7 @@ public:
      * @param args The function's arguments.
      * @returns A representation of the function.
      */
+    [[nodiscard]]
     function* create_function(
       std::string name,
       std::unique_ptr<value> return_type,
@@ -2067,6 +2293,46 @@ public:
       std::vector<std::unique_ptr<value>> arg);
 
     /**
+     * Add a macro definition.
+     *
+     * @throws Throws a `codegen_error` if the macro already exists.
+     * @param name The macro name.
+     * @param desc The macro descriptor.
+     * @param import_path Import path of the macro, or `std::nullopt`.
+     */
+    void add_macro(
+      std::string name,
+      module_::macro_descriptor desc,
+      std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Get a macro.
+     *
+     * @throws Throws a `codegen_error` if the macro is not found.
+     * @param name The macro name.
+     * @param import_path Import path of the macro, or `std::nullopt`.
+     */
+    [[nodiscard]]
+    macro* get_macro(
+      const token& name,
+      std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Get the macro list.
+     *
+     * @returns Returns the macro list.
+     */
+    [[nodiscard]]
+    std::vector<std::unique_ptr<macro>>& get_macros()
+    {
+        return macros;
+    }
+
+    /** Generate a unique macro invocation id. */
+    [[nodiscard]]
+    std::size_t generate_macro_invocation_id();
+
+    /**
      * Set instruction insertion point.
      *
      * @param ip The insertion point for instructions.
@@ -2080,6 +2346,7 @@ public:
      *                 Defaults to `false`.
      * @return Returns the current insertion point.
      */
+    [[nodiscard]]
     basic_block* get_insertion_point(bool validate = false) const
     {
         if(validate && insertion_point == nullptr)
@@ -2120,6 +2387,7 @@ public:
     }
 
     /** Get the current scope. */
+    [[nodiscard]]
     scope* get_scope()
     {
         if(!current_scopes.empty())
@@ -2131,18 +2399,21 @@ public:
     }
 
     /** Get the global scope. */
+    [[nodiscard]]
     scope* get_global_scope()
     {
         return global_scope.get();
     }
 
     /** Get the global scope. */
+    [[nodiscard]]
     const scope* get_global_scope() const
     {
         return global_scope.get();
     }
 
     /** Return whether a given scope is the global scope. */
+    [[nodiscard]]
     bool is_global_scope(const scope* s) const
     {
         return s == global_scope.get();
@@ -2159,6 +2430,7 @@ public:
     void pop_struct_access();
 
     /** Whether we are accessing a struct. */
+    [[nodiscard]]
     bool is_struct_access() const
     {
         return !struct_access.empty();
@@ -2169,6 +2441,7 @@ public:
      *
      * @throws Throws a `codegen_error` if no struct is accessed.
      */
+    [[nodiscard]]
     type get_accessed_struct() const;
 
     /**
@@ -2181,6 +2454,7 @@ public:
      * @returns Returns a type describing the struct member.
      * @throws Throws a `codegen_error` if the struct or the requested member could not be found.
      */
+    [[nodiscard]]
     value get_struct_member(
       token_location loc,
       const std::string& struct_name,
@@ -2208,12 +2482,14 @@ public:
     }
 
     /** Get all directives. */
+    [[nodiscard]]
     const std::vector<directive>& get_directives() const
     {
         return directive_stack;
     }
 
     /** Get directives matching a given name. */
+    [[nodiscard]]
     std::vector<directive> get_directives(const std::string& name) const
     {
         std::vector<directive> directives;
@@ -2242,6 +2518,7 @@ public:
      * @param default_value The default value.
      * @returns The flag's value or the default value.
      */
+    [[nodiscard]]
     bool get_directive_flag(
       const std::string& name,
       const std::string& flag_name,
@@ -2280,6 +2557,7 @@ public:
     }
 
     /** Get the last on the stack directive matching a given name. */
+    [[nodiscard]]
     std::optional<directive> get_last_directive(const std::string& name) const
     {
         auto it = std::find_if(
@@ -2336,6 +2614,7 @@ public:
      *                 Defaults to `false`.
      * @return Returns the current function.
      */
+    [[nodiscard]]
     function* get_current_function([[maybe_unused]] bool validate = false)
     {
         return current_function;
@@ -2362,6 +2641,7 @@ public:
      * @return The array type.
      * @throws Throws a `codegen_error` if no array was declared.
      */
+    [[nodiscard]]
     value get_array_type() const
     {
         if(!array_type.has_value())
@@ -2423,6 +2703,7 @@ public:
      * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
+    [[nodiscard]]
     std::pair<basic_block*, basic_block*> top_break_continue(std::optional<token_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.empty())
@@ -2440,6 +2721,7 @@ public:
     }
 
     /** Get `break`-`continue` stack size. */
+    [[nodiscard]]
     std::size_t get_break_continue_stack_size() const
     {
         return basic_block_brk_cnt.size();
@@ -2464,6 +2746,7 @@ public:
      * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
      * @throws Throws a `codegen_error` if the expression is not known.
      */
+    [[nodiscard]]
     bool get_expression_constant(const ast::expression& expr) const;
 
     /**
@@ -2472,6 +2755,7 @@ public:
      * @param expr The expression.
      * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
      */
+    [[nodiscard]]
     bool has_expression_constant(const ast::expression& expr) const;
 
     /**
@@ -2489,6 +2773,7 @@ public:
      * @returns The expression's value.
      * @throws Throws a `codegen_error` if the expression is not known.
      */
+    [[nodiscard]]
     const value& get_expression_value(const ast::expression& expr) const;
 
     /**
@@ -2497,6 +2782,7 @@ public:
      * @param expr The expression.
      * @returns `true` if the expression is known to have a compile-time value, `false` otherwise.
      */
+    [[nodiscard]]
     bool has_expression_value(const ast::expression& expr) const;
 
     /*
@@ -2654,6 +2940,7 @@ public:
      *
      * @returns A unique label identifier.
      */
+    [[nodiscard]]
     std::string generate_label();
 
     /*
@@ -2661,6 +2948,7 @@ public:
      */
 
     /** Generate a string representation. */
+    [[nodiscard]]
     std::string to_string() const;
 };
 

@@ -4,18 +4,14 @@
  * constant expression evaluation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <unordered_map>
-#include <set>
-#include <tuple>
-
 #include "shared/module.h"
+#include "compiler/codegen.h"
+#include "compiler/typing.h"
 #include "ast.h"
-#include "codegen.h"
-#include "typing.h"
 #include "utils.h"
 
 namespace slang::ast
@@ -25,7 +21,7 @@ namespace slang::ast
  * literal_expression.
  */
 
-std::unique_ptr<cg::value> literal_expression::evaluate(cg::context& ctx) const
+std::unique_ptr<cg::value> literal_expression::evaluate([[maybe_unused]] cg::context& ctx) const
 {
     if(!tok.value.has_value())
     {

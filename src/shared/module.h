@@ -57,6 +57,7 @@ enum class symbol_type : std::uint8_t
     function = 1,
     type = 2,
     constant = 3,
+    macro = 4,
 };
 
 /**
@@ -67,13 +68,14 @@ enum class symbol_type : std::uint8_t
  */
 inline archive& operator&(archive& ar, symbol_type& s)
 {
-    std::uint8_t i = static_cast<std::uint8_t>(s);
+    auto i = static_cast<std::uint8_t>(s);
     ar & i;
 
     if(i != static_cast<std::uint8_t>(symbol_type::package)
        && i != static_cast<std::uint8_t>(symbol_type::function)
        && i != static_cast<std::uint8_t>(symbol_type::type)
-       && i != static_cast<std::uint8_t>(symbol_type::constant))
+       && i != static_cast<std::uint8_t>(symbol_type::constant)
+       && i != static_cast<std::uint8_t>(symbol_type::macro))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -91,6 +93,7 @@ inline std::string to_string(symbol_type s)
     case symbol_type::function: return "function";
     case symbol_type::type: return "type";
     case symbol_type::constant: return "constant";
+    case symbol_type::macro: return "macro";
     }
     return "<unknown>";
 }
@@ -149,7 +152,7 @@ inline std::string to_string(array_type type)
  */
 inline archive& operator&(archive& ar, array_type& t)
 {
-    std::uint8_t v = static_cast<std::uint8_t>(t);
+    auto v = static_cast<std::uint8_t>(t);
     ar & v;
     if(v != static_cast<std::uint8_t>(array_type::i32)
        && v != static_cast<std::uint8_t>(array_type::f32)
@@ -197,6 +200,13 @@ struct constant_table_entry
     constant_table_entry(const constant_table_entry&) = default;
     constant_table_entry(constant_table_entry&&) = default;
 
+    /** Default destructor. */
+    ~constant_table_entry() = default;
+
+    /** Default assignments. */
+    constant_table_entry& operator=(const constant_table_entry&) = default;
+    constant_table_entry& operator=(constant_table_entry&&) = default;
+
     /**
      * Initialize a constant table entry.
      *
@@ -208,10 +218,6 @@ struct constant_table_entry
     , data{std::move(data)}
     {
     }
-
-    /** Default assignments. */
-    constant_table_entry& operator=(const constant_table_entry&) = default;
-    constant_table_entry& operator=(constant_table_entry&&) = default;
 };
 
 /**
@@ -227,7 +233,7 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
         throw serialization_error("Archive has to be reading or writing.");
     }
 
-    std::uint8_t t = static_cast<std::uint8_t>(entry.type);
+    auto t = static_cast<std::uint8_t>(entry.type);
     ar & t;
 
     if(t != static_cast<std::uint8_t>(constant_type::i32)
@@ -328,6 +334,9 @@ public:
     variable_type(const variable_type&) = default;
     variable_type(variable_type&&) = default;
 
+    /** Default destructor. */
+    ~variable_type() = default;
+
     /** Default assignments. */
     variable_type& operator=(const variable_type&) = default;
     variable_type& operator=(variable_type&&) = default;
@@ -371,6 +380,7 @@ public:
      *
      * @returns The encoded type string.
      */
+    [[nodiscard]]
     std::string encode() const;
 
     /**
@@ -381,30 +391,35 @@ public:
     void set_from_encoded(const std::string& s);
 
     /** Return the base type. */
+    [[nodiscard]]
     const std::string& base_type() const noexcept
     {
         return decoded_type_string;
     }
 
     /** Whether the type is an array. */
+    [[nodiscard]]
     bool is_array() const
     {
         return array_dims.has_value();
     }
 
     /** Return the array dimensions or `std::nullopt`. */
+    [[nodiscard]]
     std::optional<std::size_t> get_array_dims() const
     {
         return array_dims;
     }
 
     /** Get the type's layout id. */
+    [[nodiscard]]
     std::optional<std::size_t> get_layout_id() const
     {
         return layout_id;
     }
 
     /** Get the import name of the module defining the type. */
+    [[nodiscard]]
     std::optional<std::size_t> get_import_index() const
     {
         return import_index;
@@ -441,6 +456,9 @@ struct variable_descriptor : public symbol
     variable_descriptor(const variable_descriptor&) = default;
     variable_descriptor(variable_descriptor&&) = default;
 
+    /** Default destructor. */
+    ~variable_descriptor() = default;
+
     /** Default assignments. */
     variable_descriptor& operator=(const variable_descriptor&) = default;
     variable_descriptor& operator=(variable_descriptor&&) = default;
@@ -474,6 +492,9 @@ struct function_signature
     function_signature() = default;
     function_signature(const function_signature&) = default;
     function_signature(function_signature&&) = default;
+
+    /** Default destructor. */
+    ~function_signature() = default;
 
     /** Default assignments. */
     function_signature& operator=(const function_signature&) = default;
@@ -520,6 +541,9 @@ struct native_function_details
     native_function_details(const native_function_details&) = default;
     native_function_details(native_function_details&&) = default;
 
+    /** Default destructor. */
+    ~native_function_details() = default;
+
     /** Default assignments. */
     native_function_details& operator=(const native_function_details&) = default;
     native_function_details& operator=(native_function_details&&) = default;
@@ -530,7 +554,7 @@ struct native_function_details
      * @param library_name The name of the library this function is implemented in.
      */
     explicit native_function_details(std::string library_name)
-    : library_name{library_name}
+    : library_name{std::move(library_name)}
     {
     }
 };
@@ -569,6 +593,9 @@ struct function_details : public symbol
     function_details() = default;
     function_details(const function_details&) = default;
     function_details(function_details&&) = default;
+
+    /** Default destructor. */
+    ~function_details() = default;
 
     /** Default assignments. */
     function_details& operator=(const function_details&) = default;
@@ -617,6 +644,9 @@ struct function_descriptor
     function_descriptor() = default;
     function_descriptor(const function_descriptor&) = default;
     function_descriptor(function_descriptor&&) = default;
+
+    /** Default destructor. */
+    ~function_descriptor() = default;
 
     /** Default assignments. */
     function_descriptor& operator=(const function_descriptor&) = default;
@@ -683,6 +713,96 @@ inline archive& operator&(archive& ar, function_descriptor& desc)
     return ar;
 }
 
+/** A directive. */
+struct directive_descriptor
+{
+    /** The directive's arguments. */
+    std::vector<std::pair<std::string, std::string>> args;
+
+    /** Default constructors. */
+    directive_descriptor() = default;
+    directive_descriptor(const directive_descriptor&) = default;
+    directive_descriptor(directive_descriptor&&) = default;
+
+    /** Default destructor. */
+    ~directive_descriptor() = default;
+
+    /** Default assignments. */
+    directive_descriptor& operator=(const directive_descriptor&) = default;
+    directive_descriptor& operator=(directive_descriptor&&) = default;
+
+    /**
+     * Construct a directive descriptor.
+     *
+     * @param args Directive arguments.
+     */
+    explicit directive_descriptor(std::vector<std::pair<std::string, std::string>> args)
+    : args{std::move(args)}
+    {
+    }
+};
+
+/**
+ * Serializer for directive descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The directive descriptor.
+ */
+inline archive& operator&(archive& ar, directive_descriptor& desc)
+{
+    ar & desc.args;
+    return ar;
+}
+
+/** Macro descriptor. */
+struct macro_descriptor
+{
+    /** Directive list. */
+    std::vector<std::pair<std::string, directive_descriptor>> directives;
+
+    /** Serialized macro AST, or `std::nullopt` (for built-in macros). */
+    std::optional<std::vector<std::byte>> serialized_ast;
+
+    /** Default constructors. */
+    macro_descriptor() = default;
+    macro_descriptor(const macro_descriptor&) = default;
+    macro_descriptor(macro_descriptor&&) = default;
+
+    /** Default destructor. */
+    ~macro_descriptor() = default;
+
+    /** Default assignments. */
+    macro_descriptor& operator=(const macro_descriptor&) = default;
+    macro_descriptor& operator=(macro_descriptor&&) = default;
+
+    /**
+     * Construct a macro descriptor.
+     *
+     * @param directives Directive list.
+     * @param serialized_ast The serialized macro AST, or `std::nullopt` for built-in macros.
+     */
+    macro_descriptor(
+      std::vector<std::pair<std::string, directive_descriptor>> directives,
+      std::optional<std::vector<std::byte>> serialized_ast)
+    : directives{std::move(directives)}
+    , serialized_ast{std::move(serialized_ast)}
+    {
+    }
+};
+
+/**
+ * Serializer for macro descriptors.
+ *
+ * @param ar The archive to use for serialization.
+ * @param desc The macro descriptor.
+ */
+inline archive& operator&(archive& ar, macro_descriptor& desc)
+{
+    ar & desc.directives;
+    ar & desc.serialized_ast;
+    return ar;
+}
+
 /** Field descriptor. */
 struct field_descriptor
 {
@@ -702,6 +822,9 @@ struct field_descriptor
     field_descriptor() = default;
     field_descriptor(const field_descriptor&) = default;
     field_descriptor(field_descriptor&&) = default;
+
+    /** Default destructor. */
+    ~field_descriptor() = default;
 
     /** Default assignments. */
     field_descriptor& operator=(const field_descriptor&) = default;
@@ -736,11 +859,11 @@ struct field_descriptor
  * Serializer for field descriptors.
  *
  * @param ar The archive to use for serialization.
- * @param info The type descriptor.
+ * @param desc The field descriptor.
  */
-inline archive& operator&(archive& ar, field_descriptor& info)
+inline archive& operator&(archive& ar, field_descriptor& desc)
 {
-    ar & info.base_type;
+    ar & desc.base_type;
     return ar;
 }
 
@@ -804,6 +927,9 @@ struct imported_symbol
     imported_symbol(const imported_symbol&) = default;
     imported_symbol(imported_symbol&&) = default;
 
+    /** Default destructor. */
+    ~imported_symbol() = default;
+
     /** Default assignments. */
     imported_symbol& operator=(const imported_symbol&) = default;
     imported_symbol& operator=(imported_symbol&&) = default;
@@ -846,13 +972,21 @@ struct exported_symbol
     /** Symbol name. */
     std::string name;
 
-    /** Function, struct descriptor or constant table index. */
-    std::variant<function_descriptor, struct_descriptor, std::size_t> desc;
+    /** Function, struct descriptor, constant table index or macro descriptor. */
+    std::variant<
+      function_descriptor,
+      struct_descriptor,
+      std::size_t,
+      macro_descriptor>
+      desc;
 
     /** Default constructors. */
     exported_symbol() = default;
     exported_symbol(const exported_symbol&) = default;
     exported_symbol(exported_symbol&&) = default;
+
+    /** Default destructor. */
+    ~exported_symbol() = default;
 
     /** Default assignments. */
     exported_symbol& operator=(const exported_symbol&) = default;
@@ -865,9 +999,15 @@ struct exported_symbol
      * @param name The symbol name.
      * @param desc The symbol's descriptor.
      */
-    exported_symbol(symbol_type type,
-                    std::string name,
-                    std::variant<function_descriptor, struct_descriptor, std::size_t> desc)
+    exported_symbol(
+      symbol_type type,
+      std::string name,
+      std::variant<
+        function_descriptor,
+        struct_descriptor,
+        std::size_t,
+        macro_descriptor>
+        desc)
     : type{type}
     , name{std::move(name)}
     , desc{std::move(desc)}
@@ -936,6 +1076,20 @@ inline archive& operator&(archive& ar, exported_symbol& s)
             ar & i;
         }
     }
+    else if(s.type == symbol_type::macro)
+    {
+        if(ar.is_reading())
+        {
+            macro_descriptor desc;
+            ar & desc;
+            s.desc = std::move(desc);
+        }
+        else if(ar.is_writing())
+        {
+            auto& desc = std::get<macro_descriptor>(s.desc);
+            ar & desc;
+        }
+    }
     else
     {
         throw serialization_error("Unknown symbol type.");
@@ -986,6 +1140,9 @@ public:
     language_module() = default;
     language_module(const language_module&) = default;
     language_module(language_module&&) = default;
+
+    /** Default destructor. */
+    ~language_module() = default;
 
     /** Default assignments. */
     language_module& operator=(const language_module&) = default;
@@ -1067,6 +1224,14 @@ public:
     void add_constant(std::string name, std::size_t i);
 
     /**
+     * Add a macro to the module.
+     *
+     * @param name The macro's name.
+     * @param desc The macro descriptor.
+     */
+    void add_macro(std::string name, macro_descriptor desc);
+
+    /**
      * Set the constant table.
      *
      * @param constants The new constant table.
@@ -1087,18 +1252,21 @@ public:
     }
 
     /** Get the module header. */
+    [[nodiscard]]
     const module_header& get_header() const
     {
         return header;
     }
 
     /** Get the binary. */
+    [[nodiscard]]
     const std::vector<std::byte>& get_binary() const
     {
         return binary;
     }
 
     /** Get whether the module is decoded. */
+    [[nodiscard]]
     bool is_decoded() const
     {
         return decoded;

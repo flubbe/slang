@@ -428,7 +428,7 @@ void exec::invoke(const std::vector<std::string>& args)
 
     if(result.count("search-path") > 0)
     {
-        std::list<std::string> v = utils::split(result["search-path"].as<std::string>(), ";");
+        std::vector<std::string> v = utils::split(result["search-path"].as<std::string>(), ";");
         for(auto& it: v)
         {
             if(verbose)

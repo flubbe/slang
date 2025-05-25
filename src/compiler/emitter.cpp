@@ -4,14 +4,12 @@
  * instruction emitter.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <set>
-#include <stdexcept>
-#include <unordered_map>
-
+#include "archives/memory.h"
+#include "compiler/ast/ast.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "codegen.h"
@@ -19,6 +17,7 @@
 #include "utils.h"
 
 namespace cg = slang::codegen;
+namespace ast = slang::ast;
 
 namespace slang
 {
@@ -46,10 +45,12 @@ void export_table_builder::add_function(
   module_::variable_type return_type,
   std::vector<module_::variable_type> arg_types)
 {
-    if(std::find_if(export_table.begin(), export_table.end(),
-                    [&name](const module_::exported_symbol& entry) -> bool
-                    { return entry.type == module_::symbol_type::function
-                             && entry.name == name; })
+    if(std::find_if(
+         export_table.begin(),
+         export_table.end(),
+         [&name](const module_::exported_symbol& entry) -> bool
+         { return entry.type == module_::symbol_type::function
+                  && entry.name == name; })
        != export_table.end())
     {
         throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", name));
@@ -73,10 +74,12 @@ void export_table_builder::update_function(
   std::size_t offset,
   std::vector<module_::variable_descriptor> locals)
 {
-    auto it = std::find_if(export_table.begin(), export_table.end(),
-                           [&name](const module_::exported_symbol& entry) -> bool
-                           { return entry.type == module_::symbol_type::function
-                                    && entry.name == name; });
+    auto it = std::find_if(
+      export_table.begin(),
+      export_table.end(),
+      [&name](const module_::exported_symbol& entry) -> bool
+      { return entry.type == module_::symbol_type::function
+               && entry.name == name; });
     if(it == export_table.end())
     {
         throw emitter_error(fmt::format("Cannot update function to export table: '{}' not found.", name));
@@ -96,10 +99,12 @@ void export_table_builder::add_native_function(
   std::vector<module_::variable_type> arg_types,
   std::string import_library)
 {
-    if(std::find_if(export_table.begin(), export_table.end(),
-                    [&name](const module_::exported_symbol& entry) -> bool
-                    { return entry.type == module_::symbol_type::function
-                             && entry.name == name; })
+    if(std::find_if(
+         export_table.begin(),
+         export_table.end(),
+         [&name](const module_::exported_symbol& entry) -> bool
+         { return entry.type == module_::symbol_type::function
+                  && entry.name == name; })
        != export_table.end())
     {
         throw emitter_error(fmt::format("Cannot add function to export table: '{}' already exists.", name));
@@ -180,10 +185,12 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
 
 void export_table_builder::add_constant(std::string name, std::size_t i)
 {
-    if(std::find_if(export_table.begin(), export_table.end(),
-                    [&name](const module_::exported_symbol& entry) -> bool
-                    { return entry.type == module_::symbol_type::constant
-                             && entry.name == name; })
+    if(std::find_if(
+         export_table.begin(),
+         export_table.end(),
+         [&name](const module_::exported_symbol& entry) -> bool
+         { return entry.type == module_::symbol_type::constant
+                  && entry.name == name; })
        != export_table.end())
     {
         throw emitter_error(fmt::format("Cannot add constant to export table: '{}' already exists.", name));
@@ -192,12 +199,33 @@ void export_table_builder::add_constant(std::string name, std::size_t i)
     export_table.emplace_back(module_::symbol_type::constant, std::move(name), i);
 }
 
+void export_table_builder::add_macro(std::string name, module_::macro_descriptor desc)
+{
+    if(std::find_if(
+         export_table.begin(),
+         export_table.end(),
+         [&name](const module_::exported_symbol& entry) -> bool
+         { return entry.type == module_::symbol_type::macro
+                  && entry.name == name; })
+       != export_table.end())
+    {
+        throw emitter_error(fmt::format("Cannot add macro to export table: '{}' already exists.", name));
+    }
+
+    export_table.emplace_back(
+      module_::symbol_type::macro,
+      name,
+      std::move(desc));
+}
+
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
 {
-    auto it = std::find_if(export_table.begin(), export_table.end(),
-                           [t, &name](const module_::exported_symbol& entry) -> bool
-                           { return entry.type == t
-                                    && entry.name == name; });
+    auto it = std::find_if(
+      export_table.begin(),
+      export_table.end(),
+      [t, &name](const module_::exported_symbol& entry) -> bool
+      { return entry.type == t
+               && entry.name == name; });
     if(it == export_table.end())
     {
         throw emitter_error(fmt::format("Symbol '{}' of type '{}' not found in export table.", name, to_string(t)));
@@ -245,6 +273,10 @@ void export_table_builder::write(module_::language_module& mod) const
         else if(entry.type == module_::symbol_type::constant)
         {
             mod.add_constant(entry.name, std::get<std::size_t>(entry.desc));
+        }
+        else if(entry.type == module_::symbol_type::macro)
+        {
+            mod.add_macro(entry.name, std::get<module_::macro_descriptor>(entry.desc));
         }
         else
         {
@@ -363,6 +395,41 @@ void instruction_emitter::collect_imports()
                 }
             }
         }
+    }
+
+    for(auto& m: ctx.macros)
+    {
+        const auto& desc = m->get_desc();
+        if(!desc.serialized_ast.has_value())
+        {
+            throw emitter_error(
+              fmt::format(
+                "Macro '{}' has empty AST.",
+                m->get_name()));
+        }
+
+        memory_read_archive ar{
+          desc.serialized_ast.value(),
+          true,
+          endian::little};
+
+        std::unique_ptr<ast::expression> macro_ast;
+        ar& ast::expression_serializer{macro_ast};
+
+        macro_ast->visit_nodes(
+          [this](const ast::expression& e) -> void
+          {
+              if(e.is_macro_invocation()
+                 && e.get_namespace_path().has_value())
+              {
+                  ctx.add_import(
+                    module_::symbol_type::macro,
+                    e.get_namespace_path().value(),    // NOLINT(bugprone-unchecked-optional-access)
+                    e.as_named_expression()->get_name().s);
+              }
+          },
+          true,
+          false);
     }
 }
 
@@ -763,27 +830,31 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         const auto* arg = static_cast<const cg::field_access_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
         // resolve references to struct and field name.
-        vle_int struct_index = 0;
-        vle_int field_index = 0;
+        vle_int struct_index{0};
+        vle_int field_index{0};
 
-        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                      [arg](const std::unique_ptr<cg::struct_>& t) -> bool
-                                      {
-                                          return t->get_name() == arg->get_struct_name()
-                                                 && t->get_import_path() == arg->get_import_path();
-                                      });
+        auto struct_it = std::find_if(
+          ctx.types.begin(),
+          ctx.types.end(),
+          [arg](const std::unique_ptr<cg::struct_>& t) -> bool
+          {
+              return t->get_name() == arg->get_struct_name()
+                     && t->get_import_path() == arg->get_import_path();
+          });
         if(struct_it != ctx.types.end())
         {
             if((*struct_it)->get_import_path().has_value())
             {
                 // find struct in import table.
-                auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                              [&struct_it](const cg::imported_symbol& s) -> bool
-                                              {
-                                                  return s.type == module_::symbol_type::type
-                                                         && s.name == (*struct_it)->get_name()
-                                                         && s.import_path == (*struct_it)->get_import_path();
-                                              });
+                auto import_it = std::find_if(
+                  ctx.imports.begin(),
+                  ctx.imports.end(),
+                  [&struct_it](const cg::imported_symbol& s) -> bool
+                  {
+                      return s.type == module_::symbol_type::type
+                             && s.name == (*struct_it)->get_name()
+                             && s.import_path == (*struct_it)->get_import_path();
+                  });
                 if(import_it == ctx.imports.end())
                 {
                     throw emitter_error(fmt::format(
@@ -791,15 +862,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                       (*struct_it)->get_name(),
                       (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
+                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
             }
             else
             {
                 // find struct in export table.
-                struct_index = utils::numeric_cast<std::int64_t>(
+                struct_index = vle_int{utils::numeric_cast<std::int64_t>(
                   exports.get_index(
                     module_::symbol_type::type,
-                    (*struct_it)->get_name()));
+                    (*struct_it)->get_name()))};
             }
         }
         else
@@ -823,7 +894,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 arg->get_member().get_name().value_or("<invalid-name>"),
                 arg->get_struct_name()));
         }
-        field_index = std::distance(members.begin(), field_it);
+        field_index = vle_int{std::distance(members.begin(), field_it)};
 
         emit(instruction_buffer, opcode::setfield);
         instruction_buffer & struct_index;
@@ -836,27 +907,31 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         const auto* arg = static_cast<const cg::field_access_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
         // resolve references to struct and field name.
-        vle_int struct_index = 0;
-        vle_int field_index = 0;
+        vle_int struct_index{0};
+        vle_int field_index{0};
 
-        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                      [arg](const std::unique_ptr<cg::struct_>& t) -> bool
-                                      {
-                                          return t->get_name() == arg->get_struct_name()
-                                                 && t->get_import_path() == arg->get_import_path();
-                                      });
+        auto struct_it = std::find_if(
+          ctx.types.begin(),
+          ctx.types.end(),
+          [arg](const std::unique_ptr<cg::struct_>& t) -> bool
+          {
+              return t->get_name() == arg->get_struct_name()
+                     && t->get_import_path() == arg->get_import_path();
+          });
         if(struct_it != ctx.types.end())
         {
             if((*struct_it)->get_import_path().has_value())
             {
                 // find struct in import table.
-                auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                              [&struct_it](const cg::imported_symbol& s) -> bool
-                                              {
-                                                  return s.type == module_::symbol_type::type
-                                                         && s.name == (*struct_it)->get_name()
-                                                         && s.import_path == (*struct_it)->get_import_path();
-                                              });
+                auto import_it = std::find_if(
+                  ctx.imports.begin(),
+                  ctx.imports.end(),
+                  [&struct_it](const cg::imported_symbol& s) -> bool
+                  {
+                      return s.type == module_::symbol_type::type
+                             && s.name == (*struct_it)->get_name()
+                             && s.import_path == (*struct_it)->get_import_path();
+                  });
                 if(import_it == ctx.imports.end())
                 {
                     throw emitter_error(
@@ -865,15 +940,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         (*struct_it)->get_name(),
                         (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
+                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
             }
             else
             {
                 // find struct in export table.
-                struct_index = utils::numeric_cast<std::int64_t>(
+                struct_index = vle_int{utils::numeric_cast<std::int64_t>(
                   exports.get_index(
                     module_::symbol_type::type,
-                    (*struct_it)->get_name()));
+                    (*struct_it)->get_name()))};
             }
         }
         else
@@ -898,7 +973,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 arg->get_member().get_name().value_or("<invalid-name>"),
                 arg->get_struct_name()));
         }
-        field_index = std::distance(members.begin(), field_it);
+        field_index = vle_int{std::distance(members.begin(), field_it)};
 
         emit(instruction_buffer, opcode::getfield);
         instruction_buffer & struct_index;
@@ -977,8 +1052,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             throw emitter_error(fmt::format("Cannot find label '{}'.", else_label));
         }
 
-        vle_int then_index = std::distance(jump_targets.begin(), then_it);
-        vle_int else_index = std::distance(jump_targets.begin(), else_it);
+        vle_int then_index{std::distance(jump_targets.begin(), then_it)};
+        vle_int else_index{std::distance(jump_targets.begin(), else_it)};
 
         emit(instruction_buffer, opcode::jnz);
         instruction_buffer & then_index;
@@ -997,7 +1072,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             throw emitter_error(fmt::format("Cannot find label '{}'.", label));
         }
 
-        vle_int index = std::distance(jump_targets.begin(), it);
+        vle_int index{std::distance(jump_targets.begin(), it)};
         emit(instruction_buffer, opcode::jmp);
         instruction_buffer & index;
     }
@@ -1009,7 +1084,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         const auto type = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
         // resolve type to index.
-        vle_int struct_index = 0;
+        vle_int struct_index{0};
 
         auto struct_it = std::find_if(
           ctx.types.begin(),
@@ -1041,15 +1116,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         (*struct_it)->get_name(),
                         (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
+                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
             }
             else
             {
                 // find struct in export table.
-                struct_index = utils::numeric_cast<std::int64_t>(
+                struct_index = vle_int{utils::numeric_cast<std::int64_t>(
                   exports.get_index(
                     module_::symbol_type::type,
-                    (*struct_it)->get_name()));
+                    (*struct_it)->get_name()))};
             }
         }
         else
@@ -1116,26 +1191,30 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         auto type = static_cast<cg::type_argument*>(args[0].get())->get_value()->get_type();    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
         // resolve type to index.
-        vle_int struct_index = 0;
+        vle_int struct_index{0};
 
-        auto struct_it = std::find_if(ctx.types.begin(), ctx.types.end(),
-                                      [&type](const std::unique_ptr<cg::struct_>& t) -> bool
-                                      {
-                                          return t->get_name() == type.get_struct_name()
-                                                 && t->get_import_path() == type.get_import_path();
-                                      });
+        auto struct_it = std::find_if(
+          ctx.types.begin(),
+          ctx.types.end(),
+          [&type](const std::unique_ptr<cg::struct_>& t) -> bool
+          {
+              return t->get_name() == type.get_struct_name()
+                     && t->get_import_path() == type.get_import_path();
+          });
         if(struct_it != ctx.types.end())
         {
             if((*struct_it)->get_import_path().has_value())
             {
                 // find type in import table.
-                auto import_it = std::find_if(ctx.imports.begin(), ctx.imports.end(),
-                                              [&struct_it](const cg::imported_symbol& s) -> bool
-                                              {
-                                                  return s.type == module_::symbol_type::type
-                                                         && s.name == (*struct_it)->get_name()
-                                                         && s.import_path == (*struct_it)->get_import_path();
-                                              });
+                auto import_it = std::find_if(
+                  ctx.imports.begin(),
+                  ctx.imports.end(),
+                  [&struct_it](const cg::imported_symbol& s) -> bool
+                  {
+                      return s.type == module_::symbol_type::type
+                             && s.name == (*struct_it)->get_name()
+                             && s.import_path == (*struct_it)->get_import_path();
+                  });
                 if(import_it == ctx.imports.end())
                 {
                     throw emitter_error(
@@ -1144,15 +1223,15 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         (*struct_it)->get_name(),
                         (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = -std::distance(ctx.imports.begin(), import_it) - 1;
+                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
             }
             else
             {
                 // find struct in export table.
-                struct_index = utils::numeric_cast<std::int64_t>(
+                struct_index = vle_int{utils::numeric_cast<std::int64_t>(
                   exports.get_index(
                     module_::symbol_type::type,
-                    (*struct_it)->get_name()));
+                    (*struct_it)->get_name()))};
             }
         }
         else
@@ -1276,6 +1355,37 @@ void instruction_emitter::run()
         }
     }
 
+    // exported macros.
+    for(auto& m: ctx.macros)
+    {
+        if(m->is_import())
+        {
+            // Macros are only valid at compile-time, so
+            // they should not appear in the import table.
+            auto import_it = std::find_if(
+              ctx.imports.cbegin(),
+              ctx.imports.cend(),
+              [&m](const cg::imported_symbol& s) -> bool
+              {
+                  return s.type == module_::symbol_type::macro
+                         && s.name == m->get_name()
+                         && s.import_path == m->get_import_path();
+              });
+            if(import_it != ctx.imports.cend())
+            {
+                throw std::runtime_error(
+                  fmt::format(
+                    "Macro '{}' from package '{}' should not appear in import table.",
+                    m->get_name(),
+                    m->get_import_path().value_or("<invalid-import-path>")));
+            }
+        }
+        else
+        {
+            exports.add_macro(m->get_name(), m->get_desc());
+        }
+    }
+
     // the export count is not allowed to change after this point, so store it here and check later.
     std::size_t export_count = exports.size();
 
@@ -1367,8 +1477,9 @@ void instruction_emitter::run()
             auto jump_it = jump_targets.find(it->get_label());
             if(jump_it != jump_targets.end())
             {
-                vle_int index = std::distance(jump_targets.begin(), jump_it);
                 emit(instruction_buffer, opcode::label);
+
+                vle_int index{std::distance(jump_targets.begin(), jump_it)};
                 instruction_buffer & index;
             }
 

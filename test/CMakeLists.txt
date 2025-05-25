@@ -28,6 +28,7 @@ add_test(NAME package COMMAND test_package)
 add_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/token.cpp
 )
 target_link_libraries(test_lexer fmt::fmt GTest::gtest GTest::gtest_main)
 target_compile_options(test_lexer PRIVATE
@@ -38,11 +39,15 @@ add_test(NAME lexer COMMAND test_lexer)
 
 add_executable(test_parser
     test_parser.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/builtins/format.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -56,11 +61,15 @@ add_test(NAME parser COMMAND test_parser)
 
 add_executable(test_codegen
     test_codegen.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/builtins/format.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -74,11 +83,15 @@ add_test(NAME codegen COMMAND test_codegen)
 
 add_executable(test_compile_ir
     test_compile_ir.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/builtins/format.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/utils.cpp
@@ -92,12 +105,16 @@ add_test(NAME compile_ir COMMAND test_compile_ir)
 
 add_executable(test_type_system
     test_type_system.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
@@ -118,12 +135,16 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_resolve
     test_resolve.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/archives/file.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
@@ -146,12 +167,16 @@ set_tests_properties(type_system PROPERTIES
 add_executable(test_output
     test_output.cpp
     ../src/archives/file.cpp
-    ../src/compiler/ast.cpp
-    ../src/compiler/eval.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/builtins/format.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
@@ -169,9 +194,6 @@ add_test(NAME output COMMAND test_output)
 set_tests_properties(output PROPERTIES 
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
-)
-set_tests_properties(output PROPERTIES 
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_SETUP output
 )
 
@@ -185,6 +207,37 @@ target_compile_options(test_serialization PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME serialization COMMAND test_serialization)
+
+add_executable(test_ast_serialization
+    test_ast_serialization.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/builtins/format.cpp
+    ../src/archives/file.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
+    ../src/resolve.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_ast_serialization fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_ast_serialization PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME ast_serialization COMMAND test_ast_serialization)
+set_tests_properties(ast_serialization PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+    FIXTURES_REQUIRED needs_std
+)
 
 add_executable(test_filemanager
     test_filemanager.cpp
@@ -319,6 +372,106 @@ add_compile_exec_fail_test(
     "slang invalid main signature 2"
     FALSE
     test/test_invalid_main_signature2
+)
+add_compile_exec_test(
+    "slang macros"
+    TRUE
+    test/macros/test_macros
+)
+add_compile_exec_test(
+    "slang macros recursion"
+    TRUE
+    test/macros/test_recursion
+)
+add_compile_fail_test(
+    "slang macros fail 1"
+    FALSE
+    test/macros/test_fail1
+)
+add_compile_fail_test(
+    "slang macros fail 2"
+    FALSE
+    test/macros/test_fail2
+)
+add_compile_fail_test(
+    "slang macros fail 3"
+    FALSE
+    test/macros/test_fail3
+)
+add_compile_fail_test(
+    "slang macros fail 4"
+    FALSE
+    test/macros/test_fail4
+)
+add_compile_fail_test(
+    "slang macros fail 5"
+    FALSE
+    test/macros/test_fail5
+)
+add_compile_fail_test(
+    "slang macros fail 6"
+    FALSE
+    test/macros/test_fail6 --search-path test/macros
+)
+add_compile_fail_test(
+    "slang macros fail 7"
+    FALSE
+    test/macros/test_fail7 --search-path test/macros
+)
+add_compile_fail_test(
+    "slang macros fail 8"
+    FALSE
+    test/macros/test_fail8
+)
+add_compile_fail_test(
+    "slang macros fail 9"
+    FALSE
+    test/macros/test_fail9
+)
+add_compile_fail_test(
+    "slang macros fail 10"
+    FALSE
+    test/macros/test_fail10
+)
+add_compile_fail_test(
+    "slang macros fail 11"
+    FALSE
+    test/macros/test_fail11
+)
+add_compile_fail_test(
+    "slang macros fail 12"
+    FALSE
+    test/macros/test_fail12
+)
+add_compile_exec_test(
+    "slang macro import"
+    TRUE
+    test/macros/test_import --search-path test/macros
+)
+set_tests_properties(
+    "slang macro import (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_macros
+)
+add_compile_exec_test(
+    "slang macro transitive import 1"
+    TRUE
+    test/macros/test_transitive_import1 --search-path test/macros
+)
+set_tests_properties(
+    "slang macro transitive import 1 (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_import
+)
+add_compile_exec_test(
+    "slang macro transitive import 2"
+    TRUE
+    test/macros/test_transitive_import2 --search-path test/macros
+)
+set_tests_properties(
+    "slang macro transitive import 2 (default, compile)" 
+    PROPERTIES FIXTURES_REQUIRED 
+    test_transitive_import1
 )
 add_compile_exec_test(
     "slang math"

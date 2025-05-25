@@ -4,7 +4,7 @@
  * the parser. generates an AST from the lexer output.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-#include "ast.h"
+#include "compiler/ast/ast.h"
 #include "lexer.h"
 
 namespace slang
@@ -103,6 +103,9 @@ protected:
 
     /** Directive stack with entries `(name, restore_function)`. */
     std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
+
+    /** Macro AST's. Point into the parsed AST. */
+    std::vector<ast::expression*> macro_asts;
 
     /**
      * Get the next token and store it in the token buffer `current_token`.
@@ -237,6 +240,12 @@ protected:
     /** Parse an return statement. */
     std::unique_ptr<ast::return_statement> parse_return();
 
+    /** Parse a macro. */
+    std::unique_ptr<ast::macro_expression> parse_macro();
+
+    /** Parse a macro branch. */
+    std::unique_ptr<ast::macro_branch> parse_macro_branch();
+
     /** Push a directive onto the directive stack. */
     void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
 
@@ -269,6 +278,18 @@ public:
     std::shared_ptr<ast::expression> get_ast() const
     {
         return ast;
+    }
+
+    /** Get the macros (pointers into the AST). */
+    std::vector<ast::expression*>& get_macro_asts()
+    {
+        return macro_asts;
+    }
+
+    /** Get the macros (pointers into the AST). */
+    const std::vector<ast::expression*>& get_macro_asts() const
+    {
+        return macro_asts;
     }
 };
 

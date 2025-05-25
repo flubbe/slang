@@ -153,7 +153,7 @@ public:
     }
 
     /** Default destructor. */
-    virtual ~context() = default;
+    ~context() = default;
 
     /**
      * Register a native function to a module.

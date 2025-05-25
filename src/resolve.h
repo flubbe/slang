@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -38,6 +38,25 @@ class module_loader;
 namespace slang::resolve
 {
 
+/**
+ * Generate an import name.
+ *
+ * @param name The name of the symbol.
+ * @param transitive Whether this is a transitive import.
+ * @returns Returns the import name.
+ */
+inline std::string make_import_name(
+  const std::string& name,
+  bool transitive)
+{
+    if(transitive)
+    {
+        return std::string("$") + name;
+    }
+
+    return name;
+}
+
 /** A resolve error. */
 class resolve_error : public std::runtime_error
 {
@@ -63,16 +82,6 @@ public:
     resolve_error(const token_location& loc, const std::string& message);
 };
 
-/** A constant descriptor. */
-struct constant_descriptor
-{
-    /** The constant type. */
-    module_::constant_type type;
-
-    /** The constant's value. */
-    std::variant<std::int32_t, float, std::string> value;
-};
-
 /** Resolver context. */
 class context
 {
@@ -91,15 +100,19 @@ protected:
      * already resolved.
      *
      * @param import_name The module's import name.
+     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
      * @returns A reference to the resolved module.
      */
-    module_::module_resolver& resolve_module(const std::string& import_name);
+    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
 
 public:
     /** Default constructors. */
     context() = delete;
     context(const context&) = default;
     context(context&&) = default;
+
+    /** Default destructor. */
+    ~context() = default;
 
     /** Default assignments. */
     context& operator=(const context&) = delete;
@@ -119,9 +132,21 @@ public:
      * Resolve imports from a type context.
      *
      * @param ctx The code generation context.
-     * @param ctx The typing context.
+     * @param type_ctx The typing context.
      */
     void resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+
+    /**
+     * Resolve macros.
+     *
+     * @note Macro resolution might lead to additional imports being needed. That is,
+     *       if the function returns `true`, import resolution needs to be run.
+     *
+     * @param ctx The code generation context.
+     * @param type_ctx The typing context.
+     * @returns `true` if macros were resolved, and `false` otherwise.
+     */
+    static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
 };
 
 }    // namespace slang::resolve

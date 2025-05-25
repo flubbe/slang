@@ -4,7 +4,7 @@
  * Code generation tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -45,7 +45,14 @@ TEST(codegen, create_function)
 
     ASSERT_NE(fn_block, other_fn_block);
 
-    EXPECT_THROW(ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {}), cg::codegen_error);
+    EXPECT_THROW(static_cast<void>(    // ignore return value, since the function should throw anyway.
+                   ctx.create_function(
+                     "test",
+                     std::make_unique<cg::value>(
+                       cg::type{
+                         cg::type_class::i32, 0}),
+                     {})),
+                 cg::codegen_error);
 }
 
 TEST(codegen, insertion_points)

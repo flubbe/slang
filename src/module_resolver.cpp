@@ -17,8 +17,10 @@ namespace slang::module_
 
 module_resolver::module_resolver(
   file_manager& file_mgr,
-  fs::path path)
+  fs::path path,
+  bool transitive)
 : path{std::move(path)}
+, transitive{transitive}
 {
     auto read_ar = file_mgr.open(this->path, slang::file_manager::open_mode::read);
     (*read_ar) & mod;

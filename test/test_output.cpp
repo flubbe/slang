@@ -4,7 +4,7 @@
  * Compiler output tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -13,14 +13,14 @@
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 
+#include "archives/file.h"
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
+#include "compiler/ast/node_registry.h"
 #include "shared/module.h"
 #include "resolve.h"
-
-#include "archives/file.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;

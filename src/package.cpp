@@ -62,7 +62,7 @@ void package::make_persistent()
     }
 }
 
-std::list<std::string> package::split(const std::string& s)
+std::vector<std::string> package::split(const std::string& s)
 {
     return slang::utils::split(s, delimiter);
 }
@@ -85,7 +85,7 @@ bool package::is_valid_name(const std::string& name)
     }
 
     // split name at "::" occurences.
-    std::list<std::string> components = split(name);
+    auto components = split(name);
 
     // validate components
     return std::all_of(components.begin(), components.end(), is_valid_name_component);
@@ -155,7 +155,7 @@ package package_manager::open(const std::string& name, bool create)
     }
 
     fs::path package_path = package_root;
-    std::list<std::string> components = package::split(name);
+    std::vector<std::string> components = package::split(name);
     for(const auto& c: components)
     {
         package_path /= c;
@@ -192,7 +192,7 @@ void package_manager::remove(const std::string& name)
     }
 
     fs::path package_path = package_root;
-    std::list<std::string> components = package::split(name);
+    std::vector<std::string> components = package::split(name);
     for(const auto& c: components)
     {
         package_path /= c;
@@ -215,7 +215,7 @@ bool package_manager::exists(const std::string& name) const
 
     fs::path package_path = package_root;
 
-    std::list<std::string> components = package::split(name);
+    std::vector<std::string> components = package::split(name);
     for(const auto& c: components)
     {
         package_path /= c;
@@ -241,7 +241,7 @@ std::vector<std::string> package_manager::get_package_names(bool include_sub_pac
             throw std::runtime_error(fmt::format("The parent package '{}' does not exist.", *parent));
         }
 
-        std::list<std::string> components = slang::utils::split(*parent, package::delimiter);
+        std::vector<std::string> components = slang::utils::split(*parent, package::delimiter);
         for(auto& c: components)
         {
             search_root /= c;

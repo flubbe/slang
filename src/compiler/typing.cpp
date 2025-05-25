@@ -11,7 +11,7 @@
 #include <fmt/core.h>
 
 #include "shared/type_utils.h"
-#include "ast.h"
+#include "ast/ast.h"
 #include "package.h"
 #include "type.h"
 #include "typing.h"
@@ -25,6 +25,23 @@ namespace slang::typing
 /*
  * type implementation.
  */
+
+archive& operator&(archive& ar, type_class& cls)
+{
+    auto i = static_cast<std::uint8_t>(cls);
+    ar & i;
+
+    if(i > static_cast<std::uint8_t>(type_class::last))
+    {
+        throw serialization_error(
+          fmt::format(
+            "Type class out of range ({} >= {}).",
+            i,
+            static_cast<std::uint8_t>(type_class::last)));
+    }
+
+    return ar;
+}
 
 type_info::type_info(
   const token& base,
@@ -70,6 +87,13 @@ bool type_info::operator!=(const type_info& other) const
     return !(*this == other);
 }
 
+void type_info::serialize(archive& ar)
+{
+    ar & location;
+    ar & name;
+    ar & cls;
+}
+
 type_info* type_info::get_element_type()
 {
     if(!is_array())
@@ -85,10 +109,12 @@ type_info* type_info::get_element_type()
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).",
-                          *name, components.size())
-            : fmt::format("Inconsistent component count for array type ({} components, expected 1).",
-                          components.size());
+            ? fmt::format(
+                "Inconsistent component count for array type '{}' ({} components, expected 1).",
+                *name, components.size())
+            : fmt::format(
+                "Inconsistent component count for array type ({} components, expected 1).",
+                components.size());
         throw type_error(location, error_string);
     }
 
@@ -110,10 +136,12 @@ const type_info* type_info::get_element_type() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Inconsistent component count for array type '{}' ({} components, expected 1).",
-                          *name, components.size())
-            : fmt::format("Inconsistent component count for array type ({} components, expected 1).",
-                          components.size());
+            ? fmt::format(
+                "Inconsistent component count for array type '{}' ({} components, expected 1).",
+                *name, components.size())
+            : fmt::format(
+                "Inconsistent component count for array type ({} components, expected 1).",
+                components.size());
         throw type_error(location, error_string);
     }
 
@@ -135,8 +163,9 @@ const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Inconsistent component count for function signature '{}' (0 components, expected at least 1).",
-                          *name)
+            ? fmt::format(
+                "Inconsistent component count for function signature '{}' (0 components, expected at least 1).",
+                *name)
             : std::string{"Inconsistent component count for function signature (0 components, expected at least 1)."};
         throw type_error(location, error_string);
     }
@@ -156,6 +185,17 @@ std::uint64_t type_info::get_type_id() const
     }
 
     return *type_id;
+}
+
+std::string type_info::to_string() const
+{
+    if(is_array())
+    {
+        return fmt::format(
+          "[{}]",
+          get_element_type()->to_string());
+    }
+    return name.value_or("<none>");
 }
 
 /*
@@ -247,19 +287,23 @@ std::string scope::to_string() const
 
 void context::add_base_type(std::string name, bool is_reference_type)
 {
-    auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name](const std::pair<type_info, std::uint64_t>& t) -> bool
-                           {
-                               return name == ty::to_string(t.first);
-                           });
+    auto it = std::find_if(
+      type_map.begin(),
+      type_map.end(),
+      [&name](const std::pair<type_info, std::uint64_t>& t) -> bool
+      {
+          return name == ty::to_string(t.first);
+      });
     if(it != type_map.end())
     {
         throw type_error(fmt::format("Type '{}' already exists.", name));
     }
 
-    if(std::find_if(base_types.begin(), base_types.end(),
-                    [&name](const std::pair<std::string, bool>& v) -> bool
-                    { return v.first == name; })
+    if(std::find_if(
+         base_types.begin(),
+         base_types.end(),
+         [&name](const std::pair<std::string, bool>& v) -> bool
+         { return v.first == name; })
        != base_types.end())
     {
         throw type_error(fmt::format("Inconsistent type context: Type '{}' exists in base types, but not in type map.", name));
@@ -271,7 +315,21 @@ void context::add_base_type(std::string name, bool is_reference_type)
     base_types.emplace_back(std::move(name), is_reference_type);
 }
 
-void context::add_import(std::vector<token> path)
+/**
+ * Convert a path into a string.
+ *
+ * @param path The path to convert.
+ * @returns The path concatenated into a string.
+ */
+static std::string to_string(const std::vector<token>& path)
+{
+    auto transform = [](const token& p) -> std::string
+    { return p.s; };
+
+    return utils::join(path, {transform}, package::delimiter);
+}
+
+void context::add_import(std::vector<token> path, bool transitive)
 {
     if(path.empty())
     {
@@ -283,10 +341,157 @@ void context::add_import(std::vector<token> path)
         throw type_error(path[0].location, fmt::format("Import statement can only occur in the global scope."));
     }
 
-    auto transform = [](const token& p) -> std::string
-    { return p.s; };
+    add_import(::ty::to_string(path), transitive);
+}
 
-    imported_modules.emplace_back(utils::join(path, {transform}, package::delimiter));
+void context::add_import(std::string path, bool transitive)
+{
+    auto it = std::find_if(
+      imported_modules.begin(),
+      imported_modules.end(),
+      [&path](const imported_module& m) -> bool
+      {
+          return path == m.path;
+      });
+
+    if(it != imported_modules.end())
+    {
+        if(!transitive && it->transitive)
+        {
+            it->transitive = false;
+
+            /*
+             * update all symbols imported from this package.
+             *
+             * 1. update constants.
+             */
+
+            auto c_mod_it = imported_constants.find(path);
+            if(c_mod_it != imported_constants.end())
+            {
+                for(auto& sym: c_mod_it->second)
+                {
+                    if(sym.name.s.at(0) != '$')
+                    {
+                        throw type_error(
+                          fmt::format(
+                            "Inconsistent transitivity information for import '{}::{}'.",
+                            path, sym.name.s));
+                    }
+                    sym.name.s = sym.name.s.substr(1);
+                }
+            }
+
+            /*
+             * 2. update functions.
+             */
+
+            auto fn_mod_it = imported_functions.find(path);
+            if(fn_mod_it != imported_functions.end())
+            {
+                std::vector<std::string> fn_names;
+
+                // first part: update stored names and store keys.
+                for(auto& fn: fn_mod_it->second)
+                {
+                    if(fn.first.at(0) != '$' || fn.second.name.s.at(0) != '$')
+                    {
+                        throw type_error(
+                          fmt::format(
+                            "Inconsistent transitivity information for import '{}::{}'.",
+                            path, fn.second.name.s));
+                    }
+
+                    fn.second.name.s = fn.second.name.s.substr(1);
+                    fn_names.emplace_back(fn.first);
+                }
+
+                // second part: update keys.
+                for(auto& key: fn_names)
+                {
+                    auto node = fn_mod_it->second.extract(key);
+                    node.key() = node.key().substr(1);
+                    fn_mod_it->second.insert(std::move(node));
+                }
+            }
+
+            /*
+             * 3. update types/structs.
+             */
+
+            std::vector<std::string> struct_names;
+
+            // first part: update stored names and store keys.
+            for(auto& it: global_scope.structs)
+            {
+                if(it.second.import_path != path)
+                {
+                    continue;
+                }
+
+                if(it.first.at(0) != '$' || it.second.name.s.at(0) != '$')
+                {
+                    throw type_error(
+                      fmt::format(
+                        "Inconsistent transitivity information for import '{}::{}'.",
+                        path, it.second.name.s));
+                }
+
+                it.second.name.s = it.second.name.s.substr(1);
+                struct_names.emplace_back(it.first);
+            }
+
+            // second part: update keys.
+            for(auto& key: struct_names)
+            {
+                auto node = global_scope.structs.extract(key);
+                node.key() = node.key().substr(1);
+                global_scope.structs.insert(std::move(node));
+            }
+        }
+        else if(transitive && !it->transitive)
+        {
+            throw std::runtime_error(
+              fmt::format(
+                "Tried to make non-transitive import '{}' transitive.",
+                path));
+        }
+    }
+    else
+    {
+        imported_modules.emplace_back(
+          imported_module{
+            path,
+            transitive});
+    }
+}
+
+bool context::is_transitive_import(const std::string& namespace_path) const
+{
+    for(const auto& mod: imported_modules)
+    {
+        if(mod.path == namespace_path)
+        {
+            return mod.transitive;
+        }
+    }
+
+    throw type_error(
+      fmt::format(
+        "No module named '{}' found when checking transitive imports.",
+        namespace_path));
+}
+
+bool context::has_import(const std::string& path)
+{
+    return std::find_if(
+             imported_modules.cbegin(),
+             imported_modules.cend(),
+             [&path](const imported_module& m) -> bool
+             {
+                 return path == m.path;
+             })
+           != imported_modules.cend();
 }
 
 void context::add_variable(
@@ -335,8 +540,9 @@ void context::add_variable(
         {
             throw type_error(
               name.location,
-              fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
-                          name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+              fmt::format(
+                "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
         }
 
         current_scope->variables.insert({name.s, {name, std::move(var_type)}});
@@ -389,8 +595,10 @@ void context::add_function(
         {
             throw type_error(
               name.location,
-              fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
-                          name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
+              fmt::format(
+                "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+                name.s, current_scope->get_qualified_name(),
+                slang::to_string(tok->location)));
         }
 
         auto func_type = get_function_type(name, arg_types, ret_type);
@@ -408,8 +616,10 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
     {
         throw type_error(
           name.location,
-          fmt::format("Name '{}' already defined in scope '{}'. The previous definition is here: {}",
-                      name.s, global_scope.get_qualified_name(), slang::to_string(tok->location)));
+          fmt::format(
+            "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
+            name.s, global_scope.get_qualified_name(),
+            slang::to_string(tok->location)));
     }
 
     // add to global scope.
@@ -430,12 +640,14 @@ bool context::has_type(const std::string& name, const std::optional<std::string>
     }
 
     // search type map.
-    auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
-                           {
-                               return t.first.to_string() == name
-                                      && t.first.get_import_path() == import_path;
-                           });
+    auto it = std::find_if(
+      type_map.begin(),
+      type_map.end(),
+      [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
+      {
+          return t.first.to_string() == name
+                 && t.first.get_import_path() == import_path;
+      });
     if(it != type_map.end())
     {
         return true;
@@ -458,16 +670,79 @@ bool context::has_type(const type_info& ty) const
     return has_type(ty.to_string(), ty.get_import_path());
 }
 
+void context::add_macro(std::string name, std::optional<std::string> import_path)
+{
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
+
+    if(import_path.has_value())
+    {
+        auto mod_it = imported_macros.find(import_path.value());
+        if(mod_it == imported_macros.end())
+        {
+            imported_macros.insert({import_path.value(), {std::move(name)}});
+        }
+        else
+        {
+            auto it = std::find(mod_it->second.begin(), mod_it->second.end(), name);
+            if(it != mod_it->second.end())
+            {
+                throw type_error(
+                  fmt::format(
+                    "The module '{}' containing the symbol '{}' already is imported.",
+                    *import_path, name));
+            }
+
+            mod_it->second.emplace_back(std::move(name));
+        }
+    }
+    else
+    {
+        auto it = std::find(macros.begin(), macros.end(), name);
+        if(it != macros.end())
+        {
+            throw type_error(
+              fmt::format(
+                "The symbol '{}' already exists in the current module.",
+                name));
+        }
+
+        macros.emplace_back(std::move(name));
+    }
+}
+
+bool context::has_macro(const std::string& name, const std::optional<std::string>& import_path) const
+{
+    if(import_path.has_value())
+    {
+        auto mod_it = imported_macros.find(import_path.value());
+        if(mod_it == imported_macros.end())
+        {
+            return false;
+        }
+
+        return std::find(mod_it->second.begin(), mod_it->second.end(), name) != mod_it->second.end();
+    }
+    else
+    {
+        return std::find(macros.begin(), macros.end(), name) != macros.end();
+    }
+}
+
 bool context::is_reference_type(const std::string& name, const std::optional<std::string>& import_path) const
 {
     if(!import_path.has_value())
     {
         // check base types.
-        auto base_it = std::find_if(base_types.begin(), base_types.end(),
-                                    [&name](const std::pair<std::string, bool>& v) -> bool
-                                    {
-                                        return v.first == name;
-                                    });
+        auto base_it = std::find_if(
+          base_types.begin(),
+          base_types.end(),
+          [&name](const std::pair<std::string, bool>& v) -> bool
+          {
+              return v.first == name;
+          });
         if(base_it != base_types.end())
         {
             return base_it->second;
@@ -555,27 +830,29 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
 
 type_info context::get_type(const std::string& name, bool array, const std::optional<std::string>& import_path)
 {
-    auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&name, array, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
-                           {
-                               if(array != t.first.is_array())
-                               {
-                                   return false;
-                               }
+    auto it = std::find_if(
+      type_map.begin(),
+      type_map.end(),
+      [&name, array, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
+      {
+          if(array != t.first.is_array())
+          {
+              return false;
+          }
 
-                               if(!ty::is_builtin_type(name) && import_path != t.first.get_import_path())
-                               {
-                                   return false;
-                               }
+          if(!ty::is_builtin_type(name) && import_path != t.first.get_import_path())
+          {
+              return false;
+          }
 
-                               if(array && t.first.is_array())
-                               {
-                                   const type_info* element_type = t.first.get_element_type();
-                                   return name == ty::to_string(*element_type);
-                               }
+          if(array && t.first.is_array())
+          {
+              const type_info* element_type = t.first.get_element_type();
+              return name == ty::to_string(*element_type);
+          }
 
-                               return name == ty::to_string(t.first);
-                           });
+          return name == ty::to_string(t.first);
+      });
     if(it != type_map.end())
     {
         return it->first;
@@ -584,26 +861,29 @@ type_info context::get_type(const std::string& name, bool array, const std::opti
     // for arrays, also search for the base type.
     if(array)
     {
-        auto it = std::find_if(type_map.begin(), type_map.end(),
-                               [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
-                               {
-                                   if(t.first.is_array())
-                                   {
-                                       return false;
-                                   }
+        auto it = std::find_if(
+          type_map.begin(),
+          type_map.end(),
+          [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
+          {
+              if(t.first.is_array())
+              {
+                  return false;
+              }
 
-                                   return name == ty::to_string(t.first)
-                                          && import_path == t.first.get_import_path();
-                               });
+              return name == ty::to_string(t.first)
+                     && import_path == t.first.get_import_path();
+          });
         if(it != type_map.end())
         {
             // add the array type to the type map.
             auto type_id = generate_type_id();
-            type_map.emplace_back(type_info{
-                                    token{name, {0, 0}},
-                                    array ? type_class::tc_array : type_class::tc_plain,
-                                    type_id, import_path},
-                                  type_id);
+            type_map.emplace_back(
+              type_info{
+                token{name, {0, 0}},
+                array ? type_class::tc_array : type_class::tc_plain,
+                type_id, import_path},
+              type_id);
             return type_map.back().first;
         }
     }
@@ -623,22 +903,24 @@ type_info context::get_unresolved_type(token name, type_class cls, std::optional
         import_path = std::nullopt;
     }
 
-    auto it = std::find_if(unresolved_types.begin(), unresolved_types.end(),
-                           [&name, cls, &import_path](const type_info& t) -> bool
-                           {
-                               if(import_path != t.get_import_path())
-                               {
-                                   return false;
-                               }
+    auto it = std::find_if(
+      unresolved_types.begin(),
+      unresolved_types.end(),
+      [&name, cls, &import_path](const type_info& t) -> bool
+      {
+          if(import_path != t.get_import_path())
+          {
+              return false;
+          }
 
-                               if(cls == type_class::tc_array && t.is_array())
-                               {
-                                   const type_info* element_type = t.get_element_type();
-                                   return element_type != nullptr && (name.s == ty::to_string(*element_type));
-                               }
+          if(cls == type_class::tc_array && t.is_array())
+          {
+              const type_info* element_type = t.get_element_type();
+              return element_type != nullptr && (name.s == ty::to_string(*element_type));
+          }
 
-                               return name.s == ty::to_string(t);
-                           });
+          return name.s == ty::to_string(t);
+      });
     if(it != unresolved_types.end())
     {
         return *it;
@@ -691,12 +973,14 @@ void context::resolve(type_info& ty)
     }
 
     // resolve type.
-    auto it = std::find_if(type_map.begin(), type_map.end(),
-                           [&ty](const std::pair<type_info, std::uint64_t>& t) -> bool
-                           {
-                               return ty.to_string() == t.first.to_string()
-                                      && ty.get_import_path() == t.first.get_import_path();
-                           });
+    auto it = std::find_if(
+      type_map.begin(),
+      type_map.end(),
+      [&ty](const std::pair<type_info, std::uint64_t>& t) -> bool
+      {
+          return ty.to_string() == t.first.to_string()
+                 && ty.get_import_path() == t.first.get_import_path();
+      });
     if(it == type_map.end())
     {
         // add array types.
@@ -817,8 +1101,11 @@ type_info context::get_function_type(const token& name, const std::vector<type_i
 {
     auto transform = [](const type_info& t) -> std::string
     { return ty::to_string(t); };
-    std::string type_string = fmt::format("fn {}({}) -> {}", name.s, slang::utils::join(arg_types, {transform}, ", "),
-                                          ty::to_string(ret_type));
+    std::string type_string = fmt::format(
+      "fn {}({}) -> {}",
+      name.s,
+      slang::utils::join(arg_types, {transform}, ", "),
+      ty::to_string(ret_type));
 
     return get_unresolved_type({type_string, name.location}, type_class::tc_function);
 }
@@ -840,16 +1127,22 @@ const function_signature& context::get_function_signature(const token& name, con
         // check if the module was imported.
         for(const auto& it: imported_modules)
         {
-            if(it == *import_path)
+            if(it.path == *import_path)
             {
-                throw type_error(name.location, fmt::format("Function '{}' not found in '{}'.", name.s, *import_path));
+                throw type_error(
+                  name.location,
+                  fmt::format(
+                    "Function '{}' not found in '{}'.",
+                    name.s,
+                    *import_path));
             }
         }
         throw type_error(
           name.location,
           fmt::format(
             "Cannot resolve function '{}' in module '{}', since the module is not imported.",
-            name.s, *import_path));
+            name.s,
+            *import_path));
     }
 
     for(scope* s = current_scope; s != nullptr; s = s->parent)
@@ -982,9 +1275,10 @@ const token& context::get_scope_name() const
 }
 
 const struct_definition*
-  context::get_struct_definition(token_location loc,
-                                 const std::string& name,
-                                 const std::optional<std::string>& import_path) const
+  context::get_struct_definition(
+    token_location loc,
+    const std::string& name,
+    const std::optional<std::string>& import_path) const
 {
     for(scope* s = current_scope; s != nullptr; s = s->parent)
     {
@@ -1038,7 +1332,7 @@ std::string context::to_string() const
     std::string ret = "Imports:\n";
     for(const auto& it: imported_modules)
     {
-        ret += fmt::format("* {}\n", it);
+        ret += fmt::format("* {}{}\n", it.path, it.transitive ? " [transitive]" : "");
     }
 
     ret += "\nType map:\n";

@@ -4,13 +4,14 @@
  * type representation in the typing system.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "token.h"
@@ -21,11 +22,22 @@ namespace slang::typing
 /** Type class. */
 enum class type_class : std::uint8_t
 {
-    tc_plain = 0,   /** Plain (non-array, non-struct, non-function) type. */
-    tc_array = 1,   /** Array type. */
-    tc_struct = 2,  /** Struct type. */
-    tc_function = 3 /** Function type. */
+    tc_plain = 0,    /** Plain (non-array, non-struct, non-function) type. */
+    tc_array = 1,    /** Array type. */
+    tc_struct = 2,   /** Struct type. */
+    tc_function = 3, /** Function type. */
+
+    last = tc_function /** Last element. */
 };
+
+/**
+ * `type_class` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param cls The type class to serialize.
+ * @returns The input archive.
+ */
+archive& operator&(archive& ar, type_class& cls);
 
 /** Type representation. */
 class type_info
@@ -73,10 +85,11 @@ public:
      * @param type_id The type's id, or `std::nullopt` for an unresolved type.
      * @param import_path Optional import path.
      */
-    type_info(const token& base,
-              type_class cls,
-              std::optional<std::uint64_t> type_id,
-              std::optional<std::string> import_path = std::nullopt);
+    type_info(
+      const token& base,
+      type_class cls,
+      std::optional<std::uint64_t> type_id,
+      std::optional<std::string> import_path = std::nullopt);
 
     /**
      * Return if two types are equal.
@@ -91,6 +104,13 @@ public:
      * @throws Throws a `type_error` if the types are not both resolved.
      */
     bool operator!=(const type_info& other) const;
+
+    /**
+     * Serialize `type_info`.
+     *
+     * @param ar The archive to use for serialization.
+     */
+    void serialize(archive& ar);
 
     /** Get the token location. */
     const token_location& get_location() const
@@ -168,14 +188,7 @@ public:
      *
      * @return The string representation of this type.
      */
-    std::string to_string() const
-    {
-        if(is_array())
-        {
-            return fmt::format("[{}]", get_element_type()->to_string());
-        }
-        return *name;
-    }
+    std::string to_string() const;
 
     /**
      * Helper to create an unresolved type.
@@ -184,11 +197,27 @@ public:
      * @param cls The type class.
      * @param import_path The import path, or `std::nullopt` for the current module.
      */
-    static type_info make_unresolved(token base, type_class cls, std::optional<std::string> import_path)
+    static type_info make_unresolved(
+      token base,
+      type_class cls,
+      std::optional<std::string> import_path)
     {
         return {std::move(base), cls, std::nullopt, std::move(import_path)};
     }
 };
+
+/**
+ * Serialize `type_info`.
+ *
+ * @param ar The archive to use for serialization.
+ * @param info The type info to serialize.
+ * @returns The input archive.
+ */
+inline archive& operator&(archive& ar, type_info& info)
+{
+    info.serialize(ar);
+    return ar;
+}
 
 /**
  * Convert a type to a string.
