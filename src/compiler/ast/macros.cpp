@@ -496,6 +496,8 @@ void macro_expression::collect_names(
         std::move(directives),
         ar.get_buffer()},
       get_namespace_path());
+
+    type_ctx.add_macro(name.s, get_namespace_path());
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(
@@ -519,30 +521,30 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
     visit_nodes(
       [this, &ctx](expression& e) -> void
       {
-          if(e.get_id() != ast::node_identifier::namespace_access_expression)
-          {
-              return;
-          }
+          std::optional<std::string> namespace_path{std::nullopt};
 
-          e.update_namespace();
-
-          auto namespace_path = e.get_namespace_path();
-          if(!namespace_path.has_value())
+          if(e.get_id() == ast::node_identifier::namespace_access_expression)
           {
-              throw ty::type_error(
-                loc,
-                fmt::format(
-                  "Unable to get namespace in macro expansion at {}.",
-                  ::slang::to_string(e.get_location())));
-          }
+              e.update_namespace();
 
-          if(!ctx.has_import(namespace_path.value()))
-          {
-              throw ty::type_error(
-                loc,
-                fmt::format(
-                  "Unresolved import '{}',",
-                  namespace_path.value()));
+              namespace_path = e.get_namespace_path();
+              if(!namespace_path.has_value())
+              {
+                  throw ty::type_error(
+                    loc,
+                    fmt::format(
+                      "Unable to get namespace in macro expansion at {}.",
+                      ::slang::to_string(e.get_location())));
+              }
+
+              if(!ctx.has_import(namespace_path.value()))
+              {
+                  throw ty::type_error(
+                    loc,
+                    fmt::format(
+                      "Unresolved import '{}',",
+                      namespace_path.value()));
+              }
           }
 
           if(e.is_call_expression())
@@ -558,8 +560,11 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
                   throw ty::type_error(
                     loc,
                     fmt::format(
-                      "Unresolved symbol '{}::{}',",
-                      namespace_path.value(), e.as_macro_invocation()->get_name().s));
+                      "Unresolved symbol '{}{}',",
+                      namespace_path.has_value()
+                        ? fmt::format("{}::", namespace_path.value())
+                        : std::string{""},
+                      e.as_macro_invocation()->get_name().s));
               }
           }
       },

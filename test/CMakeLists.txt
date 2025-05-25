@@ -433,6 +433,16 @@ add_compile_fail_test(
     FALSE
     test/macros/test_fail10
 )
+add_compile_fail_test(
+    "slang macros fail 11"
+    FALSE
+    test/macros/test_fail11
+)
+add_compile_fail_test(
+    "slang macros fail 12"
+    FALSE
+    test/macros/test_fail12
+)
 add_compile_exec_test(
     "slang macro import"
     TRUE
