@@ -422,6 +422,11 @@ public:
         return slang::utils::join(namespace_stack, "::");
     }
 
+    /** Update namespace. */
+    virtual void update_namespace()
+    {
+    }
+
     /**
      * Type checking.
      *
@@ -895,9 +900,7 @@ public:
     [[nodiscard]]
     call_expression* as_call_expression() override
     {
-        auto expr_namespace_stack = namespace_stack;
-        expr_namespace_stack.push_back(name.s);
-        expr->set_namespace(std::move(expr_namespace_stack));
+        update_namespace();
         return expr->as_call_expression();
     }
 
@@ -910,9 +913,7 @@ public:
     [[nodiscard]]
     macro_invocation* as_macro_invocation() override
     {
-        auto expr_namespace_stack = namespace_stack;
-        expr_namespace_stack.push_back(name.s);
-        expr->set_namespace(std::move(expr_namespace_stack));
+        update_namespace();
         return expr->as_macro_invocation();
     }
 
@@ -928,8 +929,15 @@ public:
     }
 
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
-
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+
+    void update_namespace() override
+    {
+        auto expr_namespace_stack = namespace_stack;
+        expr_namespace_stack.push_back(name.s);
+        expr->set_namespace(std::move(expr_namespace_stack));
+    }
+
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -3214,6 +3222,7 @@ public:
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
+    [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]

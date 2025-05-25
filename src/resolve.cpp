@@ -456,6 +456,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             else if(it.type == module_::symbol_type::macro)
             {
                 ctx.add_macro(import_name, std::get<module_::macro_descriptor>(it.desc), import.path);
+                type_ctx.add_macro(import_name, import.path);
             }
             else
             {

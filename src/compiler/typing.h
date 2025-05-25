@@ -345,6 +345,15 @@ class context
       std::vector<variable_type>>
       imported_constants;
 
+    /** Imported macros, indexed by `(import_path, macro_name)`. */
+    std::unordered_map<
+      std::string,
+      std::vector<std::string>>
+      imported_macros;
+
+    /** Local macros. */
+    std::vector<std::string> macros;
+
     /** Struct/type stack, for member/type lookups. */
     std::vector<const struct_definition*> struct_stack;
 
@@ -506,6 +515,25 @@ public:
      * @returns True if the type exists within the current scope.
      */
     bool has_type(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
+
+    /**
+     * Add a macro name.
+     *
+     * @throws A type_error if the macro already exists.
+     *
+     * @param name The macro's name.
+     * @param import_path Optional import path.
+     */
+    void add_macro(std::string name, std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Check if the context contains a macro.
+     *
+     * @param name The macro's name.
+     * @param import_path Optional import path.
+     * @returns True if the macro exists.
+     */
+    bool has_macro(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
 
     /**
      * Check if the context contains a specific type.

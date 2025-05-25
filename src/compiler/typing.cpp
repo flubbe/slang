@@ -670,6 +670,67 @@ bool context::has_type(const type_info& ty) const
     return has_type(ty.to_string(), ty.get_import_path());
 }
 
+void context::add_macro(std::string name, std::optional<std::string> import_path)
+{
+    if(current_scope == nullptr)
+    {
+        throw std::runtime_error("Typing context: No current scope.");
+    }
+
+    if(import_path.has_value())
+    {
+        auto mod_it = imported_macros.find(import_path.value());
+        if(mod_it == imported_macros.end())
+        {
+            imported_macros.insert({import_path.value(), {std::move(name)}});
+        }
+        else
+        {
+            auto it = std::find(mod_it->second.begin(), mod_it->second.end(), name);
+            if(it != mod_it->second.end())
+            {
+                throw type_error(
+                  fmt::format(
+                    "The module '{}' containing the symbol '{}' already is imported.",
+                    *import_path, name));
+            }
+
+            mod_it->second.emplace_back(std::move(name));
+        }
+    }
+    else
+    {
+        auto it = std::find(macros.begin(), macros.end(), name);
+        if(it != macros.end())
+        {
+            throw type_error(
+              fmt::format(
+                "The symbol '{}' already exists in the current module.",
+                name));
+        }
+
+        macros.emplace_back(std::move(name));
+    }
+}
+
+bool context::has_macro(const std::string& name, const std::optional<std::string>& import_path) const
+{
+    if(import_path.has_value())
+    {
+        auto mod_it = imported_macros.find(import_path.value());
+        if(mod_it == imported_macros.end())
+        {
+            return false;
+        }
+
+        return std::find(mod_it->second.begin(), mod_it->second.end(), name) != mod_it->second.end();
+    }
+    else
+    {
+        return std::find(macros.begin(), macros.end(), name) != macros.end();
+    }
+}
+
 bool context::is_reference_type(const std::string& name, const std::optional<std::string>& import_path) const
 {
     if(!import_path.has_value())

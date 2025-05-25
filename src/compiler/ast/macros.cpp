@@ -512,6 +512,63 @@ bool macro_expression::supports_directive(const std::string& name) const
            || name == "builtin";
 }
 
+std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::context& ctx)
+{
+    // Check that all necessary imports exist in the type context.
+
+    visit_nodes(
+      [this, &ctx](expression& e) -> void
+      {
+          if(e.get_id() != ast::node_identifier::namespace_access_expression)
+          {
+              return;
+          }
+
+          e.update_namespace();
+
+          auto namespace_path = e.get_namespace_path();
+          if(!namespace_path.has_value())
+          {
+              throw ty::type_error(
+                loc,
+                fmt::format(
+                  "Unable to get namespace in macro expansion at {}.",
+                  ::slang::to_string(e.get_location())));
+          }
+
+          if(!ctx.has_import(namespace_path.value()))
+          {
+              throw ty::type_error(
+                loc,
+                fmt::format(
+                  "Unresolved import '{}',",
+                  namespace_path.value()));
+          }
+
+          if(e.is_call_expression())
+          {
+              // FIXME Add a `has_symbol` function.
+              ctx.get_function_signature(e.as_call_expression()->get_callee(), namespace_path);
+          }
+          else if(e.is_macro_invocation())
+          {
+              // FIXME Add a `has_symbol` function.
+              if(!ctx.has_macro(e.as_macro_invocation()->get_name().s, namespace_path))
+              {
+                  throw ty::type_error(
+                    loc,
+                    fmt::format(
+                      "Unresolved symbol '{}::{}',",
+                      namespace_path.value(), e.as_macro_invocation()->get_name().s));
+              }
+          }
+      },
+      false,
+      true);
+
+    return std::nullopt;
+}
+
 std::string macro_expression::to_string() const
 {
     std::string ret = fmt::format("Macro(name={}, branches=(", name.s);

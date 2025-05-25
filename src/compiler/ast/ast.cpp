@@ -599,6 +599,7 @@ void namespace_access_expression::serialize(archive& ar)
 
 std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
@@ -607,9 +608,8 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
 
 std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
 {
-    auto expr_namespace_stack = namespace_stack;
-    expr_namespace_stack.push_back(name.s);
-    expr->set_namespace(std::move(expr_namespace_stack));
+    update_namespace();
+
     expr_type = expr->type_check(ctx);
     if(!expr_type.has_value())
     {
