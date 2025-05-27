@@ -383,6 +383,11 @@ add_compile_exec_test(
     TRUE
     test/macros/test_recursion
 )
+add_compile_exec_test(
+    "slang macros const"
+    TRUE
+    test/macros/test_const
+)
 add_compile_fail_test(
     "slang macros fail 1"
     FALSE
