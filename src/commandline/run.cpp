@@ -373,13 +373,13 @@ static void check_finalized_gc(gc::garbage_collector& gc, bool verbose)
     }
 }
 
-exec::exec(slang::package_manager& manager)
-: command{"exec"}
+run::run(slang::package_manager& manager)
+: command{"run"}
 , manager{manager}
 {
 }
 
-void exec::invoke(const std::vector<std::string>& args)
+void run::invoke(const std::vector<std::string>& args)
 {
     cxxopts::Options options = make_cxxopts_options();
 
@@ -507,9 +507,9 @@ void exec::invoke(const std::vector<std::string>& args)
     check_finalized_gc(ctx.get_gc(), verbose);
 }
 
-std::string exec::get_description() const
+std::string run::get_description() const
 {
-    return "Execute a module.";
+    return "Run a module.";
 }
 
 }    // namespace slang::commandline

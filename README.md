@@ -7,13 +7,13 @@ in a while.
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline)) 
 provides two commands:
 - `slang compile`: Compiles a source file into bytecode.
-- `slang exec`: Executes the main function from a compiled file.
+- `slang run`: Run the main function from a compiled file.
 
 For example:
 ```bash
 $ slang compile src/lang/std.sl -o lang/std.cmod
 $ slang compile examples/hello_world.sl
-$ slang exec examples/hello_world
+$ slang run examples/hello_world
 ```
 The last command should result in
 ```
@@ -23,8 +23,8 @@ Program exited with exit code 0.
 ```
 To get an impression of the generated modules and bytecode, you can use
 ```bash
-$ slang exec lang/std --disasm
-$ slang exec examples/hello_world --disasm
+$ slang run lang/std --disasm
+$ slang run examples/hello_world --disasm
 ```
 You can also have a look at the [instruction set](docs/instructions.md).
 

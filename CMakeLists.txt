@@ -39,7 +39,7 @@ add_executable(slang
     src/shared/opcodes.cpp
     src/commandline/commandline.cpp
     src/commandline/compile.cpp
-    src/commandline/exec.cpp
+    src/commandline/run.cpp
     src/filemanager.cpp
     src/main.cpp
     src/module_resolver.cpp

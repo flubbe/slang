@@ -150,15 +150,15 @@ public:
     std::string get_description() const override;
 };
 
-/** Package execution. */
-class exec : public command
+/** Module execution. */
+class run : public command
 {
     /** The package manager bound to this command. */
     slang::package_manager& manager;
 
 public:
     /** Constructor. */
-    explicit exec(slang::package_manager& manager);
+    explicit run(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };
