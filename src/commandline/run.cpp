@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * `exec` command implementation.
+ * `run` command implementation.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -24,291 +24,9 @@ namespace si = slang::interpreter;
 namespace slang::commandline
 {
 
-/** Instruction logger for disassembly. */
-class instruction_logger : public slang::interpreter::instruction_recorder
-{
-    /** Constant table entries. */
-    std::size_t constant_entries{0};
-
-    /** Import table entry count. */
-    std::size_t import_entries{0};
-
-    /** Export table entry count */
-    std::size_t export_entries{0};
-
-public:
-    void section(const std::string& name) override
-    {
-        fmt::print("--- {} ---\n", name);
-    }
-
-    void function(const std::string& name, const module_::function_details& details) override
-    {
-        fmt::print(
-          "{:>4}: @{} (size {}, args {}, locals {})\n",
-          details.offset, name, details.size, details.args_size, details.locals_size);
-    }
-
-    void type(const std::string& name, const module_::struct_descriptor& desc) override
-    {
-        fmt::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
-
-        for(std::size_t i = 0; i < desc.member_types.size(); ++i)
-        {
-            const auto& [member_name, member_type] = desc.member_types[i];
-            fmt::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
-                       to_string(member_type.base_type),
-                       member_name,
-                       member_type.offset,
-                       member_type.size,
-                       member_type.alignment,
-                       i != desc.member_types.size() - 1
-                         ? ","
-                         : "");
-        }
-
-        fmt::print("}}\n");
-    }
-
-    void constant(const module_::constant_table_entry& c) override
-    {
-        fmt::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
-        if(c.type == module_::constant_type::i32)
-        {
-            fmt::print("{}\n", std::get<std::int32_t>(c.data));
-        }
-        else if(c.type == module_::constant_type::f32)
-        {
-            fmt::print("{}\n", std::get<float>(c.data));
-        }
-        else if(c.type == module_::constant_type::str)
-        {
-            fmt::print("{}\n", std::get<std::string>(c.data));
-        }
-        ++constant_entries;
-    }
-
-    void record(const module_::exported_symbol& s) override
-    {
-        fmt::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
-        if(s.type == module_::symbol_type::constant)
-        {
-            fmt::print(", {}", std::get<std::size_t>(s.desc));
-        }
-        fmt::print("\n");
-        ++export_entries;
-    }
-
-    void record(const module_::imported_symbol& s) override
-    {
-        fmt::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
-        ++import_entries;
-    }
-
-    void label(std::int64_t index) override
-    {
-        fmt::print("%{}:\n", index);
-    }
-
-    void record(opcode instr) override
-    {
-        fmt::print("    {:>11}\n", to_string(instr));
-    }
-
-    void record(opcode instr, std::int64_t i) override
-    {
-        fmt::print("    {:>11}    {}\n", to_string(instr), i);
-    }
-
-    void record(opcode instr, std::int64_t i1, std::int64_t i2) override
-    {
-        fmt::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
-    }
-
-    void record(opcode instr, float f) override
-    {
-        fmt::print("    {:>11}    {}\n", to_string(instr), f);
-    }
-
-    void record(opcode instr, std::int64_t i, std::string s) override
-    {
-        fmt::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
-    }
-
-    void record(
-      opcode instr,
-      std::int64_t i,
-      std::string s,
-      std::int64_t field_index) override
-    {
-        fmt::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
-    }
-
-    void record(opcode instr, std::string s1, std::string s2) override
-    {
-        fmt::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
-    }
-
-    void record(opcode instr, std::string s1, std::string s2, std::string s3) override
-    {
-        fmt::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
-    }
-};
-
 /*
- * exec implementation.
+ * run implementation.
  */
-
-/**
- * Set up the default runtime environment for a context.
- *
- * @param ctx The context to set up.
- * @param verbose Whether to enable verbose logging.
- */
-static void runtime_setup(si::context& ctx, bool verbose)
-{
-    if(verbose)
-    {
-        fmt::print("Info: Registering type layouts.\n");
-    }
-
-    rt::register_builtin_type_layouts(ctx.get_gc());
-
-    if(verbose)
-    {
-        fmt::print("Info: Registering native functions.\n");
-    }
-
-    ctx.register_native_function("slang", "print",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     auto* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}", *s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     auto* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}\n", *s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "array_copy",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::array_copy(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_length",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_length(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_equals",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_equals(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_concat",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_concat(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "i32_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::i32_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "f32_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::f32_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "parse_i32",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::parse_i32(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "parse_f32",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::parse_f32(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "assert",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::assert_(ctx, stack);
-                                 });
-
-    /*
-     * Math.
-     */
-
-    ctx.register_native_function("slang", "abs",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::abs(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "sqrt",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::sqrt(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "ceil",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::ceil(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "floor",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::floor(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "trunc",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::trunc(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "round",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::round(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "sin",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::sin(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "cos",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::cos(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "tan",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::tan(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "asin",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::asin(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "acos",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::acos(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "atan",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::atan(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "atan2",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::atan2(ctx, stack);
-                                 });
-}
 
 /**
  * Validate the signature of `main`.
@@ -386,10 +104,9 @@ void run::invoke(const std::vector<std::string>& args)
     // clang-format off
     options.add_options()
         ("v,verbose", "Verbose output.")
-        ("d,disasm", "Show disassembly and exit.")
         ("no-lang", "Exclude default language modules.")
         ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
-        ("filename", "The file to compile", cxxopts::value<std::string>());
+        ("filename", "The file to run.", cxxopts::value<std::string>());
     // clang-format on
 
     options.parse_positional({"filename"});
@@ -403,7 +120,6 @@ void run::invoke(const std::vector<std::string>& args)
     }
 
     bool verbose = result.count("verbose") > 0;
-    bool disassemble = result.count("disasm") > 0;
     bool no_lang = result.count("no-lang") > 0;
 
     auto module_path = fs::absolute(fs::path{result["filename"].as<std::string>()});
@@ -472,13 +188,6 @@ void run::invoke(const std::vector<std::string>& args)
     // Set up interpreter context.
     si::context ctx{file_mgr};
     runtime_setup(ctx, verbose);
-
-    if(disassemble)
-    {
-        auto recorder = std::make_shared<instruction_logger>();
-        ctx.resolve_module(module_name, recorder);
-        return;
-    }
 
     si::module_loader& loader = ctx.resolve_module(module_name);
     si::function& main_function = loader.get_function("main");

@@ -23,8 +23,8 @@ Program exited with exit code 0.
 ```
 To get an impression of the generated modules and bytecode, you can use
 ```bash
-$ slang run lang/std --disasm
-$ slang run examples/hello_world --disasm
+$ slang disasm lang/std
+$ slang disasm examples/hello_world
 ```
 You can also have a look at the [instruction set](docs/instructions.md).
 
