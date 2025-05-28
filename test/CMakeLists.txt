@@ -530,12 +530,12 @@ set_tests_properties(
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (default, exec)" 
+    "slang test_import (default, run)" 
     PROPERTIES FIXTURES_REQUIRED 
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (--no-eval-const-subexpr, exec)" 
+    "slang test_import (--no-eval-const-subexpr, run)" 
     PROPERTIES FIXTURES_REQUIRED 
     example_package_hello
 )
@@ -572,7 +572,7 @@ add_compile_exec_test(
 
 add_my_test(
     "slang examples/print_args -- Hello World"
-    ${CMAKE_BINARY_DIR}/slang exec examples/print_args -- Hello World
+    ${CMAKE_BINARY_DIR}/slang run examples/print_args -- Hello World
 )
 set_tests_properties(
     "slang examples/print_args -- Hello World"
@@ -588,7 +588,7 @@ add_compile_exec_test(
 
 add_my_test(
     "slang examples/string_conversion -- 3.141 a -1"
-    ${CMAKE_BINARY_DIR}/slang exec examples/string_conversion -- 3.141 a -1
+    ${CMAKE_BINARY_DIR}/slang run examples/string_conversion -- 3.141 a -1
 )
 set_tests_properties(
     "slang examples/string_conversion -- 3.141 a -1"

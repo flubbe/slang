@@ -58,7 +58,8 @@ int main(int argc, char* argv[])
         // create command list.
         command_vector cmd_list;
         add_unique_command(cmd_list, std::make_unique<slang::commandline::compile>(root_pm));
-        add_unique_command(cmd_list, std::make_unique<slang::commandline::exec>(root_pm));
+        add_unique_command(cmd_list, std::make_unique<slang::commandline::disasm>(root_pm));
+        add_unique_command(cmd_list, std::make_unique<slang::commandline::run>(root_pm));
 
         cxxopts::Options options(argv[0], "slang command line interface.");    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 

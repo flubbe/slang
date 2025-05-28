@@ -18,6 +18,15 @@
 
 #include "package.h"
 
+/*
+ * Forward declarations.
+ */
+
+namespace slang::interpreter
+{
+class context;
+}    // namespace slang::interpreter
+
 namespace slang::commandline
 {
 
@@ -150,17 +159,38 @@ public:
     std::string get_description() const override;
 };
 
-/** Package execution. */
-class exec : public command
+/** Module execution. */
+class run : public command
 {
     /** The package manager bound to this command. */
     slang::package_manager& manager;
 
 public:
     /** Constructor. */
-    explicit exec(slang::package_manager& manager);
+    explicit run(slang::package_manager& manager);
     void invoke(const std::vector<std::string>& args) override;
     std::string get_description() const override;
 };
+
+/** Bytecode disassembly. */
+class disasm : public command
+{
+    /** The package manager bound to this command. */
+    slang::package_manager& manager;
+
+public:
+    /** Constructor. */
+    explicit disasm(slang::package_manager& manager);
+    void invoke(const std::vector<std::string>& args) override;
+    std::string get_description() const override;
+};
+
+/**
+ * Set up the default runtime environment for a context.
+ *
+ * @param ctx The context to set up.
+ * @param verbose Whether to enable verbose logging. Defaults to `false`.
+ */
+void runtime_setup(slang::interpreter::context& ctx, bool verbose = false);
 
 }    // namespace slang::commandline
