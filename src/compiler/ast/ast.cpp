@@ -1811,7 +1811,7 @@ std::string struct_anonymous_initializer_expression::to_string() const
         }
         ret += fmt::format("{}", initializers.back()->to_string());
     }
-    ret += ")";
+    ret += "))";
     return ret;
 }
 
