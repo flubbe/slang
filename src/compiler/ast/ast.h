@@ -513,6 +513,8 @@ inline archive& operator&(archive& ar, expression& expr)
 /** Any expression with a name. */
 class named_expression : public expression
 {
+    friend class macro_expression;
+
 protected:
     /** The expression name. */
     token name;
@@ -968,11 +970,10 @@ public:
 /** Access expression. */
 class access_expression : public expression
 {
-    /** Left-hand side of the access axpression. */
-    std::unique_ptr<expression> lhs;
+    friend class macro_expression;
 
-    /** Right-hand side of the access expression. */
-    std::unique_ptr<expression> rhs;
+    /** Left and right hand sides. */
+    std::unique_ptr<expression> lhs, rhs;
 
     /** Struct type of the l.h.s. Set during type checking. */
     ty::type_info lhs_type;
@@ -1036,6 +1037,17 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get()};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get()};
+    }
 
     /** Return the accessed struct's type info. */
     [[nodiscard]]

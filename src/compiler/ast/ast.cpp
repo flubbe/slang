@@ -1037,7 +1037,17 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
         ty::type_info t;
         if(expansion)
         {
+            bool scope_type_check = expansion->is_macro_branch();
+            if(scope_type_check)
+            {
+                ctx.enter_anonymous_scope(get_location());
+            }
             std::optional<ty::type_info> opt_t = expansion->type_check(ctx);
+            if(scope_type_check)
+            {
+                ctx.exit_anonymous_scope();
+            }
+
             if(!opt_t.has_value())
             {
                 throw ty::type_error(loc, "Expression has no type.");
@@ -1065,7 +1075,17 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
     {
         if(expansion)
         {
+            bool scope_type_check = expansion->is_macro_branch();
+            if(scope_type_check)
+            {
+                ctx.enter_anonymous_scope(get_location());
+            }
             expr_type = expansion->type_check(ctx);
+            if(scope_type_check)
+            {
+                ctx.exit_anonymous_scope();
+            }
+
             if(expr_type.has_value())
             {
                 ctx.set_expression_type(this, *expr_type);
@@ -1312,7 +1332,11 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
         }
     }
 
-    return std::nullopt;
+    expr_type = std::make_optional<ty::type_info>(
+      name, ty::type_class::tc_declaration, std::nullopt);
+    ctx.set_expression_type(this, expr_type.value());
+
+    return expr_type;
 }
 
 std::string variable_declaration_expression::to_string() const
@@ -3220,7 +3244,10 @@ std::optional<ty::type_info> block::type_check(ty::context& ctx)
 {
     for(auto& expr: exprs)
     {
-        expr->type_check(ctx);
+        if(!ctx.has_expression_type(*expr))
+        {
+            expr->type_check(ctx);
+        }
     }
 
     return std::nullopt;

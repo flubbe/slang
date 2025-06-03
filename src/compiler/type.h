@@ -27,7 +27,9 @@ enum class type_class : std::uint8_t
     tc_struct = 2,   /** Struct type. */
     tc_function = 3, /** Function type. */
 
-    last = tc_function /** Last element. */
+    tc_declaration = 4, /** Any declaration. */
+
+    last = tc_declaration /** Last element. */
 };
 
 /**
