@@ -25,8 +25,6 @@ struct S
     std::int32_t i{0};
 };
 
-static_assert(std::is_standard_layout_v<S>);    // for offsetof
-
 /**
  * Register native functions and types.
  *
