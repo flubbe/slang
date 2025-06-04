@@ -778,7 +778,7 @@ std::unique_ptr<expression> macro_expression::expand(
             .release())};
 
     const std::size_t invocation_id = ctx.generate_macro_invocation_id();
-    auto rename_visitor = [invocation_id](expression& e) -> void
+    auto rename_visitor = [invocation_id, &ctx](expression& e) -> void
     {
         if(e.is_macro_branch())
         {
@@ -799,7 +799,12 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_variable_reference();
-            expr->name.s = make_local_name(invocation_id, expr->name.s);
+            if(!ctx.has_registered_constant_name(expr->name.s))
+            {
+                expr->name.s = make_local_name(invocation_id, expr->name.s);
+            }
+
+            // FIXME We need to rename when the constant's name is overridden by a local.
         }
     };
 

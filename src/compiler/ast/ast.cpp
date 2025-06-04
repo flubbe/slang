@@ -1522,6 +1522,13 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::co
         t.to_string()));
 }
 
+void constant_declaration_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+{
+    auto const_type = type->to_type_info(type_ctx);
+    type_ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
+    ctx.register_constant_name(name);
+}
+
 std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
 {
     // Prevent double declaration of constant.
@@ -1531,8 +1538,6 @@ std::optional<ty::type_info> constant_declaration_expression::type_check(ty::con
     }
 
     auto const_type = type->to_type_info(ctx);
-    ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
-
     auto rhs = expr->type_check(ctx);
     if(!rhs)
     {

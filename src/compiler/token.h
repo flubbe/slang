@@ -152,6 +152,28 @@ struct token
     , value{std::move(value)}
     {
     }
+
+    /** Comparison operator. */
+    bool operator<(const token& other) const
+    {
+        if(location.line < other.location.line)
+        {
+            return true;
+        }
+        else if(location.line == other.location.line)
+        {
+            if(location.col < other.location.col)
+            {
+                return true;
+            }
+            else if(location.col == other.location.col)
+            {
+                return s < other.s;
+            }
+        }
+
+        return false;
+    }
 };
 
 /**

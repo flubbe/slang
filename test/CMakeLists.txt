@@ -483,6 +483,11 @@ add_compile_exec_test(
     TRUE
     test/macros/test_struct
 )
+set_tests_properties(
+    "slang macro struct (default, compile)"
+    PROPERTIES 
+    FIXTURES_REQUIRED needs_std
+)
 add_compile_exec_test(
     "slang math"
     TRUE
