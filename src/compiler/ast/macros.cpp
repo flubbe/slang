@@ -806,6 +806,12 @@ std::unique_ptr<expression> macro_expression::expand(
 
             // FIXME We need to rename when the constant's name is overridden by a local.
         }
+        else if(e.is_struct_member_access())
+        {
+            // rename macro variable.
+            auto* expr = e.as_access_expression()->get_left_expression()->as_named_expression();
+            expr->name.s = make_local_name(invocation_id, expr->name.s);
+        }
     };
 
     branch->visit_nodes(

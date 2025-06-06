@@ -1038,15 +1038,11 @@ public:
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
+    /** Get the left-hand side expression. */
     [[nodiscard]]
-    std::vector<expression*> get_children() override
+    expression* get_left_expression()
     {
-        return {lhs.get()};
-    }
-    [[nodiscard]]
-    std::vector<const expression*> get_children() const override
-    {
-        return {lhs.get()};
+        return lhs.get();
     }
 
     /** Return the accessed struct's type info. */
