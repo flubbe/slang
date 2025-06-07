@@ -11,8 +11,9 @@
 #pragma once
 
 #include <algorithm>
-#include <stdexcept>
 #include <list>
+#include <set>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -2018,6 +2019,9 @@ class context
     /** Imported constants. */
     std::vector<constant_table_entry> imported_constants;
 
+    /** Names registered as constants, without a value. */
+    std::set<token> constant_names;
+
     /** Global scope. */
     std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
 
@@ -2208,6 +2212,20 @@ public:
       std::string name,
       std::string s,
       std::optional<std::string> import_path = std::nullopt);
+
+    /**
+     * Register a token/name as a constant. Idempotent, i.e. names can be registered multiple times.
+     *
+     * @param name The constant's name.
+     */
+    void register_constant_name(token name);
+
+    /**
+     * Check whether a name was registered as a constant.
+     *
+     * @param name The name to check.
+     */
+    bool has_registered_constant_name(const std::string& name);
 
     /**
      * Get a reference to a string or create a new one if it does not exist.

@@ -478,7 +478,7 @@ public:
       std::function<void(expression&)> visitor,
       bool visit_self,
       bool post_order = false,
-      std::function<bool(const expression&)> filter = nullptr);
+      const std::function<bool(const expression&)>& filter = nullptr);
 
     /**
      * Visit all nodes in this expression tree using pre-order or post-order traversal.
@@ -494,7 +494,7 @@ public:
       std::function<void(const expression&)> visitor,
       bool visit_self,
       bool post_order = false,
-      std::function<bool(const expression&)> filter = nullptr) const;
+      const std::function<bool(const expression&)>& filter = nullptr) const;
 };
 
 /**
@@ -513,6 +513,8 @@ inline archive& operator&(archive& ar, expression& expr)
 /** Any expression with a name. */
 class named_expression : public expression
 {
+    friend class macro_expression;
+
 protected:
     /** The expression name. */
     token name;
@@ -968,11 +970,10 @@ public:
 /** Access expression. */
 class access_expression : public expression
 {
-    /** Left-hand side of the access axpression. */
-    std::unique_ptr<expression> lhs;
+    friend class macro_expression;
 
-    /** Right-hand side of the access expression. */
-    std::unique_ptr<expression> rhs;
+    /** Left and right hand sides. */
+    std::unique_ptr<expression> lhs, rhs;
 
     /** Struct type of the l.h.s. Set during type checking. */
     ty::type_info lhs_type;
@@ -1036,6 +1037,13 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
+
+    /** Get the left-hand side expression. */
+    [[nodiscard]]
+    expression* get_left_expression()
+    {
+        return lhs.get();
+    }
 
     /** Return the accessed struct's type info. */
     [[nodiscard]]
@@ -1271,8 +1279,9 @@ public:
         return {};
     }
 
-    /** Get the value of the object. */
-    [[nodiscard]] cg::value get_value(cg::context& ctx) const;
+    /** Get the value of the object, or `std::nullopt` if it is not in scope. */
+    [[nodiscard]]
+    std::optional<cg::value> get_value(cg::context& ctx) const;
 
     /** Whether this variable was expanded by an expression. */
     [[nodiscard]]
@@ -1446,6 +1455,7 @@ public:
       const std::vector<std::pair<token, token>>& args) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 

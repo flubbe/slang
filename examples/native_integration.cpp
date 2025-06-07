@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <cstddef>
+
 #include <fmt/core.h>
 
 #include "interpreter/interpreter.h"
@@ -35,7 +37,7 @@ static void register_native(si::context& ctx)
 
     // Register a struct.
     std::vector<std::size_t> layout = {
-      0 /* offset of the `std::string`*/
+      offsetof(S, s) /* offset of the `std::string`*/
     };
     ctx.get_gc().register_type_layout(si::make_type_name("native_integration", "S"), layout);
 

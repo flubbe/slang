@@ -857,6 +857,23 @@ void context::add_constant(std::string name, std::string s, std::optional<std::s
     slang::codegen::add_constant(constants, imported_constants, std::move(name), std::move(s), std::move(import_path));
 }
 
+void context::register_constant_name(token name)
+{
+    constant_names.emplace(std::move(name));
+}
+
+bool context::has_registered_constant_name(const std::string& name)
+{
+    return std::find_if(
+             constant_names.begin(),
+             constant_names.end(),
+             [&name](const token& s) -> bool
+             {
+                 return s.s == name;
+             })
+           != constant_names.end();
+}
+
 std::size_t context::get_string(std::string str)
 {
     auto it = std::find_if(

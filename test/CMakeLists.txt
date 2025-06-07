@@ -479,6 +479,16 @@ set_tests_properties(
     test_transitive_import1
 )
 add_compile_exec_test(
+    "slang macro struct"
+    TRUE
+    test/macros/test_struct
+)
+set_tests_properties(
+    "slang macro struct (default, compile)"
+    PROPERTIES 
+    FIXTURES_REQUIRED needs_std
+)
+add_compile_exec_test(
     "slang math"
     TRUE
     test/test_math
@@ -487,6 +497,11 @@ add_compile_exec_test(
     "slang operators"
     TRUE
     test/test_operators
+)
+add_compile_exec_test(
+    "slang scopes"
+    TRUE
+    test/test_scopes
 )
 add_compile_exec_test(
     "slang strings"
