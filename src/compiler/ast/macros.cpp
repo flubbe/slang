@@ -777,8 +777,34 @@ std::unique_ptr<expression> macro_expression::expand(
             ->clone()
             .release())};
 
+    std::set<std::string> original_local_names;
+
+    auto collect_names_visitor = [&original_local_names](expression& e) -> void
+    {
+        if(e.is_macro_branch())
+        {
+            // collect arguments.
+            auto* expr = e.as_macro_branch();
+            for(auto& arg: expr->args)
+            {
+                original_local_names.insert(std::get<0>(arg).s);
+            }
+        }
+        else if(e.is_variable_declaration())
+        {
+            // collect macro variable.
+            auto* expr = e.as_variable_declaration();
+            original_local_names.insert(expr->name.s);
+        }
+    };
+
+    branch->visit_nodes(
+      collect_names_visitor,
+      true /* visit this node */
+    );
+
     const std::size_t invocation_id = ctx.generate_macro_invocation_id();
-    auto rename_visitor = [invocation_id, &ctx](expression& e) -> void
+    auto rename_visitor = [&original_local_names, invocation_id, &ctx](expression& e) -> void
     {
         if(e.is_macro_branch())
         {
@@ -799,18 +825,20 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_variable_reference();
-            if(!ctx.has_registered_constant_name(expr->name.s))
+            if(original_local_names.count(expr->name.s) > 0
+               || !ctx.has_registered_constant_name(expr->name.s))
             {
                 expr->name.s = make_local_name(invocation_id, expr->name.s);
             }
-
-            // FIXME We need to rename when the constant's name is overridden by a local.
         }
         else if(e.is_struct_member_access())
         {
             // rename macro variable.
             auto* expr = e.as_access_expression()->get_left_expression()->as_named_expression();
-            expr->name.s = make_local_name(invocation_id, expr->name.s);
+            if(original_local_names.count(expr->name.s) > 0)
+            {
+                expr->name.s = make_local_name(invocation_id, expr->name.s);
+            }
         }
     };
 

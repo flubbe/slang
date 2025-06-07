@@ -970,61 +970,65 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         return expansion->generate_code(ctx, mc);
     }
 
-    // check if we're loading a constant.
-    std::optional<std::string> import_path = get_namespace_path();
-    std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
-    if(const_v.has_value())
+    // First check for variables, then for constants.
+    std::optional<cg::value> v = get_value(ctx);
+    if(!v.has_value())
     {
-        if(mc != memory_context::load)
+        // check if we're loading a constant.
+
+        std::optional<std::string> import_path = get_namespace_path();
+        std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
+        if(const_v.has_value())
         {
+            if(mc != memory_context::load)
+            {
+                throw cg::codegen_error(
+                  loc,
+                  fmt::format(
+                    "Cannot assign to constant '{}{}'.",
+                    import_path.has_value()
+                      ? fmt::format("{}::", *import_path)
+                      : "",
+                    name.s));
+            }
+
+            // load the constant directly.
+
+            if(const_v->type == module_::constant_type::i32)
+            {
+                ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
+                return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+            }
+
+            if(const_v->type == module_::constant_type::f32)
+            {
+                ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
+                return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+            }
+
+            if(const_v->type == module_::constant_type::str)
+            {
+                ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
+                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+            }
+
             throw cg::codegen_error(
               loc,
               fmt::format(
-                "Cannot assign to constant '{}{}'.",
+                "Cannot load constant '{}{}' of unknown type {}.",
                 import_path.has_value()
                   ? fmt::format("{}::", *import_path)
                   : "",
-                name.s));
+                name.s,
+                static_cast<int>(const_v->type)));
         }
-
-        // load the constant directly.
-
-        if(const_v->type == module_::constant_type::i32)
-        {
-            ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
-        }
-
-        if(const_v->type == module_::constant_type::f32)
-        {
-            ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
-        }
-
-        if(const_v->type == module_::constant_type::str)
-        {
-            ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
-        }
-
-        throw cg::codegen_error(
-          loc,
-          fmt::format(
-            "Cannot load constant '{}{}' of unknown type {}.",
-            import_path.has_value()
-              ? fmt::format("{}::", *import_path)
-              : "",
-            name.s,
-            static_cast<int>(const_v->type)));
     }
-
-    cg::value v = get_value(ctx);
 
     if(mc == memory_context::load)
     {
         if(ctx.is_struct_access())
         {
-            if(!v.get_name().has_value())
+            if(!v.value().get_name().has_value())
             {
                 throw cg::codegen_error(
                   loc,
@@ -1035,34 +1039,34 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
             auto member_value = ctx.get_struct_member(
               loc,
               struct_type.to_string(),
-              v.get_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
+              v.value().get_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
               struct_type.get_import_path());
 
             ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_type, member_value));
         }
         else
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
         }
 
         if(element_expr)
         {
             element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_load(std::make_unique<cg::type_argument>(v.get_type().deref()), true);
+            ctx.generate_load(std::make_unique<cg::type_argument>(v.value().get_type().deref()), true);
         }
     }
     else if(mc == memory_context::store)
     {
         if(element_expr)
         {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
+            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
             element_expr->generate_code(ctx, memory_context::load);
 
             // if we're storing an element, generation of the store opcode needs to be deferred to the caller.
         }
         else
         {
-            ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v)));
+            ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
         }
     }
     else
@@ -1072,9 +1076,9 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(element_expr)
     {
-        return std::make_unique<cg::value>(v.deref());
+        return std::make_unique<cg::value>(v.value().deref());
     }
-    return std::make_unique<cg::value>(v);
+    return std::make_unique<cg::value>(v.value());
 }
 
 std::optional<ty::type_info> variable_reference_expression::type_check(ty::context& ctx)
@@ -1175,7 +1179,7 @@ std::string variable_reference_expression::to_string() const
     return ret;
 }
 
-cg::value variable_reference_expression::get_value(cg::context& ctx) const
+std::optional<cg::value> variable_reference_expression::get_value(cg::context& ctx) const
 {
     if(!ctx.is_struct_access())
     {
@@ -1197,11 +1201,8 @@ cg::value variable_reference_expression::get_value(cg::context& ctx) const
             scope = scope->get_outer();
         }
 
-        throw cg::codegen_error(
-          loc,
-          fmt::format(
-            "Cannot find variable or constant '{}' in current scope.",
-            name.s));
+        // name not in scope.
+        return std::nullopt;
     }
 
     auto struct_type = ctx.get_accessed_struct();

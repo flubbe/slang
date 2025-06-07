@@ -499,6 +499,11 @@ add_compile_exec_test(
     test/test_operators
 )
 add_compile_exec_test(
+    "slang scopes"
+    TRUE
+    test/test_scopes
+)
+add_compile_exec_test(
     "slang strings"
     TRUE
     test/test_strings
