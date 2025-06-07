@@ -478,7 +478,7 @@ public:
       std::function<void(expression&)> visitor,
       bool visit_self,
       bool post_order = false,
-      std::function<bool(const expression&)> filter = nullptr);
+      const std::function<bool(const expression&)>& filter = nullptr);
 
     /**
      * Visit all nodes in this expression tree using pre-order or post-order traversal.
@@ -494,7 +494,7 @@ public:
       std::function<void(const expression&)> visitor,
       bool visit_self,
       bool post_order = false,
-      std::function<bool(const expression&)> filter = nullptr) const;
+      const std::function<bool(const expression&)>& filter = nullptr) const;
 };
 
 /**

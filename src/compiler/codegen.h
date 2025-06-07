@@ -2218,7 +2218,7 @@ public:
      *
      * @param name The constant's name.
      */
-    void register_constant_name(token t);
+    void register_constant_name(token name);
 
     /**
      * Check whether a name was registered as a constant.

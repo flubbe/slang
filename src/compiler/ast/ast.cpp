@@ -243,7 +243,7 @@ void visit_nodes(
   std::function<void(T&)>& visitor,
   bool visit_self,
   bool post_order,
-  std::function<bool(std::add_const_t<T>&)> filter = nullptr)
+  const std::function<bool(std::add_const_t<T>&)>& filter = nullptr)
 {
     static_assert(
       std::is_same_v<std::decay_t<T>, expression>
@@ -301,18 +301,18 @@ void expression::visit_nodes(
   std::function<void(expression&)> visitor,
   bool visit_self,
   bool post_order,
-  std::function<bool(const expression&)> filter)
+  const std::function<bool(const expression&)>& filter)
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, filter);
 }
 
 void expression::visit_nodes(
   std::function<void(const expression&)> visitor,
   bool visit_self,
   bool post_order,
-  std::function<bool(const expression&)> filter) const
+  const std::function<bool(const expression&)>& filter) const
 {
-    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, std::move(filter));
+    slang::ast::visit_nodes(*this, visitor, visit_self, post_order, filter);
 }
 
 /*
@@ -978,50 +978,59 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
         std::optional<std::string> import_path = get_namespace_path();
         std::optional<cg::constant_table_entry> const_v = ctx.get_constant(name.s, import_path);
-        if(const_v.has_value())
+        if(!const_v.has_value())
         {
-            if(mc != memory_context::load)
-            {
-                throw cg::codegen_error(
-                  loc,
-                  fmt::format(
-                    "Cannot assign to constant '{}{}'.",
-                    import_path.has_value()
-                      ? fmt::format("{}::", *import_path)
-                      : "",
-                    name.s));
-            }
-
-            // load the constant directly.
-
-            if(const_v->type == module_::constant_type::i32)
-            {
-                ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
-                return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
-            }
-
-            if(const_v->type == module_::constant_type::f32)
-            {
-                ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
-                return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
-            }
-
-            if(const_v->type == module_::constant_type::str)
-            {
-                ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
-                return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
-            }
-
             throw cg::codegen_error(
               loc,
               fmt::format(
-                "Cannot load constant '{}{}' of unknown type {}.",
+                "Cannot find variable or constant '{}{}' in current scope.",
                 import_path.has_value()
                   ? fmt::format("{}::", *import_path)
                   : "",
-                name.s,
-                static_cast<int>(const_v->type)));
+                name.s));
         }
+
+        if(mc != memory_context::load)
+        {
+            throw cg::codegen_error(
+              loc,
+              fmt::format(
+                "Cannot assign to constant '{}{}'.",
+                import_path.has_value()
+                  ? fmt::format("{}::", *import_path)
+                  : "",
+                name.s));
+        }
+
+        // load the constant directly.
+
+        if(const_v->type == module_::constant_type::i32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+        }
+
+        if(const_v->type == module_::constant_type::f32)
+        {
+            ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+        }
+
+        if(const_v->type == module_::constant_type::str)
+        {
+            ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
+            return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+        }
+
+        throw cg::codegen_error(
+          loc,
+          fmt::format(
+            "Cannot load constant '{}{}' of unknown type {}.",
+            import_path.has_value()
+              ? fmt::format("{}::", *import_path)
+              : "",
+            name.s,
+            static_cast<int>(const_v->type)));
     }
 
     if(mc == memory_context::load)

@@ -725,10 +725,8 @@ bool context::has_macro(const std::string& name, const std::optional<std::string
 
         return std::find(mod_it->second.begin(), mod_it->second.end(), name) != mod_it->second.end();
     }
-    else
-    {
-        return std::find(macros.begin(), macros.end(), name) != macros.end();
-    }
+
+    return std::find(macros.begin(), macros.end(), name) != macros.end();
 }
 
 bool context::is_reference_type(const std::string& name, const std::optional<std::string>& import_path) const
