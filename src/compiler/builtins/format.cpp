@@ -26,6 +26,7 @@ struct format_string_placeholder
     std::uint8_t type{0};
 };
 
+/** Expansion helper for format macro. */
 class format_macro_expander
 {
     /** Descriptor for the `format!` macro. */
