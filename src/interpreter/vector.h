@@ -4,7 +4,7 @@
  * a vector class with fixed-size heap allocated element count and memory.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 

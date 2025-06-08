@@ -18,7 +18,7 @@
 #include "archives/archive.h"
 #include "compiler/directive.h"
 #include "compiler/type.h"
-#include "node_registry.h"
+#include "node_ids.h"
 #include "utils.h"
 
 /*

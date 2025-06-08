@@ -30,7 +30,7 @@ class slangRecipe(ConanFile):
         self.tool_requires("cmake/[>=3.22.6 <4.0]")
 
     def validate(self):
-        check_min_cppstd(self, 17)
+        check_min_cppstd(self, 23)
 
     def layout(self):
         cmake_layout(self)

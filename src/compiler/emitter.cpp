@@ -10,6 +10,7 @@
 
 #include "archives/memory.h"
 #include "compiler/ast/ast.h"
+#include "compiler/ast/node_registry.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "codegen.h"

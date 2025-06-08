@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/ast/node_registry.h"
 #include "compiler/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
