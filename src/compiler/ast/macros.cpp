@@ -9,11 +9,11 @@
  */
 
 #include "archives/archive.h"
-#include "compiler/builtins/macros.h"
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
+#include "builtins.h"
 #include "node_registry.h"
 #include "resolve.h"
 
@@ -103,8 +103,7 @@ bool expression::expand_macros(
                && m->get_name() == "format!")
             {
                 macro_expr->set_expansion(
-                  slang::codegen::macros::expand_builtin_format(
-                    m->get_desc(),
+                  std::make_unique<format_macro_expression>(
                     macro_expr->get_location(),
                     macro_expr->get_exprs()));
             }
