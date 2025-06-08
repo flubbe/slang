@@ -44,7 +44,7 @@ A preliminary (incomplete) documentation of the scripting language can be found 
 
 1. Using _Conan_ and _CMake_:
     ```
-    $ conan install . --build=missing
+    $ conan install . --build=missing -s compiler.cppstd=gnu23
     $ cmake --preset conan-debug
     $ cmake --build build --preset conan-debug
     ```
