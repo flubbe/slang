@@ -18,6 +18,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set up GCC 14
+      run: |
+        sudo apt install gcc-14 g++-14
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+        sudo update-alternatives --set gcc /usr/bin/gcc-14
     
     - name: Install Conan
       id: conan
