@@ -85,8 +85,8 @@ public:
     {
     }
 
-    /** Default assignments. */
-    expression& operator=(const expression&) = default;
+    /** Assignment operators. */
+    expression& operator=(const expression&) = delete;
     expression& operator=(expression&&) = default;
 
     /** Default destructor. */
@@ -528,8 +528,8 @@ public:
     named_expression(const named_expression&) = default;
     named_expression(named_expression&&) = default;
 
-    /** Default assignment operators. */
-    named_expression& operator=(const named_expression&) = default;
+    /** Assignment operators. */
+    named_expression& operator=(const named_expression&) = delete;
     named_expression& operator=(named_expression&&) = default;
 
     /**
@@ -593,8 +593,8 @@ public:
     literal_expression(const literal_expression&) = default;
     literal_expression(literal_expression&&) = default;
 
-    /** Default assignment operators. */
-    literal_expression& operator=(const literal_expression&) = default;
+    /** Assignment operators. */
+    literal_expression& operator=(const literal_expression&) = delete;
     literal_expression& operator=(literal_expression&&) = default;
 
     /**
@@ -664,8 +664,8 @@ public:
     type_expression(const type_expression&) = default;
     type_expression(type_expression&&) = default;
 
-    /** Default assignments. */
-    type_expression& operator=(const type_expression&) = default;
+    /** Assignment operators. */
+    type_expression& operator=(const type_expression&) = delete;
     type_expression& operator=(type_expression&&) = default;
 
     /**
@@ -760,7 +760,12 @@ public:
     type_cast_expression() = default;
 
     /** Copy and move constructors. */
-    type_cast_expression(const type_cast_expression&) = delete;
+    type_cast_expression(const type_cast_expression& other)
+    : super{other}
+    , expr{other.expr->clone()}
+    , target_type{other.target_type->clone()}
+    {
+    }
     type_cast_expression(type_cast_expression&&) = default;
 
     /** Assignment operators. */
@@ -857,7 +862,11 @@ public:
 
     /** Defaulted and deleted constructors. */
     namespace_access_expression() = default;
-    namespace_access_expression(const namespace_access_expression&) = delete;
+    namespace_access_expression(const namespace_access_expression& other)
+    : super{other}
+    , expr{other.expr->clone()}
+    {
+    }
     namespace_access_expression(namespace_access_expression&&) = default;
 
     /** Assignment operators. */
@@ -984,7 +993,13 @@ public:
 
     /** Defaulted and deleted constructors. */
     access_expression() = default;
-    access_expression(const access_expression&) = delete;
+    access_expression(const access_expression& other)
+    : super{other}
+    , lhs{other.lhs->clone()}
+    , rhs{other.rhs->clone()}
+    , lhs_type{other.lhs_type}
+    {
+    }
     access_expression(access_expression&&) = default;
 
     /** Assignment operators. */
@@ -1067,10 +1082,14 @@ public:
     import_expression() = default;
 
     /** Copy and move constructors. */
-    import_expression(const import_expression&) = delete;
+    import_expression(const import_expression& other)
+    : super{other}
+    , path{other.path}
+    {
+    }
     import_expression(import_expression&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     import_expression& operator=(const import_expression&) = delete;
     import_expression& operator=(import_expression&&) = default;
 
@@ -1105,7 +1124,7 @@ class directive_expression : public named_expression
     /** Key-value pairs. */
     std::vector<std::pair<token, token>> args;
 
-    /** An optional expression the directive applies to. */
+    /** An expression the directive applies to. */
     std::unique_ptr<expression> expr;
 
 public:
@@ -1116,10 +1135,15 @@ public:
     directive_expression() = default;
 
     /** Copy and move constructors. */
-    directive_expression(const directive_expression&) = delete;
+    directive_expression(const directive_expression& other)
+    : super{other}
+    , args{other.args}
+    , expr{other.expr->clone()}
+    {
+    }
     directive_expression(directive_expression&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     directive_expression& operator=(const directive_expression&) = delete;
     directive_expression& operator=(directive_expression&&) = default;
 
@@ -1192,10 +1216,15 @@ public:
 
     /** Defaulted and deleted constructors. */
     variable_reference_expression() = default;
-    variable_reference_expression(const variable_reference_expression&) = delete;
+    variable_reference_expression(const variable_reference_expression& other)
+    : super{other}
+    , element_expr{other.element_expr ? other.element_expr->clone() : nullptr}
+    , expansion{other.expansion ? other.expansion->clone() : nullptr}
+    {
+    }
     variable_reference_expression(variable_reference_expression&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     variable_reference_expression& operator=(const variable_reference_expression&) = delete;
     variable_reference_expression& operator=(variable_reference_expression&&) = default;
 
@@ -1324,7 +1353,12 @@ public:
 
     /** Defaulted and deleted constructors. */
     variable_declaration_expression() = default;
-    variable_declaration_expression(const variable_declaration_expression&) = delete;
+    variable_declaration_expression(const variable_declaration_expression& other)
+    : super{other}
+    , type{other.type->clone()}
+    , expr{other.expr ? other.expr->clone() : nullptr}
+    {
+    }
     variable_declaration_expression(variable_declaration_expression&&) = default;
 
     /** Assignment operators. */
@@ -1418,7 +1452,12 @@ public:
 
     /** Defaulted and deleted constructors. */
     constant_declaration_expression() = default;
-    constant_declaration_expression(const constant_declaration_expression&) = delete;
+    constant_declaration_expression(const constant_declaration_expression& other)
+    : super{other}
+    , type{other.type->clone()}
+    , expr{other.expr->clone()}
+    {
+    }
     constant_declaration_expression(constant_declaration_expression&&) = default;
 
     /** Assignment operators. */
@@ -1496,7 +1535,19 @@ public:
     array_initializer_expression() = default;
 
     /** Copy and move constructors. */
-    array_initializer_expression(const array_initializer_expression&) = delete;
+    array_initializer_expression(const array_initializer_expression& other)
+    : super{other}
+    {
+        exprs.reserve(other.exprs.size());
+        std::transform(
+          other.exprs.begin(),
+          other.exprs.end(),
+          std::back_inserter(exprs),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
     array_initializer_expression(array_initializer_expression&&) = default;
 
     /** Assignment operators. */
@@ -1567,7 +1618,21 @@ public:
     struct_definition_expression() = default;
 
     /** Copy and move constructors. */
-    struct_definition_expression(const struct_definition_expression&) = delete;
+    struct_definition_expression(const struct_definition_expression& other)
+    : super{other}
+    {
+        members.reserve(other.members.size());
+        std::transform(
+          other.members.begin(),
+          other.members.end(),
+          std::back_inserter(members),
+          [](const auto& ptr)
+          {
+              return std::unique_ptr<variable_declaration_expression>(
+                static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                  ptr->clone().release()));
+          });
+    }
     struct_definition_expression(struct_definition_expression&&) = default;
 
     /** Assignment operators. */
@@ -1643,7 +1708,19 @@ public:
 
     /** Defaulted and deleted constructor. */
     struct_anonymous_initializer_expression() = default;
-    struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression&) = delete;
+    struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression& other)
+    : super{other}
+    {
+        initializers.reserve(other.initializers.size());
+        std::transform(
+          other.initializers.begin(),
+          other.initializers.end(),
+          std::back_inserter(initializers),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
     struct_anonymous_initializer_expression(struct_anonymous_initializer_expression&&) = default;
 
     /** Assignment operators. */
@@ -1722,7 +1799,11 @@ public:
     named_initializer() = default;
 
     /** Copy and move constructors. */
-    named_initializer(const named_initializer&) = delete;
+    named_initializer(const named_initializer& other)
+    : super{other}
+    , expr{other.expr->clone()}
+    {
+    }
     named_initializer(named_initializer&&) = default;
 
     /** Assignment operators. */
@@ -1799,7 +1880,21 @@ public:
     struct_named_initializer_expression() = default;
 
     /** Copy and move constructors. */
-    struct_named_initializer_expression(const struct_named_initializer_expression&) = delete;
+    struct_named_initializer_expression(const struct_named_initializer_expression& other)
+    : super{other}
+    {
+        initializers.reserve(other.initializers.size());
+        std::transform(
+          other.initializers.begin(),
+          other.initializers.end(),
+          std::back_inserter(initializers),
+          [](const auto& ptr)
+          {
+              return std::unique_ptr<named_initializer>(
+                static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                  ptr->clone().release()));
+          });
+    }
     struct_named_initializer_expression(struct_named_initializer_expression&&) = default;
 
     /** Assignment operators. */
@@ -1878,7 +1973,13 @@ public:
 
     /** Defaulted and deleted constructors. */
     binary_expression() = default;
-    binary_expression(const binary_expression&) = delete;
+    binary_expression(const binary_expression& other)
+    : super{other}
+    , op{other.op}
+    , lhs{other.lhs->clone()}
+    , rhs{other.rhs->clone()}
+    {
+    }
     binary_expression(binary_expression&&) = default;
 
     /** Assignment operators. */
@@ -1952,7 +2053,12 @@ public:
     unary_expression() = default;
 
     /** Copy and move constructors. */
-    unary_expression(const unary_expression&) = delete;
+    unary_expression(const unary_expression& other)
+    : super{other}
+    , op{other.op}
+    , operand{other.operand->clone()}
+    {
+    }
     unary_expression(unary_expression&&) = default;
 
     /** Assignment operators. */
@@ -2018,7 +2124,12 @@ public:
 
     /** Defaulted and deleted constructors. */
     new_expression() = default;
-    new_expression(const new_expression&) = delete;
+    new_expression(const new_expression& other)
+    : super{other}
+    , type_expr{other.type_expr->clone()}
+    , expr{other.expr->clone()}
+    {
+    }
     new_expression(new_expression&&) = default;
 
     /** Assignment operators. */
@@ -2076,11 +2187,14 @@ public:
 
     /** Defaulted constructors. */
     null_expression() = default;
-    null_expression(const null_expression&) = default;
+    null_expression(const null_expression& other)
+    : super{other}
+    {
+    }
     null_expression(null_expression&&) = default;
 
     /** Assignment operators. */
-    null_expression& operator=(const null_expression&) = default;
+    null_expression& operator=(const null_expression&) = delete;
     null_expression& operator=(null_expression&&) = default;
 
     /**
@@ -2121,7 +2235,12 @@ public:
 
     /** Defaulted and deleted constructor. */
     postfix_expression() = default;
-    postfix_expression(const postfix_expression&) = delete;
+    postfix_expression(const postfix_expression& other)
+    : super{other}
+    , identifier{other.identifier->clone()}
+    , op{other.op}
+    {
+    }
     postfix_expression(postfix_expression&&) = default;
 
     /** Assignment operators. */
@@ -2202,10 +2321,28 @@ public:
     prototype_ast() = default;
 
     /** Copy and move constructors. */
-    prototype_ast(const prototype_ast&) = delete;
+    prototype_ast(const prototype_ast& other)
+    : loc{other.loc}
+    , name{other.name}
+    , return_type{other.return_type->clone()}
+    , args_type_info{other.args_type_info}
+    , return_type_info{other.return_type_info}
+    {
+        args.reserve(other.args.size());
+        std::transform(
+          other.args.begin(),
+          other.args.end(),
+          std::back_inserter(args),
+          [](const auto& arg)
+          {
+              return std::make_pair(
+                arg.first,
+                arg.second->clone());
+          });
+    }
     prototype_ast(prototype_ast&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     prototype_ast& operator=(const prototype_ast&) = delete;
     prototype_ast& operator=(prototype_ast&&) = default;
 
@@ -2257,7 +2394,19 @@ public:
 
     /** Defaulted and deleted constructor. */
     block() = default;
-    block(const block&) = delete;
+    block(const block& other)
+    : super{other}
+    {
+        exprs.reserve(other.exprs.size());
+        std::transform(
+          other.exprs.begin(),
+          other.exprs.end(),
+          std::back_inserter(exprs),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
     block(block&&) = default;
 
     /** Assignment operators. */
@@ -2335,7 +2484,12 @@ public:
     function_expression() = default;
 
     /** Copy and move constructors. */
-    function_expression(const function_expression&) = delete;
+    function_expression(const function_expression& other)
+    : super{other}
+    , prototype{other.prototype->clone()}
+    , body{static_cast<block*>(other.body->clone().release())}
+    {
+    }
     function_expression(function_expression&&) = default;
 
     /** Assignment operators. */
@@ -2417,10 +2571,25 @@ public:
 
     /** Defaulted and deleted constructors. */
     call_expression() = default;
-    call_expression(const call_expression&) = delete;
+    call_expression(const call_expression& other)
+    : super{other}
+    , callee{other.callee}
+    , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
+    , return_type{other.return_type}
+    {
+        args.reserve(other.args.size());
+        std::transform(
+          other.args.begin(),
+          other.args.end(),
+          std::back_inserter(args),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
     call_expression(call_expression&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     call_expression& operator=(const call_expression&) = delete;
     call_expression& operator=(call_expression&&) = default;
 
@@ -2547,10 +2716,25 @@ public:
 
     /** Defaulted and deleted constructors. */
     macro_invocation() = default;
-    macro_invocation(const macro_invocation&) = delete;
+    macro_invocation(const macro_invocation& other)
+    : super{other}
+    , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
+    , expansion{other.expansion ? other.expansion->clone() : nullptr}
+    {
+        exprs.reserve(other.exprs.size());
+        std::transform(
+          other.exprs.begin(),
+          other.exprs.end(),
+          std::back_inserter(exprs),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
+
     macro_invocation(macro_invocation&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     macro_invocation& operator=(const macro_invocation&) = delete;
     macro_invocation& operator=(macro_invocation&&) = default;
 
@@ -2693,7 +2877,11 @@ public:
 
     /** Defaulted and deleted constructors. */
     return_statement() = default;
-    return_statement(const return_statement&) = delete;
+    return_statement(const return_statement& other)
+    : super{other}
+    , expr{other.expr ? other.expr->clone() : nullptr}
+    {
+    }
     return_statement(return_statement&&) = default;
 
     /** Assignment operators. */
@@ -2765,7 +2953,13 @@ public:
 
     /** Defaulted and deleted constructors. */
     if_statement() = default;
-    if_statement(const if_statement&) = delete;
+    if_statement(const if_statement& other)
+    : super{other}
+    , condition{other.condition->clone()}
+    , if_block{other.if_block->clone()}
+    , else_block{other.else_block ? other.else_block->clone() : nullptr}
+    {
+    }
     if_statement(if_statement&&) = default;
 
     /** Assignment operators. */
@@ -2850,7 +3044,12 @@ public:
 
     /** Defaulted and deleted constructors. */
     while_statement() = default;
-    while_statement(const while_statement&) = delete;
+    while_statement(const while_statement& other)
+    : super{other}
+    , condition{other.condition->clone()}
+    , while_block{other.while_block->clone()}
+    {
+    }
     while_statement(while_statement&&) = default;
 
     /** Assignment operators. */
@@ -2910,10 +3109,13 @@ public:
     break_statement() = default;
 
     /** Copy and move constructors. */
-    break_statement(const break_statement&) = delete;
+    break_statement(const break_statement& other)
+    : super{other}
+    {
+    }
     break_statement(break_statement&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     break_statement& operator=(const break_statement&) = delete;
     break_statement& operator=(break_statement&&) = default;
 
@@ -2955,10 +3157,13 @@ public:
     continue_statement() = default;
 
     /** Copy and move constructors. */
-    continue_statement(const continue_statement&) = delete;
+    continue_statement(const continue_statement& other)
+    : super{other}
+    {
+    }
     continue_statement(continue_statement&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     continue_statement& operator=(const continue_statement&) = delete;
     continue_statement& operator=(continue_statement&&) = default;
 
@@ -3008,10 +3213,16 @@ public:
 
     /** Defaulted and deleted constructors. */
     macro_branch() = default;
-    macro_branch(const macro_branch&) = delete;
+    macro_branch(const macro_branch& other)
+    : super{other}
+    , args{other.args}
+    , args_end_with_list{other.args_end_with_list}
+    , body{static_cast<block*>(other.body->clone().release())}
+    {
+    }
     macro_branch(macro_branch&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     macro_branch& operator=(const macro_branch&) = delete;
     macro_branch& operator=(macro_branch&&) = default;
 
@@ -3115,10 +3326,22 @@ public:
 
     /** Defaulted and deleted constructors. */
     macro_expression_list() = default;
-    macro_expression_list(const macro_expression_list&) = delete;
+    macro_expression_list(const macro_expression_list& other)
+    : super{other}
+    {
+        expr_list.reserve(other.expr_list.size());
+        std::transform(
+          other.expr_list.begin(),
+          other.expr_list.end(),
+          std::back_inserter(expr_list),
+          [](const auto& ptr)
+          {
+              return ptr->clone();
+          });
+    }
     macro_expression_list(macro_expression_list&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     macro_expression_list& operator=(const macro_expression_list&) = delete;
     macro_expression_list& operator=(macro_expression_list&&) = default;
 
@@ -3188,10 +3411,23 @@ public:
 
     /** Defaulted and deleted constructors. */
     macro_expression() = default;
-    macro_expression(const macro_expression&) = delete;
+    macro_expression(const macro_expression& other)
+    : super{other}
+    {
+        branches.reserve(other.branches.size());
+        std::transform(
+          other.branches.begin(),
+          other.branches.end(),
+          std::back_inserter(branches),
+          [](const auto& ptr)
+          {
+              return std::unique_ptr<macro_branch>(
+                static_cast<macro_branch*>(ptr->clone().release()));
+          });
+    }
     macro_expression(macro_expression&&) = default;
 
-    /** Default assignment operators. */
+    /** Assignment operators. */
     macro_expression& operator=(const macro_expression&) = delete;
     macro_expression& operator=(macro_expression&&) = default;
 
