@@ -68,6 +68,14 @@ fn test_format() -> void {
             "sum 3"
         ),
         "sum 3");
+
+    std::println(std::format!("{}", ret_i32() + sum!(1, 2)));
+    std::assert(
+        std::string_equals(
+            std::format!("{}", ret_i32() + sum!(1, 2)),
+            "-120"
+        ),
+        "-120");
 }
 
 fn test_macro() -> void {

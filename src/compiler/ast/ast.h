@@ -233,7 +233,7 @@ public:
     [[nodiscard]]
     virtual const class macro_expression_list* as_macro_expression_list() const;
 
-    /** Whether this expression is a macro invokation. */
+    /** Whether this expression is a macro invocation. */
     [[nodiscard]]
     virtual bool is_macro_invocation() const
     {
@@ -241,7 +241,7 @@ public:
     }
 
     /**
-     * Get the expression as a macro invokation expression.
+     * Get the expression as a macro invocation expression.
      *
      * @note Updates the expression's namespace path.
      * @throws Throws a `std::runtime_error` if the expression is not a macro invocation.
@@ -2527,7 +2527,7 @@ public:
     }
 };
 
-/** Macro invokation. */
+/** Macro invocation. */
 class macro_invocation : public named_expression
 {
     friend class expression;
@@ -2555,7 +2555,7 @@ public:
     macro_invocation& operator=(macro_invocation&&) = default;
 
     /**
-     * Construct a macro invokation.
+     * Construct a macro invocation.
      *
      * @param name The macro's name.
      * @param exprs Expressions the macro operates on.

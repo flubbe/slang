@@ -34,14 +34,19 @@ bool expression::expand_macros(
   const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count{0};
-    std::vector<ast::macro_invocation*> expanded_macros; /* does not include locally defined macros */
+    std::vector<ast::macro_invocation*> expanded_imported_macros;
+
+    auto filter_macros = [](const expression& e) -> bool
+    {
+        return !e.is_macro_expression();
+    };
 
     // replace macro nodes by the macro AST.
     auto macro_expansion_visitor =
       [&macro_asts,
        &codegen_ctx,
        &macro_expansion_count,
-       &expanded_macros](expression& e)
+       &expanded_imported_macros](expression& e)
     {
         if(!e.is_macro_invocation())
         {
@@ -126,10 +131,30 @@ bool expression::expand_macros(
                 std::unique_ptr<expression> macro_ast;
                 ar& expression_serializer{macro_ast};
 
+                // Local macros and functions need to have their namespace added here.
+                macro_ast->visit_nodes(
+                  [&macro_expr](expression& e)
+                  {
+                      if(!e.is_call_expression() && !e.is_macro_invocation())
+                      {
+                          return;
+                      }
+
+                      // make sure that we have the actual expression (and not a namespace access),
+                      // and that the namespace is empty (meaning the expression invokes a local macro/function).
+                      if(e.get_id() != ast::node_identifier::namespace_access_expression
+                         && !e.get_namespace_path().has_value())
+                      {
+                          // Set the namespace to the import's name (stored in macro_expr).
+                          e.set_namespace(macro_expr->get_namespace());
+                      }
+                  },
+                  false);
+
                 macro_expr->set_expansion(
                   macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
 
-                expanded_macros.push_back(macro_expr);
+                expanded_imported_macros.push_back(macro_expr);
             }
         }
 
@@ -149,9 +174,9 @@ bool expression::expand_macros(
             return;
         }
 
-        // adjust local namespaces and transitive import names.
+        // Handle transitive import names.
         macro_expr->expansion->visit_nodes(
-          [&macro_expr, &codegen_ctx, &type_ctx](expression& e) -> void
+          [&codegen_ctx, &type_ctx](expression& e) -> void
           {
               if(!e.is_call_expression())
               {
@@ -161,50 +186,42 @@ bool expression::expand_macros(
               // function calls can never be made for transitive imports,
               // that is, all modules have to be explicit imports here.
 
-              if(e.get_id() != ast::node_identifier::namespace_access_expression
-                 && !e.get_namespace_path().has_value())
-              {
-                  // Set the namespace to the import's name (stored in macro_expr).
-                  e.set_namespace(macro_expr->get_namespace());
-              }
-
               auto* c = e.as_call_expression();
-              auto path = c->get_namespace_path().value();
-              if(!type_ctx.has_import(path))
+              std::optional<std::string> namespace_path = c->get_namespace_path();
+              if(namespace_path.has_value())
               {
-                  type_ctx.add_import(path, false);
+                  const auto& path = namespace_path.value();
+                  if(!type_ctx.has_import(path))
+                  {
+                      type_ctx.add_import(path, false);
 
-                  // TODO Do we need to validate that `path` is part of an import statement?
-              }
-              else if(type_ctx.is_transitive_import(path))
-              {
-                  // make import explicit.
-                  type_ctx.add_import(path, false);
-                  codegen_ctx.make_import_explicit(path);
+                      // TODO Do we need to validate that `path` is part of an import statement?
+                  }
+                  else if(type_ctx.is_transitive_import(path))
+                  {
+                      // make import explicit.
+                      type_ctx.add_import(path, false);
+                      codegen_ctx.make_import_explicit(path);
+                  }
               }
           },
           true,
           false);
     };
 
-    auto filter = [](const expression& e) -> bool
-    {
-        return !e.is_macro_expression();
-    };
-
     visit_nodes(
       macro_expansion_visitor,
       true,  /* visit this node */
       false, /* pre-order traversal */
-      filter);
+      filter_macros);
 
     visit_nodes(
       function_import_visitor,
       true,  /* visit this node */
       false, /* pre-order traversal */
-      filter);
+      filter_macros);
 
-    for(auto& macro_expr: expanded_macros)
+    for(auto& macro_expr: expanded_imported_macros)
     {
         // adjust local namespaces and transitive import names.
         macro_expr->expansion->visit_nodes(
@@ -246,11 +263,14 @@ std::unique_ptr<expression> macro_invocation::clone() const
         cloned_exprs.emplace_back(expr->clone());
     }
 
-    return std::make_unique<macro_invocation>(
+    auto cloned_expr = std::make_unique<macro_invocation>(
       name,
       std::move(cloned_exprs),
       index_expr ? index_expr->clone() : nullptr,
       expansion ? expansion->clone() : nullptr);
+    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
+
+    return cloned_expr;
 }
 
 void macro_invocation::serialize(archive& ar)
@@ -345,11 +365,14 @@ std::string macro_invocation::to_string() const
 
 std::unique_ptr<expression> macro_branch::clone() const
 {
-    return std::make_unique<macro_branch>(
+    auto cloned_expr = std::make_unique<macro_branch>(
       get_location(),
       args,
       args_end_with_list,
       std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
+
+    return cloned_expr;
 }
 
 void macro_branch::serialize(archive& ar)
@@ -399,7 +422,10 @@ std::unique_ptr<expression> macro_expression_list::clone() const
         cloned_expr_list.emplace_back(expr->clone());
     }
 
-    return std::make_unique<macro_expression_list>(loc, std::move(cloned_expr_list));
+    auto cloned_expr = std::make_unique<macro_expression_list>(loc, std::move(cloned_expr_list));
+    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
+
+    return cloned_expr;
 }
 
 void macro_expression_list::serialize(archive& ar)
@@ -457,7 +483,10 @@ std::unique_ptr<expression> macro_expression::clone() const
         );
     }
 
-    return std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
+    auto cloned_expr = std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
+    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
+
+    return cloned_expr;
 }
 
 void macro_expression::serialize(archive& ar)

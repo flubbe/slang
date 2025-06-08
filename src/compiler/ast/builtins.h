@@ -40,7 +40,7 @@ struct format_string_placeholder
 /** Expansion helper for format macro. */
 class format_macro_expander
 {
-    /** Location of the macro invokation. */
+    /** Location of the macro invocation. */
     token_location loc;
 
     /** Expressions the macro operates on. */
@@ -85,7 +85,7 @@ public:
      * Constructor.
      *
      * @param desc Descriptor for the `format!` macro.
-     * @param loc Location of the macro invokation.
+     * @param loc Location of the macro invocation.
      * @param exprs Expressions the macro operates on.
      */
     format_macro_expander(

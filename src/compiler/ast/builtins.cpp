@@ -152,7 +152,7 @@ std::unique_ptr<cg::value> format_macro_expression::generate_code(
     {
         throw cg::codegen_error(
           loc,
-          "Unmatched format placeholders or syntax error in macro invokation.");
+          "Unmatched format placeholders or syntax error in macro invocation.");
     }
 
     const auto& format_string = exprs[0]->as_literal()->get_token();

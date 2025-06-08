@@ -463,7 +463,7 @@ public:
      * Invoke the function.
      *
      * @param args Function arguments.
-     * @return Result of the invokation.
+     * @return Result of the invocation.
      */
     value invoke(const std::vector<value>& args);
 
@@ -471,7 +471,7 @@ public:
      * Invoke the function.
      *
      * @param args Function arguments.
-     * @return Result of the invokation.
+     * @return Result of the invocation.
      */
     value operator()(const std::vector<value>& args)
     {
@@ -482,7 +482,7 @@ public:
      * Invoke the function.
      *
      * @param args Function arguments.
-     * @return Result of the invokation.
+     * @return Result of the invocation.
      */
     template<typename... Args>
     value operator()(Args&&... args)
