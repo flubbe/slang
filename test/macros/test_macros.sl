@@ -76,6 +76,12 @@ fn test_format() -> void {
             "-120"
         ),
         "-120");
+
+    std::assert(
+        std::string_equals(
+            std::format!("{} {} {} {}", 12, 13, 3.141, "Test"),
+            "12 13 3.141 Test"),
+        "12 13 3.141 Test");
 }
 
 fn test_macro() -> void {
