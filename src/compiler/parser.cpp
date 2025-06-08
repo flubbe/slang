@@ -952,7 +952,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
           std::make_unique<ast::variable_reference_expression>(std::move(identifier)), std::move(postfix_op));
     }
 
-    if(current_token->s == "(")    // function call or macro invokation.
+    if(current_token->s == "(")    // function call or macro invocation.
     {
         get_next_token();    // skip "("
 

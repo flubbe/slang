@@ -17,7 +17,6 @@
 #include "codegen.h"
 #include "resolve.h"
 #include "utils.h"
-#include "builtins/macros.h"
 
 namespace slang::codegen
 {

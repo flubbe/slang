@@ -1053,7 +1053,7 @@ TEST(interpreter, multiple_modules)
     EXPECT_EQ(ctx.get_gc().byte_size(), 0);
 }
 
-TEST(interpreter, invokation_api)
+TEST(interpreter, invocation_api)
 {
     {
         slang::file_manager file_mgr;

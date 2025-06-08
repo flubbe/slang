@@ -2888,7 +2888,7 @@ public:
     void generate_get_field(std::unique_ptr<field_access_argument> arg);
 
     /**
-     * Statically or dynamically invoke a function. If the invokation
+     * Statically or dynamically invoke a function. If the invocation
      * is dynamic, the function is loaded from the stack.
      *
      * @param name The function's name for statically invoked functions.

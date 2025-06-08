@@ -233,7 +233,7 @@ public:
     [[nodiscard]]
     virtual const class macro_expression_list* as_macro_expression_list() const;
 
-    /** Whether this expression is a macro invokation. */
+    /** Whether this expression is a macro invocation. */
     [[nodiscard]]
     virtual bool is_macro_invocation() const
     {
@@ -241,7 +241,7 @@ public:
     }
 
     /**
-     * Get the expression as a macro invokation expression.
+     * Get the expression as a macro invocation expression.
      *
      * @note Updates the expression's namespace path.
      * @throws Throws a `std::runtime_error` if the expression is not a macro invocation.
@@ -1313,10 +1313,10 @@ class variable_declaration_expression : public named_expression
     friend class macro_expression;
 
     /** The variable's type. */
-    std::unique_ptr<ast::type_expression> type;
+    std::unique_ptr<type_expression> type;
 
     /** An optional initializer expression. */
-    std::unique_ptr<ast::expression> expr;
+    std::unique_ptr<expression> expr;
 
 public:
     /** Set the super class. */
@@ -1339,7 +1339,11 @@ public:
      * @param type The variable's type.
      * @param expr An optional initializer expression.
      */
-    variable_declaration_expression(token_location loc, token name, std::unique_ptr<ast::type_expression> type, std::unique_ptr<ast::expression> expr)
+    variable_declaration_expression(
+      token_location loc,
+      token name,
+      std::unique_ptr<type_expression> type,
+      std::unique_ptr<expression> expr)
     : named_expression{loc, std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
@@ -1386,7 +1390,7 @@ public:
 
     /** Get the variable's type. */
     [[nodiscard]]
-    const std::unique_ptr<ast::type_expression>& get_type() const
+    const std::unique_ptr<type_expression>& get_type() const
     {
         return type;
     }
@@ -1403,10 +1407,10 @@ public:
 class constant_declaration_expression : public named_expression
 {
     /** The constant's type. */
-    std::unique_ptr<ast::type_expression> type;
+    std::unique_ptr<type_expression> type;
 
     /** The initializer expression. */
-    std::unique_ptr<ast::expression> expr;
+    std::unique_ptr<expression> expr;
 
 public:
     /** Set the super class. */
@@ -1432,8 +1436,8 @@ public:
     constant_declaration_expression(
       token_location loc,
       token name,
-      std::unique_ptr<ast::type_expression> type,
-      std::unique_ptr<ast::expression> expr)
+      std::unique_ptr<type_expression> type,
+      std::unique_ptr<expression> expr)
     : named_expression{loc, std::move(name)}
     , type{std::move(type)}
     , expr{std::move(expr)}
@@ -1472,7 +1476,7 @@ public:
 
     /** Get the constant's type. */
     [[nodiscard]]
-    const std::unique_ptr<ast::type_expression>& get_type() const
+    const std::unique_ptr<type_expression>& get_type() const
     {
         return type;
     }
@@ -1482,7 +1486,7 @@ public:
 class array_initializer_expression : public expression
 {
     /** Initializer expressions for each element. */
-    std::vector<std::unique_ptr<ast::expression>> exprs;
+    std::vector<std::unique_ptr<expression>> exprs;
 
 public:
     /** Set the super class. */
@@ -2523,13 +2527,13 @@ public:
     }
 };
 
-/** Macro invokation. */
+/** Macro invocation. */
 class macro_invocation : public named_expression
 {
     friend class expression;
 
     /** Expressions the macro operates on. */
-    std::vector<std::unique_ptr<ast::expression>> exprs;
+    std::vector<std::unique_ptr<expression>> exprs;
 
     /** An optional index expression for return value array access. */
     std::unique_ptr<expression> index_expr;
@@ -2551,7 +2555,7 @@ public:
     macro_invocation& operator=(macro_invocation&&) = default;
 
     /**
-     * Construct a macro invokation.
+     * Construct a macro invocation.
      *
      * @param name The macro's name.
      * @param exprs Expressions the macro operates on.
@@ -2560,7 +2564,7 @@ public:
      */
     macro_invocation(
       token name,
-      std::vector<std::unique_ptr<ast::expression>> exprs,
+      std::vector<std::unique_ptr<expression>> exprs,
       std::unique_ptr<expression> index_expr = nullptr,
       std::unique_ptr<expression> expansion = nullptr)
     : named_expression{name.location, std::move(name)}
@@ -2650,7 +2654,7 @@ public:
      * @return The expressions.
      */
     [[nodiscard]]
-    const std::vector<std::unique_ptr<ast::expression>>& get_exprs() const
+    const std::vector<std::unique_ptr<expression>>& get_exprs() const
     {
         return exprs;
     }
@@ -2681,7 +2685,7 @@ public:
 class return_statement : public expression
 {
     /** (Optional) returned expression. */
-    std::unique_ptr<ast::expression> expr;
+    std::unique_ptr<expression> expr;
 
 public:
     /** Set the super class. */
@@ -2704,7 +2708,7 @@ public:
      */
     return_statement(
       token_location loc,
-      std::unique_ptr<ast::expression> expr)
+      std::unique_ptr<expression> expr)
     : expression{loc}
     , expr{std::move(expr)}
     {
@@ -2747,13 +2751,13 @@ public:
 class if_statement : public expression
 {
     /** The condition. */
-    std::unique_ptr<ast::expression> condition;
+    std::unique_ptr<expression> condition;
 
     /** If block. */
-    std::unique_ptr<ast::expression> if_block;
+    std::unique_ptr<expression> if_block;
 
     /** (Optinal) else block. */
-    std::unique_ptr<ast::expression> else_block;
+    std::unique_ptr<expression> else_block;
 
 public:
     /** Set the super class. */
@@ -2778,9 +2782,9 @@ public:
      */
     if_statement(
       token_location loc,
-      std::unique_ptr<ast::expression> condition,
-      std::unique_ptr<ast::expression> if_block,
-      std::unique_ptr<ast::expression> else_block)
+      std::unique_ptr<expression> condition,
+      std::unique_ptr<expression> if_block,
+      std::unique_ptr<expression> else_block)
     : expression{loc}
     , condition{std::move(condition)}
     , if_block{std::move(if_block)}
@@ -2835,10 +2839,10 @@ public:
 class while_statement : public expression
 {
     /** The condition. */
-    std::unique_ptr<ast::expression> condition;
+    std::unique_ptr<expression> condition;
 
     /** While block. */
-    std::unique_ptr<ast::expression> while_block;
+    std::unique_ptr<expression> while_block;
 
 public:
     /** Set the super class. */
@@ -2862,8 +2866,8 @@ public:
      */
     while_statement(
       token_location loc,
-      std::unique_ptr<ast::expression> condition,
-      std::unique_ptr<ast::expression> while_block)
+      std::unique_ptr<expression> condition,
+      std::unique_ptr<expression> while_block)
     : expression{loc}
     , condition{std::move(condition)}
     , while_block{std::move(while_block)}

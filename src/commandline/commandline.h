@@ -92,7 +92,7 @@ public:
     /**
      * Construct a command.
      *
-     * @param name The command's name, used for invokation. A valid name
+     * @param name The command's name, used for invocation. A valid name
      *             consists only of letters and underscores.
      *
      * @throws Throws a std::runtime_error if the name is invalid.

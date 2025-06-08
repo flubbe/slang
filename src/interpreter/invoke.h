@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * function invokation helpers.
+ * function invocation helpers.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025

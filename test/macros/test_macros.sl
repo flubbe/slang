@@ -14,6 +14,10 @@ macro sum! {
     };
 }
 
+fn ret_i32() -> i32 {
+    return -123;
+}
+
 fn test_format() -> void {
     std::assert(
         std::string_equals(
@@ -32,6 +36,52 @@ fn test_format() -> void {
             std::format!("Test: {d}", s/2),
             "Test: 21"),
         "Test: 21");
+
+    std::println(std::format!("{} test", 123));
+    std::assert(
+        std::string_equals(
+            std::format!("{} test", 123),
+            "123 test"
+        ),
+        "123 test");
+
+    std::println(std::format!(" {} ", 3.141));
+    std::assert(
+        std::string_equals(
+            std::format!(" {} ", 3.141),
+            " 3.141 "
+        ),
+        "3.141");
+
+    std::println(std::format!("str {}", "test"));
+    std::assert(
+        std::string_equals(
+            std::format!("str {}", "test"),
+            "str test"
+        ),
+        "str test");
+
+    std::println(std::format!("sum {}", sum!(1, 2)));
+    std::assert(
+        std::string_equals(
+            std::format!("sum {}", sum!(1, 2)),
+            "sum 3"
+        ),
+        "sum 3");
+
+    std::println(std::format!("{}", ret_i32() + sum!(1, 2)));
+    std::assert(
+        std::string_equals(
+            std::format!("{}", ret_i32() + sum!(1, 2)),
+            "-120"
+        ),
+        "-120");
+
+    std::assert(
+        std::string_equals(
+            std::format!("{} {} {} {}", 12, 13, 3.141, "Test"),
+            "12 13 3.141 Test"),
+        "12 13 3.141 Test");
 }
 
 fn test_macro() -> void {

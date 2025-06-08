@@ -68,7 +68,9 @@ enum class node_identifier : std::uint8_t
     macro_expression_list = 32,
     macro_expression = 33,
 
-    last = macro_expression
+    format_macro_expression = 34,
+
+    last = format_macro_expression
 };
 
 /**

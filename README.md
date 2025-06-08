@@ -5,9 +5,10 @@ and an interpreter. It is far from complete and I am working on aspects of it ev
 in a while.
 
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline)) 
-provides two commands:
+provides these commands:
 - `slang compile`: Compiles a source file into bytecode.
 - `slang run`: Run the main function from a compiled file.
+- `slang disasm`: Disassemble a module and print the bytecode.
 
 For example:
 ```bash

@@ -1,6 +1,10 @@
 import std;
 import test_macros;
 
+fn local_function() -> void {
+    std::println("Local function called");
+}
+
 macro two! {
     () => {
         test_macros::sum!(1, 1);
@@ -16,6 +20,7 @@ macro test! {
 macro test_format_print! {
     () => {
         test!();
+        local_function();
         std::println("test_format_print!");
     };
 }
