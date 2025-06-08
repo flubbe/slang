@@ -67,10 +67,7 @@ static std::unique_ptr<cg::value> type_info_to_value(
 
 std::unique_ptr<expression> expression::clone() const
 {
-    auto cloned_expr = std::make_unique<expression>(loc);
-    cloned_expr->namespace_stack = namespace_stack;
-    cloned_expr->expr_type = expr_type;
-    return cloned_expr;
+    return std::make_unique<expression>(*this);
 }
 
 void expression::serialize(archive& ar)
@@ -321,11 +318,7 @@ void expression::visit_nodes(
 
 std::unique_ptr<expression> named_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<named_expression>();
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-    cloned_expr->name = name;
-
-    return cloned_expr;
+    return std::make_unique<named_expression>(*this);
 }
 
 void named_expression::serialize(archive& ar)
@@ -340,11 +333,7 @@ void named_expression::serialize(archive& ar)
 
 std::unique_ptr<expression> literal_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<literal_expression>();
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-    cloned_expr->tok = tok;
-
-    return cloned_expr;
+    return std::make_unique<literal_expression>(*this);
 }
 
 void literal_expression::serialize(archive& ar)
@@ -513,13 +502,7 @@ void type_expression::serialize(archive& ar)
 
 std::unique_ptr<expression> type_cast_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<type_cast_expression>(
-      loc,
-      expr->clone(),
-      target_type->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<type_cast_expression>(*this);
 }
 
 void type_cast_expression::serialize(archive& ar)
@@ -627,12 +610,7 @@ std::string type_cast_expression::to_string() const
 
 std::unique_ptr<expression> namespace_access_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<namespace_access_expression>(
-      name,
-      expr->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<namespace_access_expression>(*this);
 }
 
 void namespace_access_expression::serialize(archive& ar)
@@ -718,13 +696,7 @@ access_expression::access_expression(std::unique_ptr<ast::expression> lhs, std::
 
 std::unique_ptr<expression> access_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<access_expression>(
-      lhs->clone(),
-      rhs->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-    cloned_expr->lhs_type = lhs_type;
-
-    return cloned_expr;
+    return std::make_unique<access_expression>(*this);
 }
 
 void access_expression::serialize(archive& ar)
@@ -869,10 +841,7 @@ std::string access_expression::to_string() const
 
 std::unique_ptr<expression> import_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<import_expression>(path);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<import_expression>(*this);
 }
 
 void import_expression::serialize(archive& ar)
@@ -906,13 +875,7 @@ std::string import_expression::to_string() const
 
 std::unique_ptr<expression> directive_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<directive_expression>(
-      name,
-      args,
-      expr->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<directive_expression>(*this);
 }
 
 void directive_expression::serialize(archive& ar)
@@ -965,13 +928,7 @@ std::string directive_expression::to_string() const
 
 std::unique_ptr<expression> variable_reference_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<variable_reference_expression>(
-      name,
-      element_expr ? element_expr->clone() : nullptr,
-      expansion ? expansion->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<variable_reference_expression>(*this);
 }
 
 void variable_reference_expression::serialize(archive& ar)
@@ -1338,14 +1295,7 @@ ty::type_info type_expression::to_unresolved_type_info(ty::context& ctx) const
 
 std::unique_ptr<expression> variable_declaration_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<variable_declaration_expression>(
-      loc,
-      name,
-      type->clone(),
-      expr ? expr->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<variable_declaration_expression>(*this);
 }
 
 void variable_declaration_expression::serialize(archive& ar)
@@ -1466,14 +1416,7 @@ std::string variable_declaration_expression::to_string() const
 
 std::unique_ptr<expression> constant_declaration_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<constant_declaration_expression>(
-      loc,
-      name,
-      type->clone(),
-      expr->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<constant_declaration_expression>(*this);
 }
 
 void constant_declaration_expression::serialize(archive& ar)
@@ -1613,19 +1556,7 @@ std::string constant_declaration_expression::to_string() const
 
 std::unique_ptr<expression> array_initializer_expression::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_exprs;
-    cloned_exprs.reserve(exprs.size());
-    for(const auto& e: exprs)
-    {
-        cloned_exprs.emplace_back(e->clone());
-    }
-
-    auto cloned_expr = std::make_unique<array_initializer_expression>(
-      loc,
-      std::move(cloned_exprs));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<array_initializer_expression>(*this);
 }
 
 void array_initializer_expression::serialize(archive& ar)
@@ -1752,22 +1683,7 @@ std::string array_initializer_expression::to_string() const
 
 std::unique_ptr<expression> struct_definition_expression::clone() const
 {
-    std::vector<std::unique_ptr<variable_declaration_expression>> cloned_members;
-    cloned_members.reserve(members.size());
-    for(const auto& m: members)
-    {
-        cloned_members.emplace_back(
-          static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-            m->clone().release()));
-    }
-
-    auto cloned_expr = std::make_unique<struct_definition_expression>(
-      loc,
-      name,
-      std::move(cloned_members));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<struct_definition_expression>(*this);
 }
 
 void struct_definition_expression::serialize(archive& ar)
@@ -1871,20 +1787,7 @@ std::string struct_definition_expression::to_string() const
 
 std::unique_ptr<expression> struct_anonymous_initializer_expression::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_initializers;
-    cloned_initializers.reserve(initializers.size());
-    for(const auto& m: initializers)
-    {
-        cloned_initializers.emplace_back(
-          m->clone());
-    }
-
-    auto cloned_expr = std::make_unique<struct_anonymous_initializer_expression>(
-      name,
-      std::move(cloned_initializers));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<struct_anonymous_initializer_expression>(*this);
 }
 
 void struct_anonymous_initializer_expression::serialize(archive& ar)
@@ -2024,12 +1927,7 @@ std::string struct_anonymous_initializer_expression::to_string() const
 
 std::unique_ptr<expression> named_initializer::clone() const
 {
-    auto cloned_expr = std::make_unique<named_initializer>(
-      name,
-      expr->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<named_initializer>(*this);
 }
 
 void named_initializer::serialize(archive& ar)
@@ -2064,21 +1962,7 @@ std::string named_initializer::to_string() const
 
 std::unique_ptr<expression> struct_named_initializer_expression::clone() const
 {
-    std::vector<std::unique_ptr<named_initializer>> cloned_initializers;
-    cloned_initializers.reserve(initializers.size());
-    for(const auto& initializer: initializers)
-    {
-        cloned_initializers.emplace_back(
-          static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-            initializer->clone().release()));
-    }
-
-    auto cloned_expr = std::make_unique<struct_named_initializer_expression>(
-      name,
-      std::move(cloned_initializers));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<struct_named_initializer_expression>(*this);
 }
 
 void struct_named_initializer_expression::serialize(archive& ar)
@@ -2267,14 +2151,7 @@ std::string struct_named_initializer_expression::to_string() const
 
 std::unique_ptr<expression> binary_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<binary_expression>(
-      loc,
-      op,
-      lhs->clone(),
-      rhs->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<binary_expression>(*this);
 }
 
 void binary_expression::serialize(archive& ar)
@@ -2753,13 +2630,7 @@ std::string binary_expression::to_string() const
 
 std::unique_ptr<expression> unary_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<unary_expression>(
-      loc,
-      op,
-      operand->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<unary_expression>(*this);
 }
 
 void unary_expression::serialize(archive& ar)
@@ -3023,13 +2894,7 @@ std::string unary_expression::to_string() const
 
 std::unique_ptr<expression> new_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<new_expression>(
-      loc,
-      type_expr->clone(),
-      expr->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<new_expression>(*this);
 }
 
 void new_expression::serialize(archive& ar)
@@ -3136,10 +3001,7 @@ std::string new_expression::to_string() const
 
 std::unique_ptr<expression> null_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<null_expression>(loc);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<null_expression>(*this);
 }
 
 std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -3172,12 +3034,7 @@ std::string null_expression::to_string() const
 
 std::unique_ptr<expression> postfix_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<postfix_expression>(
-      identifier->clone(),
-      op);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<postfix_expression>(*this);
 }
 
 void postfix_expression::serialize(archive& ar)
@@ -3282,20 +3139,7 @@ std::string postfix_expression::to_string() const
 
 std::unique_ptr<prototype_ast> prototype_ast::clone() const
 {
-    std::vector<std::pair<token, std::unique_ptr<type_expression>>> cloned_args;
-    cloned_args.reserve(args.size());
-    for(const auto& arg: args)
-    {
-        cloned_args.emplace_back(
-          arg.first,
-          arg.second->clone());
-    }
-
-    return std::make_unique<prototype_ast>(
-      loc,
-      name,
-      std::move(cloned_args),
-      return_type->clone());
+    return std::make_unique<prototype_ast>(*this);
 }
 
 void prototype_ast::serialize(archive& ar)
@@ -3423,19 +3267,7 @@ std::string prototype_ast::to_string() const
 
 std::unique_ptr<expression> block::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_exprs;
-    cloned_exprs.reserve(exprs.size());
-    for(const auto& e: exprs)
-    {
-        cloned_exprs.emplace_back(e->clone());
-    }
-
-    auto cloned_expr = std::make_unique<block>(
-      loc,
-      std::move(cloned_exprs));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<block>(*this);
 }
 
 void block::serialize(archive& ar)
@@ -3532,13 +3364,7 @@ std::string block::to_string() const
 
 std::unique_ptr<expression> function_expression::clone() const
 {
-    auto cloned_expr = std::make_unique<function_expression>(
-      loc,
-      prototype->clone(),
-      std::unique_ptr<block>(static_cast<block*>(body->clone().release())));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<function_expression>(*this);
 }
 
 void function_expression::serialize(archive& ar)
@@ -3696,20 +3522,7 @@ std::string function_expression::to_string() const
 
 std::unique_ptr<expression> call_expression::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_args;
-    cloned_args.reserve(args.size());
-    for(const auto& arg: args)
-    {
-        cloned_args.emplace_back(arg->clone());
-    }
-
-    auto cloned_expr = std::make_unique<call_expression>(
-      callee,
-      std::move(cloned_args),
-      index_expr ? index_expr->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<call_expression>(*this);
 }
 
 void call_expression::serialize(archive& ar)
@@ -3833,12 +3646,7 @@ std::string call_expression::to_string() const
 
 std::unique_ptr<expression> return_statement::clone() const
 {
-    auto cloned_expr = std::make_unique<return_statement>(
-      loc,
-      expr ? expr->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<return_statement>(*this);
 }
 
 void return_statement::serialize(archive& ar)
@@ -3942,14 +3750,7 @@ std::string return_statement::to_string() const
 
 std::unique_ptr<expression> if_statement::clone() const
 {
-    auto cloned_expr = std::make_unique<if_statement>(
-      loc,
-      condition->clone(),
-      if_block->clone(),
-      else_block ? else_block->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<if_statement>(*this);
 }
 
 void if_statement::serialize(archive& ar)
@@ -4077,13 +3878,7 @@ std::string if_statement::to_string() const
 
 std::unique_ptr<expression> while_statement::clone() const
 {
-    auto cloned_expr = std::make_unique<while_statement>(
-      loc,
-      condition->clone(),
-      while_block->clone());
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<while_statement>(*this);
 }
 
 void while_statement::serialize(archive& ar)
@@ -4182,10 +3977,7 @@ std::string while_statement::to_string() const
 
 std::unique_ptr<expression> break_statement::clone() const
 {
-    auto cloned_expr = std::make_unique<break_statement>(loc);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<break_statement>(*this);
 }
 
 std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
@@ -4201,10 +3993,7 @@ std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[ma
 
 std::unique_ptr<expression> continue_statement::clone() const
 {
-    auto cloned_expr = std::make_unique<continue_statement>(loc);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<continue_statement>(*this);
 }
 
 std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const

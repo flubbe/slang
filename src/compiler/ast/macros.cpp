@@ -256,21 +256,7 @@ bool expression::expand_macros(
 
 std::unique_ptr<expression> macro_invocation::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_exprs;
-    cloned_exprs.reserve(exprs.size());
-    for(const auto& expr: exprs)
-    {
-        cloned_exprs.emplace_back(expr->clone());
-    }
-
-    auto cloned_expr = std::make_unique<macro_invocation>(
-      name,
-      std::move(cloned_exprs),
-      index_expr ? index_expr->clone() : nullptr,
-      expansion ? expansion->clone() : nullptr);
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<macro_invocation>(*this);
 }
 
 void macro_invocation::serialize(archive& ar)
@@ -365,14 +351,7 @@ std::string macro_invocation::to_string() const
 
 std::unique_ptr<expression> macro_branch::clone() const
 {
-    auto cloned_expr = std::make_unique<macro_branch>(
-      get_location(),
-      args,
-      args_end_with_list,
-      std::unique_ptr<block>{static_cast<block*>(body->clone().release())});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<macro_branch>(*this);
 }
 
 void macro_branch::serialize(archive& ar)
@@ -415,17 +394,7 @@ std::string macro_branch::to_string() const
 
 std::unique_ptr<expression> macro_expression_list::clone() const
 {
-    std::vector<std::unique_ptr<expression>> cloned_expr_list;
-    cloned_expr_list.reserve(expr_list.size());
-    for(const auto& expr: expr_list)
-    {
-        cloned_expr_list.emplace_back(expr->clone());
-    }
-
-    auto cloned_expr = std::make_unique<macro_expression_list>(loc, std::move(cloned_expr_list));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<macro_expression_list>(*this);
 }
 
 void macro_expression_list::serialize(archive& ar)
@@ -474,19 +443,7 @@ std::string macro_expression_list::to_string() const
 
 std::unique_ptr<expression> macro_expression::clone() const
 {
-    std::vector<std::unique_ptr<macro_branch>> cloned_branches;
-    cloned_branches.reserve(branches.size());
-    for(const auto& branch: branches)
-    {
-        cloned_branches.emplace_back(
-          static_cast<macro_branch*>(branch->clone().release())    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        );
-    }
-
-    auto cloned_expr = std::make_unique<macro_expression>(loc, name, std::move(cloned_branches));
-    *static_cast<super*>(cloned_expr.get()) = *static_cast<const super*>(this);
-
-    return cloned_expr;
+    return std::make_unique<macro_expression>(*this);
 }
 
 void macro_expression::serialize(archive& ar)
