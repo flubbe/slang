@@ -8,9 +8,11 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <ranges>
 
 #include "compiler/ast/ast.h"
+#include "compiler/ast/node_registry.h"
 #include "compiler/codegen.h"
 #include "compiler/typing.h"
 #include "shared/type_utils.h"
@@ -86,7 +88,7 @@ static cg::value to_value(
         if(sym.type != module_::symbol_type::package)
         {
             throw resolve_error(
-              fmt::format(
+              std::format(
                 "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
                 vt.get_import_index().value(),
                 sym.name));
@@ -129,7 +131,7 @@ static ty::type_info to_unresolved_type_info(
         if(sym.type != module_::symbol_type::package)
         {
             throw resolve_error(
-              fmt::format(
+              std::format(
                 "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
                 desc.base_type.get_import_index().value(),
                 sym.name));
@@ -174,7 +176,7 @@ static ty::type_info to_resolved_type_info(
         if(sym.type != module_::symbol_type::package)
         {
             throw resolve_error(
-              fmt::format(
+              std::format(
                 "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
                 import_index.value(),
                 sym.name));
@@ -193,7 +195,7 @@ static ty::type_info to_resolved_type_info(
  */
 
 resolve_error::resolve_error(const token_location& loc, const std::string& message)
-: std::runtime_error{fmt::format("{}: {}", to_string(loc), message)}
+: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
 
@@ -212,7 +214,7 @@ static module_::module_resolver& resolve_module(
     auto it = resolvers.find(import_name);
     if(it != resolvers.end())
     {
-        throw resolve_error(fmt::format("Module '{}' is already resolved.", import_name));
+        throw resolve_error(std::format("Module '{}' is already resolved.", import_name));
     }
 
     std::string import_path = import_name;
@@ -301,7 +303,7 @@ static void add_constant(
     else
     {
         throw resolve_error(
-          fmt::format(
+          std::format(
             "Constant '{}' has unknown type id {}.",
             name,
             static_cast<int>(entry.type)));
@@ -326,15 +328,11 @@ static void add_function(
   const std::string& name,
   const module_::function_descriptor& desc)
 {
-    std::vector<cg::value> prototype_arg_types;
-    std::transform(
-      desc.signature.arg_types.cbegin(),
-      desc.signature.arg_types.cend(),
-      std::back_inserter(prototype_arg_types),
-      [&resolver, &import_path](const module_::variable_type& arg) -> cg::value
-      {
-          return to_value(arg, resolver, import_path);
-      });
+    std::vector<cg::value> prototype_arg_types =
+      desc.signature.arg_types
+      | std::views::transform([&resolver, &import_path](const module_::variable_type& arg)
+                              { return to_value(arg, resolver, import_path); })
+      | std::ranges::to<std::vector>();
 
     ctx.add_prototype(
       name,
@@ -379,22 +377,19 @@ static void add_type(
 {
     // Add type to code generation context.
     {
-        std::vector<std::pair<std::string, cg::value>> members;
-        std::transform(
-          desc.member_types.cbegin(),
-          desc.member_types.cend(),
-          std::back_inserter(members),
-          [&import_path, &resolver](
-            const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
-          {
-              return {
+        std::vector<std::pair<std::string, cg::value>> members =
+          desc.member_types
+          | std::views::transform(
+            [&import_path, &resolver](
+              const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
+            { return {
                 std::get<0>(member),
                 to_value(
                   std::get<1>(member).base_type,
                   resolver,
                   import_path,
-                  std::get<0>(member))};
-          });
+                  std::get<0>(member))}; })
+          | std::ranges::to<std::vector>();
 
         ctx.add_import(module_::symbol_type::type, import_path, name);
         ctx.add_struct(name, members, desc.flags, import_path);
@@ -460,7 +455,7 @@ void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
             }
             else
             {
-                throw resolve_error(fmt::format("Found unknown symbol type '{}'.", static_cast<int>(it.type)));
+                throw resolve_error(std::format("Found unknown symbol type '{}'.", static_cast<int>(it.type)));
             }
         }
     }
@@ -476,7 +471,7 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
         if(!desc.serialized_ast.has_value())
         {
             throw resolve_error(
-              fmt::format(
+              std::format(
                 "Macro '{}' has empty AST.",
                 m->get_name()));
         }
@@ -484,7 +479,7 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
         memory_read_archive ar{
           desc.serialized_ast.value(),
           true,
-          endian::little};
+          std::endian::little};
 
         std::unique_ptr<ast::expression> macro_ast;
         ar& ast::expression_serializer{macro_ast};

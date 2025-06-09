@@ -4,13 +4,12 @@
  * Serialization tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <cstring>
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "archives/archive.h"
@@ -151,9 +150,9 @@ std::vector<std::uint8_t> to_big_endian(double d)
 TEST(serialization, big_endian_file_archive)
 {
     {
-        slang::file_write_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_write_archive ar{"big_endian.bin", std::endian::big};
 
-        EXPECT_EQ(ar.get_target_byte_order(), slang::endian::big);
+        EXPECT_EQ(ar.get_target_byte_order(), std::endian::big);
         EXPECT_EQ(ar.is_persistent(), true);
         EXPECT_EQ(ar.is_reading(), false);
         EXPECT_EQ(ar.is_writing(), true);
@@ -225,9 +224,9 @@ TEST(serialization, big_endian_file_archive)
         }
     }
     {
-        slang::file_read_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_read_archive ar{"big_endian.bin", std::endian::big};
 
-        EXPECT_EQ(ar.get_target_byte_order(), slang::endian::big);
+        EXPECT_EQ(ar.get_target_byte_order(), std::endian::big);
         EXPECT_EQ(ar.is_persistent(), true);
         EXPECT_EQ(ar.is_reading(), true);
         EXPECT_EQ(ar.is_writing(), false);
@@ -255,9 +254,9 @@ TEST(serialization, big_endian_file_archive)
 TEST(serialization, little_endian_file_archive)
 {
     {
-        slang::file_write_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_write_archive ar{"little_endian.bin", std::endian::little};
 
-        EXPECT_EQ(ar.get_target_byte_order(), slang::endian::little);
+        EXPECT_EQ(ar.get_target_byte_order(), std::endian::little);
         EXPECT_EQ(ar.is_persistent(), true);
         EXPECT_EQ(ar.is_reading(), false);
         EXPECT_EQ(ar.is_writing(), true);
@@ -321,9 +320,9 @@ TEST(serialization, little_endian_file_archive)
         }
     }
     {
-        slang::file_read_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_read_archive ar{"little_endian.bin", std::endian::little};
 
-        EXPECT_EQ(ar.get_target_byte_order(), slang::endian::little);
+        EXPECT_EQ(ar.get_target_byte_order(), std::endian::little);
         EXPECT_EQ(ar.is_persistent(), true);
         EXPECT_EQ(ar.is_reading(), true);
         EXPECT_EQ(ar.is_writing(), false);
@@ -351,13 +350,13 @@ TEST(serialization, little_endian_file_archive)
 TEST(serialization, strings)
 {
     {
-        slang::file_write_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_write_archive ar{"little_endian.bin", std::endian::little};
         std::string s1 = "Hello, ";
         std::string s2 = "World!";
         ar & s1 & s2;
     }
     {
-        slang::file_read_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_read_archive ar{"little_endian.bin", std::endian::little};
         std::string s1 = "Hello, ";
         std::string s2 = "World!";
         ar & s1 & s2;
@@ -366,13 +365,13 @@ TEST(serialization, strings)
         EXPECT_EQ(s2, "World!");
     }
     {
-        slang::file_write_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_write_archive ar{"big_endian.bin", std::endian::big};
         std::string s1 = "Hello, ";
         std::string s2 = "World!";
         ar & s1 & s2;
     }
     {
-        slang::file_read_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_read_archive ar{"big_endian.bin", std::endian::big};
         std::string s1 = "Hello, ";
         std::string s2 = "World!";
         ar & s1 & s2;
@@ -385,12 +384,12 @@ TEST(serialization, strings)
 TEST(serialization, vectors)
 {
     {
-        slang::file_write_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_write_archive ar{"little_endian.bin", std::endian::little};
         std::vector<std::string> v = {"Hello, ", "World!"};
         ar & v;
     }
     {
-        slang::file_read_archive ar{"little_endian.bin", slang::endian::little};
+        slang::file_read_archive ar{"little_endian.bin", std::endian::little};
         std::vector<std::string> v;
 
         ar & v;
@@ -400,12 +399,12 @@ TEST(serialization, vectors)
         EXPECT_EQ(v[1], "World!");
     }
     {
-        slang::file_write_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_write_archive ar{"big_endian.bin", std::endian::big};
         std::vector<std::string> v = {"Hello, ", "World!"};
         ar & v;
     }
     {
-        slang::file_read_archive ar{"big_endian.bin", slang::endian::big};
+        slang::file_read_archive ar{"big_endian.bin", std::endian::big};
         std::vector<std::string> v;
 
         ar & v;

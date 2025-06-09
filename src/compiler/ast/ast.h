@@ -11,6 +11,7 @@
 #pragma once
 
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,7 +19,7 @@
 #include "archives/archive.h"
 #include "compiler/directive.h"
 #include "compiler/type.h"
-#include "node_registry.h"
+#include "node_ids.h"
 #include "utils.h"
 
 /*
@@ -1537,16 +1538,11 @@ public:
     /** Copy and move constructors. */
     array_initializer_expression(const array_initializer_expression& other)
     : super{other}
+    , exprs{other.exprs
+            | std::views::transform([](const auto& ptr)
+                                    { return ptr->clone(); })
+            | std::ranges::to<std::vector>()}
     {
-        exprs.reserve(other.exprs.size());
-        std::transform(
-          other.exprs.begin(),
-          other.exprs.end(),
-          std::back_inserter(exprs),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
     array_initializer_expression(array_initializer_expression&&) = default;
 
@@ -1620,18 +1616,14 @@ public:
     /** Copy and move constructors. */
     struct_definition_expression(const struct_definition_expression& other)
     : super{other}
+    , members{other.members
+              | std::views::transform(
+                [](const auto& ptr)
+                { return std::unique_ptr<variable_declaration_expression>(
+                    static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                      ptr->clone().release())); })
+              | std::ranges::to<std::vector>()}
     {
-        members.reserve(other.members.size());
-        std::transform(
-          other.members.begin(),
-          other.members.end(),
-          std::back_inserter(members),
-          [](const auto& ptr)
-          {
-              return std::unique_ptr<variable_declaration_expression>(
-                static_cast<variable_declaration_expression*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                  ptr->clone().release()));
-          });
     }
     struct_definition_expression(struct_definition_expression&&) = default;
 
@@ -1710,16 +1702,14 @@ public:
     struct_anonymous_initializer_expression() = default;
     struct_anonymous_initializer_expression(const struct_anonymous_initializer_expression& other)
     : super{other}
+    , initializers{other.initializers
+                   | std::views::transform(
+                     [](const auto& ptr)
+                     {
+                         return ptr->clone();
+                     })
+                   | std::ranges::to<std::vector>()}
     {
-        initializers.reserve(other.initializers.size());
-        std::transform(
-          other.initializers.begin(),
-          other.initializers.end(),
-          std::back_inserter(initializers),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
     struct_anonymous_initializer_expression(struct_anonymous_initializer_expression&&) = default;
 
@@ -1758,30 +1748,24 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        std::vector<expression*> exprs;
-        std::transform(
-          initializers.begin(),
-          initializers.end(),
-          std::back_inserter(exprs),
-          [](const std::unique_ptr<expression>& initializer) -> expression*
-          {
-              return initializer.get();
-          });
-        return exprs;
+        return initializers
+               | std::views::transform(
+                 [](const std::unique_ptr<expression>& initializer) -> expression*
+                 {
+                     return initializer.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        std::vector<const expression*> exprs;
-        std::transform(
-          initializers.cbegin(),
-          initializers.cend(),
-          std::back_inserter(exprs),
-          [](const std::unique_ptr<expression>& initializer) -> const expression*
-          {
-              return initializer.get();
-          });
-        return exprs;
+        return initializers
+               | std::views::transform(
+                 [](const std::unique_ptr<expression>& initializer) -> const expression*
+                 {
+                     return initializer.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
 };
 
@@ -1882,18 +1866,14 @@ public:
     /** Copy and move constructors. */
     struct_named_initializer_expression(const struct_named_initializer_expression& other)
     : super{other}
+    , initializers{other.initializers
+                   | std::views::transform(
+                     [](const auto& ptr)
+                     { return std::unique_ptr<named_initializer>(
+                         static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                           ptr->clone().release())); })
+                   | std::ranges::to<std::vector>()}
     {
-        initializers.reserve(other.initializers.size());
-        std::transform(
-          other.initializers.begin(),
-          other.initializers.end(),
-          std::back_inserter(initializers),
-          [](const auto& ptr)
-          {
-              return std::unique_ptr<named_initializer>(
-                static_cast<named_initializer*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                  ptr->clone().release()));
-          });
     }
     struct_named_initializer_expression(struct_named_initializer_expression&&) = default;
 
@@ -1931,30 +1911,24 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        std::vector<expression*> exprs;
-        std::transform(
-          initializers.begin(),
-          initializers.end(),
-          std::back_inserter(exprs),
-          [](std::unique_ptr<named_initializer>& initializer) -> expression*
-          {
-              return initializer.get();
-          });
-        return exprs;
+        return initializers
+               | std::views::transform(
+                 [](const std::unique_ptr<named_initializer>& initializer) -> expression*
+                 {
+                     return initializer.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        std::vector<const expression*> exprs;
-        std::transform(
-          initializers.cbegin(),
-          initializers.cend(),
-          std::back_inserter(exprs),
-          [](const std::unique_ptr<named_initializer>& initializer) -> expression*
-          {
-              return initializer.get();
-          });
-        return exprs;
+        return initializers
+               | std::views::transform(
+                 [](const std::unique_ptr<named_initializer>& initializer) -> const expression*
+                 {
+                     return initializer.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
 };
 
@@ -2324,21 +2298,17 @@ public:
     prototype_ast(const prototype_ast& other)
     : loc{other.loc}
     , name{other.name}
+    , args{other.args
+           | std::views::transform(
+             [](const auto& arg)
+             { return std::make_pair(
+                 arg.first,
+                 arg.second->clone()); })
+           | std::ranges::to<std::vector>()}
     , return_type{other.return_type->clone()}
     , args_type_info{other.args_type_info}
     , return_type_info{other.return_type_info}
     {
-        args.reserve(other.args.size());
-        std::transform(
-          other.args.begin(),
-          other.args.end(),
-          std::back_inserter(args),
-          [](const auto& arg)
-          {
-              return std::make_pair(
-                arg.first,
-                arg.second->clone());
-          });
     }
     prototype_ast(prototype_ast&&) = default;
 
@@ -2396,16 +2366,14 @@ public:
     block() = default;
     block(const block& other)
     : super{other}
+    , exprs{other.exprs
+            | std::views::transform(
+              [](const auto& ptr)
+              {
+                  return ptr->clone();
+              })
+            | std::ranges::to<std::vector>()}
     {
-        exprs.reserve(other.exprs.size());
-        std::transform(
-          other.exprs.begin(),
-          other.exprs.end(),
-          std::back_inserter(exprs),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
     block(block&&) = default;
 
@@ -2574,18 +2542,16 @@ public:
     call_expression(const call_expression& other)
     : super{other}
     , callee{other.callee}
+    , args{other.args
+           | std::views::transform(
+             [](const auto& ptr)
+             {
+                 return ptr->clone();
+             })
+           | std::ranges::to<std::vector>()}
     , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
     , return_type{other.return_type}
     {
-        args.reserve(other.args.size());
-        std::transform(
-          other.args.begin(),
-          other.args.end(),
-          std::back_inserter(args),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
     call_expression(call_expression&&) = default;
 
@@ -2718,18 +2684,16 @@ public:
     macro_invocation() = default;
     macro_invocation(const macro_invocation& other)
     : super{other}
+    , exprs{other.exprs
+            | std::views::transform(
+              [](const auto& ptr)
+              {
+                  return ptr->clone();
+              })
+            | std::ranges::to<std::vector>()}
     , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
     , expansion{other.expansion ? other.expansion->clone() : nullptr}
     {
-        exprs.reserve(other.exprs.size());
-        std::transform(
-          other.exprs.begin(),
-          other.exprs.end(),
-          std::back_inserter(exprs),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
 
     macro_invocation(macro_invocation&&) = default;
@@ -3328,16 +3292,14 @@ public:
     macro_expression_list() = default;
     macro_expression_list(const macro_expression_list& other)
     : super{other}
+    , expr_list{other.expr_list
+                | std::views::transform(
+                  [](const auto& ptr)
+                  {
+                      return ptr->clone();
+                  })
+                | std::ranges::to<std::vector>()}
     {
-        expr_list.reserve(other.expr_list.size());
-        std::transform(
-          other.expr_list.begin(),
-          other.expr_list.end(),
-          std::back_inserter(expr_list),
-          [](const auto& ptr)
-          {
-              return ptr->clone();
-          });
     }
     macro_expression_list(macro_expression_list&&) = default;
 
@@ -3413,17 +3375,15 @@ public:
     macro_expression() = default;
     macro_expression(const macro_expression& other)
     : super{other}
+    , branches{other.branches
+               | std::views::transform(
+                 [](const auto& ptr)
+                 {
+                     return std::unique_ptr<macro_branch>(
+                       static_cast<macro_branch*>(ptr->clone().release()));
+                 })
+               | std::ranges::to<std::vector>()}
     {
-        branches.reserve(other.branches.size());
-        std::transform(
-          other.branches.begin(),
-          other.branches.end(),
-          std::back_inserter(branches),
-          [](const auto& ptr)
-          {
-              return std::unique_ptr<macro_branch>(
-                static_cast<macro_branch*>(ptr->clone().release()));
-          });
     }
     macro_expression(macro_expression&&) = default;
 

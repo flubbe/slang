@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "token.h"
 #include "utils.h"
@@ -36,7 +36,7 @@ archive& operator&(archive& ar, token_type& ty)
     if(i > static_cast<std::uint8_t>(token_type::last))
     {
         throw serialization_error(
-          fmt::format(
+          std::format(
             "Invalid token type ({} > {}).",
             i,
             static_cast<std::uint8_t>(token_type::last)));
@@ -48,7 +48,7 @@ archive& operator&(archive& ar, token_type& ty)
 
 std::string to_string(const token_location& loc)
 {
-    return fmt::format("{}:{}", loc.line, loc.col);
+    return std::format("{}:{}", loc.line, loc.col);
 }
 
 std::string to_string(token_type ty)
@@ -117,7 +117,7 @@ static void serialize_token_value(
         else if(has_value)
         {
             throw serialization_error(
-              fmt::format(
+              std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
                 static_cast<std::int32_t>(ty)));
         }
@@ -142,7 +142,7 @@ static void serialize_token_value(
         else if(has_value)
         {
             throw serialization_error(
-              fmt::format(
+              std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
                 static_cast<std::int32_t>(ty)));
         }

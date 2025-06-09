@@ -120,7 +120,7 @@ struct binary_operation_helper
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
                 lhs.to_string(), rhs.to_string()));
         }
@@ -141,7 +141,7 @@ struct binary_operation_helper
 
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Invalid type '{}' for binary operator evaluation.",
             lhs.get_type().to_string()));
     }
@@ -172,7 +172,7 @@ struct binary_comparison_helper
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
                 lhs.to_string(), rhs.to_string()));
         }
@@ -193,7 +193,7 @@ struct binary_comparison_helper
 
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Invalid type '{}' for comparison evaluation.",
             lhs.get_type().to_string()));
     }
@@ -209,7 +209,7 @@ bool binary_expression::is_const_eval(cg::context& ctx) const
       "&", "^", "|",
       "&&", "||"};
 
-    if(std::find(bin_ops.begin(), bin_ops.end(), op.s) == bin_ops.end())
+    if(std::ranges::find(std::as_const(bin_ops), op.s) == bin_ops.cend())
     {
         return false;
     }
@@ -426,7 +426,7 @@ struct unary_operation_helper
 
         throw cg::codegen_error(
           loc,
-          fmt::format("Invalid type '{}' for unary operator evaluation.",
+          std::format("Invalid type '{}' for unary operator evaluation.",
                       v.get_type().to_string()));
     }
 };

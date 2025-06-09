@@ -4,7 +4,7 @@
  * runtime utils.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -68,15 +68,9 @@ public:
     ~gc_object_base();
 
     /** Get the contained object. */
-    void* get()
+    auto* get(this auto&& self)
     {
-        return obj;
-    }
-
-    /** Get the contained object. */
-    const void* get() const
-    {
-        return obj;
+        return self.obj;
     }
 };
 
@@ -113,15 +107,9 @@ public:
     }
 
     /** Get the contained object. */
-    T* get()
+    auto* get(this auto&& self)
     {
-        return static_cast<T*>(gc_object_base::get());
-    }
-
-    /** Get the contained object. */
-    const T* get() const
-    {
-        return static_cast<const T*>(gc_object_base::get());
+        return static_cast<T*>(self.gc_object_base::get());
     }
 };
 

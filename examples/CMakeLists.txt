@@ -1,9 +1,8 @@
 project(tests CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(fmt REQUIRED)
 find_package(GTest REQUIRED CONFIG)
 
 set(COMPILE_OPTIONS_MSVC $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>)
@@ -30,7 +29,7 @@ add_executable(native_integration
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(native_integration fmt::fmt Microsoft.GSL::GSL)
+target_link_libraries(native_integration Microsoft.GSL::GSL)
 target_compile_options(native_integration PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}

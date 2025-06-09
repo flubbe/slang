@@ -4,7 +4,7 @@
  * module loader.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -46,7 +46,9 @@ struct instruction_recorder
      * @param name Name of the function.
      * @param details Details of the function.
      */
-    virtual void function([[maybe_unused]] const std::string& name, [[maybe_unused]] const module_::function_details& details)
+    virtual void function(
+      [[maybe_unused]] const std::string& name,
+      [[maybe_unused]] const module_::function_details& details)
     {
     }
 
@@ -56,7 +58,9 @@ struct instruction_recorder
      * @param name The type name.
      * @param desc The type descriptor.
      */
-    virtual void type([[maybe_unused]] const std::string& name, [[maybe_unused]] const module_::struct_descriptor& desc)
+    virtual void type(
+      [[maybe_unused]] const std::string& name,
+      [[maybe_unused]] const module_::struct_descriptor& desc)
     {
     }
 
@@ -65,7 +69,8 @@ struct instruction_recorder
      *
      * @param c The constant.
      */
-    virtual void constant([[maybe_unused]] const module_::constant_table_entry& c)
+    virtual void constant(
+      [[maybe_unused]] const module_::constant_table_entry& c)
     {
     }
 
@@ -74,7 +79,8 @@ struct instruction_recorder
      *
      * @param s The exported symbol.
      */
-    virtual void record([[maybe_unused]] const module_::exported_symbol& s)
+    virtual void record(
+      [[maybe_unused]] const module_::exported_symbol& s)
     {
     }
 
@@ -83,7 +89,8 @@ struct instruction_recorder
      *
      * @param s The imported symbol.
      */
-    virtual void record([[maybe_unused]] const module_::imported_symbol& s)
+    virtual void record(
+      [[maybe_unused]] const module_::imported_symbol& s)
     {
     }
 
@@ -111,7 +118,9 @@ struct instruction_recorder
      * @param instr The instruction's opcode.
      * @param i An integer parameter.
      */
-    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i)
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::int64_t i)
     {
     }
 
@@ -122,7 +131,10 @@ struct instruction_recorder
      * @param i1 The first integer parameter.
      * @param i2 The second integer parameter.
      */
-    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i1, [[maybe_unused]] std::int64_t i2)
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::int64_t i1,
+      [[maybe_unused]] std::int64_t i2)
     {
     }
 
@@ -132,7 +144,9 @@ struct instruction_recorder
      * @param instr The instruction's opcode.
      * @param f A floating-point parameter.
      */
-    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] float f)
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] float f)
     {
     }
 
@@ -143,7 +157,10 @@ struct instruction_recorder
      * @param i A table index.
      * @param s The table entry.
      */
-    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::int64_t i, [[maybe_unused]] std::string s)
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::int64_t i,
+      [[maybe_unused]] std::string s)
     {
     }
 
@@ -170,7 +187,10 @@ struct instruction_recorder
      * @param s1 The first string parameter.
      * @param s2 The second string parameter.
      */
-    virtual void record([[maybe_unused]] opcode instr, [[maybe_unused]] std::string s1, [[maybe_unused]] std::string s2)
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] std::string s1,
+      [[maybe_unused]] std::string s2)
     {
     }
 
@@ -285,10 +305,11 @@ public:
      * @param path The module's path.
      * @param recorder An optional instruction recorder.
      */
-    module_loader(context& ctx,
-                  std::string import_name,
-                  fs::path path,
-                  std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
+    module_loader(
+      context& ctx,
+      std::string import_name,
+      fs::path path,
+      std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
 
     /**
      * Check if the module contains a function.

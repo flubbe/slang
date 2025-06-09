@@ -10,13 +10,12 @@ include_directories(
     src/include
 )
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(cxxopts REQUIRED)
-find_package(fmt REQUIRED)
 find_package(Microsoft.GSL REQUIRED)
 
 add_executable(slang
@@ -55,7 +54,7 @@ add_executable(slang
     src/runtime/utils.cpp
     src/utils.cpp
 )
-target_link_libraries(slang cxxopts::cxxopts fmt::fmt Microsoft.GSL::GSL)
+target_link_libraries(slang cxxopts::cxxopts Microsoft.GSL::GSL)
 
 add_subdirectory(examples)
 add_subdirectory(test)

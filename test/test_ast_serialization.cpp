@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/ast/node_registry.h"
 #include "compiler/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
@@ -25,11 +26,11 @@ namespace
 {
 
 /** Helper to test AST serialization by compiling the test input. */
-static void run_test(
+void run_test(
   std::size_t test_id,
   const std::string& test_input)
 {
-    const std::string filename = fmt::format("ast_serialization_{}.bin", test_id);
+    const std::string filename = std::format("ast_serialization_{}.bin", test_id);
 
     slang::lexer lexer;
     slang::parser parser;

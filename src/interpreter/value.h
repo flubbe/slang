@@ -30,7 +30,7 @@ class value
     std::any data;
 
     /** Size of the value, in bytes. */
-    std::size_t size;
+    std::size_t size{0};
 
     /** Type identifier. */
     module_::variable_type type;
@@ -53,32 +53,38 @@ class value
      * @param memory The memory to write into.
      */
     template<typename T>
+        requires(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                 || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>)
     void create_primitive_type(std::byte* memory) const
     {
-        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
-                      "Primitive type must be an integer or a floating point type.");
+        const T* ptr = std::any_cast<T>(&data);
+        if(!ptr)
+        {
+            throw std::bad_any_cast();
+        }
 
         // we can just copy the value.
-        std::memcpy(memory, std::any_cast<T>(&data), sizeof(T));
+        std::memcpy(memory, ptr, sizeof(T));
     }
 
     /**
-     * Create a vector of a primitive type or a string in memory.
+     * Create a vector of a primitive type.
      *
      * @param memory The memory to write into.
      */
     template<typename T>
+        requires(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                 || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>)
     void create_vector_type(std::byte* memory) const
     {
-        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
-                      "Vector type must be an integer type or a floating point type.");
-
         // we need to convert `std::vector` to a `fixed_vector<T>*`.
         auto input_vec = std::any_cast<std::vector<T>>(&data);
-        auto vec = new fixed_vector<T>(input_vec->size());
+        if(!input_vec)
+        {
+            throw std::bad_any_cast();
+        }
 
+        auto vec = new fixed_vector<T>(input_vec->size());
         for(std::size_t i = 0; i < input_vec->size(); ++i)
         {
             (*vec)[i] = (*input_vec)[i];
@@ -88,22 +94,62 @@ class value
     }
 
     /**
-     * Delete a vector type from memory.
+     * Create a vector of a string in memory.
      *
-     * @param memory The memory to delete the vector type from.
+     * @param memory The memory to write into.
+     */
+    void create_string_vector_type(std::byte* memory) const
+    {
+        // we need to convert `std::vector` to a `fixed_vector<T>*`.
+        auto input_vec = std::any_cast<std::vector<std::string>>(&data);
+        if(!input_vec)
+        {
+            throw std::bad_any_cast();
+        }
+
+        auto vec = new fixed_vector<std::string*>(input_vec->size());
+        for(std::size_t i = 0; i < input_vec->size(); ++i)
+        {
+            (*vec)[i] = new std::string{(*input_vec)[i]};
+        }
+
+        std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
+    }
+
+    /**
+     * Delete a vector of a primitive type.
+     *
+     * @param memory The memory to delete the vector from.
      */
     template<typename T>
+        requires(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
+                 || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>)
     void destroy_vector_type(std::byte* memory) const
     {
-        static_assert(std::is_integral_v<std::remove_cv_t<std::remove_reference_t<T>>>
-                        || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>,
-                      "Vector type must be an integer type or a floating point type.");
-
         fixed_vector<T>* vec;
         std::memcpy(&vec, memory, sizeof(fixed_vector<T>*));
         delete vec;
 
         std::memset(memory, 0, sizeof(fixed_vector<T>*));
+    }
+
+    /**
+     * Delete a vector of strings.
+     *
+     * @param memory The memory to delete the vector from.
+     */
+    void destroy_string_vector_type(std::byte* memory) const
+    {
+        fixed_vector<std::string*>* vec;
+        std::memcpy(&vec, memory, sizeof(fixed_vector<std::string*>*));
+
+        for(auto& s: *vec)
+        {
+            delete s;
+        }
+        delete vec;
+
+        std::memset(memory, 0, sizeof(fixed_vector<std::string*>*));
     }
 
     /**
@@ -141,8 +187,14 @@ class value
      */
     void create_addr(std::byte* memory) const
     {
+        void* const* addr = std::any_cast<void*>(&data);
+        if(!addr)
+        {
+            throw std::bad_any_cast();
+        }
+
         // we can just copy the value.
-        std::memcpy(memory, std::any_cast<void*>(&data), sizeof(void*));
+        std::memcpy(memory, addr, sizeof(void*));
     }
 
     /**
@@ -382,7 +434,7 @@ public:
     /**
      * Access the data.
      *
-     * @returns Retuens a pointer to the value. Returns `nullptr´ if the cast is invalid.
+     * @returns Returns a pointer to the value. Returns `nullptr´ if the cast is invalid.
      */
     template<typename T>
     const T* get() const
@@ -390,36 +442,6 @@ public:
         return std::any_cast<T>(&data);
     }
 };
-
-template<>
-inline void value::create_vector_type<std::string>(std::byte* memory) const
-{
-    // we need to convert `std::vector` to a `fixed_vector<T>*`.
-    auto input_vec = std::any_cast<std::vector<std::string>>(&data);
-    auto vec = new fixed_vector<std::string*>(input_vec->size());
-
-    for(std::size_t i = 0; i < input_vec->size(); ++i)
-    {
-        (*vec)[i] = new std::string{(*input_vec)[i]};
-    }
-
-    std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
-}
-
-template<>
-inline void value::destroy_vector_type<std::string>(std::byte* memory) const
-{
-    fixed_vector<std::string*>* vec;
-    std::memcpy(&vec, memory, sizeof(fixed_vector<std::string*>*));
-
-    for(auto& s: *vec)
-    {
-        delete s;
-    }
-    delete vec;
-
-    std::memset(memory, 0, sizeof(fixed_vector<std::string*>*));
-}
 
 inline value::value(std::vector<std::int32_t> int_vec)
 : data{std::move(int_vec)}
@@ -442,7 +464,7 @@ inline value::value(std::vector<std::string> string_vec)
 , size{sizeof(void*)}
 , type{"str", 1}
 {
-    bind(&value::create_vector_type<std::string>, &value::destroy_vector_type<std::string>);
+    bind(&value::create_string_vector_type, &value::destroy_string_vector_type);
 }
 
 /**

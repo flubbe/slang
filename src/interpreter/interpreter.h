@@ -32,7 +32,7 @@ inline std::string make_type_name(
   const std::string& package_import_name,
   const std::string& type_name)
 {
-    return fmt::format("{}.{}", package_import_name, type_name);
+    return std::format("{}.{}", package_import_name, type_name);
 }
 
 /**
@@ -116,10 +116,11 @@ class context
      * @param entry_point Entry point of the function where the error occured.
      * @param offset Offset into the decoded binary where the error occured.
      */
-    void stack_trace_handler(interpreter_error& err,
-                             const module_loader& loader,
-                             std::size_t entry_point,
-                             std::size_t offset);
+    void stack_trace_handler(
+      interpreter_error& err,
+      const module_loader& loader,
+      std::size_t entry_point,
+      std::size_t offset);
 
     /**
      * Create a readable message from a stack trace by resolving the entry points

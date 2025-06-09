@@ -8,7 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <print>
+
 #include <gtest/gtest.h>
 
 #include "archives/file.h"
@@ -144,7 +146,7 @@ void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
                                  [&ctx, &print_buf](si::operand_stack& stack)
                                  {
                                      auto* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(fmt::format("{}\n", *s));
+                                     print_buf.push_back(std::format("{}\n", *s));
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "array_copy",
@@ -765,7 +767,7 @@ TEST(interpreter, structs)
     }
     catch(const std::runtime_error& e)
     {
-        fmt::print("Error loading 'structs.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        std::print("Error loading 'structs.cmod'. Make sure to run 'test_output' to generate the file.\n");
         throw e;
     }
 
@@ -934,7 +936,7 @@ TEST(interpreter, struct_argument)
             float j;
             std::string* s;
         };
-        S s{0, 0.f, nullptr};
+        S s{.i = 0, .j = 0.f, .s = nullptr};
 
         std::size_t layout_id = 0;
         ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("struct_arg", "S")));

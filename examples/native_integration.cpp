@@ -9,8 +9,7 @@
  */
 
 #include <cstddef>
-
-#include <fmt/core.h>
+#include <print>
 
 #include "interpreter/interpreter.h"
 #include "runtime/utils.h"
@@ -48,7 +47,7 @@ static void register_native(si::context& ctx)
       [&ctx](si::operand_stack& stack)
       {
           auto [gc_container] = rt::get_args<rt::gc_object<std::string>>(ctx, stack);
-          fmt::print("{}", *gc_container.get());
+          std::print("{}", *gc_container.get());
       });
 }
 
@@ -79,7 +78,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch(const slang::file_error& err)
     {
-        fmt::print("Error: {}\n", err.what());
+        std::print("Error: {}\n", err.what());
         return EXIT_FAILURE;
     }
 
@@ -89,45 +88,46 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Find the function to invoke.
     if(!loader.has_function("test"))
     {
-        fmt::print("Cannot find function 'test' in module.\n");
+        std::print("Cannot find function 'test' in module.\n");
         return EXIT_FAILURE;
     }
     si::function& function = loader.get_function("test");
 
     // Set up argument for function call.
     std::string str = "Hello from native code!";
-    S s = S{&str, 123};    // NOLINT(readability-magic-numbers)
+    S s = S{.s = &str, .i = 123};    // NOLINT(readability-magic-numbers)
 
     // Invoke the function.
     si::value res;
     try
     {
-        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers)
+        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers,modernize-use-std-numbers)
     }
     catch(const si::interpreter_error& err)
     {
-        fmt::print("Error: {}\n", err.what());
+        std::print("Error: {}\n", err.what());
         return EXIT_FAILURE;
     }
 
     // Print the result.
-    S* ret_s = static_cast<S*>(*res.get<void*>());
-    if(ret_s == nullptr)
+    void* const* ret = res.get<void*>();
+    if(ret == nullptr)
     {
         // `res` can be `nullptr` if the return type was not an object.
-        fmt::print("Got unexpected return type.\n");
+        std::print("Got unexpected return type.\n");
         return EXIT_FAILURE;
     }
 
+    S* ret_s = static_cast<S*>(*ret);
     if(ret_s->s == nullptr)
     {
-        fmt::print("Received null instead of string.\n");
+        std::print("Received null instead of string.\n");
     }
     else
     {
-        fmt::print("String: {}\n", *ret_s->s);
+        std::print("String: {}\n", *ret_s->s);
     }
-    fmt::print("Value: {}\n", ret_s->i);
+    std::print("Value: {}\n", ret_s->i);
 
     // Clean up return values.
     ctx.get_gc().remove_temporary(ret_s);
@@ -136,14 +136,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Check that the memory was cleaned up.
     if(ctx.get_gc().object_count() != 0)
     {
-        fmt::print("GC: There are objects left.\n");
+        std::print("GC: There are objects left.\n");
     }
     if(ctx.get_gc().root_set_size() != 0)
     {
-        fmt::print("GC: There are roots left.\n");
+        std::print("GC: There are roots left.\n");
     }
     if(ctx.get_gc().byte_size() != 0)
     {
-        fmt::print("GC: There is memory left.\n");
+        std::print("GC: There is memory left.\n");
     }
 }

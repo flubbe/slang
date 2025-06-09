@@ -8,7 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <print>
 
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
@@ -39,26 +40,26 @@ static void validate_main_signature(const si::function& main_function, bool verb
 {
     if(verbose)
     {
-        fmt::print("Info: Validating signature of 'main'.\n");
+        std::print("Info: Validating signature of 'main'.\n");
     }
 
     // validate function signature for 'main'.
     const module_::function_signature& sig = main_function.get_signature();
     if(sig.return_type.base_type() != "i32" || sig.return_type.is_array())
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Invalid return type for 'main' expected 'i32', got '{}'.",
           slang::module_::to_string(sig.return_type)));
     }
     if(sig.arg_types.size() != 1)
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Invalid parameter count for 'main'. Expected 1 parameter, got {}.",
           sig.arg_types.size()));
     }
     if(sig.arg_types[0].base_type() != "str" || !sig.arg_types[0].is_array())
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Invalid parameter type for 'main'. Expected parameter of type '[str]', got '{}'.",
           slang::module_::to_string(sig.arg_types[0])));
     }
@@ -74,20 +75,20 @@ static void check_finalized_gc(gc::garbage_collector& gc, bool verbose)
 {
     if(verbose)
     {
-        fmt::print("Info: Checking GC cleanup.\n");
+        std::print("Info: Checking GC cleanup.\n");
     }
 
     if(gc.object_count() != 0)
     {
-        fmt::print("GC warning: Object count is {}.\n", gc.object_count());
+        std::print("GC warning: Object count is {}.\n", gc.object_count());
     }
     if(gc.root_set_size() != 0)
     {
-        fmt::print("GC warning: Root set size is {}.\n", gc.root_set_size());
+        std::print("GC warning: Root set size is {}.\n", gc.root_set_size());
     }
     if(gc.byte_size() != 0)
     {
-        fmt::print("GC warning: {} bytes still allocated.\n", gc.byte_size());
+        std::print("GC warning: {} bytes still allocated.\n", gc.byte_size());
     }
 }
 
@@ -115,7 +116,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(result.count("filename") < 1)
     {
-        fmt::print("{}\n", options.help());
+        std::print("{}\n", options.help());
         return;
     }
 
@@ -136,7 +137,7 @@ void run::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            fmt::print("Info: Adding 'lang' to search paths.\n");
+            std::print("Info: Adding 'lang' to search paths.\n");
         }
 
         file_mgr.add_search_path("lang");
@@ -149,7 +150,7 @@ void run::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                fmt::print("Info: Adding '{}' to search paths.\n", it);
+                std::print("Info: Adding '{}' to search paths.\n", it);
             }
 
             file_mgr.add_search_path(it);
@@ -157,17 +158,17 @@ void run::invoke(const std::vector<std::string>& args)
     }
 
     // Forwarded arguments.
-    auto separator = std::find(args.begin(), args.end(), "--");
+    auto separator = std::ranges::find(std::as_const(args), "--");
     std::vector<std::string> forwarded_args{
-      separator != args.end()
+      separator != args.cend()
         ? separator + 1
-        : args.end(),
-      args.end()};
+        : args.cend(),
+      args.cend()};
 
     // Get module name.
     if(!file_mgr.is_file(module_path))
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Compiled module '{}' does not exist.",
           module_path.string()));
     }
@@ -175,14 +176,14 @@ void run::invoke(const std::vector<std::string>& args)
     auto module_name = module_path.filename().stem();
     if(module_name.string().empty())
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Trying to get module name from path '{}' produced empty string.",
           module_path.string()));
     }
 
     if(verbose)
     {
-        fmt::print("Info: module name: {}\n", module_name.string());
+        std::print("Info: module name: {}\n", module_name.string());
     }
 
     // Set up interpreter context.
@@ -196,7 +197,7 @@ void run::invoke(const std::vector<std::string>& args)
     // call 'main'.
     if(verbose)
     {
-        fmt::print("Info: Invoking 'main'.\n");
+        std::print("Info: Invoking 'main'.\n");
     }
     si::value res = si::invoke(
       main_function,
@@ -206,11 +207,11 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(return_value == nullptr)
     {
-        fmt::print("\nProgram did not return a valid exit code.\n");
+        std::print("\nProgram did not return a valid exit code.\n");
     }
     else
     {
-        fmt::print("\nProgram exited with exit code {}.\n", *return_value);
+        std::print("\nProgram exited with exit code {}.\n", *return_value);
     }
 
     check_finalized_gc(ctx.get_gc(), verbose);

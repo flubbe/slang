@@ -8,7 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <print>
 
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
@@ -83,7 +84,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
         if(verbose)
         {
-            fmt::print("Info: Module path: {}\n", module_path.string());
+            std::print("Info: Module path: {}\n", module_path.string());
         }
 
         // generate output file name, if necessary.
@@ -94,14 +95,14 @@ void compile::invoke(const std::vector<std::string>& args)
 
             if(verbose)
             {
-                fmt::print("Info: Output file: {}\n", output_file.string());
+                std::print("Info: Output file: {}\n", output_file.string());
             }
         }
     }
 
     if(display_help_and_exit)
     {
-        fmt::print("{}\n", options.help());
+        std::print("{}\n", options.help());
         return;
     }
 
@@ -112,11 +113,11 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(!evaluate_constant_subexpressions)
         {
-            fmt::print("Info: Evaluation of constant subexpressions disabled.\n");
+            std::print("Info: Evaluation of constant subexpressions disabled.\n");
         }
         else
         {
-            fmt::print("Info: Evaluation of constant subexpressions enabled (default).\n");
+            std::print("Info: Evaluation of constant subexpressions enabled (default).\n");
         }
     }
 
@@ -130,7 +131,7 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            fmt::print("Info: Adding 'lang' to search paths.\n");
+            std::print("Info: Adding 'lang' to search paths.\n");
         }
 
         file_mgr.add_search_path("lang");
@@ -143,7 +144,7 @@ void compile::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                fmt::print("Info: Adding '{}' to search paths.\n", it);
+                std::print("Info: Adding '{}' to search paths.\n", it);
             }
 
             file_mgr.add_search_path(it);
@@ -154,10 +155,10 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!file_mgr.is_file(module_path))
     {
-        throw std::runtime_error(fmt::format("Module '{}' does not exist.", module_path.string()));
+        throw std::runtime_error(std::format("Module '{}' does not exist.", module_path.string()));
     }
 
-    fmt::print("Compiling '{}'...\n", module_path.string());
+    std::print("Compiling '{}'...\n", module_path.string());
 
     std::string input_buffer;
     {
@@ -165,7 +166,7 @@ void compile::invoke(const std::vector<std::string>& args)
         std::size_t input_size = input_ar->size();
         if(input_size == 0)
         {
-            fmt::print("Empty input.\n");
+            std::print("Empty input.\n");
             return;
         }
 
@@ -181,14 +182,14 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!lexer.eof())
     {
-        fmt::print("Lexer did not complete input reading.\n");
+        std::print("Lexer did not complete input reading.\n");
         return;
     }
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     if(!ast)
     {
-        fmt::print("No AST produced.\n");
+        std::print("No AST produced.\n");
         return;
     }
 
@@ -220,7 +221,7 @@ void compile::invoke(const std::vector<std::string>& args)
     slang::file_write_archive write_ar(output_file.string());
     write_ar & mod;
 
-    fmt::print("Compilation finished. Output file: {}\n", output_file.string());
+    std::print("Compilation finished. Output file: {}\n", output_file.string());
 }
 
 std::string compile::get_description() const

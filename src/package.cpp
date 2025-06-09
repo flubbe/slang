@@ -4,13 +4,14 @@
  * package management.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <algorithm>
-
-#include <fmt/core.h>
+#include <format>
+#include <print>
+#include <ranges>
 
 #include "package.h"
 
@@ -77,8 +78,8 @@ bool package::is_valid_name(const std::string& name)
     // ensure the delimiters only occur inside the name.
     if(name.length() >= delimiter.length())
     {
-        if(name.substr(0, delimiter.length()) == delimiter
-           || name.substr(name.length() - delimiter.length(), std::string::npos) == delimiter)
+        if(name.starts_with(delimiter)
+           || name.ends_with(delimiter))
         {
             return false;
         }
@@ -88,7 +89,7 @@ bool package::is_valid_name(const std::string& name)
     auto components = split(name);
 
     // validate components
-    return std::all_of(components.begin(), components.end(), is_valid_name_component);
+    return std::ranges::all_of(components, is_valid_name_component);
 }
 
 bool package::is_valid_name_component(const std::string& name)
@@ -99,11 +100,12 @@ bool package::is_valid_name_component(const std::string& name)
         return false;
     }
 
-    return std::all_of(
-      std::next(name.begin()),
-      name.end(),
+    return std::ranges::all_of(
+      name | std::views::drop(1),
       [](char ch)
-      { return ch == '_' || std::isalnum(ch) != 0; });
+      {
+          return ch == '_' || std::isalnum(ch) != 0;
+      });
 }
 
 /*
@@ -151,7 +153,7 @@ package package_manager::open(const std::string& name, bool create)
 {
     if(!package::is_valid_name(name))
     {
-        throw std::runtime_error(fmt::format("package_manager::open: Invalid package name '{}'.", name));
+        throw std::runtime_error(std::format("package_manager::open: Invalid package name '{}'.", name));
     }
 
     fs::path package_path = package_root;
@@ -165,7 +167,7 @@ package package_manager::open(const std::string& name, bool create)
     {
         if(!create)
         {
-            throw std::runtime_error(fmt::format("package_manager::open: Cannot find '{}'.", package_path.string()));
+            throw std::runtime_error(std::format("package_manager::open: Cannot find '{}'.", package_path.string()));
         }
 
         // create the package.
@@ -183,12 +185,12 @@ void package_manager::remove(const std::string& name)
 {
     if(!package::is_valid_name(name))
     {
-        throw std::runtime_error(fmt::format("package_manager::remove: Invalid package name '{}'.", name));
+        throw std::runtime_error(std::format("package_manager::remove: Invalid package name '{}'.", name));
     }
 
     if(!exists(name))
     {
-        throw std::runtime_error(fmt::format("package_manager::remove: Package '{}' does not exist.", name));
+        throw std::runtime_error(std::format("package_manager::remove: Package '{}' does not exist.", name));
     }
 
     fs::path package_path = package_root;
@@ -198,11 +200,11 @@ void package_manager::remove(const std::string& name)
         package_path /= c;
     }
 
-    fmt::print("Remove: {}\n", package_path.string());
+    std::print("Remove: {}\n", package_path.string());
 
     if(fs::remove_all(package_path) == 0)
     {
-        throw std::runtime_error(fmt::format("Could not remove package '{}'.", name));
+        throw std::runtime_error(std::format("Could not remove package '{}'.", name));
     }
 }
 
@@ -210,7 +212,7 @@ bool package_manager::exists(const std::string& name) const
 {
     if(!package::is_valid_name(name))
     {
-        throw std::runtime_error(fmt::format("package_manager::exists: Invalid package name '{}'.", name));
+        throw std::runtime_error(std::format("package_manager::exists: Invalid package name '{}'.", name));
     }
 
     fs::path package_path = package_root;
@@ -233,12 +235,12 @@ std::vector<std::string> package_manager::get_package_names(bool include_sub_pac
     {
         if(!package::is_valid_name(*parent))
         {
-            throw std::runtime_error(fmt::format("The name '{}' is not a valid package name.", *parent));
+            throw std::runtime_error(std::format("The name '{}' is not a valid package name.", *parent));
         }
 
         if(!exists(*parent))
         {
-            throw std::runtime_error(fmt::format("The parent package '{}' does not exist.", *parent));
+            throw std::runtime_error(std::format("The parent package '{}' does not exist.", *parent));
         }
 
         std::vector<std::string> components = slang::utils::split(*parent, package::delimiter);
@@ -270,14 +272,16 @@ std::vector<std::string> package_manager::get_package_names(bool include_sub_pac
                 std::vector<std::string> string_components;
                 string_components.reserve(path_components.size());
 
-                std::for_each(path_components.begin(), path_components.end(), [&string_components](auto& c)
-                              { string_components.push_back(c.string()); });
+                std::ranges::for_each(
+                  path_components,
+                  [&string_components](auto& c)
+                  { string_components.push_back(c.string()); });
                 package_name_components.push_back(string_components);
             }
         }
     }
 
-    std::sort(package_name_components.begin(), package_name_components.end());
+    std::ranges::sort(package_name_components);
 
     std::vector<std::string> package_names;
     package_names.reserve(package_name_components.size());

@@ -4,24 +4,28 @@
  * portable archive and serialization support.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "file.h"
 
 namespace slang
 {
 
-file_archive::file_archive(fs::path path, bool read, bool write, endian target_byte_order)
+file_archive::file_archive(
+  fs::path path,
+  bool read,
+  bool write,
+  std::endian target_byte_order)
 : archive{read, write, true, target_byte_order}
 , path{std::move(path)}
 {
     if(read && write)
     {
-        throw serialization_error(fmt::format("Cannot open file '{}' for reading and writing simultaneously.", this->path.c_str()));
+        throw serialization_error(std::format("Cannot open file '{}' for reading and writing simultaneously.", this->path.c_str()));
     }
 
     if(write)
@@ -35,7 +39,7 @@ file_archive::file_archive(fs::path path, bool read, bool write, endian target_b
 
     if(!file)
     {
-        throw serialization_error(fmt::format("Unable to open file '{}'.", this->path.c_str()));
+        throw serialization_error(std::format("Unable to open file '{}'.", this->path.c_str()));
     }
 }
 

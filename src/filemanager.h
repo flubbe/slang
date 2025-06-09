@@ -4,7 +4,7 @@
  * file manager.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -73,7 +73,7 @@ public:
     void add_search_path(fs::path p)
     {
         p = fs::canonical(std::move(p));
-        if(std::find(search_paths.begin(), search_paths.end(), p) == search_paths.end())
+        if(std::ranges::find(search_paths, p) == search_paths.end())
         {
             search_paths.emplace_back(std::move(p));
         }

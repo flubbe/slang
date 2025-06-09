@@ -4,15 +4,13 @@
  * utility functions.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <list>
 #include <string>
 #include <vector>
-
-#include <fmt/core.h>
 
 namespace slang::utils
 {

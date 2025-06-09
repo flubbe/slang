@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "shared/module.h"
 #include "shared/opcodes.h"
@@ -29,7 +29,7 @@ namespace rs = slang::resolve;
  */
 
 codegen_error::codegen_error(const token_location& loc, const std::string& message)
-: std::runtime_error{fmt::format("{}: {}", to_string(loc), message)}
+: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
 
@@ -100,7 +100,7 @@ type_class to_type_class(const std::string& s)
     auto it = map.find(s);
     if(it == map.end())
     {
-        throw codegen_error(fmt::format("No type class for type '{}'.", s));
+        throw codegen_error(std::format("No type class for type '{}'.", s));
     }
 
     return it->second;
@@ -122,7 +122,7 @@ std::string type::to_string() const
     {
         if(is_array())
         {
-            return fmt::format("[{}]", it->second);
+            return std::format("[{}]", it->second);
         }
         return it->second;
     }
@@ -131,7 +131,7 @@ std::string type::to_string() const
     {
         if(is_array())
         {
-            return fmt::format("[{}]", struct_name.value_or("<unnamed-struct>"));
+            return std::format("[{}]", struct_name.value_or("<unnamed-struct>"));
         }
         return struct_name.value_or("<unnamed-struct>");
     }
@@ -173,7 +173,7 @@ void value::validate() const
 
     if(!ty.is_struct())
     {
-        throw codegen_error(fmt::format("Invalid value type '{}'.", ty.to_string()));
+        throw codegen_error(std::format("Invalid value type '{}'.", ty.to_string()));
     }
 
     if(!ty.get_struct_name().has_value() || ty.get_struct_name()->empty())
@@ -183,7 +183,7 @@ void value::validate() const
 
     if(ty::is_builtin_type(*ty.get_struct_name()))
     {
-        throw codegen_error(fmt::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
+        throw codegen_error(std::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
     }
 }
 
@@ -191,9 +191,9 @@ std::string value::to_string() const
 {
     if(has_name())
     {
-        return fmt::format("{} %{}", get_type().to_string(), get_name().value());    // NOLINT(bugprone-unchecked-optional-access)
+        return std::format("{} %{}", get_type().to_string(), get_name().value());    // NOLINT(bugprone-unchecked-optional-access)
     }
-    return fmt::format("{}", get_type().to_string());
+    return std::format("{}", get_type().to_string());
 }
 
 /*
@@ -206,20 +206,20 @@ std::string const_argument::to_string() const
 
     if(type_name == "i32")
     {
-        return fmt::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
     if(type_name == "f32")
     {
-        return fmt::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
     if(type_name == "str")
     {
-        return fmt::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    throw codegen_error(fmt::format("Unrecognized const_argument type."));
+    throw codegen_error(std::format("Unrecognized const_argument type."));
 }
 
 /*
@@ -238,7 +238,7 @@ std::string instruction::to_string() const
         }
         buf += args.back()->to_string();
     }
-    return fmt::format("{}{}", name, buf);
+    return std::format("{}{}", name, buf);
 }
 
 /*
@@ -249,20 +249,20 @@ std::string basic_block::to_string() const
 {
     if(unreachable)
     {
-        return fmt::format("{}:\n unreachable", label);
+        return std::format("{}:\n unreachable", label);
     }
 
     if(instrs.empty())
     {
-        return fmt::format("{}:", label);
+        return std::format("{}:", label);
     }
 
-    std::string buf = fmt::format("{}:\n", label);
+    std::string buf = std::format("{}:\n", label);
     for(std::size_t i = 0; i < instrs.size() - 1; ++i)
     {
-        buf += fmt::format(" {}\n", instrs[i]->to_string());
+        buf += std::format(" {}\n", instrs[i]->to_string());
     }
-    buf += fmt::format(" {}", instrs.back()->to_string());
+    buf += std::format(" {}", instrs.back()->to_string());
     return buf;
 }
 
@@ -287,9 +287,8 @@ bool basic_block::is_valid() const
 
 bool scope::contains(const std::string& name) const
 {
-    if(std::find_if(
-         args.begin(),
-         args.end(),
+    if(std::ranges::find_if(
+         args,
          [&name](const std::unique_ptr<value>& v) -> bool
          {
              if(!v->has_name())
@@ -299,14 +298,13 @@ bool scope::contains(const std::string& name) const
 
              return *v->get_name() == name;
          })
-       != args.end())
+       != args.cend())
     {
         return true;
     }
 
-    if(std::find_if(
-         locals.begin(),
-         locals.end(),
+    if(std::ranges::find_if(
+         locals,
          [&name](const std::unique_ptr<value>& v) -> bool
          {
              if(!v->has_name())
@@ -316,7 +314,7 @@ bool scope::contains(const std::string& name) const
 
              return *v->get_name() == name;
          })
-       != locals.end())
+       != locals.cend())
     {
         return true;
     }
@@ -326,22 +324,20 @@ bool scope::contains(const std::string& name) const
 
 bool scope::contains_struct(const std::string& name, const std::optional<std::string>& import_path) const
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
                  && p.second.get_import_path() == import_path;
       });
-    return it != structs.end();
+    return it != structs.cend();
 }
 
 value* scope::get_value(const std::string& name)
 {
-    auto it = std::find_if(
-      args.begin(),
-      args.end(),
+    auto it = std::ranges::find_if(
+      args,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -356,9 +352,8 @@ value* scope::get_value(const std::string& name)
         return it->get();
     }
 
-    it = std::find_if(
-      locals.begin(),
-      locals.end(),
+    it = std::ranges::find_if(
+      locals,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -379,9 +374,8 @@ value* scope::get_value(const std::string& name)
 
 std::size_t scope::get_index(const std::string& name) const
 {
-    auto it = std::find_if(
-      args.begin(),
-      args.end(),
+    auto it = std::ranges::find_if(
+      args,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -391,14 +385,13 @@ std::size_t scope::get_index(const std::string& name) const
 
           return *v->get_name() == name;
       });
-    if(it != args.end())
+    if(it != args.cend())
     {
-        return std::distance(args.begin(), it);
+        return std::distance(args.cbegin(), it);
     }
 
-    it = std::find_if(
-      locals.begin(),
-      locals.end(),
+    it = std::ranges::find_if(
+      locals,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -409,12 +402,12 @@ std::size_t scope::get_index(const std::string& name) const
           return *v->get_name() == name;
       });
 
-    if(it != locals.end())
+    if(it != locals.cend())
     {
-        return args.size() + std::distance(locals.begin(), it);
+        return args.size() + std::distance(locals.cbegin(), it);
     }
 
-    throw codegen_error(fmt::format("Name '{}' not found in scope.", name));
+    throw codegen_error(std::format("Name '{}' not found in scope.", name));
 }
 
 void scope::add_argument(std::unique_ptr<value> arg)
@@ -427,7 +420,7 @@ void scope::add_argument(std::unique_ptr<value> arg)
     if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
     {
         throw codegen_error(
-          fmt::format(
+          std::format(
             "Name '{}' already contained in scope.",
             arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
@@ -444,7 +437,7 @@ void scope::add_local(std::unique_ptr<value> arg)
     if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
     {
         throw codegen_error(
-          fmt::format(
+          std::format(
             "Name '{}' already contained in scope.",
             arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
@@ -457,9 +450,8 @@ void scope::add_struct(
   std::uint8_t flags,
   std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
@@ -469,9 +461,9 @@ void scope::add_struct(
     {
         if(import_path.has_value())
         {
-            throw codegen_error(fmt::format("Type '{}' from '{}' already exists in scope.", name, import_path.value()));
+            throw codegen_error(std::format("Type '{}' from '{}' already exists in scope.", name, import_path.value()));
         }
-        throw codegen_error(fmt::format("Type '{}' already exists in scope.", name));
+        throw codegen_error(std::format("Type '{}' already exists in scope.", name));
     }
 
     std::string name_copy = name;
@@ -480,21 +472,20 @@ void scope::add_struct(
 
 const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
                  && p.second.get_import_path() == import_path;
       });
-    if(it == structs.end())
+    if(it == structs.cend())
     {
         if(import_path.has_value())
         {
-            throw codegen_error(fmt::format("Type '{}' from '{}' not found in scope.", name, import_path.value()));
+            throw codegen_error(std::format("Type '{}' from '{}' not found in scope.", name, import_path.value()));
         }
-        throw codegen_error(fmt::format("Type '{}' not found in scope.", name));
+        throw codegen_error(std::format("Type '{}' not found in scope.", name));
     }
     return it->second.get_members();
 }
@@ -508,11 +499,11 @@ std::string function::to_string() const
     std::string buf;
     if(native)
     {
-        buf = fmt::format("native ({}) {} @{}(", import_library, return_type->to_string(), name);
+        buf = std::format("native ({}) {} @{}(", import_library, return_type->to_string(), name);
     }
     else
     {
-        buf = fmt::format("define {} @{}(", return_type->to_string(), name);
+        buf = std::format("define {} @{}(", return_type->to_string(), name);
     }
 
     const auto& args = scope.get_args();
@@ -520,9 +511,9 @@ std::string function::to_string() const
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            buf += fmt::format("{}, ", args[i]->to_string());
+            buf += std::format("{}, ", args[i]->to_string());
         }
-        buf += fmt::format("{})", args.back()->to_string());
+        buf += std::format("{})", args.back()->to_string());
     }
     else
     {
@@ -534,11 +525,11 @@ std::string function::to_string() const
         buf += " {\n";
         for(const auto& v: scope.get_locals())
         {
-            buf += fmt::format("local {}\n", v->to_string());
+            buf += std::format("local {}\n", v->to_string());
         }
         for(const auto& b: instr_blocks)
         {
-            buf += fmt::format("{}\n", b->to_string());
+            buf += std::format("{}\n", b->to_string());
         }
         buf += "}";
     }
@@ -552,14 +543,14 @@ std::string function::to_string() const
 
 std::string struct_::to_string() const
 {
-    std::string buf = fmt::format("%{} = type {{\n", name);
+    std::string buf = std::format("%{} = type {{\n", name);
     if(!members.empty())
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
-            buf += fmt::format(" {} %{},\n", members[i].second.get_type().to_string(), members[i].first);
+            buf += std::format(" {} %{},\n", members[i].second.get_type().to_string(), members[i].first);
         }
-        buf += fmt::format(" {} %{},\n", members.back().second.get_type().to_string(), members.back().first);
+        buf += std::format(" {} %{},\n", members.back().second.get_type().to_string(), members.back().first);
     }
     buf += "}";
     return buf;
@@ -571,9 +562,8 @@ std::string struct_::to_string() const
 
 void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
 {
-    auto it = std::find_if(
-      imports.begin(),
-      imports.end(),
+    auto it = std::ranges::find_if(
+      imports,
       [&name](const imported_symbol& s) -> bool
       {
           return name == s.name;
@@ -583,13 +573,13 @@ void context::add_import(module_::symbol_type type, std::string import_path, std
         // check whether the imports match.
         if(import_path != it->import_path)
         {
-            throw codegen_error(fmt::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
+            throw codegen_error(std::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
         }
 
         if(it->type != type)
         {
             throw codegen_error(
-              fmt::format("Found different symbol types for import '{}': '{}' and '{}'.",
+              std::format("Found different symbol types for import '{}': '{}' and '{}'.",
                           name,
                           slang::module_::to_string(it->type),
                           slang::module_::to_string(type)));
@@ -607,34 +597,33 @@ std::size_t context::get_import_index(
   std::string import_path,
   std::string name) const
 {
-    auto it = std::find_if(
-      imports.begin(),
-      imports.end(),
+    auto it = std::ranges::find_if(
+      imports,
       [&name](const imported_symbol& s) -> bool
       {
           return name == s.name;
       });
-    if(it != imports.end())
+    if(it != imports.cend())
     {
         if(it->import_path != import_path)
         {
-            throw codegen_error(fmt::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
+            throw codegen_error(std::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
         }
 
         if(it->type != type)
         {
             throw codegen_error(
-              fmt::format("Found different symbol types for import '{}': '{}' and '{}'.",
+              std::format("Found different symbol types for import '{}': '{}' and '{}'.",
                           name,
                           slang::module_::to_string(it->type),
                           slang::module_::to_string(type)));
         }
 
-        return std::distance(imports.begin(), it);
+        return std::distance(imports.cbegin(), it);
     }
 
     throw codegen_error(
-      fmt::format("Symbol '{}' of type '{}' with path '{}' not found in imports.",
+      std::format("Symbol '{}' of type '{}' with path '{}' not found in imports.",
                   name,
                   slang::module_::to_string(type),
                   import_path));
@@ -699,16 +688,15 @@ struct_* context::add_struct(
   std::uint8_t flags,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         types.begin(),
-         types.end(),
+    if(std::ranges::find_if(
+         types,
          [&name](const std::unique_ptr<struct_>& t) -> bool
          {
              return t->get_name() == name;
          })
        != types.end())
     {
-        throw codegen_error(fmt::format("Type '{}' already defined.", name));
+        throw codegen_error(std::format("Type '{}' already defined.", name));
     }
 
     return types.emplace_back(
@@ -722,9 +710,8 @@ struct_* context::add_struct(
 
 struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      types.begin(),
-      types.end(),
+    auto it = std::ranges::find_if(
+      types,
       [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
       {
           return t->get_name() == name
@@ -735,10 +722,10 @@ struct_* context::get_type(const std::string& name, std::optional<std::string> i
     {
         if(import_path.has_value())
         {
-            throw codegen_error(fmt::format("Type '{}' from import '{}' not found.", name, *import_path));
+            throw codegen_error(std::format("Type '{}' from import '{}' not found.", name, *import_path));
         }
 
-        throw codegen_error(fmt::format("Type '{}' not found.", name));
+        throw codegen_error(std::format("Type '{}' not found.", name));
     }
 
     return it->get();
@@ -750,33 +737,32 @@ struct false_type : public std::false_type
 {
 };
 
-/** Helper to map types to `module_::constant_type` values. */
+/**
+ * Maps `std::int32_t`, `float` and `std::string` to the corresponding
+ * values in `module_::constant_type`.
+ *
+ * @param value The type to map.
+ */
 template<typename T>
-struct constant_type_mapper
+constexpr module_::constant_type map_constant_type()
 {
-    static_assert(false_type<T>::value, "Invalid constant type.");
-};
-
-/** Map `std::int32_t` to `module_::constant_type::i32`. */
-template<>
-struct constant_type_mapper<std::int32_t>
-{
-    static constexpr module_::constant_type value = module_::constant_type::i32;
-};
-
-/** Map `float` to `module_::constant_type::f32`. */
-template<>
-struct constant_type_mapper<float>
-{
-    static constexpr module_::constant_type value = module_::constant_type::f32;
-};
-
-/** Map `std::string` to `module_::constant_type::str`. */
-template<>
-struct constant_type_mapper<std::string>
-{
-    static constexpr module_::constant_type value = module_::constant_type::str;
-};
+    if constexpr(std::same_as<T, std::int32_t>)
+    {
+        return module_::constant_type::i32;
+    }
+    else if constexpr(std::same_as<T, float>)
+    {
+        return module_::constant_type::f32;
+    }
+    else if constexpr(std::same_as<T, std::string>)
+    {
+        return module_::constant_type::str;
+    }
+    else
+    {
+        static_assert(false_type<T>::value, "Unsupported constant type.");
+    }
+}
 
 /**
  * Add a constant to the corresponding table. That is, it is added to the import table
@@ -793,26 +779,25 @@ void add_constant(
   std::vector<constant_table_entry>& module_constants,
   std::vector<constant_table_entry>& imported_constants,
   std::string name,
-  T value,
+  const T& value,
   std::optional<std::string> import_path)
 {
     if(import_path.has_value())
     {
         // add constant to imported constants table.
-        auto it = std::find_if(
-          imported_constants.begin(),
-          imported_constants.end(),
+        auto it = std::ranges::find_if(
+          imported_constants,
           [&name, &import_path](const constant_table_entry& entry) -> bool
           {
               return entry.name.has_value() && *entry.name == name && entry.import_path == import_path;
           });
         if(it != imported_constants.end())
         {
-            throw codegen_error(fmt::format("Imported constant with name '{}' already exists.", name));
+            throw codegen_error(std::format("Imported constant with name '{}' already exists.", name));
         }
 
         imported_constants.emplace_back(
-          constant_type_mapper<T>::value,
+          map_constant_type<T>(),
           std::move(value),
           std::move(import_path),
           std::move(name));
@@ -820,20 +805,19 @@ void add_constant(
     else
     {
         // add constant to constants table.
-        auto it = std::find_if(
-          module_constants.begin(),
-          module_constants.end(),
+        auto it = std::ranges::find_if(
+          module_constants,
           [&name](const constant_table_entry& entry) -> bool
           {
               return entry.name.has_value() && *entry.name == name;
           });
         if(it != module_constants.end())
         {
-            throw codegen_error(fmt::format("Constant with name '{}' already exists.", name));
+            throw codegen_error(std::format("Constant with name '{}' already exists.", name));
         }
 
         module_constants.emplace_back(
-          constant_type_mapper<T>::value,
+          map_constant_type<T>(),
           std::move(value),
           std::move(import_path),
           std::move(name),
@@ -841,19 +825,43 @@ void add_constant(
     }
 }
 
-void context::add_constant(std::string name, std::int32_t i, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  std::int32_t i,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), i, std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      i,
+      std::move(import_path));
 }
 
-void context::add_constant(std::string name, float f, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  float f,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), f, std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      f,
+      std::move(import_path));
 }
 
-void context::add_constant(std::string name, std::string s, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  const std::string& s,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), std::move(s), std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      s,
+      std::move(import_path));
 }
 
 void context::register_constant_name(token name)
@@ -863,9 +871,8 @@ void context::register_constant_name(token name)
 
 bool context::has_registered_constant_name(const std::string& name)
 {
-    return std::find_if(
-             constant_names.begin(),
-             constant_names.end(),
+    return std::ranges::find_if(
+             constant_names,
              [&name](const token& s) -> bool
              {
                  return s.s == name;
@@ -875,9 +882,8 @@ bool context::has_registered_constant_name(const std::string& name)
 
 std::size_t context::get_string(std::string str)
 {
-    auto it = std::find_if(
-      constants.begin(),
-      constants.end(),
+    auto it = std::ranges::find_if(
+      constants,
       [&str](const module_::constant_table_entry& t) -> bool
       {
           return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
@@ -901,9 +907,8 @@ std::optional<constant_table_entry> context::get_constant(
      * If not found, search the import table and copy the constant into
      * the import table.
      */
-    auto it = std::find_if(
-      constants.cbegin(),
-      constants.cend(),
+    auto it = std::ranges::find_if(
+      constants,
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -913,9 +918,8 @@ std::optional<constant_table_entry> context::get_constant(
         return *it;
     }
 
-    it = std::find_if(
-      imported_constants.cbegin(),
-      imported_constants.cend(),
+    it = std::ranges::find_if(
+      imported_constants,
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -941,9 +945,8 @@ void context::add_prototype(
   std::vector<value> args,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         prototypes.begin(),
-         prototypes.end(),
+    if(std::ranges::find_if(
+         prototypes,
          [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
          {
              return p->get_name() == name
@@ -951,7 +954,7 @@ void context::add_prototype(
          })
        != prototypes.end())
     {
-        throw codegen_error(fmt::format("Prototype '{}' already defined.", name));
+        throw codegen_error(std::format("Prototype '{}' already defined.", name));
     }
 
     prototypes.emplace_back(
@@ -964,21 +967,20 @@ void context::add_prototype(
 
 const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(
-      prototypes.begin(),
-      prototypes.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(prototypes),
       [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
       {
           return p->get_name() == name
                  && p->get_import_path() == import_path;
       });
-    if(it == prototypes.end())
+    if(it == prototypes.cend())
     {
         if(import_path.has_value())
         {
-            throw codegen_error(fmt::format("Prototype '{}' not found in '{}'.", name, *import_path));
+            throw codegen_error(std::format("Prototype '{}' not found in '{}'.", name, *import_path));
         }
-        throw codegen_error(fmt::format("Prototype '{}' not found.", name));
+        throw codegen_error(std::format("Prototype '{}' not found.", name));
     }
     return **it;
 }
@@ -987,16 +989,15 @@ function* context::create_function(std::string name,
                                    std::unique_ptr<value> return_type,
                                    std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(
-         funcs.begin(),
-         funcs.end(),
+    if(std::ranges::find_if(
+         funcs,
          [&name](const std::unique_ptr<function>& fn) -> bool
          {
              return fn->get_name() == name;
          })
        != funcs.end())
     {
-        throw codegen_error(fmt::format("Function '{}' already defined.", name));
+        throw codegen_error(std::format("Function '{}' already defined.", name));
     }
 
     return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
@@ -1007,16 +1008,15 @@ void context::create_native_function(std::string lib_name,
                                      std::unique_ptr<value> return_type,
                                      std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(
-         funcs.begin(),
-         funcs.end(),
+    if(std::ranges::find_if(
+         funcs,
          [&name](const std::unique_ptr<function>& fn) -> bool
          {
              return fn->get_name() == name;
          })
        != funcs.end())
     {
-        throw codegen_error(fmt::format("Function '{}' already defined.", name));
+        throw codegen_error(std::format("Function '{}' already defined.", name));
     }
 
     funcs.emplace_back(
@@ -1032,9 +1032,8 @@ void context::add_macro(
   module_::macro_descriptor desc,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         macros.begin(),
-         macros.end(),
+    if(std::ranges::find_if(
+         macros,
          [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
          {
              return m->get_name() == name
@@ -1042,7 +1041,7 @@ void context::add_macro(
          })
        != macros.end())
     {
-        throw codegen_error(fmt::format("Macro '{}' already defined.", name));
+        throw codegen_error(std::format("Macro '{}' already defined.", name));
     }
 
     macros.emplace_back(
@@ -1056,9 +1055,8 @@ macro* context::get_macro(
   const token& name,
   std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      macros.begin(),
-      macros.end(),
+    auto it = std::ranges::find_if(
+      macros,
       [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
       {
           return m->get_name() == name.s
@@ -1075,14 +1073,14 @@ macro* context::get_macro(
     {
         throw codegen_error(
           name.location,
-          fmt::format(
+          std::format(
             "Macro '{}::{}' not found.",
             import_path.value(),
             name.s));
     }
     throw codegen_error(
       name.location,
-      fmt::format(
+      std::format(
         "Macro '{}' not found.",
         name.s));
 }
@@ -1148,18 +1146,17 @@ value context::get_struct_member(
     const scope* s = get_global_scope();
     const auto& members = s->get_struct(struct_name, std::move(import_path));
 
-    auto it = std::find_if(
-      members.begin(),
-      members.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(members),
       [&member_name](const std::pair<std::string, value>& v)
       {
           return v.first == member_name;
       });
-    if(it == members.end())
+    if(it == members.cend())
     {
         throw codegen_error(
           loc,
-          fmt::format("Struct '{}' does not contain a field with name '{}'.",
+          std::format("Struct '{}' does not contain a field with name '{}'.",
                       struct_name, member_name));
     }
 
@@ -1188,7 +1185,7 @@ bool context::get_expression_constant(const ast::expression& expr) const
 
 bool context::has_expression_constant(const ast::expression& expr) const
 {
-    return constant_expressions.find(&expr) != constant_expressions.end();
+    return constant_expressions.contains(&expr);
 }
 
 void context::set_expression_value(const ast::expression& expr, std::unique_ptr<value> v)
@@ -1209,7 +1206,7 @@ const value& context::get_expression_value(const ast::expression& expr) const
 
 bool context::has_expression_value(const ast::expression& expr) const
 {
-    return expression_values.find(&expr) != expression_values.end();
+    return expression_values.contains(&expr);
 }
 
 /*
@@ -1320,7 +1317,7 @@ void context::generate_dup(value vt, std::vector<value> vals)
 {
     if(vals.size() >= std::numeric_limits<std::int32_t>::max())
     {
-        throw codegen_error(fmt::format("Depth in dup instruction exceeds maximum value ({} >= {}).", vals.size(), std::numeric_limits<std::int32_t>::max()));
+        throw codegen_error(std::format("Depth in dup instruction exceeds maximum value ({} >= {}).", vals.size(), std::numeric_limits<std::int32_t>::max()));
     }
 
     validate_insertion_point();
@@ -1454,7 +1451,7 @@ void context::generate_store(std::unique_ptr<argument> arg, bool store_element)
 std::string context::generate_label()
 {
     ++label_count;
-    return fmt::format("{}", label_count - 1);
+    return std::format("{}", label_count - 1);
 }
 
 /**
@@ -1473,7 +1470,7 @@ static std::string make_printable(const std::string& s)
     {
         if(isalnum(c) == 0 && c != ' ')
         {
-            str += fmt::format("\\x{:02x}", c);
+            str += std::format("\\x{:02x}", c);
         }
         else
         {
@@ -1497,19 +1494,19 @@ static std::string print_constant(std::size_t index, const module_::constant_tab
 
     if(c.type == module_::constant_type::i32)
     {
-        buf += fmt::format(".i32 @{} {}", index, std::get<std::int32_t>(c.data));
+        buf += std::format(".i32 @{} {}", index, std::get<std::int32_t>(c.data));
     }
     else if(c.type == module_::constant_type::f32)
     {
-        buf += fmt::format(".f32 @{} {}", index, std::get<float>(c.data));
+        buf += std::format(".f32 @{} {}", index, std::get<float>(c.data));
     }
     else if(c.type == module_::constant_type::str)
     {
-        buf += fmt::format(".string @{} \"{}\"", index, make_printable(std::get<std::string>(c.data)));
+        buf += std::format(".string @{} \"{}\"", index, make_printable(std::get<std::string>(c.data)));
     }
     else
     {
-        buf += fmt::format(".<unknown> @{}", index);
+        buf += std::format(".<unknown> @{}", index);
     }
 
     return buf;
@@ -1524,7 +1521,7 @@ std::string context::to_string() const
     {
         for(std::size_t i = 0; i < constants.size() - 1; ++i)
         {
-            buf += fmt::format("{}\n", print_constant(i, constants[i]));
+            buf += std::format("{}\n", print_constant(i, constants[i]));
         }
         buf += print_constant(constants.size() - 1, constants.back());
 
@@ -1540,9 +1537,9 @@ std::string context::to_string() const
     {
         for(std::size_t i = 0; i < types.size() - 1; ++i)
         {
-            buf += fmt::format("{}\n", types[i]->to_string());
+            buf += std::format("{}\n", types[i]->to_string());
         }
-        buf += fmt::format("{}", types.back()->to_string());
+        buf += std::format("{}", types.back()->to_string());
 
         // don't append a newline if there are no functions.
         if(!funcs.empty())
@@ -1556,9 +1553,9 @@ std::string context::to_string() const
     {
         for(std::size_t i = 0; i < funcs.size() - 1; ++i)
         {
-            buf += fmt::format("{}\n", funcs[i]->to_string());
+            buf += std::format("{}\n", funcs[i]->to_string());
         }
-        buf += fmt::format("{}", funcs.back()->to_string());
+        buf += std::format("{}", funcs.back()->to_string());
     }
 
     return buf;

@@ -42,9 +42,9 @@ A preliminary (incomplete) documentation of the scripting language can be found 
 
 ### Building the project
 
-1. Using _Conan_ and _CMake_:
+1. Using _Conan_ and _CMake_ (debug build):
     ```
-    $ conan install . --build=missing
+    $ conan install . --build=missing -s compiler.cppstd=23 -s build_type=Debug
     $ cmake --preset conan-debug
     $ cmake --build build --preset conan-debug
     ```
@@ -52,7 +52,6 @@ A preliminary (incomplete) documentation of the scripting language can be found 
 
     The project depends on
     - [`cxxopts`](https://github.com/jarro2783/cxxopts) (==3.2.0)
-    - [`fmt`](https://github.com/fmtlib/fmt) (>=10.0.0, <11.0)
     - [`GSL`](https://github.com/microsoft/GSL) (==4.1.0)
     - [GoogleTest](https://github.com/google/googletest) (>=1.14.0, <2.0)
 

@@ -9,7 +9,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "node_registry.h"
 #include "ast.h"
@@ -60,7 +60,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     }
 
     throw std::runtime_error(
-      fmt::format(
+      std::format(
         "Cannot construct AST node from unknown id {}.",
         static_cast<std::uint8_t>(id)));
 }

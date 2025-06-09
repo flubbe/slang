@@ -4,7 +4,7 @@
  * in-memory archives.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -45,7 +45,9 @@ public:
      * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
-    memory_write_archive(bool persistent, endian byte_order = endian::native)
+    memory_write_archive(
+      bool persistent,
+      std::endian byte_order = std::endian::native)
     : archive{false, true, persistent, byte_order}
     {
     }
@@ -116,7 +118,10 @@ public:
      * @param persistent Whether to mirror the behavior of persistent archive w.r.t. byte ordering.
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
-    memory_read_archive(const std::vector<std::byte>& memory_buffer, bool persistent, endian byte_order = endian::native)
+    memory_read_archive(
+      const std::vector<std::byte>& memory_buffer,
+      bool persistent,
+      std::endian byte_order = std::endian::native)
     : archive{true, false, persistent, byte_order}
     , memory_buffer{memory_buffer}
     {

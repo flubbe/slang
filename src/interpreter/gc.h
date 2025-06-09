@@ -4,7 +4,7 @@
  * garbage collector.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -176,11 +176,12 @@ inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
         throw gc_error("Invalid function call: Tried to create i32 array with a type layout.");
     }
 
-    return {gc_object_type::array_i32,
-            nullptr,
-            sizeof(si::fixed_vector<std::int32_t>),
-            std::alignment_of_v<si::fixed_vector<std::int32_t>>,
-            flags, obj};
+    return {
+      gc_object_type::array_i32,
+      nullptr,
+      sizeof(si::fixed_vector<std::int32_t>),
+      std::alignment_of_v<si::fixed_vector<std::int32_t>>,
+      flags, obj};
 }
 
 template<>
@@ -194,11 +195,12 @@ inline gc_object gc_object::from<si::fixed_vector<float>>(
         throw gc_error("Invalid function call: Tried to create f32 array with a type layout.");
     }
 
-    return {gc_object_type::array_f32,
-            nullptr,
-            sizeof(si::fixed_vector<float>),
-            std::alignment_of_v<si::fixed_vector<float>>,
-            flags, obj};
+    return {
+      gc_object_type::array_f32,
+      nullptr,
+      sizeof(si::fixed_vector<float>),
+      std::alignment_of_v<si::fixed_vector<float>>,
+      flags, obj};
 }
 
 template<>
@@ -212,11 +214,12 @@ inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
         throw gc_error("Invalid function call: Tried to create string array with a type layout.");
     }
 
-    return {gc_object_type::array_str,
-            nullptr,
-            sizeof(si::fixed_vector<std::string*>),
-            std::alignment_of_v<si::fixed_vector<std::string*>>,
-            flags, obj};
+    return {
+      gc_object_type::array_str,
+      nullptr,
+      sizeof(si::fixed_vector<std::string*>),
+      std::alignment_of_v<si::fixed_vector<std::string*>>,
+      flags, obj};
 }
 
 template<>
@@ -230,11 +233,12 @@ inline gc_object gc_object::from<si::fixed_vector<void*>>(
         throw gc_error("Invalid function call: Tried to create object array without a type layout.");
     }
 
-    return {gc_object_type::array_aref,
-            layout,
-            sizeof(si::fixed_vector<void*>),
-            std::alignment_of_v<si::fixed_vector<void*>>,
-            flags, obj};
+    return {
+      gc_object_type::array_aref,
+      layout,
+      sizeof(si::fixed_vector<void*>),
+      std::alignment_of_v<si::fixed_vector<void*>>,
+      flags, obj};
 }
 
 /** Persistent object. */

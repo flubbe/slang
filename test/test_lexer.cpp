@@ -10,7 +10,6 @@
 
 #include <variant>
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "compiler/lexer.h"

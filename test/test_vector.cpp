@@ -4,15 +4,13 @@
  * Custom vector class tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <string>
 
 #include <gtest/gtest.h>
-
-#include <fmt/core.h>
 
 #include "interpreter/vector.h"
 

@@ -281,15 +281,9 @@ public:
     }
 
     /** Get the macros (pointers into the AST). */
-    std::vector<ast::expression*>& get_macro_asts()
+    auto& get_macro_asts(this auto&& self)
     {
-        return macro_asts;
-    }
-
-    /** Get the macros (pointers into the AST). */
-    const std::vector<ast::expression*>& get_macro_asts() const
-    {
-        return macro_asts;
+        return self.macro_asts;
     }
 };
 

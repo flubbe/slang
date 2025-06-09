@@ -67,7 +67,7 @@ protected:
      */
     cxxopts::Options make_cxxopts_options() const
     {
-        const std::string program_name = fmt::format("{} {}", get_command_line()[0], get_name());
+        const std::string program_name = std::format("{} {}", get_command_line()[0], get_name());
         return cxxopts::Options(program_name, get_description());
     }
 

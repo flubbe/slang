@@ -10,13 +10,12 @@
 
 #pragma once
 
+#include <format>
 #include <functional>
 #include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "archives/archive.h"
 #include "archives/memory.h"
@@ -271,7 +270,7 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
         }
     }
     else if(ar.is_writing())
@@ -297,7 +296,7 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(fmt::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
         }
     }
 

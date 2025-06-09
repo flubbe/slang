@@ -4,11 +4,11 @@
  * file manager.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2024
+ * \copyright Copyright (c) 2025
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "filemanager.h"
 
@@ -22,9 +22,8 @@ bool file_manager::exists(const fs::path& p) const
         return fs::exists(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::exists(sp / p);
@@ -38,9 +37,8 @@ bool file_manager::is_file(const fs::path& p) const
         return fs::is_regular_file(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::is_regular_file(sp / p);
@@ -54,9 +52,8 @@ bool file_manager::is_directory(const fs::path& p) const
         return fs::is_directory(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::is_directory(sp / p);
@@ -69,7 +66,7 @@ fs::path file_manager::resolve(const fs::path& path) const
     {
         if(!fs::is_regular_file(path))
         {
-            throw file_error(fmt::format("Resolved path '{}' is not a file.", path.c_str()));
+            throw file_error(std::format("Resolved path '{}' is not a file.", path.c_str()));
         }
         return fs::canonical(path);
     }
@@ -82,7 +79,7 @@ fs::path file_manager::resolve(const fs::path& path) const
         }
     }
 
-    throw file_error(fmt::format("Unable to resolve path '{}'.", path.c_str()));
+    throw file_error(std::format("Unable to resolve path '{}'.", path.c_str()));
 }
 
 std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode mode) const
@@ -107,17 +104,17 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
 
     if(resolved_path.empty())
     {
-        throw file_error(fmt::format("Unable to find file '{}' in search paths.", path.string()));
+        throw file_error(std::format("Unable to find file '{}' in search paths.", path.string()));
     }
 
     if(mode == open_mode::read)
     {
-        return std::make_unique<file_read_archive>(resolved_path, endian::little);
+        return std::make_unique<file_read_archive>(resolved_path, std::endian::little);
     }
 
     if(mode == open_mode::write)
     {
-        return std::make_unique<file_write_archive>(resolved_path, endian::little);
+        return std::make_unique<file_write_archive>(resolved_path, std::endian::little);
     }
 
     throw std::runtime_error("Invalid file open mode.");

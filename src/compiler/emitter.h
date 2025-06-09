@@ -207,7 +207,7 @@ public:
      */
     explicit instruction_emitter(cg::context& ctx)
     : ctx{ctx}
-    , instruction_buffer{false, slang::endian::little}
+    , instruction_buffer{false, std::endian::little}
     {
     }
 

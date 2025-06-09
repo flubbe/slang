@@ -11,14 +11,14 @@
 #pragma once
 
 #include <algorithm>
+#include <format>
 #include <list>
+#include <ranges>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "archives/archive.h"
 #include "archives/memory.h"
@@ -479,7 +479,7 @@ public:
     {
         if(index < -1)
         {
-            throw codegen_error(fmt::format("String index must be non-negative or -1. Got {}.", index));
+            throw codegen_error(std::format("String index must be non-negative or -1. Got {}.", index));
         }
 
         constant_index = index;
@@ -644,10 +644,10 @@ public:
     {
         if(import_path.has_value())
         {
-            return fmt::format("@{}::{}", *import_path, *name->get_name());
+            return std::format("@{}::{}", *import_path, *name->get_name());
         }
 
-        return fmt::format("@{}", *name->get_name());
+        return std::format("@{}", *name->get_name());
     }
 
     [[nodiscard]]
@@ -711,7 +711,7 @@ public:
     {
         if(import_path.has_value())
         {
-            return fmt::format("{}::{}", *import_path, vt.to_string());
+            return std::format("{}::{}", *import_path, vt.to_string());
         }
 
         return vt.to_string();
@@ -756,7 +756,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("{}", var->to_string());
+        return std::format("{}", var->to_string());
     }
 
     [[nodiscard]]
@@ -805,13 +805,13 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("%{}", label);
+        return std::format("%{}", label);
     }
 
     [[nodiscard]]
     const value* get_value() const override
     {
-        throw codegen_error(fmt::format("Cannot get type from label '{}'.", to_string()));
+        throw codegen_error(std::format("Cannot get type from label '{}'.", to_string()));
     }
 };
 
@@ -886,7 +886,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("{}", ::slang::codegen::to_string(cast));
+        return std::format("{}", ::slang::codegen::to_string(cast));
     }
 
     [[nodiscard]]
@@ -955,7 +955,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("%{}, {}", get_struct_name(), member.to_string());
+        return std::format("%{}, {}", get_struct_name(), member.to_string());
     }
 
     [[nodiscard]]
@@ -1442,16 +1442,9 @@ public:
 
     /** Get the outer scope. */
     [[nodiscard]]
-    scope* get_outer()
+    auto get_outer(this auto&& self)
     {
-        return outer;
-    }
-
-    /** Get the outer scope. */
-    [[nodiscard]]
-    const scope* get_outer() const
-    {
-        return outer;
+        return self.outer;
     }
 
     /** Get a string representation of the scope. */
@@ -1460,7 +1453,7 @@ public:
     {
         if(outer)
         {
-            return fmt::format("{}::{}", outer->to_string(), name);
+            return std::format("{}::{}", outer->to_string(), name);
         }
 
         return name;
@@ -1729,32 +1722,24 @@ public:
     }
 
     /** Get the function's scope. */
-    class scope* get_scope()
-    {
-        return &scope;
-    }
-
-    /** Get the function's scope. */
     [[nodiscard]]
-    const class scope* get_scope() const
+    auto get_scope(this auto&& self)
     {
-        return &scope;
+        return &self.scope;
     }
 
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
     [[nodiscard]]
     std::pair<type, std::vector<type>> get_signature() const
     {
-        std::vector<type> arg_types;
-        auto& args = scope.get_args();
-        std::transform(
-          args.cbegin(),
-          args.cend(),
-          std::back_inserter(arg_types),
-          [](const auto& arg) -> type
-          {
-              return arg->get_type();
-          });
+        std::vector<type> arg_types =
+          scope.get_args()
+          | std::views::transform(
+            [](const auto& arg) -> type
+            {
+                return arg->get_type();
+            })
+          | std::ranges::to<std::vector>();
         return {return_type->get_type(), std::move(arg_types)};
     }
 
@@ -1777,7 +1762,7 @@ public:
     {
         if(!native)
         {
-            throw codegen_error(fmt::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
+            throw codegen_error(std::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
         }
 
         return import_library;
@@ -1873,13 +1858,13 @@ public:
     [[nodiscard]]
     bool is_transitive_import() const
     {
-        return is_import() && name.substr(0, 1) == "$";
+        return is_import() && name.starts_with("$");
     }
 
     /** Set transitivity. */
     void set_transitive(bool transitive)
     {
-        bool transitive_name = name.substr(0, 1) == "$";
+        bool transitive_name = name.starts_with("$");
         if(transitive_name && !transitive)
         {
             name = name.substr(1);
@@ -2210,7 +2195,7 @@ public:
      */
     void add_constant(
       std::string name,
-      std::string s,
+      const std::string& s,
       std::optional<std::string> import_path = std::nullopt);
 
     /**
@@ -2341,9 +2326,9 @@ public:
      * @returns Returns the macro list.
      */
     [[nodiscard]]
-    std::vector<std::unique_ptr<macro>>& get_macros()
+    auto& get_macros(this auto&& self)
     {
-        return macros;
+        return self.macros;
     }
 
     /** Generate a unique macro invocation id. */
@@ -2406,28 +2391,21 @@ public:
 
     /** Get the current scope. */
     [[nodiscard]]
-    scope* get_scope()
+    auto* get_scope(this auto&& self)
     {
-        if(!current_scopes.empty())
+        if(!self.current_scopes.empty())
         {
-            return current_scopes.back();
+            return self.current_scopes.back();
         }
 
-        return global_scope.get();
+        return self.global_scope.get();
     }
 
     /** Get the global scope. */
     [[nodiscard]]
-    scope* get_global_scope()
+    auto* get_global_scope(this auto&& self)
     {
-        return global_scope.get();
-    }
-
-    /** Get the global scope. */
-    [[nodiscard]]
-    const scope* get_global_scope() const
-    {
-        return global_scope.get();
+        return self.global_scope.get();
     }
 
     /** Return whether a given scope is the global scope. */
@@ -2546,14 +2524,13 @@ public:
         {
             if(it->name.s == name)
             {
-                auto flag_it = std::find_if(
-                  it->args.begin(),
-                  it->args.end(),
+                auto flag_it = std::ranges::find_if(
+                  std::as_const(it->args),
                   [&flag_name](const std::pair<token, token>& arg)
                   {
                       return arg.first.s == flag_name;
                   });
-                if(flag_it != it->args.end())
+                if(flag_it != it->args.cend())
                 {
                     if(flag_it->second.s.empty() || flag_it->second.s == "true")
                     {
@@ -2578,15 +2555,14 @@ public:
     [[nodiscard]]
     std::optional<directive> get_last_directive(const std::string& name) const
     {
-        auto it = std::find_if(
-          directive_stack.rbegin(),
-          directive_stack.rend(),
+        auto it = std::ranges::find_if(
+          std::as_const(directive_stack) | std::views::reverse,
           [&name](const directive& dir)
           {
               return dir.name.s == name;
           });
 
-        if(it != directive_stack.rend())
+        if(it != directive_stack.crend())
         {
             return *it;
         }
