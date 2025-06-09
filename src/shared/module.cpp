@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <format>
+#include <utility>
 
 #include "module.h"
 #include "type_utils.h" /* for slang::typing::is_reference_type */
@@ -36,13 +37,12 @@ static constexpr char type_prefix = 'C';
 
 std::string variable_type::encode() const
 {
-    auto it = std::find_if(
-      type_encoding.begin(),
-      type_encoding.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(type_encoding),
       [this](const std::pair<std::string, std::string>& p) -> bool
       { return p.first == decoded_type_string; });
 
-    if(it != type_encoding.end())
+    if(it != type_encoding.cend())
     {
         return std::format("{:[>{}}{}", "", array_dims.value_or(0), it->second);
     }
@@ -69,13 +69,12 @@ void variable_type::set_from_encoded(const std::string& s)
     base_s = s.substr(array_dim_indicator_end);
     array_dims = array_dim_indicator_end > 0 ? std::make_optional(array_dim_indicator_end) : std::nullopt;
 
-    auto it = std::find_if(
-      type_encoding.begin(),
-      type_encoding.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(type_encoding),
       [&base_s](const std::pair<std::string, std::string>& p) -> bool
       { return p.second == base_s; });
 
-    if(it != type_encoding.end())
+    if(it != type_encoding.cend())
     {
         decoded_type_string = it->first;
     }
@@ -176,16 +175,15 @@ archive& operator&(archive& ar, variable_descriptor& desc)
 
 std::size_t language_module::add_import(symbol_type type, std::string name, std::uint32_t package_index)
 {
-    auto it = std::find_if(
-      header.imports.begin(),
-      header.imports.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(header.imports),
       [type, &name](const imported_symbol& s) -> bool
       {
           return s.type == type && s.name == name;
       });
-    if(it != header.imports.end())
+    if(it != header.imports.cend())
     {
-        return std::distance(header.imports.begin(), it);
+        return std::distance(header.imports.cbegin(), it);
     }
 
     header.imports.emplace_back(type, std::move(name), package_index);
@@ -199,14 +197,13 @@ void language_module::add_function(
   std::size_t size, std::size_t entry_point,
   std::vector<variable_descriptor> locals)
 {
-    if(std::find_if(
-         header.exports.begin(),
-         header.exports.end(),
+    if(std::ranges::find_if(
+         std::as_const(header.exports),
          [&name](const exported_symbol& s) -> bool
          {
              return s.type == symbol_type::function && s.name == name;
          })
-       != header.exports.end())
+       != header.exports.cend())
     {
         throw module_error(std::format("Cannot add function: Symbol '{}' already defined.", name));
     }
@@ -224,14 +221,13 @@ void language_module::add_native_function(
   std::vector<variable_type> arg_types,
   std::string lib_name)
 {
-    if(std::find_if(
-         header.exports.begin(),
-         header.exports.end(),
+    if(std::ranges::find_if(
+         std::as_const(header.exports),
          [&name](const exported_symbol& s) -> bool
          {
              return s.type == symbol_type::function && s.name == name;
          })
-       != header.exports.end())
+       != header.exports.cend())
     {
         throw module_error(std::format("Cannot add native function: '{}' already defined.", name));
     }
@@ -248,14 +244,13 @@ void language_module::add_struct(
   std::vector<std::pair<std::string, field_descriptor>> members,
   uint8_t flags)
 {
-    if(std::find_if(
-         header.exports.begin(),
-         header.exports.end(),
+    if(std::ranges::find_if(
+         std::as_const(header.exports),
          [&name](const exported_symbol& s) -> bool
          {
              return s.type == symbol_type::type && s.name == name;
          })
-       != header.exports.end())
+       != header.exports.cend())
     {
         throw module_error(std::format("Cannot add type: '{}' already defined.", name));
     }
@@ -266,14 +261,13 @@ void language_module::add_struct(
 
 void language_module::add_constant(std::string name, std::size_t i)
 {
-    if(std::find_if(
-         header.exports.begin(),
-         header.exports.end(),
+    if(std::ranges::find_if(
+         std::as_const(header.exports),
          [&name](const exported_symbol& s) -> bool
          {
              return s.type == symbol_type::constant && s.name == name;
          })
-       != header.exports.end())
+       != header.exports.cend())
     {
         throw module_error(std::format("Cannot add constant: '{}' already defined.", name));
     }
@@ -283,14 +277,13 @@ void language_module::add_constant(std::string name, std::size_t i)
 
 void language_module::add_macro(std::string name, macro_descriptor desc)
 {
-    if(std::find_if(
-         header.exports.begin(),
-         header.exports.end(),
+    if(std::ranges::find_if(
+         std::as_const(header.exports),
          [&name](const exported_symbol& s) -> bool
          {
              return s.type == symbol_type::macro && s.name == name;
          })
-       != header.exports.end())
+       != header.exports.cend())
     {
         throw module_error(std::format("Cannot add macro: '{}' already defined.", name));
     }

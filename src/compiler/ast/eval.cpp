@@ -209,7 +209,7 @@ bool binary_expression::is_const_eval(cg::context& ctx) const
       "&", "^", "|",
       "&&", "||"};
 
-    if(std::find(bin_ops.begin(), bin_ops.end(), op.s) == bin_ops.end())
+    if(std::ranges::find(std::as_const(bin_ops), op.s) == bin_ops.cend())
     {
         return false;
     }

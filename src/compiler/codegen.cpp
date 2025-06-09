@@ -287,9 +287,8 @@ bool basic_block::is_valid() const
 
 bool scope::contains(const std::string& name) const
 {
-    if(std::find_if(
-         args.begin(),
-         args.end(),
+    if(std::ranges::find_if(
+         args,
          [&name](const std::unique_ptr<value>& v) -> bool
          {
              if(!v->has_name())
@@ -299,14 +298,13 @@ bool scope::contains(const std::string& name) const
 
              return *v->get_name() == name;
          })
-       != args.end())
+       != args.cend())
     {
         return true;
     }
 
-    if(std::find_if(
-         locals.begin(),
-         locals.end(),
+    if(std::ranges::find_if(
+         locals,
          [&name](const std::unique_ptr<value>& v) -> bool
          {
              if(!v->has_name())
@@ -316,7 +314,7 @@ bool scope::contains(const std::string& name) const
 
              return *v->get_name() == name;
          })
-       != locals.end())
+       != locals.cend())
     {
         return true;
     }
@@ -326,22 +324,20 @@ bool scope::contains(const std::string& name) const
 
 bool scope::contains_struct(const std::string& name, const std::optional<std::string>& import_path) const
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
                  && p.second.get_import_path() == import_path;
       });
-    return it != structs.end();
+    return it != structs.cend();
 }
 
 value* scope::get_value(const std::string& name)
 {
-    auto it = std::find_if(
-      args.begin(),
-      args.end(),
+    auto it = std::ranges::find_if(
+      args,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -356,9 +352,8 @@ value* scope::get_value(const std::string& name)
         return it->get();
     }
 
-    it = std::find_if(
-      locals.begin(),
-      locals.end(),
+    it = std::ranges::find_if(
+      locals,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -379,9 +374,8 @@ value* scope::get_value(const std::string& name)
 
 std::size_t scope::get_index(const std::string& name) const
 {
-    auto it = std::find_if(
-      args.begin(),
-      args.end(),
+    auto it = std::ranges::find_if(
+      args,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -391,14 +385,13 @@ std::size_t scope::get_index(const std::string& name) const
 
           return *v->get_name() == name;
       });
-    if(it != args.end())
+    if(it != args.cend())
     {
-        return std::distance(args.begin(), it);
+        return std::distance(args.cbegin(), it);
     }
 
-    it = std::find_if(
-      locals.begin(),
-      locals.end(),
+    it = std::ranges::find_if(
+      locals,
       [&name](const std::unique_ptr<value>& v) -> bool
       {
           if(!v->has_name())
@@ -409,9 +402,9 @@ std::size_t scope::get_index(const std::string& name) const
           return *v->get_name() == name;
       });
 
-    if(it != locals.end())
+    if(it != locals.cend())
     {
-        return args.size() + std::distance(locals.begin(), it);
+        return args.size() + std::distance(locals.cbegin(), it);
     }
 
     throw codegen_error(std::format("Name '{}' not found in scope.", name));
@@ -457,9 +450,8 @@ void scope::add_struct(
   std::uint8_t flags,
   std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
@@ -480,15 +472,14 @@ void scope::add_struct(
 
 const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(
-      structs.begin(),
-      structs.end(),
+    auto it = std::ranges::find_if(
+      structs,
       [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
       {
           return p.first == name
                  && p.second.get_import_path() == import_path;
       });
-    if(it == structs.end())
+    if(it == structs.cend())
     {
         if(import_path.has_value())
         {
@@ -571,9 +562,8 @@ std::string struct_::to_string() const
 
 void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
 {
-    auto it = std::find_if(
-      imports.begin(),
-      imports.end(),
+    auto it = std::ranges::find_if(
+      imports,
       [&name](const imported_symbol& s) -> bool
       {
           return name == s.name;
@@ -607,14 +597,13 @@ std::size_t context::get_import_index(
   std::string import_path,
   std::string name) const
 {
-    auto it = std::find_if(
-      imports.begin(),
-      imports.end(),
+    auto it = std::ranges::find_if(
+      imports,
       [&name](const imported_symbol& s) -> bool
       {
           return name == s.name;
       });
-    if(it != imports.end())
+    if(it != imports.cend())
     {
         if(it->import_path != import_path)
         {
@@ -630,7 +619,7 @@ std::size_t context::get_import_index(
                           slang::module_::to_string(type)));
         }
 
-        return std::distance(imports.begin(), it);
+        return std::distance(imports.cbegin(), it);
     }
 
     throw codegen_error(
@@ -699,9 +688,8 @@ struct_* context::add_struct(
   std::uint8_t flags,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         types.begin(),
-         types.end(),
+    if(std::ranges::find_if(
+         types,
          [&name](const std::unique_ptr<struct_>& t) -> bool
          {
              return t->get_name() == name;
@@ -722,9 +710,8 @@ struct_* context::add_struct(
 
 struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      types.begin(),
-      types.end(),
+    auto it = std::ranges::find_if(
+      types,
       [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
       {
           return t->get_name() == name
@@ -799,9 +786,8 @@ void add_constant(
     if(import_path.has_value())
     {
         // add constant to imported constants table.
-        auto it = std::find_if(
-          imported_constants.begin(),
-          imported_constants.end(),
+        auto it = std::ranges::find_if(
+          imported_constants,
           [&name, &import_path](const constant_table_entry& entry) -> bool
           {
               return entry.name.has_value() && *entry.name == name && entry.import_path == import_path;
@@ -820,9 +806,8 @@ void add_constant(
     else
     {
         // add constant to constants table.
-        auto it = std::find_if(
-          module_constants.begin(),
-          module_constants.end(),
+        auto it = std::ranges::find_if(
+          module_constants,
           [&name](const constant_table_entry& entry) -> bool
           {
               return entry.name.has_value() && *entry.name == name;
@@ -863,9 +848,8 @@ void context::register_constant_name(token name)
 
 bool context::has_registered_constant_name(const std::string& name)
 {
-    return std::find_if(
-             constant_names.begin(),
-             constant_names.end(),
+    return std::ranges::find_if(
+             constant_names,
              [&name](const token& s) -> bool
              {
                  return s.s == name;
@@ -875,9 +859,8 @@ bool context::has_registered_constant_name(const std::string& name)
 
 std::size_t context::get_string(std::string str)
 {
-    auto it = std::find_if(
-      constants.begin(),
-      constants.end(),
+    auto it = std::ranges::find_if(
+      constants,
       [&str](const module_::constant_table_entry& t) -> bool
       {
           return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
@@ -901,9 +884,8 @@ std::optional<constant_table_entry> context::get_constant(
      * If not found, search the import table and copy the constant into
      * the import table.
      */
-    auto it = std::find_if(
-      constants.cbegin(),
-      constants.cend(),
+    auto it = std::ranges::find_if(
+      constants,
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -913,9 +895,8 @@ std::optional<constant_table_entry> context::get_constant(
         return *it;
     }
 
-    it = std::find_if(
-      imported_constants.cbegin(),
-      imported_constants.cend(),
+    it = std::ranges::find_if(
+      imported_constants,
       [&name, &import_path](const constant_table_entry& entry) -> bool
       {
           return entry.name == name && entry.import_path == import_path;
@@ -941,9 +922,8 @@ void context::add_prototype(
   std::vector<value> args,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         prototypes.begin(),
-         prototypes.end(),
+    if(std::ranges::find_if(
+         prototypes,
          [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
          {
              return p->get_name() == name
@@ -964,15 +944,14 @@ void context::add_prototype(
 
 const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
 {
-    auto it = std::find_if(
-      prototypes.begin(),
-      prototypes.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(prototypes),
       [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
       {
           return p->get_name() == name
                  && p->get_import_path() == import_path;
       });
-    if(it == prototypes.end())
+    if(it == prototypes.cend())
     {
         if(import_path.has_value())
         {
@@ -987,9 +966,8 @@ function* context::create_function(std::string name,
                                    std::unique_ptr<value> return_type,
                                    std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(
-         funcs.begin(),
-         funcs.end(),
+    if(std::ranges::find_if(
+         funcs,
          [&name](const std::unique_ptr<function>& fn) -> bool
          {
              return fn->get_name() == name;
@@ -1007,9 +985,8 @@ void context::create_native_function(std::string lib_name,
                                      std::unique_ptr<value> return_type,
                                      std::vector<std::unique_ptr<value>> args)
 {
-    if(std::find_if(
-         funcs.begin(),
-         funcs.end(),
+    if(std::ranges::find_if(
+         funcs,
          [&name](const std::unique_ptr<function>& fn) -> bool
          {
              return fn->get_name() == name;
@@ -1032,9 +1009,8 @@ void context::add_macro(
   module_::macro_descriptor desc,
   std::optional<std::string> import_path)
 {
-    if(std::find_if(
-         macros.begin(),
-         macros.end(),
+    if(std::ranges::find_if(
+         macros,
          [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
          {
              return m->get_name() == name
@@ -1056,9 +1032,8 @@ macro* context::get_macro(
   const token& name,
   std::optional<std::string> import_path)
 {
-    auto it = std::find_if(
-      macros.begin(),
-      macros.end(),
+    auto it = std::ranges::find_if(
+      macros,
       [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
       {
           return m->get_name() == name.s
@@ -1148,14 +1123,13 @@ value context::get_struct_member(
     const scope* s = get_global_scope();
     const auto& members = s->get_struct(struct_name, std::move(import_path));
 
-    auto it = std::find_if(
-      members.begin(),
-      members.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(members),
       [&member_name](const std::pair<std::string, value>& v)
       {
           return v.first == member_name;
       });
-    if(it == members.end())
+    if(it == members.cend())
     {
         throw codegen_error(
           loc,
@@ -1188,7 +1162,7 @@ bool context::get_expression_constant(const ast::expression& expr) const
 
 bool context::has_expression_constant(const ast::expression& expr) const
 {
-    return constant_expressions.find(&expr) != constant_expressions.end();
+    return constant_expressions.contains(&expr);
 }
 
 void context::set_expression_value(const ast::expression& expr, std::unique_ptr<value> v)
@@ -1209,7 +1183,7 @@ const value& context::get_expression_value(const ast::expression& expr) const
 
 bool context::has_expression_value(const ast::expression& expr) const
 {
-    return expression_values.find(&expr) != expression_values.end();
+    return expression_values.contains(&expr);
 }
 
 /*

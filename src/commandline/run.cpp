@@ -158,12 +158,12 @@ void run::invoke(const std::vector<std::string>& args)
     }
 
     // Forwarded arguments.
-    auto separator = std::find(args.begin(), args.end(), "--");
+    auto separator = std::ranges::find(std::as_const(args), "--");
     std::vector<std::string> forwarded_args{
-      separator != args.end()
+      separator != args.cend()
         ? separator + 1
-        : args.end(),
-      args.end()};
+        : args.cend(),
+      args.cend()};
 
     // Get module name.
     if(!file_mgr.is_file(module_path))

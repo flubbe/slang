@@ -11,6 +11,7 @@
 #include <array>
 #include <algorithm>
 #include <format>
+#include <utility>
 
 #include "lexer.h"
 
@@ -122,7 +123,7 @@ static const std::array<char, operator_chars_count> operator_chars = {
  */
 static bool is_operator(const std::optional<char>& c)
 {
-    return c && std::find(operator_chars.begin(), operator_chars.end(), *c) != operator_chars.end();
+    return c && std::ranges::find(std::as_const(operator_chars), *c) != operator_chars.cend();
 }
 
 /**
@@ -295,7 +296,7 @@ std::optional<token> lexer::next()
             while((c = peek()))
             {
                 std::string temp_token = current_token + *c;
-                if(std::find(operators.begin(), operators.end(), temp_token) == operators.end())
+                if(std::ranges::find(std::as_const(operators), temp_token) == operators.cend())
                 {
                     break;
                 }

@@ -287,9 +287,8 @@ std::string scope::to_string() const
 
 void context::add_base_type(std::string name, bool is_reference_type)
 {
-    auto it = std::find_if(
-      type_map.begin(),
-      type_map.end(),
+    auto it = std::ranges::find_if(
+      type_map,
       [&name](const std::pair<type_info, std::uint64_t>& t) -> bool
       {
           return name == ty::to_string(t.first);
@@ -299,9 +298,8 @@ void context::add_base_type(std::string name, bool is_reference_type)
         throw type_error(std::format("Type '{}' already exists.", name));
     }
 
-    if(std::find_if(
-         base_types.begin(),
-         base_types.end(),
+    if(std::ranges::find_if(
+         base_types,
          [&name](const std::pair<std::string, bool>& v) -> bool
          { return v.first == name; })
        != base_types.end())
@@ -346,9 +344,8 @@ void context::add_import(std::vector<token> path, bool transitive)
 
 void context::add_import(std::string path, bool transitive)
 {
-    auto it = std::find_if(
-      imported_modules.begin(),
-      imported_modules.end(),
+    auto it = std::ranges::find_if(
+      imported_modules,
       [&path](const imported_module& m) -> bool
       {
           return path == m.path;
@@ -484,9 +481,8 @@ bool context::is_transitive_import(const std::string& namespace_path) const
 
 bool context::has_import(const std::string& path)
 {
-    return std::find_if(
-             imported_modules.cbegin(),
-             imported_modules.cend(),
+    return std::ranges::find_if(
+             std::as_const(imported_modules),
              [&path](const imported_module& m) -> bool
              {
                  return path == m.path;
@@ -510,9 +506,8 @@ void context::add_variable(
         }
         else
         {
-            auto const_it = std::find_if(
-              mod_it->second.begin(),
-              mod_it->second.end(),
+            auto const_it = std::ranges::find_if(
+              mod_it->second,
               [&name](const variable_type& entry) -> bool
               {
                   return entry.name.s == name.s;
@@ -640,15 +635,14 @@ bool context::has_type(const std::string& name, const std::optional<std::string>
     }
 
     // search type map.
-    auto it = std::find_if(
-      type_map.begin(),
-      type_map.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(type_map),
       [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
       {
           return t.first.to_string() == name
                  && t.first.get_import_path() == import_path;
       });
-    if(it != type_map.end())
+    if(it != type_map.cend())
     {
         return true;
     }
@@ -656,7 +650,7 @@ bool context::has_type(const std::string& name, const std::optional<std::string>
     // search scopes.
     for(const scope* s = current_scope; s != nullptr; s = s->parent)
     {
-        if(s->structs.find(name) != s->structs.end())
+        if(s->structs.contains(name))
         {
             return true;
         }
@@ -686,7 +680,7 @@ void context::add_macro(std::string name, std::optional<std::string> import_path
         }
         else
         {
-            auto it = std::find(mod_it->second.begin(), mod_it->second.end(), name);
+            auto it = std::ranges::find(mod_it->second, name);
             if(it != mod_it->second.end())
             {
                 throw type_error(
@@ -700,7 +694,7 @@ void context::add_macro(std::string name, std::optional<std::string> import_path
     }
     else
     {
-        auto it = std::find(macros.begin(), macros.end(), name);
+        auto it = std::ranges::find(macros, name);
         if(it != macros.end())
         {
             throw type_error(
@@ -723,10 +717,10 @@ bool context::has_macro(const std::string& name, const std::optional<std::string
             return false;
         }
 
-        return std::find(mod_it->second.begin(), mod_it->second.end(), name) != mod_it->second.end();
+        return std::ranges::find(std::as_const(mod_it->second), name) != mod_it->second.cend();
     }
 
-    return std::find(macros.begin(), macros.end(), name) != macros.end();
+    return std::ranges::find(std::as_const(macros), name) != macros.cend();
 }
 
 bool context::is_reference_type(const std::string& name, const std::optional<std::string>& import_path) const
@@ -734,14 +728,13 @@ bool context::is_reference_type(const std::string& name, const std::optional<std
     if(!import_path.has_value())
     {
         // check base types.
-        auto base_it = std::find_if(
-          base_types.begin(),
-          base_types.end(),
+        auto base_it = std::ranges::find_if(
+          std::as_const(base_types),
           [&name](const std::pair<std::string, bool>& v) -> bool
           {
               return v.first == name;
           });
-        if(base_it != base_types.end())
+        if(base_it != base_types.cend())
         {
             return base_it->second;
         }
@@ -771,9 +764,8 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
         {
             if(import_path == *namespace_path)
             {
-                auto it = std::find_if(
-                  constants.cbegin(),
-                  constants.cend(),
+                auto it = std::ranges::find_if(
+                  constants,
                   [&identifier](const variable_type& t) -> bool
                   {
                       return identifier.s == t.name.s;
@@ -828,9 +820,8 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
 
 type_info context::get_type(const std::string& name, bool array, const std::optional<std::string>& import_path)
 {
-    auto it = std::find_if(
-      type_map.begin(),
-      type_map.end(),
+    auto it = std::ranges::find_if(
+      type_map,
       [&name, array, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
       {
           if(array != t.first.is_array())
@@ -859,9 +850,8 @@ type_info context::get_type(const std::string& name, bool array, const std::opti
     // for arrays, also search for the base type.
     if(array)
     {
-        auto it = std::find_if(
-          type_map.begin(),
-          type_map.end(),
+        auto it = std::ranges::find_if(
+          type_map,
           [&name, &import_path](const std::pair<type_info, std::uint64_t>& t) -> bool
           {
               if(t.first.is_array())
@@ -901,9 +891,8 @@ type_info context::get_unresolved_type(token name, type_class cls, std::optional
         import_path = std::nullopt;
     }
 
-    auto it = std::find_if(
-      unresolved_types.begin(),
-      unresolved_types.end(),
+    auto it = std::ranges::find_if(
+      unresolved_types,
       [&name, cls, &import_path](const type_info& t) -> bool
       {
           if(import_path != t.get_import_path())
@@ -971,9 +960,8 @@ void context::resolve(type_info& ty)
     }
 
     // resolve type.
-    auto it = std::find_if(
-      type_map.begin(),
-      type_map.end(),
+    auto it = std::ranges::find_if(
+      type_map,
       [&ty](const std::pair<type_info, std::uint64_t>& t) -> bool
       {
           return ty.to_string() == t.first.to_string()
@@ -1015,9 +1003,8 @@ void context::resolve_types()
     // add structs to type map.
     for(auto& s: global_scope.structs)
     {
-        auto it = std::find_if(
-          type_map.begin(),
-          type_map.end(),
+        auto it = std::ranges::find_if(
+          type_map,
           [&s](const std::pair<type_info, std::uint64_t>& t) -> bool
           {
               if(s.second.import_path != t.first.get_import_path())
@@ -1048,9 +1035,8 @@ void context::resolve_types()
 
     // don't resolve built-in types and function types.
     std::vector<type_info> unresolved;
-    std::copy_if(
-      unresolved_types.begin(),
-      unresolved_types.end(),
+    std::ranges::copy_if(
+      unresolved_types,
       std::back_inserter(unresolved),
       [](const type_info& t) -> bool
       {
@@ -1230,9 +1216,8 @@ void context::enter_anonymous_scope(token_location loc)
     ++anonymous_scope_id;
 
     // check if the scope already exists.
-    auto it = std::find_if(
-      current_scope->children.begin(),
-      current_scope->children.end(),
+    auto it = std::ranges::find_if(
+      current_scope->children,
       [&anonymous_scope](const scope& s) -> bool
       { return s.name.s == anonymous_scope.s; });
     if(it != current_scope->children.end())
@@ -1322,7 +1307,7 @@ void context::set_expression_type(const ast::expression* expr, type_info t)
 
 bool context::has_expression_type(const ast::expression& expr) const
 {
-    return expression_types.find(&expr) != expression_types.end();
+    return expression_types.contains(&expr);
 }
 
 std::string context::to_string() const

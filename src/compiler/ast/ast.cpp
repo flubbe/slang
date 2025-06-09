@@ -9,6 +9,7 @@
  */
 
 #include <print>
+#include <ranges>
 #include <set>
 #include <stack>
 
@@ -2002,9 +2003,8 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     {
         const auto& member_name = initializer->get_name().s;
 
-        auto it = std::find_if(
-          t->cbegin(),
-          t->cend(),
+        auto it = std::ranges::find_if(
+          *t,
           [&member_name](const std::pair<std::string, cg::value>& m) -> bool
           { return m.first == member_name; });
         if(it == t->cend())
@@ -2066,9 +2066,8 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
     {
         const auto& member_name = initializer->get_name().s;
 
-        if(std::find_if(
-             initialized_member_names.begin(),
-             initialized_member_names.end(),
+        if(std::ranges::find_if(
+             initialized_member_names,
              [&member_name](auto& name) -> bool
              { return name == member_name; })
            != initialized_member_names.end())
@@ -2082,9 +2081,8 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         }
         initialized_member_names.push_back(member_name);
 
-        auto it = std::find_if(
-          struct_def->members.begin(),
-          struct_def->members.end(),
+        auto it = std::ranges::find_if(
+          struct_def->members,
           [&member_name](const auto& m) -> bool
           { return m.first.s == member_name; });
         if(it == struct_def->members.end())
@@ -2864,7 +2862,7 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
     }
 
     auto operand_type = ctx.get_expression_type(*operand);
-    auto type_it = std::find(op_it->second.begin(), op_it->second.end(), ty::to_string(operand_type));
+    auto type_it = std::ranges::find(op_it->second, ty::to_string(operand_type));
     if(type_it == op_it->second.end())
     {
         throw ty::type_error(
@@ -3196,35 +3194,34 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
 
 void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 {
-    std::vector<cg::value> prototype_arg_types;
-    std::transform(
-      args.cbegin(),
-      args.cend(),
-      std::back_inserter(prototype_arg_types),
-      [](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> cg::value
-      {
-          if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
-          {
-              return cg::value{
-                cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
-                         std::get<1>(arg)->is_array()
-                           ? static_cast<std::size_t>(1)
-                           : static_cast<std::size_t>(0)}};
-          }
+    std::vector<cg::value> prototype_arg_types =
+      args
+      | std::views::transform(
+        [](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> cg::value
+        {
+            if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
+            {
+                return cg::value{
+                  cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
+                           std::get<1>(arg)->is_array()
+                             ? static_cast<std::size_t>(1)
+                             : static_cast<std::size_t>(0)}};
+            }
 
-          return cg::value{std::get<1>(arg)->to_type()};
-      });
+            return cg::value{std::get<1>(arg)->to_type()};
+        })
+      | std::ranges::to<std::vector>();
 
     cg::value ret_val = cg::value{return_type->to_type()};
     ctx.add_prototype(name.s, std::move(ret_val), std::move(prototype_arg_types));
 
-    std::vector<ty::type_info> arg_types;
-    std::transform(
-      args.cbegin(),
-      args.cend(),
-      std::back_inserter(arg_types),
-      [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
-      { return std::get<1>(arg)->to_unresolved_type_info(type_ctx); });
+    std::vector<ty::type_info> arg_types =
+      args
+      | std::views::transform(
+        [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
+        { return std::get<1>(arg)->to_unresolved_type_info(type_ctx); })
+      | std::ranges::to<std::vector>();
+
     type_ctx.add_function(
       name,
       std::move(arg_types),

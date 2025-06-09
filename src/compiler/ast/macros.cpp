@@ -62,9 +62,8 @@ bool expression::expand_macros(
         if(!macro_expr->get_namespace_path().has_value())
         {
             // expand local macro.
-            auto it = std::find_if(
-              macro_asts.begin(),
-              macro_asts.end(),
+            auto it = std::ranges::find_if(
+              macro_asts,
               [macro_expr](const expression* m) -> bool
               {
                   if(!m->is_macro_expression())
@@ -84,7 +83,7 @@ bool expression::expand_macros(
                   return macro_expr->get_name().s == m->as_named_expression()->get_name().s;
               });
 
-            if(it == macro_asts.end())
+            if(it == macro_asts.cend())
             {
                 throw cg::codegen_error(
                   macro_expr->get_location(),
@@ -456,24 +455,23 @@ void macro_expression::collect_names(
   cg::context& ctx,
   [[maybe_unused]] ty::context& type_ctx) const
 {
-    std::vector<std::pair<std::string, module_::directive_descriptor>> directives;
-    std::transform(
-      ctx.get_directives().cbegin(),
-      ctx.get_directives().cend(),
-      std::back_inserter(directives),
-      [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
-      {
-          std::vector<std::pair<std::string, std::string>> args;
-          std::transform(
-            d.args.cbegin(),
-            d.args.cend(),
-            std::back_inserter(args),
-            [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
-            {
-                return std::make_pair(arg.first.s, arg.second.s);
-            });
-          return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
-      });
+    std::vector<std::pair<std::string, module_::directive_descriptor>> directives =
+      ctx.get_directives()
+      | std::views::transform(
+        [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
+        {
+            std::vector<std::pair<std::string, std::string>> args =
+              d.args
+              | std::views::transform(
+                [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
+                {
+                    return std::make_pair(arg.first.s, arg.second.s);
+                })
+              | std::ranges::to<std::vector>();
+
+            return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
+        })
+      | std::ranges::to<std::vector>();
 
     memory_write_archive ar{true, endian::little};
     auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
@@ -837,9 +835,8 @@ std::unique_ptr<expression> macro_expression::expand(
     {
         const auto& arg = branch->get_args()[i];
 
-        if(std::find_if(
-             arg_pos.begin(),
-             arg_pos.end(),
+        if(std::ranges::find_if(
+             arg_pos,
              [arg](const auto& p) -> bool
              {
                  return arg.first.s == p.first;
@@ -865,14 +862,13 @@ std::unique_ptr<expression> macro_expression::expand(
             // corresponding invocation item.
 
             auto* ref_expr = e.as_variable_reference();
-            auto it = std::find_if(
-              arg_pos.begin(),
-              arg_pos.end(),
+            auto it = std::ranges::find_if(
+              std::as_const(arg_pos),
               [ref_expr](const auto& p) -> bool
               {
                   return ref_expr->get_name().s == p.first;
               });
-            if(it == arg_pos.end())
+            if(it == arg_pos.cend())
             {
                 // not an argument.
                 return;

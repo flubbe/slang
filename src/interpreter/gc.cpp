@@ -413,12 +413,13 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
 std::size_t garbage_collector::register_type_layout(std::string name, std::vector<std::size_t> layout)
 {
     // check if the layout already exists
-    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
-                           [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
-                           {
-                               return t.second.first == name;
-                           });
-    if(it != type_layouts.end())
+    auto it = std::ranges::find_if(
+      std::as_const(type_layouts),
+      [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
+      {
+          return t.second.first == name;
+      });
+    if(it != type_layouts.cend())
     {
         throw gc_error(std::format("Layout for type '{}' already registered.", name));
     }
@@ -427,7 +428,7 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
     std::size_t id = 0;
     for(; id < type_layouts.size(); ++id)
     {
-        if(type_layouts.find(id) == type_layouts.end())
+        if(!type_layouts.contains(id))
         {
             break;
         }
@@ -442,12 +443,13 @@ std::size_t garbage_collector::check_type_layout(
   const std::vector<std::size_t>& layout) const
 {
     // check if the layout already exists
-    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
-                           [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
-                           {
-                               return t.second.first == name;
-                           });
-    if(it == type_layouts.end())
+    auto it = std::ranges::find_if(
+      std::as_const(type_layouts),
+      [&name](const std::pair<std::size_t, std::pair<std::string, std::vector<size_t>>>& t) -> bool
+      {
+          return t.second.first == name;
+      });
+    if(it == type_layouts.cend())
     {
         throw gc_error(std::format("Layout for type '{}' not found.", name));
     }
@@ -462,12 +464,13 @@ std::size_t garbage_collector::check_type_layout(
 
 std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
 {
-    auto it = std::find_if(type_layouts.begin(), type_layouts.end(),
-                           [name](const std::pair<std::size_t, std::pair<std::string, std::vector<std::size_t>>>& layout) -> bool
-                           {
-                               return layout.second.first == name;
-                           });
-    if(it == type_layouts.end())
+    auto it = std::ranges::find_if(
+      std::as_const(type_layouts),
+      [name](const std::pair<std::size_t, std::pair<std::string, std::vector<std::size_t>>>& layout) -> bool
+      {
+          return layout.second.first == name;
+      });
+    if(it == type_layouts.cend())
     {
         throw gc_error(std::format("No type layout for type '{}' registered.", name));
     }

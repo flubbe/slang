@@ -46,9 +46,8 @@ void export_table_builder::add_function(
   module_::variable_type return_type,
   std::vector<module_::variable_type> arg_types)
 {
-    if(std::find_if(
-         export_table.begin(),
-         export_table.end(),
+    if(std::ranges::find_if(
+         export_table,
          [&name](const module_::exported_symbol& entry) -> bool
          { return entry.type == module_::symbol_type::function
                   && entry.name == name; })
@@ -75,9 +74,8 @@ void export_table_builder::update_function(
   std::size_t offset,
   std::vector<module_::variable_descriptor> locals)
 {
-    auto it = std::find_if(
-      export_table.begin(),
-      export_table.end(),
+    auto it = std::ranges::find_if(
+      export_table,
       [&name](const module_::exported_symbol& entry) -> bool
       { return entry.type == module_::symbol_type::function
                && entry.name == name; });
@@ -100,9 +98,8 @@ void export_table_builder::add_native_function(
   std::vector<module_::variable_type> arg_types,
   std::string import_library)
 {
-    if(std::find_if(
-         export_table.begin(),
-         export_table.end(),
+    if(std::ranges::find_if(
+         export_table,
          [&name](const module_::exported_symbol& entry) -> bool
          { return entry.type == module_::symbol_type::function
                   && entry.name == name; })
@@ -125,9 +122,8 @@ void export_table_builder::add_native_function(
 
 void export_table_builder::add_type(const cg::context& ctx, const std::unique_ptr<cg::struct_>& type)
 {
-    if(std::find_if(
-         export_table.begin(),
-         export_table.end(),
+    if(std::ranges::find_if(
+         export_table,
          [&type](const module_::exported_symbol& entry) -> bool
          { return entry.type == module_::symbol_type::type
                   && entry.name == type->get_name(); })
@@ -136,47 +132,43 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
         throw emitter_error(std::format("Cannot add function to export table: '{}' already exists.", type->get_name()));
     }
 
-    auto members = type->get_members();
-    std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members;
+    std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members =
+      type->get_members()
+      | std::views::transform(
+        [&ctx](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
+        {
+            const auto& t = std::get<1>(m);
 
-    std::transform(
-      members.cbegin(),
-      members.cend(),
-      std::back_inserter(transformed_members),
-      [&ctx](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
-      {
-          const auto& t = std::get<1>(m);
-
-          std::optional<std::size_t> import_index = std::nullopt;
-          if(t.get_type().is_import())
-          {
-              // find the import index.
-              auto import_it = std::find_if(
-                ctx.imports.begin(),
-                ctx.imports.end(),
-                [&t](const cg::imported_symbol& s) -> bool
+            std::optional<std::size_t> import_index = std::nullopt;
+            if(t.get_type().is_import())
+            {
+                // find the import index.
+                auto import_it = std::ranges::find_if(
+                  ctx.imports,
+                  [&t](const cg::imported_symbol& s) -> bool
+                  {
+                      return s.type == module_::symbol_type::type
+                             && s.name == t.get_type().base_type().to_string()
+                             && s.import_path == t.get_type().base_type().get_import_path();
+                  });
+                if(import_it == ctx.imports.end())
                 {
-                    return s.type == module_::symbol_type::type
-                           && s.name == t.get_type().base_type().to_string()
-                           && s.import_path == t.get_type().base_type().get_import_path();
-                });
-              if(import_it == ctx.imports.end())
-              {
-                  throw emitter_error(std::format(
-                    "Type '{}' from package '{}' not found in import table.",
-                    t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
-              }
+                    throw emitter_error(std::format(
+                      "Type '{}' from package '{}' not found in import table.",
+                      t.get_type().base_type().to_string(), *t.get_type().base_type().get_import_path()));
+                }
 
-              import_index = std::distance(ctx.imports.begin(), import_it);
-          }
+                import_index = std::distance(ctx.imports.begin(), import_it);
+            }
 
-          return std::make_pair(
-            std::get<0>(m),
-            module_::field_descriptor{
-              t.get_type().base_type().to_string(),
-              t.get_type().is_array(),
-              import_index});
-      });
+            return std::make_pair(
+              std::get<0>(m),
+              module_::field_descriptor{
+                t.get_type().base_type().to_string(),
+                t.get_type().is_array(),
+                import_index});
+        })
+      | std::ranges::to<std::vector>();
 
     export_table.emplace_back(
       module_::symbol_type::type,
@@ -186,9 +178,8 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
 
 void export_table_builder::add_constant(std::string name, std::size_t i)
 {
-    if(std::find_if(
-         export_table.begin(),
-         export_table.end(),
+    if(std::ranges::find_if(
+         export_table,
          [&name](const module_::exported_symbol& entry) -> bool
          { return entry.type == module_::symbol_type::constant
                   && entry.name == name; })
@@ -202,9 +193,8 @@ void export_table_builder::add_constant(std::string name, std::size_t i)
 
 void export_table_builder::add_macro(std::string name, module_::macro_descriptor desc)
 {
-    if(std::find_if(
-         export_table.begin(),
-         export_table.end(),
+    if(std::ranges::find_if(
+         export_table,
          [&name](const module_::exported_symbol& entry) -> bool
          { return entry.type == module_::symbol_type::macro
                   && entry.name == name; })
@@ -221,18 +211,17 @@ void export_table_builder::add_macro(std::string name, module_::macro_descriptor
 
 std::size_t export_table_builder::get_index(module_::symbol_type t, const std::string& name) const
 {
-    auto it = std::find_if(
-      export_table.begin(),
-      export_table.end(),
+    auto it = std::ranges::find_if(
+      std::as_const(export_table),
       [t, &name](const module_::exported_symbol& entry) -> bool
       { return entry.type == t
                && entry.name == name; });
-    if(it == export_table.end())
+    if(it == export_table.cend())
     {
         throw emitter_error(std::format("Symbol '{}' of type '{}' not found in export table.", name, to_string(t)));
     }
 
-    return std::distance(export_table.begin(), it);
+    return std::distance(export_table.cbegin(), it);
 }
 
 void export_table_builder::write(module_::language_module& mod) const
@@ -337,9 +326,8 @@ void instruction_emitter::collect_imports()
                     const auto& import_path = arg->get_import_path();
                     if(import_path.has_value())
                     {
-                        auto import_it = std::find_if(
-                          ctx.prototypes.begin(),
-                          ctx.prototypes.end(),
+                        auto import_it = std::ranges::find_if(
+                          ctx.prototypes,
                           [arg, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
                           {
                               return p->is_import()
@@ -371,9 +359,8 @@ void instruction_emitter::collect_imports()
                     const auto& import_path = arg->get_import_path();
                     if(import_path.has_value())
                     {
-                        auto import_it = std::find_if(
-                          ctx.types.begin(),
-                          ctx.types.end(),
+                        auto import_it = std::ranges::find_if(
+                          ctx.types,
                           [arg, import_path](const std::unique_ptr<cg::struct_>& p) -> bool
                           {
                               return p->is_import()
@@ -783,9 +770,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
 
         // resolve imports.
-        auto import_it = std::find_if(
-          ctx.prototypes.begin(),
-          ctx.prototypes.end(),
+        auto import_it = std::ranges::find_if(
+          ctx.prototypes,
           [arg, import_path](const std::unique_ptr<cg::prototype>& p) -> bool
           {
               return p->is_import()
@@ -834,9 +820,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         vle_int struct_index{0};
         vle_int field_index{0};
 
-        auto struct_it = std::find_if(
-          ctx.types.begin(),
-          ctx.types.end(),
+        auto struct_it = std::ranges::find_if(
+          ctx.types,
           [arg](const std::unique_ptr<cg::struct_>& t) -> bool
           {
               return t->get_name() == arg->get_struct_name()
@@ -847,9 +832,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             if((*struct_it)->get_import_path().has_value())
             {
                 // find struct in import table.
-                auto import_it = std::find_if(
-                  ctx.imports.begin(),
-                  ctx.imports.end(),
+                auto import_it = std::ranges::find_if(
+                  ctx.imports,
                   [&struct_it](const cg::imported_symbol& s) -> bool
                   {
                       return s.type == module_::symbol_type::type
@@ -880,9 +864,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
 
         const auto& members = struct_it->get()->get_members();
-        auto field_it = std::find_if(
-          members.begin(),
-          members.end(),
+        auto field_it = std::ranges::find_if(
+          members,
           [arg](const std::pair<std::string, cg::value>& m) -> bool
           {
               return m.first == *arg->get_member().get_name();
@@ -911,9 +894,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         vle_int struct_index{0};
         vle_int field_index{0};
 
-        auto struct_it = std::find_if(
-          ctx.types.begin(),
-          ctx.types.end(),
+        auto struct_it = std::ranges::find_if(
+          ctx.types,
           [arg](const std::unique_ptr<cg::struct_>& t) -> bool
           {
               return t->get_name() == arg->get_struct_name()
@@ -924,9 +906,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             if((*struct_it)->get_import_path().has_value())
             {
                 // find struct in import table.
-                auto import_it = std::find_if(
-                  ctx.imports.begin(),
-                  ctx.imports.end(),
+                auto import_it = std::ranges::find_if(
+                  ctx.imports,
                   [&struct_it](const cg::imported_symbol& s) -> bool
                   {
                       return s.type == module_::symbol_type::type
@@ -959,9 +940,8 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
 
         const auto& members = struct_it->get()->get_members();
         const auto field_it =
-          std::find_if(
-            members.cbegin(),
-            members.cend(),
+          std::ranges::find_if(
+            std::as_const(members),
             [arg](const std::pair<std::string, cg::value>& m) -> bool
             {
                 return m.first == arg->get_member().get_name().value_or("<invalid-name>");
@@ -974,7 +954,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 arg->get_member().get_name().value_or("<invalid-name>"),
                 arg->get_struct_name()));
         }
-        field_index = vle_int{std::distance(members.begin(), field_it)};
+        field_index = vle_int{std::distance(members.cbegin(), field_it)};
 
         emit(instruction_buffer, opcode::getfield);
         instruction_buffer & struct_index;
@@ -1087,29 +1067,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         // resolve type to index.
         vle_int struct_index{0};
 
-        auto struct_it = std::find_if(
-          ctx.types.begin(),
-          ctx.types.end(),
+        auto struct_it = std::ranges::find_if(
+          std::as_const(ctx.types),
           [&type](const std::unique_ptr<cg::struct_>& t) -> bool
           {
               return t->get_name() == type.get_struct_name()
                      && t->get_import_path() == type.get_import_path();
           });
-        if(struct_it != ctx.types.end())
+        if(struct_it != ctx.types.cend())
         {
             if((*struct_it)->get_import_path().has_value())
             {
                 // find type in import table.
-                auto import_it = std::find_if(
-                  ctx.imports.begin(),
-                  ctx.imports.end(),
+                auto import_it = std::ranges::find_if(
+                  std::as_const(ctx.imports),
                   [&struct_it](const cg::imported_symbol& s) -> bool
                   {
                       return s.type == module_::symbol_type::type
                              && s.name == (*struct_it)->get_name()
                              && s.import_path == (*struct_it)->get_import_path();
                   });
-                if(import_it == ctx.imports.end())
+                if(import_it == ctx.imports.cend())
                 {
                     throw emitter_error(
                       std::format(
@@ -1117,7 +1095,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         (*struct_it)->get_name(),
                         (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
+                struct_index = vle_int{-std::distance(ctx.imports.cbegin(), import_it) - 1};
             }
             else
             {
@@ -1194,29 +1172,27 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         // resolve type to index.
         vle_int struct_index{0};
 
-        auto struct_it = std::find_if(
-          ctx.types.begin(),
-          ctx.types.end(),
+        auto struct_it = std::ranges::find_if(
+          std::as_const(ctx.types),
           [&type](const std::unique_ptr<cg::struct_>& t) -> bool
           {
               return t->get_name() == type.get_struct_name()
                      && t->get_import_path() == type.get_import_path();
           });
-        if(struct_it != ctx.types.end())
+        if(struct_it != ctx.types.cend())
         {
             if((*struct_it)->get_import_path().has_value())
             {
                 // find type in import table.
-                auto import_it = std::find_if(
-                  ctx.imports.begin(),
-                  ctx.imports.end(),
+                auto import_it = std::ranges::find_if(
+                  std::as_const(ctx.imports),
                   [&struct_it](const cg::imported_symbol& s) -> bool
                   {
                       return s.type == module_::symbol_type::type
                              && s.name == (*struct_it)->get_name()
                              && s.import_path == (*struct_it)->get_import_path();
                   });
-                if(import_it == ctx.imports.end())
+                if(import_it == ctx.imports.cend())
                 {
                     throw emitter_error(
                       std::format(
@@ -1224,7 +1200,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                         (*struct_it)->get_name(),
                         (*struct_it)->get_import_path().value_or("<invalid-import-path>")));
                 }
-                struct_index = vle_int{-std::distance(ctx.imports.begin(), import_it) - 1};
+                struct_index = vle_int{-std::distance(ctx.imports.cbegin(), import_it) - 1};
             }
             else
             {
@@ -1287,16 +1263,15 @@ void instruction_emitter::run()
         if(it->is_import())
         {
             // Verify that the type is in the import table.
-            auto import_it = std::find_if(
-              ctx.imports.begin(),
-              ctx.imports.end(),
+            auto import_it = std::ranges::find_if(
+              std::as_const(ctx.imports),
               [&it](const cg::imported_symbol& s) -> bool
               {
                   return s.type == module_::symbol_type::type
                          && s.name == it->get_name()
                          && s.import_path == it->get_import_path();
               });
-            if(import_it == ctx.imports.end())
+            if(import_it == ctx.imports.cend())
             {
                 throw std::runtime_error(
                   std::format(
@@ -1323,21 +1298,18 @@ void instruction_emitter::run()
           std::nullopt,
           get_import_index_or_nullopt(ctx, signature_ret_type)};
 
-        std::vector<module_::variable_type> arg_types;
-        std::transform(
-          signature_arg_types.cbegin(),
-          signature_arg_types.cend(),
-          std::back_inserter(arg_types),
-          [this](const cg::type& t) -> module_::variable_type
-          {
-              return {
+        std::vector<module_::variable_type> arg_types =
+          signature_arg_types
+          | std::views::transform(
+            [this](const cg::type& t) -> module_::variable_type
+            { return {
                 t.base_type().to_string(),
                 t.is_array()
                   ? std::make_optional(t.get_array_dims())
                   : std::nullopt,
                 std::nullopt,
-                get_import_index_or_nullopt(ctx, t)};
-          });
+                get_import_index_or_nullopt(ctx, t)}; })
+          | std::ranges::to<std::vector>();
 
         if(f->is_native())
         {
@@ -1363,9 +1335,8 @@ void instruction_emitter::run()
         {
             // Macros are only valid at compile-time, so
             // they should not appear in the import table.
-            auto import_it = std::find_if(
-              ctx.imports.cbegin(),
-              ctx.imports.cend(),
+            auto import_it = std::ranges::find_if(
+              std::as_const(ctx.imports),
               [&m](const cg::imported_symbol& s) -> bool
               {
                   return s.type == module_::symbol_type::macro
@@ -1426,7 +1397,7 @@ void instruction_emitter::run()
             }
 
             std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
-            if(unset_indices.find(index) == unset_indices.end())
+            if(!unset_indices.contains(index))
             {
                 throw emitter_error(std::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
             }
@@ -1449,7 +1420,7 @@ void instruction_emitter::run()
             }
 
             std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
-            if(unset_indices.find(index) == unset_indices.end())
+            if(!unset_indices.contains(index))
             {
                 throw emitter_error(std::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
             }
@@ -1526,7 +1497,7 @@ module_::language_module instruction_emitter::to_module() const
     {
         if(it.type == module_::symbol_type::package)
         {
-            auto p_it = std::find(packages.cbegin(), packages.cend(), it.name);
+            auto p_it = std::ranges::find(std::as_const(packages), it.name);
             if(p_it != packages.cend())
             {
                 packages.erase(p_it);
@@ -1535,16 +1506,15 @@ module_::language_module instruction_emitter::to_module() const
         else
         {
             // ensure we import the symbol's package.
-            auto p_it = std::find_if(
-              ctx.imports.cbegin(),
-              ctx.imports.cend(),
+            auto p_it = std::ranges::find_if(
+              std::as_const(ctx.imports),
               [&it](const auto& s) -> bool
               {
                   return s.type == module_::symbol_type::package && s.name == it.import_path;
               });
             if(p_it == ctx.imports.cend())
             {
-                auto p_it = std::find(packages.cbegin(), packages.cend(), it.name);
+                auto p_it = std::ranges::find(std::as_const(packages), it.name);
                 if(p_it == packages.cend())
                 {
                     packages.push_back(it.import_path);
@@ -1557,9 +1527,8 @@ module_::language_module instruction_emitter::to_module() const
     std::vector<cg::imported_symbol> template_header;
     auto add_symbol_to_template = [&template_header](const cg::imported_symbol& s)
     {
-        if(std::find_if(
-             template_header.cbegin(),
-             template_header.cend(),
+        if(std::ranges::find_if(
+             std::as_const(template_header),
              [&s](const cg::imported_symbol& it)
              {
                  return s.type == it.type
@@ -1589,9 +1558,8 @@ module_::language_module instruction_emitter::to_module() const
         }
         else
         {
-            auto import_it = std::find_if(
-              template_header.cbegin(),
-              template_header.cend(),
+            auto import_it = std::ranges::find_if(
+              std::as_const(template_header),
               [&it](const auto& s) -> bool
               {
                   return s.type == module_::symbol_type::package && s.name == it.import_path;
@@ -1610,24 +1578,23 @@ module_::language_module instruction_emitter::to_module() const
      * Constants.
      */
     std::vector<cg::constant_table_entry> exported_constants;
-    std::copy_if(
-      ctx.constants.cbegin(),
-      ctx.constants.cend(),
+    std::ranges::copy_if(
+      std::as_const(ctx.constants),
       std::back_inserter(exported_constants),
       [](const cg::constant_table_entry& entry) -> bool
       {
           return !entry.import_path.has_value();
       });
 
-    std::vector<module_::constant_table_entry> constants;
-    std::transform(
-      exported_constants.cbegin(),
-      exported_constants.cend(),
-      std::back_inserter(constants),
-      [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
-      {
-          return {entry.type, entry.data};
-      });
+    std::vector<module_::constant_table_entry> constants =
+      exported_constants
+      | std::views::transform(
+        [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
+        {
+            return {entry.type, entry.data};
+        })
+      | std::ranges::to<std::vector>();
+
     mod.set_constant_table(constants);
 
     /*

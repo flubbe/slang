@@ -9,6 +9,7 @@
  */
 
 #include <format>
+#include <ranges>
 
 #include "compiler/ast/ast.h"
 #include "compiler/ast/node_registry.h"
@@ -327,15 +328,11 @@ static void add_function(
   const std::string& name,
   const module_::function_descriptor& desc)
 {
-    std::vector<cg::value> prototype_arg_types;
-    std::transform(
-      desc.signature.arg_types.cbegin(),
-      desc.signature.arg_types.cend(),
-      std::back_inserter(prototype_arg_types),
-      [&resolver, &import_path](const module_::variable_type& arg) -> cg::value
-      {
-          return to_value(arg, resolver, import_path);
-      });
+    std::vector<cg::value> prototype_arg_types =
+      desc.signature.arg_types
+      | std::views::transform([&resolver, &import_path](const module_::variable_type& arg)
+                              { return to_value(arg, resolver, import_path); })
+      | std::ranges::to<std::vector>();
 
     ctx.add_prototype(
       name,
@@ -380,22 +377,19 @@ static void add_type(
 {
     // Add type to code generation context.
     {
-        std::vector<std::pair<std::string, cg::value>> members;
-        std::transform(
-          desc.member_types.cbegin(),
-          desc.member_types.cend(),
-          std::back_inserter(members),
-          [&import_path, &resolver](
-            const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
-          {
-              return {
+        std::vector<std::pair<std::string, cg::value>> members =
+          desc.member_types
+          | std::views::transform(
+            [&import_path, &resolver](
+              const std::pair<std::string, module_::field_descriptor>& member) -> std::pair<std::string, cg::value>
+            { return {
                 std::get<0>(member),
                 to_value(
                   std::get<1>(member).base_type,
                   resolver,
                   import_path,
-                  std::get<0>(member))};
-          });
+                  std::get<0>(member))}; })
+          | std::ranges::to<std::vector>();
 
         ctx.add_import(module_::symbol_type::type, import_path, name);
         ctx.add_struct(name, members, desc.flags, import_path);

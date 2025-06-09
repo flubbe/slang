@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <format>
 #include <list>
+#include <ranges>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -1731,16 +1732,14 @@ public:
     [[nodiscard]]
     std::pair<type, std::vector<type>> get_signature() const
     {
-        std::vector<type> arg_types;
-        auto& args = scope.get_args();
-        std::transform(
-          args.cbegin(),
-          args.cend(),
-          std::back_inserter(arg_types),
-          [](const auto& arg) -> type
-          {
-              return arg->get_type();
-          });
+        std::vector<type> arg_types =
+          scope.get_args()
+          | std::views::transform(
+            [](const auto& arg) -> type
+            {
+                return arg->get_type();
+            })
+          | std::ranges::to<std::vector>();
         return {return_type->get_type(), std::move(arg_types)};
     }
 
@@ -2525,14 +2524,13 @@ public:
         {
             if(it->name.s == name)
             {
-                auto flag_it = std::find_if(
-                  it->args.begin(),
-                  it->args.end(),
+                auto flag_it = std::ranges::find_if(
+                  std::as_const(it->args),
                   [&flag_name](const std::pair<token, token>& arg)
                   {
                       return arg.first.s == flag_name;
                   });
-                if(flag_it != it->args.end())
+                if(flag_it != it->args.cend())
                 {
                     if(flag_it->second.s.empty() || flag_it->second.s == "true")
                     {
@@ -2557,15 +2555,14 @@ public:
     [[nodiscard]]
     std::optional<directive> get_last_directive(const std::string& name) const
     {
-        auto it = std::find_if(
-          directive_stack.rbegin(),
-          directive_stack.rend(),
+        auto it = std::ranges::find_if(
+          std::as_const(directive_stack) | std::views::reverse,
           [&name](const directive& dir)
           {
               return dir.name.s == name;
           });
 
-        if(it != directive_stack.rend())
+        if(it != directive_stack.crend())
         {
             return *it;
         }

@@ -265,7 +265,7 @@ void module_loader::decode_structs()
             }
             else
             {
-                if(struct_map.find(member_type.base_type.base_type()) == struct_map.end())
+                if(!struct_map.contains(member_type.base_type.base_type()))
                 {
                     if(!member_type.base_type.import_index.has_value())
                     {
@@ -321,7 +321,7 @@ void module_loader::decode_structs()
                             "Could not resolve package for import '{}'.",
                             member_type.base_type.base_type()));
                     }
-                    if(loader->struct_map.find(member_type.base_type.base_type()) == loader->struct_map.end())
+                    if(!loader->struct_map.contains(member_type.base_type.base_type()))
                     {
                         throw interpreter_error(
                           std::format(
@@ -437,9 +437,8 @@ void module_loader::decode()
 
         // find the imported symbol.
         module_::module_header& import_header = loader.mod.header;
-        auto exp_it = std::find_if(
-          import_header.exports.begin(),
-          import_header.exports.end(),
+        auto exp_it = std::ranges::find_if(
+          import_header.exports,
           [&it](const module_::exported_symbol& exp) -> bool
           {
               return exp.name == it.name;
@@ -1423,7 +1422,7 @@ module_loader::module_loader(
             continue;
         }
 
-        if(function_map.find(it.name) != function_map.end())
+        if(function_map.contains(it.name))
         {
             throw interpreter_error(std::format("Function '{}' already exists in exports.", it.name));
         }
@@ -1504,11 +1503,12 @@ function& module_loader::get_function(const std::string& name)
 
 std::optional<std::string> module_loader::resolve_entry_point(std::size_t entry_point) const
 {
-    auto func_it = std::find_if(function_map.cbegin(), function_map.cend(),
-                                [entry_point](const auto& f) -> bool
-                                {
-                                    return f.second.get_entry_point() == entry_point;
-                                });
+    auto func_it = std::ranges::find_if(
+      std::as_const(function_map),
+      [entry_point](const auto& f) -> bool
+      {
+          return f.second.get_entry_point() == entry_point;
+      });
     if(func_it != function_map.cend())
     {
         return func_it->first;

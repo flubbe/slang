@@ -1641,7 +1641,7 @@ void context::register_native_function(
     }
     else
     {
-        if(native_mod_it->second.find(fn_name) != native_mod_it->second.end())
+        if(native_mod_it->second.contains(fn_name))
         {
             throw interpreter_error(
               std::format(
@@ -1678,9 +1678,8 @@ module_loader& context::resolve_module(const std::string& import_name, std::shar
 
 std::string context::get_import_name(const module_loader& loader) const
 {
-    auto it = std::find_if(
-      loaders.cbegin(),
-      loaders.cend(),
+    auto it = std::ranges::find_if(
+      std::as_const(loaders),
       [&loader](const std::pair<const std::string, std::unique_ptr<module_loader>>& p) -> bool
       {
           return p.second.get() == &loader;
