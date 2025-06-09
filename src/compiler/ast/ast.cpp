@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <print>
 #include <set>
 #include <stack>
 
@@ -157,7 +158,7 @@ std::unique_ptr<cg::value> expression::generate_code(
   [[maybe_unused]] memory_context mc) const
 {
     throw std::runtime_error(
-      fmt::format(
+      std::format(
         "{}: Expression does not generate code.",
         ::slang::to_string(loc)));
 }
@@ -175,7 +176,7 @@ void expression::push_directive(
             {
                 return arg.first.s;
             }
-            return fmt::format("{}={}", arg.first.s, arg.second.s); };
+            return std::format("{}={}", arg.first.s, arg.second.s); };
 
         auto arg_string = slang::utils::join(args, {transform}, ", ");
 
@@ -194,11 +195,11 @@ void expression::push_directive(
 
         throw ty::type_error(
           name.location,
-          fmt::format(
+          std::format(
             "Directive '{}'{} is not supported by the expression with AST '{}'.",
             name.s,
             !arg_string.empty()
-              ? fmt::format(" with arguments '{}'", arg_string)
+              ? std::format(" with arguments '{}'", arg_string)
               : std::string{},
             expr_string));
     }
@@ -355,7 +356,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot store into int_literal '{}'.",
                 std::get<int>(*tok.value)));
         }
@@ -364,7 +365,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot store into fp_literal '{}'.",
                 std::get<float>(*tok.value)));
         }
@@ -373,14 +374,14 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot store into str_literal '{}'.",
                 std::get<std::string>(*tok.value)));
         }
 
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Cannot store into unknown literal of type id '{}'.",
             static_cast<int>(tok.type)));
     }
@@ -405,7 +406,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
 
     throw cg::codegen_error(
       loc,
-      fmt::format(
+      std::format(
         "Unable to generate code for literal of type id '{}'.",
         static_cast<int>(tok.type)));
 }
@@ -436,7 +437,7 @@ std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           tok.location,
-          fmt::format(
+          std::format(
             "Unknown literal type with id '{}'.",
             static_cast<int>(tok.type)));
     }
@@ -450,7 +451,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return fmt::format("FloatLiteral(value={})", std::get<float>(*tok.value));
+            return std::format("FloatLiteral(value={})", std::get<float>(*tok.value));
         }
 
         return "FloatLiteral(<none>)";
@@ -460,7 +461,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return fmt::format("IntLiteral(value={})", std::get<int>(*tok.value));
+            return std::format("IntLiteral(value={})", std::get<int>(*tok.value));
         }
 
         return "IntLiteral(<none>)";
@@ -470,7 +471,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return fmt::format("StrLiteral(value=\"{}\")", std::get<std::string>(*tok.value));
+            return std::format("StrLiteral(value=\"{}\")", std::get<std::string>(*tok.value));
         }
 
         return "StrLiteral(<none>)";
@@ -531,7 +532,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot cast '{}' to 'str'.",
                 v->get_type().to_string()));
         }
@@ -583,7 +584,7 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Invalid cast to non-primitive type '{}'.",
                 target_type->get_name().s));
         }
@@ -598,7 +599,7 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
 
 std::string type_cast_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "TypeCast(target_type={}, expr={})",
       target_type->to_string(),
       expr ? expr->to_string() : std::string("<none>"));
@@ -644,7 +645,7 @@ std::optional<ty::type_info> namespace_access_expression::type_check(ty::context
 
 std::string namespace_access_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "Scope(name={}, expr={})",
       name.s,
       expr ? expr->to_string() : std::string("<none>"));
@@ -730,7 +731,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Could not find name for element access in array access expression."));
         }
         auto* identifier_expr = rhs->as_named_expression();
@@ -748,7 +749,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
 
         throw cg::codegen_error(
           rhs->get_location(),
-          fmt::format(
+          std::format(
             "Unknown array property '{}'.",
             identifier_expr->get_name().s));
     }
@@ -763,7 +764,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Cannot load array '{}' as an object.",
             lhs_value->get_name().value_or("<none>")));
     }
@@ -772,7 +773,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Cannot access members of non-struct type '{}'.",
             lhs_value_type.to_string()));
     }
@@ -832,7 +833,7 @@ std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
 
 std::string access_expression::to_string() const
 {
-    return fmt::format("Access(lhs={}, rhs={})", lhs->to_string(), rhs->to_string());
+    return std::format("Access(lhs={}, rhs={})", lhs->to_string(), rhs->to_string());
 }
 
 /*
@@ -866,7 +867,7 @@ std::string import_expression::to_string() const
     auto transform = [](const token& p) -> std::string
     { return p.s; };
 
-    return fmt::format("Import(path={})", slang::utils::join(path, {transform}, "."));
+    return std::format("Import(path={})", slang::utils::join(path, {transform}, "."));
 }
 
 /*
@@ -913,9 +914,9 @@ std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
 std::string directive_expression::to_string() const
 {
     auto transform = [](const std::pair<token, token>& p) -> std::string
-    { return fmt::format("{}, {}", p.first.s, p.second.s); };
+    { return std::format("{}, {}", p.first.s, p.second.s); };
 
-    return fmt::format(
+    return std::format(
       "Directive(name={}, args=({}), expr={})",
       name.s,
       slang::utils::join(args, {transform}, ","),
@@ -958,10 +959,10 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot find variable or constant '{}{}' in current scope.",
                 import_path.has_value()
-                  ? fmt::format("{}::", *import_path)
+                  ? std::format("{}::", *import_path)
                   : "",
                 name.s));
         }
@@ -970,10 +971,10 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Cannot assign to constant '{}{}'.",
                 import_path.has_value()
-                  ? fmt::format("{}::", *import_path)
+                  ? std::format("{}::", *import_path)
                   : "",
                 name.s));
         }
@@ -1000,10 +1001,10 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Cannot load constant '{}{}' of unknown type {}.",
             import_path.has_value()
-              ? fmt::format("{}::", *import_path)
+              ? std::format("{}::", *import_path)
               : "",
             name.s,
             static_cast<int>(const_v->type)));
@@ -1017,7 +1018,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format("Cannot access struct: No member name."));
+                  std::format("Cannot access struct: No member name."));
             }
 
             auto struct_type = ctx.get_accessed_struct();
@@ -1145,17 +1146,17 @@ std::optional<ty::type_info> variable_reference_expression::type_check(ty::conte
 
 std::string variable_reference_expression::to_string() const
 {
-    std::string ret = fmt::format("VariableReference(name={}", name.s);
+    std::string ret = std::format("VariableReference(name={}", name.s);
 
     if(element_expr)
     {
-        ret += fmt::format(
+        ret += std::format(
           ", element_expr={}",
           element_expr->to_string());
     }
     if(expansion)
     {
-        ret += fmt::format(
+        ret += std::format(
           ", expansion={}",
           expansion->to_string());
     }
@@ -1173,7 +1174,7 @@ std::optional<cg::value> variable_reference_expression::get_value(cg::context& c
         {
             throw cg::codegen_error(
               loc,
-              fmt::format("No scope to search for '{}'.", name.s));
+              std::format("No scope to search for '{}'.", name.s));
         }
 
         while(scope != nullptr)
@@ -1195,7 +1196,7 @@ std::optional<cg::value> variable_reference_expression::get_value(cg::context& c
     {
         throw cg::codegen_error(
           loc,
-          fmt::format("Cannot access struct: No struct name."));
+          std::format("Cannot access struct: No struct name."));
     }
 
     return ctx.get_struct_member(
@@ -1214,7 +1215,7 @@ std::string type_expression::get_qualified_name() const
     std::optional<std::string> namespace_path = get_namespace_path();
     if(namespace_path.has_value())
     {
-        return fmt::format("{}::{}", namespace_path.value(), type_name.s);
+        return std::format("{}::{}", namespace_path.value(), type_name.s);
     }
     return type_name.s;
 }
@@ -1241,12 +1242,12 @@ std::string type_expression::to_string() const
     {
         for(std::size_t i = 0; i < namespace_stack.size() - 1; ++i)
         {
-            namespace_string += fmt::format("{}, ", namespace_stack[i].s);
+            namespace_string += std::format("{}, ", namespace_stack[i].s);
         }
         namespace_string += namespace_stack.back().s;
     }
 
-    return fmt::format(
+    return std::format(
       "TypeExpression(name={}, namespaces=({}), array={})",
       get_name().s,
       namespace_string,
@@ -1261,7 +1262,7 @@ cg::type type_expression::to_type() const
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Type '{}' cannot occur in a namespace.",
                 type_name.s));
         }
@@ -1311,7 +1312,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Invalid memory context for variable declaration."));
     }
 
@@ -1320,7 +1321,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "No scope available for adding locals."));
     }
 
@@ -1376,7 +1377,7 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
         auto rhs = expr->type_check(ctx);
         if(!rhs)
         {
-            throw ty::type_error(name.location, fmt::format("Expression has no type."));
+            throw ty::type_error(name.location, std::format("Expression has no type."));
         }
 
         // Either the types match, or the type is a reference type which is set to 'null'.
@@ -1385,7 +1386,7 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "R.h.s. has type '{}' (type id {}), which does not match the variable's type '{}' (type id {}).",
                 ty::to_string(*rhs),
                 rhs->get_type_id(),
@@ -1403,7 +1404,7 @@ std::optional<ty::type_info> variable_declaration_expression::type_check(ty::con
 
 std::string variable_declaration_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "VariableDeclaration(name={}, type={}, expr={})",
       name.s,
       type->to_string(),
@@ -1495,7 +1496,7 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::co
 
     throw cg::codegen_error(
       expr->get_location(),
-      fmt::format(
+      std::format(
         "Invalid token type '{}' for constant declaration.",
         t.to_string()));
 }
@@ -1530,7 +1531,7 @@ std::optional<ty::type_info> constant_declaration_expression::type_check(ty::con
     {
         throw ty::type_error(
           name.location,
-          fmt::format(
+          std::format(
             "R.h.s. has type '{}' (type id {}), which does not match the constant's type '{}' (type id {}).",
             ty::to_string(*rhs),
             rhs->get_type_id(),
@@ -1543,7 +1544,7 @@ std::optional<ty::type_info> constant_declaration_expression::type_check(ty::con
 
 std::string constant_declaration_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "Constant(name={}, type={}, expr={})",
       name.s,
       type->to_string(),
@@ -1573,7 +1574,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
     {
         throw cg::codegen_error(
-          fmt::format(
+          std::format(
             "Cannot generate code for array initializer list: list size exceeds numeric limits ({} >= {}).",
             exprs.size(),
             std::numeric_limits<std::int32_t>::max()));
@@ -1595,7 +1596,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Array index exceeds max i32 size ({}).",
                 std::numeric_limits<std::int32_t>::max()));
         }
@@ -1612,7 +1613,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Inconsistent types in array initialization: '{}' and '{}'.",
                     v->get_type().to_string(),
                     expr_value->get_type().to_string()));
@@ -1641,7 +1642,7 @@ std::optional<ty::type_info> array_initializer_expression::type_check(ty::contex
             {
                 throw ty::type_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Initializer types do not match. Found '{}' and '{}'.",
                     ty::to_string(*t),
                     ty::to_string(*expr_type)));
@@ -1670,9 +1671,9 @@ std::string array_initializer_expression::to_string() const
 
     for(std::size_t i = 0; i < exprs.size() - 1; ++i)
     {
-        ret += fmt::format("{}, ", exprs[i]->to_string());
+        ret += std::format("{}, ", exprs[i]->to_string());
     }
-    ret += fmt::format("{}))", exprs.back()->to_string());
+    ret += std::format("{}))", exprs.back()->to_string());
 
     return ret;
 }
@@ -1768,14 +1769,14 @@ std::optional<ty::type_info> struct_definition_expression::type_check(ty::contex
 
 std::string struct_definition_expression::to_string() const
 {
-    std::string ret = fmt::format("Struct(name={}, members=(", name.s);
+    std::string ret = std::format("Struct(name={}, members=(", name.s);
     if(!members.empty())
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", members[i]->to_string());
+            ret += std::format("{}, ", members[i]->to_string());
         }
-        ret += fmt::format("{}", members.back()->to_string());
+        ret += std::format("{}", members.back()->to_string());
     }
     ret += "))";
     return ret;
@@ -1834,7 +1835,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Code generation for '{}.{}' initialization returned no type.",
                 name.s,
                 member_name));
@@ -1844,7 +1845,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
                 name.s,
                 member_name,
@@ -1866,7 +1867,7 @@ std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check
     {
         throw ty::type_error(
           name.location,
-          fmt::format(
+          std::format(
             "Struct '{}' has {} members, but {} are initialized.",
             name.s,
             struct_def->members.size(),
@@ -1891,7 +1892,7 @@ std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
                 name.s,
                 struct_member.first.s,
@@ -1908,14 +1909,14 @@ std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check
 
 std::string struct_anonymous_initializer_expression::to_string() const
 {
-    std::string ret = fmt::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
+    std::string ret = std::format("StructAnonymousInitializer(name={}, initializers=(", name.s);
     if(!initializers.empty())
     {
         for(std::size_t i = 0; i < initializers.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", initializers[i]->to_string());
+            ret += std::format("{}, ", initializers[i]->to_string());
         }
-        ret += fmt::format("{}", initializers.back()->to_string());
+        ret += std::format("{}", initializers.back()->to_string());
     }
     ret += "))";
     return ret;
@@ -1950,7 +1951,7 @@ std::optional<ty::type_info> named_initializer::type_check(ty::context& ctx)
 
 std::string named_initializer::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "NamedInitializer(name={}, expr={})",
       get_name().s,
       expr->to_string());
@@ -2010,7 +2011,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Struct '{}' has no member '{}'.",
                 name.s, member_name));
         }
@@ -2024,7 +2025,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Code generation for '{}.{}' initialization returned no type.",
                 name.s, member_name));
         }
@@ -2033,7 +2034,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Code generation for '{}.{}' initialization returned '{}' (expected '{}').",
                 name.s,
                 member_name,
@@ -2055,7 +2056,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
     {
         throw ty::type_error(
           name.location,
-          fmt::format(
+          std::format(
             "Struct '{}' has {} members, but {} are initialized.",
             name.s, struct_def->members.size(), initializers.size()));
     }
@@ -2074,7 +2075,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Multiple initializations of struct member '{}::{}'.",
                 name.s,
                 member_name));
@@ -2090,7 +2091,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Struct '{}' has no member '{}'.",
                 name.s, member_name));
         }
@@ -2107,7 +2108,7 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
         {
             throw ty::type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
                 name.s,
                 member_name,
@@ -2124,18 +2125,18 @@ std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty:
 
 std::string struct_named_initializer_expression::to_string() const
 {
-    std::string ret = fmt::format("StructNamedInitializer(name={}, initializers=(", name.s);
+    std::string ret = std::format("StructNamedInitializer(name={}, initializers=(", name.s);
 
     if(!initializers.empty())
     {
         for(std::size_t i = 0; i < initializers.size() - 1; ++i)
         {
-            ret += fmt::format(
+            ret += std::format(
               "name={}, expr={}, ",
               initializers[i]->get_name().s,
               initializers[i]->get_expression()->to_string());
         }
-        ret += fmt::format(
+        ret += std::format(
           "name={}, expr={}",
           initializers.back()->get_name().s,
           initializers.back()->get_expression()->to_string());
@@ -2332,7 +2333,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                     // fall-through
                 }
 
-                fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+                std::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
                 // fall-through
             }
         }
@@ -2345,7 +2346,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Types don't match in binary operation. L.h.s.: {}, R.h.s.: {}.",
                 lhs_value->get_type().to_string(),
                 rhs_value->get_type().to_string()));
@@ -2355,7 +2356,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         if(it == binary_op_map.end())
         {
             throw std::runtime_error(
-              fmt::format(
+              std::format(
                 "{}: Code generation for binary operator '{}' not implemented.",
                 slang::to_string(loc), op.s));
         }
@@ -2408,7 +2409,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Unexpected type '{}' when generating dup instruction.",
                     rhs_value->to_string()));
             }
@@ -2454,7 +2455,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Unexpected type '{}' when generating dup instruction.",
                     rhs_value->to_string()));
             }
@@ -2526,7 +2527,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
                 ty::to_string(lhs_type),
                 reduced_op,
@@ -2549,7 +2550,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
                 ty::to_string(lhs_type),
                 reduced_op,
@@ -2575,7 +2576,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
             ty::to_string(lhs_type)));
@@ -2584,7 +2585,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
             ty::to_string(rhs_type)));
@@ -2594,7 +2595,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
             ty::to_string(lhs_type),
             reduced_op,
@@ -2618,7 +2619,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 
 std::string binary_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "Binary(op=\"{}\", lhs={}, rhs={})", op.s,
       lhs ? lhs->to_string() : std::string("<none>"),
       rhs ? rhs->to_string() : std::string("<none>"));
@@ -2655,7 +2656,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Wrong expression type '{}' for prefix operator '++'. Expected 'i32' or 'f32'.",
                 v->get_type().to_string()));
         }
@@ -2682,7 +2683,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Wrong expression type '{}' for prefix operator '--'. Expected 'i32' or 'f32'.",
                 v->get_type().to_string()));
         }
@@ -2739,7 +2740,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
                 // fall-through
             }
 
-            fmt::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+            std::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
             // fall-through
         }
     }
@@ -2768,7 +2769,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Type error for unary operator '-': Expected 'i32' or 'f32', got '{}'.",
                 v->get_type().to_string()));
         }
@@ -2785,7 +2786,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Type error for unary operator '!': Expected 'i32', got '{}'.",
                 v->get_type().to_string()));
         }
@@ -2806,7 +2807,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Type error for unary operator '~': Expected 'i32', got '{}'.",
                 v->get_type().to_string()));
         }
@@ -2821,7 +2822,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     }
 
     throw std::runtime_error(
-      fmt::format(
+      std::format(
         "{}: Code generation for unary operator '{}' not implemented.",
         slang::to_string(loc),
         op.s));
@@ -2857,7 +2858,7 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           op.location,
-          fmt::format(
+          std::format(
             "Unknown unary operator '{}'.",
             op.s));
     }
@@ -2868,7 +2869,7 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           operand->get_location(),
-          fmt::format(
+          std::format(
             "Invalid operand type '{}' for unary operator '{}'.",
             ty::to_string(operand_type),
             op.s));
@@ -2882,7 +2883,7 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
 
 std::string unary_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "Unary(op=\"{}\", operand={})",
       op.s,
       operand ? operand->to_string() : std::string("<none>"));
@@ -2932,7 +2933,7 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected <integer> as array size, got '{}'.",
             v->get_type().to_string()));
     }
@@ -2977,7 +2978,7 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           expr->get_location(),
-          fmt::format(
+          std::format(
             "Expected array size of type 'i32', got '{}'.",
             ty::to_string(*array_size_type)));
     }
@@ -2990,7 +2991,7 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
 
 std::string new_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "NewExpression(type={}, expr={})",
       type_expr->to_string(), expr->to_string());
 }
@@ -3056,7 +3057,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Wrong expression type '{}' for postfix operator. Expected 'i32' or 'f32'.",
             v->get_type().to_string()));
     }
@@ -3095,7 +3096,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     {
         throw cg::codegen_error(
           op.location,
-          fmt::format(
+          std::format(
             "Unknown postfix operator '{}'.",
             op.s));
     }
@@ -3116,7 +3117,7 @@ std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           identifier->get_location(),
-          fmt::format(
+          std::format(
             "Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').",
             op.s,
             identifier_type_str));
@@ -3130,7 +3131,7 @@ std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
 
 std::string postfix_expression::to_string() const
 {
-    return fmt::format("Postfix(identifier={}, op=\"{}\")", identifier->to_string(), op.s);
+    return std::format("Postfix(identifier={}, op=\"{}\")", identifier->to_string(), op.s);
 }
 
 /*
@@ -3246,16 +3247,16 @@ void prototype_ast::type_check(ty::context& ctx)
 std::string prototype_ast::to_string() const
 {
     std::string ret_type_str = return_type->to_string();
-    std::string ret = fmt::format("Prototype(name={}, return_type={}, args=(", name.s, ret_type_str);
+    std::string ret = std::format("Prototype(name={}, return_type={}, args=(", name.s, ret_type_str);
     if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
             std::string arg_type_str = std::get<1>(args[i])->to_string();
-            ret += fmt::format("(name={}, type={}), ", std::get<0>(args[i]).s, arg_type_str);
+            ret += std::format("(name={}, type={}), ", std::get<0>(args[i]).s, arg_type_str);
         }
         std::string arg_type_str = std::get<1>(args.back())->to_string();
-        ret += fmt::format("(name={}, type={})", std::get<0>(args.back()).s, arg_type_str);
+        ret += std::format("(name={}, type={})", std::get<0>(args.back()).s, arg_type_str);
     }
     ret += "))";
     return ret;
@@ -3350,9 +3351,9 @@ std::string block::to_string() const
     {
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
+            ret += std::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
         }
-        ret += fmt::format("{}", exprs.back() ? exprs.back()->to_string() : std::string("<none>"));
+        ret += std::format("{}", exprs.back() ? exprs.back()->to_string() : std::string("<none>"));
     }
     ret += "))";
     return ret;
@@ -3410,7 +3411,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "No function body defined for '{}'.",
                 prototype->get_name().s));
         }
@@ -3435,7 +3436,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Missing return statement in function '{}'.",
                     fn->get_name()));
             }
@@ -3450,7 +3451,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         {
             throw cg::codegen_error(
               loc,
-              fmt::format(
+              std::format(
                 "Native function '{}': Expected argument 'lib' for directive.",
                 prototype->get_name().s));
         }
@@ -3510,7 +3511,7 @@ std::optional<ty::type_info> function_expression::type_check(ty::context& ctx)
 
 std::string function_expression::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "Function(prototype={}, body={})",
       prototype ? prototype->to_string() : std::string("<none>"),
       body ? body->to_string() : std::string("<none>"));
@@ -3569,7 +3570,7 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           callee.location,
-          fmt::format(
+          std::format(
             "Wrong number of arguments in function call. Expected {}, got {}.",
             sig.arg_types.size(),
             args.size()));
@@ -3588,7 +3589,7 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               args[i]->get_location(),
-              fmt::format(
+              std::format(
                 "Type of argument {} does not match signature: Expected '{}', got '{}'.",
                 i + 1,
                 ty::to_string(sig.arg_types[i]),
@@ -3627,14 +3628,14 @@ std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
 
 std::string call_expression::to_string() const
 {
-    std::string ret = fmt::format("Call(callee={}, args=(", callee.s);
+    std::string ret = std::format("Call(callee={}, args=(", callee.s);
     if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
+            ret += std::format("{}, ", args[i] ? args[i]->to_string() : std::string("<none>"));
         }
-        ret += fmt::format("{}", args.back() ? args.back()->to_string() : std::string("<none>"));
+        ret += std::format("{}", args.back() ? args.back()->to_string() : std::string("<none>"));
     }
     ret += "))";
     return ret;
@@ -3693,7 +3694,7 @@ std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Function '{}' declared as having no return value cannot have a return expression.",
                 sig->name.s));
         }
@@ -3710,7 +3711,7 @@ std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Function '{}': Unresolved return type '{}'.",
                 sig->name.s,
                 ty::to_string(*ret_type)));
@@ -3720,7 +3721,7 @@ std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
         {
             throw ty::type_error(
               loc,
-              fmt::format(
+              std::format(
                 "Function '{}': Return expression has type '{}', expected '{}'.",
                 sig->name.s,
                 ty::to_string(*ret_type),
@@ -3738,7 +3739,7 @@ std::string return_statement::to_string() const
 {
     if(expr)
     {
-        return fmt::format("Return(expr={})", expr->to_string());
+        return std::format("Return(expr={})", expr->to_string());
     }
 
     return "Return()";
@@ -3777,7 +3778,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected if condition to be of type 'i32', got '{}",
             v->get_type().to_string()));
     }
@@ -3844,7 +3845,7 @@ std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected if condition to be of type 'i32', got '{}",
             ty::to_string(*condition_type)));
     }
@@ -3865,7 +3866,7 @@ std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
 
 std::string if_statement::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "If(condition={}, if_block={}, else_block={})",
       condition ? condition->to_string() : std::string("<none>"),
       if_block ? if_block->to_string() : std::string("<none>"),
@@ -3915,7 +3916,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected while condition to be of type 'i32', got '{}'.",
             v->get_type().to_string()));
     }
@@ -3951,7 +3952,7 @@ std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Expected while condition to be of type 'i32', got '{}",
             ty::to_string(*condition_type)));
     }
@@ -3965,7 +3966,7 @@ std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)
 
 std::string while_statement::to_string() const
 {
-    return fmt::format(
+    return std::format(
       "While(condition={}, while_block={})",
       condition ? condition->to_string() : std::string("<none>"),
       while_block ? while_block->to_string() : std::string("<none>"));

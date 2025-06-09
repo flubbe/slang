@@ -27,7 +27,7 @@ void assert_(si::context& ctx, si::operand_stack& stack)
         std::string* msg = msg_container.get();
         if(msg != nullptr && ctx.get_gc().get_object_type(msg) == gc::gc_object_type::str)
         {
-            throw interpreter::interpreter_error(fmt::format("Assertion failed: {}", *msg));
+            throw interpreter::interpreter_error(std::format("Assertion failed: {}", *msg));
         }
 
         throw interpreter::interpreter_error("Assertion failed (invalid message).");

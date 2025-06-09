@@ -8,7 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <print>
 
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
@@ -39,24 +40,24 @@ class instruction_logger : public slang::interpreter::instruction_recorder
 public:
     void section(const std::string& name) override
     {
-        fmt::print("--- {} ---\n", name);
+        std::print("--- {} ---\n", name);
     }
 
     void function(const std::string& name, const module_::function_details& details) override
     {
-        fmt::print(
+        std::print(
           "{:>4}: @{} (size {}, args {}, locals {})\n",
           details.offset, name, details.size, details.args_size, details.locals_size);
     }
 
     void type(const std::string& name, const module_::struct_descriptor& desc) override
     {
-        fmt::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
+        std::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
 
         for(std::size_t i = 0; i < desc.member_types.size(); ++i)
         {
             const auto& [member_name, member_type] = desc.member_types[i];
-            fmt::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
+            std::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
                        to_string(member_type.base_type),
                        member_name,
                        member_type.offset,
@@ -67,72 +68,72 @@ public:
                          : "");
         }
 
-        fmt::print("}}\n");
+        std::print("}}\n");
     }
 
     void constant(const module_::constant_table_entry& c) override
     {
-        fmt::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
+        std::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
         if(c.type == module_::constant_type::i32)
         {
-            fmt::print("{}\n", std::get<std::int32_t>(c.data));
+            std::print("{}\n", std::get<std::int32_t>(c.data));
         }
         else if(c.type == module_::constant_type::f32)
         {
-            fmt::print("{}\n", std::get<float>(c.data));
+            std::print("{}\n", std::get<float>(c.data));
         }
         else if(c.type == module_::constant_type::str)
         {
-            fmt::print("{}\n", std::get<std::string>(c.data));
+            std::print("{}\n", std::get<std::string>(c.data));
         }
         ++constant_entries;
     }
 
     void record(const module_::exported_symbol& s) override
     {
-        fmt::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
+        std::print("{:>3}: {:>11}, {}", export_entries, to_string(s.type), s.name);
         if(s.type == module_::symbol_type::constant)
         {
-            fmt::print(", {}", std::get<std::size_t>(s.desc));
+            std::print(", {}", std::get<std::size_t>(s.desc));
         }
-        fmt::print("\n");
+        std::print("\n");
         ++export_entries;
     }
 
     void record(const module_::imported_symbol& s) override
     {
-        fmt::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
+        std::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
         ++import_entries;
     }
 
     void label(std::int64_t index) override
     {
-        fmt::print("%{}:\n", index);
+        std::print("%{}:\n", index);
     }
 
     void record(opcode instr) override
     {
-        fmt::print("    {:>11}\n", to_string(instr));
+        std::print("    {:>11}\n", to_string(instr));
     }
 
     void record(opcode instr, std::int64_t i) override
     {
-        fmt::print("    {:>11}    {}\n", to_string(instr), i);
+        std::print("    {:>11}    {}\n", to_string(instr), i);
     }
 
     void record(opcode instr, std::int64_t i1, std::int64_t i2) override
     {
-        fmt::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
+        std::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
     }
 
     void record(opcode instr, float f) override
     {
-        fmt::print("    {:>11}    {}\n", to_string(instr), f);
+        std::print("    {:>11}    {}\n", to_string(instr), f);
     }
 
     void record(opcode instr, std::int64_t i, std::string s) override
     {
-        fmt::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
+        std::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
     }
 
     void record(
@@ -141,17 +142,17 @@ public:
       std::string s,
       std::int64_t field_index) override
     {
-        fmt::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
+        std::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
     }
 
     void record(opcode instr, std::string s1, std::string s2) override
     {
-        fmt::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
+        std::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
     }
 
     void record(opcode instr, std::string s1, std::string s2, std::string s3) override
     {
-        fmt::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
+        std::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
     }
 };
 
@@ -181,7 +182,7 @@ void disasm::invoke(const std::vector<std::string>& args)
 
     if(result.count("filename") < 1)
     {
-        fmt::print("{}\n", options.help());
+        std::print("{}\n", options.help());
         return;
     }
 
@@ -214,7 +215,7 @@ void disasm::invoke(const std::vector<std::string>& args)
     // Get module name.
     if(!file_mgr.is_file(module_path))
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Compiled module '{}' does not exist.",
           module_path.string()));
     }
@@ -222,12 +223,12 @@ void disasm::invoke(const std::vector<std::string>& args)
     auto module_name = module_path.filename().stem();
     if(module_name.string().empty())
     {
-        throw std::runtime_error(fmt::format(
+        throw std::runtime_error(std::format(
           "Trying to get module name from path '{}' produced empty string.",
           module_path.string()));
     }
 
-    fmt::print("Module name: {}\n\n", module_name.string());
+    std::print("Module name: {}\n\n", module_name.string());
 
     // Set up interpreter context. The disassembly happens during module resolution.
     si::context ctx{file_mgr};

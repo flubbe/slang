@@ -10,12 +10,10 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <variant>
-
-#include <fmt/core.h>
 
 #include "token.h"
 

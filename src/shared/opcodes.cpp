@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "opcodes.h"
 
@@ -103,7 +103,7 @@ archive& operator&(archive& ar, opcode& op)
 
     if(op_base >= static_cast<opcode_base>(opcode::opcode_count))
     {
-        throw opcode_error(fmt::format("Invalid opcode '{}'.", op_base));
+        throw opcode_error(std::format("Invalid opcode '{}'.", op_base));
     }
 
     op = static_cast<opcode>(op_base);

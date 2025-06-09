@@ -9,9 +9,10 @@
  */
 
 #include <cstdlib>
+#include <format>
+#include <print>
 
 #include <cxxopts.hpp>
-#include <fmt/core.h>
 
 #include "commandline/commandline.h"
 
@@ -32,7 +33,7 @@ void add_unique_command(command_vector& cmds, std::unique_ptr<slang::commandline
     {
         if(c->get_name() == new_cmd->get_name())
         {
-            throw std::runtime_error(fmt::format("add_unique_command: Command '{}' already registered.", new_cmd->get_name()));
+            throw std::runtime_error(std::format("add_unique_command: Command '{}' already registered.", new_cmd->get_name()));
         }
     }
 
@@ -68,9 +69,9 @@ int main(int argc, char* argv[])
             std::string text = "  command   The command to execute. One of {";
             for(std::size_t i = 0; i < cmd_list.size() - 1; ++i)
             {
-                text += fmt::format("{}|", cmd_list[i]->get_name());
+                text += std::format("{}|", cmd_list[i]->get_name());
             }
-            return fmt::format("{}{}}}.", text, cmd_list.back()->get_name());
+            return std::format("{}{}}}.", text, cmd_list.back()->get_name());
         };
 
         options.add_options()("command", "", cxxopts::value<std::string>());
@@ -81,9 +82,9 @@ int main(int argc, char* argv[])
 
         if(result.count("command") < 1)
         {
-            fmt::print("{}", options.help());
-            fmt::print("Positional arguments:\n\n");
-            fmt::print("{}\n\n", command_help());
+            std::print("{}", options.help());
+            std::print("Positional arguments:\n\n");
+            std::print("{}\n\n", command_help());
             return EXIT_SUCCESS;
         }
 
@@ -97,27 +98,27 @@ int main(int argc, char* argv[])
             }
         }
 
-        fmt::print("{}", options.help());
-        fmt::print("Positional arguments:\n\n");
-        fmt::print("{}\n\n", command_help());
+        std::print("{}", options.help());
+        std::print("Positional arguments:\n\n");
+        std::print("{}\n\n", command_help());
 
-        fmt::print("Error: Command '{}' not found.\n\n", args[0]);
+        std::print("Error: Command '{}' not found.\n\n", args[0]);
 
         return EXIT_FAILURE;
     }
     catch(const std::runtime_error& e)
     {
-        fmt::print("An error occured: {}\n", e.what());
+        std::print("An error occured: {}\n", e.what());
         return EXIT_FAILURE;
     }
     catch(const cxxopts::exceptions::exception& e)
     {
-        fmt::print("{}\n", e.what());
+        std::print("{}\n", e.what());
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        fmt::print("The program unexpectedly crashed.\n");
+        std::print("The program unexpectedly crashed.\n");
         return EXIT_FAILURE;
     }
 }

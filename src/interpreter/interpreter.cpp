@@ -8,7 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
+#include <print>
 
 #include "archives/memory.h"
 #include "shared/module.h"
@@ -19,7 +20,7 @@
 #include "vector.h"
 
 #ifdef INTERPRETER_DEBUG
-#    define DEBUG_LOG(...) fmt::print("INT: {}\n", fmt::format(__VA_ARGS__))
+#    define DEBUG_LOG(...) std::print("INT: {}\n", std::format(__VA_ARGS__))
 #else
 #    define DEBUG_LOG(...)
 #endif
@@ -140,13 +141,13 @@ std::function<void(operand_stack&)> context::resolve_native_function(
     auto mod_it = native_function_map.find(library_name);
     if(mod_it == native_function_map.end())
     {
-        throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (library not found).", name, library_name));
+        throw interpreter_error(std::format("Cannot resolve native function '{}' in '{}' (library not found).", name, library_name));
     }
 
     auto func_it = mod_it->second.find(name);
     if(func_it == mod_it->second.end())
     {
-        throw interpreter_error(fmt::format("Cannot resolve native function '{}' in '{}' (function not found).", name, library_name));
+        throw interpreter_error(std::format("Cannot resolve native function '{}' in '{}' (function not found).", name, library_name));
     }
 
     DEBUG_LOG("resolved imported native function '{}.{}'.", library_name, name);
@@ -285,7 +286,7 @@ opcode context::exec(
         if(call_stack_level > max_call_stack_depth)
         {
             throw interpreter_error(
-              fmt::format(
+              std::format(
                 "Function call exceeded maximum call stack depth ({}).",
                 max_call_stack_depth));
         }
@@ -294,7 +295,7 @@ opcode context::exec(
         if(offset >= binary.size())
         {
             throw interpreter_error(
-              fmt::format(
+              std::format(
                 "Entry point is outside the loaded code segment ({} >= {}).",
                 offset,
                 binary.size()));
@@ -312,7 +313,7 @@ opcode context::exec(
             if(instr >= static_cast<std::byte>(opcode::opcode_count))
             {
                 throw interpreter_error(
-                  fmt::format(
+                  std::format(
                     "'{:02x}' is not an opcode.",
                     std::to_integer<std::uint8_t>(instr)));
             }
@@ -335,7 +336,7 @@ opcode context::exec(
 
             if(offset == function_end)
             {
-                throw interpreter_error(fmt::format("Execution reached function boundary."));
+                throw interpreter_error(std::format("Execution reached function boundary."));
             }
 
             switch(instr_opcode)
@@ -518,13 +519,13 @@ opcode context::exec(
                 auto i = read_unchecked<std::int64_t>(binary, offset);
                 if(i < 0 || static_cast<std::size_t>(i) >= frame.constants.size())
                 {
-                    throw interpreter_error(fmt::format("Invalid index '{}' into constant table.", i));
+                    throw interpreter_error(std::format("Invalid index '{}' into constant table.", i));
                 }
 
                 auto* str = gc.gc_new<std::string>(gc::gc_object::of_temporary);
                 if(frame.constants[i].type != module_::constant_type::str)
                 {
-                    throw interpreter_error(fmt::format("Entry {} of constant table is not a string.", i));
+                    throw interpreter_error(std::format("Entry {} of constant table is not a string.", i));
                 }
 
                 *str = std::get<std::string>(frame.constants[i].data);
@@ -668,7 +669,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -692,7 +693,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -716,7 +717,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -741,7 +742,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -764,7 +765,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -787,7 +788,7 @@ opcode context::exec(
                 if(i < 0)
                 {
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "'{}': Invalid offset '{}' for local.",
                         to_string(instr_opcode),
                         i));
@@ -882,7 +883,7 @@ opcode context::exec(
                     // store return value
                     if(callee_frame.stack.size() != details.return_size)
                     {
-                        throw interpreter_error(fmt::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
+                        throw interpreter_error(std::format("Expected {} bytes to be returned from function call, got {}.", details.return_size, callee_frame.stack.size()));
                     }
                     frame.stack.push_stack(callee_frame.stack);
                 }
@@ -907,7 +908,7 @@ opcode context::exec(
                 std::int32_t size = frame.stack.pop_i32();
                 if(size < 0)
                 {
-                    throw interpreter_error(fmt::format("Invalid array size '{}'.", size));
+                    throw interpreter_error(std::format("Invalid array size '{}'.", size));
                 }
 
                 if(type == static_cast<std::uint8_t>(module_::array_type::i32))
@@ -933,7 +934,7 @@ opcode context::exec(
                 }
                 else
                 {
-                    throw interpreter_error(fmt::format("Unkown array type '{}' for newarray.", type));
+                    throw interpreter_error(std::format("Unkown array type '{}' for newarray.", type));
                 }
 
                 break;
@@ -946,7 +947,7 @@ opcode context::exec(
                 std::int32_t length = frame.stack.pop_i32();
                 if(length < 0)
                 {
-                    throw interpreter_error(fmt::format("Invalid array length '{}'.", length));
+                    throw interpreter_error(std::format("Invalid array length '{}'.", length));
                 }
 
                 frame.stack.push_addr(gc.gc_new_array(layout_id, length, gc::gc_object::of_temporary));
@@ -1011,7 +1012,7 @@ opcode context::exec(
                 }
                 else
                 {
-                    throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
                 }
 
                 break;
@@ -1057,7 +1058,7 @@ opcode context::exec(
                 }
                 else
                 {
-                    throw interpreter_error(fmt::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
                 }
 
                 break;
@@ -1080,7 +1081,7 @@ opcode context::exec(
                     if(target_layout_id != source_layout_id)
                     {
                         throw interpreter_error(
-                          fmt::format("Type cast from '{}' to '{}' failed.",
+                          std::format("Type cast from '{}' to '{}' failed.",
                                       gc.layout_to_string(source_layout_id), gc.layout_to_string(target_layout_id)));
                     }
                     frame.stack.push_addr(obj);
@@ -1291,10 +1292,10 @@ opcode context::exec(
             } /* opcode::jmp */
             default:
                 throw interpreter_error(
-                  fmt::format(
+                  std::format(
                     "Opcode '{}' ({}) not implemented.",
                     to_string(instr_opcode),
-                    instr));
+                    static_cast<std::uint8_t>(instr)));
             }
         }
 
@@ -1344,10 +1345,10 @@ std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>&
         if(loader_it != loaders.end())
         {
             func_name = loader_it->second->resolve_entry_point(entry.entry_point)
-                          .value_or(fmt::format("<unknown at {}>", entry.entry_point));
+                          .value_or(std::format("<unknown at {}>", entry.entry_point));
         }
 
-        buf += fmt::format("  in {}.{}\n", entry.mod_name, func_name);
+        buf += std::format("  in {}.{}\n", entry.mod_name, func_name);
     }
     return buf;
 }
@@ -1391,7 +1392,7 @@ public:
         if(arg_types.size() != args.size())
         {
             throw interpreter_error(
-              fmt::format(
+              std::format(
                 "Argument count does not match: Expected {}, got {}.",
                 arg_types.size(), args.size()));
         }
@@ -1409,7 +1410,7 @@ public:
                     if(arg_types[i].layout_id.has_value())
                     {
                         throw interpreter_error(
-                          fmt::format(
+                          std::format(
                             "Argument {} has wrong base type (expected type '{}' with id '{}', got id '{}').",
                             i,
                             arg_types[i].base_type(),
@@ -1418,7 +1419,7 @@ public:
                     }
 
                     throw interpreter_error(
-                      fmt::format(
+                      std::format(
                         "Argument {} has wrong base type (expected type '{}', got id '{}').",
                         i,
                         arg_types[i].base_type(),
@@ -1428,7 +1429,7 @@ public:
             else if(arg_types[i].base_type() != arg_type.base_type())
             {
                 throw interpreter_error(
-                  fmt::format(
+                  std::format(
                     "Argument {} has wrong base type (expected '{}', got '{}').",
                     i,
                     arg_types[i].base_type(),
@@ -1438,7 +1439,7 @@ public:
             if(arg_types[i].is_array() != arg_type.is_array())
             {
                 throw interpreter_error(
-                  fmt::format(
+                  std::format(
                     "Argument {} has wrong array property (expected '{}', got '{}').",
                     i,
                     arg_types[i].is_array(),
@@ -1447,7 +1448,7 @@ public:
 
             if(offset + args[i].get_size() > locals.size())
             {
-                throw interpreter_error(fmt::format(
+                throw interpreter_error(std::format(
                   "Stack overflow during argument allocation while processing argument {}.", i));
             }
 
@@ -1594,7 +1595,7 @@ value context::exec(
     }
     else
     {
-        throw interpreter_error(fmt::format(
+        throw interpreter_error(std::format(
           "Invalid return opcode '{}' ({}).",
           to_string(ret_opcode), static_cast<int>(ret_opcode)));
     }
@@ -1618,7 +1619,7 @@ void context::register_native_function(
 {
     if(!func)
     {
-        throw interpreter_error(fmt::format("Cannot register null native function '{}.{}'.", mod_name, fn_name));
+        throw interpreter_error(std::format("Cannot register null native function '{}.{}'.", mod_name, fn_name));
     }
 
     auto loader_it = loaders.find(mod_name);
@@ -1627,7 +1628,7 @@ void context::register_native_function(
         if(loader_it->second->has_function(fn_name))
         {
             throw interpreter_error(
-              fmt::format(
+              std::format(
                 "Cannot register native function: '{}' is already definded for module '{}'.",
                 fn_name, mod_name));
         }
@@ -1643,7 +1644,7 @@ void context::register_native_function(
         if(native_mod_it->second.find(fn_name) != native_mod_it->second.end())
         {
             throw interpreter_error(
-              fmt::format(
+              std::format(
                 "Cannot register native function: '{}' is already definded for module '{}'.",
                 fn_name,
                 mod_name));
@@ -1711,13 +1712,13 @@ value context::invoke(const std::string& module_name, const std::string& functio
         const auto& stack_trace = e.get_stack_trace();
         if(!stack_trace.empty())
         {
-            buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
+            buf += std::format("\n{}", stack_trace_to_string(stack_trace));
         }
 
         if(call_stack_level == 0)
         {
             // we never entered context::exec, so add the function explicitly.
-            buf += fmt::format("  in {}.{}\n", module_name, function_name);
+            buf += std::format("  in {}.{}\n", module_name, function_name);
         }
 
         reset();
@@ -1740,7 +1741,7 @@ value context::invoke(const module_loader& loader, const function& fn, const std
         const auto& stack_trace = e.get_stack_trace();
         if(!stack_trace.empty())
         {
-            buf += fmt::format("\n{}", stack_trace_to_string(stack_trace));
+            buf += std::format("\n{}", stack_trace_to_string(stack_trace));
         }
 
         if(call_stack_level == 0)
@@ -1748,9 +1749,9 @@ value context::invoke(const module_loader& loader, const function& fn, const std
             // we never entered context::exec, so add the function explicitly.
             std::string module_name = get_import_name(loader);
             std::string function_name = loader.resolve_entry_point(fn.get_entry_point())
-                                          .value_or(fmt::format("<unknown at {}>", fn.get_entry_point()));
+                                          .value_or(std::format("<unknown at {}>", fn.get_entry_point()));
 
-            buf += fmt::format("  in {}.{}\n", module_name, function_name);
+            buf += std::format("  in {}.{}\n", module_name, function_name);
         }
 
         reset();

@@ -12,8 +12,6 @@
 
 #include <gtest/gtest.h>
 
-#include <fmt/core.h>
-
 #include "interpreter/vector.h"
 
 namespace si = slang::interpreter;

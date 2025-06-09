@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "commandline.h"
 
@@ -42,7 +42,7 @@ void command::validate_name() const
     {
         if(c != '_' && (std::isalpha(c) == 0))
         {
-            throw std::runtime_error(fmt::format("Invalid command name '{}'.", name));
+            throw std::runtime_error(std::format("Invalid command name '{}'.", name));
         }
     }
 }

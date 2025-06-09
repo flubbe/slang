@@ -1,4 +1,3 @@
-import os
 from conan import ConanFile
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, cmake_layout
@@ -22,7 +21,6 @@ class slangRecipe(ConanFile):
 
     def requirements(self):
         self.requires("cxxopts/3.2.0")
-        self.requires("fmt/[>=10.0.0 <11.0]")
         self.requires("ms-gsl/4.1.0")
         self.test_requires("gtest/[>=1.14.0 <2.0]")
 

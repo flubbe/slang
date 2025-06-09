@@ -10,8 +10,6 @@
 
 #include "filemanager.h"
 
-#include <fmt/core.h>
-
 #include <gtest/gtest.h>
 
 namespace

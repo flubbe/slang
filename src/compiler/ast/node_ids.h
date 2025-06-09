@@ -11,8 +11,7 @@
 #pragma once
 
 #include <cstdint>
-
-#include <fmt/core.h>
+#include <format>
 
 #include "archives/archive.h"
 
@@ -77,7 +76,7 @@ inline archive& operator&(archive& ar, node_identifier& i)
     if(i_u8 > static_cast<std::uint8_t>(node_identifier::last))
     {
         throw serialization_error(
-          fmt::format(
+          std::format(
             "Node identifier out of range ({} > {}).",
             i_u8,
             static_cast<std::uint8_t>(i)));

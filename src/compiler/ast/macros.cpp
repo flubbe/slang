@@ -71,14 +71,14 @@ bool expression::expand_macros(
                   {
                       throw cg::codegen_error(
                         m->get_location(),
-                        fmt::format("Non-macro expression in macro list."));
+                        std::format("Non-macro expression in macro list."));
                   }
 
                   if(!m->is_named_expression())
                   {
                       throw cg::codegen_error(
                         m->get_location(),
-                        fmt::format("Unnamed expression in macro list."));
+                        std::format("Unnamed expression in macro list."));
                   }
 
                   return macro_expr->get_name().s == m->as_named_expression()->get_name().s;
@@ -88,7 +88,7 @@ bool expression::expand_macros(
             {
                 throw cg::codegen_error(
                   macro_expr->get_location(),
-                  fmt::format(
+                  std::format(
                     "Macro '{}' not found.",
                     macro_expr->get_name().s));
             }
@@ -118,7 +118,7 @@ bool expression::expand_macros(
                 {
                     throw cg::codegen_error(
                       macro_expr->get_location(),
-                      fmt::format(
+                      std::format(
                         "Could not load macro '{}' (no data).",
                         macro_expr->get_name().s));
                 }
@@ -326,20 +326,20 @@ std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
 
 std::string macro_invocation::to_string() const
 {
-    std::string ret = fmt::format(
+    std::string ret = std::format(
       "MacroInvocation(callee={}, exprs=(", get_name().s);
 
     if(!exprs.empty())
     {
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", exprs[i]->to_string());
+            ret += std::format("{}, ", exprs[i]->to_string());
         }
-        ret += fmt::format("{}", exprs.back()->to_string());
+        ret += std::format("{}", exprs.back()->to_string());
     }
     if(expansion)
     {
-        ret += fmt::format("), expansion=({}", expansion->to_string());
+        ret += std::format("), expansion=({}", expansion->to_string());
     }
     ret += "))";
     return ret;
@@ -371,17 +371,17 @@ std::unique_ptr<cg::value> macro_branch::generate_code(
 
 std::string macro_branch::to_string() const
 {
-    std::string ret = fmt::format("MacroBranch(args=(");
+    std::string ret = std::format("MacroBranch(args=(");
     if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
             const auto& arg = args[i];
-            ret += fmt::format("(name={}, type={}), ", arg.first.s, arg.second.s);
+            ret += std::format("(name={}, type={}), ", arg.first.s, arg.second.s);
         }
-        ret += fmt::format("(name={}, type={})", args.back().first.s, args.back().second.s);
+        ret += std::format("(name={}, type={})", args.back().first.s, args.back().second.s);
     }
-    ret += fmt::format(
+    ret += std::format(
       "), args_end_with_list={}, body={})",
       args_end_with_list ? "true" : "false",
       body->to_string());
@@ -424,14 +424,14 @@ std::optional<ty::type_info> macro_expression_list::type_check([[maybe_unused]] 
 
 std::string macro_expression_list::to_string() const
 {
-    std::string ret = fmt::format("MacroExpressionList(expr_list=(");
+    std::string ret = std::format("MacroExpressionList(expr_list=(");
     if(!expr_list.empty())
     {
         for(std::size_t i = 0; i < expr_list.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", expr_list[i]->to_string());
+            ret += std::format("{}, ", expr_list[i]->to_string());
         }
-        ret += fmt::format("{}", expr_list.back()->to_string());
+        ret += std::format("{}", expr_list.back()->to_string());
     }
     ret += "))";
     return ret;
@@ -521,7 +521,7 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
               {
                   throw ty::type_error(
                     loc,
-                    fmt::format(
+                    std::format(
                       "Unable to get namespace in macro expansion at {}.",
                       ::slang::to_string(e.get_location())));
               }
@@ -530,7 +530,7 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
               {
                   throw ty::type_error(
                     loc,
-                    fmt::format(
+                    std::format(
                       "Unresolved import '{}',",
                       namespace_path.value()));
               }
@@ -548,10 +548,10 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
               {
                   throw ty::type_error(
                     loc,
-                    fmt::format(
+                    std::format(
                       "Unresolved symbol '{}{}',",
                       namespace_path.has_value()
-                        ? fmt::format("{}::", namespace_path.value())
+                        ? std::format("{}::", namespace_path.value())
                         : std::string{""},
                       e.as_macro_invocation()->get_name().s));
               }
@@ -565,15 +565,15 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
 
 std::string macro_expression::to_string() const
 {
-    std::string ret = fmt::format("Macro(name={}, branches=(", name.s);
+    std::string ret = std::format("Macro(name={}, branches=(", name.s);
     if(!branches.empty())
     {
         for(std::size_t i = 0; i < branches.size() - 1; ++i)
         {
             const auto& branch = branches[i];
-            ret += fmt::format("{}, ", branch->to_string());
+            ret += std::format("{}, ", branch->to_string());
         }
-        ret += fmt::format("{}", branches.back()->to_string());
+        ret += std::format("{}", branches.back()->to_string());
     }
     ret += "))";
     return ret;
@@ -651,7 +651,7 @@ static const macro_branch* get_matching_branch(
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Macro branches at {} and {} both match.",
             slang::to_string(match.first->get_location()),
             slang::to_string(tie.first->get_location())));
@@ -661,7 +661,7 @@ static const macro_branch* get_matching_branch(
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Could not match branch for macro '{}' defined at {}.",
             macro_expr->as_named_expression()->get_name().s,
             slang::to_string(macro_expr->get_location())));
@@ -707,7 +707,7 @@ static std::vector<std::unique_ptr<expression>> expand_invocation_args(
             {
                 throw cg::codegen_error(
                   invocation_exprs[i]->get_location(),
-                  fmt::format(
+                  std::format(
                     "Argument {} cannot be a macro expression list.",
                     i));
             }
@@ -741,7 +741,7 @@ static std::vector<std::unique_ptr<expression>> expand_invocation_args(
  */
 static std::string make_local_name(std::size_t invocation_id, std::string name)
 {
-    return fmt::format("${}{}", invocation_id, name);
+    return std::format("${}{}", invocation_id, name);
 }
 
 std::unique_ptr<expression> macro_expression::expand(
@@ -848,7 +848,7 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             throw cg::codegen_error(
               arg.first.location,
-              fmt::format(
+              std::format(
                 "Argument '{}' was already defined.",
                 arg.first.s));
         }

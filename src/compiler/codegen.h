@@ -11,14 +11,13 @@
 #pragma once
 
 #include <algorithm>
+#include <format>
 #include <list>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "archives/archive.h"
 #include "archives/memory.h"
@@ -479,7 +478,7 @@ public:
     {
         if(index < -1)
         {
-            throw codegen_error(fmt::format("String index must be non-negative or -1. Got {}.", index));
+            throw codegen_error(std::format("String index must be non-negative or -1. Got {}.", index));
         }
 
         constant_index = index;
@@ -644,10 +643,10 @@ public:
     {
         if(import_path.has_value())
         {
-            return fmt::format("@{}::{}", *import_path, *name->get_name());
+            return std::format("@{}::{}", *import_path, *name->get_name());
         }
 
-        return fmt::format("@{}", *name->get_name());
+        return std::format("@{}", *name->get_name());
     }
 
     [[nodiscard]]
@@ -711,7 +710,7 @@ public:
     {
         if(import_path.has_value())
         {
-            return fmt::format("{}::{}", *import_path, vt.to_string());
+            return std::format("{}::{}", *import_path, vt.to_string());
         }
 
         return vt.to_string();
@@ -756,7 +755,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("{}", var->to_string());
+        return std::format("{}", var->to_string());
     }
 
     [[nodiscard]]
@@ -805,13 +804,13 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("%{}", label);
+        return std::format("%{}", label);
     }
 
     [[nodiscard]]
     const value* get_value() const override
     {
-        throw codegen_error(fmt::format("Cannot get type from label '{}'.", to_string()));
+        throw codegen_error(std::format("Cannot get type from label '{}'.", to_string()));
     }
 };
 
@@ -886,7 +885,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("{}", ::slang::codegen::to_string(cast));
+        return std::format("{}", ::slang::codegen::to_string(cast));
     }
 
     [[nodiscard]]
@@ -955,7 +954,7 @@ public:
     [[nodiscard]]
     std::string to_string() const override
     {
-        return fmt::format("%{}, {}", get_struct_name(), member.to_string());
+        return std::format("%{}, {}", get_struct_name(), member.to_string());
     }
 
     [[nodiscard]]
@@ -1460,7 +1459,7 @@ public:
     {
         if(outer)
         {
-            return fmt::format("{}::{}", outer->to_string(), name);
+            return std::format("{}::{}", outer->to_string(), name);
         }
 
         return name;
@@ -1777,7 +1776,7 @@ public:
     {
         if(!native)
         {
-            throw codegen_error(fmt::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
+            throw codegen_error(std::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
         }
 
         return import_library;

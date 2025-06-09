@@ -30,7 +30,7 @@ static void run_test(
   std::size_t test_id,
   const std::string& test_input)
 {
-    const std::string filename = fmt::format("ast_serialization_{}.bin", test_id);
+    const std::string filename = std::format("ast_serialization_{}.bin", test_id);
 
     slang::lexer lexer;
     slang::parser parser;

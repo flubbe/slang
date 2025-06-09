@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "filemanager.h"
 
@@ -69,7 +69,7 @@ fs::path file_manager::resolve(const fs::path& path) const
     {
         if(!fs::is_regular_file(path))
         {
-            throw file_error(fmt::format("Resolved path '{}' is not a file.", path.c_str()));
+            throw file_error(std::format("Resolved path '{}' is not a file.", path.c_str()));
         }
         return fs::canonical(path);
     }
@@ -82,7 +82,7 @@ fs::path file_manager::resolve(const fs::path& path) const
         }
     }
 
-    throw file_error(fmt::format("Unable to resolve path '{}'.", path.c_str()));
+    throw file_error(std::format("Unable to resolve path '{}'.", path.c_str()));
 }
 
 std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode mode) const
@@ -107,7 +107,7 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
 
     if(resolved_path.empty())
     {
-        throw file_error(fmt::format("Unable to find file '{}' in search paths.", path.string()));
+        throw file_error(std::format("Unable to find file '{}' in search paths.", path.string()));
     }
 
     if(mode == open_mode::read)

@@ -9,14 +9,14 @@
  */
 
 #include <algorithm>
-
-#include <fmt/core.h>
+#include <format>
+#include <print>
 
 #include "vector.h"
 #include "gc.h"
 
 #ifdef GC_DEBUG
-#    define GC_LOG(...) fmt::print("GC: {}\n", fmt::format(__VA_ARGS__))
+#    define GC_LOG(...) std::print("GC: {}\n", std::format(__VA_ARGS__))
 #else
 #    define GC_LOG(...)
 #endif
@@ -153,7 +153,7 @@ void garbage_collector::delete_object(gc_object& obj_info)
     }
     else
     {
-        throw gc_error(fmt::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
+        throw gc_error(std::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
     }
 }
 
@@ -186,12 +186,12 @@ void garbage_collector::remove_root(void* obj)
     auto it = root_set.find(obj);
     if(it == root_set.end())
     {
-        throw gc_error(fmt::format("Cannot remove root for object at {}, since it does not exist in the GC root set.", obj));
+        throw gc_error(std::format("Cannot remove root for object at {}, since it does not exist in the GC root set.", obj));
     }
 
     if(it->second == 0)
     {
-        throw gc_error(fmt::format("Negative reference count for GC root {}", obj));
+        throw gc_error(std::format("Negative reference count for GC root {}", obj));
     }
     --it->second;
 
@@ -261,7 +261,7 @@ void garbage_collector::run()
 
     if(object_set_size < objects.size())
     {
-        throw gc_error(fmt::format("Object list grew during GC run: {} -> {}", object_set_size, objects.size()));
+        throw gc_error(std::format("Object list grew during GC run: {} -> {}", object_set_size, objects.size()));
     }
 
 #ifdef GC_DEBUG
@@ -315,7 +315,7 @@ void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
     auto layout_it = type_layouts.find(layout_id);
     if(layout_it == type_layouts.end())
     {
-        throw gc_error(fmt::format("No type for layout id {} registered.", layout_id));
+        throw gc_error(std::format("No type for layout id {} registered.", layout_id));
     }
 
     auto it = persistent_objects.find(obj);
@@ -338,7 +338,7 @@ void garbage_collector::remove_persistent(void* obj)
     auto it = persistent_objects.find(obj);
     if(it == persistent_objects.end())
     {
-        throw gc_error(fmt::format("Reference at {} does not exist in GC persistent object set.", obj));
+        throw gc_error(std::format("Reference at {} does not exist in GC persistent object set.", obj));
     }
 
     --it->second.reference_count;
@@ -382,12 +382,12 @@ void garbage_collector::remove_temporary(void* obj)
     auto it = temporary_objects.find(obj);
     if(it == temporary_objects.end())
     {
-        throw gc_error(fmt::format("Reference at {} does not exist in GC temporary object set.", obj));
+        throw gc_error(std::format("Reference at {} does not exist in GC temporary object set.", obj));
     }
 
     if(it->second == 0)
     {
-        throw gc_error(fmt::format("Temporary at {} has no references.", obj));
+        throw gc_error(std::format("Temporary at {} has no references.", obj));
     }
 
     --it->second;
@@ -404,7 +404,7 @@ gc_object_type garbage_collector::get_object_type(void* obj) const
     auto it = objects.find(obj);
     if(it == objects.end())
     {
-        throw gc_error(fmt::format("Reference at {} does not exist in the GC object list.", obj));
+        throw gc_error(std::format("Reference at {} does not exist in the GC object list.", obj));
     }
 
     return it->second.type;
@@ -420,7 +420,7 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
                            });
     if(it != type_layouts.end())
     {
-        throw gc_error(fmt::format("Layout for type '{}' already registered.", name));
+        throw gc_error(std::format("Layout for type '{}' already registered.", name));
     }
 
     // find the first free identifier.
@@ -449,12 +449,12 @@ std::size_t garbage_collector::check_type_layout(
                            });
     if(it == type_layouts.end())
     {
-        throw gc_error(fmt::format("Layout for type '{}' not found.", name));
+        throw gc_error(std::format("Layout for type '{}' not found.", name));
     }
 
     if(it->second.second != layout)
     {
-        throw gc_error(fmt::format("A different layout was already registered for type '{}'.", name));
+        throw gc_error(std::format("A different layout was already registered for type '{}'.", name));
     }
 
     return it->first;
@@ -469,7 +469,7 @@ std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
                            });
     if(it == type_layouts.end())
     {
-        throw gc_error(fmt::format("No type layout for type '{}' registered.", name));
+        throw gc_error(std::format("No type layout for type '{}' registered.", name));
     }
 
     return it->first;
@@ -480,7 +480,7 @@ std::size_t garbage_collector::get_type_layout_id(void* obj) const
     auto obj_it = objects.find(obj);
     if(obj_it == objects.end())
     {
-        throw gc_error(fmt::format("Reference at {} does not exist in the GC object list.", obj));
+        throw gc_error(std::format("Reference at {} does not exist in the GC object list.", obj));
     }
 
     for(const auto& it: type_layouts)
@@ -491,7 +491,7 @@ std::size_t garbage_collector::get_type_layout_id(void* obj) const
         }
     }
 
-    throw gc_error(fmt::format("No type layout for type '{}' registered.", obj));
+    throw gc_error(std::format("No type layout for type '{}' registered.", obj));
 }
 
 std::string garbage_collector::layout_to_string(std::size_t layout_id) const
@@ -504,7 +504,7 @@ std::string garbage_collector::layout_to_string(std::size_t layout_id) const
         }
     }
 
-    throw gc_error(fmt::format("No type layout for id {} registered.", layout_id));
+    throw gc_error(std::format("No type layout for id {} registered.", layout_id));
 }
 
 }    // namespace slang::gc

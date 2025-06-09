@@ -10,7 +10,6 @@
 
 #include <cstring>
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "archives/archive.h"

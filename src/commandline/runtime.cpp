@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <print>
 
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
@@ -28,28 +28,28 @@ void runtime_setup(si::context& ctx, bool verbose)
 {
     if(verbose)
     {
-        fmt::print("Info: Registering type layouts.\n");
+        std::print("Info: Registering type layouts.\n");
     }
 
     rt::register_builtin_type_layouts(ctx.get_gc());
 
     if(verbose)
     {
-        fmt::print("Info: Registering native functions.\n");
+        std::print("Info: Registering native functions.\n");
     }
 
     ctx.register_native_function("slang", "print",
                                  [&ctx](si::operand_stack& stack)
                                  {
                                      auto* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}", *s);
+                                     std::print("{}", *s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "println",
                                  [&ctx](si::operand_stack& stack)
                                  {
                                      auto* s = stack.pop_addr<std::string>();
-                                     fmt::print("{}\n", *s);
+                                     std::print("{}\n", *s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "array_copy",

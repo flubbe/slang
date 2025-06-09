@@ -32,7 +32,7 @@ inline std::string make_type_name(
   const std::string& package_import_name,
   const std::string& type_name)
 {
-    return fmt::format("{}.{}", package_import_name, type_name);
+    return std::format("{}.{}", package_import_name, type_name);
 }
 
 /**

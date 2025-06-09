@@ -8,7 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "compiler/codegen.h"

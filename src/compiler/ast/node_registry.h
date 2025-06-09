@@ -12,10 +12,9 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <type_traits>
-
-#include <fmt/core.h>
 
 #include "archives/archive.h"
 #include "ast.h"
@@ -91,7 +90,7 @@ struct expression_serializer
         if(id > static_cast<std::uint8_t>(node_identifier::last))
         {
             throw serialization_error(
-              fmt::format(
+              std::format(
                 "Invalid AST node id ({} > {}).",
                 id,
                 static_cast<std::uint8_t>(node_identifier::last)));
@@ -178,7 +177,7 @@ struct expression_vector_serializer
                 if(id > static_cast<std::uint8_t>(node_identifier::last))
                 {
                     throw serialization_error(
-                      fmt::format(
+                      std::format(
                         "Invalid AST node id ({} >= {}).",
                         id,
                         static_cast<std::uint8_t>(node_identifier::last)));

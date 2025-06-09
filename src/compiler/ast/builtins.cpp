@@ -63,7 +63,7 @@ void format_macro_expander::create_format_string_placeholders()
             {
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Invalid format string '{}'.",
                     format_string.s));
             }
@@ -92,7 +92,7 @@ void format_macro_expander::create_format_string_placeholders()
                 {
                     throw cg::codegen_error(
                       loc,
-                      fmt::format(
+                      std::format(
                         "Unsupported format specifier '{}'.",
                         current_format_specifier));
                 }
@@ -116,7 +116,7 @@ void format_macro_expander::create_format_string_placeholders()
 
                 throw cg::codegen_error(
                   loc,
-                  fmt::format(
+                  std::format(
                     "Invalid format string '{}'.",
                     format_string.s));
             }
@@ -134,7 +134,7 @@ void format_macro_expander::create_format_string_placeholders()
     {
         throw cg::codegen_error(
           loc,
-          fmt::format(
+          std::format(
             "Invalid format string '{}'.",
             format_string.s));
     }
@@ -241,10 +241,10 @@ std::unique_ptr<cg::value> format_macro_expression::generate_code(
         {
             throw cg::codegen_error(
               expr->get_location(),
-              fmt::format(
+              std::format(
                 "Unknown format specified '{}'.",
                 fph.type.has_value()
-                  ? fmt::format("{}", fph.type.value())
+                  ? std::format("{}", fph.type.value())
                   : std::string("<unspecified>")));
         }
 
@@ -305,7 +305,7 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Macro 'format!': No format string found."));
     }
 
@@ -314,7 +314,7 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
     {
         throw ty::type_error(
           loc,
-          fmt::format(
+          std::format(
             "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
             exprs.size() - 1,
             expander.get_placeholders().size()));
@@ -331,7 +331,7 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
         {
             throw ty::type_error(
               e->get_location(),
-              fmt::format(
+              std::format(
                 "Macro 'format!': Argument at position '{}' has no type.",
                 i));
         }
@@ -350,7 +350,7 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
             {
                 throw ty::type_error(
                   e->get_location(),
-                  fmt::format(
+                  std::format(
                     "Macro 'format!': Argument at position {} has wrong type.",
                     i));
             }
@@ -374,7 +374,7 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
             {
                 throw ty::type_error(
                   e->get_location(),
-                  fmt::format(
+                  std::format(
                     "Macro 'format!': Argument at position '{}' is not convertible to a string.",
                     i));
             }
@@ -386,12 +386,12 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
 
 std::string format_macro_expression::to_string() const
 {
-    std::string ret = fmt::format("FormatMacroExpression(exprs=(");
+    std::string ret = std::format("FormatMacroExpression(exprs=(");
     if(!exprs.empty())
     {
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
-            ret += fmt::format("{}, ", exprs[i]->to_string());
+            ret += std::format("{}, ", exprs[i]->to_string());
         }
         ret += exprs.back()->to_string();
     }

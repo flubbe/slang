@@ -9,8 +9,7 @@
  */
 
 #include <algorithm>
-
-#include <fmt/core.h>
+#include <format>
 
 #include "module.h"
 #include "type_utils.h" /* for slang::typing::is_reference_type */
@@ -45,7 +44,7 @@ std::string variable_type::encode() const
 
     if(it != type_encoding.end())
     {
-        return fmt::format("{:[>{}}{}", "", array_dims.value_or(0), it->second);
+        return std::format("{:[>{}}{}", "", array_dims.value_or(0), it->second);
     }
 
     // assume it is a struct.
@@ -54,7 +53,7 @@ std::string variable_type::encode() const
         throw module_error("Cannot encode empty struct name.");
     }
 
-    return fmt::format("{:[>{}}{}{};", "", array_dims.value_or(0), type_prefix, decoded_type_string);
+    return std::format("{:[>{}}{}{};", "", array_dims.value_or(0), type_prefix, decoded_type_string);
 }
 
 void variable_type::set_from_encoded(const std::string& s)
@@ -64,7 +63,7 @@ void variable_type::set_from_encoded(const std::string& s)
     std::size_t array_dim_indicator_end = s.find_first_not_of('[');
     if(array_dim_indicator_end == std::string::npos)
     {
-        throw module_error(fmt::format("Cannot decode invalid type '{}'.", s));
+        throw module_error(std::format("Cannot decode invalid type '{}'.", s));
     }
 
     base_s = s.substr(array_dim_indicator_end);
@@ -90,7 +89,7 @@ void variable_type::set_from_encoded(const std::string& s)
     }
     else
     {
-        throw module_error(fmt::format("Cannot decode unknown type '{}'.", s));
+        throw module_error(std::format("Cannot decode unknown type '{}'.", s));
     }
 }
 
@@ -209,7 +208,7 @@ void language_module::add_function(
          })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add function: Symbol '{}' already defined.", name));
+        throw module_error(std::format("Cannot add function: Symbol '{}' already defined.", name));
     }
 
     function_descriptor desc{
@@ -234,7 +233,7 @@ void language_module::add_native_function(
          })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add native function: '{}' already defined.", name));
+        throw module_error(std::format("Cannot add native function: '{}' already defined.", name));
     }
 
     function_descriptor desc{
@@ -258,7 +257,7 @@ void language_module::add_struct(
          })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add type: '{}' already defined.", name));
+        throw module_error(std::format("Cannot add type: '{}' already defined.", name));
     }
 
     struct_descriptor desc{flags, std::move(members)};
@@ -276,7 +275,7 @@ void language_module::add_constant(std::string name, std::size_t i)
          })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add constant: '{}' already defined.", name));
+        throw module_error(std::format("Cannot add constant: '{}' already defined.", name));
     }
 
     header.exports.emplace_back(symbol_type::constant, name, i);
@@ -293,7 +292,7 @@ void language_module::add_macro(std::string name, macro_descriptor desc)
          })
        != header.exports.end())
     {
-        throw module_error(fmt::format("Cannot add macro: '{}' already defined.", name));
+        throw module_error(std::format("Cannot add macro: '{}' already defined.", name));
     }
 
     header.exports.emplace_back(symbol_type::macro, name, std::move(desc));

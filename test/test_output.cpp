@@ -8,9 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <format>
 #include <memory>
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "archives/file.h"
@@ -1860,7 +1860,7 @@ TEST(output, multiple_modules)
 
             slang::module_::language_module mod = emitter.to_module();
 
-            slang::file_write_archive write_ar(fmt::format("{}.cmod", s.first));
+            slang::file_write_archive write_ar(std::format("{}.cmod", s.first));
             EXPECT_NO_THROW(write_ar & mod);
         }
     }

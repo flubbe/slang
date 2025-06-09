@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
+#include <format>
 
 #include "shared/type_utils.h"
 #include "ast/ast.h"
@@ -34,7 +34,7 @@ archive& operator&(archive& ar, type_class& cls)
     if(i > static_cast<std::uint8_t>(type_class::last))
     {
         throw serialization_error(
-          fmt::format(
+          std::format(
             "Type class out of range ({} >= {}).",
             i,
             static_cast<std::uint8_t>(type_class::last)));
@@ -71,7 +71,7 @@ bool type_info::operator==(const type_info& other) const
 {
     if(!type_id.has_value() || !other.type_id.has_value())
     {
-        throw type_error(fmt::format(
+        throw type_error(std::format(
           "Comparison of types '{}' ({}) and '{}' ({}).",
           to_string(),
           (type_id.has_value() ? "resolved" : "unresolved"),
@@ -100,7 +100,7 @@ type_info* type_info::get_element_type()
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Cannot get element type for '{}'.", *name)
+            ? std::format("Cannot get element type for '{}'.", *name)
             : std::string{"Cannot get element type."};
         throw type_error(location, error_string);
     }
@@ -109,10 +109,10 @@ type_info* type_info::get_element_type()
     {
         auto error_string =
           name.has_value()
-            ? fmt::format(
+            ? std::format(
                 "Inconsistent component count for array type '{}' ({} components, expected 1).",
                 *name, components.size())
-            : fmt::format(
+            : std::format(
                 "Inconsistent component count for array type ({} components, expected 1).",
                 components.size());
         throw type_error(location, error_string);
@@ -127,7 +127,7 @@ const type_info* type_info::get_element_type() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Cannot get element type for '{}'.", *name)
+            ? std::format("Cannot get element type for '{}'.", *name)
             : std::string{"Cannot get element type."};
         throw type_error(location, error_string);
     }
@@ -136,10 +136,10 @@ const type_info* type_info::get_element_type() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format(
+            ? std::format(
                 "Inconsistent component count for array type '{}' ({} components, expected 1).",
                 *name, components.size())
-            : fmt::format(
+            : std::format(
                 "Inconsistent component count for array type ({} components, expected 1).",
                 components.size());
         throw type_error(location, error_string);
@@ -154,7 +154,7 @@ const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Cannot get signature for non-function type '{}'.", *name)
+            ? std::format("Cannot get signature for non-function type '{}'.", *name)
             : std::string{"Cannot get signature for non-function type."};
         throw type_error(location, error_string);
     }
@@ -163,7 +163,7 @@ const std::vector<std::shared_ptr<type_info>>& type_info::get_signature() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format(
+            ? std::format(
                 "Inconsistent component count for function signature '{}' (0 components, expected at least 1).",
                 *name)
             : std::string{"Inconsistent component count for function signature (0 components, expected at least 1)."};
@@ -179,7 +179,7 @@ std::uint64_t type_info::get_type_id() const
     {
         auto error_string =
           name.has_value()
-            ? fmt::format("Unresolved type '{}'.", *name)
+            ? std::format("Unresolved type '{}'.", *name)
             : std::string{"Unresolved type."};
         throw type_error(location, error_string);
     }
@@ -191,7 +191,7 @@ std::string type_info::to_string() const
 {
     if(is_array())
     {
-        return fmt::format(
+        return std::format(
           "[{}]",
           get_element_type()->to_string());
     }
@@ -220,7 +220,7 @@ std::string to_string(const std::pair<token, bool>& t)
  */
 
 type_error::type_error(const token_location& loc, const std::string& message)
-: std::runtime_error{fmt::format("{}: {}", to_string(loc), message)}
+: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
 
@@ -234,7 +234,7 @@ std::string function_signature::to_string() const
     {
         return ty::to_string(t);
     };
-    return fmt::format(
+    return std::format(
       "fn {}({}) -> {}",
       name.s,
       slang::utils::join(arg_types, {transform}, ", "),
@@ -250,28 +250,28 @@ std::string scope::get_qualified_name() const
     std::string qualified_name = name.s;
     for(const scope* s = this->parent; s != nullptr; s = s->parent)
     {
-        qualified_name = fmt::format("{}::{}", s->name.s, qualified_name);
+        qualified_name = std::format("{}::{}", s->name.s, qualified_name);
     }
     return qualified_name;
 }
 
 std::string scope::to_string() const
 {
-    std::string repr = fmt::format("scope: {}\n------\n", get_qualified_name());
+    std::string repr = std::format("scope: {}\n------\n", get_qualified_name());
     for(const auto& [name, type]: variables)
     {
-        repr += fmt::format("[v]  name: {}, type: {}\n", name, ty::to_string(type.var_type));
+        repr += std::format("[v]  name: {}, type: {}\n", name, ty::to_string(type.var_type));
     }
     for(const auto& [name, sig]: functions)
     {
-        repr += fmt::format("[fn] name: {}, signature: {}\n", name, sig.to_string());
+        repr += std::format("[fn] name: {}, signature: {}\n", name, sig.to_string());
     }
     for(const auto& [name, s]: structs)
     {
-        repr += fmt::format("[s]  name: {}\n    members:\n", name);
+        repr += std::format("[s]  name: {}\n    members:\n", name);
         for(const auto& [n, t]: s.members)
         {
-            repr += fmt::format("     - name: {}, type: {}\n", n.s, ty::to_string(t));
+            repr += std::format("     - name: {}, type: {}\n", n.s, ty::to_string(t));
         }
     }
 
@@ -296,7 +296,7 @@ void context::add_base_type(std::string name, bool is_reference_type)
       });
     if(it != type_map.end())
     {
-        throw type_error(fmt::format("Type '{}' already exists.", name));
+        throw type_error(std::format("Type '{}' already exists.", name));
     }
 
     if(std::find_if(
@@ -306,7 +306,7 @@ void context::add_base_type(std::string name, bool is_reference_type)
          { return v.first == name; })
        != base_types.end())
     {
-        throw type_error(fmt::format("Inconsistent type context: Type '{}' exists in base types, but not in type map.", name));
+        throw type_error(std::format("Inconsistent type context: Type '{}' exists in base types, but not in type map.", name));
     }
 
     auto type_id = generate_type_id();
@@ -338,7 +338,7 @@ void context::add_import(std::vector<token> path, bool transitive)
 
     if(current_scope != &global_scope)
     {
-        throw type_error(path[0].location, fmt::format("Import statement can only occur in the global scope."));
+        throw type_error(path[0].location, std::format("Import statement can only occur in the global scope."));
     }
 
     add_import(::ty::to_string(path), transitive);
@@ -374,7 +374,7 @@ void context::add_import(std::string path, bool transitive)
                     if(sym.name.s.at(0) != '$')
                     {
                         throw type_error(
-                          fmt::format(
+                          std::format(
                             "Inconsistent transitivity information for import '{}::{}'.",
                             path, sym.name.s));
                     }
@@ -397,7 +397,7 @@ void context::add_import(std::string path, bool transitive)
                     if(fn.first.at(0) != '$' || fn.second.name.s.at(0) != '$')
                     {
                         throw type_error(
-                          fmt::format(
+                          std::format(
                             "Inconsistent transitivity information for import '{}::{}'.",
                             path, fn.second.name.s));
                     }
@@ -432,7 +432,7 @@ void context::add_import(std::string path, bool transitive)
                 if(it.first.at(0) != '$' || it.second.name.s.at(0) != '$')
                 {
                     throw type_error(
-                      fmt::format(
+                      std::format(
                         "Inconsistent transitivity information for import '{}::{}'.",
                         path, it.second.name.s));
                 }
@@ -452,7 +452,7 @@ void context::add_import(std::string path, bool transitive)
         else if(transitive && !it->transitive)
         {
             throw std::runtime_error(
-              fmt::format(
+              std::format(
                 "Tried to make non-transitive import '{}' transitive.",
                 path));
         }
@@ -477,7 +477,7 @@ bool context::is_transitive_import(const std::string& namespace_path) const
     }
 
     throw type_error(
-      fmt::format(
+      std::format(
         "No module named '{}' found when checking transitive imports.",
         namespace_path));
 }
@@ -521,7 +521,7 @@ void context::add_variable(
             {
                 throw type_error(
                   name.location,
-                  fmt::format("The module '{}' containing the constant '{}' already is imported.",
+                  std::format("The module '{}' containing the constant '{}' already is imported.",
                               *import_path, name.s));
             }
             mod_it->second.emplace_back(std::move(name), var_type);
@@ -540,7 +540,7 @@ void context::add_variable(
         {
             throw type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
                 name.s, current_scope->get_qualified_name(), slang::to_string(tok->location)));
         }
@@ -578,7 +578,7 @@ void context::add_function(
             {
                 throw type_error(
                   name.location,
-                  fmt::format("The module '{}' containing the symbol '{}' already is imported.",
+                  std::format("The module '{}' containing the symbol '{}' already is imported.",
                               *import_path, name.s));
             }
             auto func_type = get_function_type(name, arg_types, ret_type);
@@ -595,7 +595,7 @@ void context::add_function(
         {
             throw type_error(
               name.location,
-              fmt::format(
+              std::format(
                 "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
                 name.s, current_scope->get_qualified_name(),
                 slang::to_string(tok->location)));
@@ -616,7 +616,7 @@ void context::add_struct(token name, std::vector<std::pair<token, type_info>> me
     {
         throw type_error(
           name.location,
-          fmt::format(
+          std::format(
             "Name '{}' already defined in scope '{}'. The previous definition is here: {}",
             name.s, global_scope.get_qualified_name(),
             slang::to_string(tok->location)));
@@ -690,7 +690,7 @@ void context::add_macro(std::string name, std::optional<std::string> import_path
             if(it != mod_it->second.end())
             {
                 throw type_error(
-                  fmt::format(
+                  std::format(
                     "The module '{}' containing the symbol '{}' already is imported.",
                     *import_path, name));
             }
@@ -704,7 +704,7 @@ void context::add_macro(std::string name, std::optional<std::string> import_path
         if(it != macros.end())
         {
             throw type_error(
-              fmt::format(
+              std::format(
                 "The symbol '{}' already exists in the current module.",
                 name));
         }
@@ -759,7 +759,7 @@ bool context::is_reference_type(const type_info& t) const
 
 type_info context::get_identifier_type(const token& identifier, const std::optional<std::string>& namespace_path) const
 {
-    std::string err = fmt::format("Unknown type error at identifier '{}'.", identifier.s);
+    std::string err = std::format("Unknown type error at identifier '{}'.", identifier.s);
 
     // FIXME This is only called in a variable-access-like context, so we don't search functions or types here.
     //       This is not visible from the function's name.
@@ -788,7 +788,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
             }
         }
 
-        err = fmt::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
+        err = std::format("Identifier '{}::{}' not found in imports.", *namespace_path, identifier.s);
     }
     /* 2. struct member access. */
     else if(!struct_stack.empty())
@@ -801,7 +801,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
             }
         }
 
-        err = fmt::format("Name '{}' not found in struct '{}'.", identifier.s, struct_stack.back()->name.s);
+        err = std::format("Name '{}' not found in struct '{}'.", identifier.s, struct_stack.back()->name.s);
     }
     /* 3. unqualified non-member access. */
     else
@@ -820,7 +820,7 @@ type_info context::get_identifier_type(const token& identifier, const std::optio
             }
         }
 
-        err = fmt::format("Name '{}' not found in scope '{}'.", identifier.s, current_scope->name.s);
+        err = std::format("Name '{}' not found in scope '{}'.", identifier.s, current_scope->name.s);
     }
 
     throw type_error(identifier.location, err);
@@ -888,10 +888,10 @@ type_info context::get_type(const std::string& name, bool array, const std::opti
 
     if(import_path.has_value())
     {
-        throw type_error(fmt::format("Unknown type '{}' from import '{}'.", name, *import_path));
+        throw type_error(std::format("Unknown type '{}' from import '{}'.", name, *import_path));
     }
 
-    throw type_error(fmt::format("Unknown type '{}'.", name));
+    throw type_error(std::format("Unknown type '{}'.", name));
 }
 
 type_info context::get_unresolved_type(token name, type_class cls, std::optional<std::string> import_path)
@@ -994,7 +994,7 @@ void context::resolve(type_info& ty)
         {
             throw type_error(
               ty.get_location(),
-              fmt::format(
+              std::format(
                 "Cannot resolve type '{}' from '{}'.",
                 ty.to_string(),
                 ty.get_import_path().value()));    // NOLINT(bugprone-unchecked-optional-access)
@@ -1002,7 +1002,7 @@ void context::resolve(type_info& ty)
 
         throw type_error(
           ty.get_location(),
-          fmt::format(
+          std::format(
             "Cannot resolve type '{}'.",
             ty.to_string()));
     }
@@ -1099,7 +1099,7 @@ type_info context::get_function_type(const token& name, const std::vector<type_i
 {
     auto transform = [](const type_info& t) -> std::string
     { return ty::to_string(t); };
-    std::string type_string = fmt::format(
+    std::string type_string = std::format(
       "fn {}({}) -> {}",
       name.s,
       slang::utils::join(arg_types, {transform}, ", "),
@@ -1129,7 +1129,7 @@ const function_signature& context::get_function_signature(const token& name, con
             {
                 throw type_error(
                   name.location,
-                  fmt::format(
+                  std::format(
                     "Function '{}' not found in '{}'.",
                     name.s,
                     *import_path));
@@ -1137,7 +1137,7 @@ const function_signature& context::get_function_signature(const token& name, con
         }
         throw type_error(
           name.location,
-          fmt::format(
+          std::format(
             "Cannot resolve function '{}' in module '{}', since the module is not imported.",
             name.s,
             *import_path));
@@ -1152,19 +1152,19 @@ const function_signature& context::get_function_signature(const token& name, con
         }
     }
 
-    throw type_error(name.location, fmt::format("Function with name '{}' not found in current scope.", name.s));
+    throw type_error(name.location, std::format("Function with name '{}' not found in current scope.", name.s));
 }
 
 void context::enter_function_scope(token name)
 {
     if(current_scope == nullptr)
     {
-        throw type_error(name.location, fmt::format("Cannot enter function scope '{}': No global scope.", name.s));
+        throw type_error(name.location, std::format("Cannot enter function scope '{}': No global scope.", name.s));
     }
 
     if(named_scope.has_value())
     {
-        throw type_error(name.location, fmt::format("Nested functions are not allowed. Current scope: '{}'.", named_scope->s));
+        throw type_error(name.location, std::format("Nested functions are not allowed. Current scope: '{}'.", named_scope->s));
     }
     named_scope = name;
 
@@ -1186,7 +1186,7 @@ void context::enter_struct_scope(token name)
 {
     if(current_scope == nullptr)
     {
-        throw type_error(name.location, fmt::format("Cannot enter struct scope '{}': No global scope.", name.s));
+        throw type_error(name.location, std::format("Cannot enter struct scope '{}': No global scope.", name.s));
     }
 
     named_scope = name;
@@ -1198,17 +1198,17 @@ void context::exit_named_scope(const token& name)
 {
     if(current_scope == nullptr)
     {
-        throw type_error(name.location, fmt::format("Cannot exit scope '{}': No scope to leave.", name.s));
+        throw type_error(name.location, std::format("Cannot exit scope '{}': No scope to leave.", name.s));
     }
 
     if(current_scope->parent == nullptr)
     {
-        throw type_error(name.location, fmt::format("Cannot exit scope '{}': No scope to leave.", name.s));
+        throw type_error(name.location, std::format("Cannot exit scope '{}': No scope to leave.", name.s));
     }
 
     if(current_scope->name.s != name.s)
     {
-        throw type_error(name.location, fmt::format("Cannot exit scope '{}': Expected to exit scope '{}'.", name.s, current_scope->name.s));
+        throw type_error(name.location, std::format("Cannot exit scope '{}': Expected to exit scope '{}'.", name.s, current_scope->name.s));
     }
 
     current_scope = current_scope->parent;
@@ -1226,7 +1226,7 @@ void context::enter_anonymous_scope(token_location loc)
 {
     token anonymous_scope;
     anonymous_scope.location = loc;
-    anonymous_scope.s = fmt::format("<anonymous@{}>", anonymous_scope_id);
+    anonymous_scope.s = std::format("<anonymous@{}>", anonymous_scope_id);
     ++anonymous_scope_id;
 
     // check if the scope already exists.
@@ -1238,7 +1238,7 @@ void context::enter_anonymous_scope(token_location loc)
     if(it != current_scope->children.end())
     {
         // this should never happen.
-        throw type_error(anonymous_scope.location, fmt::format("Cannot enter anonymous scope: Name '{}' already exists.", anonymous_scope.s));
+        throw type_error(anonymous_scope.location, std::format("Cannot enter anonymous scope: Name '{}' already exists.", anonymous_scope.s));
     }
 
     current_scope->children.emplace_back(std::move(anonymous_scope), current_scope);
@@ -1256,7 +1256,7 @@ void context::exit_anonymous_scope()
     if(current_scope->name.s.substr(0, ANONYMOUS_SUBSTR_LENGTH) != "<anonymous@"
        || current_scope->name.s.back() != '>')
     {
-        throw type_error(current_scope->name.location, fmt::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name.s));
+        throw type_error(current_scope->name.location, std::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name.s));
     }
 
     current_scope = current_scope->parent;
@@ -1287,7 +1287,7 @@ const struct_definition*
         }
     }
 
-    throw type_error(loc, fmt::format("Unknown struct '{}'.", name));
+    throw type_error(loc, std::format("Unknown struct '{}'.", name));
 }
 
 void context::push_struct_definition(const struct_definition* s)
@@ -1330,16 +1330,16 @@ std::string context::to_string() const
     std::string ret = "Imports:\n";
     for(const auto& it: imported_modules)
     {
-        ret += fmt::format("* {}{}\n", it.path, it.transitive ? " [transitive]" : "");
+        ret += std::format("* {}{}\n", it.path, it.transitive ? " [transitive]" : "");
     }
 
     ret += "\nType map:\n";
     for(const auto& it: type_map)
     {
-        ret += fmt::format("  {}, {}\n", it.first.to_string(), it.second);
+        ret += std::format("  {}, {}\n", it.first.to_string(), it.second);
     }
 
-    return fmt::format("{}\n{}", ret, global_scope.to_string());
+    return std::format("{}\n{}", ret, global_scope.to_string());
 }
 
 }    // namespace slang::typing

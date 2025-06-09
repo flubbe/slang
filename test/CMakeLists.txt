@@ -3,7 +3,6 @@ project(tests CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(fmt REQUIRED)
 find_package(GTest REQUIRED CONFIG)
 
 set(COMPILE_OPTIONS_MSVC $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>)
@@ -18,7 +17,7 @@ add_executable(test_package
     ../src/package.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_package fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_package GTest::gtest GTest::gtest_main)
 target_compile_options(test_package PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -30,7 +29,7 @@ add_executable(test_lexer
     ../src/compiler/lexer.cpp
     ../src/compiler/token.cpp
 )
-target_link_libraries(test_lexer fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_lexer GTest::gtest GTest::gtest_main)
 target_compile_options(test_lexer PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -52,7 +51,7 @@ add_executable(test_parser
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_parser fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_parser GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_parser PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -74,7 +73,7 @@ add_executable(test_codegen
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_codegen fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_codegen GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_codegen PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -96,7 +95,7 @@ add_executable(test_compile_ir
     ../src/shared/module.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_compile_ir fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_compile_ir GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_compile_ir PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -122,7 +121,7 @@ add_executable(test_type_system
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_type_system fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_type_system GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_type_system PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -152,7 +151,7 @@ add_executable(test_resolve
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_resolve fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_resolve GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_resolve PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -185,7 +184,7 @@ add_executable(test_output
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_output fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_output GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_output PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -201,7 +200,7 @@ add_executable(test_serialization
     test_serialization.cpp
     ../src/archives/file.cpp
 )
-target_link_libraries(test_serialization fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_serialization GTest::gtest GTest::gtest_main)
 target_compile_options(test_serialization PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -228,7 +227,7 @@ add_executable(test_ast_serialization
     ../src/resolve.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_ast_serialization fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_ast_serialization GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_ast_serialization PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -244,7 +243,7 @@ add_executable(test_filemanager
     ../src/archives/file.cpp
     ../src/filemanager.cpp
 )
-target_link_libraries(test_filemanager fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_filemanager GTest::gtest GTest::gtest_main)
 target_compile_options(test_filemanager PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -269,7 +268,7 @@ add_executable(test_interpreter
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(test_interpreter fmt::fmt GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_interpreter GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_interpreter PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -284,7 +283,7 @@ set_tests_properties(type_system PROPERTIES
 add_executable(test_vector
     test_vector.cpp
 )
-target_link_libraries(test_vector fmt::fmt GTest::gtest GTest::gtest_main)
+target_link_libraries(test_vector GTest::gtest GTest::gtest_main)
 target_compile_options(test_vector PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}

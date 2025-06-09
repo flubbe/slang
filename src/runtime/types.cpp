@@ -8,8 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fmt/core.h>
-
 #include "interpreter/interpreter.h"
 #include "runtime/runtime.h"
 #include "../utils.h"

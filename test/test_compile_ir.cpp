@@ -10,7 +10,6 @@
 
 #include <memory>
 
-#include <fmt/core.h>
 #include <gtest/gtest.h>
 
 #include "compiler/codegen.h"

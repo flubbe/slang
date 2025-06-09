@@ -10,8 +10,7 @@
 
 #include <array>
 #include <algorithm>
-
-#include <fmt/core.h>
+#include <format>
 
 #include "lexer.h"
 
@@ -155,11 +154,11 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
         }
         catch(const std::invalid_argument&)
         {
-            throw lexical_error(fmt::format("Invalid argument for integer conversion: '{}'.", s));
+            throw lexical_error(std::format("Invalid argument for integer conversion: '{}'.", s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(fmt::format("Argument out of range for integer conversion: '{}'.", s));
+            throw lexical_error(std::format("Argument out of range for integer conversion: '{}'.", s));
         }
     }
     else if(type == token_type::fp_literal)
@@ -170,11 +169,11 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
         }
         catch(const std::invalid_argument& e)
         {
-            throw lexical_error(fmt::format("Invalid argument for floating point conversion: '{}'.", s));
+            throw lexical_error(std::format("Invalid argument for floating point conversion: '{}'.", s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(fmt::format("Argument out of range for floating point conversion: '{}'.", s));
+            throw lexical_error(std::format("Argument out of range for floating point conversion: '{}'.", s));
         }
     }
 
@@ -220,7 +219,7 @@ std::optional<token> lexer::next()
             if(!is_identifier(c, true))
             {
                 throw lexical_error(
-                  fmt::format(
+                  std::format(
                     "{}: Expected identifier, got '{}'.",
                     to_string(loc),
                     *c));    // NOLINT(bugprone-unchecked-optional-access)
@@ -327,7 +326,7 @@ std::optional<token> lexer::next()
                 if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
                 {
                     throw lexical_error(
-                      fmt::format(
+                      std::format(
                         "{}: Expected non-alphabetic character, got '{}'.",
                         to_string(loc),
                         *peek()));    // NOLINT(bugprone-unchecked-optional-access)
@@ -380,7 +379,7 @@ std::optional<token> lexer::next()
             if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
             {
                 throw lexical_error(
-                  fmt::format(
+                  std::format(
                     "{}: Invalid suffix '{}' on numeric literal.",
                     to_string(loc),
                     *peek()));    // NOLINT(bugprone-unchecked-optional-access)
@@ -399,7 +398,7 @@ std::optional<token> lexer::next()
                 if(peek().has_value() && *peek() != '.')    // NOLINT(bugprone-unchecked-optional-access)
                 {
                     throw lexical_error(
-                      fmt::format(
+                      std::format(
                         "{}: Expected '.', got '{}'.",
                         to_string(loc),
                         *peek()));    // NOLINT(bugprone-unchecked-optional-access)
@@ -432,7 +431,7 @@ std::optional<token> lexer::next()
                     }
                     if(*c == '\n')
                     {
-                        throw lexical_error(fmt::format("{}: Missing terminating character '\"'.", to_string(loc)));
+                        throw lexical_error(std::format("{}: Missing terminating character '\"'.", to_string(loc)));
                     }
                 }
                 else
@@ -474,7 +473,7 @@ std::optional<token> lexer::next()
                     }
                     else
                     {
-                        throw lexical_error(fmt::format("{}: Unknown escape sequence '\\{}'.", to_string(loc), *c));
+                        throw lexical_error(std::format("{}: Unknown escape sequence '\\{}'.", to_string(loc), *c));
                     }
                 }
             }
@@ -482,7 +481,7 @@ std::optional<token> lexer::next()
             if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
             {
                 throw lexical_error(
-                  fmt::format(
+                  std::format(
                     "{}: Invalid suffix '{}' on string literal.",
                     to_string(loc),
                     *peek()));    // NOLINT(bugprone-unchecked-optional-access)
@@ -508,7 +507,7 @@ std::optional<token> lexer::next()
         }
 
         throw lexical_error(
-          fmt::format(
+          std::format(
             "{}: Unexpected character '{}' (0x{:x})",
             to_string(loc),
             *c,

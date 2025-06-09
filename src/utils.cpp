@@ -12,8 +12,6 @@
 #include <string>
 #include <vector>
 
-#include <fmt/core.h>
-
 namespace slang::utils
 {
 
