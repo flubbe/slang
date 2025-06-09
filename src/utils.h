@@ -105,7 +105,8 @@ inline void replace_all(
  * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
  */
 template<typename T>
-constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignment, T p)
+    requires(!std::is_integral_v<T>)
+constexpr T align(std::size_t alignment, T p)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<T>((reinterpret_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
@@ -120,7 +121,8 @@ constexpr std::enable_if_t<!std::is_integral_v<T>, T> align(std::size_t alignmen
  * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
  */
 template<typename T>
-constexpr std::enable_if_t<std::is_integral_v<T>, T> align(std::size_t alignment, T p)
+    requires(std::is_integral_v<T>)
+constexpr T align(std::size_t alignment, T p)
 {
     return static_cast<T>((static_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }

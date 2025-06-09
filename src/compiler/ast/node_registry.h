@@ -46,11 +46,10 @@ std::unique_ptr<T> construct(node_identifier id)
 }
 
 /** AST expression serializer. */
-template<
-  typename T,
-  typename = std::enable_if_t<
-    (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
-    && std::is_base_of_v<expression, typename T::element_type>>>
+template<typename T>
+    requires(
+      (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
+      && std::is_base_of_v<expression, typename T::element_type>)
 struct expression_serializer
 {
     /** Reference to the expression. */
@@ -125,11 +124,10 @@ archive& operator&(archive& ar, expression_serializer<T> expr)
 }
 
 /** AST expression serializer, vector version. */
-template<
-  typename T,
-  typename = std::enable_if_t<
-    (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
-    && std::is_base_of_v<expression, typename T::element_type>>>
+template<typename T>
+    requires(
+      (utils::is_shared_ptr_v<T> || utils::is_unique_ptr_v<T>)
+      && std::is_base_of_v<expression, typename T::element_type>)
 struct expression_vector_serializer
 {
     /** Reference to the expression vector. */
