@@ -2195,7 +2195,7 @@ public:
      */
     void add_constant(
       std::string name,
-      std::string s,
+      const std::string& s,
       std::optional<std::string> import_path = std::nullopt);
 
     /**

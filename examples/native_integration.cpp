@@ -95,7 +95,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     // Set up argument for function call.
     std::string str = "Hello from native code!";
-    S s = S{&str, 123};    // NOLINT(readability-magic-numbers)
+    S s = S{.s = &str, .i = 123};    // NOLINT(readability-magic-numbers)
 
     // Invoke the function.
     si::value res;

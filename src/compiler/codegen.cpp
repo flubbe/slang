@@ -737,33 +737,32 @@ struct false_type : public std::false_type
 {
 };
 
-/** Helper to map types to `module_::constant_type` values. */
+/**
+ * Maps `std::int32_t`, `float` and `std::string` to the corresponding
+ * values in `module_::constant_type`.
+ *
+ * @param value The type to map.
+ */
 template<typename T>
-struct constant_type_mapper
+constexpr module_::constant_type map_constant_type()
 {
-    static_assert(false_type<T>::value, "Invalid constant type.");
-};
-
-/** Map `std::int32_t` to `module_::constant_type::i32`. */
-template<>
-struct constant_type_mapper<std::int32_t>
-{
-    static constexpr module_::constant_type value = module_::constant_type::i32;
-};
-
-/** Map `float` to `module_::constant_type::f32`. */
-template<>
-struct constant_type_mapper<float>
-{
-    static constexpr module_::constant_type value = module_::constant_type::f32;
-};
-
-/** Map `std::string` to `module_::constant_type::str`. */
-template<>
-struct constant_type_mapper<std::string>
-{
-    static constexpr module_::constant_type value = module_::constant_type::str;
-};
+    if constexpr(std::same_as<T, std::int32_t>)
+    {
+        return module_::constant_type::i32;
+    }
+    else if constexpr(std::same_as<T, float>)
+    {
+        return module_::constant_type::f32;
+    }
+    else if constexpr(std::same_as<T, std::string>)
+    {
+        return module_::constant_type::str;
+    }
+    else
+    {
+        static_assert(false_type<T>::value, "Unsupported constant type.");
+    }
+}
 
 /**
  * Add a constant to the corresponding table. That is, it is added to the import table
@@ -780,7 +779,7 @@ void add_constant(
   std::vector<constant_table_entry>& module_constants,
   std::vector<constant_table_entry>& imported_constants,
   std::string name,
-  T value,
+  const T& value,
   std::optional<std::string> import_path)
 {
     if(import_path.has_value())
@@ -798,7 +797,7 @@ void add_constant(
         }
 
         imported_constants.emplace_back(
-          constant_type_mapper<T>::value,
+          map_constant_type<T>(),
           std::move(value),
           std::move(import_path),
           std::move(name));
@@ -818,7 +817,7 @@ void add_constant(
         }
 
         module_constants.emplace_back(
-          constant_type_mapper<T>::value,
+          map_constant_type<T>(),
           std::move(value),
           std::move(import_path),
           std::move(name),
@@ -826,19 +825,43 @@ void add_constant(
     }
 }
 
-void context::add_constant(std::string name, std::int32_t i, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  std::int32_t i,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), i, std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      i,
+      std::move(import_path));
 }
 
-void context::add_constant(std::string name, float f, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  float f,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), f, std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      f,
+      std::move(import_path));
 }
 
-void context::add_constant(std::string name, std::string s, std::optional<std::string> import_path)
+void context::add_constant(
+  std::string name,
+  const std::string& s,
+  std::optional<std::string> import_path)
 {
-    slang::codegen::add_constant(constants, imported_constants, std::move(name), std::move(s), std::move(import_path));
+    slang::codegen::add_constant(
+      constants,
+      imported_constants,
+      std::move(name),
+      s,
+      std::move(import_path));
 }
 
 void context::register_constant_name(token name)

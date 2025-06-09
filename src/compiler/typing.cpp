@@ -458,8 +458,8 @@ void context::add_import(std::string path, bool transitive)
     {
         imported_modules.emplace_back(
           imported_module{
-            path,
-            transitive});
+            .path = path,
+            .transitive = transitive});
     }
 }
 

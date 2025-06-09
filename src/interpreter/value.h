@@ -30,7 +30,7 @@ class value
     std::any data;
 
     /** Size of the value, in bytes. */
-    std::size_t size;
+    std::size_t size{0};
 
     /** Type identifier. */
     module_::variable_type type;

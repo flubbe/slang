@@ -173,7 +173,9 @@ void export_table_builder::add_type(const cg::context& ctx, const std::unique_pt
     export_table.emplace_back(
       module_::symbol_type::type,
       type->get_name(),
-      module_::struct_descriptor{type->get_flags(), std::move(transformed_members)});
+      module_::struct_descriptor{
+        .flags = type->get_flags(),
+        .member_types = std::move(transformed_members)});
 }
 
 void export_table_builder::add_constant(std::string name, std::size_t i)

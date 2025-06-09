@@ -936,7 +936,7 @@ TEST(interpreter, struct_argument)
             float j;
             std::string* s;
         };
-        S s{0, 0.f, nullptr};
+        S s{.i = 0, .j = 0.f, .s = nullptr};
 
         std::size_t layout_id = 0;
         ASSERT_NO_THROW(layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("struct_arg", "S")));

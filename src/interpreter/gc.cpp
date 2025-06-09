@@ -321,7 +321,11 @@ void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
     auto it = persistent_objects.find(obj);
     if(it == persistent_objects.end())
     {
-        persistent_objects.insert({obj, gc_persistent_object{&layout_it->second.second, 1}});
+        persistent_objects.insert(
+          {obj,
+           gc_persistent_object{
+             .layout = &layout_it->second.second,
+             .reference_count = 1}});
     }
     else
     {

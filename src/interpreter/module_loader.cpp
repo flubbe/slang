@@ -178,20 +178,31 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     // array types.
     if(type.is_array())
     {
-        // FIXME the copy `std::size_t(...)` is here because clang complains about losing `const` qualifier.
-        return {0, sizeof(void*), std::size_t{std::alignment_of_v<void*>}, 0};
+        return {
+          .flags = 0,
+          .size = sizeof(void*),
+          .alignment = std::alignment_of_v<void*>,
+          .layout_id = 0};
     }
 
     // built-in types.
     if(type.base_type() == "void")
     {
-        return {0, 0, 0, 0};
+        return {
+          .flags = 0,
+          .size = 0,
+          .alignment = 0,
+          .layout_id = 0};
     }
 
     auto built_in_it = type_properties_map.find(type.base_type());
     if(built_in_it != type_properties_map.end())
     {
-        return {0, built_in_it->second.first, built_in_it->second.second, 0};
+        return {
+          .flags = 0,
+          .size = built_in_it->second.first,
+          .alignment = built_in_it->second.second,
+          .layout_id = 0};
     }
 
     // structs.
@@ -201,7 +212,11 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
         throw interpreter_error(std::format("Cannot resolve size for type '{}': Type not found.", type.base_type()));
     }
 
-    return {type_it->second.flags, type_it->second.size, type_it->second.alignment, type_it->second.layout_id};
+    return {
+      .flags = type_it->second.flags,
+      .size = type_it->second.size,
+      .alignment = type_it->second.alignment,
+      .layout_id = type_it->second.layout_id};
 }
 
 field_properties module_loader::get_field_properties(
@@ -228,7 +243,10 @@ field_properties module_loader::get_field_properties(
     }
 
     auto field_info = type_it->second.member_types.at(field_index);
-    return {field_info.second.size, field_info.second.offset, is_garbage_collected(type_name)};
+    return {
+      .size = field_info.second.size,
+      .offset = field_info.second.offset,
+      .needs_gc = is_garbage_collected(type_name)};
 }
 
 void module_loader::decode_structs()

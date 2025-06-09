@@ -156,7 +156,7 @@ std::string to_string(const variable_type& t)
  */
 
 variable_descriptor::variable_descriptor(variable_type type)
-: symbol{0, 0}
+: symbol{.size = 0, .offset = 0}
 , type{std::move(type)}
 , reference{ty::is_reference_type(this->type.base_type())}
 {
@@ -255,7 +255,8 @@ void language_module::add_struct(
         throw module_error(std::format("Cannot add type: '{}' already defined.", name));
     }
 
-    struct_descriptor desc{flags, std::move(members)};
+    struct_descriptor desc{
+      .flags = flags, .member_types = std::move(members)};
     header.exports.emplace_back(symbol_type::type, name, std::move(desc));
 }
 

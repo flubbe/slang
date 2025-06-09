@@ -71,12 +71,15 @@ void format_macro_expander::create_format_string_placeholders()
             if(i + 1 < format_string.s.length() && format_string.s[i + 1] == '{')
             {
                 placeholders.emplace_back(
-                  format_string_placeholder{i, i + 1, '{'});
+                  format_string_placeholder{
+                    .start = i,
+                    .end = i + 1,
+                    .type = '{'});
                 i += 1;
                 continue;
             }
 
-            current_placeholder = format_string_placeholder{i, 0, 0};
+            current_placeholder = format_string_placeholder{.start = i, .end = 0, .type = 0};
         }
         else if(format_string.s[i] == '}')
         {
@@ -109,7 +112,10 @@ void format_macro_expander::create_format_string_placeholders()
                 if(i + 1 < format_string.s.length() && format_string.s[i + 1] == '}')
                 {
                     placeholders.emplace_back(
-                      format_string_placeholder{i, i + 1, '}'});
+                      format_string_placeholder{
+                        .start = i,
+                        .end = i + 1,
+                        .type = '}'});
                     i += 1;
                     continue;
                 }
@@ -360,15 +366,24 @@ std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ct
             // store type in placeholders.
             if(type_str == "i32")
             {
-                placeholders.emplace_back(format_string_placeholder{p.start, p.end, 'd'});
+                placeholders.emplace_back(format_string_placeholder{
+                  .start = p.start,
+                  .end = p.end,
+                  .type = 'd'});
             }
             else if(type_str == "f32")
             {
-                placeholders.emplace_back(format_string_placeholder{p.start, p.end, 'f'});
+                placeholders.emplace_back(format_string_placeholder{
+                  .start = p.start,
+                  .end = p.end,
+                  .type = 'f'});
             }
             else if(type_str == "str")
             {
-                placeholders.emplace_back(format_string_placeholder{p.start, p.end, 's'});
+                placeholders.emplace_back(format_string_placeholder{
+                  .start = p.start,
+                  .end = p.end,
+                  .type = 's'});
             }
             else
             {
