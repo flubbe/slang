@@ -172,7 +172,10 @@ public:
             throw interpreter_error("Stack overflow.");
         }
 
-        stack.insert(stack.end(), stack.end() - 4, stack.end());
+        stack.insert(
+          stack.end(),
+          stack.end() - 4,
+          stack.end());
     }
 
     /** Duplicate the top f32 on the stack. */
@@ -188,7 +191,10 @@ public:
             throw interpreter_error("Stack overflow.");
         }
 
-        stack.insert(stack.end(), stack.end() - 4, stack.end());
+        stack.insert(
+          stack.end(),
+          stack.end() - 4,
+          stack.end());
     }
 
     /** Duplicate the top address on the stack. */
@@ -204,7 +210,10 @@ public:
             throw interpreter_error("Stack overflow.");
         }
 
-        stack.insert(stack.end(), stack.end() - sizeof(void*), stack.end());
+        stack.insert(
+          stack.end(),
+          stack.end() - sizeof(void*),
+          stack.end());
     }
 
     /** Duplicate a memory block of size `size1` and insert it at `size1 + size2` from the top. */
@@ -216,7 +225,10 @@ public:
         }
 
         std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
-        stack.insert(stack.end() - size1 - size2, copy.begin(), copy.end());
+        stack.insert(
+          stack.end() - size1 - size2,
+          copy.begin(),
+          copy.end());
     }
 
     /** Duplicate a memory block of size `size1` and insert it at `size1 + size2 + size3` from the top. */
@@ -228,7 +240,10 @@ public:
         }
 
         std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
-        stack.insert(stack.end() - size1 - size2 - size3, copy.begin(), copy.end());
+        stack.insert(
+          stack.end() - size1 - size2 - size3,
+          copy.begin(),
+          copy.end());
     }
 
     /**
@@ -242,7 +257,10 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&i), reinterpret_cast<std::uint8_t*>(&i) + 4);
+        stack.insert(
+          stack.end(),
+          reinterpret_cast<std::uint8_t*>(&i),
+          reinterpret_cast<std::uint8_t*>(&i) + 4);
     }
 
     /**
@@ -256,7 +274,10 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&f), reinterpret_cast<std::uint8_t*>(&f) + 4);
+        stack.insert(
+          stack.end(),
+          reinterpret_cast<std::uint8_t*>(&f),
+          reinterpret_cast<std::uint8_t*>(&f) + 4);
     }
 
     /**
@@ -271,7 +292,10 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(stack.end(), reinterpret_cast<std::uint8_t*>(&addr), reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
+        stack.insert(
+          stack.end(),
+          reinterpret_cast<std::uint8_t*>(&addr),
+          reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
     }
 
     /**
@@ -285,7 +309,10 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(stack.end(), other.stack.begin(), other.stack.end());
+        stack.insert(
+          stack.end(),
+          other.stack.begin(),
+          other.stack.end());
     }
 
     /** Pop an i32 from the stack. */

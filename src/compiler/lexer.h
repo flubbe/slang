@@ -140,12 +140,14 @@ public:
     /** Destructor. */
     ~lexer() = default;
 
-    /** Assignment. */
+    /** Assignments. */
     lexer& operator=(const lexer&) = default;
     lexer& operator=(lexer&&) = default;
 
     /**
      * Set the input string.
+     *
+     * @param str The new input string. This is copied into the lexer.
      */
     void set_input(const std::string& str)
     {

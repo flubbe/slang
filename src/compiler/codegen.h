@@ -1441,16 +1441,9 @@ public:
 
     /** Get the outer scope. */
     [[nodiscard]]
-    scope* get_outer()
+    auto get_outer(this auto&& self)
     {
-        return outer;
-    }
-
-    /** Get the outer scope. */
-    [[nodiscard]]
-    const scope* get_outer() const
-    {
-        return outer;
+        return self.outer;
     }
 
     /** Get a string representation of the scope. */
@@ -1728,16 +1721,10 @@ public:
     }
 
     /** Get the function's scope. */
-    class scope* get_scope()
-    {
-        return &scope;
-    }
-
-    /** Get the function's scope. */
     [[nodiscard]]
-    const class scope* get_scope() const
+    auto get_scope(this auto&& self)
     {
-        return &scope;
+        return &self.scope;
     }
 
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
@@ -2340,9 +2327,9 @@ public:
      * @returns Returns the macro list.
      */
     [[nodiscard]]
-    std::vector<std::unique_ptr<macro>>& get_macros()
+    auto& get_macros(this auto&& self)
     {
-        return macros;
+        return self.macros;
     }
 
     /** Generate a unique macro invocation id. */
@@ -2405,28 +2392,21 @@ public:
 
     /** Get the current scope. */
     [[nodiscard]]
-    scope* get_scope()
+    auto* get_scope(this auto&& self)
     {
-        if(!current_scopes.empty())
+        if(!self.current_scopes.empty())
         {
-            return current_scopes.back();
+            return self.current_scopes.back();
         }
 
-        return global_scope.get();
+        return self.global_scope.get();
     }
 
     /** Get the global scope. */
     [[nodiscard]]
-    scope* get_global_scope()
+    auto* get_global_scope(this auto&& self)
     {
-        return global_scope.get();
-    }
-
-    /** Get the global scope. */
-    [[nodiscard]]
-    const scope* get_global_scope() const
-    {
-        return global_scope.get();
+        return self.global_scope.get();
     }
 
     /** Return whether a given scope is the global scope. */
