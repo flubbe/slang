@@ -550,7 +550,7 @@ void module_loader::decode()
                 throw interpreter_error("Error during decode: Got negative stack size.");
             }
 
-            if(static_cast<std::size_t>(stack_size) > max_stack_size)
+            if(utils::numeric_cast<std::size_t>(stack_size) > max_stack_size)
             {
                 max_stack_size = stack_size;
             }

@@ -306,21 +306,21 @@ opcode context::exec(
         const std::size_t function_end = offset + size;
         while(offset < function_end)
         {
-            auto instr = binary[offset];
+            auto instr = std::to_integer<opcode_base>(binary[offset]);
             ++offset;
 
             // validate opcode.
-            if(instr >= static_cast<std::byte>(opcode::opcode_count))
+            if(instr >= static_cast<opcode_base>(opcode::opcode_count))
             {
                 throw interpreter_error(
                   std::format(
                     "'{:02x}' is not an opcode.",
-                    std::to_integer<std::uint8_t>(instr)));
+                    instr));
             }
             auto instr_opcode = static_cast<opcode>(instr);
 
             // return.
-            if(instr >= static_cast<std::byte>(opcode::ret) && instr <= static_cast<std::byte>(opcode::aret))
+            if(instr >= static_cast<opcode_base>(opcode::ret) && instr <= static_cast<opcode_base>(opcode::aret))
             {
                 // NOTE The stack size is validated by the caller.
 

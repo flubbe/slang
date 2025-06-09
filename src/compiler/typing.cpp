@@ -1237,8 +1237,7 @@ void context::exit_anonymous_scope()
         throw type_error(current_scope->name.location, "Cannot exit anonymous scope: No scope to leave.");
     }
 
-    constexpr auto ANONYMOUS_SUBSTR_LENGTH = 11;
-    if(current_scope->name.s.substr(0, ANONYMOUS_SUBSTR_LENGTH) != "<anonymous@"
+    if(!current_scope->name.s.starts_with("<anonymous@")
        || current_scope->name.s.back() != '>')
     {
         throw type_error(current_scope->name.location, std::format("Cannot exit anonymous scope: Scope id '{}' not anonymous.", current_scope->name.s));

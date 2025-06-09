@@ -22,9 +22,8 @@ bool file_manager::exists(const fs::path& p) const
         return fs::exists(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::exists(sp / p);
@@ -38,9 +37,8 @@ bool file_manager::is_file(const fs::path& p) const
         return fs::is_regular_file(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::is_regular_file(sp / p);
@@ -54,9 +52,8 @@ bool file_manager::is_directory(const fs::path& p) const
         return fs::is_directory(p);
     }
 
-    return std::any_of(
-      search_paths.begin(),
-      search_paths.end(),
+    return std::ranges::any_of(
+      search_paths,
       [&p](const auto& sp) -> bool
       {
           return fs::is_directory(sp / p);

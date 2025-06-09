@@ -1858,13 +1858,13 @@ public:
     [[nodiscard]]
     bool is_transitive_import() const
     {
-        return is_import() && name.substr(0, 1) == "$";
+        return is_import() && name.starts_with("$");
     }
 
     /** Set transitivity. */
     void set_transitive(bool transitive)
     {
-        bool transitive_name = name.substr(0, 1) == "$";
+        bool transitive_name = name.starts_with("$");
         if(transitive_name && !transitive)
         {
             name = name.substr(1);

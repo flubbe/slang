@@ -44,7 +44,7 @@ static const std::set<std::string> keywords = {
 /** Check whether a given string is a keyword. */
 static bool is_keyword(const std::string& s)
 {
-    return keywords.find(s) != keywords.end();
+    return keywords.contains(s);
 }
 
 /**

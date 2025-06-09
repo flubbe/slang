@@ -146,7 +146,7 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
     {
         try
         {
-            if(s.substr(0, 2) == "0x")
+            if(s.starts_with("0x"))
             {
                 constexpr int BASE = 16;
                 return std::stoi(s, nullptr, BASE);

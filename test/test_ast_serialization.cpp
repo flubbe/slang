@@ -26,7 +26,7 @@ namespace
 {
 
 /** Helper to test AST serialization by compiling the test input. */
-static void run_test(
+void run_test(
   std::size_t test_id,
   const std::string& test_input)
 {

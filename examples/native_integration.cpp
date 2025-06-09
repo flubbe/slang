@@ -101,7 +101,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     si::value res;
     try
     {
-        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers)
+        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers,modernize-use-std-numbers)
     }
     catch(const si::interpreter_error& err)
     {

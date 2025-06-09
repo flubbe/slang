@@ -808,7 +808,7 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_variable_reference();
-            if(original_local_names.count(expr->name.s) > 0
+            if(original_local_names.contains(expr->name.s)
                || !ctx.has_registered_constant_name(expr->name.s))
             {
                 expr->name.s = make_local_name(invocation_id, expr->name.s);
@@ -818,7 +818,7 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_access_expression()->get_left_expression()->as_named_expression();
-            if(original_local_names.count(expr->name.s) > 0)
+            if(original_local_names.contains(expr->name.s))
             {
                 expr->name.s = make_local_name(invocation_id, expr->name.s);
             }
