@@ -27,7 +27,7 @@ TEST(filemanager, exists)
 
     std::unique_ptr<slang::file_archive> ar;
     EXPECT_NO_THROW(ar = mgr.open("README.md", slang::file_manager::open_mode::read));
-    EXPECT_EQ(ar->get_target_byte_order(), slang::endian::little);
+    EXPECT_EQ(ar->get_target_byte_order(), std::endian::little);
     EXPECT_EQ(ar->is_reading(), true);
     EXPECT_EQ(ar->is_writing(), false);
     EXPECT_EQ(ar->is_persistent(), true);

@@ -15,7 +15,11 @@
 namespace slang
 {
 
-file_archive::file_archive(fs::path path, bool read, bool write, endian target_byte_order)
+file_archive::file_archive(
+  fs::path path,
+  bool read,
+  bool write,
+  std::endian target_byte_order)
 : archive{read, write, true, target_byte_order}
 , path{std::move(path)}
 {

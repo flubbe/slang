@@ -388,7 +388,7 @@ void module_loader::decode()
         throw interpreter_error("Tried to decode a module that already is decoded.");
     }
 
-    memory_read_archive ar{mod.get_binary(), true, slang::endian::little};
+    memory_read_archive ar{mod.get_binary(), true, std::endian::little};
 
     recorder->section("Constant table");
     for(auto& c: mod.header.constants)

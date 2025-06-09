@@ -125,7 +125,7 @@ bool expression::expand_macros(
                 memory_read_archive ar{
                   m->get_desc().serialized_ast.value(),
                   true,
-                  endian::little};
+                  std::endian::little};
 
                 std::unique_ptr<expression> macro_ast;
                 ar& expression_serializer{macro_ast};
@@ -473,7 +473,7 @@ void macro_expression::collect_names(
         })
       | std::ranges::to<std::vector>();
 
-    memory_write_archive ar{true, endian::little};
+    memory_write_archive ar{true, std::endian::little};
     auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
     ar& expression_serializer{cloned_expr};
 

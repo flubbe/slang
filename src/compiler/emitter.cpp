@@ -399,7 +399,7 @@ void instruction_emitter::collect_imports()
         memory_read_archive ar{
           desc.serialized_ast.value(),
           true,
-          endian::little};
+          std::endian::little};
 
         std::unique_ptr<ast::expression> macro_ast;
         ar& ast::expression_serializer{macro_ast};

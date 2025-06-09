@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <bit>
 #include <stdexcept>
 #include <cstddef>
 #include <cstdint>
@@ -23,26 +24,12 @@
 namespace slang
 {
 
-/** The endianness of the system. Only 'big' and 'little' are supported. */
-enum class endian    // NOLINT(performance-enum-size)
-{
-#if defined(_MSC_VER) && !defined(__clang__)
-    little = 0,
-    big = 1,
-    native = little
-#else
-    little = __ORDER_LITTLE_ENDIAN__,
-    big = __ORDER_BIG_ENDIAN__,
-    native = __BYTE_ORDER__
-#endif
-};
-
 /*
  * Assert assumptions use in the code.
  */
 
 static_assert(
-  endian::native == endian::little || endian::native == endian::big,
+  std::endian::native == std::endian::little || std::endian::native == std::endian::big,
   "Only little endian or big endian CPU architectures are supported.");
 
 static_assert(
@@ -79,7 +66,7 @@ public:
 class archive
 {
     /** The target byte order for persistent archives. */
-    endian target_byte_order;
+    std::endian target_byte_order;
 
     /** Whether this is a read archive. */
     bool read;
@@ -116,7 +103,11 @@ public:
      * @param persistent Whether this is a persistent archive.
      * @param target_byte_order The target byte order for persistent archives.
      */
-    archive(bool read, bool write, bool persistent, endian target_byte_order = endian::native)
+    archive(
+      bool read,
+      bool write,
+      bool persistent,
+      std::endian target_byte_order = std::endian::native)
     : target_byte_order{target_byte_order}
     , read{read}
     , write{write}
@@ -148,7 +139,7 @@ public:
 
     /** Return the target byte order for this archive. Only used/relevant for persistent archives. */
     [[nodiscard]]
-    endian get_target_byte_order() const
+    std::endian get_target_byte_order() const
     {
         return target_byte_order;
     }
@@ -191,7 +182,7 @@ public:
         else
         {
             // persistent archive.
-            if(target_byte_order == endian::native)
+            if(target_byte_order == std::endian::native)
             {
                 serialize_bytes(buffer, c);
             }

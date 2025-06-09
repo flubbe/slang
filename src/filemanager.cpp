@@ -109,12 +109,12 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
 
     if(mode == open_mode::read)
     {
-        return std::make_unique<file_read_archive>(resolved_path, endian::little);
+        return std::make_unique<file_read_archive>(resolved_path, std::endian::little);
     }
 
     if(mode == open_mode::write)
     {
-        return std::make_unique<file_write_archive>(resolved_path, endian::little);
+        return std::make_unique<file_write_archive>(resolved_path, std::endian::little);
     }
 
     throw std::runtime_error("Invalid file open mode.");
