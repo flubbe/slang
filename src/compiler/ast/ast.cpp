@@ -237,6 +237,8 @@ std::string expression::to_string() const
  * @tparam T The expression type. Must be a subclass of `expression`.
  */
 template<typename T>
+    requires(std::is_same_v<std::decay_t<T>, expression>
+             || std::is_base_of_v<expression, std::decay_t<T>>)
 void visit_nodes(
   T& expr,
   std::function<void(T&)>& visitor,
@@ -244,10 +246,6 @@ void visit_nodes(
   bool post_order,
   const std::function<bool(std::add_const_t<T>&)>& filter = nullptr)
 {
-    static_assert(
-      std::is_same_v<std::decay_t<T>, expression>
-      || std::is_base_of_v<expression, std::decay_t<T>>);
-
     // use DFS to topologically sort the AST.
     std::stack<T*> stack;
     stack.push(&expr);

@@ -345,11 +345,10 @@ public:
 
     /** Modify the top value on the stack in-place. */
     template<typename T, typename U>
+        requires(sizeof(T) == sizeof(U)
+                 && std::is_scalar_v<T> && std::is_scalar_v<U>)
     void modify_top(std::function<U(T)> func)
     {
-        static_assert(sizeof(T) == sizeof(U));
-        static_assert(std::is_scalar_v<T> && std::is_scalar_v<U>);
-
         if(stack.size() < sizeof(T))
         {
             throw interpreter_error("Stack underflow");
