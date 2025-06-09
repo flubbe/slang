@@ -120,68 +120,21 @@ constexpr T align(std::size_t alignment, T p)
  * @param p The parameter to align.
  * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
  */
-template<typename T>
-    requires(std::is_integral_v<T>)
+template<std::integral T>
 constexpr T align(std::size_t alignment, T p)
 {
     return static_cast<T>((static_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
 }
 
 /*
- * Helpers for tuples.
- */
-
-/** Check that all tuple types are the same. */
-template<typename T, typename... Args>
-struct all_same_type
-{
-    constexpr static bool value = std::is_same_v<std::tuple<T, Args...>,
-                                                 std::tuple<Args..., T>>;
-};
-
-template<typename... Args>
-struct all_same_type<std::tuple<Args...>> : all_same_type<Args...>
-{
-};
-
-template<>
-struct all_same_type<std::tuple<>>
-{
-    constexpr static bool value = true;
-};
-
-template<typename... Args>
-constexpr bool all_same_type_v = all_same_type<Args...>::value;
-
-/*
  * Helpers for smart pointers.
  */
 
-template<typename>
-struct is_shared_ptr : std::false_type
-{
-};
-
 template<typename T>
-struct is_shared_ptr<std::shared_ptr<T>> : std::true_type
-{
-};
-
-template<typename T>
-constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
-
-template<typename>
-struct is_unique_ptr : std::false_type
-{
-};
-
-template<typename T>
-struct is_unique_ptr<std::unique_ptr<T>> : std::true_type
-{
-};
-
-template<typename T>
-constexpr bool is_unique_ptr_v = is_unique_ptr<T>::value;
+concept smart_ptr =
+  requires { typename T::element_type; }
+  && (std::is_same_v<T, std::shared_ptr<typename T::element_type>>
+      || std::is_same_v<T, std::unique_ptr<typename T::element_type>>);
 
 /*
  * Safe casting.
@@ -195,11 +148,9 @@ constexpr bool is_unique_ptr_v = is_unique_ptr<T>::value;
  * @throws Throws a `std::out_of_range` exception if the value does not fit into the target type.
  */
 template<typename T, typename S>
-T numeric_cast(S value)
+    requires(std::is_integral_v<T> && std::is_integral_v<S>)
+constexpr T numeric_cast(S value)
 {
-    static_assert(std::is_integral_v<T>, "T must be an integral type.");
-    static_assert(std::is_integral_v<S>, "S must be an integral type.");
-
     if constexpr(std::is_signed_v<S> == std::is_signed_v<T>)
     {
         using ComparisonType = std::common_type_t<S, T>;
