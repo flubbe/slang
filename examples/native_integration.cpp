@@ -110,14 +110,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
 
     // Print the result.
-    S* ret_s = static_cast<S*>(*res.get<void*>());
-    if(ret_s == nullptr)
+    void* const* ret = res.get<void*>();
+    if(ret == nullptr)
     {
         // `res` can be `nullptr` if the return type was not an object.
         std::print("Got unexpected return type.\n");
         return EXIT_FAILURE;
     }
 
+    S* ret_s = static_cast<S*>(*ret);
     if(ret_s->s == nullptr)
     {
         std::print("Received null instead of string.\n");

@@ -57,8 +57,14 @@ class value
                  || std::is_floating_point_v<std::remove_cv_t<std::remove_reference_t<T>>>)
     void create_primitive_type(std::byte* memory) const
     {
+        const T* ptr = std::any_cast<T>(&data);
+        if(!ptr)
+        {
+            throw std::bad_any_cast();
+        }
+
         // we can just copy the value.
-        std::memcpy(memory, std::any_cast<T>(&data), sizeof(T));
+        std::memcpy(memory, ptr, sizeof(T));
     }
 
     /**
@@ -73,8 +79,12 @@ class value
     {
         // we need to convert `std::vector` to a `fixed_vector<T>*`.
         auto input_vec = std::any_cast<std::vector<T>>(&data);
-        auto vec = new fixed_vector<T>(input_vec->size());
+        if(!input_vec)
+        {
+            throw std::bad_any_cast();
+        }
 
+        auto vec = new fixed_vector<T>(input_vec->size());
         for(std::size_t i = 0; i < input_vec->size(); ++i)
         {
             (*vec)[i] = (*input_vec)[i];
@@ -92,8 +102,12 @@ class value
     {
         // we need to convert `std::vector` to a `fixed_vector<T>*`.
         auto input_vec = std::any_cast<std::vector<std::string>>(&data);
-        auto vec = new fixed_vector<std::string*>(input_vec->size());
+        if(!input_vec)
+        {
+            throw std::bad_any_cast();
+        }
 
+        auto vec = new fixed_vector<std::string*>(input_vec->size());
         for(std::size_t i = 0; i < input_vec->size(); ++i)
         {
             (*vec)[i] = new std::string{(*input_vec)[i]};
@@ -173,8 +187,14 @@ class value
      */
     void create_addr(std::byte* memory) const
     {
+        void* const* addr = std::any_cast<void*>(&data);
+        if(!addr)
+        {
+            throw std::bad_any_cast();
+        }
+
         // we can just copy the value.
-        std::memcpy(memory, std::any_cast<void*>(&data), sizeof(void*));
+        std::memcpy(memory, addr, sizeof(void*));
     }
 
     /**
@@ -414,7 +434,7 @@ public:
     /**
      * Access the data.
      *
-     * @returns Retuens a pointer to the value. Returns `nullptr´ if the cast is invalid.
+     * @returns Returns a pointer to the value. Returns `nullptr´ if the cast is invalid.
      */
     template<typename T>
     const T* get() const
