@@ -312,6 +312,17 @@ public:
     }
 
     /**
+     * Return whether this expression is pure, i.e. if it has no side effects.
+     *
+     * @param ctx The context in which to check.
+     */
+    [[nodiscard]]
+    virtual bool is_pure(cg::context&) const
+    {
+        return false;
+    }
+
+    /**
      * Evaluate the compile-time constant.
      *
      * @param ctx The context used for code generation.
@@ -631,6 +642,12 @@ public:
     }
 
     [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
+
+    [[nodiscard]]
     literal_expression* as_literal() override
     {
         return this;
@@ -840,6 +857,12 @@ public:
         return expr->as_named_expression();
     }
 
+    [[nodiscard]]
+    bool is_pure(cg::context& ctx) const override
+    {
+        return expr->is_pure(ctx);
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -940,13 +963,19 @@ public:
         return expr->is_const_eval(ctx);
     }
 
-    std::optional<std::string> get_namespace_path() const override
+    [[nodiscard]]
+    bool is_pure(cg::context& ctx) const override
     {
-        return expr->get_namespace_path();
+        return expr->is_pure(ctx);
     }
 
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+
+    std::optional<std::string> get_namespace_path() const override
+    {
+        return expr->get_namespace_path();
+    }
 
     void update_namespace() override
     {
@@ -1045,6 +1074,12 @@ public:
     virtual const access_expression* as_access_expression() const override
     {
         return this;
+    }
+
+    [[nodiscard]]
+    bool is_pure(cg::context& ctx) const override
+    {
+        return lhs->is_pure(ctx) && rhs->is_pure(ctx);
     }
 
     /**
@@ -1278,6 +1313,13 @@ public:
     }
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+
+    [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
+
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -1580,6 +1622,12 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1751,6 +1799,12 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1825,10 +1879,13 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    /** Generates code for the initializing expression. */
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
 
-    /** Returns the type of the initializing expression. */
+    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
 
     [[nodiscard]] std::string to_string() const override;
@@ -1913,6 +1970,12 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
+
+    [[nodiscard]]
+    bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2002,6 +2065,7 @@ public:
     [[nodiscard]] bool needs_pop() const override;
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override;
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -2081,6 +2145,7 @@ public:
     }
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override;
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -2151,6 +2216,13 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]] bool needs_pop() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2203,6 +2275,16 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
+
+    [[nodiscard]] bool needs_pop() const override
+    {
+        return true;
+    }
+
+    [[nodiscard]] bool is_pure(cg::context&) const override
+    {
+        return true;
+    }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2419,6 +2501,8 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]] bool is_pure(cg::context&) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2619,6 +2703,8 @@ public:
         return return_type.to_string() != "void";
     }
 
+    [[nodiscard]] bool is_pure(cg::context&) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2756,6 +2842,17 @@ public:
     macro_invocation* as_macro_invocation() override
     {
         return this;
+    }
+
+    [[nodiscard]]
+    bool needs_pop() const override
+    {
+        return expansion->needs_pop();
+    }
+
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override
+    {
+        return expansion->is_pure(ctx);
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
@@ -2974,6 +3071,13 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override
+    {
+        return condition->is_pure(ctx)
+               && if_block->is_pure(ctx)
+               && (!else_block || else_block->is_pure(ctx));
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -3060,6 +3164,12 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
+
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override
+    {
+        return condition->is_pure(ctx)
+               && while_block->is_pure(ctx);
+    }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;

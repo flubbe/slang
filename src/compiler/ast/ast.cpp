@@ -384,10 +384,6 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
             "Cannot store into unknown literal of type id '{}'.",
             static_cast<int>(tok.type)));
     }
-    else if(mc == memory_context::none)
-    {
-        std::print("{}: Expression has no effect.\n", ::slang::to_string(loc));
-    }
 
     if(tok.type == token_type::int_literal)
     {
@@ -1011,11 +1007,6 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
               : "",
             name.s,
             static_cast<int>(const_v->type)));
-    }
-
-    if(mc == memory_context::none)
-    {
-        std::print("{}: Expression has no effect.\n", ::slang::to_string(loc));
     }
 
     if(mc != memory_context::store)
@@ -2214,6 +2205,12 @@ bool binary_expression::needs_pop() const
     return !is_assignment;
 }
 
+bool binary_expression::is_pure(cg::context& ctx) const
+{
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
+    return !is_assignment && lhs->is_pure(ctx) && rhs->is_pure(ctx);
+}
+
 std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     /*
@@ -2642,6 +2639,11 @@ void unary_expression::serialize(archive& ar)
     ar& expression_serializer{operand};
 }
 
+bool unary_expression::is_pure(cg::context& ctx) const
+{
+    return operand->is_pure(ctx);
+}
+
 std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::store)
@@ -2904,6 +2906,11 @@ void new_expression::serialize(archive& ar)
     super::serialize(ar);
     ar & type_expr;
     ar& expression_serializer{expr};
+}
+
+bool new_expression::is_pure(cg::context& ctx) const
+{
+    return expr->is_pure(ctx);
 }
 
 std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -3277,12 +3284,27 @@ void block::serialize(archive& ar)
     ar& expression_vector_serializer{exprs};
 }
 
+bool block::is_pure(cg::context& ctx) const
+{
+    return std::ranges::all_of(
+      exprs,
+      [&ctx](const auto& e) -> bool
+      {
+          return e->is_pure(ctx);
+      });
+}
+
 std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc == memory_context::none)
     {
         for(const auto& expr: exprs)
         {
+            if(expr->is_pure(ctx))
+            {
+                std::print("{}: Expression has no effect.\n", ::slang::to_string(expr->get_location()));
+            }
+
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 
             // non-assigning expressions need cleanup.
@@ -3305,6 +3327,10 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
             const auto& expr = exprs[i];
+            if(expr->is_pure(ctx))
+            {
+                std::print("{}: Expression has no effect.\n", ::slang::to_string(expr->get_location()));
+            }
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 
             // non-assigning expressions need cleanup.
@@ -3533,6 +3559,13 @@ void call_expression::serialize(archive& ar)
     ar& expression_vector_serializer{args};
     ar& expression_serializer{index_expr};
     ar & return_type;
+}
+
+bool call_expression::is_pure(cg::context&) const
+{
+    // TODO Check in context. Functions from the current module can be checked,
+    //      imported functions and native functions should be seen as impure.
+    return false;
 }
 
 std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
