@@ -508,6 +508,11 @@ add_compile_exec_test(
     test/test_math
 )
 add_compile_exec_test(
+    "slang expression without effect"
+    FALSE
+    test/test_expr_no_effect
+)
+add_compile_exec_test(
     "slang operators"
     TRUE
     test/test_operators

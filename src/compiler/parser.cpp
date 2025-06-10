@@ -375,6 +375,7 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
 std::unique_ptr<ast::type_expression> parser::parse_type()
 {
     bool is_array_type{false};
+    auto location = current_token->location;
 
     if(current_token->s == "[")
     {
@@ -422,7 +423,7 @@ std::unique_ptr<ast::type_expression> parser::parse_type()
     token type = components.back();
     components.pop_back();
 
-    return std::make_unique<ast::type_expression>(current_token->location, std::move(type), std::move(components), is_array_type);
+    return std::make_unique<ast::type_expression>(location, std::move(type), std::move(components), is_array_type);
 }
 
 // array_initializer_expr ::= '[' exprs ']'
@@ -870,6 +871,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
 {
     std::unique_ptr<ast::expression> expr;
+    auto location = current_token->location;
 
     if(current_token->s == "new")
     {
@@ -880,7 +882,7 @@ std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
     {
         // parse 'null'.
         get_next_token();
-        expr = std::make_unique<ast::null_expression>(current_token->location);
+        expr = std::make_unique<ast::null_expression>(location);
     }
     else
     {
@@ -893,7 +895,7 @@ std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
         else
         {
             get_next_token();
-            expr = std::make_unique<ast::unary_expression>(current_token->location, std::move(op), parse_unary());
+            expr = std::make_unique<ast::unary_expression>(location, std::move(op), parse_unary());
         }
     }
 
@@ -909,6 +911,7 @@ std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
 std::unique_ptr<ast::expression> parser::parse_new()
 {
     token new_token = *current_token;
+    auto location = current_token->location;
     get_next_token();
 
     auto type_expr = parse_type();
@@ -926,7 +929,7 @@ std::unique_ptr<ast::expression> parser::parse_new()
     }
     get_next_token();    // skip "]"
 
-    return std::make_unique<ast::new_expression>(current_token->location, std::move(type_expr), std::move(expr));
+    return std::make_unique<ast::new_expression>(location, std::move(type_expr), std::move(expr));
 }
 
 // identifierexpr ::= identifier
@@ -1179,7 +1182,7 @@ std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
         throw syntax_error(tok, std::format("Expected <literal>, got '{}'.", tok.s));
     }
 
-    return std::make_unique<ast::literal_expression>(current_token->location, std::move(tok));
+    return std::make_unique<ast::literal_expression>(tok.location, std::move(tok));
 }
 
 std::unique_ptr<ast::expression> parser::parse_paren_expression()

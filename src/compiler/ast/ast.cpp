@@ -384,6 +384,10 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
             "Cannot store into unknown literal of type id '{}'.",
             static_cast<int>(tok.type)));
     }
+    else if(mc == memory_context::none)
+    {
+        std::print("{}: Expression has no effect.\n", ::slang::to_string(loc));
+    }
 
     if(tok.type == token_type::int_literal)
     {
@@ -1009,7 +1013,12 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
             static_cast<int>(const_v->type)));
     }
 
-    if(mc == memory_context::load)
+    if(mc == memory_context::none)
+    {
+        std::print("{}: Expression has no effect.\n", ::slang::to_string(loc));
+    }
+
+    if(mc != memory_context::store)
     {
         if(ctx.is_struct_access())
         {
@@ -1040,7 +1049,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
             ctx.generate_load(std::make_unique<cg::type_argument>(v.value().get_type().deref()), true);
         }
     }
-    else if(mc == memory_context::store)
+    else
     {
         if(element_expr)
         {
@@ -1053,10 +1062,6 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         {
             ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
         }
-    }
-    else
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for variable reference expression.");
     }
 
     if(element_expr)

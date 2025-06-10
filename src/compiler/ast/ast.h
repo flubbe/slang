@@ -619,6 +619,11 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]] bool needs_pop() const override
+    {
+        return true;
+    }
+
     [[nodiscard]]
     bool is_const_eval(cg::context&) const override
     {
@@ -1254,6 +1259,11 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
+
+    [[nodiscard]] bool needs_pop() const override
+    {
+        return true;
+    }
 
     [[nodiscard]]
     variable_reference_expression* as_variable_reference() override
@@ -2064,6 +2074,11 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
+
+    [[nodiscard]] bool needs_pop() const override
+    {
+        return true;
+    }
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
