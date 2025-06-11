@@ -40,35 +40,36 @@ class instruction_logger : public slang::interpreter::instruction_recorder
 public:
     void section(const std::string& name) override
     {
-        std::print("--- {} ---\n", name);
+        std::println("--- {} ---", name);
     }
 
     void function(const std::string& name, const module_::function_details& details) override
     {
-        std::print(
-          "{:>4}: @{} (size {}, args {}, locals {})\n",
+        std::println(
+          "{:>4}: @{} (size {}, args {}, locals {})",
           details.offset, name, details.size, details.args_size, details.locals_size);
     }
 
     void type(const std::string& name, const module_::struct_descriptor& desc) override
     {
-        std::print("%{} = type (size {}, alignment {}, flags {}) {{\n", name, desc.size, desc.alignment, desc.flags);
+        std::println("%{} = type (size {}, alignment {}, flags {}) {{", name, desc.size, desc.alignment, desc.flags);
 
         for(std::size_t i = 0; i < desc.member_types.size(); ++i)
         {
             const auto& [member_name, member_type] = desc.member_types[i];
-            std::print("    {} %{} (offset {}, size {}, alignment {}){}\n",
-                       to_string(member_type.base_type),
-                       member_name,
-                       member_type.offset,
-                       member_type.size,
-                       member_type.alignment,
-                       i != desc.member_types.size() - 1
-                         ? ","
-                         : "");
+            std::println(
+              "    {} %{} (offset {}, size {}, alignment {}){}",
+              to_string(member_type.base_type),
+              member_name,
+              member_type.offset,
+              member_type.size,
+              member_type.alignment,
+              i != desc.member_types.size() - 1
+                ? ","
+                : "");
         }
 
-        std::print("}}\n");
+        std::println("}}");
     }
 
     void constant(const module_::constant_table_entry& c) override
@@ -76,15 +77,15 @@ public:
         std::print("{:>3}: {:>3}, ", constant_entries, to_string(c.type));
         if(c.type == module_::constant_type::i32)
         {
-            std::print("{}\n", std::get<std::int32_t>(c.data));
+            std::println("{}", std::get<std::int32_t>(c.data));
         }
         else if(c.type == module_::constant_type::f32)
         {
-            std::print("{}\n", std::get<float>(c.data));
+            std::println("{}", std::get<float>(c.data));
         }
         else if(c.type == module_::constant_type::str)
         {
-            std::print("{}\n", std::get<std::string>(c.data));
+            std::println("{}", std::get<std::string>(c.data));
         }
         ++constant_entries;
     }
@@ -96,44 +97,44 @@ public:
         {
             std::print(", {}", std::get<std::size_t>(s.desc));
         }
-        std::print("\n");
+        std::println();
         ++export_entries;
     }
 
     void record(const module_::imported_symbol& s) override
     {
-        std::print("{:>3}: {:>11}, {}, {}\n", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
+        std::println("{:>3}: {:>11}, {}, {}", import_entries, to_string(s.type), s.name, static_cast<std::int32_t>(s.package_index));
         ++import_entries;
     }
 
     void label(std::int64_t index) override
     {
-        std::print("%{}:\n", index);
+        std::println("%{}:", index);
     }
 
     void record(opcode instr) override
     {
-        std::print("    {:>11}\n", to_string(instr));
+        std::println("    {:>11}", to_string(instr));
     }
 
     void record(opcode instr, std::int64_t i) override
     {
-        std::print("    {:>11}    {}\n", to_string(instr), i);
+        std::println("    {:>11}    {}", to_string(instr), i);
     }
 
     void record(opcode instr, std::int64_t i1, std::int64_t i2) override
     {
-        std::print("    {:>11}    {}, {}\n", to_string(instr), i1, i2);
+        std::println("    {:>11}    {}, {}", to_string(instr), i1, i2);
     }
 
     void record(opcode instr, float f) override
     {
-        std::print("    {:>11}    {}\n", to_string(instr), f);
+        std::println("    {:>11}    {}", to_string(instr), f);
     }
 
     void record(opcode instr, std::int64_t i, std::string s) override
     {
-        std::print("    {:>11}    {} ({})\n", to_string(instr), i, s);
+        std::println("    {:>11}    {} ({})", to_string(instr), i, s);
     }
 
     void record(
@@ -142,17 +143,17 @@ public:
       std::string s,
       std::int64_t field_index) override
     {
-        std::print("    {:>11}    {} ({}), {}\n", to_string(instr), i, s, field_index);
+        std::println("    {:>11}    {} ({}), {}", to_string(instr), i, s, field_index);
     }
 
     void record(opcode instr, std::string s1, std::string s2) override
     {
-        std::print("    {:>11}    {}, {}\n", to_string(instr), s1, s2);
+        std::println("    {:>11}    {}, {}", to_string(instr), s1, s2);
     }
 
     void record(opcode instr, std::string s1, std::string s2, std::string s3) override
     {
-        std::print("    {:>11}    {}, {}, {}\n", to_string(instr), s1, s2, s3);
+        std::println("    {:>11}    {}, {}, {}", to_string(instr), s1, s2, s3);
     }
 };
 
@@ -182,7 +183,7 @@ void disasm::invoke(const std::vector<std::string>& args)
 
     if(result.count("filename") < 1)
     {
-        std::print("{}\n", options.help());
+        std::println("{}", options.help());
         return;
     }
 

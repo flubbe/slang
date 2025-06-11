@@ -84,7 +84,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
         if(verbose)
         {
-            std::print("Info: Module path: {}\n", module_path.string());
+            std::println("Info: Module path: {}", module_path.string());
         }
 
         // generate output file name, if necessary.
@@ -95,14 +95,14 @@ void compile::invoke(const std::vector<std::string>& args)
 
             if(verbose)
             {
-                std::print("Info: Output file: {}\n", output_file.string());
+                std::println("Info: Output file: {}", output_file.string());
             }
         }
     }
 
     if(display_help_and_exit)
     {
-        std::print("{}\n", options.help());
+        std::println("{}", options.help());
         return;
     }
 
@@ -113,11 +113,11 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(!evaluate_constant_subexpressions)
         {
-            std::print("Info: Evaluation of constant subexpressions disabled.\n");
+            std::println("Info: Evaluation of constant subexpressions disabled.");
         }
         else
         {
-            std::print("Info: Evaluation of constant subexpressions enabled (default).\n");
+            std::println("Info: Evaluation of constant subexpressions enabled (default).");
         }
     }
 
@@ -131,7 +131,7 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            std::print("Info: Adding 'lang' to search paths.\n");
+            std::println("Info: Adding 'lang' to search paths.");
         }
 
         file_mgr.add_search_path("lang");
@@ -144,7 +144,7 @@ void compile::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                std::print("Info: Adding '{}' to search paths.\n", it);
+                std::println("Info: Adding '{}' to search paths.", it);
             }
 
             file_mgr.add_search_path(it);
@@ -158,7 +158,7 @@ void compile::invoke(const std::vector<std::string>& args)
         throw std::runtime_error(std::format("Module '{}' does not exist.", module_path.string()));
     }
 
-    std::print("Compiling '{}'...\n", module_path.string());
+    std::println("Compiling '{}'...", module_path.string());
 
     std::string input_buffer;
     {
@@ -166,7 +166,7 @@ void compile::invoke(const std::vector<std::string>& args)
         std::size_t input_size = input_ar->size();
         if(input_size == 0)
         {
-            std::print("Empty input.\n");
+            std::println("Empty input.");
             return;
         }
 
@@ -182,14 +182,14 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!lexer.eof())
     {
-        std::print("Lexer did not complete input reading.\n");
+        std::println("Lexer did not complete input reading.");
         return;
     }
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     if(!ast)
     {
-        std::print("No AST produced.\n");
+        std::println("No AST produced.");
         return;
     }
 
@@ -221,7 +221,7 @@ void compile::invoke(const std::vector<std::string>& args)
     slang::file_write_archive write_ar(output_file.string());
     write_ar & mod;
 
-    std::print("Compilation finished. Output file: {}\n", output_file.string());
+    std::println("Compilation finished. Output file: {}", output_file.string());
 }
 
 std::string compile::get_description() const

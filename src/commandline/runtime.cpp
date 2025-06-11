@@ -28,14 +28,14 @@ void runtime_setup(si::context& ctx, bool verbose)
 {
     if(verbose)
     {
-        std::print("Info: Registering type layouts.\n");
+        std::println("Info: Registering type layouts.");
     }
 
     rt::register_builtin_type_layouts(ctx.get_gc());
 
     if(verbose)
     {
-        std::print("Info: Registering native functions.\n");
+        std::println("Info: Registering native functions.");
     }
 
     ctx.register_native_function("slang", "print",
@@ -49,7 +49,7 @@ void runtime_setup(si::context& ctx, bool verbose)
                                  [&ctx](si::operand_stack& stack)
                                  {
                                      auto* s = stack.pop_addr<std::string>();
-                                     std::print("{}\n", *s);
+                                     std::println("{}", *s);
                                      ctx.get_gc().remove_temporary(s);
                                  });
     ctx.register_native_function("slang", "array_copy",

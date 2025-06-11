@@ -20,7 +20,7 @@
 #include "vector.h"
 
 #ifdef INTERPRETER_DEBUG
-#    define DEBUG_LOG(...) std::print("INT: {}\n", std::format(__VA_ARGS__))
+#    define DEBUG_LOG(...) std::println("INT: {}", std::format(__VA_ARGS__))
 #else
 #    define DEBUG_LOG(...)
 #endif

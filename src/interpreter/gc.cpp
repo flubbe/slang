@@ -16,7 +16,7 @@
 #include "gc.h"
 
 #ifdef GC_DEBUG
-#    define GC_LOG(...) std::print("GC: {}\n", std::format(__VA_ARGS__))
+#    define GC_LOG(...) std::println("GC: {}", std::format(__VA_ARGS__))
 #else
 #    define GC_LOG(...)
 #endif

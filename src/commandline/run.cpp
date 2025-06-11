@@ -40,7 +40,7 @@ static void validate_main_signature(const si::function& main_function, bool verb
 {
     if(verbose)
     {
-        std::print("Info: Validating signature of 'main'.\n");
+        std::println("Info: Validating signature of 'main'.");
     }
 
     // validate function signature for 'main'.
@@ -75,20 +75,20 @@ static void check_finalized_gc(gc::garbage_collector& gc, bool verbose)
 {
     if(verbose)
     {
-        std::print("Info: Checking GC cleanup.\n");
+        std::println("Info: Checking GC cleanup.");
     }
 
     if(gc.object_count() != 0)
     {
-        std::print("GC warning: Object count is {}.\n", gc.object_count());
+        std::println("GC warning: Object count is {}.", gc.object_count());
     }
     if(gc.root_set_size() != 0)
     {
-        std::print("GC warning: Root set size is {}.\n", gc.root_set_size());
+        std::println("GC warning: Root set size is {}.", gc.root_set_size());
     }
     if(gc.byte_size() != 0)
     {
-        std::print("GC warning: {} bytes still allocated.\n", gc.byte_size());
+        std::println("GC warning: {} bytes still allocated.", gc.byte_size());
     }
 }
 
@@ -116,7 +116,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(result.count("filename") < 1)
     {
-        std::print("{}\n", options.help());
+        std::println("{}", options.help());
         return;
     }
 
@@ -137,7 +137,7 @@ void run::invoke(const std::vector<std::string>& args)
     {
         if(verbose)
         {
-            std::print("Info: Adding 'lang' to search paths.\n");
+            std::println("Info: Adding 'lang' to search paths.");
         }
 
         file_mgr.add_search_path("lang");
@@ -150,7 +150,7 @@ void run::invoke(const std::vector<std::string>& args)
         {
             if(verbose)
             {
-                std::print("Info: Adding '{}' to search paths.\n", it);
+                std::println("Info: Adding '{}' to search paths.", it);
             }
 
             file_mgr.add_search_path(it);
@@ -183,7 +183,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(verbose)
     {
-        std::print("Info: module name: {}\n", module_name.string());
+        std::println("Info: module name: {}", module_name.string());
     }
 
     // Set up interpreter context.
@@ -197,7 +197,7 @@ void run::invoke(const std::vector<std::string>& args)
     // call 'main'.
     if(verbose)
     {
-        std::print("Info: Invoking 'main'.\n");
+        std::println("Info: Invoking 'main'.");
     }
     si::value res = si::invoke(
       main_function,
@@ -207,11 +207,13 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(return_value == nullptr)
     {
-        std::print("\nProgram did not return a valid exit code.\n");
+        std::println();
+        std::println("Program did not return a valid exit code.");
     }
     else
     {
-        std::print("\nProgram exited with exit code {}.\n", *return_value);
+        std::println();
+        std::println("Program exited with exit code {}.", *return_value);
     }
 
     check_finalized_gc(ctx.get_gc(), verbose);

@@ -767,7 +767,7 @@ TEST(interpreter, structs)
     }
     catch(const std::runtime_error& e)
     {
-        std::print("Error loading 'structs.cmod'. Make sure to run 'test_output' to generate the file.\n");
+        std::println("Error loading 'structs.cmod'. Make sure to run 'test_output' to generate the file.");
         throw e;
     }
 

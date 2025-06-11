@@ -78,7 +78,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch(const slang::file_error& err)
     {
-        std::print("Error: {}\n", err.what());
+        std::println("Error: {}", err.what());
         return EXIT_FAILURE;
     }
 
@@ -88,7 +88,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Find the function to invoke.
     if(!loader.has_function("test"))
     {
-        std::print("Cannot find function 'test' in module.\n");
+        std::println("Cannot find function 'test' in module.");
         return EXIT_FAILURE;
     }
     si::function& function = loader.get_function("test");
@@ -105,7 +105,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
     catch(const si::interpreter_error& err)
     {
-        std::print("Error: {}\n", err.what());
+        std::println("Error: {}", err.what());
         return EXIT_FAILURE;
     }
 
@@ -114,20 +114,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     if(ret == nullptr)
     {
         // `res` can be `nullptr` if the return type was not an object.
-        std::print("Got unexpected return type.\n");
+        std::println("Got unexpected return type.");
         return EXIT_FAILURE;
     }
 
     S* ret_s = static_cast<S*>(*ret);
     if(ret_s->s == nullptr)
     {
-        std::print("Received null instead of string.\n");
+        std::println("Received null instead of string.");
     }
     else
     {
-        std::print("String: {}\n", *ret_s->s);
+        std::println("String: {}", *ret_s->s);
     }
-    std::print("Value: {}\n", ret_s->i);
+    std::println("Value: {}", ret_s->i);
 
     // Clean up return values.
     ctx.get_gc().remove_temporary(ret_s);
@@ -136,14 +136,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     // Check that the memory was cleaned up.
     if(ctx.get_gc().object_count() != 0)
     {
-        std::print("GC: There are objects left.\n");
+        std::println("GC: There are objects left.");
     }
     if(ctx.get_gc().root_set_size() != 0)
     {
-        std::print("GC: There are roots left.\n");
+        std::println("GC: There are roots left.");
     }
     if(ctx.get_gc().byte_size() != 0)
     {
-        std::print("GC: There is memory left.\n");
+        std::println("GC: There is memory left.");
     }
 }

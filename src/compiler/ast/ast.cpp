@@ -2331,7 +2331,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
                     // fall-through
                 }
 
-                std::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+                std::println("{}: Warning: Attempted constant expression computation failed.", ::slang::to_string(loc));
                 // fall-through
             }
         }
@@ -2743,7 +2743,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
                 // fall-through
             }
 
-            std::print("{}: Warning: Attempted constant expression computation failed.\n", ::slang::to_string(loc));
+            std::println("{}: Warning: Attempted constant expression computation failed.", ::slang::to_string(loc));
             // fall-through
         }
     }
@@ -3302,7 +3302,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
         {
             if(expr->is_pure(ctx))
             {
-                std::print("{}: Expression has no effect.\n", ::slang::to_string(expr->get_location()));
+                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
             }
 
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
@@ -3329,7 +3329,7 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
             const auto& expr = exprs[i];
             if(expr->is_pure(ctx))
             {
-                std::print("{}: Expression has no effect.\n", ::slang::to_string(expr->get_location()));
+                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
             }
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 

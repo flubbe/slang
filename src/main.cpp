@@ -108,17 +108,17 @@ int main(int argc, char* argv[])
     }
     catch(const std::runtime_error& e)
     {
-        std::print("An error occured: {}\n", e.what());
+        std::println("An error occured: {}", e.what());
         return EXIT_FAILURE;
     }
     catch(const cxxopts::exceptions::exception& e)
     {
-        std::print("{}\n", e.what());
+        std::println("{}", e.what());
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        std::print("The program unexpectedly crashed.\n");
+        std::println("The program unexpectedly crashed.");
         return EXIT_FAILURE;
     }
 }

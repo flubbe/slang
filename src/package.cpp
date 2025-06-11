@@ -200,7 +200,7 @@ void package_manager::remove(const std::string& name)
         package_path /= c;
     }
 
-    std::print("Remove: {}\n", package_path.string());
+    std::println("Remove: {}", package_path.string());
 
     if(fs::remove_all(package_path) == 0)
     {
