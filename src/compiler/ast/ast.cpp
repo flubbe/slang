@@ -3303,6 +3303,9 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
             if(expr->is_pure(ctx))
             {
                 std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+                // don't generate code.
+                continue;
             }
 
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
@@ -3330,6 +3333,9 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
             if(expr->is_pure(ctx))
             {
                 std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+                // don't generate code.
+                continue;
             }
             std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
 
