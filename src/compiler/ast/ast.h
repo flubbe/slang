@@ -2703,7 +2703,7 @@ public:
         return return_type.to_string() != "void";
     }
 
-    [[nodiscard]] bool is_pure(cg::context&) const override;
+    [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;

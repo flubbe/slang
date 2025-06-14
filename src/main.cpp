@@ -11,13 +11,11 @@
 #include <cstdlib>
 #include <format>
 #include <print>
+#include <ranges>
 
 #include <cxxopts.hpp>
 
 #include "commandline/commandline.h"
-
-/** The command vector type. */
-using command_vector = std::vector<std::unique_ptr<slang::commandline::command>>;
 
 /**
  * Add a unique command to a list. If a command of the same name
@@ -27,17 +25,22 @@ using command_vector = std::vector<std::unique_ptr<slang::commandline::command>>
  * @param new_cmd The new command.
  * @throws If the command is already registered, a std::runtime_error is thrown.
  */
-void add_unique_command(command_vector& cmds, std::unique_ptr<slang::commandline::command> new_cmd)
+void add_unique_command(
+  std::vector<std::unique_ptr<slang::commandline::command>>& cmds,
+  std::unique_ptr<slang::commandline::command> new_cmd)
 {
-    for(const auto& c: cmds)
+    if(std::ranges::find_if(
+         cmds,
+         [&new_cmd](const auto& cmd) -> bool
+         {
+             return cmd->get_name() == new_cmd->get_name();
+         })
+       != cmds.end())
     {
-        if(c->get_name() == new_cmd->get_name())
-        {
-            throw std::runtime_error(std::format("add_unique_command: Command '{}' already registered.", new_cmd->get_name()));
-        }
+        throw std::runtime_error(std::format("add_unique_command: Command '{}' already registered.", new_cmd->get_name()));
     }
 
-    cmds.push_back(std::move(new_cmd));
+    cmds.emplace_back(std::move(new_cmd));
 }
 
 /**
@@ -57,7 +60,7 @@ int main(int argc, char* argv[])
         slang::package_manager root_pm{"lang"};
 
         // create command list.
-        command_vector cmd_list;
+        std::vector<std::unique_ptr<slang::commandline::command>> cmd_list;
         add_unique_command(cmd_list, std::make_unique<slang::commandline::compile>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::disasm>(root_pm));
         add_unique_command(cmd_list, std::make_unique<slang::commandline::run>(root_pm));
@@ -88,14 +91,17 @@ int main(int argc, char* argv[])
             return EXIT_SUCCESS;
         }
 
-        auto command = result["command"].as<std::string>();
-        for(auto& cmd: cmd_list)
+        auto command_name = result["command"].as<std::string>();
+        auto cmd = std::ranges::find_if(
+          cmd_list,
+          [&command_name](const auto& cmd) -> bool
+          {
+              return cmd->get_name() == command_name;
+          });
+        if(cmd != cmd_list.end())
         {
-            if(command == cmd->get_name())
-            {
-                cmd->invoke({std::next(args.begin()), args.end()});
-                return EXIT_SUCCESS;
-            }
+            (*cmd)->invoke({std::next(args.begin()), args.end()});
+            return EXIT_SUCCESS;
         }
 
         std::print("{}", options.help());

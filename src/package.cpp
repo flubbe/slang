@@ -283,12 +283,14 @@ std::vector<std::string> package_manager::get_package_names(bool include_sub_pac
 
     std::ranges::sort(package_name_components);
 
-    std::vector<std::string> package_names;
-    package_names.reserve(package_name_components.size());
-    for(auto& c: package_name_components)
-    {
-        package_names.push_back(slang::utils::join(c, package::delimiter));
-    }
+    std::vector<std::string> package_names =
+      package_name_components
+      | std::views::transform(
+        [](const auto& c)
+        {
+            return slang::utils::join(c, package::delimiter);
+        })
+      | std::ranges::to<std::vector>();
 
     return package_names;
 }

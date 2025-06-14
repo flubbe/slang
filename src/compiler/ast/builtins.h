@@ -149,11 +149,14 @@ public:
       const std::vector<std::unique_ptr<expression>>& exprs)
     : expression{loc}
     {
-        this->exprs.reserve(exprs.size());
-        for(const auto& e: exprs)
-        {
-            this->exprs.emplace_back(e->clone());
-        }
+        this->exprs =
+          exprs
+          | std::views::transform(
+            [](const auto& e)
+            {
+                return e->clone();
+            })
+          | std::ranges::to<std::vector>();
     }
 
     [[nodiscard]]
@@ -169,24 +172,24 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        std::vector<expression*> children;
-        children.reserve(exprs.size());
-        for(auto& e: exprs)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
+        return exprs
+               | std::views::transform(
+                 [](auto& e)
+                 {
+                     return e.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        std::vector<const expression*> children;
-        children.reserve(exprs.size());
-        for(const auto& e: exprs)
-        {
-            children.emplace_back(e.get());
-        }
-        return children;
+        return exprs
+               | std::views::transform(
+                 [](const auto& e) -> const expression*
+                 {
+                     return e.get();
+                 })
+               | std::ranges::to<std::vector>();
     }
 };
 

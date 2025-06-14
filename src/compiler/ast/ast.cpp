@@ -1705,14 +1705,18 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
           "Cannot declare type outside global scope.");
     }
 
-    std::vector<std::pair<std::string, cg::value>> struct_members;
-    for(const auto& m: members)
-    {
-        cg::value v = {m->get_type()->to_type(),
-                       m->get_name().s};
-
-        struct_members.emplace_back(m->get_name().s, std::move(v));
-    }
+    std::vector<std::pair<std::string, cg::value>> struct_members =
+      members
+      | std::views::transform(
+        [](const auto& m)
+        {
+            return std::make_pair(
+              m->get_name().s,
+              cg::value{
+                m->get_type()->to_type(),
+                m->get_name().s});
+        })
+      | std::ranges::to<std::vector>();
 
     auto flags = static_cast<std::uint8_t>(module_::struct_flags::none);
     if(ctx.get_last_directive("allow_cast").has_value())
@@ -1732,14 +1736,17 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
 
 void struct_definition_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
 {
-    std::vector<std::pair<token, ty::type_info>> struct_members;
-    struct_members.reserve(members.size());
-    for(const auto& m: members)
-    {
-        struct_members.emplace_back(
-          m->get_name(),
-          m->get_type()->to_unresolved_type_info(type_ctx));
-    }
+    std::vector<std::pair<token, ty::type_info>> struct_members =
+      members
+      | std::views::transform(
+        [&type_ctx](const auto& m)
+        {
+            return std::make_pair(
+              m->get_name(),
+              m->get_type()->to_unresolved_type_info(type_ctx));
+        })
+      | std::ranges::to<std::vector>();
+
     type_ctx.add_struct(name, std::move(struct_members));
 }
 
@@ -3241,6 +3248,7 @@ void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
 void prototype_ast::type_check(ty::context& ctx)
 {
     // get the argument types and add them to the current scope.
+    args_type_info.clear();
     for(const auto& arg: args)
     {
         args_type_info.push_back(std::get<1>(arg)->to_type_info(ctx));
@@ -3567,7 +3575,7 @@ void call_expression::serialize(archive& ar)
     ar & return_type;
 }
 
-bool call_expression::is_pure(cg::context&) const
+bool call_expression::is_pure([[maybe_unused]] cg::context& ctx) const
 {
     // TODO Check in context. Functions from the current module can be checked,
     //      imported functions and native functions should be seen as impure.

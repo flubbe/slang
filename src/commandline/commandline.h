@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <ranges>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -79,11 +80,14 @@ protected:
      */
     static cxxopts::ParseResult parse_args(cxxopts::Options& options, const std::vector<std::string>& args)
     {
-        std::vector<const char*> argv = {{}};    // dummy first argument
-        for(auto& arg: args)
-        {
-            argv.push_back(arg.data());
-        }
+        std::vector<const char*> argv =
+          args
+          | std::views::transform(
+            [](const auto& arg)
+            { return arg.data(); })
+          | std::ranges::to<std::vector>();
+
+        argv.insert(argv.begin(), "<dummy-argument>");
 
         return options.parse(argv.size(), argv.data());
     };

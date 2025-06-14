@@ -343,12 +343,11 @@ static void add_function(
       prototype_arg_types,
       import_path);
 
-    std::vector<ty::type_info> arg_types;
-    arg_types.reserve(desc.signature.arg_types.size());
-    for(const auto& arg: desc.signature.arg_types)
-    {
-        arg_types.emplace_back(to_resolved_type_info(type_ctx, arg, resolver, import_path));
-    }
+    std::vector<ty::type_info> arg_types =
+      desc.signature.arg_types
+      | std::views::transform([&type_ctx, &resolver, &import_path](const module_::variable_type& arg)
+                              { return to_resolved_type_info(type_ctx, arg, resolver, import_path); })
+      | std::ranges::to<std::vector>();
 
     type_ctx.add_function(
       {name, {0, 0}},
@@ -398,14 +397,14 @@ static void add_type(
 
     // Add type to typing context.
     {
-        std::vector<std::pair<token, ty::type_info>> members;
-        members.reserve(desc.member_types.size());
-        for(const auto& [member_name, member_type]: desc.member_types)
-        {
-            members.push_back(std::make_pair<token, ty::type_info>(
-              {member_name, {0, 0}},
-              to_unresolved_type_info(type_ctx, member_type, resolver, import_path)));
-        }
+        std::vector<std::pair<token, ty::type_info>> members =
+          desc.member_types
+          | std::views::transform(
+            [&type_ctx, &resolver, &import_path](const std::pair<std::string, module_::field_descriptor>& member)
+            { return std::make_pair<token, ty::type_info>(
+                {std::get<0>(member), {0, 0}},
+                to_unresolved_type_info(type_ctx, std::get<1>(member), resolver, import_path)); })
+          | std::ranges::to<std::vector>();
 
         type_ctx.add_struct({name, {0, 0}}, std::move(members), import_path);
     }

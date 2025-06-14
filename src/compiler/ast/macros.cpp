@@ -677,12 +677,11 @@ static const macro_branch* get_matching_branch(
 static std::vector<std::unique_ptr<expression>> expand_invocation_args(
   const macro_invocation& invocation)
 {
-    std::vector<std::unique_ptr<expression>> invocation_exprs;
-    invocation_exprs.reserve(invocation.get_exprs().size());
-    for(const auto& expr: invocation.get_exprs())
-    {
-        invocation_exprs.emplace_back(expr->clone());
-    }
+    std::vector<std::unique_ptr<expression>> invocation_exprs =
+      invocation.get_exprs()
+      | std::views::transform([](const auto& e)
+                              { return e->clone(); })
+      | std::ranges::to<std::vector>();
 
     if(!invocation_exprs.empty())
     {
