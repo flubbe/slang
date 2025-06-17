@@ -1486,13 +1486,9 @@ TEST(compile_ir, if_statement)
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
-                  " jmp %1\n"
                   "2:\n"
                   " const i32 0\n"
                   " ret i32\n"
-                  " jmp %1\n"
-                  "1:\n"
-                  " unreachable\n"
                   "}");
     }
 }

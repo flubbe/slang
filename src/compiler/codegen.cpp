@@ -247,11 +247,6 @@ std::string instruction::to_string() const
 
 std::string basic_block::to_string() const
 {
-    if(unreachable)
-    {
-        return std::format("{}:\n unreachable", label);
-    }
-
     if(instrs.empty())
     {
         return std::format("{}:", label);

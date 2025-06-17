@@ -41,6 +41,11 @@ class expression;       /* ast.h */
 class macro_invocation; /* ast.h */
 }    // namespace slang::ast
 
+namespace slang::opt::cfg
+{
+class context; /* opt/cfg.h */
+}    // namespace slang::opt::cfg
+
 namespace slang::codegen
 {
 
@@ -1061,9 +1066,6 @@ class basic_block
     /** The associated inserting context (if any). */
     class context* inserting_context{nullptr};
 
-    /** Whether the block is marked as unreachable. */
-    bool unreachable = false;
-
     /**
      * Set a new context for inserting instructions.
      * Pass nullptr to clear the context.
@@ -1079,6 +1081,7 @@ class basic_block
      */
     explicit basic_block(std::string label)
     : label{std::move(label)}
+    , instrs{}
     {
     }
 
@@ -1143,21 +1146,11 @@ public:
         return !instrs.empty() && instrs.back()->is_branching();
     }
 
-    /** Mark the block as unreachable. */
-    void set_unreachable()
-    {
-        unreachable = true;
-    }
-
-    /**
-     * Check whether this block is unreachable.
-     *
-     * Currently this is done by checking if the block is explicitly marked as unreachable.
-     */
+    /** Whether this block is terminated, i.e., ending with a branch or return. */
     [[nodiscard]]
-    bool is_unreachable() const
+    bool is_terminated() const
     {
-        return unreachable;
+        return ends_with_return() || ends_with_branch();
     }
 
     /**
@@ -1991,8 +1984,10 @@ struct constant_table_entry : public module_::constant_table_entry
 /** Code generator context. */
 class context
 {
+    // FIXME Too many friends.
     friend class slang::instruction_emitter;
     friend class slang::export_table_builder;
+    friend class slang::opt::cfg::context;
     friend class basic_block;
 
     /** List of structs. */
@@ -2609,8 +2604,12 @@ public:
      * @return Returns the current function.
      */
     [[nodiscard]]
-    function* get_current_function([[maybe_unused]] bool validate = false)
+    function* get_current_function(bool validate = false)
     {
+        if(validate && current_function == nullptr)
+        {
+            throw codegen_error("No current function.");
+        }
         return current_function;
     }
 
@@ -2983,7 +2982,7 @@ inline void basic_block::set_inserting_context(context* ctx)
 
 inline basic_block* basic_block::create(context& ctx, std::string name)
 {
-    return ctx.basic_blocks.emplace_back(std::unique_ptr<basic_block>(new basic_block(name))).get();
+    return ctx.basic_blocks.emplace_back(new basic_block(name)).get();
 }
 
 /*

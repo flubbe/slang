@@ -336,7 +336,7 @@ opcode context::exec(
 
             if(offset == function_end)
             {
-                throw interpreter_error(std::format("Execution reached function boundary."));
+                throw interpreter_error("Execution reached function boundary.");
             }
 
             switch(instr_opcode)
