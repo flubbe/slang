@@ -13,6 +13,7 @@
 
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
 #include "commandline.h"
@@ -198,6 +199,7 @@ void compile::invoke(const std::vector<std::string>& args)
     ty::context type_ctx;
     rs::context resolve_ctx{file_mgr};
     cg::context codegen_ctx;
+    opt::cfg::context cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{codegen_ctx};
 
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
@@ -214,6 +216,7 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->type_check(type_ctx);
     ast->generate_code(codegen_ctx);
 
+    cfg_context.run();
     emitter.run();
 
     slang::module_::language_module mod = emitter.to_module();

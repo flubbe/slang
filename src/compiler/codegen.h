@@ -41,6 +41,11 @@ class expression;       /* ast.h */
 class macro_invocation; /* ast.h */
 }    // namespace slang::ast
 
+namespace slang::opt::cfg
+{
+class context; /* opt/cfg.h */
+}    // namespace slang::opt::cfg
+
 namespace slang::codegen
 {
 
@@ -1979,8 +1984,10 @@ struct constant_table_entry : public module_::constant_table_entry
 /** Code generator context. */
 class context
 {
+    // FIXME Too many friends.
     friend class slang::instruction_emitter;
     friend class slang::export_table_builder;
+    friend class slang::opt::cfg::context;
     friend class basic_block;
 
     /** List of structs. */
