@@ -1061,9 +1061,6 @@ class basic_block
     /** The associated inserting context (if any). */
     class context* inserting_context{nullptr};
 
-    /** Whether the block is marked as unreachable. */
-    bool unreachable = false;
-
     /**
      * Set a new context for inserting instructions.
      * Pass nullptr to clear the context.
@@ -1141,23 +1138,6 @@ public:
     bool ends_with_branch() const
     {
         return !instrs.empty() && instrs.back()->is_branching();
-    }
-
-    /** Mark the block as unreachable. */
-    void set_unreachable()
-    {
-        unreachable = true;
-    }
-
-    /**
-     * Check whether this block is unreachable.
-     *
-     * Currently this is done by checking if the block is explicitly marked as unreachable.
-     */
-    [[nodiscard]]
-    bool is_unreachable() const
-    {
-        return unreachable;
     }
 
     /**

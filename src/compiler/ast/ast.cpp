@@ -3467,7 +3467,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
         }
 
         auto* ip = ctx.get_insertion_point(true);
-        if(!ip->ends_with_return() && !ip->is_unreachable())
+        if(!ip->ends_with_return())
         {
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
@@ -3846,7 +3846,10 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     ctx.set_insertion_point(if_basic_block);
     if_block->generate_code(ctx, memory_context::none);
     if_ends_with_return = if_basic_block->ends_with_return();
-    ctx.generate_branch(merge_basic_block);
+    if(!if_ends_with_return)
+    {
+        ctx.generate_branch(merge_basic_block);
+    }
 
     // code generation for optional else block.
     if(!else_block)
@@ -3861,20 +3864,32 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
         ctx.set_insertion_point(else_basic_block);
         else_block->generate_code(ctx, memory_context::none);
         else_ends_with_return = else_basic_block->ends_with_return();
-        ctx.generate_branch(merge_basic_block);
+        if(!else_ends_with_return)
+        {
+            ctx.generate_branch(merge_basic_block);
+        }
 
         ctx.set_insertion_point(function_insertion_point);
         ctx.generate_cond_branch(if_basic_block, else_basic_block);
     }
 
     // emit merge block.
-    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
-    ctx.set_insertion_point(merge_basic_block);
-
-    // check if the merge block is reachable.
-    if(if_ends_with_return && else_ends_with_return)
+    if(!if_ends_with_return || !else_ends_with_return)
     {
-        merge_basic_block->set_unreachable();
+        ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+        ctx.set_insertion_point(merge_basic_block);
+    }
+    else
+    {
+        // pick the last of the if/else blocks.
+        if(else_block)
+        {
+            ctx.set_insertion_point(else_basic_block);
+        }
+        else
+        {
+            ctx.set_insertion_point(if_basic_block);
+        }
     }
 
     return nullptr;
