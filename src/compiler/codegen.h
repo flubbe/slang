@@ -1076,6 +1076,7 @@ class basic_block
      */
     explicit basic_block(std::string label)
     : label{std::move(label)}
+    , instrs{}
     {
     }
 
@@ -1138,6 +1139,13 @@ public:
     bool ends_with_branch() const
     {
         return !instrs.empty() && instrs.back()->is_branching();
+    }
+
+    /** Whether this block is terminated, i.e., ending with a branch or return. */
+    [[nodiscard]]
+    bool is_terminated() const
+    {
+        return ends_with_return() || ends_with_branch();
     }
 
     /**
@@ -2589,8 +2597,12 @@ public:
      * @return Returns the current function.
      */
     [[nodiscard]]
-    function* get_current_function([[maybe_unused]] bool validate = false)
+    function* get_current_function(bool validate = false)
     {
+        if(validate && current_function == nullptr)
+        {
+            throw codegen_error("No current function.");
+        }
         return current_function;
     }
 
@@ -2963,7 +2975,7 @@ inline void basic_block::set_inserting_context(context* ctx)
 
 inline basic_block* basic_block::create(context& ctx, std::string name)
 {
-    return ctx.basic_blocks.emplace_back(std::unique_ptr<basic_block>(new basic_block(name))).get();
+    return ctx.basic_blocks.emplace_back(new basic_block(name)).get();
 }
 
 /*

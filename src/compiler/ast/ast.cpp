@@ -3306,8 +3306,21 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
 {
     if(mc == memory_context::none)
     {
+        bool was_terminated = false;
+
         for(const auto& expr: exprs)
         {
+            if(was_terminated)
+            {
+                auto* fn = ctx.get_current_function();
+                if(fn != nullptr)
+                {
+                    cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+                    fn->append_basic_block(bb);
+                    ctx.set_insertion_point(bb);
+                }
+            }
+
             if(expr->is_pure(ctx))
             {
                 std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
@@ -3327,6 +3340,17 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
                 }
 
                 ctx.generate_pop(*v);
+            }
+
+            auto* bb = ctx.get_insertion_point();
+            if(ctx.get_current_function() != nullptr
+               && bb != nullptr)
+            {
+                was_terminated = bb->is_terminated();
+            }
+            else
+            {
+                was_terminated = false;
             }
         }
 
