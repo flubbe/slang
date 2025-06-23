@@ -16,6 +16,7 @@
 namespace slang::codegen
 {
 class context;
+class function;
 }    // namespace slang::codegen
 
 namespace slang::opt::cfg
@@ -28,6 +29,14 @@ class context
 {
     /** The associated codegen context. */
     cg::context& ctx;
+
+protected:
+    /**
+     * Run the CFG analysis on a function.
+     *
+     * @param func The function to run the analysis on.
+     */
+    void run_on_function(cg::function& func);
 
 public:
     /** Deleted constructors. */

@@ -1701,6 +1701,19 @@ public:
         instr_blocks.push_back(block);
     }
 
+    /**
+     * Remove an instruction block by label.
+     *
+     * @note This unlinks the block, without freeing its memory (managed by the codegen context).
+     * @note Removing a block invalidates iterators and references for that basic block.
+     *
+     * @throws Throws a `codegen_error` if the label could not be found.
+     *
+     * @param label The block's label.
+     * @returns A pointer to the block.
+     */
+    basic_block* remove_basic_block(const std::string& label);
+
     /** Return whether the function ends with a return statement. */
     [[nodiscard]]
     bool ends_with_return() const
@@ -1755,7 +1768,10 @@ public:
     {
         if(!native)
         {
-            throw codegen_error(std::format("Cannot get import library for function '{}', as it was not declared as native.", get_name()));
+            throw codegen_error(
+              std::format(
+                "Cannot get import library for function '{}', as it was not declared as native.",
+                get_name()));
         }
 
         return import_library;

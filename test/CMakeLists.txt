@@ -532,6 +532,11 @@ add_compile_exec_test(
     TRUE
     test/test_structs
 )
+add_compile_exec_test(
+    "slang unreachable"
+    TRUE
+    test/test_unreachable
+)
 
 #
 # Tests with other package dependencies
