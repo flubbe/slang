@@ -24,24 +24,17 @@ void context::run_on_function(cg::function& func)
 {
     // collect all control flow transfers.
     std::unordered_map<
-      std::string,              /* origin block label */
-      std::vector<std::string>> /* transfer targets. */
+      std::string,           /* origin block label */
+      std::set<std::string>> /* transfer targets. */
       transfer_map;
 
     auto insert_unique_cfg_transfer =
       [&transfer_map](const std::string& origin, const std::string& target) -> void
     {
-        if(transfer_map.contains(origin))
+        auto [it, success] = transfer_map.try_emplace(origin, std::set{target});
+        if(!success)
         {
-            auto& targets_vector = transfer_map[origin];
-            if(std::ranges::find(targets_vector, target) == targets_vector.end())
-            {
-                targets_vector.emplace_back(target);
-            }
-        }
-        else
-        {
-            transfer_map.insert({origin, {target}});
+            it->second.insert(target);
         }
     };
 
@@ -86,55 +79,54 @@ void context::run_on_function(cg::function& func)
         }
     }
 
-    // trace control flow and mark unreachable blocks.
-    std::vector<std::string> active = {"entry"};
-    std::vector<std::string> marked;
+    // trace control flow and mark reachable blocks.
+    std::set<std::string> active = {"entry"};
+    std::set<std::string> reachable;
 
     while(!active.empty())
     {
-        auto label = active.back();
-        active.pop_back();
+        auto label = std::move(active.extract(active.begin()).value());
 
-        // don't add nodes twice. this ensures loop termination.
-        if(std::ranges::find(marked, label) != marked.end())
+        // don't process nodes twice. this ensures loop termination.
+        if(reachable.contains(label))
         {
             continue;
         }
 
-        marked.push_back(label);
+        reachable.emplace(label);
 
         auto it = transfer_map.find(label);
         if(it != transfer_map.end())
         {
             for(const auto& target: it->second)
             {
-                // a marked node cannot become active again.
-                if(std::ranges::find(marked, target) != marked.end())
+                // a reachable node cannot become active again.
+                if(reachable.contains(target))
                 {
                     continue;
                 }
 
                 // don't add nodes twice.
-                if(std::ranges::find(active, target) == active.end())
+                if(!active.contains(target))
                 {
-                    active.push_back(target);
+                    active.emplace(target);
                 }
             }
         }
     }
 
-    // remove unmarked blocks.
-    std::vector<std::string> unmarked;
+    // remove unreachable blocks.
+    std::set<std::string> unreachable;
 
     for(const auto& it: func.get_basic_blocks())
     {
-        if(std::ranges::find(marked, it->get_label()) == marked.end())
+        if(!reachable.contains(it->get_label()))
         {
-            unmarked.push_back(it->get_label());
+            unreachable.emplace(it->get_label());
         }
     }
 
-    for(const auto& label: unmarked)
+    for(const auto& label: unreachable)
     {
         func.remove_basic_block(label);
     }
