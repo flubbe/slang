@@ -163,6 +163,34 @@ set_tests_properties(type_system PROPERTIES
     FIXTURES_REQUIRED needs_std
 )
 
+add_executable(test_opt_cfg
+    test_opt_cfg.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/builtins.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/codegen.cpp
+    ../src/compiler/emitter.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/opt/cfg.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/shared/opcodes.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_opt_cfg GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_opt_cfg PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME opt_cfg COMMAND test_opt_cfg)
+set_tests_properties(opt_cfg PROPERTIES 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
 add_executable(test_output
     test_output.cpp
     ../src/archives/file.cpp
