@@ -247,11 +247,6 @@ std::string instruction::to_string() const
 
 std::string basic_block::to_string() const
 {
-    if(unreachable)
-    {
-        return std::format("{}:\n unreachable", label);
-    }
-
     if(instrs.empty())
     {
         return std::format("{}:", label);
@@ -493,6 +488,30 @@ const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::s
 /*
  * function.
  */
+
+basic_block* function::remove_basic_block(const std::string& label)
+{
+    auto it = std::ranges::find_if(
+      instr_blocks,
+      [&label](const basic_block* bb) -> bool
+      {
+          return bb->get_label() == label;
+      });
+
+    if(it == instr_blocks.end())
+    {
+        throw codegen_error(
+          std::format(
+            "Function '{}': Cannot remove basic block with label '{}': Label not found.",
+            get_name(),
+            label));
+    }
+
+    basic_block* bb = *it;
+    instr_blocks.erase(it);
+
+    return bb;
+}
 
 std::string function::to_string() const
 {

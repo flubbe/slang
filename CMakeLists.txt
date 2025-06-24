@@ -28,6 +28,7 @@ add_executable(slang
     src/compiler/codegen.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
+    src/compiler/opt/cfg.cpp
     src/compiler/parser.cpp
     src/compiler/token.cpp
     src/compiler/typing.cpp
