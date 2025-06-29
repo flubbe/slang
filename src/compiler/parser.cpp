@@ -592,7 +592,8 @@ std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
 }
 
 // block_expr ::= '{' stmts_exprs '}'
-// stmts_exprs ::= (statement | expression ';')
+// stmts_exprs ::= block_expr
+//               | (statement | expression ';')
 //               | (statement | expression ';') stmts_exprs
 // statement ::= if_statement
 //             | while_statement
@@ -627,6 +628,10 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
                   std::move(directive.second),
                   std::move(expr)));
             }
+        }
+        else if(current_token->s == "{")
+        {
+            stmts_exprs.emplace_back(parse_block());
         }
         else
         {
