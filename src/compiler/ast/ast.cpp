@@ -280,17 +280,17 @@ void visit_nodes(
 
     if(post_order)
     {
-        for(auto it = sorted_ast.rbegin(); it != sorted_ast.rend(); ++it)
-        {
-            visitor(**it);
-        }
+        std::ranges::for_each(
+          sorted_ast | std::views::reverse,
+          [&](T* ptr)
+          { visitor(*ptr); });
     }
     else
     {
-        for(auto* it: sorted_ast)
-        {
-            visitor(*it);
-        }
+        std::ranges::for_each(
+          sorted_ast,
+          [&](T* ptr)
+          { visitor(*ptr); });
     }
 }
 

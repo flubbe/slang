@@ -352,6 +352,11 @@ public:
     {
     }
 
+    /** Name resolution. */
+    virtual void resolve_names()
+    {
+    }
+
     /**
      * Push a directive to the expression's directive stack (during code generation).
      *
@@ -864,6 +869,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -879,7 +885,7 @@ public:
     }
 };
 
-/** Scope expression. */
+/** Namespace access expression. */
 class namespace_access_expression : public named_expression
 {
     /** The remaining expression. */
@@ -971,6 +977,7 @@ public:
 
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
 
     std::optional<std::string> get_namespace_path() const override
     {
@@ -1091,6 +1098,7 @@ public:
      *       calling `generate_object_load` beforehand.
      */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1225,6 +1233,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1323,6 +1332,7 @@ public:
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1453,6 +1463,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1629,6 +1640,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1716,6 +1728,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void resolve_names() override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1806,6 +1819,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1886,6 +1900,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
 
     [[nodiscard]] std::string to_string() const override;
@@ -1978,6 +1993,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2069,6 +2085,7 @@ public:
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2149,6 +2166,7 @@ public:
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2224,6 +2242,7 @@ public:
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2347,6 +2366,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2505,6 +2525,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2591,6 +2612,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void resolve_names() override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2706,6 +2728,7 @@ public:
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2856,6 +2879,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -2988,6 +3012,7 @@ public:
     void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -3020,7 +3045,7 @@ class if_statement : public expression
     /** If block. */
     std::unique_ptr<expression> if_block;
 
-    /** (Optinal) else block. */
+    /** (Optional) else block. */
     std::unique_ptr<expression> else_block;
 
 public:
@@ -3079,6 +3104,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -3172,6 +3198,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -3364,6 +3391,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3470,6 +3498,7 @@ public:
 
     void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void resolve_names() override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
 
@@ -3554,8 +3583,9 @@ public:
         return this;
     }
 
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void resolve_names() override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;

@@ -276,7 +276,16 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    return expansion->generate_code(ctx, mc);
+    auto return_type = expansion->generate_code(ctx, mc);
+    if(index_expr)
+    {
+        // evaluate the index expression.
+        index_expr->generate_code(ctx, memory_context::load);
+        ctx.generate_load(std::make_unique<cg::type_argument>(return_type->deref()), true);
+        return std::make_unique<cg::value>(return_type->deref());
+    }
+
+    return return_type;
 }
 
 std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
