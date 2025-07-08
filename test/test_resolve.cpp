@@ -13,12 +13,12 @@
 #include "compiler/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace
 {
@@ -44,11 +44,11 @@ TEST(resolve, std)
         ASSERT_TRUE(mgr.is_file("std.cmod"));
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
@@ -75,11 +75,11 @@ TEST(resolve, std)
         ASSERT_TRUE(mgr.is_file("std.cmod"));
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -106,11 +106,11 @@ TEST(resolve, std)
         ASSERT_TRUE(mgr.is_file("std.cmod"));
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
 }

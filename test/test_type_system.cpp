@@ -15,12 +15,12 @@
 #include "compiler/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/typing.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace
 {
@@ -713,11 +713,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
     }
@@ -742,11 +742,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -771,11 +771,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -800,11 +800,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -829,11 +829,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -858,11 +858,11 @@ TEST(type_system, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -1521,9 +1521,9 @@ TEST(type_system, examples)
 
         ty::context type_ctx;
         cg::context codegen_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }
@@ -1562,9 +1562,9 @@ TEST(type_system, native_binding)
         slang::file_manager mgr;
         ty::context type_ctx;
         cg::context codegen_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         EXPECT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        EXPECT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         EXPECT_NO_THROW(type_ctx.resolve_types());
         EXPECT_NO_THROW(ast->type_check(type_ctx));
     }

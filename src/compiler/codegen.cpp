@@ -15,14 +15,14 @@
 #include "shared/type_utils.h"
 #include "ast/ast.h"
 #include "codegen.h"
-#include "resolve.h"
+#include "loader.h"
 #include "utils.h"
 
 namespace slang::codegen
 {
 
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 /*
  * Exceptions.

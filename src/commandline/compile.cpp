@@ -15,13 +15,15 @@
 #include "compiler/emitter.h"
 #include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "commandline.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
+namespace ld = slang::loader;
 namespace rs = slang::resolve;
 
 namespace slang::commandline
@@ -197,8 +199,9 @@ void compile::invoke(const std::vector<std::string>& args)
     const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
     ty::context type_ctx;
-    rs::context resolve_ctx{file_mgr};
+    ld::context loader_ctx{file_mgr};
     cg::context codegen_ctx;
+    rs::context resolver_ctx;
     opt::cfg::context cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{codegen_ctx};
 
@@ -209,10 +212,10 @@ void compile::invoke(const std::vector<std::string>& args)
     {
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
-            resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
-        } while(rs::context::resolve_macros(codegen_ctx, type_ctx));
+            loader_ctx.resolve_imports(codegen_ctx, type_ctx);
+        } while(ld::context::resolve_macros(codegen_ctx, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
-    ast->resolve_names();
+    ast->resolve_names(resolver_ctx);
     type_ctx.resolve_types();
     ast->type_check(type_ctx);
     ast->generate_code(codegen_ctx);

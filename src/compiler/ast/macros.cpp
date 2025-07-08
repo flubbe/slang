@@ -15,11 +15,11 @@
 #include "ast.h"
 #include "builtins.h"
 #include "node_registry.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace slang::ast
 {
@@ -236,7 +236,7 @@ bool expression::expand_macros(
                   }
 
                   auto* m = e.as_macro_invocation();
-                  m->name.s = rs::make_import_name(
+                  m->name.s = ld::make_import_name(
                     m->name.s,
                     type_ctx.is_transitive_import(
                       m->get_namespace_path().value()));

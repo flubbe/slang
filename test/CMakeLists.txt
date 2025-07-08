@@ -43,10 +43,10 @@ add_executable(test_parser
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
@@ -66,10 +66,10 @@ add_executable(test_codegen
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
@@ -89,10 +89,10 @@ add_executable(test_compile_ir
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
@@ -113,16 +113,16 @@ add_executable(test_type_system
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/loader.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_type_system GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -144,16 +144,16 @@ add_executable(test_resolve
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/loader.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_resolve GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -175,12 +175,12 @@ add_executable(test_opt_cfg
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
@@ -205,18 +205,18 @@ add_executable(test_output
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
+    ../src/loader.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_output GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -250,17 +250,17 @@ add_executable(test_ast_serialization
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
     ../src/archives/file.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
+    ../src/loader.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_ast_serialization GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)

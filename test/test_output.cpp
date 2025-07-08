@@ -20,12 +20,12 @@
 #include "compiler/typing.h"
 #include "compiler/ast/node_registry.h"
 #include "shared/module.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace
 {
@@ -62,12 +62,12 @@ TEST(output, native_binding)
 
         slang::file_manager mgr;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -238,12 +238,12 @@ TEST(output, emitter)
 
         slang::file_manager mgr;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -287,12 +287,12 @@ TEST(output, hello_world)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -327,12 +327,12 @@ TEST(output, hello_world)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -387,12 +387,12 @@ TEST(output, operators)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -424,12 +424,12 @@ TEST(output, operators)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -467,12 +467,12 @@ TEST(output, string_operations)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -504,12 +504,12 @@ TEST(output, string_operations)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -566,12 +566,12 @@ TEST(output, prefix_postfix)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -633,12 +633,12 @@ TEST(output, control_flow)
     mgr.add_search_path("lang");
 
     ty::context type_ctx;
-    rs::context resolve_ctx{mgr};
+    ld::context loader_ctx{mgr};
     cg::context codegen_ctx;
     slang::instruction_emitter emitter{codegen_ctx};
 
     ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+    ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
     ASSERT_NO_THROW(type_ctx.resolve_types());
     ASSERT_NO_THROW(ast->type_check(type_ctx));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -680,12 +680,12 @@ TEST(output, loops)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -736,12 +736,12 @@ TEST(output, loops)
         mgr.add_search_path("lang");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -776,12 +776,12 @@ TEST(output, infinite_recursion)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -823,12 +823,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -898,12 +898,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -935,12 +935,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -965,12 +965,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -995,12 +995,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -1030,12 +1030,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1094,12 +1094,12 @@ TEST(output, arrays)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1148,12 +1148,12 @@ TEST(output, return_discard)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1202,12 +1202,12 @@ TEST(output, return_discard)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1243,12 +1243,12 @@ TEST(output, return_discard)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1283,12 +1283,12 @@ TEST(output, missing_return)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_THROW(ast->generate_code(codegen_ctx), cg::codegen_error);
@@ -1321,12 +1321,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1363,12 +1363,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1412,12 +1412,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1452,12 +1452,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1493,12 +1493,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1535,12 +1535,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1579,12 +1579,12 @@ TEST(output, structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1625,12 +1625,12 @@ TEST(output, nested_structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1676,12 +1676,12 @@ TEST(output, nested_structs)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1723,12 +1723,12 @@ TEST(output, type_imports)
         mgr.add_search_path(".");
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1764,12 +1764,12 @@ TEST(output, null_assignment)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
     }
@@ -1800,12 +1800,12 @@ TEST(output, null_access)
         slang::file_manager mgr;
 
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
+        ld::context loader_ctx{mgr};
         cg::context codegen_ctx;
         slang::instruction_emitter emitter{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
         ASSERT_NO_THROW(type_ctx.resolve_types());
         ASSERT_NO_THROW(ast->type_check(type_ctx));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
@@ -1847,12 +1847,12 @@ TEST(output, multiple_modules)
             mgr.add_search_path(".");
 
             ty::context type_ctx;
-            rs::context resolve_ctx{mgr};
+            ld::context loader_ctx{mgr};
             cg::context codegen_ctx;
             slang::instruction_emitter emitter{codegen_ctx};
 
             ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-            ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
+            ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
             ASSERT_NO_THROW(type_ctx.resolve_types());
             ASSERT_NO_THROW(ast->type_check(type_ctx));
             ASSERT_NO_THROW(ast->generate_code(codegen_ctx));

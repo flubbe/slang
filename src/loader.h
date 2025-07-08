@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * name resolution.
+ * module and import resolution.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -30,12 +30,7 @@ namespace slang::codegen
 class context;
 }    // namespace slang::codegen
 
-namespace slang::interpreter
-{
-class module_loader;
-}    // namespace slang::interpreter
-
-namespace slang::resolve
+namespace slang::loader
 {
 
 /**
@@ -149,4 +144,4 @@ public:
     static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
 };
 
-}    // namespace slang::resolve
+}    // namespace slang::loader
