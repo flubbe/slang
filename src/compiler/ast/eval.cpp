@@ -97,7 +97,7 @@ std::unique_ptr<cg::value> variable_reference_expression::evaluate(cg::context& 
 
 struct binary_operation_helper
 {
-    token_location loc;
+    source_location loc;
     std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
     std::function<float(float, float)> func_f32;
 
@@ -149,7 +149,7 @@ struct binary_operation_helper
 
 struct binary_comparison_helper
 {
-    token_location loc;
+    source_location loc;
     std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
     std::function<std::int32_t(float, float)> func_f32;
 
@@ -395,7 +395,7 @@ std::unique_ptr<cg::value> binary_expression::evaluate(cg::context& ctx) const
 
 struct unary_operation_helper
 {
-    token_location loc;
+    source_location loc;
     std::function<std::int32_t(std::int32_t)> func_i32;
     std::function<float(float)> func_f32;
 

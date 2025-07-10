@@ -47,7 +47,7 @@ class lexer
     std::string::iterator position;
 
     /** Current location (i.e., line and column). */
-    token_location location;
+    source_location location;
 
     /** Tab size. */
     std::size_t tab_size{default_tab_size};
@@ -206,7 +206,7 @@ public:
      * @return The current location.
      */
     [[nodiscard]]
-    token_location get_location() const
+    source_location get_location() const
     {
         return location;
     }

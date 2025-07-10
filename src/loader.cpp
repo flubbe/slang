@@ -194,7 +194,7 @@ static ty::type_info to_resolved_type_info(
  * Exceptions.
  */
 
-resolve_error::resolve_error(const token_location& loc, const std::string& message)
+resolve_error::resolve_error(const source_location& loc, const std::string& message)
 : std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }

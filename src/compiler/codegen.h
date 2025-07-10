@@ -71,7 +71,7 @@ public:
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    codegen_error(const slang::token_location& loc, const std::string& message);
+    codegen_error(const slang::source_location& loc, const std::string& message);
 };
 
 /** Type classes. */
@@ -2463,7 +2463,7 @@ public:
      */
     [[nodiscard]]
     value get_struct_member(
-      token_location loc,
+      source_location loc,
       const std::string& struct_name,
       const std::string& member_name,
       std::optional<std::string> import_path = std::nullopt) const;
@@ -2690,7 +2690,7 @@ public:
      * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
-    void pop_break_continue(std::optional<token_location> loc = std::nullopt)
+    void pop_break_continue(std::optional<source_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.empty())
         {
@@ -2713,7 +2713,7 @@ public:
      * @throws Throws a `codegen_error` if the stack is empty.
      */
     [[nodiscard]]
-    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<token_location> loc = std::nullopt)
+    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<source_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.empty())
         {

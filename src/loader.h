@@ -74,7 +74,7 @@ public:
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    resolve_error(const token_location& loc, const std::string& message);
+    resolve_error(const source_location& loc, const std::string& message);
 };
 
 /** Resolver context. */

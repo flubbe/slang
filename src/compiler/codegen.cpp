@@ -28,7 +28,7 @@ namespace ld = slang::loader;
  * Exceptions.
  */
 
-codegen_error::codegen_error(const token_location& loc, const std::string& message)
+codegen_error::codegen_error(const source_location& loc, const std::string& message)
 : std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
@@ -1157,7 +1157,7 @@ type context::get_accessed_struct() const
 }
 
 value context::get_struct_member(
-  token_location loc,
+  source_location loc,
   const std::string& struct_name,
   const std::string& member_name,
   std::optional<std::string> import_path) const

@@ -41,7 +41,7 @@ struct format_string_placeholder
 class format_macro_expander
 {
     /** Location of the macro invocation. */
-    token_location loc;
+    source_location loc;
 
     /** Expressions the macro operates on. */
     const std::vector<std::unique_ptr<ast::expression>>& exprs;
@@ -89,7 +89,7 @@ public:
      * @param exprs Expressions the macro operates on.
      */
     format_macro_expander(
-      token_location loc,
+      source_location loc,
       const std::vector<std::unique_ptr<ast::expression>>& exprs)
     : loc{loc}
     , exprs{exprs}
@@ -145,7 +145,7 @@ public:
      * @param exprs The argument expressions.
      */
     format_macro_expression(
-      token_location loc,
+      source_location loc,
       const std::vector<std::unique_ptr<expression>>& exprs)
     : expression{loc}
     {

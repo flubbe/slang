@@ -208,7 +208,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
 // args ::= identifier ':' type_id | identifier ':' type_id ',' args
 std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip "fn" token.
     if(current_token->type != token_type::identifier)
     {
@@ -275,7 +275,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
 //            | prototype block_expr
 std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     std::unique_ptr<ast::prototype_ast> proto = parse_prototype();
     if(!current_token.has_value())
     {
@@ -295,7 +295,7 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
 //                 | 'let' identifier ':' [identifier] = expression
 std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'let'.
     if(current_token->type != token_type::identifier)
     {
@@ -335,7 +335,7 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
 // const_def ::= 'const' identifier ':' identifier '=' literal_expression
 std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'const'.
     if(current_token->type != token_type::identifier)
     {
@@ -431,7 +431,7 @@ std::unique_ptr<ast::type_expression> parser::parse_type()
 //         | expression
 std::unique_ptr<ast::array_initializer_expression> parser::parse_array_initializer_expression()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip '['.
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
@@ -463,7 +463,7 @@ std::unique_ptr<ast::array_initializer_expression> parser::parse_array_initializ
 // variable_declaration ::= identifier ':' type
 std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'struct'.
     if(current_token->type != token_type::identifier)
     {
@@ -602,7 +602,7 @@ std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
 //             | return_statement
 std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     if(current_token->s != "{")
     {
         throw syntax_error(*current_token, std::format("Expected '{{', got '{}'.", current_token->s));
@@ -831,7 +831,7 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
 {
     while(true)
     {
-        token_location loc = current_token->location;
+        source_location loc = current_token->location;
 
         int tok_prec = get_token_precedence();
         if(tok_prec < prec)
@@ -1212,7 +1212,7 @@ std::unique_ptr<ast::expression> parser::parse_expression()
 
 std::unique_ptr<ast::expression> parser::parse_type_cast_expression(std::unique_ptr<ast::expression> expr)
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'as'.
 
     if(current_token->type != token_type::identifier)
@@ -1226,7 +1226,7 @@ std::unique_ptr<ast::expression> parser::parse_type_cast_expression(std::unique_
 // ifexpr ::= '(' expression ')' block 'else' (ifexpr | block)
 std::unique_ptr<ast::if_statement> parser::parse_if()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'if'.
     if(current_token->s != "(")
     {
@@ -1254,7 +1254,7 @@ std::unique_ptr<ast::if_statement> parser::parse_if()
 
 std::unique_ptr<ast::expression> parser::parse_while()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'while'.
     if(current_token->s != "(")
     {
@@ -1268,7 +1268,7 @@ std::unique_ptr<ast::expression> parser::parse_while()
 
 std::unique_ptr<ast::expression> parser::parse_break()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'break'.
     if(current_token->s != ";")
     {
@@ -1279,7 +1279,7 @@ std::unique_ptr<ast::expression> parser::parse_break()
 
 std::unique_ptr<ast::expression> parser::parse_continue()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'continue'.
     if(current_token->s != ";")
     {
@@ -1290,7 +1290,7 @@ std::unique_ptr<ast::expression> parser::parse_continue()
 
 std::unique_ptr<ast::return_statement> parser::parse_return()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'return'.
 
     std::unique_ptr<ast::expression> expr{nullptr};
@@ -1309,7 +1309,7 @@ std::unique_ptr<ast::return_statement> parser::parse_return()
 
 std::unique_ptr<ast::macro_expression> parser::parse_macro()
 {
-    token_location loc = current_token->location;
+    source_location loc = current_token->location;
     get_next_token();    // skip 'macro'.
 
     if(current_token->type != token_type::macro_name)

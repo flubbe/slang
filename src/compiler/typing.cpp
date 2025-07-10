@@ -219,7 +219,7 @@ std::string to_string(const std::pair<token, bool>& t)
  * Exceptions.
  */
 
-type_error::type_error(const token_location& loc, const std::string& message)
+type_error::type_error(const source_location& loc, const std::string& message)
 : std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
@@ -917,7 +917,7 @@ type_info context::get_unresolved_type(token name, type_class cls, std::optional
     return unresolved_types.back();
 }
 
-bool context::is_convertible(token_location loc, const type_info& from, const type_info& to) const
+bool context::is_convertible(source_location loc, const type_info& from, const type_info& to) const
 {
     if(from.to_string() == to.to_string() && from.get_import_path() == to.get_import_path())
     {
@@ -1208,7 +1208,7 @@ void context::exit_named_scope(const token& name)
     }
 }
 
-void context::enter_anonymous_scope(token_location loc)
+void context::enter_anonymous_scope(source_location loc)
 {
     token anonymous_scope;
     anonymous_scope.location = loc;
@@ -1258,7 +1258,7 @@ const token& context::get_scope_name() const
 
 const struct_definition*
   context::get_struct_definition(
-    token_location loc,
+    source_location loc,
     const std::string& name,
     const std::optional<std::string>& import_path) const
 {

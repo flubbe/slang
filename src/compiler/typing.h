@@ -53,7 +53,7 @@ public:
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    type_error(const slang::token_location& loc, const std::string& message);
+    type_error(const slang::source_location& loc, const std::string& message);
 };
 
 /** A variable type. */
@@ -214,7 +214,7 @@ struct scope
      * @param loc The scope location.
      * @param name The scope name.
      */
-    scope(token_location loc, std::string scope_name)
+    scope(source_location loc, std::string scope_name)
     {
         name.s = std::move(scope_name);
         name.location = std::move(loc);
@@ -633,7 +633,7 @@ public:
      * @param to The type to convert to.
      * @returns Whether the type `from` is convertible to the type `to`.
      */
-    bool is_convertible(token_location loc, const type_info& from, const type_info& to) const;
+    bool is_convertible(source_location loc, const type_info& from, const type_info& to) const;
 
     /**
      * Resolve a type and set its type id.
@@ -698,7 +698,7 @@ public:
     void exit_named_scope(const token& name);
 
     /** Enter an anonymous scope. */
-    void enter_anonymous_scope(token_location loc);
+    void enter_anonymous_scope(source_location loc);
 
     /** Exit an anonymous scope. */
     void exit_anonymous_scope();
@@ -717,7 +717,7 @@ public:
      * @returns A reference to the struct's definition.
      */
     const struct_definition* get_struct_definition(
-      token_location loc,
+      source_location loc,
       const std::string& name,
       const std::optional<std::string>& import_path = std::nullopt) const;
 

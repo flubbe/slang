@@ -71,7 +71,7 @@ class expression
 {
 protected:
     /** The expression's location. */
-    token_location loc;
+    source_location loc;
 
     /** Namespace stack for the expression. */
     std::vector<std::string> namespace_stack;
@@ -90,7 +90,7 @@ public:
      *
      * @param loc The expression location.
      */
-    expression(token_location loc)
+    expression(source_location loc)
     : loc{loc}
     {
     }
@@ -471,7 +471,7 @@ public:
 
     /** Get the expression's location. */
     [[nodiscard]]
-    const token_location& get_location() const
+    const source_location& get_location() const
     {
         return loc;
     }
@@ -564,7 +564,7 @@ public:
      * @param loc The location.
      * @param tok The name token.
      */
-    named_expression(token_location loc, token name)
+    named_expression(source_location loc, token name)
     : expression{loc}
     , name{std::move(name)}
     {
@@ -629,7 +629,7 @@ public:
      * @param loc The location.
      * @param tok The token.
      */
-    literal_expression(token_location loc, token tok)
+    literal_expression(source_location loc, token tok)
     : expression{loc}
     , tok{std::move(tok)}
     {
@@ -684,7 +684,7 @@ public:
 class type_expression
 {
     /** Location. */
-    token_location loc;
+    source_location loc;
 
     /** The type name. */
     token type_name;
@@ -713,7 +713,7 @@ public:
      * @param namespace_stack Namespaces for type resolution.
      * @param is_array Whether the type is an array type.
      */
-    type_expression(token_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
+    type_expression(source_location loc, token type_name, std::vector<token> namespace_stack, bool is_array)
     : loc{loc}
     , type_name{std::move(type_name)}
     , namespace_stack{std::move(namespace_stack)}
@@ -726,7 +726,7 @@ public:
 
     /** Get the location. */
     [[nodiscard]]
-    token_location get_location() const
+    source_location get_location() const
     {
         return loc;
     }
@@ -817,7 +817,7 @@ public:
      * @param target_type The target type.
      */
     type_cast_expression(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<expression> expr,
       std::unique_ptr<type_expression> target_type)
     : expression{loc}
@@ -1446,7 +1446,7 @@ public:
      * @param expr An optional initializer expression.
      */
     variable_declaration_expression(
-      token_location loc,
+      source_location loc,
       token name,
       std::unique_ptr<type_expression> type,
       std::unique_ptr<expression> expr)
@@ -1546,7 +1546,7 @@ public:
      * @param expr The initializer expression.
      */
     constant_declaration_expression(
-      token_location loc,
+      source_location loc,
       token name,
       std::unique_ptr<type_expression> type,
       std::unique_ptr<expression> expr)
@@ -1626,7 +1626,7 @@ public:
      * Construct an array initializer expression.
      */
     array_initializer_expression(
-      token_location loc,
+      source_location loc,
       std::vector<std::unique_ptr<expression>> exprs)
     : expression{loc}
     , exprs{std::move(exprs)}
@@ -1718,7 +1718,7 @@ public:
      * @param members The struct's members.
      */
     struct_definition_expression(
-      token_location loc,
+      source_location loc,
       token name,
       std::vector<std::unique_ptr<variable_declaration_expression>> members)
     : named_expression{loc, std::move(name)}
@@ -2067,7 +2067,7 @@ public:
      * @param rhs The right-hand side.
      */
     binary_expression(
-      token_location loc,
+      source_location loc,
       token op,
       std::unique_ptr<expression> lhs,
       std::unique_ptr<expression> rhs)
@@ -2147,7 +2147,7 @@ public:
      * @param operand The operand.
      */
     unary_expression(
-      token_location loc,
+      source_location loc,
       token op,
       std::unique_ptr<expression> operand)
     : expression{loc}
@@ -2225,7 +2225,7 @@ public:
      * @param expr The array length expression.
      */
     new_expression(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<type_expression> type_expr,
       std::unique_ptr<expression> expr)
     : expression{loc}
@@ -2291,7 +2291,7 @@ public:
      *
      * @param loc The location.
      */
-    explicit null_expression(token_location loc)
+    explicit null_expression(source_location loc)
     : expression{loc}
     {
     }
@@ -2399,7 +2399,7 @@ public:
 class prototype_ast
 {
     /** Token location. */
-    token_location loc;
+    source_location loc;
 
     /** The function name. */
     token name;
@@ -2451,7 +2451,7 @@ public:
      * @param return_type The function's return type.
      */
     prototype_ast(
-      token_location loc,
+      source_location loc,
       token name,
       std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
       std::unique_ptr<type_expression> return_type)
@@ -2514,7 +2514,7 @@ public:
      * @param exprs The program expressions.
      */
     block(
-      token_location loc,
+      source_location loc,
       std::vector<std::unique_ptr<expression>> exprs)
     : expression{loc}
     , exprs{std::move(exprs)}
@@ -2601,7 +2601,7 @@ public:
      * @param body The function's body.
      */
     function_expression(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<prototype_ast> prototype,
       std::unique_ptr<block> body)
     : expression{loc}
@@ -3004,7 +3004,7 @@ public:
      * @param expr The returned expression (if any).
      */
     return_statement(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<expression> expr)
     : expression{loc}
     , expr{std::move(expr)}
@@ -3085,7 +3085,7 @@ public:
      * @param else_block The block to be executed if the condition was false.
      */
     if_statement(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<expression> condition,
       std::unique_ptr<expression> if_block,
       std::unique_ptr<expression> else_block)
@@ -3182,7 +3182,7 @@ public:
      * @param while_block The block to be executed while the condition is true.
      */
     while_statement(
-      token_location loc,
+      source_location loc,
       std::unique_ptr<expression> condition,
       std::unique_ptr<expression> while_block)
     : expression{loc}
@@ -3249,7 +3249,7 @@ public:
      *
      * @param loc The location.
      */
-    explicit break_statement(token_location loc)
+    explicit break_statement(source_location loc)
     : expression{loc}
     {
     }
@@ -3297,7 +3297,7 @@ public:
      *
      * @param loc The location.
      */
-    explicit continue_statement(token_location loc)
+    explicit continue_statement(source_location loc)
     : expression{loc}
     {
     }
@@ -3360,7 +3360,7 @@ public:
      * @param body Branch body.
      */
     macro_branch(
-      token_location loc,
+      source_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
       std::unique_ptr<block> body)
@@ -3476,7 +3476,7 @@ public:
      * @param expr_list The expression list.
      */
     macro_expression_list(
-      token_location loc,
+      source_location loc,
       std::vector<std::unique_ptr<expression>> expr_list)
     : expression{loc}
     , expr_list{std::move(expr_list)}
@@ -3562,7 +3562,7 @@ public:
      * @param branches The macro's branches.
      */
     macro_expression(
-      token_location loc,
+      source_location loc,
       token name,
       std::vector<std::unique_ptr<macro_branch>> branches)
     : named_expression{loc, std::move(name)}

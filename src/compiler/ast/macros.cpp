@@ -597,7 +597,7 @@ std::string macro_expression::to_string() const
  *         multiple matches were found, or no matches were found.
  */
 static const macro_branch* get_matching_branch(
-  token_location loc,
+  source_location loc,
   const macro_expression* macro_expr,
   const std::vector<std::unique_ptr<expression>>& invocation_exprs)
 {
