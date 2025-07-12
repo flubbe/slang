@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * name resolution.
+ * module and import resolution.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -30,12 +30,7 @@ namespace slang::codegen
 class context;
 }    // namespace slang::codegen
 
-namespace slang::interpreter
-{
-class module_loader;
-}    // namespace slang::interpreter
-
-namespace slang::resolve
+namespace slang::loader
 {
 
 /**
@@ -60,26 +55,16 @@ inline std::string make_import_name(
 /** A resolve error. */
 class resolve_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a resolve_error.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit resolve_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a resolve_error.
      *
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    resolve_error(const token_location& loc, const std::string& message);
+    resolve_error(const source_location& loc, const std::string& message);
 };
 
 /** Resolver context. */
@@ -149,4 +134,4 @@ public:
     static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
 };
 
-}    // namespace slang::resolve
+}    // namespace slang::loader

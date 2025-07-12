@@ -17,14 +17,14 @@
 #include "compiler/typing.h"
 #include "shared/type_utils.h"
 #include "package.h"
-#include "resolve.h"
+#include "loader.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
 namespace si = slang::interpreter;
 
-namespace slang::resolve
+namespace slang::loader
 {
 
 /*
@@ -194,7 +194,7 @@ static ty::type_info to_resolved_type_info(
  * Exceptions.
  */
 
-resolve_error::resolve_error(const token_location& loc, const std::string& message)
+resolve_error::resolve_error(const source_location& loc, const std::string& message)
 : std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
 }
@@ -252,7 +252,7 @@ module_::module_resolver& context::resolve_module(
         return *it->second;
     }
 
-    return slang::resolve::resolve_module(file_mgr, resolvers, import_name, transitive);
+    return slang::loader::resolve_module(file_mgr, resolvers, import_name, transitive);
 }
 
 /**
@@ -528,4 +528,4 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
     return needs_import_resolution;
 }
 
-}    // namespace slang::resolve
+}    // namespace slang::loader

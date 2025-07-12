@@ -25,16 +25,7 @@ namespace fs = std::filesystem;
 /** A module resolution error. */
 class resolution_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `resolution_error`.
-     *
-     * @param message The error message.
-     */
-    explicit resolution_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** A module resolver for loading a module without decoding its bytecode. */

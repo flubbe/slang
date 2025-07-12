@@ -25,16 +25,7 @@ namespace slang
  */
 class lexical_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a lexical_error.
-     *
-     * @param message The error message.
-     */
-    explicit lexical_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** The lexer. Generates tokens from an input string. */
@@ -47,7 +38,7 @@ class lexer
     std::string::iterator position;
 
     /** Current location (i.e., line and column). */
-    token_location location;
+    source_location location;
 
     /** Tab size. */
     std::size_t tab_size{default_tab_size};
@@ -206,7 +197,7 @@ public:
      * @return The current location.
      */
     [[nodiscard]]
-    token_location get_location() const
+    source_location get_location() const
     {
         return location;
     }

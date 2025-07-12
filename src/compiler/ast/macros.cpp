@@ -15,11 +15,11 @@
 #include "ast.h"
 #include "builtins.h"
 #include "node_registry.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace slang::ast
 {
@@ -236,7 +236,7 @@ bool expression::expand_macros(
                   }
 
                   auto* m = e.as_macro_invocation();
-                  m->name.s = rs::make_import_name(
+                  m->name.s = ld::make_import_name(
                     m->name.s,
                     type_ctx.is_transitive_import(
                       m->get_namespace_path().value()));
@@ -276,7 +276,16 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    return expansion->generate_code(ctx, mc);
+    auto return_type = expansion->generate_code(ctx, mc);
+    if(index_expr)
+    {
+        // evaluate the index expression.
+        index_expr->generate_code(ctx, memory_context::load);
+        ctx.generate_load(std::make_unique<cg::type_argument>(return_type->deref()), true);
+        return std::make_unique<cg::value>(return_type->deref());
+    }
+
+    return return_type;
 }
 
 std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
@@ -588,7 +597,7 @@ std::string macro_expression::to_string() const
  *         multiple matches were found, or no matches were found.
  */
 static const macro_branch* get_matching_branch(
-  token_location loc,
+  source_location loc,
   const macro_expression* macro_expr,
   const std::vector<std::unique_ptr<expression>>& invocation_exprs)
 {

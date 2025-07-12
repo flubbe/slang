@@ -65,20 +65,12 @@ struct stack_trace_entry
 /** Interpreter error. */
 class interpreter_error : public std::runtime_error
 {
+    using std::runtime_error::runtime_error;
+
     /** Call stack. */
     std::vector<stack_trace_entry> stack_trace;
 
 public:
-    /**
-     * Construct a `interpreter_error`.
-     *
-     * @param message The error message.
-     */
-    explicit interpreter_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
-
     /**
      * Construct a `interpreter_error`.
      *

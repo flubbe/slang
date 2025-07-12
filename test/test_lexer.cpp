@@ -43,35 +43,35 @@ TEST(lexer, tokenize_whitespaces_identifiers)
 
     EXPECT_EQ(tokens[0].s, "a");
     EXPECT_EQ(tokens[0].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[0].location, slang::token_location(1, 1));
+    EXPECT_EQ(tokens[0].location, slang::source_location(1, 1));
 
     EXPECT_EQ(tokens[1].s, "a_b!");
     EXPECT_EQ(tokens[1].type, slang::token_type::macro_name);
-    EXPECT_EQ(tokens[1].location, slang::token_location(1, 3));
+    EXPECT_EQ(tokens[1].location, slang::source_location(1, 3));
 
     EXPECT_EQ(tokens[2].s, "$_b");
     EXPECT_EQ(tokens[2].type, slang::token_type::macro_identifier);
-    EXPECT_EQ(tokens[2].location, slang::token_location(1, 8));
+    EXPECT_EQ(tokens[2].location, slang::source_location(1, 8));
 
     EXPECT_EQ(tokens[3].s, "_AB");
     EXPECT_EQ(tokens[3].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[3].location, slang::token_location(1, 12));
+    EXPECT_EQ(tokens[3].location, slang::source_location(1, 12));
 
     EXPECT_EQ(tokens[4].s, "_12ab");
     EXPECT_EQ(tokens[4].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[4].location, slang::token_location(1, 19));
+    EXPECT_EQ(tokens[4].location, slang::source_location(1, 19));
 
     EXPECT_EQ(tokens[5].s, "h");
     EXPECT_EQ(tokens[5].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[5].location, slang::token_location(2, 1));
+    EXPECT_EQ(tokens[5].location, slang::source_location(2, 1));
 
     EXPECT_EQ(tokens[6].s, "u_789");
     EXPECT_EQ(tokens[6].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[6].location, slang::token_location(2, 1));
+    EXPECT_EQ(tokens[6].location, slang::source_location(2, 1));
 
     EXPECT_EQ(tokens[7].s, "t");
     EXPECT_EQ(tokens[7].type, slang::token_type::identifier);
-    EXPECT_EQ(tokens[7].location, slang::token_location(3, 6));
+    EXPECT_EQ(tokens[7].location, slang::source_location(3, 6));
 }
 
 TEST(lexer, single_line_comment)

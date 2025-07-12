@@ -52,26 +52,16 @@ namespace slang::codegen
 /** A code generation error. */
 class codegen_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `codegen_error`.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit codegen_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a `codegen_error`.
      *
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    codegen_error(const slang::token_location& loc, const std::string& message);
+    codegen_error(const slang::source_location& loc, const std::string& message);
 };
 
 /** Type classes. */
@@ -2463,7 +2453,7 @@ public:
      */
     [[nodiscard]]
     value get_struct_member(
-      token_location loc,
+      source_location loc,
       const std::string& struct_name,
       const std::string& member_name,
       std::optional<std::string> import_path = std::nullopt) const;
@@ -2690,7 +2680,7 @@ public:
      * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
-    void pop_break_continue(std::optional<token_location> loc = std::nullopt)
+    void pop_break_continue(std::optional<source_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.empty())
         {
@@ -2713,7 +2703,7 @@ public:
      * @throws Throws a `codegen_error` if the stack is empty.
      */
     [[nodiscard]]
-    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<token_location> loc = std::nullopt)
+    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<source_location> loc = std::nullopt)
     {
         if(basic_block_brk_cnt.empty())
         {

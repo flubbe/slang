@@ -45,7 +45,7 @@ archive& operator&(archive& ar, type_class& cls);
 class type_info
 {
     /** Source location of the type (if available). */
-    token_location location;
+    source_location location;
 
     /** Optional name for this type. Only set when `cls` is not `type_class::tc_array`. */
     std::optional<std::string> name;
@@ -115,7 +115,7 @@ public:
     void serialize(archive& ar);
 
     /** Get the token location. */
-    const token_location& get_location() const
+    const source_location& get_location() const
     {
         return location;
     }

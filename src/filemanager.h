@@ -27,16 +27,7 @@ namespace slang
  */
 class file_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a file_error.
-     *
-     * @param message The error message.
-     */
-    explicit file_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /**

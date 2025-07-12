@@ -34,16 +34,7 @@ namespace cg = slang::codegen;
 /** An error during instruction emission. */
 class emitter_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `emitter_error`.
-     *
-     * @param message The error message.
-     */
-    explicit emitter_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** Export table builder. */
