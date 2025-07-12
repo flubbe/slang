@@ -34,19 +34,9 @@ namespace slang::typing
 /** Type errors. */
 class type_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a type_error.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit type_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a type_error.
      *

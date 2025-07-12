@@ -50,16 +50,7 @@ static_assert(
 /** A serialization error. */
 class serialization_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `serialization_error`.
-     *
-     * @param message The error message.
-     */
-    explicit serialization_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** An abstract archive for byte-order independent serialization. */

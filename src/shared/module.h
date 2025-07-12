@@ -37,16 +37,7 @@ namespace si = slang::interpreter;
 /** A module error. */
 class module_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `module_error`.
-     *
-     * @param message The error message.
-     */
-    explicit module_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** Symbol types for imports and exports. */

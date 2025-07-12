@@ -55,19 +55,9 @@ inline std::string make_import_name(
 /** A resolve error. */
 class resolve_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a resolve_error.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit resolve_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a resolve_error.
      *

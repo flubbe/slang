@@ -42,16 +42,7 @@ static_assert(sizeof(si::fixed_vector<void*>) == sizeof(void*));
 /** Garbage collection error. */
 class gc_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `gc_error`.
-     *
-     * @param message The error message.
-     */
-    explicit gc_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /**

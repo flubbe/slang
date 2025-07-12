@@ -52,19 +52,9 @@ namespace slang::codegen
 /** A code generation error. */
 class codegen_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `codegen_error`.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit codegen_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a `codegen_error`.
      *
