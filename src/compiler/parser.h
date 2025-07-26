@@ -72,8 +72,12 @@ protected:
     /** The lexer common to all internal parse calls. */
     lexer* current_lexer{nullptr};
 
-    /** The parsed AST. */
-    std::shared_ptr<ast::expression> ast;
+    /**
+     * The parsed AST. Since the program essentially consist of a sequence
+     * of expressions, it is represented by an `ast::block`. This is also
+     * important for scoping later, since this block acts as the global scope.
+     */
+    std::shared_ptr<ast::block> ast;
 
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
@@ -255,7 +259,7 @@ public:
     void parse(lexer& lexer);
 
     /** Get the AST. */
-    std::shared_ptr<ast::expression> get_ast() const
+    std::shared_ptr<ast::block> get_ast() const
     {
         return ast;
     }

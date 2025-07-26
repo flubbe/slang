@@ -68,6 +68,10 @@ void context::resolve_imports(
     // import environment, to be merged with the context's environment.
     sema::env import_env;
     co::context import_collector{import_env};
+    if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
+    {
+        throw std::runtime_error("Got unexpected scope id for global scope.");
+    }
 
     for(auto& [id, info]: env.symbol_table)
     {
@@ -80,8 +84,6 @@ void context::resolve_imports(
 
         module_::module_resolver& resolver = loader.resolve_module(
           info.qualified_name, transitive_import);
-
-        // FIXME declaring module
 
         const module_::module_header& header = resolver.get_module().get_header();
 
@@ -100,7 +102,7 @@ void context::resolve_imports(
               qualified_name,
               to_sema_symbol_type(it.type),
               info.loc,
-              info.declaring_module,
+              id,
               transitive_import,
               &it);
         }
@@ -147,7 +149,10 @@ void context::resolve_imports(
         auto scope_it = env.scope_map.find(env.global_scope_id);
         if(scope_it == env.scope_map.end())
         {
-            throw std::runtime_error("No global scope in semantic environment.");
+            throw std::runtime_error(
+              std::format(
+                "No global scope (id '{}') in semantic environment.",
+                static_cast<int>(env.global_scope_id)));
         }
         auto binding_it = scope_it->second.bindings.find(info.name);
         if(binding_it != scope_it->second.bindings.end())

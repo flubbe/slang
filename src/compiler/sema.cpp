@@ -129,11 +129,17 @@ std::string to_string(const env& env)
 
         for(const auto& [id, s]: env.scope_map)
         {
+            auto name = s.name;
+            if(s.parent == scope::invalid_id)
+            {
+                name += " [global]";
+            }
+
             res += std::format(
               "    {:>9}    {:>9}    {}\n",
               id,
               static_cast<int>(s.parent),
-              s.name);
+              name);
         }
     }
 

@@ -173,7 +173,7 @@ struct symbol_info
 /** Semantic environment. */
 struct env
 {
-    /** Global scope id. */
+    /** Global scope id. Needs to be set manually, e.g. by a collection context. */
     scope_id global_scope_id{scope::invalid_id};
 
     /** Scope table. */

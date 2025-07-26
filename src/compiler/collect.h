@@ -65,7 +65,7 @@ class context
     sema::scope_id current_scope;
 
     /** Current scope id counter. */
-    sema::scope_id scope_id_counter{0};
+    sema::scope_id scope_id_counter{global_scope_id};
 
     /** Current symbol id counter. */
     sema::symbol_id::value_type symbol_id_counter{0};
@@ -100,6 +100,15 @@ class context
     }
 
 public:
+    /**
+     * Global scope id. This is also the smallest valid scope id.
+     *
+     * The first scope in the AST will be assigned the global scope id.
+     * This works, since the AST always has a `block` (creating a scope)
+     * at its root.
+     */
+    static constexpr sema::scope_id global_scope_id{0};
+
     /** Default constructors. */
     context() = delete;
     context(const context&) = delete;
@@ -113,11 +122,8 @@ public:
     context(sema::env& env)
     : env{env}
     {
-        current_scope = create_scope(
-          sema::scope::invalid_id,
-          std::nullopt,
-          source_location{0, 0});
-        env.global_scope_id = current_scope;
+        current_scope = sema::scope::invalid_id;
+        env.global_scope_id = global_scope_id;
     }
 
     /** Default destructor. */

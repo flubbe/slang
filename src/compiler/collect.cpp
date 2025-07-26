@@ -257,12 +257,7 @@ void context::push_scope(sema::scope_id id)
 
 void context::pop_scope()
 {
-    auto* scope = get_scope(current_scope);
-    if(scope->parent == sema::scope::invalid_id)
-    {
-        throw std::runtime_error("Cannot pop scope without parent.");
-    }
-    current_scope = scope->parent;
+    current_scope = get_scope(current_scope)->parent;
 }
 
 /**
