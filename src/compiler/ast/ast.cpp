@@ -561,6 +561,14 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
 }
 
+void type_cast_expression::collect_names(co::context& ctx)
+{
+    if(expr)
+    {
+        expr->collect_names(ctx);
+    }
+}
+
 std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
 {
     auto type = expr->type_check(ctx);
@@ -629,10 +637,14 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
     return expr->generate_code(ctx, mc);
 }
 
-std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
+void namespace_access_expression::collect_names(co::context& ctx)
 {
     update_namespace();
+    expr->collect_names(ctx);
+}
 
+std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
+{
     expr_type = expr->type_check(ctx);
     if(!expr_type.has_value())
     {
@@ -856,9 +868,22 @@ std::unique_ptr<cg::value> import_expression::generate_code([[maybe_unused]] cg:
     return nullptr;
 }
 
-void import_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
+void import_expression::collect_names(co::context& ctx)
 {
-    type_ctx.add_import(path, false);
+    super::collect_names(ctx);
+
+    ctx.declare(
+      path.begin()->s,
+      utils::join(
+        path
+          | std::views::transform([](const auto& c)
+                                  { return c.s; })
+          | std::ranges::to<std::vector>(),
+        "::"),
+      sema::symbol_type::module_import,
+      path.begin()->location,
+      sema::symbol_id::invalid,
+      false);
 }
 
 std::string import_expression::to_string() const
@@ -893,11 +918,14 @@ std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx,
     return ret;
 }
 
-void directive_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void directive_expression::collect_names(co::context& ctx)
 {
-    expr->push_directive(ctx, name, args);
-    expr->collect_names(ctx, type_ctx);
-    expr->pop_directive(ctx);
+    super::collect_names(ctx);
+
+    // TODO
+    // expr->push_directive(ctx, name, args);
+    expr->collect_names(ctx);
+    // expr->pop_directive(ctx);
 }
 
 std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
@@ -1301,6 +1329,22 @@ void variable_declaration_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
+void variable_declaration_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::variable_declaration,
+      name.location,
+      sema::symbol_id::invalid,
+      false);
+}
+
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
 {
     if(mc != memory_context::none)
@@ -1496,11 +1540,25 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::co
         t.to_string()));
 }
 
-void constant_declaration_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void constant_declaration_expression::collect_names(co::context& ctx)
 {
-    auto const_type = type->to_type_info(type_ctx);
-    type_ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
-    ctx.register_constant_name(name);
+    super::collect_names(ctx);
+
+    ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::constant_declaration,
+      name.location,
+      sema::symbol_id::invalid,
+      false);
+
+    // TODO
+    // auto const_type = type->to_type_info(type_ctx);
+    // type_ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
+    // ctx.register_constant_name(name);
 }
 
 std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
@@ -1619,6 +1677,16 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
     return v;
 }
 
+void array_initializer_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    for(auto& it: exprs)
+    {
+        it->collect_names(ctx);
+    }
+}
+
 std::optional<ty::type_info> array_initializer_expression::type_check(ty::context& ctx)
 {
     std::optional<ty::type_info> t;
@@ -1734,20 +1802,30 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     return nullptr;
 }
 
-void struct_definition_expression::collect_names([[maybe_unused]] cg::context& ctx, ty::context& type_ctx) const
+void struct_definition_expression::collect_names(co::context& ctx)
 {
-    std::vector<std::pair<token, ty::type_info>> struct_members =
-      members
-      | std::views::transform(
-        [&type_ctx](const auto& m)
-        {
-            return std::make_pair(
-              m->get_name(),
-              m->get_type()->to_unresolved_type_info(type_ctx));
-        })
-      | std::ranges::to<std::vector>();
+    super::collect_names(ctx);
 
-    type_ctx.add_struct(name, std::move(struct_members));
+    ctx.push_scope(std::format("{}@struct", name.s), name.location);
+    for(auto& m: members)
+    {
+        m->collect_names(ctx);
+    }
+    ctx.pop_scope();
+
+    // TODO
+    // std::vector<std::pair<token, ty::type_info>> struct_members =
+    //   members
+    //   | std::views::transform(
+    //     [&type_ctx](const auto& m)
+    //     {
+    //         return std::make_pair(
+    //           m->get_name(),
+    //           m->get_type()->to_unresolved_type_info(type_ctx));
+    //     })
+    //   | std::ranges::to<std::vector>();
+
+    // type_ctx.add_struct(name, std::move(struct_members));
 }
 
 bool struct_definition_expression::supports_directive(const std::string& name) const
@@ -1861,6 +1939,16 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
 }
 
+void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    for(auto& it: initializers)
+    {
+        it->collect_names(ctx);
+    }
+}
+
 std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
 {
     const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
@@ -1944,6 +2032,12 @@ std::unique_ptr<cg::value> named_initializer::generate_code(
   memory_context mc) const
 {
     return expr->generate_code(ctx, mc);
+}
+
+void named_initializer::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    expr->collect_names(ctx);
 }
 
 std::optional<ty::type_info> named_initializer::type_check(ty::context& ctx)
@@ -2047,6 +2141,15 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
     }
 
     return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
+}
+
+void struct_named_initializer_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    for(auto& it: initializers)
+    {
+        it->collect_names(ctx);
+    }
 }
 
 std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty::context& ctx)
@@ -2483,6 +2586,13 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     return lhs->generate_code(ctx, memory_context::store);
 }
 
+void binary_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    lhs->collect_names(ctx);
+    rhs->collect_names(ctx);
+}
+
 std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 {
     if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
@@ -2838,6 +2948,12 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         op.s));
 }
 
+void unary_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    operand->collect_names(ctx);
+}
+
 std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
 {
     if(!ctx.has_expression_type(*operand))
@@ -2962,6 +3078,12 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
     // custom type.
     ctx.generate_anewarray(cg::value{type_expr->to_type()});
     return std::make_unique<cg::value>(type_expr->to_type());
+}
+
+void new_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    expr->collect_names(ctx);
 }
 
 std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
@@ -3119,6 +3241,12 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
     return v;
 }
 
+void postfix_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    identifier->collect_names(ctx);
+}
+
 std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
 {
     auto identifier_type = identifier->type_check(ctx);
@@ -3209,40 +3337,70 @@ void prototype_ast::generate_native_binding(const std::string& lib_name, cg::con
     ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
-void prototype_ast::collect_names(cg::context& ctx, ty::context& type_ctx) const
+sema::scope_id prototype_ast::collect_names(co::context& ctx)
 {
-    std::vector<cg::value> prototype_arg_types =
-      args
-      | std::views::transform(
-        [](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> cg::value
-        {
-            if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
-            {
-                return cg::value{
-                  cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
-                           std::get<1>(arg)->is_array()
-                             ? static_cast<std::size_t>(1)
-                             : static_cast<std::size_t>(0)}};
-            }
+    ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::function_definition,
+      name.location,
+      sema::symbol_id::invalid,
+      false);
 
-            return cg::value{std::get<1>(arg)->to_type()};
-        })
-      | std::ranges::to<std::vector>();
+    auto id = ctx.push_scope(std::format("{}@function", name.s), name.location);
+    for(const auto& arg: args)
+    {
+        ctx.declare(
+          arg.first.s,
+          std::format(
+            "{}::{}",
+            ctx.get_canonical_scope_name(ctx.get_current_scope()),
+            arg.first.s),
+          sema::symbol_type::variable_declaration,
+          arg.first.location,
+          sema::symbol_id::invalid,
+          false);
+    }
+    ctx.pop_scope();
 
-    cg::value ret_val = cg::value{return_type->to_type()};
-    ctx.add_prototype(name.s, std::move(ret_val), std::move(prototype_arg_types));
+    return id;
 
-    std::vector<ty::type_info> arg_types =
-      args
-      | std::views::transform(
-        [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
-        { return std::get<1>(arg)->to_unresolved_type_info(type_ctx); })
-      | std::ranges::to<std::vector>();
+    // TODO
+    // std::vector<cg::value> prototype_arg_types =
+    //   args
+    //   | std::views::transform(
+    //     [](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> cg::value
+    //     {
+    //         if(ty::is_builtin_type(std::get<1>(arg)->get_name().s))
+    //         {
+    //             return cg::value{
+    //               cg::type{cg::to_type_class(std::get<1>(arg)->get_name().s),
+    //                        std::get<1>(arg)->is_array()
+    //                          ? static_cast<std::size_t>(1)
+    //                          : static_cast<std::size_t>(0)}};
+    //         }
 
-    type_ctx.add_function(
-      name,
-      std::move(arg_types),
-      return_type->to_unresolved_type_info(type_ctx));
+    //         return cg::value{std::get<1>(arg)->to_type()};
+    //     })
+    //   | std::ranges::to<std::vector>();
+
+    // cg::value ret_val = cg::value{return_type->to_type()};
+    // ctx.add_prototype(name.s, std::move(ret_val), std::move(prototype_arg_types));
+
+    // std::vector<ty::type_info> arg_types =
+    //   args
+    //   | std::views::transform(
+    //     [&type_ctx](const std::pair<token, std::unique_ptr<type_expression>>& arg) -> ty::type_info
+    //     { return std::get<1>(arg)->to_unresolved_type_info(type_ctx); })
+    //   | std::ranges::to<std::vector>();
+
+    // type_ctx.add_function(
+    //   name,
+    //   std::move(arg_types),
+    //   return_type->to_unresolved_type_info(type_ctx));
 }
 
 void prototype_ast::type_check(ty::context& ctx)
@@ -3390,11 +3548,28 @@ std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context
     throw cg::codegen_error(loc, "Invalid memory context for code block.");
 }
 
-void block::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void block::collect_names(co::context& ctx)
 {
+    collect_names(ctx, true);
+}
+
+void block::collect_names(co::context& ctx, bool push_anonymous_scope)
+{
+    super::collect_names(ctx);
+
+    if(push_anonymous_scope)
+    {
+        ctx.push_scope(std::nullopt, loc);
+    }
+
     for(const auto& expr: exprs)
     {
-        expr->collect_names(ctx, type_ctx);
+        expr->collect_names(ctx);
+    }
+
+    if(push_anonymous_scope)
+    {
+        ctx.pop_scope();
     }
 }
 
@@ -3546,9 +3721,19 @@ std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, 
     return nullptr;
 }
 
-void function_expression::collect_names(cg::context& ctx, ty::context& type_ctx) const
+void function_expression::collect_names(co::context& ctx)
 {
-    prototype->collect_names(ctx, type_ctx);
+    super::collect_names(ctx);
+
+    auto scope_id = prototype->collect_names(ctx);
+    token name = prototype->get_name();
+
+    if(body != nullptr)
+    {
+        ctx.push_scope(scope_id);
+        body->collect_names(ctx, false);
+        ctx.pop_scope();
+    }
 }
 
 bool function_expression::supports_directive(const std::string& name) const
@@ -3630,6 +3815,21 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     }
 
     return std::make_unique<cg::value>(std::move(return_type));
+}
+
+void call_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    for(auto& arg: args)
+    {
+        arg->collect_names(ctx);
+    }
+
+    if(index_expr)
+    {
+        index_expr->collect_names(ctx);
+    }
 }
 
 std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
@@ -3749,6 +3949,14 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
     }
 
     return nullptr;
+}
+
+void return_statement::collect_names(co::context& ctx)
+{
+    if(expr)
+    {
+        expr->collect_names(ctx);
+    }
 }
 
 std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
@@ -3919,6 +4127,17 @@ std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_
     return nullptr;
 }
 
+void if_statement::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    condition->collect_names(ctx);
+    if_block->collect_names(ctx);
+    if(else_block)
+    {
+        else_block->collect_names(ctx);
+    }
+}
+
 std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
 {
     auto condition_type = condition->type_check(ctx);
@@ -4024,6 +4243,13 @@ std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memo
     ctx.set_insertion_point(merge_basic_block);
 
     return nullptr;
+}
+
+void while_statement::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    condition->collect_names(ctx);
+    while_block->collect_names(ctx);
 }
 
 std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)

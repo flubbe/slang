@@ -25,7 +25,7 @@
  */
 namespace slang::ast
 {
-class expression;
+class expression; /* ast.h */
 }    // namespace slang::ast
 
 namespace slang::typing

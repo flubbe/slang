@@ -8,313 +8,175 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "shared/module.h"
-#include "compiler/codegen.h"
-#include "compiler/typing.h"
-#include "ast/ast.h"
+#include <format>
+#include <ranges>
+
+#include "collect.h"
+#include "loader.h"
+#include "package.h"
+#include "resolve.h"
 #include "utils.h"
 
-namespace slang::ast
+#include <print>
+
+namespace slang::resolve
 {
+
+namespace co = slang::collect;
 
 /*
- * type_cast_expression.
+ * context.
  */
 
-void type_cast_expression::resolve_names(rs::context& ctx)
+std::optional<sema::symbol_id> context::resolve(
+  const std::string& name,
+  sema::symbol_type type,
+  sema::scope_id scope_id)
 {
-    expr->resolve_names(ctx);
+    return env.get_symbol_id(
+      name,
+      type,
+      scope_id);
 }
 
-/*
- * namespace_access_expression.
+/**
+ * Map module symbols to semantic symbol types.
+ *
+ * @param s Symbol type from the module header.
+ * @returns Returns the symbol mapped to `sema::symbol_type`.
+ * @throws Throws a `std::runtime_error` if the symbol type could not be mapped.
  */
-
-void namespace_access_expression::resolve_names(rs::context& ctx)
+sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
 {
-    expr->resolve_names(ctx);
-}
-
-/*
- * access_expression.
- */
-
-void access_expression::resolve_names(rs::context& ctx)
-{
-    lhs->resolve_names(ctx);
-    rhs->resolve_names(ctx);
-}
-
-/*
- * directive_expression.
- */
-
-void directive_expression::resolve_names(rs::context& ctx)
-{
-    expr->resolve_names(ctx);
-}
-
-/*
- * variable_reference_expression.
- */
-
-void variable_reference_expression::resolve_names(rs::context& ctx)
-{
-    if(element_expr)
+    switch(s)
     {
-        element_expr->resolve_names(ctx);
-    }
-
-    if(expansion)
-    {
-        expansion->resolve_names(ctx);
+    case module_::symbol_type::constant: return sema::symbol_type::constant_declaration;
+    case module_::symbol_type::function: return sema::symbol_type::function_definition;
+    case module_::symbol_type::macro: return sema::symbol_type::macro_definition;
+    case module_::symbol_type::type: return sema::symbol_type::struct_definition;
+    default:
+        throw std::runtime_error(
+          std::format(
+            "Unable to get semantic symbol type from module symbol type '{}'.",
+            static_cast<int>(s)));
     }
 }
 
-/*
- * variable_declaration_expression.
- */
-
-void variable_declaration_expression::resolve_names(rs::context& ctx)
+void context::resolve_imports(
+  ld::context& loader)
 {
-    if(expr)
+    // import environment, to be merged with the context's environment.
+    sema::env import_env;
+    co::context import_collector{import_env};
+
+    for(auto& [id, info]: env.symbol_table)
     {
-        expr->resolve_names(ctx);
+        if(info.type != sema::symbol_type::module_import)
+        {
+            continue;
+        }
+
+        bool transitive_import = env.transitive_imports.contains(id);
+
+        module_::module_resolver& resolver = loader.resolve_module(
+          info.qualified_name, transitive_import);
+
+        // FIXME declaring module
+
+        const module_::module_header& header = resolver.get_module().get_header();
+
+        for(const auto& it: header.exports)
+        {
+            std::print("loader: {} ({}, transitive: {})\n", it.name, to_string(it.type), transitive_import);
+
+            auto qualified_name =
+              std::format(
+                "{}::{}",
+                info.qualified_name,
+                it.name);
+
+            import_collector.declare(
+              it.name,
+              qualified_name,
+              to_sema_symbol_type(it.type),
+              info.loc,
+              info.declaring_module,
+              transitive_import,
+              &it);
+        }
+
+        std::println("resolve_imports: {}, qualified name: {}", info.name, info.qualified_name);
     }
-}
 
-/*
- * array_initializer_expression.
- */
-
-void array_initializer_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      exprs,
-      [&ctx](std::unique_ptr<expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-}
-
-/*
- * struct_definition_expression.
- */
-
-void struct_definition_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      members,
-      [&ctx](std::unique_ptr<variable_declaration_expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-}
-
-/*
- * struct_anonymous_initializer_expression.
- */
-
-void struct_anonymous_initializer_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      initializers,
-      [&ctx](std::unique_ptr<expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-}
-
-/*
- * named_initializer.
- */
-
-void named_initializer::resolve_names(rs::context& ctx)
-{
-    expr->resolve_names(ctx);
-}
-
-/*
- * struct_named_initializer_expression.
- */
-
-void struct_named_initializer_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      initializers,
-      [&ctx](std::unique_ptr<named_initializer>& e)
-      {
-          e->resolve_names(ctx);
-      });
-}
-
-/*
- * binary_expression.
- */
-
-void binary_expression::resolve_names(rs::context& ctx)
-{
-    lhs->resolve_names(ctx);
-    rhs->resolve_names(ctx);
-}
-
-/*
- * unary_expression.
- */
-
-void unary_expression::resolve_names(rs::context& ctx)
-{
-    operand->resolve_names(ctx);
-}
-
-/*
- * new_expression.
- */
-
-void new_expression::resolve_names(rs::context& ctx)
-{
-    expr->resolve_names(ctx);
-}
-
-/*
- * postfix_expression.
- */
-
-void postfix_expression::resolve_names(rs::context& ctx)
-{
-    identifier->resolve_names(ctx);
-}
-
-/*
- * block.
- */
-
-void block::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      exprs,
-      [&ctx](std::unique_ptr<expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-}
-
-/*
- * function_expression.
- */
-
-void function_expression::resolve_names(rs::context& ctx)
-{
-    if(body)
+    // Move symbols into semantic environment.
+    for(auto& [id, info]: import_env.symbol_table)
     {
-        body->resolve_names(ctx);
+        auto symbol_it = std::ranges::find_if(
+          env.symbol_table,
+          [&info](const std::pair<sema::symbol_id, sema::symbol_info>& p) -> bool
+          {
+              return p.second.name == info.name;
+          });
+        if(symbol_it != env.symbol_table.end())
+        {
+            if(symbol_it->second.qualified_name != info.qualified_name)
+            {
+                throw std::runtime_error(
+                  std::format(
+                    "'{}': A symbol with the same name already exists in symbol table. Declaration at: {}",
+                    info.qualified_name,
+                    to_string(symbol_it->second.loc)));
+            }
+
+            if(env.transitive_imports.contains(symbol_it->first)
+               && !import_env.transitive_imports.contains(id))
+            {
+                env.transitive_imports.erase(symbol_it->first);
+            }
+
+            continue;
+        }
+
+        std::println(
+          "resolve_imports: moving {} (transitive: {})",
+          info.qualified_name,
+          import_env.transitive_imports.contains(id));
+
+        env.symbol_table.insert({id, info});
+
+        auto scope_it = env.scope_map.find(env.global_scope_id);
+        if(scope_it == env.scope_map.end())
+        {
+            throw std::runtime_error("No global scope in semantic environment.");
+        }
+        auto binding_it = scope_it->second.bindings.find(info.name);
+        if(binding_it != scope_it->second.bindings.end())
+        {
+            if(binding_it->second.contains(info.type))
+            {
+                throw std::runtime_error(
+                  std::format(
+                    "Symbol '{}' of type '{}' already bound.",
+                    info.name,
+                    sema::to_string(info.type)));
+            }
+
+            binding_it->second.insert({info.type, id});
+        }
+        else
+        {
+            scope_it->second.bindings.insert(
+              {info.name,
+               {{info.type, id}}});
+        }
+
+        if(import_env.transitive_imports.contains(id))
+        {
+            env.transitive_imports.insert(id);
+        }
     }
+
+    std::print("{}\n", to_string(env));
 }
 
-/*
- * call_expression.
- */
-
-void call_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      args,
-      [&ctx](std::unique_ptr<expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-
-    if(index_expr)
-    {
-        index_expr->resolve_names(ctx);
-    }
-}
-
-/*
- * macro_invocation.
- */
-
-void macro_invocation::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      exprs,
-      [&ctx](std::unique_ptr<expression>& e)
-      {
-          e->resolve_names(ctx);
-      });
-
-    if(index_expr)
-    {
-        index_expr->resolve_names(ctx);
-    }
-}
-
-/*
- * return_statement.
- */
-
-void return_statement::resolve_names(rs::context& ctx)
-{
-    if(expr)
-    {
-        expr->resolve_names(ctx);
-    }
-}
-
-/*
- * if_statement.
- */
-
-void if_statement::resolve_names(rs::context& ctx)
-{
-    condition->resolve_names(ctx);
-    if_block->resolve_names(ctx);
-    if(else_block)
-    {
-        else_block->resolve_names(ctx);
-    }
-}
-
-/*
- * while_statement.
- */
-
-void while_statement::resolve_names(rs::context& ctx)
-{
-    condition->resolve_names(ctx);
-    while_block->resolve_names(ctx);
-}
-
-/*
- * macro_branch.
- */
-
-void macro_branch::resolve_names(rs::context& ctx)
-{
-    body->resolve_names(ctx);
-}
-
-/*
- * macro_expression_list:
- */
-
-void macro_expression_list::resolve_names([[maybe_unused]] rs::context& ctx)
-{
-    throw cg::codegen_error(loc, "Non-expanded macro expression list.");
-}
-
-/*
- * macro_expression.
- */
-
-void macro_expression::resolve_names(rs::context& ctx)
-{
-    std::ranges::for_each(
-      branches,
-      [&ctx](std::unique_ptr<macro_branch>& b)
-      {
-          b->resolve_names(ctx);
-      });
-}
-
-}    // namespace slang::ast
+}    // namespace slang::resolve

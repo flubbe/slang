@@ -19,8 +19,10 @@
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
-namespace ty = slang::typing;
+namespace co = slang::collect;
 namespace ld = slang::loader;
+namespace sema = slang::sema;
+namespace ty = slang::typing;
 
 namespace
 {
@@ -45,10 +47,12 @@ void run_test(
     ty::context type_ctx;
     ld::context loader_ctx{mgr};
     cg::context codegen_ctx;
+    sema::env env;
+    co::context co_ctx{env};
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
     ASSERT_NO_THROW(type_ctx.resolve_types());
     ASSERT_NO_THROW(ast->type_check(type_ctx));

@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "archives/archive.h"
+#include "compiler/collect.h"
 #include "compiler/directive.h"
 #include "compiler/type.h"
 #include "node_ids.h"
@@ -53,6 +54,7 @@ namespace slang::ast
 {
 
 namespace cg = slang::codegen;
+namespace co = slang::collect;
 namespace ty = slang::typing;
 namespace rs = slang::resolve;
 
@@ -78,6 +80,12 @@ protected:
 
     /** The expression's given or inferred type. Needs to be set by `type_check`. */
     std::optional<ty::type_info> expr_type;
+
+    /** Identifier scope. */
+    std::optional<sema::scope_id> scope_id;
+
+    /** Symbol id */
+    std::optional<sema::symbol_id> symbol_id;
 
 public:
     /** Default constructors. */
@@ -354,11 +362,11 @@ public:
     /**
      * Name collection.
      *
-     * @param ctx Code generation context.
-     * @param type_ctx Type system context.
+     * @param ctx Collection context.
      */
-    virtual void collect_names([[maybe_unused]] cg::context& ctx, [[maybe_unused]] ty::context& type_ctx) const
+    virtual void collect_names(co::context& ctx)
     {
+        scope_id = ctx.get_current_scope();
     }
 
     /** Name resolution. */
@@ -488,6 +496,20 @@ public:
     virtual std::vector<const expression*> get_children() const
     {
         return {};
+    }
+
+    /** Get the scope id, or `std::nullopt`. */
+    [[nodiscard]]
+    std::optional<sema::symbol_id> get_scope_id() const
+    {
+        return scope_id;
+    }
+
+    /** Get the symbol id, or `std::nullopt`. */
+    [[nodiscard]]
+    std::optional<sema::symbol_id> get_symbol_id() const
+    {
+        return symbol_id;
     }
 
     /**
@@ -878,6 +900,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1000,6 +1023,7 @@ public:
         expr->set_namespace(std::move(expr_namespace_stack));
     }
 
+    void collect_names(co::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1172,7 +1196,7 @@ public:
     void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 };
 
@@ -1241,7 +1265,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1472,6 +1496,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1571,7 +1596,7 @@ public:
       const std::vector<std::pair<token, token>>& args) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1649,6 +1674,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1736,7 +1762,7 @@ public:
     void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -1828,6 +1854,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1909,6 +1936,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
 
@@ -2002,6 +2030,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2094,6 +2123,7 @@ public:
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2175,6 +2205,7 @@ public:
     [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2251,6 +2282,7 @@ public:
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2375,6 +2407,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2467,7 +2500,7 @@ public:
 
     [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const;
+    sema::scope_id collect_names(co::context& ctx);
     void type_check(ty::context& ctx);
     [[nodiscard]] std::string to_string() const;
 
@@ -2533,7 +2566,7 @@ public:
     [[nodiscard]] bool is_pure(cg::context&) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2562,6 +2595,14 @@ public:
         }
         return children;
     }
+
+    /**
+     * Name collection.
+     *
+     * @param ctx Collection context.
+     * @param push_anonymous_scope Whether to push an anonymous name for this scope.
+     */
+    void collect_names(co::context& ctx, bool push_anonymous_scope);
 };
 
 /** A function definition. */
@@ -2620,7 +2661,7 @@ public:
     void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
@@ -2737,6 +2778,7 @@ public:
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -2888,6 +2930,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -3021,6 +3064,7 @@ public:
     void serialize(archive& ar) override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -3113,6 +3157,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -3207,6 +3252,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
@@ -3505,8 +3551,8 @@ public:
         return this;
     }
 
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_info> type_check(ty::context& ctx) override;
     std::string to_string() const override;
@@ -3593,7 +3639,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(cg::context& ctx, ty::context& type_ctx) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;

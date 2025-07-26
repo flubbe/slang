@@ -288,6 +288,26 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
     return return_type;
 }
 
+void macro_invocation::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    for(auto& expr: exprs)
+    {
+        expr->collect_names(ctx);
+    }
+
+    if(index_expr)
+    {
+        index_expr->collect_names(ctx);
+    }
+
+    if(expansion)
+    {
+        expansion->collect_names(ctx);
+    }
+}
+
 std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
 {
     // Type checking for macros.
@@ -412,8 +432,7 @@ void macro_expression_list::serialize(archive& ar)
 }
 
 void macro_expression_list::collect_names(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] ty::context& type_ctx) const
+  [[maybe_unused]] co::context& ctx)
 {
     throw cg::codegen_error(loc, "Non-expanded macro expression list.");
 }
@@ -461,39 +480,41 @@ void macro_expression::serialize(archive& ar)
 }
 
 void macro_expression::collect_names(
-  cg::context& ctx,
-  [[maybe_unused]] ty::context& type_ctx) const
+  co::context& ctx)
 {
-    std::vector<std::pair<std::string, module_::directive_descriptor>> directives =
-      ctx.get_directives()
-      | std::views::transform(
-        [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
-        {
-            std::vector<std::pair<std::string, std::string>> args =
-              d.args
-              | std::views::transform(
-                [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
-                {
-                    return std::make_pair(arg.first.s, arg.second.s);
-                })
-              | std::ranges::to<std::vector>();
+    super::collect_names(ctx);
 
-            return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
-        })
-      | std::ranges::to<std::vector>();
+    // TODO
+    // std::vector<std::pair<std::string, module_::directive_descriptor>> directives =
+    //   ctx.get_directives()
+    //   | std::views::transform(
+    //     [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
+    //     {
+    //         std::vector<std::pair<std::string, std::string>> args =
+    //           d.args
+    //           | std::views::transform(
+    //             [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
+    //             {
+    //                 return std::make_pair(arg.first.s, arg.second.s);
+    //             })
+    //           | std::ranges::to<std::vector>();
 
-    memory_write_archive ar{true, std::endian::little};
-    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
-    ar& expression_serializer{cloned_expr};
+    //         return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
+    //     })
+    //   | std::ranges::to<std::vector>();
 
-    ctx.add_macro(
-      name.s,
-      module_::macro_descriptor{
-        std::move(directives),
-        ar.get_buffer()},
-      get_namespace_path());
+    // memory_write_archive ar{true, std::endian::little};
+    // auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
+    // ar& expression_serializer{cloned_expr};
 
-    type_ctx.add_macro(name.s, get_namespace_path());
+    // ctx.add_macro(
+    //   name.s,
+    //   module_::macro_descriptor{
+    //     std::move(directives),
+    //     ar.get_buffer()},
+    //   get_namespace_path());
+
+    // type_ctx.add_macro(name.s, get_namespace_path());
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(

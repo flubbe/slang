@@ -33,6 +33,9 @@ class context;
 namespace slang::loader
 {
 
+namespace cg = slang::codegen;
+namespace ty = slang::typing;
+
 /**
  * Generate an import name.
  *
@@ -79,17 +82,6 @@ class context
       std::unique_ptr<module_::module_resolver>>
       resolvers;
 
-protected:
-    /**
-     * Resolve imports for a given module. Only loads a module if it is not
-     * already resolved.
-     *
-     * @param import_name The module's import name.
-     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
-     * @returns A reference to the resolved module.
-     */
-    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
-
 public:
     /** Default constructors. */
     context() = delete;
@@ -114,12 +106,22 @@ public:
     }
 
     /**
+     * Resolve imports for a given module. Only loads a module if it is not
+     * already resolved.
+     *
+     * @param import_name The module's import name.
+     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
+     * @returns A reference to the resolved module.
+     */
+    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
+
+    /**
      * Resolve imports from a type context.
      *
      * @param ctx The code generation context.
      * @param type_ctx The typing context.
      */
-    void resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+    void resolve_imports(cg::context& ctx, ty::context& type_ctx);
 
     /**
      * Resolve macros.
@@ -131,7 +133,7 @@ public:
      * @param type_ctx The typing context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
-    static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+    static bool resolve_macros(cg::context& ctx, ty::context& type_ctx);
 };
 
 }    // namespace slang::loader

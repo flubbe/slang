@@ -19,6 +19,8 @@
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
+namespace co = slang::collect;
+namespace sema = slang::sema;
 namespace ty = slang::typing;
 
 namespace
@@ -61,9 +63,11 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     ty::context type_ctx;
     cg::context codegen_ctx = get_context();
+    sema::env env;
+    co::context co_ctx{env};
     slang::opt::cfg::context cfg_context{codegen_ctx};
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(type_ctx.resolve_types());
     ASSERT_NO_THROW(ast->type_check(type_ctx));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));

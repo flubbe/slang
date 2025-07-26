@@ -22,6 +22,7 @@
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
+namespace co = slang::collect;
 namespace ty = slang::typing;
 namespace ld = slang::loader;
 namespace rs = slang::resolve;
@@ -201,18 +202,20 @@ void compile::invoke(const std::vector<std::string>& args)
     ty::context type_ctx;
     ld::context loader_ctx{file_mgr};
     cg::context codegen_ctx;
-    rs::context resolver_ctx;
+    sema::env env;
+    co::context co_ctx{env};
+    rs::context resolver_ctx{env};
     opt::cfg::context cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{codegen_ctx};
 
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
-    ast->collect_names(codegen_ctx, type_ctx);
+    ast->collect_names(co_ctx);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
-            loader_ctx.resolve_imports(codegen_ctx, type_ctx);
+            resolver_ctx.resolve_imports(loader_ctx);
         } while(ld::context::resolve_macros(codegen_ctx, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
     ast->resolve_names(resolver_ctx);

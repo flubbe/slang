@@ -1,0 +1,325 @@
+/**
+ * slang - a simple scripting language.
+ *
+ * name collection.
+ *
+ * \author Felix Lubbe
+ * \copyright Copyright (c) 2025
+ * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
+ */
+
+#include <format>
+#include <ranges>
+
+#include "compiler/collect.h"
+
+namespace slang::collect
+{
+
+/*
+ * redefinition_error.
+ */
+
+redefinition_error::redefinition_error(
+  const std::string& symbol_name,
+  sema::symbol_type type,
+  source_location loc,    // NOLINT(bugprone-easily-swappable-parameters)
+  source_location original_loc)
+: collection_error{std::format(
+    "{}: Redeclaration of '{}' (was already defined at {})",
+    to_string(loc),
+    symbol_name,
+    to_string(original_loc))}
+, symbol_name{symbol_name}
+, type{type}
+, loc{loc}
+, original_loc{original_loc}
+{
+}
+
+/*
+ * context.
+ */
+
+/**
+ * Generate a scope name based on the scope's source location.
+ *
+ * @param loc The scope's source location.
+ * @returns A generated scope name.
+ */
+static std::string generate_scope_name(source_location loc)
+{
+    return std::format("scope@{}", to_string(loc));
+}
+
+sema::scope_id context::create_scope(
+  sema::scope_id parent,
+  std::optional<std::string> name,
+  source_location loc)
+{
+    if(parent == sema::scope::invalid_id
+       && !env.scope_map.empty())
+    {
+        throw std::runtime_error("Scope table not empty.");
+    }
+
+    auto new_scope_id = generate_scope_id();
+
+    auto it = env.scope_map.insert(
+      {new_scope_id,
+       sema::scope{
+         .parent = parent,
+         .name = name.value_or(generate_scope_name(loc)),
+         .loc = loc}});
+    if(!it.second)
+    {
+        throw collection_error(
+          std::format(
+            "Scope with id '{}' already exists to scope table.",
+            new_scope_id));
+    }
+
+    return it.first->first;
+}
+
+sema::symbol_id context::declare(
+  std::string name,
+  std::string qualified_name,
+  sema::symbol_type type,
+  source_location loc,
+  sema::symbol_id declaring_module,
+  bool transitive,
+  std::optional<
+    std::variant<
+      const ast::expression*,
+      const module_::exported_symbol*>>
+    reference)
+{
+    sema::scope* s = get_scope(current_scope);
+
+    auto it = std::ranges::find_if(
+      s->bindings,
+      [&name, type](const auto& b) -> bool
+      {
+          if(b.first != name)
+          {
+              return false;
+          }
+
+          return b.second.contains(type);
+      });
+    if(it != s->bindings.end())
+    {
+        auto symbol_id = it->second[type];
+
+        // Redefinitions are allowed if they change transitivity from `true` to `false`.
+        if(!transitive && env.transitive_imports.contains(symbol_id))
+        {
+            // TODO qualified name? reference?
+
+            env.transitive_imports.erase(symbol_id);
+            return symbol_id;
+        }
+        else
+        {
+            auto original = env.symbol_table.find(symbol_id);
+            if(original == env.symbol_table.end())
+            {
+                throw std::runtime_error(
+                  std::format(
+                    "{}: Redefinition of symbol '{}', but original definition not found in symbol table.",
+                    to_string(loc),
+                    name));
+            }
+
+            throw redefinition_error(
+              name,
+              type,
+              loc,
+              original->second.loc);
+        }
+    }
+
+    // insert new declaration.
+    auto new_symbol_id = generate_symbol_id();
+
+    it = std::ranges::find_if(
+      s->bindings,
+      [&name](const auto& b) -> bool
+      {
+          return b.first == name;
+      });
+    if(it == s->bindings.end())
+    {
+        s->bindings.insert(
+          {name,
+           std::unordered_map<sema::symbol_type, sema::symbol_id>{
+             {type, new_symbol_id}}});
+    }
+    else
+    {
+        it->second.insert({type, new_symbol_id});
+    }
+
+    auto [entry, success] = env.symbol_table.insert(
+      {new_symbol_id,
+       sema::symbol_info{
+         .name = std::move(name),
+         .qualified_name = std::move(qualified_name),
+         .type = type,
+         .loc = loc,
+         .scope = current_scope,
+         .declaring_module = declaring_module,
+         .reference = reference}});
+    if(!success)
+    {
+        throw redefinition_error(
+          entry->second.name,
+          type,
+          loc,
+          entry->second.loc);
+    }
+
+    if(transitive)
+    {
+        env.transitive_imports.insert(new_symbol_id);
+    }
+
+    return new_symbol_id;
+}
+
+void context::attach(sema::symbol_id parent, sema::symbol_id child)    // NOLINT(bugprone-easily-swappable-parameters)
+{
+    if(parent == child)
+    {
+        throw collection_error(
+          std::format(
+            "Cannot attach symbol with id '{}' to itself.",
+            parent.value));
+    }
+
+    auto parent_it = std::ranges::find_if(
+      env.symbol_table,
+      [parent](const auto& p) -> bool
+      {
+          return p.first == parent;
+      });
+    if(parent_it == env.symbol_table.end())
+    {
+        throw collection_error(
+          std::format(
+            "Could not find symbol for id '{}'.",
+            parent.value));
+    }
+
+    if(std::ranges::find(
+         parent_it->second.children,
+         child)
+       != parent_it->second.children.end())
+    {
+        throw collection_error(
+          std::format(
+            "Child symbol with id '{}' already attached to parent with id '{}'.",
+            child.value,
+            parent.value));
+    }
+
+    parent_it->second.children.push_back(child);
+}
+
+sema::scope_id context::push_scope(
+  std::optional<std::string> name,
+  source_location loc)
+{
+    current_scope = create_scope(current_scope, std::move(name), loc);
+    return current_scope;
+}
+
+void context::push_scope(sema::scope_id id)
+{
+    if(id == sema::scope::invalid_id)
+    {
+        throw collection_error(
+          std::format(
+            "Cannot enter invalid scope."));
+    }
+
+    if(!env.scope_map.contains(id))
+    {
+        throw collection_error(
+          std::format(
+            "Cannot enter unknown scope '{}'.",
+            id));
+    }
+
+    current_scope = id;
+}
+
+void context::pop_scope()
+{
+    auto* scope = get_scope(current_scope);
+    if(scope->parent == sema::scope::invalid_id)
+    {
+        throw std::runtime_error("Cannot pop scope without parent.");
+    }
+    current_scope = scope->parent;
+}
+
+/**
+ * Scope getter implementation.
+ *
+ * @throws Throws `std::runtime_error` if the scope id is
+ *         invalid or if the scope is not found.
+ * @param env Environment to search for the scope.
+ * @param id Scope id.
+ * @returns Returns the scope.
+ */
+template<typename T>
+T* get_scope(
+  std::conditional_t<
+    std::is_const_v<T>,
+    const sema::env,
+    sema::env>&
+    env,
+  sema::scope_id id)
+{
+    if(id == sema::scope::invalid_id)
+    {
+        throw std::runtime_error("Invalid scope id.");
+    }
+
+    auto it = env.scope_map.find(id);
+    if(it == env.scope_map.end())
+    {
+        throw std::runtime_error("Scope not found in scope table.");
+    }
+
+    return &it->second;
+}
+
+sema::scope* context::get_scope(sema::scope_id id)
+{
+    return ::slang::collect::get_scope<sema::scope>(env, id);
+}
+
+const sema::scope* context::get_scope(sema::scope_id id) const
+{
+    return ::slang::collect::get_scope<const sema::scope>(env, id);
+}
+
+std::string context::get_canonical_scope_name(sema::scope_id id) const
+{
+    auto* s = get_scope(id);
+    std::string name = s->name;
+
+    for(auto it = s->parent; it != sema::scope::invalid_id;)
+    {
+        const auto* s = get_scope(it);
+        name = std::format("{}::{}", s->name, name);
+
+        it = s->parent;
+    }
+    return name;
+}
+
+}    // namespace slang::collect
