@@ -101,6 +101,11 @@ struct symbol_id
         return value < other.value;
     }
 
+    symbol_id operator++(int)
+    {
+        return {value++};
+    }
+
     /** std::hash support. */
     struct hash
     {
@@ -175,6 +180,12 @@ struct env
 {
     /** Global scope id. Needs to be set manually, e.g. by a collection context. */
     scope_id global_scope_id{scope::invalid_id};
+
+    /** Next symbol id. */
+    symbol_id next_symbol_id{0};
+
+    /** Next scope id. */
+    scope_id next_scope_id{0};
 
     /** Scope table. */
     std::unordered_map<scope_id, scope> scope_map;

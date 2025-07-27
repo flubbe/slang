@@ -61,14 +61,17 @@ class context
     /** Semantic environment. */
     sema::env& env;
 
+    /** A reference context, or `nullptr`. */
+    context* reference = nullptr;
+
     /** Current scope. */
     sema::scope_id current_scope;
 
-    /** Current scope id counter. */
-    sema::scope_id scope_id_counter{global_scope_id};
+    /** Anonymous scope id counter. */
+    std::size_t anonymous_scope_counter{0};
 
-    /** Current symbol id counter. */
-    sema::symbol_id::value_type symbol_id_counter{0};
+    /** Generate a name for an anonymous scope. */
+    std::string generate_scope_name();
 
     /**
      * Create a scope. If `scope_id` is `scope::invalid_id`, the global
@@ -84,19 +87,19 @@ class context
      */
     sema::scope_id create_scope(
       sema::scope_id parent,
-      std::optional<std::string> name,
+      const std::optional<std::string>& name,
       source_location loc);
 
     /** Return a new scope id. */
     sema::scope_id generate_scope_id()
     {
-        return scope_id_counter++;
+        return env.next_scope_id++;
     }
 
     /** Return a new symbol id. */
     sema::symbol_id generate_symbol_id()
     {
-        return {symbol_id_counter++};
+        return env.next_symbol_id++;
     }
 
 public:
@@ -118,9 +121,13 @@ public:
      * Construct the name collection context.
      *
      * @param env The semantic environment to use.
+     * @param reference An optional reference context, used e.g. for id generation.
      */
-    context(sema::env& env)
+    context(
+      sema::env& env,
+      context* reference = nullptr)
     : env{env}
+    , reference{reference}
     {
         current_scope = sema::scope::invalid_id;
         env.global_scope_id = global_scope_id;

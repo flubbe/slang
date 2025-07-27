@@ -124,7 +124,7 @@ std::string to_string(const env& env)
         res +=
           "\n"
           "    Scope Map\n"
-          "    Symbol id    Parent id    Name\n"
+          "    Scope id    Parent id    Name\n"
           "    ----------------------------------\n";
 
         for(const auto& [id, s]: env.scope_map)
@@ -136,10 +136,32 @@ std::string to_string(const env& env)
             }
 
             res += std::format(
-              "    {:>9}    {:>9}    {}\n",
+              "    {:>8}    {:>9}    {}\n",
               id,
               static_cast<int>(s.parent),
               name);
+        }
+
+        for(const auto& [scope_id, s]: env.scope_map)
+        {
+            res += std::format(
+              "\n"
+              "    Bindings for scope {}\n"
+              "    Symbol id                    Type    Name\n"
+              "    ---------------------------------------------\n",
+              scope_id);
+
+            for(const auto& [name, type_symbol_map]: s.bindings)
+            {
+                for(const auto& [symbol_type, symbol_id]: type_symbol_map)
+                {
+                    res += std::format(
+                      "    {:>9}    {:>20}    {}\n",
+                      symbol_id.value,
+                      to_string(symbol_type),
+                      name);
+                }
+            }
         }
     }
 
@@ -148,13 +170,13 @@ std::string to_string(const env& env)
         res +=
           "\n"
           "    Symbol Table\n"
-          "    Symbol id                    Type    Scope    Decl. Mod.    Location    Name\n"
-          "    --------------------------------------------------------------------------------\n";
+          "    Symbol id                    Type    Scope id    Decl. Mod.    Location    Name\n"
+          "    -----------------------------------------------------------------------------------\n";
 
         for(const auto& [id, info]: env.symbol_table)
         {
             res += std::format(
-              "    {:>9}    {:>20}    {:>5}    {:>10}    {:>8}    {} ({})\n",
+              "    {:>9}    {:>20}    {:>8}    {:>10}    {:>8}    {} ({})\n",
               static_cast<int>(id.value),
               to_string(info.type),
               info.scope,

@@ -68,10 +68,16 @@ void context::resolve_imports(
     // import environment, to be merged with the context's environment.
     sema::env import_env;
     co::context import_collector{import_env};
+
+    // set up global scope.
     if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
     {
         throw std::runtime_error("Got unexpected scope id for global scope.");
     }
+
+    // set up next ids.
+    import_env.next_scope_id = env.next_scope_id;
+    import_env.next_symbol_id = env.next_symbol_id;
 
     for(auto& [id, info]: env.symbol_table)
     {
@@ -97,7 +103,7 @@ void context::resolve_imports(
                 info.qualified_name,
                 it.name);
 
-            import_collector.declare(
+            auto new_id = import_collector.declare(
               it.name,
               qualified_name,
               to_sema_symbol_type(it.type),
@@ -105,6 +111,8 @@ void context::resolve_imports(
               id,
               transitive_import,
               &it);
+
+            std::print("new_id: {}\n", new_id.value);
         }
 
         std::println("resolve_imports: {}, qualified name: {}", info.name, info.qualified_name);
@@ -180,6 +188,9 @@ void context::resolve_imports(
             env.transitive_imports.insert(id);
         }
     }
+
+    env.next_scope_id = import_env.next_scope_id;
+    env.next_symbol_id = import_env.next_symbol_id;
 
     std::print("{}\n", to_string(env));
 }
