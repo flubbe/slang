@@ -305,98 +305,101 @@ std::unique_ptr<cg::value> format_macro_expression::generate_code(
     return lhs->generate_code(ctx, mc);
 }
 
-std::optional<ty::type_info> format_macro_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    if(exprs.empty())
-    {
-        throw ty::type_error(
-          loc,
-          std::format(
-            "Macro 'format!': No format string found."));
-    }
+    // TODO
+    throw std::runtime_error("format_macro_expression::type_check");
 
-    format_macro_expander expander{loc, exprs};
-    if(expander.get_placeholders().size() != exprs.size() - 1)
-    {
-        throw ty::type_error(
-          loc,
-          std::format(
-            "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
-            exprs.size() - 1,
-            expander.get_placeholders().size()));
-    }
+    // if(exprs.empty())
+    // {
+    //     throw ty::type_error(
+    //       loc,
+    //       std::format(
+    //         "Macro 'format!': No format string found."));
+    // }
 
-    // check that all expressions and specifiers match, or that the inferred type is supported.
-    for(std::size_t i = 1; i < exprs.size(); ++i)
-    {
-        const auto& e = exprs[i];
-        const auto& p = expander.get_placeholders()[i - 1];
+    // format_macro_expander expander{loc, exprs};
+    // if(expander.get_placeholders().size() != exprs.size() - 1)
+    // {
+    //     throw ty::type_error(
+    //       loc,
+    //       std::format(
+    //         "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
+    //         exprs.size() - 1,
+    //         expander.get_placeholders().size()));
+    // }
 
-        std::optional<ty::type_info> t = e->type_check(ctx);
-        if(!t.has_value())
-        {
-            throw ty::type_error(
-              e->get_location(),
-              std::format(
-                "Macro 'format!': Argument at position '{}' has no type.",
-                i));
-        }
+    // // check that all expressions and specifiers match, or that the inferred type is supported.
+    // for(std::size_t i = 1; i < exprs.size(); ++i)
+    // {
+    //     const auto& e = exprs[i];
+    //     const auto& p = expander.get_placeholders()[i - 1];
 
-        // FIXME Only i32, f32 and str is supported.
-        auto type_str = t.value().to_string();
-        if(p.type.has_value())
-        {
-            if((type_str == "i32" && p.type.value() == 'd')
-               || (type_str == "f32" && p.type.value() == 'f')
-               || (type_str == "str" && p.type.value() == 's'))
-            {
-                placeholders.emplace_back(p);
-            }
-            else
-            {
-                throw ty::type_error(
-                  e->get_location(),
-                  std::format(
-                    "Macro 'format!': Argument at position {} has wrong type.",
-                    i));
-            }
-        }
-        else
-        {
-            // store type in placeholders.
-            if(type_str == "i32")
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .type = 'd'});
-            }
-            else if(type_str == "f32")
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .type = 'f'});
-            }
-            else if(type_str == "str")
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .type = 's'});
-            }
-            else
-            {
-                throw ty::type_error(
-                  e->get_location(),
-                  std::format(
-                    "Macro 'format!': Argument at position '{}' is not convertible to a string.",
-                    i));
-            }
-        }
-    }
+    //     std::optional<ty::type_id> t = e->type_check(ctx);
+    //     if(!t.has_value())
+    //     {
+    //         throw ty::type_error(
+    //           e->get_location(),
+    //           std::format(
+    //             "Macro 'format!': Argument at position '{}' has no type.",
+    //             i));
+    //     }
 
-    return ctx.get_type("str", false);
+    //     // FIXME Only i32, f32 and str is supported.
+    //     auto type_str = t.value().to_string();
+    //     if(p.type.has_value())
+    //     {
+    //         if((type_str == "i32" && p.type.value() == 'd')
+    //            || (type_str == "f32" && p.type.value() == 'f')
+    //            || (type_str == "str" && p.type.value() == 's'))
+    //         {
+    //             placeholders.emplace_back(p);
+    //         }
+    //         else
+    //         {
+    //             throw ty::type_error(
+    //               e->get_location(),
+    //               std::format(
+    //                 "Macro 'format!': Argument at position {} has wrong type.",
+    //                 i));
+    //         }
+    //     }
+    //     else
+    //     {
+    //         // store type in placeholders.
+    //         if(type_str == "i32")
+    //         {
+    //             placeholders.emplace_back(format_string_placeholder{
+    //               .start = p.start,
+    //               .end = p.end,
+    //               .type = 'd'});
+    //         }
+    //         else if(type_str == "f32")
+    //         {
+    //             placeholders.emplace_back(format_string_placeholder{
+    //               .start = p.start,
+    //               .end = p.end,
+    //               .type = 'f'});
+    //         }
+    //         else if(type_str == "str")
+    //         {
+    //             placeholders.emplace_back(format_string_placeholder{
+    //               .start = p.start,
+    //               .end = p.end,
+    //               .type = 's'});
+    //         }
+    //         else
+    //         {
+    //             throw ty::type_error(
+    //               e->get_location(),
+    //               std::format(
+    //                 "Macro 'format!': Argument at position '{}' is not convertible to a string.",
+    //                 i));
+    //         }
+    //     }
+    // }
+
+    // return ctx.get_type("str", false);
 }
 
 std::string format_macro_expression::to_string() const

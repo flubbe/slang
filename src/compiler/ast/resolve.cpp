@@ -45,7 +45,6 @@ void namespace_access_expression::resolve_names(rs::context& ctx)
 void access_expression::resolve_names(rs::context& ctx)
 {
     lhs->resolve_names(ctx);
-    rhs->resolve_names(ctx);
 }
 
 /*
@@ -101,8 +100,7 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         }
     }
 
-    std::println("resolve_names: {} @ {}", name.s, scope_id.value_or(-1));
-    std::println("           id: {}", symbol_id.value().value);
+    std::println("resolve_names: variable reference {} (scope id: {}) resolved to symbol id {}.", name.s, scope_id.value_or(-1), symbol_id.value().value);
 }
 
 /*
@@ -259,7 +257,7 @@ void call_expression::resolve_names(rs::context& ctx)
     }
 
     auto prefix = utils::join(namespace_stack, "::");
-    if(prefix.length() > 0)
+    if(!prefix.empty())
     {
         prefix += "::";
     }
@@ -280,8 +278,7 @@ void call_expression::resolve_names(rs::context& ctx)
             callee.s));
     }
 
-    std::println("resolve_names: {} @ {}", callee.s, scope_id.value_or(-1));
-    std::println("           id: {}", symbol_id.value().value);
+    std::println("resolve_names: function call {} (scope id: {}) resolved to symbol id {}.", callee.s, scope_id.value_or(-1), symbol_id.value().value);
 
     std::ranges::for_each(
       args,

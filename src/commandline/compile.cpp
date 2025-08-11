@@ -199,11 +199,11 @@ void compile::invoke(const std::vector<std::string>& args)
 
     const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
-    ty::context type_ctx;
     ld::context loader_ctx{file_mgr};
     cg::context codegen_ctx;
     sema::env env;
     co::context co_ctx{env};
+    ty::context type_ctx;
     rs::context resolver_ctx{env};
     opt::cfg::context cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{codegen_ctx};
@@ -218,9 +218,10 @@ void compile::invoke(const std::vector<std::string>& args)
             resolver_ctx.resolve_imports(loader_ctx);
         } while(ld::context::resolve_macros(codegen_ctx, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
+    loader_ctx.resolve_imports(codegen_ctx, type_ctx);
     ast->resolve_names(resolver_ctx);
-    type_ctx.resolve_types();
-    ast->type_check(type_ctx);
+    ast->define_types(type_ctx);
+    ast->type_check(type_ctx, env);
     ast->generate_code(codegen_ctx);
 
     cfg_context.run();

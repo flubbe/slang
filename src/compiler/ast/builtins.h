@@ -165,8 +165,12 @@ public:
         return node_identifier::format_macro_expression;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    [[nodiscard]] std::optional<ty::type_id> type_check(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]

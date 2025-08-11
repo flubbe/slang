@@ -71,7 +71,6 @@ public:
      * Resolve imports.
      *
      * @param loader The loader to use for resolution.
-     * @param env The semantic environment.
      */
     void resolve_imports(ld::context& loader);
 };

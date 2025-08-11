@@ -44,18 +44,17 @@ void run_test(
     mgr.add_search_path(".");
     mgr.add_search_path("lang");
 
-    ty::context type_ctx;
     ld::context loader_ctx{mgr};
-    cg::context codegen_ctx;
     sema::env env;
     co::context co_ctx{env};
+    ty::context type_ctx;
+    cg::context codegen_ctx;
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
 
     {
         slang::file_write_archive write_ar{filename};

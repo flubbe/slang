@@ -13,6 +13,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -78,14 +79,14 @@ protected:
     /** Namespace stack for the expression. */
     std::vector<std::string> namespace_stack;
 
-    /** The expression's given or inferred type. Needs to be set by `type_check`. */
-    std::optional<ty::type_info> expr_type;
-
-    /** Identifier scope. */
+    /** Scope id. */
     std::optional<sema::scope_id> scope_id;
 
-    /** Symbol id */
+    /** Symbol id. */
     std::optional<sema::symbol_id> symbol_id;
+
+    /** The expression's given or inferred type. Needs to be set by `type_check`. */
+    std::optional<ty::type_id> expr_type;
 
 public:
     /** Default constructors. */
@@ -374,6 +375,9 @@ public:
     {
     }
 
+    /** Type definition. */
+    virtual void define_types([[maybe_unused]] ty::context& ctx);
+
     /**
      * Push a directive to the expression's directive stack (during code generation).
      *
@@ -468,7 +472,7 @@ public:
      *
      * @param ctx Type system context.
      */
-    virtual std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx)
+    virtual std::optional<ty::type_id> type_check([[maybe_unused]] ty::context& ctx, [[maybe_unused]] sema::env& env)
     {
         return std::nullopt;
     }
@@ -692,7 +696,7 @@ public:
     std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     /** Get the token. */
@@ -774,12 +778,6 @@ public:
 
     /** Convert the expression to a type. */
     [[nodiscard]] cg::type to_type() const;
-
-    /** Get the type info. */
-    [[nodiscard]] ty::type_info to_type_info(ty::context& ctx) const;
-
-    /** Get unresolved type info. */
-    [[nodiscard]] ty::type_info to_unresolved_type_info(ty::context& ctx) const;
 
     /** Return whether the type is an array. */
     [[nodiscard]]
@@ -902,7 +900,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1024,7 +1022,7 @@ public:
     }
 
     void collect_names(co::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1060,7 +1058,13 @@ class access_expression : public expression
     std::unique_ptr<expression> lhs, rhs;
 
     /** Struct type of the l.h.s. Set during type checking. */
-    ty::type_info lhs_type;
+    ty::type_id lhs_type;
+
+    /** Field index. */
+    std::size_t field_index{0};
+
+    /** Whether the l.h.s. is an array type. */
+    bool lhs_is_array{false};
 
 public:
     /** Set the super class. */
@@ -1131,8 +1135,9 @@ public:
      *       calling `generate_object_load` beforehand.
      */
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     /** Get the left-hand side expression. */
@@ -1144,7 +1149,7 @@ public:
 
     /** Return the accessed struct's type info. */
     [[nodiscard]]
-    ty::type_info get_struct_type() const
+    ty::type_id get_struct_type() const
     {
         return lhs_type;
     }
@@ -1267,7 +1272,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1366,7 +1371,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1498,7 +1503,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1597,7 +1602,7 @@ public:
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1676,7 +1681,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1764,8 +1769,9 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
+    void define_types(ty::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1856,7 +1862,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1938,7 +1944,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
 
     [[nodiscard]] std::string to_string() const override;
 
@@ -2032,7 +2038,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2125,7 +2131,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2207,7 +2213,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2226,6 +2232,9 @@ class new_expression : public expression
 {
     /** The type expression. */
     std::unique_ptr<type_expression> type_expr;
+
+    /** Type id of the type expression. */
+    std::optional<ty::type_id> type_expr_id;
 
     /** Array length expression. */
     std::unique_ptr<expression> expr;
@@ -2284,7 +2293,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2347,7 +2356,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 };
 
@@ -2409,7 +2418,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2437,17 +2446,25 @@ class prototype_ast
     /** The function name. */
     token name;
 
-    /** The function's arguments as pairs `(name, type)`. */
-    std::vector<std::pair<token, std::unique_ptr<type_expression>>> args;
+    /** Symbol id. */
+    sema::symbol_id symbol_id{sema::symbol_id::invalid};
+
+    /** The function's arguments as pairs `(name, (symbol_id, type))`. */
+    std::vector<
+      std::tuple<
+        token,
+        sema::symbol_id,
+        std::unique_ptr<type_expression>>>
+      args;
 
     /** The function's return type as a pair. */
     std::unique_ptr<type_expression> return_type;
 
     /** Argument type info. Set during type checking. */
-    std::vector<ty::type_info> args_type_info;
+    std::vector<ty::type_id> arg_type_ids;
 
     /** Return type info. Set during type checking. */
-    ty::type_info return_type_info;
+    ty::type_id return_type_id;
 
 public:
     /** Default constructor. */
@@ -2460,13 +2477,14 @@ public:
     , args{other.args
            | std::views::transform(
              [](const auto& arg)
-             { return std::make_pair(
-                 arg.first,
-                 arg.second->clone()); })
+             { return std::make_tuple(
+                 std::get<0>(arg),
+                 std::get<1>(arg),
+                 std::get<2>(arg)->clone()); })
            | std::ranges::to<std::vector>()}
     , return_type{other.return_type->clone()}
-    , args_type_info{other.args_type_info}
-    , return_type_info{other.return_type_info}
+    , arg_type_ids{other.arg_type_ids}
+    , return_type_id{other.return_type_id}
     {
     }
     prototype_ast(prototype_ast&&) = default;
@@ -2486,7 +2504,12 @@ public:
     prototype_ast(
       source_location loc,
       token name,
-      std::vector<std::pair<token, std::unique_ptr<type_expression>>> args,
+      std::vector<
+        std::tuple<
+          token,
+          sema::symbol_id,
+          std::unique_ptr<type_expression>>>
+        args,
       std::unique_ptr<type_expression> return_type)
     : loc{loc}
     , name{std::move(name)}
@@ -2500,14 +2523,29 @@ public:
 
     [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
-    sema::scope_id collect_names(co::context& ctx);
-    void type_check(ty::context& ctx);
+    void collect_names(co::context& ctx);
+    void type_check(ty::context& ctx, sema::env& env);
     [[nodiscard]] std::string to_string() const;
 
+    /** Return the function name. */
     [[nodiscard]]
     const token& get_name() const
     {
         return name;
+    }
+
+    /** Return the argument type id vector. */
+    [[nodiscard]]
+    std::vector<ty::type_id> get_arg_type_ids() const
+    {
+        return arg_type_ids;
+    }
+
+    /** Return the return type id. */
+    [[nodiscard]]
+    ty::type_id get_return_type_id() const
+    {
+        return return_type_id;
     }
 };
 
@@ -2568,7 +2606,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2664,7 +2702,7 @@ public:
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2687,6 +2725,20 @@ public:
         }
         return {};
     }
+
+    /** Return the argument type id vector. */
+    [[nodiscard]]
+    std::vector<ty::type_id> get_arg_type_ids() const
+    {
+        return prototype->get_arg_type_ids();
+    }
+
+    /** Return the return type id. */
+    [[nodiscard]]
+    ty::type_id get_return_type_id() const
+    {
+        return prototype->get_return_type_id();
+    }
 };
 
 /** Function calls. */
@@ -2702,7 +2754,10 @@ class call_expression : public expression
     std::unique_ptr<expression> index_expr;
 
     /** The return type. Set during type checking. */
-    ty::type_info return_type;
+    ty::type_id return_type;
+
+    /** Whether the return type is void. */
+    bool is_void_return_type{false};
 
 public:
     /** Set the super class. */
@@ -2772,7 +2827,7 @@ public:
     [[nodiscard]]
     bool needs_pop() const override
     {
-        return return_type.to_string() != "void";
+        return !is_void_return_type;
     }
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
@@ -2780,7 +2835,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2932,7 +2987,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3066,7 +3121,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3159,7 +3214,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3254,7 +3309,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3554,7 +3609,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_info> type_check(ty::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     std::string to_string() const override;
 
     /** Get the expression list. */
@@ -3642,7 +3697,9 @@ public:
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
-    [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;
+    [[nodiscard]] std::optional<ty::type_id> type_check(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]

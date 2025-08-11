@@ -32,27 +32,6 @@ namespace slang::loader
  */
 
 /**
- * Return the type class of a `variable_type`.
- *
- * @param vt A `variable_type`.
- * @return A `type_class`.
- */
-static ty::type_class to_type_class(const module_::variable_type& vt)
-{
-    if(vt.is_array())
-    {
-        return ty::type_class::tc_array;
-    }
-
-    if(ty::is_builtin_type(vt.base_type()))
-    {
-        return ty::type_class::tc_plain;
-    }
-
-    return ty::type_class::tc_struct;
-}
-
-/**
  * Convert a field given by a field descriptor to a `cg::value`.
  *
  * @param desc The field's variable type.
@@ -105,89 +84,6 @@ static cg::value to_value(
         vt.base_type(),
         type_import_package},
       name};
-}
-
-/**
- * Convert a field given by a field descriptor to a `ty::type_info`.
- *
- * @param type_ctx The type context for type lookups.
- * @param desc The field descriptor.
- * @param resolver The module resolver.
- * @param import_path The module's import path.
- * @return A `ty::type_info` with the field type.
- */
-static ty::type_info to_unresolved_type_info(
-  ty::context& type_ctx,
-  const module_::field_descriptor& desc,
-  const module_::module_resolver& resolver,
-  const std::string& import_path)
-{
-    std::string type_import_package = import_path;
-    if(desc.base_type.get_import_index().has_value())
-    {
-        // This is an imported type.
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(desc.base_type.get_import_index().value());
-        if(sym.type != module_::symbol_type::package)
-        {
-            throw resolve_error(
-              std::format(
-                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
-                desc.base_type.get_import_index().value(),
-                sym.name));
-        }
-        type_import_package = sym.name;
-    }
-
-    return type_ctx.get_unresolved_type(
-      {desc.base_type.base_type(), {0, 0}},
-      to_type_class(desc.base_type),
-      type_import_package);
-}
-
-/**
- * Convert a `variable_type` to a `ty::type_info`.
- *
- * @param type_ctx The type context for type lookups.
- * @param vt The variable type.
- * @param resolver The module resolver.
- * @param import_path The module's import path.
- * @return A `ty::type_info` with the variable type.
- */
-static ty::type_info to_resolved_type_info(
-  ty::context& type_ctx,
-  const module_::variable_type& vt,
-  const module_::module_resolver& resolver,
-  const std::string& import_path)
-{
-    if(ty::is_builtin_type(vt.base_type()))
-    {
-        return type_ctx.get_type(
-          vt.base_type(),
-          vt.is_array());
-    }
-
-    std::optional<std::size_t> import_index = vt.get_import_index();
-    std::string type_import_package = import_path;
-    if(import_index.has_value())
-    {
-        // This is an imported type.
-        const module_::imported_symbol& sym = resolver.get_module().get_header().imports.at(import_index.value());
-        if(sym.type != module_::symbol_type::package)
-        {
-            throw resolve_error(
-              std::format(
-                "Cannot resolve imported type: Import table entry '{}' ('{}') is not a package.",
-                import_index.value(),
-                sym.name));
-        }
-        type_import_package = sym.name;
-    }
-
-    return type_ctx.get_type(
-      vt.base_type(),
-      vt.is_array(),
-      type_import_package);
 }
 
 /*
@@ -279,26 +175,23 @@ static void add_constant(
     if(entry.type == module_::constant_type::i32)
     {
         ctx.add_constant(name, std::get<std::int32_t>(entry.data), import_path);
-        type_ctx.add_variable(
-          {name, {0, 0}},
-          type_ctx.get_unresolved_type({"i32", {0, 0}}, ty::type_class::tc_plain),
-          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+
+        // TODO type context
+        throw std::runtime_error("add_constant");
     }
     else if(entry.type == module_::constant_type::f32)
     {
         ctx.add_constant(name, std::get<float>(entry.data), import_path);
-        type_ctx.add_variable(
-          {name, {0, 0}},
-          type_ctx.get_unresolved_type({"f32", {0, 0}}, ty::type_class::tc_plain),
-          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+
+        // TODO type context
+        throw std::runtime_error("add_constant");
     }
     else if(entry.type == module_::constant_type::str)
     {
         ctx.add_constant(name, std::get<std::string>(entry.data), import_path);
-        type_ctx.add_variable(
-          {name, {0, 0}},
-          type_ctx.get_unresolved_type({"str", {0, 0}}, ty::type_class::tc_plain),
-          import_path);    // FIXME for the typing context, constants and variables are the same right now.
+
+        // TODO type context
+        throw std::runtime_error("add_constant");
     }
     else
     {
@@ -343,17 +236,8 @@ static void add_function(
       prototype_arg_types,
       import_path);
 
-    std::vector<ty::type_info> arg_types =
-      desc.signature.arg_types
-      | std::views::transform([&type_ctx, &resolver, &import_path](const module_::variable_type& arg)
-                              { return to_resolved_type_info(type_ctx, arg, resolver, import_path); })
-      | std::ranges::to<std::vector>();
-
-    type_ctx.add_function(
-      {name, {0, 0}},
-      std::move(arg_types),
-      to_resolved_type_info(type_ctx, desc.signature.return_type, resolver, import_path),
-      import_path);
+    // TODO type context
+    throw std::runtime_error("add_function");
 }
 
 /**
@@ -396,65 +280,32 @@ static void add_type(
     }
 
     // Add type to typing context.
-    {
-        std::vector<std::pair<token, ty::type_info>> members =
-          desc.member_types
-          | std::views::transform(
-            [&type_ctx, &resolver, &import_path](const std::pair<std::string, module_::field_descriptor>& member)
-            { return std::make_pair<token, ty::type_info>(
-                {std::get<0>(member), {0, 0}},
-                to_unresolved_type_info(type_ctx, std::get<1>(member), resolver, import_path)); })
-          | std::ranges::to<std::vector>();
-
-        type_ctx.add_struct({name, {0, 0}}, std::move(members), import_path);
-    }
+    // TODO
+    throw std::runtime_error("add_type");
 }
 
 void context::resolve_imports(cg::context& ctx, ty::context& type_ctx)
 {
-    const std::vector<ty::imported_module>& imports = type_ctx.get_imported_modules();
-
-    for(const auto& import: imports)
+    for(const auto& [name, resolver]: resolvers)
     {
-        if(import.path.empty())
+        std::println("resolve_imports: {}", name);
+
+        const module_::module_header& header = resolver->get_module().get_header();
+        for(const module_::exported_symbol& exp: header.exports)
         {
-            throw resolve_error("Cannot resolve empty import.");
-        }
+            std::println("resolve_imports: export {} ({})", exp.name, module_::to_string(exp.type));
 
-        auto it = resolvers.find(import.path);
-        if(it != resolvers.end())
-        {
-            // module is already resolved.
-            continue;
-        }
-
-        module_::module_resolver& resolver = resolve_module(import.path, import.transitive);
-        const module_::module_header& header = resolver.get_module().get_header();
-
-        for(const auto& it: header.exports)
-        {
-            const std::string import_name = make_import_name(it.name, import.transitive);
-
-            if(it.type == module_::symbol_type::constant)
+            if(exp.type == module_::symbol_type::constant)
             {
-                add_constant(ctx, type_ctx, resolver, import.path, import_name, std::get<std::size_t>(it.desc));
+                // TODO
             }
-            else if(it.type == module_::symbol_type::function)
+            else if(exp.type == module_::symbol_type::function)
             {
-                add_function(ctx, type_ctx, resolver, import.path, import_name, std::get<module_::function_descriptor>(it.desc));
+                // TODO
             }
-            else if(it.type == module_::symbol_type::type)
+            else if(exp.type == module_::symbol_type::type)
             {
-                add_type(ctx, type_ctx, resolver, import.path, import_name, std::get<module_::struct_descriptor>(it.desc));
-            }
-            else if(it.type == module_::symbol_type::macro)
-            {
-                ctx.add_macro(import_name, std::get<module_::macro_descriptor>(it.desc), import.path);
-                type_ctx.add_macro(import_name, import.path);
-            }
-            else
-            {
-                throw resolve_error(std::format("Found unknown symbol type '{}'.", static_cast<int>(it.type)));
+                // TODO
             }
         }
     }
@@ -512,11 +363,8 @@ bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
               if(e.is_macro_invocation()
                  && e.get_namespace_path().has_value())
               {
-                  if(!type_ctx.has_import(e.get_namespace_path().value()))
-                  {
-                      type_ctx.add_import(e.get_namespace_path().value(), true);
-                      needs_import_resolution = true;
-                  }
+                  // TODO type context
+                  throw std::runtime_error("resolve_macros");
               }
 
               // TODO Function calls need to be resolved.

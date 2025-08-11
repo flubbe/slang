@@ -46,13 +46,12 @@ TEST(compile_ir, empty)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
     sema::env env;
     co::context co_ctx{env};
     ty::context type_ctx;
+    cg::context ctx = get_context();
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string().length(), 0);
@@ -75,10 +74,10 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
     {
@@ -99,10 +98,10 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
     {
@@ -148,13 +147,12 @@ TEST(compile_ir, empty_function)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
     sema::env env;
     co::context co_ctx{env};
     ty::context type_ctx;
+    cg::context ctx = get_context();
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
@@ -183,13 +181,12 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -216,13 +213,12 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -249,13 +245,12 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -286,13 +281,12 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -319,13 +313,12 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -356,13 +349,12 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -393,13 +385,12 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -429,13 +420,12 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -470,13 +460,12 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -515,13 +504,12 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -563,13 +551,12 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -609,13 +596,12 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -709,13 +695,12 @@ TEST(compile_ir, unary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -747,13 +732,12 @@ TEST(compile_ir, unary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -791,13 +775,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -831,13 +814,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -871,13 +853,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -911,13 +892,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -955,13 +935,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -999,13 +978,12 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1046,13 +1024,12 @@ TEST(compile_ir, postfix_operators)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
     sema::env env;
     co::context co_ctx{env};
     ty::context type_ctx;
+    cg::context ctx = get_context();
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
@@ -1091,13 +1068,12 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1133,13 +1109,12 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1182,13 +1157,12 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1229,13 +1203,12 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1260,13 +1233,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1301,13 +1273,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1349,13 +1320,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1393,13 +1363,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
     }
     {
@@ -1428,13 +1397,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1483,13 +1451,12 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1538,13 +1505,12 @@ TEST(compile_ir, if_statement)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1582,13 +1548,12 @@ TEST(compile_ir, break_fail)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1611,13 +1576,12 @@ TEST(compile_ir, continue_fail)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1645,13 +1609,12 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1695,13 +1658,12 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1745,13 +1707,12 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
         sema::env env;
         co::context co_ctx{env};
         ty::context type_ctx;
+        cg::context ctx = get_context();
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1802,8 +1763,7 @@ TEST(compile_ir, structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),
@@ -1863,8 +1823,7 @@ TEST(compile_ir, structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),
@@ -1926,8 +1885,7 @@ TEST(compile_ir, nested_structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),
@@ -1981,8 +1939,7 @@ TEST(compile_ir, nested_structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),
@@ -2041,8 +1998,7 @@ TEST(compile_ir, nested_structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),
@@ -2111,8 +2067,7 @@ TEST(compile_ir, nested_structs)
         co::context co_ctx{env};
         ty::context type_ctx;
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
         EXPECT_EQ(codegen_ctx.to_string(),

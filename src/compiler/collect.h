@@ -166,16 +166,6 @@ public:
         reference = std::nullopt);
 
     /**
-     * Attach a child to a symbol.
-     *
-     * @param parent The parent symbol to attach the child to.
-     * @param child The child symbol to attach.
-     */
-    void attach(
-      sema::symbol_id parent,
-      sema::symbol_id child);
-
-    /**
      * Enter a scope by pushing it onto the scope stack.
      *
      * @param name An optional name. If not supplied, a name will be generated based on source location.
@@ -183,7 +173,7 @@ public:
      * @returns Returns the scope id.
      */
     sema::scope_id push_scope(
-      std::optional<std::string> name,
+      const std::optional<std::string>& name,
       source_location loc);
 
     /**

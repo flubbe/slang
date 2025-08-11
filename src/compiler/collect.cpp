@@ -195,50 +195,11 @@ sema::symbol_id context::declare(
     return new_symbol_id;
 }
 
-void context::attach(sema::symbol_id parent, sema::symbol_id child)    // NOLINT(bugprone-easily-swappable-parameters)
-{
-    if(parent == child)
-    {
-        throw collection_error(
-          std::format(
-            "Cannot attach symbol with id '{}' to itself.",
-            parent.value));
-    }
-
-    auto parent_it = std::ranges::find_if(
-      env.symbol_table,
-      [parent](const auto& p) -> bool
-      {
-          return p.first == parent;
-      });
-    if(parent_it == env.symbol_table.end())
-    {
-        throw collection_error(
-          std::format(
-            "Could not find symbol for id '{}'.",
-            parent.value));
-    }
-
-    if(std::ranges::find(
-         parent_it->second.children,
-         child)
-       != parent_it->second.children.end())
-    {
-        throw collection_error(
-          std::format(
-            "Child symbol with id '{}' already attached to parent with id '{}'.",
-            child.value,
-            parent.value));
-    }
-
-    parent_it->second.children.push_back(child);
-}
-
 sema::scope_id context::push_scope(
-  std::optional<std::string> name,
+  const std::optional<std::string>& name,
   source_location loc)
 {
-    current_scope = create_scope(current_scope, std::move(name), loc);
+    current_scope = create_scope(current_scope, name, loc);
     return current_scope;
 }
 

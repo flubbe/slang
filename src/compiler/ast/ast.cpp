@@ -29,40 +29,6 @@ namespace ty = slang::typing;
 namespace slang::ast
 {
 
-/**
- * Create a `cg::value` from a `type_info`.
- *
- * @param ti The type information.
- * @param name An optional name for the value.
- * @return A unique pointer to a `cg::value`.
- */
-static std::unique_ptr<cg::value> type_info_to_value(
-  const ty::type_info& ti,
-  std::optional<std::string> name = std::nullopt)
-{
-    std::string base_type = ti.is_array() ? ti.get_element_type()->to_string()
-                                          : ti.to_string();
-
-    if(ty::is_builtin_type(base_type))
-    {
-        return std::make_unique<cg::value>(
-          cg::type{cg::to_type_class(base_type),
-                   ti.is_array()
-                     ? static_cast<std::size_t>(1)
-                     : static_cast<std::size_t>(0)},
-          std::move(name));
-    }
-
-    return std::make_unique<cg::value>(
-      cg::type{cg::type_class::struct_,
-               ti.is_array()
-                 ? static_cast<std::size_t>(1)
-                 : static_cast<std::size_t>(0),
-               std::move(base_type),
-               ti.get_import_path()},
-      std::move(name));
-}
-
 /*
  * expression.
  */
@@ -208,6 +174,22 @@ void expression::push_directive(
     ctx.push_directive({name, args});
 }
 
+void expression::define_types(ty::context& ctx)
+{
+    visit_nodes(
+      [&ctx](expression& expr) -> void
+      {
+          // not a filter, since the filter also removes child nodes.
+          if(expr.get_id() == node_identifier::struct_definition_expression)
+          {
+              expr.define_types(ctx);
+          }
+      },
+      false, /* don't visit this node */
+      false  /* pre-order traversal */
+    );
+}
+
 void expression::pop_directive(cg::context& ctx)
 {
     ctx.pop_directive();
@@ -273,7 +255,9 @@ void visit_nodes(
         }
     }
 
-    if(!visit_self)
+    if(!visit_self
+       && !sorted_ast.empty()
+       && sorted_ast.front() == &expr)    // a filter could remove the starting node, so the check is necessary
     {
         sorted_ast.pop_front();
     }
@@ -410,7 +394,9 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
         static_cast<int>(tok.type)));
 }
 
-std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> literal_expression::type_check(
+  ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
 {
     if(!tok.value)
     {
@@ -419,18 +405,15 @@ std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
 
     if(tok.type == token_type::int_literal)
     {
-        expr_type = ctx.get_type("i32", false);
-        ctx.set_expression_type(this, *expr_type);
+        expr_type = ctx.get_i32_type();
     }
     else if(tok.type == token_type::fp_literal)
     {
-        expr_type = ctx.get_type("f32", false);
-        ctx.set_expression_type(this, *expr_type);
+        expr_type = ctx.get_f32_type();
     }
     else if(tok.type == token_type::str_literal)
     {
-        expr_type = ctx.get_type("str", false);
-        ctx.set_expression_type(this, *expr_type);
+        expr_type = ctx.get_str_type();
     }
     else
     {
@@ -440,6 +423,8 @@ std::optional<ty::type_info> literal_expression::type_check(ty::context& ctx)
             "Unknown literal type with id '{}'.",
             static_cast<int>(tok.type)));
     }
+
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -563,30 +548,34 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
 
 void type_cast_expression::collect_names(co::context& ctx)
 {
+    super::collect_names(ctx);
+
     if(expr)
     {
         expr->collect_names(ctx);
     }
 }
 
-std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> type_cast_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    auto type = expr->type_check(ctx);
+    auto type = expr->type_check(ctx, env);
     if(!type.has_value())
     {
         throw ty::type_error(loc, "Type cast expression has no type.");
     }
 
     // casts for primitive types.
-    static const std::unordered_map<std::string, std::set<std::string>> primitive_type_casts = {
-      {"i32", {"i32", "f32"}},
-      {"f32", {"i32", "f32"}},
-      {"str", {}}};
+    const std::unordered_map<ty::type_id, std::set<ty::type_id>> primitive_type_casts = {
+      {ctx.get_i32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {ctx.get_f32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {ctx.get_str_type(), {}}};
 
-    auto cast_from = primitive_type_casts.find(ty::to_string(*type));
+    auto cast_from = primitive_type_casts.find(type.value());
     if(cast_from != primitive_type_casts.end())
     {
-        auto cast_to = cast_from->second.find(target_type->get_name().s);
+        auto cast_to = cast_from->second.find(
+          ctx.resolve_type(
+            target_type->get_name().s));    // FIXME Should be resolved in type_expression.
         if(cast_to == cast_from->second.end())
         {
             throw ty::type_error(
@@ -598,8 +587,9 @@ std::optional<ty::type_info> type_cast_expression::type_check(ty::context& ctx)
     }
 
     // casts for struct types. this is checked at run-time.
-    expr_type = target_type->to_type_info(ctx);    // no array casts.
-    ctx.set_expression_type(this, *expr_type);
+    // FIXME Should be resolved in type_expression.
+    expr_type = ctx.resolve_type(target_type->get_name().s);    // no array casts.
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -639,18 +629,20 @@ std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::contex
 
 void namespace_access_expression::collect_names(co::context& ctx)
 {
+    super::collect_names(ctx);
+
     update_namespace();
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_info> namespace_access_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> namespace_access_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    expr_type = expr->type_check(ctx);
+    expr_type = expr->type_check(ctx, env);
     if(!expr_type.has_value())
     {
         throw std::runtime_error("Type check: Expression has no type in namespace access.");
     }
-    ctx.set_expression_type(this, expr_type.value());
+    ctx.set_expression_type(*this, expr_type.value());
     return expr_type;
 }
 
@@ -736,7 +728,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     /*
      * arrays.
      */
-    if(lhs_type.is_array())
+    if(lhs_is_array)
     {
         if(!rhs->is_named_expression())
         {
@@ -811,35 +803,39 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
     return std::make_unique<cg::value>(member_value);
 }
 
-std::optional<ty::type_info> access_expression::type_check(ty::context& ctx)
+void access_expression::collect_names(co::context& ctx)
 {
-    auto type = lhs->type_check(ctx);
+    super::collect_names(ctx);
+
+    lhs->collect_names(ctx);
+}
+
+std::optional<ty::type_id> access_expression::type_check(ty::context& ctx, sema::env& env)
+{
+    auto type = lhs->type_check(ctx, env);
     if(!type.has_value())
     {
-        throw ty::type_error(loc, "Access expression has no l.h.s.");
+        throw ty::type_error(
+          loc,
+          "L.h.s. has no value in element access expression.");
     }
-    lhs_type = *type;
 
-    const ty::struct_definition* struct_def =
-      lhs_type.is_array()
-        ? ctx.get_struct_definition(
-            lhs_type.get_location(),
-            "@array")    // array built-ins.
-        : ctx.get_struct_definition(
-            lhs_type.get_location(),
-            ty::to_string(lhs_type),
-            lhs_type.get_import_path());
-
-    ctx.push_struct_definition(struct_def);
-    expr_type = rhs->type_check(ctx);
-    ctx.pop_struct_definition();
-
-    if(!expr_type.has_value())
+    lhs_is_array = ctx.is_array(type.value());
+    if(!lhs_is_array && !ctx.is_struct(type.value()))
     {
-        throw std::runtime_error("Type check: Expression has no type in member access.");
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Base type '{}' is not a struct or array.",
+            ctx.to_string(type.value())));
     }
-    ctx.set_expression_type(this, expr_type.value());
-    return expr_type;
+
+    // get field.
+    // TODO
+
+    throw std::runtime_error("access_expression::type_check");
+    //    field_index = ctx.get_field_index(type.value(), rhs->get_name());
+    return ctx.get_field(type.value(), field_index);
 }
 
 std::string access_expression::to_string() const
@@ -872,7 +868,7 @@ void import_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    ctx.declare(
+    symbol_id = ctx.declare(
       path.begin()->s,
       utils::join(
         path
@@ -928,14 +924,17 @@ void directive_expression::collect_names(co::context& ctx)
     // expr->pop_directive(ctx);
 }
 
-std::optional<ty::type_info> directive_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> directive_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    expr_type = expr->type_check(ctx);
-    if(expr_type.has_value())
-    {
-        ctx.set_expression_type(this, *expr_type);
-    }
-    return expr_type;
+    // TODO
+    throw std::runtime_error("directive_expression::type_check");
+
+    // expr_type = expr->type_check(ctx);
+    // if(expr_type.has_value())
+    // {
+    //     ctx.set_expression_type(this, *expr_type);
+    // }
+    // return expr_type;
 }
 
 std::string directive_expression::to_string() const
@@ -1090,79 +1089,75 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
     return std::make_unique<cg::value>(v.value());
 }
 
-std::optional<ty::type_info> variable_reference_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> variable_reference_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    if(element_expr)
+    ty::type_id type;    // FIXME set to invalid id
+    if(expansion)
     {
-        auto v = element_expr->type_check(ctx);
-        if(!v.has_value() || ty::to_string(*v) != "i32")
+        std::optional<ty::type_id> t = expansion->type_check(ctx, env);
+        if(!t.has_value())
         {
-            throw ty::type_error(loc, "Expected <integer> for array element access.");
+            throw ty::type_error(
+              expansion->get_location(),
+              "Expression has no type.");
         }
 
-        ty::type_info t;
-        if(expansion)
-        {
-            bool scope_type_check = expansion->is_macro_branch();
-            if(scope_type_check)
-            {
-                ctx.enter_anonymous_scope(get_location());
-            }
-            std::optional<ty::type_info> opt_t = expansion->type_check(ctx);
-            if(scope_type_check)
-            {
-                ctx.exit_anonymous_scope();
-            }
-
-            if(!opt_t.has_value())
-            {
-                throw ty::type_error(loc, "Expression has no type.");
-            }
-            t = opt_t.value();
-        }
-        else
-        {
-            t = ctx.get_identifier_type(name, get_namespace_path());
-        }
-
-        if(!t.is_array())
-        {
-            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
-        }
-
-        auto* base_type = t.get_element_type();
-        expr_type = ctx.get_type(
-          base_type->to_string(),
-          base_type->is_array(),
-          base_type->get_import_path());
-        ctx.set_expression_type(this, *expr_type);
+        type = t.value();
     }
     else
     {
-        if(expansion)
+        if(!symbol_id.has_value())
         {
-            bool scope_type_check = expansion->is_macro_branch();
-            if(scope_type_check)
-            {
-                ctx.enter_anonymous_scope(get_location());
-            }
-            expr_type = expansion->type_check(ctx);
-            if(scope_type_check)
-            {
-                ctx.exit_anonymous_scope();
-            }
+            throw ty::type_error(
+              loc,
+              std::format(
+                "'{}' has no symbol id.",
+                name.s));
+        }
 
-            if(expr_type.has_value())
-            {
-                ctx.set_expression_type(this, *expr_type);
-            }
-        }
-        else
+        if(!env.type_map.contains(symbol_id.value()))
         {
-            expr_type = ctx.get_identifier_type(name, get_namespace_path());
-            ctx.set_expression_type(this, *expr_type);
+            throw ty::type_error(
+              loc,
+              std::format(
+                "'{}' not in type map.",
+                name.s));
         }
+
+        type = env.type_map[symbol_id.value()];
     }
+
+    if(element_expr)
+    {
+        auto v = element_expr->type_check(ctx, env);
+        if(!v.has_value() || ctx.are_types_compatible(v.value(), ctx.get_i32_type()))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Expected <integer> for array element access, got '{}'.",
+                v.has_value()
+                  ? ctx.to_string(v.value())
+                  : std::string("<none>")));
+        }
+
+        if(!ctx.is_array(type))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Cannot use subscript on non-array type '{}'.",
+                ctx.to_string(type)));
+        }
+
+        expr_type = ctx.array_element_type(type);
+    }
+    else
+    {
+        expr_type = type;
+    }
+
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -1300,19 +1295,6 @@ cg::type type_expression::to_type() const
       get_namespace_path()};
 }
 
-ty::type_info type_expression::to_type_info(ty::context& ctx) const
-{
-    return ctx.get_type(type_name.s, array, get_namespace_path());
-}
-
-ty::type_info type_expression::to_unresolved_type_info(ty::context& ctx) const
-{
-    return ctx.get_unresolved_type(
-      type_name,
-      array ? ty::type_class::tc_array : ty::type_class::tc_plain,
-      get_namespace_path());
-}
-
 /*
  * variable_declaration_expression.
  */
@@ -1333,7 +1315,7 @@ void variable_declaration_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    ctx.declare(
+    symbol_id = ctx.declare(
       name.s,
       std::format(
         "{}::{}",
@@ -1343,6 +1325,11 @@ void variable_declaration_expression::collect_names(co::context& ctx)
       name.location,
       sema::symbol_id::invalid,
       false);
+
+    if(expr)
+    {
+        expr->collect_names(ctx);
+    }
 }
 
 std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
@@ -1400,43 +1387,50 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
     return nullptr;
 }
 
-std::optional<ty::type_info> variable_declaration_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> variable_declaration_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    // Prevent double declaration of variable.
     if(ctx.has_expression_type(*this))
     {
         return ctx.get_expression_type(*this);
     }
 
-    auto var_type = type->to_type_info(ctx);
-    ctx.add_variable(name, var_type);
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          name.location,
+          std::format(
+            "Variable '{}' has no symbol id.",
+            name.s));
+    }
+
+    auto annotated_type_id = ctx.get_type(type->get_qualified_name());
+    env.type_map.insert({symbol_id.value(), annotated_type_id});
 
     if(expr)
     {
-        auto rhs = expr->type_check(ctx);
-        if(!rhs)
+        auto rhs = expr->type_check(ctx, env);
+        if(!rhs.has_value())
         {
-            throw ty::type_error(name.location, std::format("Expression has no type."));
+            throw ty::type_error(
+              loc,
+              "Expression has no type.");
         }
 
-        // Either the types match, or the type is a reference type which is set to 'null'.
-        if(*rhs != var_type
-           && !(ctx.is_reference_type(var_type) && *rhs == ctx.get_type("@null", false)))
+        if(!ctx.are_types_compatible(annotated_type_id, rhs.value()))
         {
             throw ty::type_error(
               name.location,
               std::format(
                 "R.h.s. has type '{}' (type id {}), which does not match the variable's type '{}' (type id {}).",
-                ty::to_string(*rhs),
-                rhs->get_type_id(),
-                ty::to_string(var_type),
-                var_type.get_type_id()));
+                ctx.to_string(rhs.value()),
+                rhs.value(),
+                ctx.to_string(annotated_type_id),
+                annotated_type_id));
         }
     }
 
-    expr_type = std::make_optional<ty::type_info>(
-      name, ty::type_class::tc_declaration, std::nullopt);
-    ctx.set_expression_type(this, expr_type.value());
+    expr_type = annotated_type_id;
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -1544,7 +1538,7 @@ void constant_declaration_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    ctx.declare(
+    symbol_id = ctx.declare(
       name.s,
       std::format(
         "{}::{}",
@@ -1561,7 +1555,7 @@ void constant_declaration_expression::collect_names(co::context& ctx)
     // ctx.register_constant_name(name);
 }
 
-std::optional<ty::type_info> constant_declaration_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> constant_declaration_expression::type_check(ty::context& ctx, sema::env& env)
 {
     // Prevent double declaration of constant.
     if(ctx.has_expression_type(*this))
@@ -1569,9 +1563,9 @@ std::optional<ty::type_info> constant_declaration_expression::type_check(ty::con
         return ctx.get_expression_type(*this);
     }
 
-    auto const_type = type->to_type_info(ctx);
-    auto rhs = expr->type_check(ctx);
-    if(!rhs)
+    auto annotated_type = ctx.get_type(type->get_name().s);
+    auto rhs = expr->type_check(ctx, env);
+    if(!rhs.has_value())
     {
         throw ty::type_error(
           name.location,
@@ -1579,17 +1573,16 @@ std::optional<ty::type_info> constant_declaration_expression::type_check(ty::con
     }
 
     // Either the types match, or the type is a reference type which is set to 'null'.
-    if(*rhs != const_type
-       && !(ctx.is_reference_type(const_type) && *rhs == ctx.get_type("@null", false)))
+    if(!ctx.are_types_compatible(annotated_type, rhs.value()))
     {
         throw ty::type_error(
           name.location,
           std::format(
             "R.h.s. has type '{}' (type id {}), which does not match the constant's type '{}' (type id {}).",
-            ty::to_string(*rhs),
-            rhs->get_type_id(),
-            ty::to_string(const_type),
-            const_type.get_type_id()));
+            ctx.to_string(rhs.value()),
+            rhs.value(),
+            ctx.to_string(annotated_type),
+            annotated_type));
     }
 
     return std::nullopt;
@@ -1687,43 +1680,42 @@ void array_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> array_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> array_initializer_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    std::optional<ty::type_info> t;
+    expr_type = std::nullopt;
     for(auto& it: exprs)
     {
-        auto expr_type = it->type_check(ctx);
+        auto type = it->type_check(ctx, env);
 
-        if(!expr_type.has_value())
+        if(!type.has_value())
         {
             throw ty::type_error(loc, "Initializer expression has no type.");
         }
 
-        if(t.has_value())
+        if(expr_type.has_value())
         {
-            if(*t != *expr_type)
+            if(expr_type != type)
             {
                 throw ty::type_error(
                   loc,
                   std::format(
                     "Initializer types do not match. Found '{}' and '{}'.",
-                    ty::to_string(*t),
-                    ty::to_string(*expr_type)));
+                    ctx.to_string(expr_type.value()),
+                    ctx.to_string(type.value())));
             }
         }
         else
         {
-            t = expr_type;
+            expr_type = type;
         }
     }
 
-    if(!t.has_value())
+    if(!expr_type.has_value())
     {
         throw ty::type_error(loc, "Initializer expression has no type.");
     }
 
-    expr_type = ctx.get_type(t->to_string(), true);
-    ctx.set_expression_type(this, *expr_type);
+    ctx.set_expression_type(*this, expr_type.value());
 
     return expr_type;
 }
@@ -1806,26 +1798,37 @@ void struct_definition_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
+    symbol_id = ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::struct_definition,
+      name.location,
+      sema::symbol_id::invalid,
+      false,
+      this);
+
     ctx.push_scope(std::format("{}@struct", name.s), name.location);
     for(auto& m: members)
     {
         m->collect_names(ctx);
     }
     ctx.pop_scope();
+}
 
-    // TODO
-    // std::vector<std::pair<token, ty::type_info>> struct_members =
-    //   members
-    //   | std::views::transform(
-    //     [&type_ctx](const auto& m)
-    //     {
-    //         return std::make_pair(
-    //           m->get_name(),
-    //           m->get_type()->to_unresolved_type_info(type_ctx));
-    //     })
-    //   | std::ranges::to<std::vector>();
-
-    // type_ctx.add_struct(name, std::move(struct_members));
+void struct_definition_expression::define_types(ty::context& ctx)
+{
+    auto struct_type_id = ctx.declare_struct(get_name().s, std::nullopt);
+    for(const auto& m: members)
+    {
+        ctx.add_field(
+          struct_type_id,
+          m->get_name().s,
+          ctx.get_type(m->get_type()->get_qualified_name()));
+    }
+    ctx.seal_struct(struct_type_id);
 }
 
 bool struct_definition_expression::supports_directive(const std::string& name) const
@@ -1835,14 +1838,12 @@ bool struct_definition_expression::supports_directive(const std::string& name) c
            || name == "native";
 }
 
-std::optional<ty::type_info> struct_definition_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> struct_definition_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    ctx.enter_struct_scope(name);
-    for(auto& m: members)
+    for(const auto& m: members)
     {
-        m->type_check(ctx);
+        m->type_check(ctx, env);
     }
-    ctx.exit_named_scope(name);
 
     return std::nullopt;
 }
@@ -1949,52 +1950,55 @@ void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> struct_anonymous_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+    // TODO
+    throw std::runtime_error("struct_anonymous_initializer_expression::type_check");
 
-    if(initializers.size() != struct_def->members.size())
-    {
-        throw ty::type_error(
-          name.location,
-          std::format(
-            "Struct '{}' has {} members, but {} are initialized.",
-            name.s,
-            struct_def->members.size(),
-            initializers.size()));
-    }
+    // const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
-    for(std::size_t i = 0; i < initializers.size(); ++i)
-    {
-        const auto& initializer = initializers[i];
-        const auto& struct_member = struct_def->members[i];
+    // if(initializers.size() != struct_def->members.size())
+    // {
+    //     throw ty::type_error(
+    //       name.location,
+    //       std::format(
+    //         "Struct '{}' has {} members, but {} are initialized.",
+    //         name.s,
+    //         struct_def->members.size(),
+    //         initializers.size()));
+    // }
 
-        auto initializer_type = initializer->type_check(ctx);
-        if(!initializer_type.has_value())
-        {
-            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
-        }
+    // for(std::size_t i = 0; i < initializers.size(); ++i)
+    // {
+    //     const auto& initializer = initializers[i];
+    //     const auto& struct_member = struct_def->members[i];
 
-        // Either the types match, or the type is a reference types which is set to 'null'.
-        if(struct_member.second != initializer_type
-           && !(ctx.is_reference_type(struct_member.second)
-                && initializer_type == ctx.get_type("@null", false)))
-        {
-            throw ty::type_error(
-              name.location,
-              std::format(
-                "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-                name.s,
-                struct_member.first.s,
-                struct_member.second.to_string(),
-                initializer_type->to_string()));
-        }
-    }
+    //     auto initializer_type = initializer->type_check(ctx);
+    //     if(!initializer_type.has_value())
+    //     {
+    //         throw ty::type_error(initializer->get_location(), "Initializer has no type.");
+    //     }
 
-    expr_type = ctx.get_type(name.s, false, get_namespace_path());
-    ctx.set_expression_type(this, *expr_type);
+    //     // Either the types match, or the type is a reference types which is set to 'null'.
+    //     if(struct_member.second != initializer_type
+    //        && !(ctx.is_reference_type(struct_member.second)
+    //             && initializer_type == ctx.get_type("@null", false)))
+    //     {
+    //         throw ty::type_error(
+    //           name.location,
+    //           std::format(
+    //             "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+    //             name.s,
+    //             struct_member.first.s,
+    //             struct_member.second.to_string(),
+    //             initializer_type->to_string()));
+    //     }
+    // }
 
-    return expr_type;
+    // expr_type = ctx.get_type(name.s, false, get_namespace_path());
+    // ctx.set_expression_type(this, *expr_type);
+
+    // return expr_type;
 }
 
 std::string struct_anonymous_initializer_expression::to_string() const
@@ -2040,9 +2044,9 @@ void named_initializer::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_info> named_initializer::type_check(ty::context& ctx)
+std::optional<ty::type_id> named_initializer::type_check(ty::context& ctx, sema::env& env)
 {
-    return expr->type_check(ctx);
+    return expr->type_check(ctx, env);
 }
 
 std::string named_initializer::to_string() const
@@ -2152,77 +2156,80 @@ void struct_named_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> struct_named_initializer_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> struct_named_initializer_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+    // TODO
+    throw std::runtime_error("struct_named_initializer_expression::type_check");
 
-    if(initializers.size() != struct_def->members.size())
-    {
-        throw ty::type_error(
-          name.location,
-          std::format(
-            "Struct '{}' has {} members, but {} are initialized.",
-            name.s, struct_def->members.size(), initializers.size()));
-    }
+    // const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
 
-    std::vector<std::string> initialized_member_names;    // used in check for duplicates
-    for(const auto& initializer: initializers)
-    {
-        const auto& member_name = initializer->get_name().s;
+    // if(initializers.size() != struct_def->members.size())
+    // {
+    //     throw ty::type_error(
+    //       name.location,
+    //       std::format(
+    //         "Struct '{}' has {} members, but {} are initialized.",
+    //         name.s, struct_def->members.size(), initializers.size()));
+    // }
 
-        if(std::ranges::find_if(
-             initialized_member_names,
-             [&member_name](auto& name) -> bool
-             { return name == member_name; })
-           != initialized_member_names.end())
-        {
-            throw ty::type_error(
-              name.location,
-              std::format(
-                "Multiple initializations of struct member '{}::{}'.",
-                name.s,
-                member_name));
-        }
-        initialized_member_names.push_back(member_name);
+    // std::vector<std::string> initialized_member_names;    // used in check for duplicates
+    // for(const auto& initializer: initializers)
+    // {
+    //     const auto& member_name = initializer->get_name().s;
 
-        auto it = std::ranges::find_if(
-          struct_def->members,
-          [&member_name](const auto& m) -> bool
-          { return m.first.s == member_name; });
-        if(it == struct_def->members.end())
-        {
-            throw ty::type_error(
-              name.location,
-              std::format(
-                "Struct '{}' has no member '{}'.",
-                name.s, member_name));
-        }
+    //     if(std::ranges::find_if(
+    //          initialized_member_names,
+    //          [&member_name](auto& name) -> bool
+    //          { return name == member_name; })
+    //        != initialized_member_names.end())
+    //     {
+    //         throw ty::type_error(
+    //           name.location,
+    //           std::format(
+    //             "Multiple initializations of struct member '{}::{}'.",
+    //             name.s,
+    //             member_name));
+    //     }
+    //     initialized_member_names.push_back(member_name);
 
-        auto initializer_type = initializer->type_check(ctx);
-        if(!initializer_type.has_value())
-        {
-            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
-        }
+    //     auto it = std::ranges::find_if(
+    //       struct_def->members,
+    //       [&member_name](const auto& m) -> bool
+    //       { return m.first.s == member_name; });
+    //     if(it == struct_def->members.end())
+    //     {
+    //         throw ty::type_error(
+    //           name.location,
+    //           std::format(
+    //             "Struct '{}' has no member '{}'.",
+    //             name.s, member_name));
+    //     }
 
-        // Either the types match, or the type is a reference types which is set to 'null'.
-        if(it->second != initializer_type
-           && !(ctx.is_reference_type(it->second) && initializer_type == ctx.get_type("@null", false)))
-        {
-            throw ty::type_error(
-              name.location,
-              std::format(
-                "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-                name.s,
-                member_name,
-                it->second.to_string(),
-                initializer_type->to_string()));
-        }
-    }
+    //     auto initializer_type = initializer->type_check(ctx);
+    //     if(!initializer_type.has_value())
+    //     {
+    //         throw ty::type_error(initializer->get_location(), "Initializer has no type.");
+    //     }
 
-    expr_type = ctx.get_type(name.s, false, get_namespace_path());
-    ctx.set_expression_type(this, *expr_type);
+    //     // Either the types match, or the type is a reference types which is set to 'null'.
+    //     if(it->second != initializer_type
+    //        && !(ctx.is_reference_type(it->second) && initializer_type == ctx.get_type("@null", false)))
+    //     {
+    //         throw ty::type_error(
+    //           name.location,
+    //           std::format(
+    //             "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+    //             name.s,
+    //             member_name,
+    //             it->second.to_string(),
+    //             initializer_type->to_string()));
+    //     }
+    // }
 
-    return expr_type;
+    // expr_type = ctx.get_type(name.s, false, get_namespace_path());
+    // ctx.set_expression_type(this, *expr_type);
+
+    // return expr_type;
 }
 
 std::string struct_named_initializer_expression::to_string() const
@@ -2384,6 +2391,9 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
      *    <binary-op>
      */
 
+    throw std::runtime_error("binary_expression::generate_code");
+
+#if 0
     std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
@@ -2584,6 +2594,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     }
 
     return lhs->generate_code(ctx, memory_context::store);
+#endif
 }
 
 void binary_expression::collect_names(co::context& ctx)
@@ -2593,7 +2604,7 @@ void binary_expression::collect_names(co::context& ctx)
     rhs->collect_names(ctx);
 }
 
-std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> binary_expression::type_check(ty::context& ctx, sema::env& env)
 {
     if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
     {
@@ -2601,9 +2612,9 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
         // no type has been set yet, so we can traverse all nodes without
         // doing evaluation twice.
         visit_nodes(
-          [&ctx](ast::expression& node)
+          [&ctx, &env](ast::expression& node)
           {
-              node.type_check(ctx);
+              node.type_check(ctx, env);
           },
           false, /* don't visit this node */
           true   /* post-order traversal */
@@ -2614,23 +2625,31 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
 
     auto lhs_type = ctx.get_expression_type(*lhs);
 
-    const ty::struct_definition* struct_def = nullptr;
-    if(op.s == ".")    // scope access
+    if(op.s == ".")    // struct access
     {
-        struct_def = ctx.get_struct_definition(loc, lhs_type.to_string(), lhs_type.get_import_path());
-        ctx.push_struct_definition(struct_def);
+        // TODO see below
+        throw std::runtime_error("binary_expression::type_check: struct access");
     }
+
+    // const ty::struct_definition* struct_def = nullptr;
+    // if(op.s == ".")    // scope access
+    // {
+    //     struct_def = ctx.get_struct_definition(loc, lhs_type.to_string(), lhs_type.get_import_path());
+    //     ctx.push_struct_definition(struct_def);
+    // }
+
+    // auto rhs_type = ctx.get_expression_type(*rhs);
+
+    // if(struct_def != nullptr)
+    // {
+    //     ctx.pop_struct_definition();
+
+    //     expr_type = rhs_type;
+    //     ctx.set_expression_type(this, *expr_type);
+    //     return expr_type;
+    // }
 
     auto rhs_type = ctx.get_expression_type(*rhs);
-
-    if(struct_def != nullptr)
-    {
-        ctx.pop_struct_definition();
-
-        expr_type = rhs_type;
-        ctx.set_expression_type(this, *expr_type);
-        return expr_type;
-    }
 
     // some operations restrict the type.
     if(reduced_op == "%"
@@ -2638,21 +2657,21 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
        || reduced_op == "&" || reduced_op == "^" || reduced_op == "|"
        || reduced_op == "&&" || reduced_op == "||")
     {
-        if(ty::to_string(lhs_type) != "i32" || ty::to_string(rhs_type) != "i32")
+        if(lhs_type != ctx.get_i32_type() || rhs_type != ctx.get_i32_type())
         {
             throw ty::type_error(
               loc,
               std::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
-                ty::to_string(lhs_type),
+                ctx.to_string(lhs_type.value()),
                 reduced_op,
-                ty::to_string(rhs_type),
+                ctx.to_string(rhs_type.value()),
                 reduced_op));
         }
 
         // set the restricted type.
-        expr_type = ctx.get_type("i32", false);
-        ctx.set_expression_type(this, *expr_type);
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
         return expr_type;
     }
 
@@ -2660,50 +2679,49 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
     if(op.s == "=" || op.s == "==" || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
-        if(lhs_type != rhs_type
-           && !(ctx.is_reference_type(lhs_type) && rhs_type == ctx.get_type("@null", false)))
+        if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
         {
             throw ty::type_error(
               loc,
               std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
-                ty::to_string(lhs_type),
+                ctx.to_string(lhs_type.value()),
                 reduced_op,
-                ty::to_string(rhs_type)));
+                ctx.to_string(rhs_type.value())));
         }
 
         if(op.s == "=")
         {
             // assignments return the type of the l.h.s.
             expr_type = lhs_type;
-            ctx.set_expression_type(this, *expr_type);
+            ctx.set_expression_type(*this, expr_type);
             return expr_type;
         }
 
         // comparisons return i32.
-        expr_type = ctx.get_type("i32", false);
-        ctx.set_expression_type(this, *expr_type);
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
         return expr_type;
     }
 
     // check lhs and rhs have supported types (i32 and f32 at the moment).
-    if(lhs_type != ctx.get_type("i32", false) && lhs_type != ctx.get_type("f32", false))
+    if(lhs_type.value() != ctx.get_i32_type() && lhs_type != ctx.get_f32_type())
     {
         throw ty::type_error(
           loc,
           std::format(
             "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ty::to_string(lhs_type)));
+            ctx.to_string(lhs_type.value())));
     }
-    if(rhs_type != ctx.get_type("i32", false) && rhs_type != ctx.get_type("f32", false))
+    if(rhs_type.value() != ctx.get_i32_type() && rhs_type.value() != ctx.get_f32_type())
     {
         throw ty::type_error(
           loc,
           std::format(
             "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
-            ty::to_string(rhs_type)));
+            ctx.to_string(rhs_type.value())));
     }
 
     if(lhs_type != rhs_type)
@@ -2712,15 +2730,15 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
           loc,
           std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
-            ty::to_string(lhs_type),
+            ctx.to_string(lhs_type.value()),
             reduced_op,
-            ty::to_string(rhs_type)));
+            ctx.to_string(rhs_type.value())));
     }
 
     if(is_comparison)
     {
         // comparisons return i32.
-        expr_type = ctx.get_type("i32", false);
+        expr_type = ctx.get_i32_type();
     }
     else
     {
@@ -2728,7 +2746,7 @@ std::optional<ty::type_info> binary_expression::type_check(ty::context& ctx)
         expr_type = lhs_type;
     }
 
-    ctx.set_expression_type(this, *expr_type);
+    ctx.set_expression_type(*this, expr_type);
     return expr_type;
 }
 
@@ -2954,7 +2972,7 @@ void unary_expression::collect_names(co::context& ctx)
     operand->collect_names(ctx);
 }
 
-std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> unary_expression::type_check(ty::context& ctx, sema::env& env)
 {
     if(!ctx.has_expression_type(*operand))
     {
@@ -2962,22 +2980,22 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
         // no type has been set yet, so we can traverse all nodes without
         // doing evaluation twice.
         visit_nodes(
-          [&ctx](ast::expression& node)
+          [&ctx, &env](ast::expression& node)
           {
-              node.type_check(ctx);
+              node.type_check(ctx, env);
           },
           false, /* don't visit this node */
           true   /* post-order traversal */
         );
     }
 
-    static const std::unordered_map<std::string, std::vector<std::string>> valid_operand_types = {
-      {"++", {"i32", "f32"}},
-      {"--", {"i32", "f32"}},
-      {"+", {"i32", "f32"}},
-      {"-", {"i32", "f32"}},
-      {"!", {"i32"}},
-      {"~", {"i32"}}};
+    const std::unordered_map<std::string, std::set<ty::type_id>> valid_operand_types = {
+      {"++", {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {"--", {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {"+", {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {"-", {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {"!", {ctx.get_i32_type()}},
+      {"~", {ctx.get_i32_type()}}};
 
     auto op_it = valid_operand_types.find(op.s);
     if(op_it == valid_operand_types.end())
@@ -2990,19 +3008,26 @@ std::optional<ty::type_info> unary_expression::type_check(ty::context& ctx)
     }
 
     auto operand_type = ctx.get_expression_type(*operand);
-    auto type_it = std::ranges::find(op_it->second, ty::to_string(operand_type));
+    if(!operand_type.has_value())
+    {
+        throw ty::type_error(
+          operand->get_location(),
+          "Expression has no type.");
+    }
+
+    auto type_it = std::ranges::find(op_it->second, operand_type.value());
     if(type_it == op_it->second.end())
     {
         throw ty::type_error(
           operand->get_location(),
           std::format(
             "Invalid operand type '{}' for unary operator '{}'.",
-            ty::to_string(operand_type),
+            ctx.to_string(operand_type.value()),
             op.s));
     }
 
     expr_type = operand_type;
-    ctx.set_expression_type(this, *expr_type);
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -3086,24 +3111,17 @@ void new_expression::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> new_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    token type_name = type_expr->get_name();
-    if(ty::is_builtin_type(type_name.s) && type_expr->get_namespace_path().has_value())
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot use namespaces with built-in types.");
-    }
-
-    if(type_name.s == "void")
+    type_expr_id = ctx.resolve_type(type_expr->get_qualified_name());
+    if(type_expr_id == ctx.get_void_type())
     {
         throw ty::type_error(
-          type_name.location,
+          type_expr->get_location(),
           "Cannot use operator new with type 'void'.");
     }
 
-    auto array_size_type = expr->type_check(ctx);
+    auto array_size_type = expr->type_check(ctx, env);
     if(!array_size_type.has_value())
     {
         throw ty::type_error(
@@ -3111,17 +3129,17 @@ std::optional<ty::type_info> new_expression::type_check(ty::context& ctx)
           "Array size expression has no type.");
     }
 
-    if(ty::to_string(*array_size_type) != "i32")
+    if(array_size_type != ctx.get_i32_type())
     {
         throw ty::type_error(
           expr->get_location(),
           std::format(
             "Expected array size of type 'i32', got '{}'.",
-            ty::to_string(*array_size_type)));
+            ctx.to_string(array_size_type.value())));
     }
 
-    expr_type = ctx.get_type(type_name.s, true, type_expr->get_namespace_path());
-    ctx.set_expression_type(this, *expr_type);
+    expr_type = ctx.get_array(array_size_type.value(), 1);
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -3154,11 +3172,14 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
     return std::make_unique<cg::value>(cg::type{cg::type_class::null, 0});
 }
 
-std::optional<ty::type_info> null_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> null_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    expr_type = ctx.get_type("@null", false);
-    ctx.set_expression_type(this, *expr_type);
-    return expr_type;
+    // TODO
+    throw std::runtime_error("null_expression::type_check");
+
+    // expr_type = ctx.get_type("@null", false);
+    // ctx.set_expression_type(this, *expr_type);
+    // return expr_type;
 }
 
 std::string null_expression::to_string() const
@@ -3247,29 +3268,32 @@ void postfix_expression::collect_names(co::context& ctx)
     identifier->collect_names(ctx);
 }
 
-std::optional<ty::type_info> postfix_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> postfix_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    auto identifier_type = identifier->type_check(ctx);
-    if(!identifier_type.has_value())
-    {
-        throw ty::type_error(identifier->get_location(), "Identifier has no type.");
-    }
+    // TODO
+    throw std::runtime_error("postfix_expression::type_check");
 
-    auto identifier_type_str = ty::to_string(*identifier_type);
-    if(identifier_type_str != "i32" && identifier_type_str != "f32")
-    {
-        throw ty::type_error(
-          identifier->get_location(),
-          std::format(
-            "Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').",
-            op.s,
-            identifier_type_str));
-    }
+    // auto identifier_type = identifier->type_check(ctx);
+    // if(!identifier_type.has_value())
+    // {
+    //     throw ty::type_error(identifier->get_location(), "Identifier has no type.");
+    // }
 
-    expr_type = identifier_type;
-    ctx.set_expression_type(this, *expr_type);
+    // auto identifier_type_str = ty::to_string(*identifier_type);
+    // if(identifier_type_str != "i32" && identifier_type_str != "f32")
+    // {
+    //     throw ty::type_error(
+    //       identifier->get_location(),
+    //       std::format(
+    //         "Postfix operator '{}' can only operate on 'i32' or 'f32' (found '{}').",
+    //         op.s,
+    //         identifier_type_str));
+    // }
 
-    return expr_type;
+    // expr_type = identifier_type;
+    // ctx.set_expression_type(this, *expr_type);
+
+    // return expr_type;
 }
 
 std::string postfix_expression::to_string() const
@@ -3292,9 +3316,35 @@ void prototype_ast::serialize(archive& ar)
     ar & name;
     ar & args;
     ar & return_type;
-    ar & args_type_info;
-    ar & return_type_info;
+    ar & arg_type_ids;
+    ar & return_type_id;
 }
+
+/*
+
+std::string base_type = ti.is_array() ? ti.get_element_type()->to_string()
+                                          : ti.to_string();
+
+if(ty::is_builtin_type(base_type))
+{
+    return std::make_unique<cg::value>(
+        cg::type{cg::to_type_class(base_type),
+                ti.is_array()
+                    ? static_cast<std::size_t>(1)
+                    : static_cast<std::size_t>(0)},
+        std::move(name));
+}
+
+return std::make_unique<cg::value>(
+    cg::type{cg::type_class::struct_,
+            ti.is_array()
+                ? static_cast<std::size_t>(1)
+                : static_cast<std::size_t>(0),
+            std::move(base_type),
+            ti.get_import_path()},
+    std::move(name));
+
+*/
 
 cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
 {
@@ -3303,70 +3353,59 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
         throw cg::codegen_error(loc, "Invalid memory context for prototype.");
     }
 
-    if(args.size() != args_type_info.size())
+    if(args.size() != arg_type_ids.size())
     {
         throw cg::codegen_error(loc, "Argument count differs from argument type count.");
     }
+
+    throw std::runtime_error("prototype_ast::generate_code");
 
     std::vector<std::unique_ptr<cg::value>> function_args;
     function_args.reserve(args.size());
     for(std::size_t i = 0; i < args.size(); ++i)
     {
-        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
+        //        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
     }
 
-    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
+    std::unique_ptr<cg::value> ret;    // = type_info_to_value(return_type_info);
     return ctx.create_function(name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
 {
-    if(args.size() != args_type_info.size())
-    {
-        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
-    }
+    throw std::runtime_error("prototype_ast::generate_native_binding");
 
-    std::vector<std::unique_ptr<cg::value>> function_args;
-    function_args.reserve(args.size());
-    for(std::size_t i = 0; i < args.size(); ++i)
-    {
-        function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
-    }
+    // if(args.size() != args_type_info.size())
+    // {
+    //     throw cg::codegen_error(loc, "Argument count differs from argument type count.");
+    // }
 
-    std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
-    ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
+    // std::vector<std::unique_ptr<cg::value>> function_args;
+    // function_args.reserve(args.size());
+    // for(std::size_t i = 0; i < args.size(); ++i)
+    // {
+    //     function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
+    // }
+
+    // std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
+    // ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
-sema::scope_id prototype_ast::collect_names(co::context& ctx)
+void prototype_ast::collect_names(co::context& ctx)
 {
-    ctx.declare(
-      name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
-      sema::symbol_type::function_definition,
-      name.location,
-      sema::symbol_id::invalid,
-      false);
-
-    auto id = ctx.push_scope(std::format("{}@function", name.s), name.location);
-    for(const auto& arg: args)
+    for(auto& arg: args)
     {
-        ctx.declare(
-          arg.first.s,
+        std::get<1>(arg) = ctx.declare(
+          std::get<0>(arg).s,
           std::format(
             "{}::{}",
             ctx.get_canonical_scope_name(ctx.get_current_scope()),
-            arg.first.s),
+            std::get<0>(arg).s),
           sema::symbol_type::variable_declaration,
-          arg.first.location,
+          std::get<0>(arg).location,
           sema::symbol_id::invalid,
           false);
     }
-    ctx.pop_scope();
-
-    return id;
 
     // TODO
     // std::vector<cg::value> prototype_arg_types =
@@ -3403,18 +3442,21 @@ sema::scope_id prototype_ast::collect_names(co::context& ctx)
     //   return_type->to_unresolved_type_info(type_ctx));
 }
 
-void prototype_ast::type_check(ty::context& ctx)
+void prototype_ast::type_check(ty::context& ctx, sema::env& env)
 {
-    // get the argument types and add them to the current scope.
-    args_type_info.clear();
+    arg_type_ids.clear();
+    arg_type_ids.reserve(args.size());
+
     for(const auto& arg: args)
     {
-        args_type_info.push_back(std::get<1>(arg)->to_type_info(ctx));
-        ctx.add_variable(std::get<0>(arg), args_type_info.back());
+        auto type = ctx.resolve_type(
+          std::get<2>(arg)->get_qualified_name());
+
+        arg_type_ids.emplace_back(type);
+        env.type_map.insert({std::get<1>(arg), type});
     }
 
-    // get and check the return type.
-    return_type_info = return_type->to_type_info(ctx);
+    return_type_id = ctx.resolve_type(return_type->get_qualified_name());
 }
 
 std::string prototype_ast::to_string() const
@@ -3425,10 +3467,10 @@ std::string prototype_ast::to_string() const
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            std::string arg_type_str = std::get<1>(args[i])->to_string();
+            std::string arg_type_str = std::get<2>(args[i])->to_string();
             ret += std::format("(name={}, type={}), ", std::get<0>(args[i]).s, arg_type_str);
         }
-        std::string arg_type_str = std::get<1>(args.back())->to_string();
+        std::string arg_type_str = std::get<2>(args.back())->to_string();
         ret += std::format("(name={}, type={})", std::get<0>(args.back()).s, arg_type_str);
     }
     ret += "))";
@@ -3573,14 +3615,15 @@ void block::collect_names(co::context& ctx, bool push_anonymous_scope)
     }
 }
 
-std::optional<ty::type_info> block::type_check(ty::context& ctx)
+std::optional<ty::type_id> block::type_check(ty::context& ctx, sema::env& env)
 {
-    for(auto& expr: exprs)
+    for(auto& expr: exprs | std::views::take(exprs.size() - 1))
     {
-        expr->type_check(ctx);
+        expr->type_check(ctx, env);
     }
+    auto ret = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
 
-    return std::nullopt;
+    return ret;
 }
 
 std::string block::to_string() const
@@ -3725,15 +3768,29 @@ void function_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    auto scope_id = prototype->collect_names(ctx);
-    token name = prototype->get_name();
+    const auto& name = prototype->get_name();
+
+    symbol_id = ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::function_definition,
+      name.location,
+      sema::symbol_id::invalid,
+      false,
+      this);
+
+    ctx.push_scope(std::format("{}@function", name.s), name.location);
+    prototype->collect_names(ctx);
 
     if(body != nullptr)
     {
-        ctx.push_scope(scope_id);
         body->collect_names(ctx, false);
-        ctx.pop_scope();
     }
+
+    ctx.pop_scope();
 }
 
 bool function_expression::supports_directive(const std::string& name) const
@@ -3742,18 +3799,20 @@ bool function_expression::supports_directive(const std::string& name) const
            || name == "native";
 }
 
-std::optional<ty::type_info> function_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> function_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    // enter function scope. the scope is exited in the type_check for the function's body.
-    ctx.enter_function_scope(prototype->get_name());
+    prototype->type_check(ctx, env);
 
-    prototype->type_check(ctx);
     if(body)
     {
-        body->type_check(ctx);
-    }
+        env.current_function_return_type = prototype->get_return_type_id();
+        env.current_function_name = prototype->get_name().s;
 
-    ctx.exit_named_scope(prototype->get_name());
+        body->type_check(ctx, env);
+
+        env.current_function_name = std::nullopt;
+        env.current_function_return_type = std::nullopt;
+    }
 
     return std::nullopt;
 }
@@ -3832,68 +3891,171 @@ void call_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> call_expression::type_check(ty::context& ctx)
+std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    auto sig = ctx.get_function_signature(callee, get_namespace_path());
-    return_type = sig.ret_type;
-
-    if(sig.arg_types.size() != args.size())
+    const auto& callee_symbol_info = env.symbol_table[symbol_id.value()];
+    if(callee_symbol_info.type != sema::symbol_type::function_definition)
     {
         throw ty::type_error(
-          callee.location,
-          std::format(
-            "Wrong number of arguments in function call. Expected {}, got {}.",
-            sig.arg_types.size(),
-            args.size()));
+          loc,
+          "Expected function call.");
     }
 
-    for(std::size_t i = 0; i < args.size(); ++i)
+    if(!callee_symbol_info.reference.has_value())
     {
-        auto arg_type = args[i]->type_check(ctx);
-        if(!arg_type.has_value())
-        {
-            throw ty::type_error(args[i]->get_location(), "Argument has no type.");
-        }
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Function '{}' has no reference.",
+            callee.s));
+    }
 
-        if(sig.arg_types[i] != *arg_type
-           && !ctx.is_convertible(args[i]->get_location(), *arg_type, sig.arg_types[i]))
+    if(callee_symbol_info.declaring_module == sema::symbol_info::current_module_id)
+    {
+        const auto* ast_node = std::get<const ast::expression*>(callee_symbol_info.reference.value());
+        if(ast_node->get_id() != ast::node_identifier::function_expression)
         {
             throw ty::type_error(
-              args[i]->get_location(),
+              loc,
               std::format(
-                "Type of argument {} does not match signature: Expected '{}', got '{}'.",
-                i + 1,
-                ty::to_string(sig.arg_types[i]),
-                ty::to_string(*arg_type)));
+                "AST node for '{}' is not a function node.",
+                callee.s));
+        }
+
+        const auto* function_node = static_cast<const ast::function_expression*>(ast_node);
+        return_type = function_node->get_return_type_id();
+        auto arg_type_ids = function_node->get_arg_type_ids();
+
+        if(arg_type_ids.size() != args.size())
+        {
+            throw ty::type_error(
+              callee.location,
+              std::format(
+                "Wrong number of arguments in function call. Expected {}, got {}.",
+                arg_type_ids.size(),
+                args.size()));
+        }
+
+        for(std::size_t i = 0; i < args.size(); ++i)
+        {
+            auto arg_type = args[i]->type_check(ctx, env);
+            if(!arg_type.has_value())
+            {
+                throw ty::type_error(
+                  args[i]->get_location(),
+                  "Argument does not have a type.");
+            }
+            if(!ctx.are_types_compatible(arg_type_ids[i], arg_type.value()))
+            {
+                throw ty::type_error(
+                  args[i]->get_location(),
+                  std::format(
+                    "Type of argument {} does not match signature: Expected '{}', got '{}'.",
+                    i + 1,
+                    ctx.to_string(arg_type_ids[i]),
+                    ctx.to_string(arg_type.value())));
+            }
+        }
+    }
+    else
+    {
+        const auto* exp_sym = std::get<const module_::exported_symbol*>(callee_symbol_info.reference.value());
+        if(exp_sym == nullptr)
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Missing export entry for function '{}'.",
+                callee.s));
+        }
+        if(exp_sym->type != module_::symbol_type::function)
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Exported symbol is not a function (got type '{}').",
+                module_::to_string(exp_sym->type)));
+        }
+
+        auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
+        return_type = ctx.resolve_type(desc.signature.return_type.base_type());
+        if(desc.signature.return_type.is_array())
+        {
+            return_type = ctx.get_array(return_type, 1);
+        }
+
+        if(desc.signature.arg_types.size() != args.size())
+        {
+            throw ty::type_error(
+              callee.location,
+              std::format(
+                "Wrong number of arguments in function call. Expected {}, got {}.",
+                desc.signature.arg_types.size(),
+                args.size()));
+        }
+
+        for(std::size_t i = 0; i < args.size(); ++i)
+        {
+            auto expected_arg_type = ctx.resolve_type(desc.signature.arg_types[i].base_type());
+            if(desc.signature.arg_types[i].is_array())
+            {
+                expected_arg_type = ctx.get_array(expected_arg_type, 1);
+            }
+
+            auto arg_type = args[i]->type_check(ctx, env);
+            if(!arg_type.has_value())
+            {
+                throw ty::type_error(
+                  args[i]->get_location(),
+                  "Argument does not have a type.");
+            }
+            if(!ctx.are_types_compatible(expected_arg_type, arg_type.value()))
+            {
+                throw ty::type_error(
+                  args[i]->get_location(),
+                  std::format(
+                    "Type of argument {} does not match signature: Expected '{}', got '{}'.",
+                    i + 1,
+                    ctx.to_string(expected_arg_type),
+                    ctx.to_string(arg_type.value())));
+            }
         }
     }
 
     if(index_expr)
     {
-        auto v = index_expr->type_check(ctx);
+        auto v = index_expr->type_check(ctx, env);
         if(!v.has_value())
         {
-            throw ty::type_error(index_expr->get_location(), "Index expression has no type.");
+            throw ty::type_error(
+              index_expr->get_location(),
+              "Index expression has no type.");
         }
-
-        if(ty::to_string(*v) != "i32")
+        if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
         {
-            throw ty::type_error(loc, "Expected <integer> for array element access.");
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Expected <integer> for array element access, got '{}'.",
+                v.has_value()
+                  ? ctx.to_string(v.value())
+                  : std::string("<none>")));
         }
 
-        if(!sig.ret_type.is_array())
+        if(ctx.is_array(return_type))
         {
             throw ty::type_error(loc, "Cannot use subscript on non-array type.");
         }
 
-        expr_type = ctx.get_type(sig.ret_type.get_element_type()->to_string(), false);
+        expr_type = ctx.array_element_type(return_type);
     }
     else
     {
-        expr_type = sig.ret_type;
+        expr_type = return_type;
     }
 
-    ctx.set_expression_type(this, *expr_type);
+    ctx.set_expression_type(*this, expr_type);
+
     return expr_type;
 }
 
@@ -3953,63 +4115,64 @@ std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, mem
 
 void return_statement::collect_names(co::context& ctx)
 {
+    super::collect_names(ctx);
+
     if(expr)
     {
         expr->collect_names(ctx);
     }
 }
 
-std::optional<ty::type_info> return_statement::type_check(ty::context& ctx)
+std::optional<ty::type_id> return_statement::type_check(ty::context& ctx, sema::env& env)
 {
-    auto sig = ctx.get_current_function();
-    if(!sig.has_value())
+    if(!env.current_function_name.has_value())
     {
-        throw ty::type_error(loc, "Cannot have return statement outside a function.");
+        throw ty::type_error(
+          loc,
+          "Current function has no name.");
+    }
+    if(!env.current_function_return_type.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          "Cannot have a return statement outside a function");
     }
 
-    if(ty::to_string(sig->ret_type) == "void")
+    if(env.current_function_return_type.value() == ctx.get_void_type())
     {
         if(expr)
         {
             throw ty::type_error(
               loc,
               std::format(
-                "Function '{}' declared as having no return value cannot have a return expression.",
-                sig->name.s));
+                "Function '{}' declared as having 'void' return type cannot have a return expression.",
+                env.current_function_name.value()));
         }
     }
     else
     {
-        auto ret_type = expr->type_check(ctx);
+        auto ret_type = expr->type_check(ctx, env);
         if(!ret_type.has_value())
         {
             throw ty::type_error(loc, "Return expression has no type.");
         }
 
-        if(!ret_type->is_resolved())
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "Function '{}': Unresolved return type '{}'.",
-                sig->name.s,
-                ty::to_string(*ret_type)));
-        }
-
-        if(*ret_type != sig->ret_type)
+        if(!ctx.are_types_compatible(
+             env.current_function_return_type.value(),
+             ret_type.value()))
         {
             throw ty::type_error(
               loc,
               std::format(
                 "Function '{}': Return expression has type '{}', expected '{}'.",
-                sig->name.s,
-                ty::to_string(*ret_type),
-                ty::to_string(sig->ret_type)));
+                env.current_function_name.value(),
+                ctx.to_string(ret_type.value()),
+                ctx.to_string(env.current_function_return_type.value())));
         }
     }
 
-    expr_type = sig->ret_type;
-    ctx.set_expression_type(this, *expr_type);
+    expr_type = std::nullopt;
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -4138,35 +4301,38 @@ void if_statement::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> if_statement::type_check(ty::context& ctx)
+std::optional<ty::type_id> if_statement::type_check(ty::context& ctx, sema::env& env)
 {
-    auto condition_type = condition->type_check(ctx);
-    if(!condition_type.has_value())
-    {
-        throw ty::type_error(condition->get_location(), "Condition has no type.");
-    }
+    // TODO
+    throw std::runtime_error("if_statement::type_check");
 
-    if(ty::to_string(*condition_type) != "i32")
-    {
-        throw ty::type_error(
-          loc,
-          std::format(
-            "Expected if condition to be of type 'i32', got '{}",
-            ty::to_string(*condition_type)));
-    }
+    // auto condition_type = condition->type_check(ctx);
+    // if(!condition_type.has_value())
+    // {
+    //     throw ty::type_error(condition->get_location(), "Condition has no type.");
+    // }
 
-    ctx.enter_anonymous_scope(if_block->get_location());
-    if_block->type_check(ctx);
-    ctx.exit_anonymous_scope();
+    // if(ty::to_string(*condition_type) != "i32")
+    // {
+    //     throw ty::type_error(
+    //       loc,
+    //       std::format(
+    //         "Expected if condition to be of type 'i32', got '{}",
+    //         ty::to_string(*condition_type)));
+    // }
 
-    if(else_block)
-    {
-        ctx.enter_anonymous_scope(else_block->get_location());
-        else_block->type_check(ctx);
-        ctx.exit_anonymous_scope();
-    }
+    // ctx.enter_anonymous_scope(if_block->get_location());
+    // if_block->type_check(ctx);
+    // ctx.exit_anonymous_scope();
 
-    return std::nullopt;
+    // if(else_block)
+    // {
+    //     ctx.enter_anonymous_scope(else_block->get_location());
+    //     else_block->type_check(ctx);
+    //     ctx.exit_anonymous_scope();
+    // }
+
+    // return std::nullopt;
 }
 
 std::string if_statement::to_string() const
@@ -4252,28 +4418,31 @@ void while_statement::collect_names(co::context& ctx)
     while_block->collect_names(ctx);
 }
 
-std::optional<ty::type_info> while_statement::type_check(ty::context& ctx)
+std::optional<ty::type_id> while_statement::type_check(ty::context& ctx, sema::env& env)
 {
-    auto condition_type = condition->type_check(ctx);
-    if(!condition_type.has_value())
-    {
-        throw ty::type_error(condition->get_location(), "Condition has no type.");
-    }
+    // TODO
+    throw std::runtime_error("while_statement::type_check");
 
-    if(ty::to_string(*condition_type) != "i32")
-    {
-        throw ty::type_error(
-          loc,
-          std::format(
-            "Expected while condition to be of type 'i32', got '{}",
-            ty::to_string(*condition_type)));
-    }
+    // auto condition_type = condition->type_check(ctx);
+    // if(!condition_type.has_value())
+    // {
+    //     throw ty::type_error(condition->get_location(), "Condition has no type.");
+    // }
 
-    ctx.enter_anonymous_scope(while_block->get_location());
-    while_block->type_check(ctx);
-    ctx.exit_anonymous_scope();
+    // if(ty::to_string(*condition_type) != "i32")
+    // {
+    //     throw ty::type_error(
+    //       loc,
+    //       std::format(
+    //         "Expected while condition to be of type 'i32', got '{}",
+    //         ty::to_string(*condition_type)));
+    // }
 
-    return std::nullopt;
+    // ctx.enter_anonymous_scope(while_block->get_location());
+    // while_block->type_check(ctx);
+    // ctx.exit_anonymous_scope();
+
+    // return std::nullopt;
 }
 
 std::string while_statement::to_string() const

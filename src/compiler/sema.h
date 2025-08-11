@@ -17,6 +17,7 @@
 #include <variant>
 
 #include "location.h"
+#include "type.h"
 
 namespace slang::ast
 {
@@ -116,6 +117,15 @@ struct symbol_id
     };
 };
 
+/**
+ * `symbol_id` serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param id The symbol id to serialize.
+ * @returns The input archive.
+ */
+archive& operator&(archive& ar, symbol_id& id);
+
 /** Scope id. */
 using scope_id = std::uint64_t;
 
@@ -161,11 +171,11 @@ struct symbol_info
     /** Scope id. */
     scope_id scope;
 
-    /** Optional children. */
-    std::vector<symbol_id> children;
-
-    /** Module declaring the symbol, or `symbol_id::invalid` for the compiled module. */
+    /** Module declaring the symbol, or `symbol_info::current_module_id` for the compiled module. */
     symbol_id declaring_module;
+
+    /** Symbol id for the currently compiled module. */
+    constexpr static auto current_module_id = symbol_id::invalid;
 
     /** Declaration info (AST node or import reference). */
     std::optional<
@@ -195,6 +205,15 @@ struct env
 
     /** Transitive import tracking. */
     std::set<symbol_id> transitive_imports;
+
+    /** Symbol-type bindings. */
+    std::unordered_map<symbol_id, typing::type_id, symbol_id::hash> type_map;
+
+    /** Current function return type. */
+    std::optional<typing::type_id> current_function_return_type{std::nullopt};
+
+    /** Current function name. */
+    std::optional<std::string> current_function_name{std::nullopt};
 
     /** Default constructors. */
     env() = default;

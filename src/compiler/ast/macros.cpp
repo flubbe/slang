@@ -190,18 +190,9 @@ bool expression::expand_macros(
               if(namespace_path.has_value())
               {
                   const auto& path = namespace_path.value();
-                  if(!type_ctx.has_import(path))
-                  {
-                      type_ctx.add_import(path, false);
 
-                      // TODO Do we need to validate that `path` is part of an import statement?
-                  }
-                  else if(type_ctx.is_transitive_import(path))
-                  {
-                      // make import explicit.
-                      type_ctx.add_import(path, false);
-                      codegen_ctx.make_import_explicit(path);
-                  }
+                  // TODO type context
+                  throw std::runtime_error("expression::expand_macros");
               }
           },
           true,
@@ -236,10 +227,14 @@ bool expression::expand_macros(
                   }
 
                   auto* m = e.as_macro_invocation();
-                  m->name.s = ld::make_import_name(
-                    m->name.s,
-                    type_ctx.is_transitive_import(
-                      m->get_namespace_path().value()));
+
+                  // TODO type context
+                  throw std::runtime_error("expand_macros");
+
+                  //   m->name.s = ld::make_import_name(
+                  //     m->name.s,
+                  //     type_ctx.is_transitive_import(
+                  //       m->get_namespace_path().value()));
               }
           },
           true,
@@ -308,7 +303,7 @@ void macro_invocation::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
+std::optional<ty::type_id> macro_invocation::type_check(ty::context& ctx, sema::env& env)
 {
     // Type checking for macros.
     if(!expansion)
@@ -325,29 +320,22 @@ std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
             return {};
         }
 
-        ctx.enter_anonymous_scope(get_location());
-
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
-            exprs[i]->type_check(ctx);
+            exprs[i]->type_check(ctx, env);
         }
 
-        auto expr_type = exprs.back()->type_check(ctx);
+        auto expr_type = exprs.back()->type_check(ctx, env);
         if(expr_type.has_value())
         {
-            ctx.set_expression_type(this, expr_type.value());
+            ctx.set_expression_type(*this, expr_type);
         }
-
-        ctx.exit_anonymous_scope();
 
         return expr_type;
     }
 
-    auto expr_type = expansion->type_check(ctx);
-    if(expr_type.has_value())
-    {
-        ctx.set_expression_type(this, expr_type.value());
-    }
+    auto expr_type = expansion->type_check(ctx, env);
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -444,7 +432,9 @@ std::unique_ptr<cg::value> macro_expression_list::generate_code(
     throw cg::codegen_error(loc, "Non-expanded macro expression list.");
 }
 
-std::optional<ty::type_info> macro_expression_list::type_check([[maybe_unused]] ty::context& ctx)
+std::optional<ty::type_id> macro_expression_list::type_check(
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
 {
     return std::nullopt;
 }
@@ -531,7 +521,9 @@ bool macro_expression::supports_directive(const std::string& name) const
            || name == "builtin";
 }
 
-std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::context& ctx)
+std::optional<ty::type_id> macro_expression::type_check(
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
 {
     // Check that all necessary imports exist in the type context.
 
@@ -554,35 +546,40 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
                       ::slang::to_string(e.get_location())));
               }
 
-              if(!ctx.has_import(namespace_path.value()))
-              {
-                  throw ty::type_error(
-                    loc,
-                    std::format(
-                      "Unresolved import '{}',",
-                      namespace_path.value()));
-              }
+              // TODO check imports.
+              throw std::runtime_error("macro_expression::type_check");
+
+              //   if(!ctx.has_import(namespace_path.value()))
+              //   {
+              //       throw ty::type_error(
+              //         loc,
+              //         std::format(
+              //           "Unresolved import '{}',",
+              //           namespace_path.value()));
+              //   }
           }
 
           if(e.is_call_expression())
           {
               // FIXME Add a `has_symbol` function.
-              ctx.get_function_signature(e.as_call_expression()->get_callee(), namespace_path);
+              //   ctx.get_function_signature(e.as_call_expression()->get_callee(), namespace_path);
+              throw std::runtime_error("macro_expression::type_check");
           }
           else if(e.is_macro_invocation())
           {
               // FIXME Add a `has_symbol` function.
-              if(!ctx.has_macro(e.as_macro_invocation()->get_name().s, namespace_path))
-              {
-                  throw ty::type_error(
-                    loc,
-                    std::format(
-                      "Unresolved symbol '{}{}',",
-                      namespace_path.has_value()
-                        ? std::format("{}::", namespace_path.value())
-                        : std::string{""},
-                      e.as_macro_invocation()->get_name().s));
-              }
+              //   if(!ctx.has_macro(e.as_macro_invocation()->get_name().s, namespace_path))
+              //   {
+              //       throw ty::type_error(
+              //         loc,
+              //         std::format(
+              //           "Unresolved symbol '{}{}',",
+              //           namespace_path.has_value()
+              //             ? std::format("{}::", namespace_path.value())
+              //             : std::string{""},
+              //           e.as_macro_invocation()->get_name().s));
+              //   }
+              throw std::runtime_error("macro_expression::type_check");
           }
       },
       false,

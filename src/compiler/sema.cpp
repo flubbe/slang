@@ -59,6 +59,16 @@ std::string to_string(symbol_type t)
 }
 
 /*
+ * symbol_id.
+ */
+
+archive& operator&(archive& ar, symbol_id& id)
+{
+    ar & id.value;
+    return ar;
+}
+
+/*
  * env.
  */
 
@@ -184,6 +194,39 @@ std::string to_string(const env& env)
               to_string(info.loc),
               info.name,
               info.qualified_name);
+        }
+    }
+
+    if(!env.transitive_imports.empty())
+    {
+        res +=
+          "\n"
+          "    Transitive Imports\n"
+          "    Symbol id\n"
+          "    -------------\n";
+
+        for(const auto& it: env.transitive_imports)
+        {
+            res += std::format(
+              "    {:>9}\n",
+              static_cast<int>(it.value));
+        }
+    }
+
+    if(!env.type_map.empty())
+    {
+        res +=
+          "\n"
+          "    Type map\n"
+          "    Symbol id    Type id\n"
+          "    ------------------------\n";
+
+        for(const auto& [symbol_id, type_id]: env.type_map)
+        {
+            res += std::format(
+              "    {:>9}    {:>7}\n",
+              static_cast<int>(symbol_id.value),
+              type_id);
         }
     }
 

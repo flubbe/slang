@@ -225,7 +225,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
     }
 
     get_next_token();
-    std::vector<std::pair<token, std::unique_ptr<ast::type_expression>>> args;
+    std::vector<std::tuple<token, sema::symbol_id, std::unique_ptr<ast::type_expression>>> args;
     while(true)
     {
         if(current_token->type != token_type::identifier)
@@ -245,7 +245,7 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         get_next_token();
 
         auto arg_type = parse_type();
-        args.emplace_back(std::move(arg_name), std::move(arg_type));
+        args.emplace_back(std::move(arg_name), sema::symbol_id::invalid, std::move(arg_type));
 
         if(current_token->s != ",")
         {
