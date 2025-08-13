@@ -180,11 +180,6 @@ void value::validate() const
     {
         throw codegen_error("Empty struct type.");
     }
-
-    if(ty::is_builtin_type(*ty.get_struct_name()))
-    {
-        throw codegen_error(std::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
-    }
 }
 
 std::string value::to_string() const

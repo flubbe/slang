@@ -1061,6 +1061,9 @@ class access_expression : public expression
     /** Struct type of the l.h.s. Set during type checking. */
     ty::type_id lhs_type;
 
+    /** Struct info. Set during type checking. */
+    std::optional<ty::struct_info> struct_info;
+
     /** Field index. */
     std::size_t field_index{0};
 
@@ -1160,6 +1163,20 @@ public:
     ty::type_id get_struct_type() const
     {
         return lhs_type;
+    }
+
+    /** Get struct info. */
+    [[nodiscard]]
+    const std::optional<ty::struct_info>& get_struct_info() const
+    {
+        return struct_info;
+    }
+
+    /** Get the field index. */
+    [[nodiscard]]
+    std::size_t get_field_index() const
+    {
+        return field_index;
     }
 };
 

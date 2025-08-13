@@ -912,6 +912,11 @@ std::optional<ty::type_id> access_expression::type_check(ty::context& ctx, sema:
             ctx.to_string(type.value())));
     }
 
+    if(ctx.is_struct(type.value()))
+    {
+        struct_info = ctx.get_struct_info(type.value());
+    }
+
     // get field.
     if(rhs->get_id() != node_identifier::variable_reference_expression)
     {
@@ -1238,7 +1243,7 @@ std::optional<ty::type_id> variable_reference_expression::type_check(ty::context
             throw ty::type_error(
               loc,
               std::format(
-                "'{}' has no symbol id.",
+                "Variable '{}' has no symbol id.",
                 name.s));
         }
 
@@ -1247,7 +1252,7 @@ std::optional<ty::type_id> variable_reference_expression::type_check(ty::context
             throw ty::type_error(
               loc,
               std::format(
-                "'{}' not in type map.",
+                "Variable '{}' not in type map.",
                 name.s));
         }
 
@@ -2099,53 +2104,49 @@ void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
 
 std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(ty::context& ctx, sema::env& env)
 {
-    // TODO
-    throw std::runtime_error("struct_anonymous_initializer_expression::type_check");
+    auto struct_type_id = ctx.get_type(name.s);
+    const ty::struct_info& info = ctx.get_struct_info(struct_type_id);
 
-    // const auto* struct_def = ctx.get_struct_definition(name.location, name.s, get_namespace_path());
+    if(initializers.size() != info.fields.size())
+    {
+        throw ty::type_error(
+          name.location,
+          std::format(
+            "Struct '{}' has {} members, but {} are initialized.",
+            name.s,
+            info.fields.size(),
+            initializers.size()));
+    }
 
-    // if(initializers.size() != struct_def->members.size())
-    // {
-    //     throw ty::type_error(
-    //       name.location,
-    //       std::format(
-    //         "Struct '{}' has {} members, but {} are initialized.",
-    //         name.s,
-    //         struct_def->members.size(),
-    //         initializers.size()));
-    // }
+    for(std::size_t i = 0; i < initializers.size(); ++i)
+    {
+        const auto& initializer = initializers[i];
+        const auto& field = info.fields[i];
 
-    // for(std::size_t i = 0; i < initializers.size(); ++i)
-    // {
-    //     const auto& initializer = initializers[i];
-    //     const auto& struct_member = struct_def->members[i];
+        auto initializer_type = initializer->type_check(ctx, env);
+        if(!initializer_type.has_value())
+        {
+            throw ty::type_error(initializer->get_location(), "Initializer has no type.");
+        }
 
-    //     auto initializer_type = initializer->type_check(ctx);
-    //     if(!initializer_type.has_value())
-    //     {
-    //         throw ty::type_error(initializer->get_location(), "Initializer has no type.");
-    //     }
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(!ctx.are_types_compatible(field.type, initializer_type.value()))
+        {
+            throw ty::type_error(
+              name.location,
+              std::format(
+                "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
+                name.s,
+                field.name,
+                ctx.to_string(field.type),
+                ctx.to_string(initializer_type.value())));
+        }
+    }
 
-    //     // Either the types match, or the type is a reference types which is set to 'null'.
-    //     if(struct_member.second != initializer_type
-    //        && !(ctx.is_reference_type(struct_member.second)
-    //             && initializer_type == ctx.get_type("@null", false)))
-    //     {
-    //         throw ty::type_error(
-    //           name.location,
-    //           std::format(
-    //             "Struct member '{}.{}' has type '{}', but initializer has type '{}'.",
-    //             name.s,
-    //             struct_member.first.s,
-    //             struct_member.second.to_string(),
-    //             initializer_type->to_string()));
-    //     }
-    // }
+    expr_type = struct_type_id;
+    ctx.set_expression_type(*this, expr_type);
 
-    // expr_type = ctx.get_type(name.s, false, get_namespace_path());
-    // ctx.set_expression_type(this, *expr_type);
-
-    // return expr_type;
+    return expr_type;
 }
 
 std::string struct_anonymous_initializer_expression::to_string() const
@@ -2547,9 +2548,6 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
      *    <binary-op>
      */
 
-    throw std::runtime_error("binary_expression::generate_code");
-
-#if 0
     std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
@@ -2691,12 +2689,37 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
 
         // by the above check, lhs is an access_expression.
         access_expression* ae_lhs = lhs->as_access_expression();
-        ty::type_info struct_type_info = ae_lhs->get_struct_type();
+        const std::optional<ty::struct_info>& struct_info = ae_lhs->get_struct_info();
+        if(!struct_info.has_value())
+        {
+            throw cg::codegen_error(
+              loc,
+              "No struct info available");
+        }
+        std::optional<std::string> import_path;
+        if(struct_info.value().qualified_name.has_value())
+        {
+            auto end = std::format("::{}", struct_info.value().name);
+            if(
+              !struct_info.value().qualified_name.value().ends_with(end)
+              || end.length() == struct_info.value().qualified_name.value().length())
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid qualified name '{}'.",
+                    struct_info.value().qualified_name.value()));
+            }
+            import_path = struct_info.value().qualified_name.value().substr(
+              0,
+              struct_info.value().qualified_name.value().length() - end.length());
+        }
+
         cg::type struct_type{
           cg::type_class::struct_,
           0,
-          struct_type_info.to_string(),
-          struct_type_info.get_import_path()};
+          struct_info.value().name,
+          import_path};
 
         ctx.generate_set_field(
           std::make_unique<cg::field_access_argument>(
@@ -2750,7 +2773,6 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
     }
 
     return lhs->generate_code(ctx, memory_context::store);
-#endif
 }
 
 void binary_expression::collect_names(co::context& ctx)
