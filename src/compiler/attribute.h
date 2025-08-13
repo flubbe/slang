@@ -32,6 +32,7 @@ class attribute_error : public std::runtime_error
 enum class attribute_kind
 {
     allow_cast, /** Allow casting from reference types. */
+    builtin,    /** Compiler built-in. */
     native      /** Native function. */
 };
 
@@ -61,5 +62,13 @@ struct attribute_info
  * @returns Returns the attribute kind, or `std::nullopt`.
  */
 std::optional<attribute_kind> get_attribute_kind(const std::string& name);
+
+/**
+ * Convert the attribute kind to a readable string.
+ *
+ * @param kind Attribute kind.
+ * @returns Returns a readable string.
+ */
+std::string to_string(attribute_kind kind);
 
 }    // namespace slang::attribs

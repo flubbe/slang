@@ -17,6 +17,7 @@
 
 #include "compiler/attribute.h"
 #include "compiler/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "shared/type_utils.h"
@@ -210,6 +211,24 @@ void expression::collect_attributes(sema::env& env) const
                                    return std::make_pair(p.first.s, p.second.s);
                                })
                              | std::ranges::to<std::vector>()});
+          }
+      },
+      false, /* don't visit this node */
+      false  /* pre-order traversal */
+    );
+}
+
+void expression::collect_macros(
+  sema::env& sema_env,
+  macro::env& macro_env) const
+{
+    visit_nodes(
+      [&sema_env, &macro_env](const expression& expr) -> void
+      {
+          // not a filter, since the filter also removes child nodes.
+          if(expr.get_id() == node_identifier::macro_expression)
+          {
+              static_cast<const macro_expression*>(&expr)->collect_macro(sema_env, macro_env);
           }
       },
       false, /* don't visit this node */
@@ -3594,22 +3613,45 @@ cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) 
 
 void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
 {
-    throw std::runtime_error("prototype_ast::generate_native_binding");
+    if(args.size() != arg_type_ids.size())
+    {
+        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
+    }
 
-    // if(args.size() != args_type_info.size())
-    // {
-    //     throw cg::codegen_error(loc, "Argument count differs from argument type count.");
-    // }
+    std::vector<std::unique_ptr<cg::value>> function_args;
+    function_args.reserve(args.size());
+    for(std::size_t i = 0; i < args.size(); ++i)
+    {
+        std::optional<std::size_t> rank{std::nullopt};
+        if(arg_type_info[i].second.kind == ty::type_kind::array)
+        {
+            rank = std::get<ty::array_info>(arg_type_info[i].second.data).rank;
+        }
 
-    // std::vector<std::unique_ptr<cg::value>> function_args;
-    // function_args.reserve(args.size());
-    // for(std::size_t i = 0; i < args.size(); ++i)
-    // {
-    //     function_args.emplace_back(type_info_to_value(args_type_info[i], args[i].first.s));
-    // }
+        function_args.emplace_back(
+          to_value(
+            arg_type_info[i].first,
+            arg_type_info[i].second.kind == ty::type_kind::builtin,
+            rank,
+            std::get<0>(args[i]).s,
+            std::nullopt /* TODO import path - maybe don't even store it here? */
+            ));
+    }
 
-    // std::unique_ptr<cg::value> ret = type_info_to_value(return_type_info);
-    // ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
+    std::optional<std::size_t> rank{std::nullopt};
+    if(return_type_info.second.kind == ty::type_kind::array)
+    {
+        rank = std::get<ty::array_info>(return_type_info.second.data).rank;
+    }
+
+    std::unique_ptr<cg::value> ret = to_value(
+      return_type_info.first,
+      return_type_info.second.kind == ty::type_kind::builtin,
+      rank,
+      std::nullopt,
+      std::nullopt /* TODO import path - maybe don't even store it here? */
+    );
+    ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::collect_names(co::context& ctx)

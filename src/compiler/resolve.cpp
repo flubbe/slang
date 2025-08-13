@@ -125,18 +125,12 @@ void context::resolve_imports(
         {
             if(symbol_it->second.qualified_name != info.qualified_name)
             {
-                throw std::runtime_error(
-                  std::format(
-                    "{}: '{}': A symbol with the same name already exists in symbol table. Declaration at: {}",
-                    to_string(info.loc),
-                    info.qualified_name,
-                    to_string(symbol_it->second.loc)));
-            }
-
-            if(env.transitive_imports.contains(symbol_it->first)
-               && !import_env.transitive_imports.contains(id))
-            {
-                env.transitive_imports.erase(symbol_it->first);
+                std::println(
+                  "{}: Warning: Import '{}' ('{}'): A symbol with the same name already exists in symbol table. Declaration at: {}",
+                  to_string(info.loc),
+                  info.name,
+                  info.qualified_name,
+                  to_string(symbol_it->second.loc));
             }
 
             continue;

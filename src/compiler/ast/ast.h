@@ -36,6 +36,15 @@ class value;
 }    // namespace slang::codegen
 
 /*
+ * Forward references for macro collection / expansion.
+ */
+
+namespace slang::macro
+{
+struct env;
+}    // namespace slang::macro
+
+/*
  * Forward declarations for name resolution.
  */
 namespace slang::resolve
@@ -369,6 +378,9 @@ public:
 
     /** Collect attributes. */
     void collect_attributes(sema::env& env) const;
+
+    /** Macro collection. */
+    void collect_macros(sema::env& sema_env, macro::env& macro_env) const;
 
     /** Function declarations. */
     void declare_functions(ty::context& ctx, sema::env& env);
@@ -3815,6 +3827,16 @@ public:
         }
         return exprs;
     }
+
+    /**
+     * Collect this macro into the macro environment.
+     *
+     * @param sema_env Semantic environment.
+     * @param macro_env Macro collection / expansion environment.
+     */
+    void collect_macro(
+      sema::env& sema_env,
+      macro::env& macro_env) const;
 
     /**
      * Expand the macro given a macro invocation.

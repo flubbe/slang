@@ -32,6 +32,7 @@ add_executable(slang
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
     src/compiler/location.cpp
+    src/compiler/macro.cpp
     src/compiler/opt/cfg.cpp
     src/compiler/parser.cpp
     src/compiler/resolve.cpp

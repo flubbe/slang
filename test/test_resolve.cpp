@@ -50,10 +50,17 @@ TEST(resolve, std)
         ld::context loader_ctx{mgr};
         sema::env env;
         co::context co_ctx{env};
+        rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
@@ -92,6 +99,10 @@ TEST(resolve, std)
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     }
@@ -124,7 +135,13 @@ TEST(resolve, std)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
 }

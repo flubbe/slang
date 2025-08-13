@@ -10,6 +10,7 @@
 
 #include "archives/archive.h"
 #include "compiler/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
@@ -474,37 +475,26 @@ void macro_expression::collect_names(
 {
     super::collect_names(ctx);
 
-    // TODO
-    // std::vector<std::pair<std::string, module_::directive_descriptor>> directives =
-    //   ctx.get_directives()
-    //   | std::views::transform(
-    //     [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
-    //     {
-    //         std::vector<std::pair<std::string, std::string>> args =
-    //           d.args
-    //           | std::views::transform(
-    //             [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
-    //             {
-    //                 return std::make_pair(arg.first.s, arg.second.s);
-    //             })
-    //           | std::ranges::to<std::vector>();
+    symbol_id = ctx.declare(
+      name.s,
+      std::format(
+        "{}::{}",
+        ctx.get_canonical_scope_name(ctx.get_current_scope()),
+        name.s),
+      sema::symbol_type::macro_definition,
+      name.location,
+      sema::symbol_id::invalid,
+      false,
+      this);
 
-    //         return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
-    //     })
-    //   | std::ranges::to<std::vector>();
+    ctx.push_scope(std::format("{}@macro", name.s), name.location);
 
-    // memory_write_archive ar{true, std::endian::little};
-    // auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
-    // ar& expression_serializer{cloned_expr};
+    for(auto& macro_branch: branches)
+    {
+        macro_branch->collect_names(ctx);
+    }
 
-    // ctx.add_macro(
-    //   name.s,
-    //   module_::macro_descriptor{
-    //     std::move(directives),
-    //     ar.get_buffer()},
-    //   get_namespace_path());
-
-    // type_ctx.add_macro(name.s, get_namespace_path());
+    ctx.pop_scope();
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(
@@ -602,6 +592,45 @@ std::string macro_expression::to_string() const
     }
     ret += "))";
     return ret;
+}
+
+void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env) const
+{
+    std::vector<std::pair<std::string, module_::directive_descriptor>> attributes;
+
+    // FIXME Module macro descriptors have to be updated.
+    if(sema_env.attribute_map.contains(symbol_id.value()))
+    {
+        attributes = sema_env.attribute_map[symbol_id.value()]
+                     | std::views::transform(
+                       [](const attribs::attribute_info& info) -> std::pair<std::string, module_::directive_descriptor>
+                       {
+                           if(info.kind == attribs::attribute_kind::builtin)
+                           {
+                               return std::make_pair(
+                                 attribs::to_string(info.kind),
+                                 module_::directive_descriptor{});
+                           }
+
+                           throw attribs::attribute_error(
+                             std::format(
+                               "{}: Attribute '{}' invalid for macro expressions.",
+                               ::slang::to_string(info.loc),
+                               attribs::to_string(info.kind)));
+                       })
+                     | std::ranges::to<std::vector>();
+    }
+
+    memory_write_archive ar{true, std::endian::little};
+    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
+    ar& expression_serializer{cloned_expr};
+
+    macro_env.add_macro(
+      name.s,
+      module_::macro_descriptor{
+        std::move(attributes),
+        ar.get_buffer()},
+      get_namespace_path());
 }
 
 /**

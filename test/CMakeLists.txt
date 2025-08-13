@@ -51,6 +51,7 @@ add_executable(test_parser
     ../src/compiler/collect.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -96,6 +97,7 @@ add_executable(test_compile_ir
     ../src/compiler/collect.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
@@ -127,6 +129,7 @@ add_executable(test_type_system
     ../src/compiler/collect.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -163,6 +166,7 @@ add_executable(test_resolve
     ../src/compiler/collect.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -201,6 +205,7 @@ add_executable(test_opt_cfg
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
@@ -239,6 +244,7 @@ add_executable(test_output
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -289,6 +295,7 @@ add_executable(test_ast_serialization
     ../src/compiler/collect.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp

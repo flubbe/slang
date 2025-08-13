@@ -13,6 +13,7 @@
 
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/macro.h"
 #include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
@@ -205,12 +206,16 @@ void compile::invoke(const std::vector<std::string>& args)
     co::context co_ctx{env};
     ty::context type_ctx;
     rs::context resolver_ctx{env};
+    macro::env macro_env;
     opt::cfg::context cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{codegen_ctx};
 
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
     ast->collect_names(co_ctx);
+    ast->resolve_names(resolver_ctx);
+    ast->collect_attributes(env);
+    ast->collect_macros(env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
@@ -218,8 +223,6 @@ void compile::invoke(const std::vector<std::string>& args)
             resolver_ctx.resolve_imports(loader_ctx);
         } while(ld::context::resolve_macros(codegen_ctx, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
-    ast->resolve_names(resolver_ctx);
-    ast->collect_attributes(env);
     ast->declare_types(type_ctx, env);
     ast->define_types(type_ctx);
     ast->declare_functions(type_ctx, env);
