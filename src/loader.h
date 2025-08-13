@@ -113,15 +113,9 @@ public:
      * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
      * @returns A reference to the resolved module.
      */
-    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
-
-    /**
-     * Resolve imports from a type context.
-     *
-     * @param ctx The code generation context.
-     * @param type_ctx The typing context.
-     */
-    void resolve_imports(cg::context& ctx, ty::context& type_ctx);
+    module_::module_resolver& resolve_module(
+      const std::string& import_name,
+      bool transitive);
 
     /**
      * Resolve macros.
@@ -133,7 +127,9 @@ public:
      * @param type_ctx The typing context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
-    static bool resolve_macros(cg::context& ctx, ty::context& type_ctx);
+    static bool resolve_macros(
+      cg::context& ctx,
+      ty::context& type_ctx);
 };
 
 }    // namespace slang::loader

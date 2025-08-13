@@ -20,7 +20,7 @@
 #include "archives/archive.h"
 #include "compiler/collect.h"
 #include "compiler/directive.h"
-#include "compiler/type.h"
+#include "compiler/typing.h"
 #include "node_ids.h"
 #include "utils.h"
 
@@ -34,14 +34,6 @@ class function;
 class type;
 class value;
 }    // namespace slang::codegen
-
-/*
- * Forward declarations for type checking.
- */
-namespace slang::typing
-{
-class context;
-}    // namespace slang::typing
 
 /*
  * Forward declarations for name resolution.
@@ -375,8 +367,17 @@ public:
     {
     }
 
+    /** Collect attributes. */
+    void collect_attributes(sema::env& env) const;
+
+    /** Function declarations. */
+    void declare_functions(ty::context& ctx, sema::env& env);
+
+    /** Type declaration. */
+    void declare_types(ty::context& ctx, sema::env& env);
+
     /** Type definition. */
-    virtual void define_types([[maybe_unused]] ty::context& ctx);
+    void define_types(ty::context& ctx) const;
 
     /**
      * Push a directive to the expression's directive stack (during code generation).
@@ -1147,6 +1148,13 @@ public:
         return lhs.get();
     }
 
+    /** Get the left-hand side expression. */
+    [[nodiscard]]
+    const expression* get_left_expression() const
+    {
+        return lhs.get();
+    }
+
     /** Return the accessed struct's type info. */
     [[nodiscard]]
     ty::type_id get_struct_type() const
@@ -1285,6 +1293,18 @@ public:
     {
         return {expr.get()};
     }
+
+    /** Return the target expression. */
+    expression* get_target();
+
+    /** Return the target expression. */
+    const expression* get_target() const;
+
+    /** Get the arguments. */
+    const std::vector<std::pair<token, token>>& get_args() const
+    {
+        return args;
+    }
 };
 
 /** Variable references. */
@@ -1357,6 +1377,12 @@ public:
     bool is_array_element_access() const override
     {
         return static_cast<bool>(element_expr);
+    }
+
+    [[nodiscard]]
+    expression* get_element_expression()
+    {
+        return element_expr.get();
     }
 
     [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
@@ -1716,6 +1742,9 @@ class struct_definition_expression : public named_expression
     /** The struct's members. */
     std::vector<std::unique_ptr<variable_declaration_expression>> members;
 
+    /** Type id filled in after type declaration. */
+    ty::type_id struct_type_id;
+
 public:
     /** Set the super class. */
     using super = named_expression;
@@ -1769,7 +1798,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    void define_types(ty::context& ctx) override;
     [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
@@ -1798,6 +1826,12 @@ public:
         }
         return children;
     }
+
+    /** Declare a struct. */
+    void declare_type(ty::context& ctx, sema::env& env);
+
+    /** Define a struct. */
+    void define_type(ty::context& ctx) const;
 };
 
 /** Anonymous struct initialization. */
@@ -2463,8 +2497,19 @@ class prototype_ast
     /** Argument type info. Set during type checking. */
     std::vector<ty::type_id> arg_type_ids;
 
+    /** Argument type info. */
+    std::vector<
+      std::pair<std::string,    /* base type*/
+                ty::type_info>> /* type info */
+      arg_type_info;
+
     /** Return type info. Set during type checking. */
     ty::type_id return_type_id;
+
+    /** Return type info. */
+    std::pair<std::string,   /* base type */
+              ty::type_info> /* type info */
+      return_type_info;
 
 public:
     /** Default constructor. */
@@ -2524,8 +2569,15 @@ public:
     [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
     void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(co::context& ctx);
-    void type_check(ty::context& ctx, sema::env& env);
     [[nodiscard]] std::string to_string() const;
+
+    /**
+     * Declare the function. Sets up the type information.
+     *
+     * @param ctx The type context.
+     * @param env The semantic environment.
+     */
+    void declare(ty::context& ctx, sema::env& env);
 
     /** Return the function name. */
     [[nodiscard]]
@@ -2541,11 +2593,25 @@ public:
         return arg_type_ids;
     }
 
+    /** Get the argument type info vector. */
+    [[nodiscard]]
+    const std::vector<std::pair<std::string, ty::type_info>>& get_arg_type_info() const
+    {
+        return arg_type_info;
+    }
+
     /** Return the return type id. */
     [[nodiscard]]
     ty::type_id get_return_type_id() const
     {
         return return_type_id;
+    }
+
+    /** Get the return type info. */
+    [[nodiscard]]
+    const std::pair<std::string, ty::type_info>& get_return_type_info() const
+    {
+        return return_type_info;
     }
 };
 
@@ -2725,6 +2791,14 @@ public:
         }
         return {};
     }
+
+    /**
+     * Declare the function.
+     *
+     * @param ctx The type context.
+     * @param env The semantic environment.
+     */
+    void declare_function(ty::context& ctx, sema::env& env);
 
     /** Return the argument type id vector. */
     [[nodiscard]]

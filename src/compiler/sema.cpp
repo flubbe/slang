@@ -122,6 +122,32 @@ std::optional<symbol_id> env::get_symbol_id(
     return std::nullopt;
 }
 
+void env::attach_attribute(
+  symbol_id id,
+  attribute_info attrib)
+{
+    attribute_map[id].emplace_back(std::move(attrib));
+}
+
+bool env::has_attribute(
+  symbol_id id,
+  attribute_kind kind)
+{
+    auto it = attribute_map.find(id);
+    if(it == attribute_map.end())
+    {
+        return false;
+    }
+
+    return std::ranges::find_if(
+             it->second,
+             [kind](const attribute_info& attrib) -> bool
+             {
+                 return attrib.kind == kind;
+             })
+           != it->second.end();
+}
+
 std::string to_string(const env& env)
 {
     std::string res = std::format(

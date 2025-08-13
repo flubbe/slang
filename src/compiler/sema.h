@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <variant>
 
+#include "attribute.h"
 #include "location.h"
 #include "type.h"
 
@@ -32,11 +33,8 @@ struct exported_symbol; /* module.h */
 namespace slang::sema
 {
 
-/** A semantic error. */
-class semantic_error : public std::runtime_error
-{
-    using std::runtime_error::runtime_error;
-};
+using slang::attribs::attribute_info;
+using slang::attribs::attribute_kind;
 
 /** Symbol type. */
 enum class symbol_type : std::uint8_t
@@ -209,6 +207,13 @@ struct env
     /** Symbol-type bindings. */
     std::unordered_map<symbol_id, typing::type_id, symbol_id::hash> type_map;
 
+    /** Attributes. */
+    std::unordered_map<
+      symbol_id,
+      std::vector<attribute_info>,
+      symbol_id::hash>
+      attribute_map;
+
     /** Current function return type. */
     std::optional<typing::type_id> current_function_return_type{std::nullopt};
 
@@ -241,6 +246,38 @@ struct env
       const std::string& name,
       symbol_type type,
       scope_id id) const;
+
+    /**
+     * Add attribute.
+     *
+     * @param id Symbol id to attach the attributes to.
+     * @param attrib The attribute to attach.
+     */
+    void attach_attribute(
+      symbol_id id,
+      attribute_info attrib);
+
+    /**
+     * Return `true` if an attribute exists on a symbol.
+     *
+     * @param id Symbol id.
+     * @param kind The attribute kind.
+     * @returns Returns whether an attribute exists on a symbol.
+     */
+    bool has_attribute(
+      symbol_id id,
+      attribute_kind kind);
+
+    /**
+     * Return the value of an attribute.
+     *
+     * @param id Symbol id.
+     * @param kind The attribute kind.
+     * @returns Returns the payload/value of an attribute.
+     */
+    std::string get_attribute(
+      symbol_id id,
+      attribute_kind kind);
 };
 
 /**

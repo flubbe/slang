@@ -116,6 +116,9 @@ struct struct_info
 
     /** Sealed after definition. */
     bool is_sealed{false};
+
+    /** Whether to allow casts from any non-primitive type. */
+    bool allow_cast{false};
 };
 
 /** Type info. */
@@ -231,27 +234,39 @@ public:
      * @returns Returns the associated `struct_info`.
      * @throws Throws a `type_error` if the id was not a struct.
      */
+    struct_info& get_struct_info(type_id id);
+
+    /**
+     * Get the struct info.
+     *
+     * @param id The struct type id.
+     * @returns Returns the associated `struct_info`.
+     * @throws Throws a `type_error` if the id was not a struct.
+     */
     const struct_info& get_struct_info(type_id id) const;
 
     /**
-     * Get a struct's field type id by index.
+     * Get a struct's field type id by index (including array-related properties).
      *
      * @param struct_id The struct type id.
      * @param index Field index.
      * @returns Returns a type id for a field.
      */
-    type_id get_field(type_id struct_id, std::size_t index) const;
+    type_id get_field_type(
+      type_id struct_id,
+      std::size_t index) const;
 
     /**
-     * Get a struct's field index by name.
+     * Get a struct's field index by name (including array-related properties
+     * like `length`).
      *
-     * @param struct_id The struct type id.
+     * @param struct_type_id The struct type id.
      * @param field_name The field's name.
      * @returns Returns the index of the field.
      */
     std::size_t get_field_index(
-      type_id struct_id,
-      const std::string& field_name);
+      type_id struct_type_id,
+      const std::string& field_name) const;
 
     /**
      * Get the id of an existing type.
@@ -260,10 +275,19 @@ public:
      * @returns Returns the type id.
      * @throws Throws a `type_error` if the type is not known.
      */
-    type_id get_type(const std::string& name);
+    type_id get_type(const std::string& name) const;
 
     /**
-     * Get the base type for an array.
+     * Get the full type info for an existing type.
+     *
+     * @param id The type id.
+     * @returns Returns the type info.
+     * @throws Throws a `type_error` if the type is not known.
+     */
+    type_info get_type_info(type_id id) const;
+
+    /**
+     * Get the base type for a type.
      *
      * @param id The type id.
      * @returns Returns the type id of the base type.
@@ -272,11 +296,11 @@ public:
     type_id get_base_type(type_id id) const;
 
     /**
-     * Get the rank of an array type.
+     * Get the array rank of a type.
      *
      * @param id The type id.
-     * @returns Returns the rank of the array.
-     * @throws Throws a `type_error` if the type was not an array type.
+     * @returns Returns the rank of the array. Return 0 for non-array types.
+     * @throws Throws a `type_error` if the type id could not be found.
      */
     std::size_t get_array_rank(type_id id) const;
 
@@ -331,6 +355,14 @@ public:
      * @returns Returns whether a type is nullable.
      */
     bool is_nullable(type_id id) const;
+
+    /**
+     * Check if a type is a reference.
+     *
+     * @param id The type id to check.
+     * @returns Returns whether a type is a reference.
+     */
+    bool is_reference(type_id id) const;
 
     /**
      * Check if the type is an array type.

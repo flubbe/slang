@@ -99,8 +99,6 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
                 name.s));
         }
     }
-
-    std::println("resolve_names: variable reference {} (scope id: {}) resolved to symbol id {}.", name.s, scope_id.value_or(-1), symbol_id.value().value);
 }
 
 /*
@@ -277,8 +275,6 @@ void call_expression::resolve_names(rs::context& ctx)
             name,
             callee.s));
     }
-
-    std::println("resolve_names: function call {} (scope id: {}) resolved to symbol id {}.", callee.s, scope_id.value_or(-1), symbol_id.value().value);
 
     std::ranges::for_each(
       args,

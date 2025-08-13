@@ -1144,36 +1144,30 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 //                     | '(' identifier 'as' type_expr ')' '.' access_expression
 std::unique_ptr<ast::expression> parser::parse_access_expression(std::unique_ptr<ast::expression> lhs)
 {
-    if(current_token->type != token_type::identifier)
+    while(true)
     {
-        throw syntax_error(*current_token, "Expected <identifier>.");
-    }
+        if(current_token->type != token_type::identifier)
+        {
+            throw syntax_error(*current_token, "Expected <identifier>.");
+        }
 
-    token identifier = *current_token;
-    get_next_token();
+        token identifier = *current_token;
 
-    if(current_token->s == "as")
-    {
-        // type cast.
-        return parse_type_cast_expression(
-          std::make_unique<ast::access_expression>(std::move(lhs),
-                                                   std::make_unique<ast::variable_reference_expression>(
-                                                     std::move(identifier))));
-    }
+        get_next_token();
 
-    if(current_token->s == ".")
-    {
-        get_next_token();    // skip '.'
-
-        // nested access.
-        return std::make_unique<ast::access_expression>(
+        lhs = std::make_unique<ast::access_expression>(
           std::move(lhs),
-          parse_access_expression(
-            std::make_unique<ast::variable_reference_expression>(std::move(identifier))));
+          std::make_unique<ast::variable_reference_expression>(std::move(identifier)));
+
+        if(current_token->s != ".")
+        {
+            break;
+        }
+
+        get_next_token();
     }
 
-    return std::make_unique<ast::access_expression>(
-      std::move(lhs), std::make_unique<ast::variable_reference_expression>(std::move(identifier)));
+    return lhs;
 }
 
 // literal_expression ::= int_literal | fp_literal | string_literal

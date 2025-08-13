@@ -22,9 +22,9 @@ namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace ld = slang::loader;
+namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
 
 namespace
 {
@@ -776,8 +776,12 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
@@ -808,7 +812,7 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
@@ -840,8 +844,12 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
     {
@@ -872,7 +880,7 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
@@ -904,7 +912,7 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
@@ -936,7 +944,7 @@ TEST(type_system, arrays)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
@@ -1044,8 +1052,11 @@ TEST(type_system, structs)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
@@ -1076,8 +1087,11 @@ TEST(type_system, structs)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
@@ -1106,8 +1120,11 @@ TEST(type_system, structs)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
@@ -1136,8 +1153,11 @@ TEST(type_system, structs)
         cg::context codegen_ctx;
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }
@@ -1169,10 +1189,13 @@ TEST(type_system, function_calls)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1199,10 +1222,13 @@ TEST(type_system, function_calls)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1229,9 +1255,12 @@ TEST(type_system, function_calls)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
     {
@@ -1259,10 +1288,13 @@ TEST(type_system, function_calls)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1290,10 +1322,13 @@ TEST(type_system, function_calls)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }
 
@@ -1323,6 +1358,7 @@ TEST(type_system, return_expressions)
 
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
+        EXPECT_NO_THROW(ast->declare_types(type_ctx, env));
         EXPECT_NO_THROW(ast->define_types(type_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
@@ -1348,10 +1384,13 @@ TEST(type_system, return_expressions)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1379,10 +1418,13 @@ TEST(type_system, return_expressions)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }
 
@@ -1412,10 +1454,13 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1441,9 +1486,12 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
     {
@@ -1472,10 +1520,13 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1503,9 +1554,12 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
     {
@@ -1534,10 +1588,13 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1565,9 +1622,12 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
         EXPECT_THROW(ast->type_check(type_ctx, env), ty::type_error);
     }
     {
@@ -1596,10 +1656,13 @@ TEST(type_system, element_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
-        EXPECT_NO_THROW(ast->define_types(type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }
 
@@ -1625,10 +1688,16 @@ TEST(type_system, examples)
 
         sema::env env;
         co::context co_ctx{env};
+        rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1652,10 +1721,16 @@ TEST(type_system, examples)
 
         sema::env env;
         co::context co_ctx{env};
+        rs::context resolver_ctx{env};
         ty::context type_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
     {
         const std::string test_input =
@@ -1684,12 +1759,21 @@ TEST(type_system, examples)
         ld::context loader_ctx{mgr};
         sema::env env;
         co::context co_ctx{env};
+        rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
-        EXPECT_NO_THROW(ast->type_check(type_ctx, env));
+        // necessary since we're not using the module loader.
+        ASSERT_NO_THROW(loader_ctx.resolve_module("std", false));
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }
 
@@ -1723,15 +1807,14 @@ TEST(type_system, native_binding)
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
-        slang::file_manager mgr;
-        ld::context loader_ctx{mgr};
         sema::env env;
         co::context co_ctx{env};
+        rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
 
-        EXPECT_NO_THROW(ast->collect_names(co_ctx));
-        EXPECT_NO_THROW(loader_ctx.resolve_imports(codegen_ctx, type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, env));
     }
 }

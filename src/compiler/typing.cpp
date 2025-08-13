@@ -232,7 +232,149 @@ void context::seal_struct(type_id struct_type_id)
     info.is_sealed = true;
 }
 
-type_id context::get_type(const std::string& name)
+struct_info& context::get_struct_info(type_id struct_type_id)
+{
+    auto it = type_info_map.find(struct_type_id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "No type with id '{}' found.",
+            struct_type_id));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get field for non-struct type '{}'.",
+            to_string(it->first)));
+    }
+
+    return std::get<struct_info>(it->second.data);
+}
+
+const struct_info& context::get_struct_info(type_id struct_type_id) const
+{
+    auto it = type_info_map.find(struct_type_id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "No type with id '{}' found.",
+            struct_type_id));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get field for non-struct type '{}'.",
+            to_string(it->first)));
+    }
+
+    return std::get<struct_info>(it->second.data);
+}
+
+type_id context::get_field_type(
+  type_id struct_type_id,
+  std::size_t field_index) const
+{
+    auto it = type_info_map.find(struct_type_id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "No type with id '{}' found.",
+            struct_type_id));
+    }
+
+    // Special case: arrays.
+    if(is_array(struct_type_id))
+    {
+        if(field_index == 0)
+        {
+            // length property.
+            return get_i32_type();
+        }
+
+        throw type_error(
+          std::format(
+            "Field index {} out of range (0-0).",
+            field_index));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get field for non-struct type '{}'.",
+            to_string(it->first)));
+    }
+
+    auto& info = std::get<struct_info>(it->second.data);
+    if(field_index >= info.fields.size())
+    {
+        throw type_error(
+          std::format(
+            "Field index {} out of range (0-{}).",
+            field_index,
+            info.fields.size()));
+    }
+
+    return info.fields[field_index].type;
+}
+
+std::size_t context::get_field_index(
+  type_id struct_type_id,
+  const std::string& name) const
+{
+    auto it = type_info_map.find(struct_type_id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "No type with id '{}' found.",
+            struct_type_id));
+    }
+
+    // Special case: arrays.
+    if(is_array(struct_type_id))
+    {
+        if(name == "length")
+        {
+            return 0;
+        }
+
+        throw type_error(
+          std::format(
+            "Unknown array property '{}'.",
+            name));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get field for non-struct type '{}'.",
+            to_string(it->first)));
+    }
+
+    auto& info = std::get<struct_info>(it->second.data);
+    auto field_it = info.fields_by_name.find(name);
+    if(field_it == info.fields_by_name.end())
+    {
+        throw type_error(
+          std::format(
+            "No field '{}' found in struct '{}'.",
+            name,
+            info.name));
+    }
+
+    return field_it->second;
+}
+
+type_id context::get_type(const std::string& name) const
 {
     // TODO Qualified names?
 
@@ -254,6 +396,20 @@ type_id context::get_type(const std::string& name)
     return it->first;
 }
 
+type_info context::get_type_info(type_id id) const
+{
+    auto it = type_info_map.find(id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "Type with id '{}' not found.",
+            id));
+    }
+
+    return it->second;
+}
+
 type_id context::get_base_type(type_id id) const
 {
     auto it = type_info_map.find(id);
@@ -265,15 +421,12 @@ type_id context::get_base_type(type_id id) const
             id));
     }
 
-    if(it->second.kind == type_kind::array)
+    if(it->second.kind != type_kind::array)
     {
-        throw type_error(
-          std::format(
-            "Inconsistent type map: Type with id {} is an array of arrays.",
-            id));
+        return id;
     }
 
-    return it->first;
+    return std::get<array_info>(it->second.data).element_type_id;
 }
 
 std::size_t context::get_array_rank(type_id id) const
@@ -287,12 +440,9 @@ std::size_t context::get_array_rank(type_id id) const
             id));
     }
 
-    if(it->second.kind == type_kind::array)
+    if(it->second.kind != type_kind::array)
     {
-        throw type_error(
-          std::format(
-            "Inconsistent type map: Type with id {} is an array of arrays.",
-            id));
+        return 0;
     }
 
     return std::get<array_info>(it->second.data).rank;
@@ -362,6 +512,14 @@ bool context::is_nullable(type_id id) const
     return id != void_type && id != i32_type && id != f32_type;
 }
 
+bool context::is_reference(type_id id) const
+{
+    return id == get_null_type()
+           || id == get_str_type()
+           || is_array(id)
+           || is_struct(id);
+}
+
 bool context::is_array(type_id id) const
 {
     auto it = type_info_map.find(id);
@@ -408,6 +566,16 @@ bool context::are_types_compatible(type_id expected, type_id actual) const
     if(actual == null_type)
     {
         return is_nullable(expected);
+    }
+
+    // check for sink types.
+    if(is_struct(expected) && is_reference(actual))
+    {
+        auto info = get_type_info(expected);
+        if(std::get<struct_info>(info.data).allow_cast)
+        {
+            return true;
+        }
     }
 
     return false;

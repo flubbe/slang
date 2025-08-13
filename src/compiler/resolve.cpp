@@ -95,15 +95,13 @@ void context::resolve_imports(
 
         for(const auto& it: header.exports)
         {
-            std::print("loader: {} ({}, transitive: {})\n", it.name, to_string(it.type), transitive_import);
-
             auto qualified_name =
               std::format(
                 "{}::{}",
                 info.qualified_name,
                 it.name);
 
-            auto new_id = import_collector.declare(
+            import_collector.declare(
               it.name,
               qualified_name,
               to_sema_symbol_type(it.type),
@@ -111,11 +109,7 @@ void context::resolve_imports(
               id,
               transitive_import,
               &it);
-
-            std::print("new_id: {}\n", new_id.value);
         }
-
-        std::println("resolve_imports: {}, qualified name: {}", info.name, info.qualified_name);
     }
 
     // Move symbols into semantic environment.
@@ -133,7 +127,8 @@ void context::resolve_imports(
             {
                 throw std::runtime_error(
                   std::format(
-                    "'{}': A symbol with the same name already exists in symbol table. Declaration at: {}",
+                    "{}: '{}': A symbol with the same name already exists in symbol table. Declaration at: {}",
+                    to_string(info.loc),
                     info.qualified_name,
                     to_string(symbol_it->second.loc)));
             }
@@ -146,11 +141,6 @@ void context::resolve_imports(
 
             continue;
         }
-
-        std::println(
-          "resolve_imports: moving {} (transitive: {})",
-          info.qualified_name,
-          import_env.transitive_imports.contains(id));
 
         env.symbol_table.insert({id, info});
 
@@ -191,8 +181,6 @@ void context::resolve_imports(
 
     env.next_scope_id = import_env.next_scope_id;
     env.next_symbol_id = import_env.next_symbol_id;
-
-    std::print("{}\n", to_string(env));
 }
 
 }    // namespace slang::resolve
