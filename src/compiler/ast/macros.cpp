@@ -32,6 +32,7 @@ namespace slang::ast
 bool expression::expand_macros(
   cg::context& codegen_ctx,
   ty::context& type_ctx,
+  macro::env& macro_env,
   const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count{0};
@@ -44,8 +45,9 @@ bool expression::expand_macros(
 
     // replace macro nodes by the macro AST.
     auto macro_expansion_visitor =
-      [&macro_asts,
-       &codegen_ctx,
+      [&codegen_ctx,
+       &macro_env,
+       &macro_asts,
        &macro_expansion_count,
        &expanded_imported_macros](expression& e)
     {
@@ -99,8 +101,8 @@ bool expression::expand_macros(
         else
         {
             // expand imported macro.
-            auto* m = codegen_ctx.get_macro(
-              macro_expr->get_name(),
+            auto* m = macro_env.get_macro(
+              macro_expr->get_name().s,
               macro_expr->get_namespace_path());
 
             // check for built-in macros.

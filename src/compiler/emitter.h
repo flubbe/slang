@@ -26,6 +26,11 @@ class instruction;
 class function;
 }    // namespace slang::codegen
 
+namespace slang::macro
+{
+struct env;
+}    // namespace slang::macro
+
 namespace slang
 {
 
@@ -144,10 +149,19 @@ public:
     void write(module_::language_module& mod) const;
 };
 
+/**
+ * The instruction emitter is (right now) the last pass in the compilation
+ * process. It emits instructions (hence the name), but also emits a full
+ * module description, including macro definitions. In future iterations,
+ * this might be split into two passes.
+ */
 class instruction_emitter
 {
     /** The associated codegen context. */
     cg::context& ctx;
+
+    /** The associated macro environment. */
+    macro::env& macro_env;
 
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
@@ -167,7 +181,8 @@ protected:
     std::set<std::string> collect_jump_targets() const;
 
     /**
-     * Collect imports by inspecting the instructions `invoke` and `new`.
+     * Collect imports by inspecting the instructions `invoke` and `new`,
+     * and macros.
      */
     void collect_imports();
 
@@ -195,9 +210,13 @@ public:
      * Construct an instruction emitter.
      *
      * @param ctx A codegen context.
+     * @param macro_env The macro environment.
      */
-    explicit instruction_emitter(cg::context& ctx)
+    instruction_emitter(
+      cg::context& ctx,
+      macro::env& macro_env)
     : ctx{ctx}
+    , macro_env{macro_env}
     , instruction_buffer{false, std::endian::little}
     {
     }

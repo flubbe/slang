@@ -12,8 +12,8 @@
 
 #include <any>
 #include <cstring>
-#include <exception>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>

@@ -208,7 +208,7 @@ void compile::invoke(const std::vector<std::string>& args)
     rs::context resolver_ctx{env};
     macro::env macro_env;
     opt::cfg::context cfg_context{codegen_ctx};
-    slang::instruction_emitter emitter{codegen_ctx};
+    slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
@@ -221,8 +221,8 @@ void compile::invoke(const std::vector<std::string>& args)
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
             resolver_ctx.resolve_imports(loader_ctx);
-        } while(ld::context::resolve_macros(codegen_ctx, type_ctx));
-    } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
+        } while(ld::context::resolve_macros(macro_env, type_ctx));
+    } while(ast->expand_macros(codegen_ctx, type_ctx, macro_env, module_macro_asts));
     ast->declare_types(type_ctx, env);
     ast->define_types(type_ctx);
     ast->declare_functions(type_ctx, env);

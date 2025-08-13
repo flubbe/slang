@@ -30,6 +30,11 @@ namespace slang::codegen
 class context;
 }    // namespace slang::codegen
 
+namespace slang::macro
+{
+struct env;
+}    // namespace slang::macro
+
 namespace slang::loader
 {
 
@@ -123,12 +128,12 @@ public:
      * @note Macro resolution might lead to additional imports being needed. That is,
      *       if the function returns `true`, import resolution needs to be run.
      *
-     * @param ctx The code generation context.
+     * @param env Macro collection / expansion environment.
      * @param type_ctx The typing context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
     static bool resolve_macros(
-      cg::context& ctx,
+      macro::env& env,
       ty::context& type_ctx);
 };
 

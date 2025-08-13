@@ -16,6 +16,7 @@
 #include "archives/file.h"
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
@@ -71,7 +72,8 @@ TEST(output, native_binding)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -249,7 +251,8 @@ TEST(output, emitter)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -300,7 +303,8 @@ TEST(output, hello_world)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -342,7 +346,8 @@ TEST(output, hello_world)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -404,7 +409,8 @@ TEST(output, operators)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -443,7 +449,8 @@ TEST(output, operators)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -488,7 +495,8 @@ TEST(output, string_operations)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -527,7 +535,8 @@ TEST(output, string_operations)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -591,7 +600,8 @@ TEST(output, prefix_postfix)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -660,7 +670,8 @@ TEST(output, control_flow)
     rs::context resolver_ctx{env};
     ty::context type_ctx;
     cg::context codegen_ctx;
-    slang::instruction_emitter emitter{codegen_ctx};
+    slang::macro::env macro_env;
+    slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -709,7 +720,8 @@ TEST(output, loops)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -767,7 +779,8 @@ TEST(output, loops)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -809,7 +822,8 @@ TEST(output, infinite_recursion)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -858,7 +872,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -935,7 +950,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -974,7 +990,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1006,7 +1023,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1038,7 +1056,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1075,7 +1094,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1141,7 +1161,8 @@ TEST(output, arrays)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1197,7 +1218,8 @@ TEST(output, return_discard)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1253,7 +1275,8 @@ TEST(output, return_discard)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1296,7 +1319,8 @@ TEST(output, return_discard)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1338,7 +1362,8 @@ TEST(output, missing_return)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1378,7 +1403,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1422,7 +1448,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1473,7 +1500,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1515,7 +1543,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1558,7 +1587,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1602,7 +1632,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1648,7 +1679,8 @@ TEST(output, structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1696,7 +1728,8 @@ TEST(output, nested_structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1749,7 +1782,8 @@ TEST(output, nested_structs)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1798,7 +1832,8 @@ TEST(output, type_imports)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1841,7 +1876,8 @@ TEST(output, null_assignment)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1879,7 +1915,8 @@ TEST(output, null_access)
         rs::context resolver_ctx{env};
         ty::context type_ctx;
         cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        slang::macro::env macro_env;
+        slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
@@ -1928,7 +1965,8 @@ TEST(output, multiple_modules)
             rs::context resolver_ctx{env};
             ty::context type_ctx;
             cg::context codegen_ctx;
-            slang::instruction_emitter emitter{codegen_ctx};
+            slang::macro::env macro_env;
+            slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
             ASSERT_NO_THROW(ast->collect_names(co_ctx));
             ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));

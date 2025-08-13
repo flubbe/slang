@@ -11,6 +11,7 @@
 #include "archives/memory.h"
 #include "compiler/ast/ast.h"
 #include "compiler/ast/node_registry.h"
+#include "compiler/macro.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "codegen.h"
@@ -387,7 +388,7 @@ void instruction_emitter::collect_imports()
         }
     }
 
-    for(auto& m: ctx.macros)
+    for(const auto& m: macro_env.macros)
     {
         const auto& desc = m->get_desc();
         if(!desc.serialized_ast.has_value())
@@ -575,7 +576,7 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
         }
         vle_int index{
           utils::numeric_cast<std::int64_t>(
-            func->get_scope()->get_index(*v->get_name()))};
+            func->get_scope()->get_index(v->get_name().value()))};
 
         if(v->get_type().is_array())
         {
@@ -1246,7 +1247,7 @@ void instruction_emitter::run()
     // exported constants.
     for(std::size_t i = 0; i < ctx.constants.size(); ++i)
     {
-        auto& c = ctx.constants[i];
+        const auto& c = ctx.constants[i];
         if(!c.add_to_exports)
         {
             continue;
@@ -1256,11 +1257,11 @@ void instruction_emitter::run()
             throw emitter_error("Cannot export a constant without a name.");
         }
 
-        exports.add_constant(*c.name, i);
+        exports.add_constant(c.name.value(), i);
     }
 
     // exported types.
-    for(auto& it: ctx.types)
+    for(const auto& it: ctx.types)
     {
         if(it->is_import())
         {
@@ -1289,7 +1290,7 @@ void instruction_emitter::run()
     }
 
     // exported functions.
-    for(auto& f: ctx.funcs)
+    for(const auto& f: ctx.funcs)
     {
         auto [signature_ret_type, signature_arg_types] = f->get_signature();
         module_::variable_type return_type = {
@@ -1331,7 +1332,7 @@ void instruction_emitter::run()
     }
 
     // exported macros.
-    for(auto& m: ctx.macros)
+    for(const auto& m: macro_env.macros)
     {
         if(m->is_import())
         {

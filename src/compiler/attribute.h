@@ -10,8 +10,8 @@
 
 #pragma once
 
-#include <exception>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <variant>
 

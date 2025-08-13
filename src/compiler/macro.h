@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -19,11 +20,13 @@
 namespace slang::macro
 {
 
-/**
- * A macro.
- *
- * FIXME Duplicated from codegen, should be removed there.
- */
+/** A generic error during macro processing. */
+class macro_error : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
+/** A macro. */
 class macro
 {
     /** The macro name. */
@@ -118,19 +121,13 @@ public:
 /** Macro collection / expansion environment. */
 struct env
 {
-    /**
-     * List of macros.
-     *
-     * FIXME Duplicated from codegen context, should be removed there.
-     */
+    /** List of macros. */
     std::vector<std::unique_ptr<macro>> macros;
 
     /**
      * Add a macro definition.
      *
-     * FIXME The wrong error type is thrown. Should be a variation of a redefinition error.
-     *
-     * @throws Throws a `std::runtime_error` if the macro already exists.
+     * @throws Throws a `macro_error` if the macro already exists.
      * @param name The macro name.
      * @param desc The macro descriptor.
      * @param import_path Import path of the macro, or `std::nullopt`.
@@ -138,6 +135,17 @@ struct env
     void add_macro(
       std::string name,
       module_::macro_descriptor desc,
+      std::optional<std::string> import_path);
+
+    /**
+     * Get a macro.
+     *
+     * @throws Throws a `macro_error` if the macro is not found.
+     * @param name The macro name.
+     * @param import_path Import path of the macro, or `std::nullopt`.
+     */
+    macro* get_macro(
+      const std::string& name,
       std::optional<std::string> import_path);
 };
 

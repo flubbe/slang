@@ -427,12 +427,14 @@ public:
      *
      * @param codegen_ctx Code generation context.
      * @param type_ctx Type system context.
+     * @param macro_env Macro collection / expansion environment.
      * @param macro_asts The module's macros as AST's.
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
     bool expand_macros(
       cg::context& codegen_ctx,
       ty::context& type_ctx,
+      macro::env& macro_env,
       const std::vector<expression*>& macro_asts);
 
     /**

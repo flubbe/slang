@@ -14,6 +14,7 @@
 #include "compiler/ast/ast.h"
 #include "compiler/ast/node_registry.h"
 #include "compiler/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/type_utils.h"
 #include "package.h"
@@ -92,11 +93,11 @@ module_::module_resolver& context::resolve_module(
     return slang::loader::resolve_module(file_mgr, resolvers, import_name, transitive);
 }
 
-bool context::resolve_macros(cg::context& ctx, ty::context& type_ctx)
+bool context::resolve_macros(macro::env& env, ty::context& type_ctx)
 {
     bool needs_import_resolution = false;
 
-    for(auto& m: ctx.get_macros())
+    for(auto& m: env.macros)
     {
         const auto& desc = m->get_desc();
         if(!desc.serialized_ast.has_value())
