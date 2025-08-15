@@ -13,14 +13,18 @@
 #include "compiler/ast/node_registry.h"
 #include "compiler/codegen.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "archives/file.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
-namespace ty = slang::typing;
+namespace co = slang::collect;
+namespace ld = slang::loader;
 namespace rs = slang::resolve;
+namespace sema = slang::sema;
+namespace ty = slang::typing;
 
 namespace
 {
@@ -42,16 +46,23 @@ void run_test(
     mgr.add_search_path(".");
     mgr.add_search_path("lang");
 
+    ld::context loader_ctx{mgr};
+    sema::env env;
+    co::context co_ctx{env};
+    rs::context resolver_ctx{env};
     ty::context type_ctx;
-    rs::context resolve_ctx{mgr};
-    cg::context codegen_ctx;
+    cg::context codegen_ctx{env};
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
 
     {
         slang::file_write_archive write_ar{filename};

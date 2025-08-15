@@ -10,27 +10,47 @@
 
 #include <format>
 
+#include "compiler/typing.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "shared/type_utils.h"
 #include "ast/ast.h"
 #include "codegen.h"
-#include "resolve.h"
+#include "loader.h"
 #include "utils.h"
 
 namespace slang::codegen
 {
 
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 /*
  * Exceptions.
  */
 
-codegen_error::codegen_error(const token_location& loc, const std::string& message)
+codegen_error::codegen_error(const source_location& loc, const std::string& message)
 : std::runtime_error{std::format("{}: {}", to_string(loc), message)}
 {
+}
+
+/*
+ * type_kind.
+ */
+
+std::string to_string(type_kind kind)
+{
+    switch(kind)
+    {
+    case type_kind::void_: return "void";
+    case type_kind::null: return "null";
+    case type_kind::i32: return "i32";
+    case type_kind::f32: return "f32";
+    case type_kind::str: return "str";
+    case type_kind::ref: return "ref";
+    default:
+        return "<unknown>";
+    }
 }
 
 /*
@@ -89,111 +109,36 @@ std::string to_string(type_cast tc)
  * type.
  */
 
-type_class to_type_class(const std::string& s)
-{
-    static const std::unordered_map<std::string, type_class> map = {
-      {"void", type_class::void_},
-      {"i32", type_class::i32},
-      {"f32", type_class::f32},
-      {"str", type_class::str}};
-
-    auto it = map.find(s);
-    if(it == map.end())
-    {
-        throw codegen_error(std::format("No type class for type '{}'.", s));
-    }
-
-    return it->second;
-}
-
 std::string type::to_string() const
 {
-    static const std::unordered_map<type_class, std::string> map = {
-      {type_class::void_, "void"},
-      {type_class::null, "null"},
-      {type_class::i32, "i32"},
-      {type_class::f32, "f32"},
-      {type_class::str, "str"},
-      {type_class::addr, "@addr"},
-      {type_class::fn, "fn"}};
+    static const std::unordered_map<type_kind, std::string> map = {
+      {type_kind::void_, "void"},
+      {type_kind::null, "null"},
+      {type_kind::i32, "i32"},
+      {type_kind::f32, "f32"},
+      {type_kind::str, "str"},
+      {type_kind::ref, "ref"}};
 
-    auto it = map.find(ty);
+    auto it = map.find(back_end_type);
     if(it != map.end())
     {
-        if(is_array())
-        {
-            return std::format("[{}]", it->second);
-        }
         return it->second;
     }
 
-    if(ty == type_class::struct_)
-    {
-        if(is_array())
-        {
-            return std::format("[{}]", struct_name.value_or("<unnamed-struct>"));
-        }
-        return struct_name.value_or("<unnamed-struct>");
-    }
-
-    throw std::runtime_error("Invalid type class.");
+    throw std::runtime_error("Invalid type kind.");
 }
 
 /*
  * value.
  */
 
-void value::validate() const
-{
-    bool is_builtin = (ty.get_type_class() == type_class::void_)
-                      || (ty.get_type_class() == type_class::i32)
-                      || (ty.get_type_class() == type_class::f32)
-                      || (ty.get_type_class() == type_class::str)
-                      || (ty.get_type_class() == type_class::fn);
-
-    if(is_builtin || ty.is_null())
-    {
-        if(ty.is_struct())
-        {
-            throw codegen_error("Type cannot be both: struct and reference.");
-        }
-
-        if(ty.is_void() && ty.is_array())
-        {
-            throw codegen_error("Type cannot be both: void and array.");
-        }
-
-        return;
-    }
-
-    if(ty.get_type_class() == type_class::addr)
-    {
-        return;
-    }
-
-    if(!ty.is_struct())
-    {
-        throw codegen_error(std::format("Invalid value type '{}'.", ty.to_string()));
-    }
-
-    if(!ty.get_struct_name().has_value() || ty.get_struct_name()->empty())
-    {
-        throw codegen_error("Empty struct type.");
-    }
-
-    if(ty::is_builtin_type(*ty.get_struct_name()))
-    {
-        throw codegen_error(std::format("Aggregate type cannot have the same name '{}' as a built-in type.", *ty.get_struct_name()));
-    }
-}
-
 std::string value::to_string() const
 {
-    if(has_name())
+    if(name.has_value())
     {
-        return std::format("{} %{}", get_type().to_string(), get_name().value());    // NOLINT(bugprone-unchecked-optional-access)
+        return std::format("{} %{}", ty.to_string(), name.value());
     }
-    return std::format("{}", get_type().to_string());
+    return std::format("{}", ty.to_string());
 }
 
 /*
@@ -202,21 +147,27 @@ std::string value::to_string() const
 
 std::string const_argument::to_string() const
 {
-    std::string type_name = type->get_type().to_string();
+    auto kind = v->get_type().get_type_kind();
 
-    if(type_name == "i32")
+    if(kind == type_kind::i32)
     {
-        return std::format("i32 {}", static_cast<constant_int*>(type.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format(
+          "i32 {}",
+          static_cast<constant_i32*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(type_name == "f32")
+    if(kind == type_kind::f32)
     {
-        return std::format("f32 {}", static_cast<constant_float*>(type.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format(
+          "f32 {}",
+          static_cast<constant_f32*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(type_name == "str")
+    if(kind == type_kind::str)
     {
-        return std::format("str @{}", static_cast<constant_str*>(type.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        return std::format(
+          "str @{}",
+          static_cast<constant_str*>(v.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
     throw codegen_error(std::format("Unrecognized const_argument type."));
@@ -648,59 +599,6 @@ std::size_t context::get_import_index(
                   import_path));
 }
 
-void context::make_import_explicit(
-  const std::string& import_path)
-{
-    for(auto& m: macros)
-    {
-        if(m->get_import_path() == import_path)
-        {
-            m->set_transitive(false);
-        }
-    }
-
-    for(auto& c: imported_constants)
-    {
-        if(c.import_path == import_path)
-        {
-            if(c.name.value().at(0) == '$')
-            {
-                c.name = c.name.value().substr(1);
-            }
-        }
-    }
-
-    for(auto& sym: imports)
-    {
-        if(sym.import_path == import_path)
-        {
-            if(sym.name.at(0) == '$')
-            {
-                sym.name = sym.name.substr(1);
-            }
-        }
-    }
-
-    for(auto& it: prototypes)
-    {
-        if(it->get_import_path() == import_path)
-        {
-            it->make_import_explicit();
-        }
-    }
-
-    for(auto& it: types)
-    {
-        if(it->get_import_path() == import_path)
-        {
-            if(it->name.at(0) == '$')
-            {
-                it->name = it->name.substr(1);
-            }
-        }
-    }
-}
-
 struct_* context::add_struct(
   std::string name,
   std::vector<std::pair<std::string, value>> members,
@@ -1046,64 +944,6 @@ void context::create_native_function(std::string lib_name,
         std::move(args)));
 }
 
-void context::add_macro(
-  std::string name,
-  module_::macro_descriptor desc,
-  std::optional<std::string> import_path)
-{
-    if(std::ranges::find_if(
-         macros,
-         [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
-         {
-             return m->get_name() == name
-                    && m->get_import_path() == import_path;
-         })
-       != macros.end())
-    {
-        throw codegen_error(std::format("Macro '{}' already defined.", name));
-    }
-
-    macros.emplace_back(
-      std::make_unique<macro>(
-        std::move(name),
-        std::move(desc),
-        std::move(import_path)));
-}
-
-macro* context::get_macro(
-  const token& name,
-  std::optional<std::string> import_path)
-{
-    auto it = std::ranges::find_if(
-      macros,
-      [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
-      {
-          return m->get_name() == name.s
-                 && m->get_import_path() == import_path;
-      });
-
-    if(it != macros.end())
-    {
-        return it->get();
-    }
-
-    // macro was not found.
-    if(import_path.has_value())
-    {
-        throw codegen_error(
-          name.location,
-          std::format(
-            "Macro '{}::{}' not found.",
-            import_path.value(),
-            name.s));
-    }
-    throw codegen_error(
-      name.location,
-      std::format(
-        "Macro '{}' not found.",
-        name.s));
-}
-
 std::size_t context::generate_macro_invocation_id()
 {
     return macro_invocation_id++;
@@ -1157,7 +997,7 @@ type context::get_accessed_struct() const
 }
 
 value context::get_struct_member(
-  token_location loc,
+  source_location loc,
   const std::string& struct_name,
   const std::string& member_name,
   std::optional<std::string> import_path) const
@@ -1180,52 +1020,6 @@ value context::get_struct_member(
     }
 
     return it->second;
-}
-
-/*
- * Compile-time expression evaluation.
- */
-
-void context::set_expression_constant(const ast::expression& expr, bool is_constant)
-{
-    constant_expressions[&expr] = is_constant;
-}
-
-bool context::get_expression_constant(const ast::expression& expr) const
-{
-    auto it = constant_expressions.find(&expr);
-    if(it == constant_expressions.end())
-    {
-        throw codegen_error(expr.get_location(), "Expression is not known to be constant.");
-    }
-
-    return it->second;
-}
-
-bool context::has_expression_constant(const ast::expression& expr) const
-{
-    return constant_expressions.contains(&expr);
-}
-
-void context::set_expression_value(const ast::expression& expr, std::unique_ptr<value> v)
-{
-    expression_values[&expr] = std::move(v);
-}
-
-const value& context::get_expression_value(const ast::expression& expr) const
-{
-    auto it = expression_values.find(&expr);
-    if(it == expression_values.end())
-    {
-        throw codegen_error(expr.get_location(), "Expression value not found.");
-    }
-
-    return *it->second;
-}
-
-bool context::has_expression_value(const ast::expression& expr) const
-{
-    return expression_values.contains(&expr);
 }
 
 /*
@@ -1299,29 +1093,29 @@ void context::generate_const(const value& vt, std::variant<int, float, std::stri
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt.get_type().get_type_class() == type_class::i32)
+    if(vt.get_type().get_type_kind() == type_kind::i32)
     {
-        auto arg = std::make_unique<const_argument>(std::get<int>(v));
+        auto arg = std::make_unique<const_argument>(std::get<int>(v), std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type().get_type_class() == type_class::f32)
+    else if(vt.get_type().get_type_kind() == type_kind::f32)
     {
-        auto arg = std::make_unique<const_argument>(std::get<float>(v));
+        auto arg = std::make_unique<const_argument>(std::get<float>(v), std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type().get_type_class() == type_class::str)
+    else if(vt.get_type().get_type_kind() == type_kind::str)
     {
-        auto arg = std::make_unique<const_argument>(std::get<std::string>(v));
+        auto arg = std::make_unique<const_argument>(std::get<std::string>(v), std::nullopt);
         arg->register_const(*this);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type().get_type_class() == type_class::fn)
-    {
-        // Nothing to do.
-    }
     else
     {
-        throw codegen_error("Invalid value type for constant.");
+        throw codegen_error(
+          std::format(
+            "Invalid type kind '{}' for constant.",
+            ::slang::codegen::to_string(
+              vt.get_type().get_type_kind())));
     }
     insertion_point->add_instruction(std::make_unique<instruction>("const", std::move(args)));
 }
@@ -1431,7 +1225,7 @@ void context::generate_ret(std::optional<value> arg)
     std::vector<std::unique_ptr<argument>> args;
     if(!arg)
     {
-        args.emplace_back(std::make_unique<type_argument>(value{type{type_class::void_, 0}}));
+        args.emplace_back(std::make_unique<type_argument>(value{type{type_kind::void_}}));
     }
     else
     {

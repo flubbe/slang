@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * name resolution.
+ * module and import resolution.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -25,18 +25,15 @@ namespace slang::typing
 class context;
 }    // namespace slang::typing
 
-namespace slang::codegen
+namespace slang::macro
 {
-class context;
-}    // namespace slang::codegen
+struct env;
+}    // namespace slang::macro
 
-namespace slang::interpreter
+namespace slang::loader
 {
-class module_loader;
-}    // namespace slang::interpreter
 
-namespace slang::resolve
-{
+namespace ty = slang::typing;
 
 /**
  * Generate an import name.
@@ -60,26 +57,16 @@ inline std::string make_import_name(
 /** A resolve error. */
 class resolve_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a resolve_error.
-     *
-     * @note Use the other constructor if you want to include location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit resolve_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a resolve_error.
      *
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    resolve_error(const token_location& loc, const std::string& message);
+    resolve_error(const source_location& loc, const std::string& message);
 };
 
 /** Resolver context. */
@@ -93,17 +80,6 @@ class context
       std::string,
       std::unique_ptr<module_::module_resolver>>
       resolvers;
-
-protected:
-    /**
-     * Resolve imports for a given module. Only loads a module if it is not
-     * already resolved.
-     *
-     * @param import_name The module's import name.
-     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
-     * @returns A reference to the resolved module.
-     */
-    module_::module_resolver& resolve_module(const std::string& import_name, bool transitive);
 
 public:
     /** Default constructors. */
@@ -129,12 +105,16 @@ public:
     }
 
     /**
-     * Resolve imports from a type context.
+     * Resolve imports for a given module. Only loads a module if it is not
+     * already resolved.
      *
-     * @param ctx The code generation context.
-     * @param type_ctx The typing context.
+     * @param import_name The module's import name.
+     * @param transitive Whether this is a transitive import, i.e. an import from a depencency resolution.
+     * @returns A reference to the resolved module.
      */
-    void resolve_imports(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+    module_::module_resolver& resolve_module(
+      const std::string& import_name,
+      bool transitive);
 
     /**
      * Resolve macros.
@@ -142,11 +122,13 @@ public:
      * @note Macro resolution might lead to additional imports being needed. That is,
      *       if the function returns `true`, import resolution needs to be run.
      *
-     * @param ctx The code generation context.
+     * @param env Macro collection / expansion environment.
      * @param type_ctx The typing context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
-    static bool resolve_macros(slang::codegen::context& ctx, slang::typing::context& type_ctx);
+    static bool resolve_macros(
+      macro::env& env,
+      ty::context& type_ctx);
 };
 
-}    // namespace slang::resolve
+}    // namespace slang::loader

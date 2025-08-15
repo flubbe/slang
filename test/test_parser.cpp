@@ -1114,6 +1114,49 @@ TEST(parser, struct_member_access)
     }
     {
         const std::string test_input =
+          "let s1: i32 = s.a.b;";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        ASSERT_NO_THROW(parser.parse(lexer));
+
+        EXPECT_TRUE(lexer.eof());
+
+        // clang-format off
+        const std::string expected =
+          "Block("
+            "exprs=("
+              "VariableDeclaration("
+                "name=s1, "
+                "type=TypeExpression("
+                  "name=i32, "
+                  "namespaces=(), "
+                  "array=false"
+                "), "
+                "expr=Access("
+                  "lhs=Access("
+                    "lhs=VariableReference("
+                      "name=s"
+                    "), "
+                    "rhs=VariableReference("
+                      "name=a"
+                    ")"
+                  "), "
+                  "rhs=VariableReference("
+                    "name=b"
+                  ")"
+                ")"
+              ")"
+            ")"
+          ")";
+        // clang-format on
+
+        EXPECT_EQ(parser.get_ast()->to_string(), expected);
+    }
+    {
+        const std::string test_input =
           "let s1: i32 = s.a.b + t.c;";
 
         slang::lexer lexer;

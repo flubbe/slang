@@ -13,15 +13,19 @@
 
 #include "compiler/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/macro.h"
 #include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "commandline.h"
-#include "resolve.h"
+#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
+namespace co = slang::collect;
 namespace ty = slang::typing;
+namespace ld = slang::loader;
 namespace rs = slang::resolve;
 
 namespace slang::commandline
@@ -196,24 +200,33 @@ void compile::invoke(const std::vector<std::string>& args)
 
     const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
+    ld::context loader_ctx{file_mgr};
+    sema::env env;
+    cg::context codegen_ctx{env};
+    co::context co_ctx{env};
     ty::context type_ctx;
-    rs::context resolve_ctx{file_mgr};
-    cg::context codegen_ctx;
+    rs::context resolver_ctx{env};
+    macro::env macro_env;
     opt::cfg::context cfg_context{codegen_ctx};
-    slang::instruction_emitter emitter{codegen_ctx};
+    slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
-    ast->collect_names(codegen_ctx, type_ctx);
+    ast->collect_names(co_ctx);
+    ast->resolve_names(resolver_ctx);
+    ast->collect_attributes(env);
+    ast->collect_macros(env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
-            resolve_ctx.resolve_imports(codegen_ctx, type_ctx);
-        } while(rs::context::resolve_macros(codegen_ctx, type_ctx));
-    } while(ast->expand_macros(codegen_ctx, type_ctx, module_macro_asts));
-    type_ctx.resolve_types();
-    ast->type_check(type_ctx);
+            resolver_ctx.resolve_imports(loader_ctx);
+        } while(ld::context::resolve_macros(macro_env, type_ctx));
+    } while(ast->expand_macros(codegen_ctx, type_ctx, macro_env, module_macro_asts));
+    ast->declare_types(type_ctx, env);
+    ast->define_types(type_ctx);
+    ast->declare_functions(type_ctx, env);
+    ast->type_check(type_ctx, env);
     ast->generate_code(codegen_ctx);
 
     cfg_context.run();

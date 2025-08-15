@@ -25,11 +25,20 @@ add_executable(slang
     src/compiler/ast/eval.cpp
     src/compiler/ast/macros.cpp
     src/compiler/ast/node_registry.cpp
+    src/compiler/ast/resolve.cpp
+    src/compiler/attribute.cpp
     src/compiler/codegen.cpp
+    src/compiler/collect.cpp
+    src/compiler/constant.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
+    src/compiler/lowering.cpp
+    src/compiler/location.cpp
+    src/compiler/macro.cpp
     src/compiler/opt/cfg.cpp
     src/compiler/parser.cpp
+    src/compiler/resolve.cpp
+    src/compiler/sema.cpp
     src/compiler/token.cpp
     src/compiler/typing.cpp
     src/interpreter/gc.cpp
@@ -43,10 +52,10 @@ add_executable(slang
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp
+    src/loader.cpp
     src/main.cpp
     src/module_resolver.cpp
     src/package.cpp
-    src/resolve.cpp
     src/runtime/arrays.cpp
     src/runtime/debug.cpp
     src/runtime/math.cpp

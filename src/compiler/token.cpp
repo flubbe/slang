@@ -16,19 +16,6 @@
 namespace slang
 {
 
-archive& operator&(archive& ar, token_location& loc)
-{
-    vle_int i{utils::numeric_cast<std::int64_t>(loc.col)};
-    ar & i;
-    loc.col = i.i;
-
-    i.i = utils::numeric_cast<std::int64_t>(loc.line);
-    ar & i;
-    loc.line = i.i;
-
-    return ar;
-}
-
 archive& operator&(archive& ar, token_type& ty)
 {
     auto i = static_cast<std::uint8_t>(ty);
@@ -44,11 +31,6 @@ archive& operator&(archive& ar, token_type& ty)
     ty = static_cast<token_type>(i);
 
     return ar;
-}
-
-std::string to_string(const token_location& loc)
-{
-    return std::format("{}:{}", loc.line, loc.col);
 }
 
 std::string to_string(token_type ty)

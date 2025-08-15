@@ -102,16 +102,7 @@ std::string to_string(opcode op);
 /** A opcode error. */
 class opcode_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `opcode_error`.
-     *
-     * @param message The error message.
-     */
-    explicit opcode_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /**

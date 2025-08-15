@@ -14,65 +14,104 @@
 #include <gtest/gtest.h>
 
 #include "compiler/codegen.h"
+#include "compiler/sema.h"
+#include "compiler/typing.h"
 
 namespace cg = slang::codegen;
+namespace const_ = slang::const_;
+namespace sema = slang::sema;
+namespace tl = slang::lowering;
+namespace ty = slang::typing;
 
 namespace
 {
 
+// Mock type ids.
+constexpr ty::type_id mock_null_type = 0;
+constexpr ty::type_id mock_void_type = 1;
+constexpr ty::type_id mock_i32_type = 2;
+constexpr ty::type_id mock_f32_type = 3;
+constexpr ty::type_id mock_str_type = 4;
+
 TEST(codegen, initialize_context)
 {
-    ASSERT_NO_THROW(cg::context ctx = cg::context());
+    sema::env sema_env;
+    const_::env const_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    ASSERT_NO_THROW(cg::context(sema_env, const_env, lowering_ctx));
 }
 
 TEST(codegen, create_function)
 {
-    cg::context ctx = cg::context();
-    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    sema::env sema_env;
+    const_::env const_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+    auto* fn = codegen_ctx.create_function(
+      "test",
+      std::make_unique<cg::value>(cg::type{
+        mock_void_type, cg::type_kind::void_}),
+      {});
     ASSERT_NE(fn, nullptr);
 
-    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    cg::basic_block* fn_block = cg::basic_block::create(codegen_ctx, "entry");
     fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
-    auto* other_fn = ctx.create_function("test2", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), {});
+    auto* other_fn = codegen_ctx.create_function(
+      "test2",
+      std::make_unique<cg::value>(cg::type{
+        mock_i32_type, cg::type_kind::i32}),
+      {});
     ASSERT_NE(other_fn, nullptr);
     ASSERT_NE(fn, other_fn);
 
-    cg::basic_block* other_fn_block = cg::basic_block::create(ctx, "entry");
+    cg::basic_block* other_fn_block = cg::basic_block::create(codegen_ctx, "entry");
     fn->append_basic_block(other_fn_block);
     ASSERT_NE(other_fn_block, nullptr);
 
     ASSERT_NE(fn_block, other_fn_block);
 
     EXPECT_THROW(static_cast<void>(    // ignore return value, since the function should throw anyway.
-                   ctx.create_function(
+                   codegen_ctx.create_function(
                      "test",
                      std::make_unique<cg::value>(
                        cg::type{
-                         cg::type_class::i32, 0}),
+                         mock_i32_type, cg::type_kind::i32}),
                      {})),
                  cg::codegen_error);
 }
 
 TEST(codegen, insertion_points)
 {
-    auto ctx = cg::context();
-    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    sema::env sema_env;
+    const_::env const_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+    auto* fn = codegen_ctx.create_function(
+      "test",
+      std::make_unique<cg::value>(cg::type{
+        mock_void_type, cg::type_kind::void_}),
+      {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
-    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    cg::basic_block* fn_block = cg::basic_block::create(codegen_ctx, "entry");
     fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
-    ctx.set_insertion_point(fn_block);
-    EXPECT_EQ(ctx.get_insertion_point(), fn_block);
+    codegen_ctx.set_insertion_point(fn_block);
+    EXPECT_EQ(codegen_ctx.get_insertion_point(), fn_block);
 
     // scoped context.
-    auto* block = cg::basic_block::create(ctx, "outer");
+    auto* block = cg::basic_block::create(codegen_ctx, "outer");
     {
-        auto inner_ctx = cg::context();
+        auto inner_ctx = cg::context{sema_env, const_env, lowering_ctx};
         inner_ctx.set_insertion_point(block);
 
         EXPECT_EQ(inner_ctx.get_insertion_point(), block);
@@ -83,25 +122,34 @@ TEST(codegen, insertion_points)
 
 TEST(codegen, validate_basic_block)
 {
-    auto ctx = cg::context();
-    auto* fn = ctx.create_function("test", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), {});
+    sema::env sema_env;
+    const_::env const_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+    auto* fn = codegen_ctx.create_function(
+      "test",
+      std::make_unique<cg::value>(cg::type{
+        mock_void_type, cg::type_kind::void_}),
+      {});
     ASSERT_NE(fn, nullptr);
 
     // basic block created by function.
-    cg::basic_block* fn_block = cg::basic_block::create(ctx, "entry");
+    cg::basic_block* fn_block = cg::basic_block::create(codegen_ctx, "entry");
     fn->append_basic_block(fn_block);
     ASSERT_NE(fn_block, nullptr);
 
-    ctx.set_insertion_point(fn_block);
-    EXPECT_EQ(ctx.get_insertion_point(), fn_block);
+    codegen_ctx.set_insertion_point(fn_block);
+    EXPECT_EQ(codegen_ctx.get_insertion_point(), fn_block);
 
     EXPECT_FALSE(fn_block->is_valid());
 
-    ctx.generate_ret();
+    codegen_ctx.generate_ret();
 
     EXPECT_TRUE(fn_block->is_valid());
 
-    ctx.generate_branch(fn_block);
+    codegen_ctx.generate_branch(fn_block);
 
     EXPECT_FALSE(fn_block->is_valid());
 }
@@ -109,7 +157,11 @@ TEST(codegen, validate_basic_block)
 TEST(codegen, generate_function)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> void
@@ -117,31 +169,43 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(cg::type{
+            mock_void_type, cg::type_kind::void_}),
+          std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        ctx.generate_ret();
+        codegen_ctx.generate_ret();
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define void @f(i32 %a) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
     }
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -150,25 +214,40 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}),
+          std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -31);    // NOLINT(readability-magic-numbers)
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_const(
+          {cg::type{
+            mock_i32_type, cg::type_kind::i32}},
+          -31);    // NOLINT(readability-magic-numbers)
+        codegen_ctx.generate_ret(
+          std::make_optional<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "entry:\n"
                   " const i32 -31\n"
@@ -176,7 +255,11 @@ TEST(codegen, generate_function)
                   "}");
     }
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -185,25 +268,42 @@ TEST(codegen, generate_function)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}),
+          std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_load(
+          std::make_unique<cg::variable_argument>(
+            std::make_unique<cg::value>(
+              cg::type{
+                mock_i32_type, cg::type_kind::i32},
+              "a")));
+        codegen_ctx.generate_ret(
+          std::make_optional<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "entry:\n"
                   " load i32 %a\n"
@@ -215,7 +315,11 @@ TEST(codegen, generate_function)
 TEST(codegen, operators)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -224,30 +328,53 @@ TEST(codegen, operators)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}),
+          std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
-        ctx.generate_binary_op(cg::binary_op::op_add, {cg::type{cg::type_class::i32, 0}});
+        codegen_ctx.generate_load(
+          std::make_unique<cg::variable_argument>(
+            std::make_unique<cg::value>(
+              cg::type{
+                mock_i32_type, cg::type_kind::i32},
+              "a")));
+        codegen_ctx.generate_const(
+          {cg::type{
+            mock_i32_type, cg::type_kind::i32}},
+          1);
+        codegen_ctx.generate_binary_op(
+          cg::binary_op::op_add,
+          {cg::type{
+            mock_i32_type, cg::type_kind::i32}});
 
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_ret(
+          std::make_optional<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "entry:\n"
                   " load i32 %a\n"
@@ -261,7 +388,11 @@ TEST(codegen, operators)
 TEST(codegen, conditional_branch)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -274,50 +405,60 @@ TEST(codegen, conditional_branch)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32}),
+          std::move(args));
+
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        cg::basic_block* cond = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* cond = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(cond);
         ASSERT_NE(cond, nullptr);
         EXPECT_EQ(cond->get_inserting_context(), nullptr);
         EXPECT_EQ(cond->get_label(), "entry");
 
-        cg::basic_block* then_block = cg::basic_block::create(ctx, "then");
-        cg::basic_block* else_block = cg::basic_block::create(ctx, "else");
-        cg::basic_block* cont_block = cg::basic_block::create(ctx, "cont");
+        cg::basic_block* then_block = cg::basic_block::create(codegen_ctx, "then");
+        cg::basic_block* else_block = cg::basic_block::create(codegen_ctx, "else");
+        cg::basic_block* cont_block = cg::basic_block::create(codegen_ctx, "cont");
 
         fn->append_basic_block(then_block);
         fn->append_basic_block(else_block);
         fn->append_basic_block(cont_block);
 
-        ctx.set_insertion_point(cond);
-        EXPECT_EQ(ctx.get_insertion_point(), cond);
+        codegen_ctx.set_insertion_point(cond);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), cond);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
-        ctx.generate_binary_op(cg::binary_op::op_equal, {cg::type{cg::type_class::i32, 0}});
-        ctx.generate_cond_branch(then_block, else_block);
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
+        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 1);
+        codegen_ctx.generate_binary_op(cg::binary_op::op_equal, {cg::type{mock_i32_type, cg::type_kind::i32}});
+        codegen_ctx.generate_cond_branch(then_block, else_block);
 
-        ctx.set_insertion_point(then_block);
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 1);
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.set_insertion_point(then_block);
+        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 1);
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
-        ctx.set_insertion_point(else_block);
-        ctx.generate_branch(cont_block);
+        codegen_ctx.set_insertion_point(else_block);
+        codegen_ctx.generate_branch(cont_block);
 
-        ctx.set_insertion_point(cont_block);
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 0);
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.set_insertion_point(cont_block);
+        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 0);
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(then_block->is_valid());
         EXPECT_TRUE(else_block->is_valid());
         EXPECT_TRUE(cont_block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "entry:\n"
                   " load i32 %a\n"
@@ -339,7 +480,11 @@ TEST(codegen, conditional_branch)
 TEST(codegen, locals_store)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> void
@@ -348,31 +493,39 @@ TEST(codegen, locals_store)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        auto* fn = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::void_, 0}), std::move(args));
+        auto* fn = codegen_ctx.create_function(
+          "test",
+          std::make_unique<cg::value>(cg::type{
+            mock_void_type, cg::type_kind::void_}),
+          std::move(args));
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        fn->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
+        fn->create_local(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
+        codegen_ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
 
-        ctx.generate_ret();
+        codegen_ctx.generate_ret();
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define void @f(i32 %a) {\n"
                   "local i32 %b\n"
                   "entry:\n"
@@ -386,7 +539,11 @@ TEST(codegen, locals_store)
 TEST(codegen, invoke)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -401,63 +558,67 @@ TEST(codegen, invoke)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args_f.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a"));
 
-        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
+        auto* fn_f = codegen_ctx.create_function("f", std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
+        fn_f->create_local(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -1);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, -1);
+        codegen_ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
 
-        ctx.generate_invoke(std::make_unique<cg::function_argument>("g", std::nullopt));
+        // FIXME Needs sema env set up.
+        const slang::sema::symbol_id mock_symbol_id{0};
 
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_invoke(
+          std::make_unique<cg::function_argument>(mock_symbol_id));
+
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
         std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
-        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
-        auto* fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
+        auto* fn_g = codegen_ctx.create_function("g", std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
-        block = cg::basic_block::create(ctx, "entry");
+        block = cg::basic_block::create(codegen_ctx, "entry");
         fn_g->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
-        ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{cg::type_class::i32, 0}});
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
+        codegen_ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{mock_i32_type, cg::type_kind::i32}});
 
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "local i32 %b\n"
                   "entry:\n"
@@ -477,7 +638,11 @@ TEST(codegen, invoke)
                   "}");
     }
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f(a: i32) -> i32
@@ -492,64 +657,69 @@ TEST(codegen, invoke)
          * }
          */
         std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args_f.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a"));
 
-        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_f));
+        auto* fn_f = codegen_ctx.create_function("f", std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}), std::move(args_f));
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
+        fn_f->create_local(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, -1);
-        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
+        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, -1);
+        codegen_ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
 
-        ctx.generate_load(std::make_unique<cg::function_argument>("g", std::nullopt));
-        ctx.generate_invoke();
+        // FIXME Needs sema env set up.
+        const slang::sema::symbol_id mock_symbol_id{0};
 
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_load(
+          std::make_unique<cg::function_argument>(
+            mock_symbol_id));
+        codegen_ctx.generate_invoke();
+
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
         std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
-        args_g.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a"));
+        args_g.emplace_back(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
-        auto* fn_g = ctx.create_function("g", std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}), std::move(args_g));
+        auto* fn_g = codegen_ctx.create_function("g", std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}), std::move(args_g));
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
-        block = cg::basic_block::create(ctx, "entry");
+        block = cg::basic_block::create(codegen_ctx, "entry");
         fn_g->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a")));
-        ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "b")));
-        ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{cg::type_class::i32, 0}});
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
+        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
+        codegen_ctx.generate_binary_op(cg::binary_op::op_mul, {cg::type{mock_i32_type, cg::type_kind::i32}});
 
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::i32, 0}));
+        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @f(i32 %a) {\n"
                   "local i32 %b\n"
                   "entry:\n"
@@ -574,7 +744,11 @@ TEST(codegen, invoke)
 TEST(codegen, struct_type)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * struct S
@@ -590,12 +764,16 @@ TEST(codegen, struct_type)
          * }
          */
 
-        ctx.add_struct("S", {{"a", {cg::type{cg::type_class::i32, 0}}}, {"b", {cg::type{cg::type_class::i32, 0}}}});
+        codegen_ctx.add_struct("S", {{"a", {cg::type{mock_i32_type, cg::type_kind::i32}}}, {"b", {cg::type{mock_i32_type, cg::type_kind::i32}}}});
 
         std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0}, "a"));
+        args.emplace_back(
+          std::make_unique<cg::value>(
+            cg::type{
+              mock_i32_type, cg::type_kind::i32},
+            "a"));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "%S = type {\n"
                   " i32 %a,\n"
                   " i32 %b,\n"
@@ -606,7 +784,11 @@ TEST(codegen, struct_type)
 TEST(codegen, strings)
 {
     {
-        cg::context ctx = cg::context();
+        sema::env sema_env;
+        const_::env const_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
         /*
          * fn f() -> str
@@ -615,26 +797,34 @@ TEST(codegen, strings)
          * }
          */
 
-        auto* fn_f = ctx.create_function("f", std::make_unique<cg::value>(cg::type{cg::type_class::str, 0}), {});
+        auto* fn_f = codegen_ctx.create_function(
+          "f",
+          std::make_unique<cg::value>(
+            cg::type{mock_str_type, cg::type_kind::str}),
+          {});
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        cg::basic_block* block = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn_f->append_basic_block(block);
         ASSERT_NE(block, nullptr);
         EXPECT_EQ(block->get_inserting_context(), nullptr);
         EXPECT_EQ(block->get_label(), "entry");
 
-        ctx.set_insertion_point(block);
-        EXPECT_EQ(ctx.get_insertion_point(), block);
-        EXPECT_EQ(block->get_inserting_context(), &ctx);
+        codegen_ctx.set_insertion_point(block);
+        EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
+        EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        ctx.generate_const({cg::type{cg::type_class::str, 0}}, "\tTest\n");
-        ctx.generate_ret(std::make_optional<cg::value>(cg::type{cg::type_class::str, 0}));
+        codegen_ctx.generate_const(
+          {cg::type{mock_str_type, cg::type_kind::str}},
+          "\tTest\n");
+        codegen_ctx.generate_ret(
+          std::make_optional<cg::value>(
+            cg::type{mock_str_type, cg::type_kind::str}));
 
         EXPECT_TRUE(block->is_valid());
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   ".string @0 \"\\x09Test\\x0a\"\n"
                   "define str @f() {\n"
                   "entry:\n"
