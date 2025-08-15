@@ -22,6 +22,7 @@ static std::unordered_map<std::string, attribute_kind> attribute_string_map =
   {
     {"allow_cast", attribute_kind::allow_cast},
     {"builtin", attribute_kind::builtin},
+    {"disable", attribute_kind::disable},
     {"native", attribute_kind::native}};
 
 std::optional<attribute_kind> get_attribute_kind(const std::string& name)

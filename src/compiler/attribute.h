@@ -33,6 +33,7 @@ enum class attribute_kind
 {
     allow_cast, /** Allow casting from reference types. */
     builtin,    /** Compiler built-in. */
+    disable,    /** Disable a flag, e.g. `disable(const_eval)`. */
     native      /** Native function. */
 };
 

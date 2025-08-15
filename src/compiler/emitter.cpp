@@ -531,14 +531,14 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             emit(
               instruction_buffer,
               i32_opcode,
-              static_cast<std::int32_t>(static_cast<const cg::constant_int*>(v)->get_int()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              static_cast<std::int32_t>(static_cast<const cg::constant_i32*>(v)->get_int()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         }
         else if(v->get_type().get_type_class() == cg::type_class::f32)
         {
             emit(
               instruction_buffer,
               f32_opcode,
-              static_cast<const cg::constant_float*>(v)->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              static_cast<const cg::constant_f32*>(v)->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         }
         else if(v->get_type().get_type_class() == cg::type_class::str)
         {

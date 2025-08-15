@@ -71,7 +71,7 @@ TEST(output, native_binding)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -250,7 +250,7 @@ TEST(output, emitter)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -302,7 +302,7 @@ TEST(output, hello_world)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -345,7 +345,7 @@ TEST(output, hello_world)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -408,7 +408,7 @@ TEST(output, operators)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -448,7 +448,7 @@ TEST(output, operators)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -494,7 +494,7 @@ TEST(output, string_operations)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -534,7 +534,7 @@ TEST(output, string_operations)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -599,7 +599,7 @@ TEST(output, prefix_postfix)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -669,7 +669,7 @@ TEST(output, control_flow)
     co::context co_ctx{env};
     rs::context resolver_ctx{env};
     ty::context type_ctx;
-    cg::context codegen_ctx;
+    cg::context codegen_ctx{env};
     slang::macro::env macro_env;
     slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -719,7 +719,7 @@ TEST(output, loops)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -778,7 +778,7 @@ TEST(output, loops)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -821,7 +821,7 @@ TEST(output, infinite_recursion)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -871,7 +871,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -949,7 +949,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -989,7 +989,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1022,7 +1022,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1055,7 +1055,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1093,7 +1093,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1160,7 +1160,7 @@ TEST(output, arrays)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1217,7 +1217,7 @@ TEST(output, return_discard)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1274,7 +1274,7 @@ TEST(output, return_discard)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1318,7 +1318,7 @@ TEST(output, return_discard)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1361,7 +1361,7 @@ TEST(output, missing_return)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1402,7 +1402,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1447,7 +1447,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1499,7 +1499,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1542,7 +1542,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1586,7 +1586,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1631,7 +1631,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1678,7 +1678,7 @@ TEST(output, structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1727,7 +1727,7 @@ TEST(output, nested_structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1781,7 +1781,7 @@ TEST(output, nested_structs)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1831,7 +1831,7 @@ TEST(output, type_imports)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1875,7 +1875,7 @@ TEST(output, null_assignment)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1914,7 +1914,7 @@ TEST(output, null_access)
         co::context co_ctx{env};
         rs::context resolver_ctx{env};
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        cg::context codegen_ctx{env};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{codegen_ctx, macro_env};
 
@@ -1964,7 +1964,7 @@ TEST(output, multiple_modules)
             co::context co_ctx{env};
             rs::context resolver_ctx{env};
             ty::context type_ctx;
-            cg::context codegen_ctx;
+            cg::context codegen_ctx{env};
             slang::macro::env macro_env;
             slang::instruction_emitter emitter{codegen_ctx, macro_env};
 

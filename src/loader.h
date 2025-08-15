@@ -25,11 +25,6 @@ namespace slang::typing
 class context;
 }    // namespace slang::typing
 
-namespace slang::codegen
-{
-class context;
-}    // namespace slang::codegen
-
 namespace slang::macro
 {
 struct env;
@@ -38,7 +33,6 @@ struct env;
 namespace slang::loader
 {
 
-namespace cg = slang::codegen;
 namespace ty = slang::typing;
 
 /**

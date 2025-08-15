@@ -26,9 +26,9 @@ namespace ty = slang::typing;
 namespace
 {
 
-cg::context get_context()
+cg::context get_context(sema::env& env)
 {
-    cg::context ctx;
+    cg::context ctx{env};
     ctx.evaluate_constant_subexpressions = false;
     return ctx;
 }
@@ -64,7 +64,7 @@ TEST(opt_cfg, remove_unreachable_blocks)
     sema::env env;
     co::context co_ctx{env};
     ty::context type_ctx;
-    cg::context codegen_ctx = get_context();
+    cg::context codegen_ctx = get_context(env);
     slang::opt::cfg::context cfg_context{codegen_ctx};
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));

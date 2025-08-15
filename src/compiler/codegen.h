@@ -22,6 +22,10 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
+#include "compiler/constant.h"
+#include "compiler/lowering.h"
+#include "compiler/sema.h"
+#include "compiler/type.h"
 #include "shared/module.h"
 #include "directive.h"
 
@@ -41,6 +45,11 @@ class expression;       /* ast.h */
 class macro_invocation; /* ast.h */
 }    // namespace slang::ast
 
+namespace slang::typing
+{
+class context; /* compiler/typing.h */
+};    // namespace slang::typing
+
 namespace slang::opt::cfg
 {
 class context; /* opt/cfg.h */
@@ -48,6 +57,9 @@ class context; /* opt/cfg.h */
 
 namespace slang::codegen
 {
+
+namespace ty = slang::typing;
+namespace tl = slang::lowering;
 
 /** A code generation error. */
 class codegen_error : public std::runtime_error
@@ -64,46 +76,37 @@ public:
     codegen_error(const slang::source_location& loc, const std::string& message);
 };
 
-/** Type classes. */
-enum class type_class : std::uint8_t
+/** Lowered type. */
+enum class type_kind : std::uint8_t
 {
-    void_,   /** Void type. */
-    null,    /** Null type. */
-    i32,     /** 32-bit signed integer.  */
-    f32,     /** 32-bit IEEE754 float. */
-    str,     /** String. */
-    struct_, /** Struct. */
-    addr,    /** Anonymous address. */
-    fn       /** A function. */
+    void_, /** Void type. */
+    null,  /** Null type. */
+    i32,   /** 32-bit signed integer.  */
+    f32,   /** 32-bit IEEE754 float. */
+    str,   /** String. */
+    ref,   /** Any reference, including arrays. */
 };
 
 /**
- * Convert a built-in type to a `type_class`.
+ * Convert a `type_kind` to a readable string.
  *
- * @param s The type string to convert.
- * @return Returns the corresponding type class.
- * @throws Throws a `codegen_error` if the string is not a type class.
+ * @param kind The type kind.
+ * @returns Returns a readable string.
  */
-type_class to_type_class(const std::string& s);
+std::string to_string(type_kind kind);
 
 /** Type of a value. */
 class type
 {
-    /** Type class. */
-    type_class ty;
+    /** Front-end type id, if known. */
+    std::optional<ty::type_id> type_id{std::nullopt};
 
-    /** Array dimensions (0 for scalar types). */
-    std::size_t array_dims;
-
-    /** Struct name. */
-    std::optional<std::string> struct_name;
-
-    /** Import path (for external struct's). */
-    std::optional<std::string> import_path;
+    /** The lowered type. */
+    type_kind back_end_type;
 
 public:
     /** Defaulted and deleted constructors. */
-    type() = delete;
+    type() = default;
     type(const type&) = default;
     type(type&&) = default;
 
@@ -117,29 +120,31 @@ public:
     /**
      * Construct a type.
      *
-     * @param ty Type class.
-     * @param array_dims Array dimensions. 0 for scalar types.
-     * @param struct_name Struct name if `ty` is `type_class::struct_`.
-     * @param import_path Import path of a struct (`std::nullopt` for the current module).
+     * @param type_id The front-end type id.
+     * @param back_end_type The back-end type.
      */
-    type(type_class ty,
-         std::size_t array_dims,
-         std::optional<std::string> struct_name = std::nullopt,
-         std::optional<std::string> import_path = std::nullopt)
-    : ty{ty}
-    , array_dims{array_dims}
-    , struct_name{std::move(struct_name)}
-    , import_path{std::move(import_path)}
+    type(ty::type_id type_id,
+         type_kind back_end_type)
+    : type_id{type_id}
+    , back_end_type{back_end_type}
+    {
+    }
+
+    /**
+     * Construct a type.
+     *
+     * @param back_end_type The back-end type.
+     */
+    type(type_kind back_end_type)
+    : back_end_type{back_end_type}
     {
     }
 
     /** Comparison. */
     bool operator==(const type& other) const
     {
-        return ty == other.ty
-               && array_dims == other.array_dims
-               && struct_name == other.struct_name
-               && import_path == other.import_path;
+        return type_id == other.type_id
+               && back_end_type == other.back_end_type;
     }
 
     /** Comparison. */
@@ -148,97 +153,17 @@ public:
         return !(*this == other);
     }
 
-    /** Get the type class. */
+    /** Get the type id. */
     [[nodiscard]]
-    type_class get_type_class() const
+    std::optional<ty::type_id> get_type_id() const
     {
-        return ty;
+        return type_id;
     }
 
-    /** Return whether the type is an array. */
-    [[nodiscard]]
-    bool is_array() const
+    /** Get the type kind / back-end type. */
+    type_kind get_type_kind() const
     {
-        return array_dims != 0;
-    }
-
-    /** Return whether this is a void type. */
-    [[nodiscard]]
-    bool is_void() const
-    {
-        return ty == type_class::void_;
-    }
-
-    /** Return whether this is a null type. */
-    [[nodiscard]]
-    bool is_null() const
-    {
-        return ty == type_class::null;
-    }
-
-    /** Return whether this is a struct type. */
-    [[nodiscard]]
-    bool is_struct() const
-    {
-        return ty == type_class::struct_;
-    }
-
-    /** Whether this is a reference type (i.e., either an array or a struct). */
-    [[nodiscard]]
-    bool is_reference() const
-    {
-        return is_array() || is_struct();
-    }
-
-    /** Whether this type is imported. */
-    [[nodiscard]]
-    bool is_import() const
-    {
-        return import_path.has_value();
-    }
-
-    /** Return the array dimensions (0 for scalar types). */
-    [[nodiscard]]
-    std::size_t get_array_dims() const
-    {
-        return array_dims;
-    }
-
-    /**
-     * Return a dereferenced array type.
-     *
-     * @throws Throws a `codegen_error` if the type is not an array.
-     */
-    [[nodiscard]]
-    type deref() const
-    {
-        if(!is_array())
-        {
-            throw codegen_error("Tried to dereference a scalar type.");
-        }
-
-        return {ty, array_dims - 1, struct_name, import_path};
-    }
-
-    /** Get the base type. */
-    [[nodiscard]]
-    type base_type() const
-    {
-        return {ty, 0, struct_name, import_path};
-    }
-
-    /** Return the struct's name, or `std::nullopt` if not a struct. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_struct_name() const
-    {
-        return struct_name;
-    }
-
-    /** Return the type's import path for external types, or `std::nullopt`. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
+        return back_end_type;
     }
 
     /** Get a readable string representation of the type. */
@@ -255,17 +180,9 @@ class value
     /** An optional name for the value. */
     std::optional<std::string> name;
 
-protected:
-    /**
-     * Validate the value.
-     *
-     * @throws A `codegen_error` if the type is invalid.
-     */
-    void validate() const;
-
 public:
     /** Default constructors. */
-    value() = delete;
+    value() = default;
     value(const value&) = default;
     value(value&&) = default;
 
@@ -286,25 +203,13 @@ public:
     : ty{std::move(ty)}
     , name{std::move(name)}
     {
-        validate();
     }
 
     /** Copy the type into a new value. */
     [[nodiscard]]
     value copy_type() const
     {
-        return {ty, std::nullopt};
-    }
-
-    /**
-     * Return the de-referenced type.
-     *
-     * @throws Throws a `codegen_error` if the value is not an array.
-     */
-    [[nodiscard]]
-    value deref() const
-    {
-        return {ty.deref()};
+        return {ty, name};
     }
 
     /** Get the value as a readable string. */
@@ -346,23 +251,16 @@ public:
 };
 
 /** A constant integer value. */
-class constant_int : public value
+class constant_i32 : public value
 {
     /** The integer. */
     int i;
 
 public:
     /** Deleted and defaulted constructors. */
-    constant_int() = delete;
-    constant_int(const constant_int&) = default;
-    constant_int(constant_int&&) = default;
-
-    /** Default destructor. */
-    ~constant_int() = default;
-
-    /** Default assignments. */
-    constant_int& operator=(const constant_int&) = default;
-    constant_int& operator=(constant_int&&) = default;
+    constant_i32() = delete;
+    constant_i32(const constant_i32&) = default;
+    constant_i32(constant_i32&&) = default;
 
     /**
      * Construct a constant integer.
@@ -370,11 +268,22 @@ public:
      * @param i The integer.
      * @param name An optional name.
      */
-    constant_int(int i, std::optional<std::string> name = std::nullopt)
-    : value{type{type_class::i32, 0}, std::move(name)}
+    constant_i32(
+      int i,
+      std::optional<std::string> name = std::nullopt)
+    : value{
+        type{type_kind::i32},
+        std::move(name)}
     , i{i}
     {
     }
+
+    /** Default destructor. */
+    ~constant_i32() = default;
+
+    /** Default assignments. */
+    constant_i32& operator=(const constant_i32&) = default;
+    constant_i32& operator=(constant_i32&&) = default;
 
     /** Get the integer. */
     [[nodiscard]]
@@ -385,35 +294,39 @@ public:
 };
 
 /** A constant floating point value. */
-class constant_float : public value
+class constant_f32 : public value
 {
     /** The floating point value. */
     float f;
 
 public:
     /** Default constructors. */
-    constant_float() = delete;
-    constant_float(const constant_float&) = default;
-    constant_float(constant_float&&) = default;
-
-    /** Default destructor. */
-    ~constant_float() = default;
-
-    /** Default assignments. */
-    constant_float& operator=(const constant_float&) = default;
-    constant_float& operator=(constant_float&&) = default;
+    constant_f32() = delete;
+    constant_f32(const constant_f32&) = default;
+    constant_f32(constant_f32&&) = default;
 
     /**
-     * Construct a constant floating point value.
+     * Construct a constant float.
      *
-     * @param f The floating point value.
+     * @param f The float.
      * @param name An optional name.
      */
-    constant_float(float f, std::optional<std::string> name = std::nullopt)
-    : value{type{type_class::f32, 0}, std::move(name)}
+    constant_f32(
+      float f,
+      std::optional<std::string> name = std::nullopt)
+    : value{
+        type{type_kind::f32},
+        std::move(name)}
     , f{f}
     {
     }
+
+    /** Default destructor. */
+    ~constant_f32() = default;
+
+    /** Default assignments. */
+    constant_f32& operator=(const constant_f32&) = default;
+    constant_f32& operator=(constant_f32&&) = default;
 
     /** Get the floating point value. */
     [[nodiscard]]
@@ -438,24 +351,28 @@ public:
     constant_str(const constant_str&) = default;
     constant_str(constant_str&&) = default;
 
-    /** Default destructor. */
-    ~constant_str() = default;
-
-    /** Default assignments. */
-    constant_str& operator=(const constant_str&) = default;
-    constant_str& operator=(constant_str&&) = default;
-
     /**
      * Construct a constant string value.
      *
      * @param s The string.
      * @param name An optional name.
      */
-    constant_str(std::string s, std::optional<std::string> name = std::nullopt)
-    : value{type{type_class::str, 0}, std::move(name)}
+    constant_str(
+      std::string s,
+      std::optional<std::string> name = std::nullopt)
+    : value{
+        type{type_kind::str},
+        std::move(name)}
     , s{std::move(s)}
     {
     }
+
+    /** Default destructor. */
+    ~constant_str() = default;
+
+    /** Default assignments. */
+    constant_str& operator=(const constant_str&) = default;
+    constant_str& operator=(constant_str&&) = default;
 
     /** Get the string value. */
     [[nodiscard]]
@@ -507,6 +424,8 @@ public:
     /** Register this argument in the constant table, if necessary. */
     virtual void register_const([[maybe_unused]] class context& ctx)
     {
+        // TODO
+        throw std::runtime_error("argument::register_const");
     }
 
     /** Get a string representation of the argument. */
@@ -523,14 +442,53 @@ public:
  */
 class const_argument : public argument
 {
-    /** The constant type. */
-    std::unique_ptr<value> type;
+    /** The value. */
+    std::unique_ptr<value> v;
 
 public:
     /** Default and delered constructors. */
     const_argument() = default;
     const_argument(const const_argument&) = delete;
     const_argument(const_argument&&) = default;
+
+    /**
+     * Create a constant argument holding an `i32`.
+     *
+     * @param i The value to hold.
+     * @param name An optional name.
+     */
+    const_argument(
+      int i,
+      std::optional<std::string> name)
+    : v{std::make_unique<constant_i32>(i, std::move(name))}
+    {
+    }
+
+    /**
+     * Create a constant argument holding an `f32`.
+     *
+     * @param f The value to hold.
+     * @param name An optional name.
+     */
+    const_argument(
+      float f,
+      std::optional<std::string> name)
+    : v{std::make_unique<constant_f32>(f, std::move(name))}
+    {
+    }
+
+    /**
+     * Create a constant argument holding a `str`.
+     *
+     * @param s The value to hold.
+     * @param name An optional name.
+     */
+    const_argument(
+      std::string s,
+      std::optional<std::string> name)
+    : v{std::make_unique<constant_str>(std::move(s), std::move(name))}
+    {
+    }
 
     /** Default destructor. */
     ~const_argument() override = default;
@@ -539,45 +497,13 @@ public:
     const_argument& operator=(const const_argument&) = delete;
     const_argument& operator=(const_argument&&) = default;
 
-    /**
-     * Create an integer argument.
-     *
-     * @param i The constant integer.
-     */
-    explicit const_argument(int i)
-    : type{std::make_unique<constant_int>(i)}
-    {
-    }
-
-    /**
-     * Create a floating-point argument.
-     *
-     * @param f The floating-point value.
-     */
-    const_argument(float f)
-    : type{std::make_unique<constant_float>(f)}
-    {
-    }
-
-    /**
-     * Create a string argument.
-     *
-     * @note A string needs to be registered with a context using `register_const`.
-     *
-     * @param s The string.
-     */
-    const_argument(std::string s)
-    : type{std::make_unique<constant_str>(s)}
-    {
-    }
-
     void register_const(class context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
     const value* get_value() const override
     {
-        return type.get();
+        return v.get();
     }
 };
 
@@ -586,11 +512,8 @@ public:
  */
 class function_argument : public argument
 {
-    /** The function's name. */
-    std::unique_ptr<value> name;
-
-    /** An optional import path for the function. */
-    std::optional<std::string> import_path = std::nullopt;
+    /** Entry in the symbol table. */
+    sema::symbol_id symbol_id;
 
 public:
     /** Defaulted and deleted constructors. */
@@ -608,47 +531,31 @@ public:
     /**
      * Create a function argument.
      *
-     * @param name The function name.
-     * @param import_path The import path of the function, or `std::nullopt`.
+     * @param symbol_id The function's symbol id.
      */
-    function_argument(std::string name, std::optional<std::string> import_path)
-    : name{std::make_unique<value>(type{type_class::fn, 0}, std::move(name))}
-    , import_path{std::move(import_path)}
+    function_argument(sema::symbol_id symbol_id)
+    : symbol_id{symbol_id}
     {
-    }
-
-    /**
-     * Set the import path.
-     *
-     * @param path The import path, or `std::nullopt`.
-     */
-    void set_import_path(std::optional<std::string> import_path)
-    {
-        this->import_path = std::move(import_path);
-    }
-
-    /** Get the import path. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
     }
 
     [[nodiscard]]
     std::string to_string() const override
     {
-        if(import_path.has_value())
-        {
-            return std::format("@{}::{}", *import_path, *name->get_name());
-        }
+        return std::format(
+          "@{}",
+          static_cast<int>(symbol_id.value));
+    }
 
-        return std::format("@{}", *name->get_name());
+    [[nodiscard]]
+    sema::symbol_id get_symbol_id() const
+    {
+        return symbol_id;
     }
 
     [[nodiscard]]
     const value* get_value() const override
     {
-        return name.get();
+        throw std::runtime_error("function_argument::get_value");
     }
 };
 
@@ -825,16 +732,17 @@ enum class type_cast : std::uint8_t
  */
 std::string to_string(type_cast tc);
 
-/**
- * A type cast argument.
- */
+/** A type cast argument. */
 class cast_argument : public argument
 {
     /** The type cast. */
     type_cast cast;
 
-    /** Value of the cast. */
-    std::unique_ptr<value> v;
+    /** Result type id. */
+    value result_value;
+
+    /** Result type of the cast. */
+    type_kind result_type;
 
 public:
     /** Default constructors. */
@@ -854,21 +762,24 @@ public:
      *
      * @param cast The cast type.
      */
-    explicit cast_argument(type_cast cast)
+    cast_argument(
+      type_cast cast)
     : cast{cast}
     {
         if(cast == type_cast::i32_to_f32)
         {
-            v = std::make_unique<value>(type{type_class::f32, 0});
+            result_type = type_kind::f32;
         }
         else if(cast == type_cast::f32_to_i32)
         {
-            v = std::make_unique<value>(type{type_class::i32, 0});
+            result_type = type_kind::i32;
         }
         else
         {
             throw codegen_error("Unknown cast type.");
         }
+
+        result_value = value{result_type};
     }
 
     /** Return the cast type. */
@@ -887,7 +798,7 @@ public:
     [[nodiscard]]
     const value* get_value() const override
     {
-        return v.get();
+        return &result_value;
     }
 };
 
@@ -897,17 +808,17 @@ class field_access_argument : public argument
     /** The struct information. */
     type struct_type;
 
-    /** The field's member. */
-    value member;
+    /** Field index. */
+    std::size_t field_index;
 
 public:
     /** Defaulted and deleted constructors. */
-    field_access_argument() = delete;
-    field_access_argument(const field_access_argument&) = delete;
+    field_access_argument() = default;
+    field_access_argument(const field_access_argument&) = default;
     field_access_argument(field_access_argument&&) = default;
 
     /** Default assignments. */
-    field_access_argument& operator=(const field_access_argument&) = delete;
+    field_access_argument& operator=(const field_access_argument&) = default;
     field_access_argument& operator=(field_access_argument&&) = default;
 
     /** Default destructor. */
@@ -917,40 +828,38 @@ public:
      * Construct a field access.
      *
      * @param struct_type Type information for the struct.
-     * @param member_type The field's accessed member.
+     * @param field_index Index of the field.
      */
-    field_access_argument(type struct_type, value member)
+    field_access_argument(
+      type struct_type,
+      std::size_t field_index)
     : argument()
-    , struct_type{std::move(struct_type)}
-    , member{std::move(member)}
+    , struct_type{struct_type}
+    , field_index{field_index}
     {
     }
 
-    /** Return the struct name. */
+    /** Return the struct's type id. */
     [[nodiscard]]
-    std::string get_struct_name() const
+    ty::type_id get_struct_type_id() const
     {
-        return *struct_type.get_struct_name();
+        return struct_type.get_type_id().value();
     }
 
-    /** Return the struct's import path. */
+    /** Return the field index. */
     [[nodiscard]]
-    std::optional<std::string> get_import_path() const
+    std::size_t get_field_index() const
     {
-        return struct_type.get_import_path();
-    }
-
-    /** Return the field's member. */
-    [[nodiscard]]
-    value get_member() const
-    {
-        return member;
+        return field_index;
     }
 
     [[nodiscard]]
     std::string to_string() const override
     {
-        return std::format("%{}, {}", get_struct_name(), member.to_string());
+        return std::format(
+          "%<type {}>, <field {}>",
+          static_cast<int>(struct_type.get_type_id().value_or(-1)),
+          field_index);
     }
 
     [[nodiscard]]
@@ -1895,6 +1804,15 @@ class context
     friend class slang::opt::cfg::context;
     friend class basic_block;
 
+    /** Semantic environment. */
+    sema::env& sema_env;
+
+    /** Constant environment. */
+    const_::env& const_env;
+
+    /** Type lowering context. */
+    tl::context& lowering_ctx;
+
     /** List of structs. */
     std::vector<std::unique_ptr<struct_>> types;
 
@@ -1918,9 +1836,6 @@ class context
 
     /** Struct stack for access resolution. */
     std::vector<type> struct_access;
-
-    /** Directive stack. */
-    std::vector<directive> directive_stack;
 
     /** List of function prototypes. */
     std::vector<std::unique_ptr<prototype>> prototypes;
@@ -1978,9 +1893,26 @@ public:
 
 public:
     /** Constructors. */
-    context() = default;
+    context() = delete;
     context(const context&) = delete;
     context(context&&) = default;
+
+    /**
+     * Construct a code generation context.
+     *
+     * @param sema_env The semantic environment.
+     * @param const_env The constant evaluation environment.
+     * @param lowering_ctx Type lowering context.
+     */
+    context(
+      sema::env& sema_env,
+      const_::env& const_env,
+      tl::context& lowering_ctx)
+    : sema_env{sema_env}
+    , const_env{const_env}
+    , lowering_ctx{lowering_ctx}
+    {
+    }
 
     /** Destructor. */
     ~context()
@@ -1990,7 +1922,47 @@ public:
 
     /** Assignments. */
     context& operator=(const context&) = delete;
-    context& operator=(context&&) = default;
+    context& operator=(context&&) = delete;
+
+    /**
+     * Lower a front-end type to a back-end type.
+     *
+     * @param id The front-end type id.
+     * @returns Returns the lowered back-end type.
+     */
+    type lower(ty::type_id id)
+    {
+        return lowering_ctx.lower(id);
+    }
+
+    /**
+     * Dereference a type. Needs to have the front-end type id set.
+     *
+     * @param reference_type The type to dereference.
+     * @param Returns the dereferences type.
+     */
+    type deref(const type& reference_type)
+    {
+        return lowering_ctx.deref(reference_type);
+    }
+
+    /** Get the type lowering context. */
+    const tl::context& get_lowering_context() const
+    {
+        return lowering_ctx;
+    }
+
+    /** Get the constant environment. */
+    const const_::env& get_const_env() const
+    {
+        return const_env;
+    }
+
+    /** Get semantic environment. */
+    const sema::env& get_sema_env() const
+    {
+        return sema_env;
+    }
 
     /**
      * Add a symbol to the import table. No-op if the symbol already exists.
@@ -2311,119 +2283,6 @@ public:
       std::optional<std::string> import_path = std::nullopt) const;
 
     /**
-     * Push a directive onto the directive stack.
-     *
-     * @param dir The directive.
-     */
-    void push_directive(directive dir)
-    {
-        directive_stack.emplace_back(std::move(dir));
-    }
-
-    /** Pop a directive from the directive stack. */
-    void pop_directive()
-    {
-        if(directive_stack.empty())
-        {
-            throw codegen_error("No directive to pop.");
-        }
-        directive_stack.pop_back();
-    }
-
-    /** Get all directives. */
-    [[nodiscard]]
-    const std::vector<directive>& get_directives() const
-    {
-        return directive_stack;
-    }
-
-    /** Get directives matching a given name. */
-    [[nodiscard]]
-    std::vector<directive> get_directives(const std::string& name) const
-    {
-        std::vector<directive> directives;
-        std::copy_if(
-          directive_stack.begin(),
-          directive_stack.end(),
-          std::back_inserter(directives),
-          [&name](const directive& dir)
-          {
-              return dir.name.s == name;
-          });
-        return directives;
-    }
-
-    /**
-     * Check if the directive has the specified flag set, that is, it is
-     * part of the directive's keys with a value of `true` or `false`. If
-     * the flag is not found or the values are invalid, `default_value` is
-     * returned.
-     *
-     * If multiple directives with the same flag, or multiple flags with the same
-     * name are found, the respective last one is used.
-     *
-     * @param name The directive's name.
-     * @param flag_name The flag's name.
-     * @param default_value The default value.
-     * @returns The flag's value or the default value.
-     */
-    [[nodiscard]]
-    bool get_directive_flag(
-      const std::string& name,
-      const std::string& flag_name,
-      bool default_value) const
-    {
-        for(auto it = directive_stack.rbegin(); it != directive_stack.rend(); ++it)
-        {
-            if(it->name.s == name)
-            {
-                auto flag_it = std::ranges::find_if(
-                  std::as_const(it->args),
-                  [&flag_name](const std::pair<token, token>& arg)
-                  {
-                      return arg.first.s == flag_name;
-                  });
-                if(flag_it != it->args.cend())
-                {
-                    if(flag_it->second.s.empty() || flag_it->second.s == "true")
-                    {
-                        return true;
-                    }
-                    else if(flag_it->second.s == "false")
-                    {
-                        return false;
-                    }
-                    else
-                    {
-                        return default_value;
-                    }
-                }
-            }
-        }
-
-        return default_value;
-    }
-
-    /** Get the last on the stack directive matching a given name. */
-    [[nodiscard]]
-    std::optional<directive> get_last_directive(const std::string& name) const
-    {
-        auto it = std::ranges::find_if(
-          std::as_const(directive_stack) | std::views::reverse,
-          [&name](const directive& dir)
-          {
-              return dir.name.s == name;
-          });
-
-        if(it != directive_stack.crend())
-        {
-            return *it;
-        }
-
-        return std::nullopt;
-    }
-
-    /**
      * Enter a function. Only one function can be entered at a time.
      *
      * @param fn The function.
@@ -2577,64 +2436,6 @@ public:
     {
         return basic_block_brk_cnt.size();
     }
-
-    /*
-     * Compile-time expression evaluation.
-     */
-
-    /**
-     * Set an expression's compile-time constancy info.
-     *
-     * @param expr The expression.
-     * @param is_constant Whether the expression is constant.
-     */
-    void set_expression_constant(const ast::expression& expr, bool is_constant = true);
-
-    /**
-     * Get an expression's compile-time constancy info.
-     *
-     * @param expr The expression.
-     * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
-     * @throws Throws a `codegen_error` if the expression is not known.
-     */
-    [[nodiscard]]
-    bool get_expression_constant(const ast::expression& expr) const;
-
-    /**
-     * Check if an expression is known to be compile-time constant.
-     *
-     * @param expr The expression.
-     * @returns `true` if the expression is known to be compile-time constant, `false` otherwise.
-     */
-    [[nodiscard]]
-    bool has_expression_constant(const ast::expression& expr) const;
-
-    /**
-     * Set an expression's compile-time value.
-     *
-     * @param expr The expression.
-     * @param value The expression's value.
-     */
-    void set_expression_value(const ast::expression& expr, std::unique_ptr<value> v);
-
-    /**
-     * Get an expression's compile-time value.
-     *
-     * @param expr The expression.
-     * @returns The expression's value.
-     * @throws Throws a `codegen_error` if the expression is not known.
-     */
-    [[nodiscard]]
-    const value& get_expression_value(const ast::expression& expr) const;
-
-    /**
-     * Check if an expression is known to have a compile-time value.
-     *
-     * @param expr The expression.
-     * @returns `true` if the expression is known to have a compile-time value, `false` otherwise.
-     */
-    [[nodiscard]]
-    bool has_expression_value(const ast::expression& expr) const;
 
     /*
      * Code generation.
@@ -2809,11 +2610,14 @@ public:
 
 inline void const_argument::register_const(context& ctx)
 {
-    if(type->get_type().to_string() == "str")
-    {
-        auto type_str = static_cast<constant_str*>(type.get());
-        type_str->set_constant_index(ctx.get_string(type_str->get_str()));
-    }
+    // TODO
+    throw std::runtime_error("const_argument::register_const");
+
+    // if(type->get_type().to_string() == "str")
+    // {
+    //     auto type_str = static_cast<constant_str*>(type.get());
+    //     type_str->set_constant_index(ctx.get_string(type_str->get_str()));
+    // }
 }
 
 /*

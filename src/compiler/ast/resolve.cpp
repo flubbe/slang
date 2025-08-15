@@ -114,6 +114,18 @@ void variable_declaration_expression::resolve_names(rs::context& ctx)
 }
 
 /*
+ * constant_declaration_expression.
+ */
+
+void constant_declaration_expression::resolve_names(rs::context& ctx)
+{
+    if(expr)
+    {
+        expr->resolve_names(ctx);
+    }
+}
+
+/*
  * array_initializer_expression.
  */
 

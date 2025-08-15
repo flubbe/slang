@@ -19,6 +19,7 @@
 
 #include "archives/archive.h"
 #include "compiler/collect.h"
+#include "compiler/constant.h"
 #include "compiler/directive.h"
 #include "compiler/typing.h"
 #include "node_ids.h"
@@ -57,8 +58,8 @@ namespace slang::ast
 
 namespace cg = slang::codegen;
 namespace co = slang::collect;
-namespace ty = slang::typing;
 namespace rs = slang::resolve;
+namespace ty = slang::typing;
 
 /**
  * The memory context for an expression.
@@ -322,10 +323,10 @@ public:
     /**
      * Return whether this expression can be evaluated to a compile-time constant.
      *
-     * @param ctx The context in which to check evaluation.
+     * @param env The constant evaluation environment.
      */
     [[nodiscard]]
-    virtual bool is_const_eval(cg::context&) const
+    virtual bool is_const_eval([[maybe_unused]] const_::env& env) const
     {
         return false;
     }
@@ -344,10 +345,13 @@ public:
     /**
      * Evaluate the compile-time constant.
      *
-     * @param ctx The context used for code generation.
+     * @param ctx The type context.
+     * @param env The semantic environment.
      * @returns Returns the result of the evaluation, or a `nullptr` if evaluation failed.
      */
-    virtual std::unique_ptr<cg::value> evaluate([[maybe_unused]] cg::context& ctx) const;
+    virtual std::optional<const_::const_info> evaluate(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] const_::env& env) const;
 
     /**
      * Generate IR.
@@ -391,36 +395,10 @@ public:
     /** Type definition. */
     void define_types(ty::context& ctx) const;
 
-    /**
-     * Push a directive to the expression's directive stack (during code generation).
-     *
-     * @throws A `type_error` if the directive is not supported by the expression.
-     *
-     * @param ctx The code generation context.
-     * @param name The directive's name.
-     * @param args The directive's arguments.
-     */
-    virtual void push_directive(
-      cg::context& ctx,
-      const token& name,
-      const std::vector<std::pair<token, token>>& args);
-
-    /**
-     * Pop the last directive from the expression's directive stack.
-     *
-     * @param ctx The code generation context.
-     * @throws A `type_error` if the stack was empty.
-     */
-    virtual void pop_directive(cg::context& ctx);
-
-    /**
-     * Check whether a directive is supported by the expression.
-     *
-     * @param name Name of the directive.
-     * @returns True if the directive is supported, and false otherwise.
-     */
-    [[nodiscard]]
-    virtual bool supports_directive([[maybe_unused]] const std::string& name) const;
+    /** Constant evaluation and folding. */
+    void evaluate_constant_expressions(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] const_::env& env);
 
     /**
      * Expand macros stored.
@@ -691,7 +669,7 @@ public:
     }
 
     [[nodiscard]]
-    bool is_const_eval(cg::context&) const override
+    bool is_const_eval(const_::env&) const override
     {
         return true;
     }
@@ -708,7 +686,9 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
@@ -729,6 +709,9 @@ class type_expression
 
     /** The type name. */
     token type_name;
+
+    /** Type id. */
+    ty::type_id type_id;
 
     /** Namespaces. */
     std::vector<token> namespace_stack;
@@ -765,6 +748,8 @@ public:
     [[nodiscard]] std::unique_ptr<type_expression> clone() const;
     void serialize(archive& ar);
 
+    void type_check(ty::context& ctx, sema::env& env);
+
     /** Get the location. */
     [[nodiscard]]
     source_location get_location() const
@@ -791,8 +776,11 @@ public:
     /** Return a readable representation of the type. */
     [[nodiscard]] std::string to_string() const;
 
-    /** Convert the expression to a type. */
-    [[nodiscard]] cg::type to_type() const;
+    /** Get the type id. */
+    [[nodiscard]] ty::type_id get_type() const
+    {
+        return type_id;
+    }
 
     /** Return whether the type is an array. */
     [[nodiscard]]
@@ -823,6 +811,8 @@ class type_cast_expression : public expression
 
     /** The target type. */
     std::unique_ptr<type_expression> target_type;
+
+    // FIXME Use a back-end target type for code generation?
 
 public:
     /** Set the super class. */
@@ -1009,9 +999,9 @@ public:
     }
 
     [[nodiscard]]
-    bool is_const_eval(cg::context& ctx) const override
+    bool is_const_eval(const_::env& env) const override
     {
-        return expr->is_const_eval(ctx);
+        return expr->is_const_eval(env);
     }
 
     [[nodiscard]]
@@ -1020,7 +1010,10 @@ public:
         return expr->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void resolve_names(rs::context& ctx) override;
 
@@ -1416,7 +1409,7 @@ public:
         return element_expr.get();
     }
 
-    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(const_::env& env) const override;
 
     [[nodiscard]]
     bool is_pure(cg::context&) const override
@@ -1424,7 +1417,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void resolve_names(rs::context& ctx) override;
@@ -1652,13 +1647,9 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    void push_directive(
-      cg::context& ctx,
-      const token& name,
-      const std::vector<std::pair<token, token>>& args) override;
-
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1829,7 +1820,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -1870,6 +1860,9 @@ class struct_anonymous_initializer_expression : public named_expression
 {
     /** Anonymous initializers. */
     std::vector<std::unique_ptr<expression>> initializers;
+
+    /** Struct info. Set during type check. */
+    ty::struct_info struct_info;
 
 public:
     /** Set the super class. */
@@ -2189,9 +2182,11 @@ public:
 
     [[nodiscard]] bool needs_pop() const override;
 
-    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(const_::env& env) const override;
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
-    [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
@@ -2271,9 +2266,11 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool is_const_eval(cg::context& ctx) const override;
+    [[nodiscard]] bool is_const_eval(const_::env& env) const override;
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
-    [[nodiscard]] std::unique_ptr<cg::value> evaluate(cg::context& ctx) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
@@ -2597,8 +2594,6 @@ public:
     [[nodiscard]] std::unique_ptr<prototype_ast> clone() const;
     void serialize(archive& ar);
 
-    [[nodiscard]] cg::function* generate_code(cg::context& ctx, memory_context mc = memory_context::none) const;
-    void generate_native_binding(const std::string& lib_name, cg::context& ctx) const;
     void collect_names(co::context& ctx);
     [[nodiscard]] std::string to_string() const;
 
@@ -2798,7 +2793,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    [[nodiscard]] bool supports_directive(const std::string& name) const override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
@@ -3801,7 +3795,6 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    [[nodiscard]] bool supports_directive(const std::string& name) const override;
     [[nodiscard]] std::optional<ty::type_id> type_check(
       [[maybe_unused]] ty::context& ctx,
       [[maybe_unused]] sema::env& env) override;

@@ -117,9 +117,11 @@ const named_expression* expression::as_named_expression() const
     throw std::runtime_error("Expression is not a named expression.");
 }
 
-std::unique_ptr<cg::value> expression::evaluate([[maybe_unused]] cg::context& ctx) const
+std::optional<const_::const_info> expression::evaluate(
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] const_::env& env) const
 {
-    return {};
+    return std::nullopt;
 }
 
 std::unique_ptr<cg::value> expression::generate_code(
@@ -130,50 +132,6 @@ std::unique_ptr<cg::value> expression::generate_code(
       std::format(
         "{}: Expression does not generate code.",
         ::slang::to_string(loc)));
-}
-
-void expression::push_directive(
-  cg::context& ctx,
-  const token& name,
-  const std::vector<std::pair<token, token>>& args)
-{
-    if(!supports_directive(name.s))
-    {
-        auto transform = [](const std::pair<token, token>& arg) -> std::string
-        { 
-            if(arg.second.s.empty())
-            {
-                return arg.first.s;
-            }
-            return std::format("{}={}", arg.first.s, arg.second.s); };
-
-        auto arg_string = slang::utils::join(args, {transform}, ", ");
-
-        // FIXME This should print the source instead of the AST.
-        constexpr std::size_t MAX_SUBSTRING_LENGTH = 80;    // FIXME arbitrary limit.
-
-        auto expr_string = to_string();
-        if(expr_string.empty())
-        {
-            expr_string = "<unknown>";
-        }
-        else if(expr_string.size() > MAX_SUBSTRING_LENGTH)
-        {
-            expr_string = expr_string.substr(0, MAX_SUBSTRING_LENGTH) + "...";
-        }
-
-        throw ty::type_error(
-          name.location,
-          std::format(
-            "Directive '{}'{} is not supported by the expression with AST '{}'.",
-            name.s,
-            !arg_string.empty()
-              ? std::format(" with arguments '{}'", arg_string)
-              : std::string{},
-            expr_string));
-    }
-
-    ctx.push_directive({name, args});
 }
 
 void expression::collect_attributes(sema::env& env) const
@@ -284,14 +242,22 @@ void expression::define_types(ty::context& ctx) const
     );
 }
 
-void expression::pop_directive(cg::context& ctx)
+void expression::evaluate_constant_expressions(
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] const_::env& env)
 {
-    ctx.pop_directive();
-}
-
-bool expression::supports_directive(const std::string& name) const
-{
-    return name == "disable";
+    visit_nodes(
+      [&ctx, &env](const expression& expr) -> void
+      {
+          if(!env.is_expression_evaluated(expr)
+             && expr.is_const_eval(env))
+          {
+              expr.evaluate(ctx, env);
+          }
+      },
+      false, /* don't visit this node */
+      false  /* pre-order traversal */
+    );
 }
 
 std::string expression::to_string() const
@@ -420,7 +386,9 @@ void literal_expression::serialize(archive& ar)
     ar & tok;
 }
 
-std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> literal_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(!tok.value)
     {
@@ -463,29 +431,33 @@ std::unique_ptr<cg::value> literal_expression::generate_code(cg::context& ctx, m
             static_cast<int>(tok.type)));
     }
 
+    cg::type_kind back_end_type;
     if(tok.type == token_type::int_literal)
     {
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, *tok.value);
-        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+        back_end_type = cg::type_kind::i32;
     }
-
-    if(tok.type == token_type::fp_literal)
+    else if(tok.type == token_type::fp_literal)
     {
-        ctx.generate_const({cg::type{cg::type_class::f32, 0}}, *tok.value);
-        return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+        back_end_type = cg::type_kind::f32;
     }
-
-    if(tok.type == token_type::str_literal)
+    else if(tok.type == token_type::str_literal)
     {
-        ctx.generate_const({cg::type{cg::type_class::str, 0}}, *tok.value);
-        return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+        back_end_type = cg::type_kind::str;
+    }
+    else
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Unable to generate code for literal of type id '{}'.",
+            static_cast<int>(tok.type)));
     }
 
-    throw cg::codegen_error(
-      loc,
-      std::format(
-        "Unable to generate code for literal of type id '{}'.",
-        static_cast<int>(tok.type)));
+    auto literal_type = cg::type{
+      expr_type.value(),
+      back_end_type};
+    ctx.generate_const({literal_type}, *tok.value);
+    return std::make_unique<cg::value>(literal_type);
 }
 
 std::optional<ty::type_id> literal_expression::type_check(
@@ -591,22 +563,28 @@ void type_cast_expression::serialize(archive& ar)
     ar & target_type;
 }
 
-std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> type_cast_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     auto v = expr->generate_code(ctx, mc);
 
     // only cast if necessary.
-    if(target_type->get_name().s != v->get_type().to_string())    // FIXME namespaces
+    cg::type lowered_type = ctx.lower(target_type->get_type());
+    if(lowered_type != v->get_type())    // FIXME namespaces
     {
-        if(target_type->get_name().s == "i32" && v->get_type().get_type_class() == cg::type_class::f32)
+        if(lowered_type.get_type_kind() == cg::type_kind::i32
+           && v->get_type().get_type_kind() == cg::type_kind::f32)
         {
             ctx.generate_cast(cg::type_cast::f32_to_i32);
         }
-        else if(target_type->get_name().s == "f32" && v->get_type().get_type_class() == cg::type_class::i32)
+        else if(lowered_type.get_type_kind() == cg::type_kind::f32
+                && v->get_type().get_type_kind() == cg::type_kind::i32)
         {
             ctx.generate_cast(cg::type_cast::i32_to_f32);
         }
-        else if(target_type->get_name().s == "str" && v->get_type().get_type_class() != cg::type_class::struct_)
+        else if(lowered_type.get_type_kind() == cg::type_kind::str
+                && v->get_type().get_type_kind() != cg::type_kind::ref)
         {
             throw cg::codegen_error(
               loc,
@@ -616,28 +594,20 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(cg::context& ctx,
         }
         else
         {
-            auto cast_target_type = target_type->to_type();
-            if(target_type->get_name().s == "str")
+            if(lowered_type.get_type_kind() == cg::type_kind::str)
             {
-                return std::make_unique<cg::value>(std::move(cast_target_type));
+                return std::make_unique<cg::value>(lowered_type);
             }
 
             // casts between non-builtin types are checked at run-time.
-            ctx.generate_checkcast(cast_target_type);
-
-            return std::make_unique<cg::value>(std::move(cast_target_type));
+            ctx.generate_checkcast(lowered_type);
+            return std::make_unique<cg::value>(lowered_type);
         }
 
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
+        return std::make_unique<cg::value>(lowered_type);
     }
 
-    // identity transformation.
-    if(ty::is_builtin_type(target_type->to_string()))
-    {
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(target_type->get_name().s), 0});
-    }
-
-    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, target_type->get_name().s});
+    return std::make_unique<cg::value>(lowered_type);
 }
 
 void type_cast_expression::collect_names(co::context& ctx)
@@ -652,6 +622,8 @@ void type_cast_expression::collect_names(co::context& ctx)
 
 std::optional<ty::type_id> type_cast_expression::type_check(ty::context& ctx, sema::env& env)
 {
+    target_type->type_check(ctx, env);
+
     auto type = expr->type_check(ctx, env);
     if(!type.has_value())
     {
@@ -712,7 +684,9 @@ void namespace_access_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> namespace_access_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> namespace_access_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
     auto expr_namespace_stack = namespace_stack;
@@ -805,7 +779,9 @@ void access_expression::serialize(archive& ar)
     ar & lhs_type;
 }
 
-std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> access_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     // validate expression.
     if(!expr_type.has_value())
@@ -841,7 +817,8 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
             }
 
             ctx.generate_arraylength();
-            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::i32});
         }
 
         throw cg::codegen_error(
@@ -856,25 +833,6 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
      */
     cg::type lhs_value_type = lhs_value->get_type();
 
-    // validate expression.
-    if(lhs_value_type.is_array())
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Cannot load array '{}' as an object.",
-            lhs_value->get_name().value_or("<none>")));
-    }
-
-    if(!lhs_value_type.is_struct())
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Cannot access members of non-struct type '{}'.",
-            lhs_value_type.to_string()));
-    }
-
     // generate access instructions for rhs.
     access_guard ag{ctx, lhs_value_type};
     if(!rhs->is_named_expression())
@@ -882,19 +840,21 @@ std::unique_ptr<cg::value> access_expression::generate_code(cg::context& ctx, me
         return rhs->generate_code(ctx, mc);
     }
 
-    cg::value member_value = ctx.get_struct_member(
-      rhs->get_location(),
-      lhs_value_type.to_string(),
-      rhs->as_named_expression()->get_name().s,
-      lhs_value_type.get_import_path());
+    auto struct_type = cg::type{
+      lhs_type,
+      cg::type_kind::ref};
 
     if(mc != memory_context::store)
     {
-        ctx.generate_get_field(std::make_unique<cg::field_access_argument>(lhs_value_type, member_value));
+        ctx.generate_get_field(
+          std::make_unique<cg::field_access_argument>(
+            struct_type,
+            field_index));
     }
     // NOTE set_field instructions have to be generated by the caller
 
-    return std::make_unique<cg::value>(member_value);
+    return std::make_unique<cg::value>(
+      ctx.lower(expr_type.value()));
 }
 
 void access_expression::collect_names(co::context& ctx)
@@ -1022,22 +982,17 @@ void directive_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> directive_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> directive_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
-    expr->push_directive(ctx, name, args);
-    std::unique_ptr<cg::value> ret = expr->generate_code(ctx, mc);
-    expr->pop_directive(ctx);
-    return ret;
+    return expr->generate_code(ctx, mc);
 }
 
 void directive_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
-
-    // TODO
-    // expr->push_directive(ctx, name, args);
     expr->collect_names(ctx);
-    // expr->pop_directive(ctx);
 }
 
 std::optional<ty::type_id> directive_expression::type_check(ty::context& ctx, sema::env& env)
@@ -1116,7 +1071,9 @@ void variable_reference_expression::serialize(archive& ar)
     ar& expression_serializer{expansion};
 }
 
-std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> variable_reference_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     // check for macro expansions first.
     if(expansion)
@@ -1124,7 +1081,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
         return expansion->generate_code(ctx, mc);
     }
 
-    // First check for variables, then for constants.
+    // check for variables, then for constants.
     std::optional<cg::value> v = get_value(ctx);
     if(!v.has_value())
     {
@@ -1158,65 +1115,71 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
         // load the constant directly.
 
+        cg::type constant_type;
         if(const_v->type == module_::constant_type::i32)
         {
-            ctx.generate_const({cg::type{cg::type_class::i32, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+            constant_type = cg::type{cg::type_kind::i32};
         }
-
-        if(const_v->type == module_::constant_type::f32)
+        else if(const_v->type == module_::constant_type::f32)
         {
-            ctx.generate_const({cg::type{cg::type_class::f32, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
+            constant_type = cg::type{cg::type_kind::f32};
         }
-
-        if(const_v->type == module_::constant_type::str)
+        else if(const_v->type == module_::constant_type::str)
         {
-            ctx.generate_const({cg::type{cg::type_class::str, 0}}, const_v->data);
-            return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+            constant_type = cg::type{cg::type_kind::str};
+        }
+        else
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Cannot load constant '{}{}' of unknown type {}.",
+                import_path.has_value()
+                  ? std::format("{}::", *import_path)
+                  : "",
+                name.s,
+                static_cast<int>(const_v->type)));
         }
 
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Cannot load constant '{}{}' of unknown type {}.",
-            import_path.has_value()
-              ? std::format("{}::", *import_path)
-              : "",
-            name.s,
-            static_cast<int>(const_v->type)));
+        ctx.generate_const(
+          constant_type,
+          const_v->data);
+        return std::make_unique<cg::value>(
+          constant_type);
     }
 
     if(mc != memory_context::store)
     {
-        if(ctx.is_struct_access())
-        {
-            if(!v.value().get_name().has_value())
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format("Cannot access struct: No member name."));
-            }
+        throw std::runtime_error("variable_reference_expression::generate_code");
 
-            auto struct_type = ctx.get_accessed_struct();
-            auto member_value = ctx.get_struct_member(
-              loc,
-              struct_type.to_string(),
-              v.value().get_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
-              struct_type.get_import_path());
+        // if(ctx.is_struct_access())
+        // {
+        //     if(!v.value().get_name().has_value())
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           std::format("Cannot access struct: No member name."));
+        //     }
 
-            ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_type, member_value));
-        }
-        else
-        {
-            ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
-        }
+        //     auto struct_type = ctx.get_accessed_struct();
+        //     auto member_value = ctx.get_struct_member(
+        //       loc,
+        //       struct_type.to_string(),
+        //       v.value().get_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
+        //       struct_type.get_import_path());
 
-        if(element_expr)
-        {
-            element_expr->generate_code(ctx, memory_context::load);
-            ctx.generate_load(std::make_unique<cg::type_argument>(v.value().get_type().deref()), true);
-        }
+        //     ctx.generate_get_field(std::make_unique<cg::field_access_argument>(struct_type, member_value));
+        // }
+        // else
+        // {
+        //     ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(v.value())));
+        // }
+
+        // if(element_expr)
+        // {
+        //     element_expr->generate_code(ctx, memory_context::load);
+        //     ctx.generate_load(std::make_unique<cg::type_argument>(v.value().get_type().deref()), true);
+        // }
     }
     else
     {
@@ -1235,7 +1198,8 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(cg::cont
 
     if(element_expr)
     {
-        return std::make_unique<cg::value>(v.value().deref());
+        return std::make_unique<cg::value>(
+          ctx.deref(v.value().get_type()));
     }
     return std::make_unique<cg::value>(v.value());
 }
@@ -1340,48 +1304,61 @@ std::string variable_reference_expression::to_string() const
 
 std::optional<cg::value> variable_reference_expression::get_value(cg::context& ctx) const
 {
-    if(!ctx.is_struct_access())
-    {
-        auto* scope = ctx.get_scope();
-        if(scope == nullptr)
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format("No scope to search for '{}'.", name.s));
-        }
+    throw std::runtime_error("variable_reference_expression::get_value");
 
-        while(scope != nullptr)
-        {
-            cg::value* v = scope->get_value(name.s);
-            if(v != nullptr)
-            {
-                return *v;
-            }
-            scope = scope->get_outer();
-        }
+    // if(!ctx.is_struct_access())
+    // {
+    //     auto* scope = ctx.get_scope();
+    //     if(scope == nullptr)
+    //     {
+    //         throw cg::codegen_error(
+    //           loc,
+    //           std::format("No scope to search for '{}'.", name.s));
+    //     }
 
-        // name not in scope.
-        return std::nullopt;
-    }
+    //     while(scope != nullptr)
+    //     {
+    //         cg::value* v = scope->get_value(name.s);
+    //         if(v != nullptr)
+    //         {
+    //             return *v;
+    //         }
+    //         scope = scope->get_outer();
+    //     }
 
-    auto struct_type = ctx.get_accessed_struct();
-    if(!struct_type.get_struct_name().has_value())
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format("Cannot access struct: No struct name."));
-    }
+    //     // name not in scope.
+    //     return std::nullopt;
+    // }
 
-    return ctx.get_struct_member(
-      loc,
-      struct_type.get_struct_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
-      get_name().s,
-      struct_type.get_import_path());
+    // auto struct_type = ctx.get_accessed_struct();
+    // if(!struct_type.get_struct_name().has_value())
+    // {
+    //     throw cg::codegen_error(
+    //       loc,
+    //       std::format("Cannot access struct: No struct name."));
+    // }
+
+    // return ctx.get_struct_member(
+    //   loc,
+    //   struct_type.get_struct_name().value(),    // NOLINT(bugprone-unchecked-optional-access)
+    //   get_name().s,
+    //   struct_type.get_import_path());
 }
 
 /*
  * type_expression.
  */
+
+void type_expression::type_check(
+  ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
+{
+    type_id = ctx.get_type(get_qualified_name());
+    if(array)
+    {
+        type_id = ctx.get_array(type_id, 1);
+    }
+}
 
 std::string type_expression::get_qualified_name() const
 {
@@ -1427,29 +1404,6 @@ std::string type_expression::to_string() const
       array);
 }
 
-cg::type type_expression::to_type() const
-{
-    if(ty::is_builtin_type(type_name.s))
-    {
-        if(!namespace_stack.empty())
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Type '{}' cannot occur in a namespace.",
-                type_name.s));
-        }
-
-        return cg::type{cg::to_type_class(type_name.s), array ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)};
-    }
-
-    return cg::type{
-      cg::type_class::struct_,
-      array ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0),    // FIXME Change if more array dimensions need to be supported.
-      type_name.s,
-      get_namespace_path()};
-}
-
 /*
  * variable_declaration_expression.
  */
@@ -1487,7 +1441,9 @@ void variable_declaration_expression::collect_names(co::context& ctx)
     }
 }
 
-std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -1506,22 +1462,9 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(cg::co
             "No scope available for adding locals."));
     }
 
-    std::unique_ptr<cg::value> v;
-    if(ty::is_builtin_type(type->get_name().s))
-    {
-        v = std::make_unique<cg::value>(
-          cg::type{cg::to_type_class(type->get_name().s),
-                   type->is_array() ? static_cast<std::size_t>(1) : static_cast<std::size_t>(0)},
-          name.s);
-        s->add_local(std::make_unique<cg::value>(*v));
-    }
-    else
-    {
-        v = std::make_unique<cg::value>(
-          type->to_type(),
-          name.s);
-        s->add_local(std::make_unique<cg::value>(*v));
-    }
+    std::unique_ptr<cg::value> v = std::make_unique<cg::value>(
+      ctx.lower(type->get_type()), name.s);
+    s->add_local(std::make_unique<cg::value>(*v));
 
     if(is_array())
     {
@@ -1619,78 +1562,36 @@ void constant_declaration_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-void constant_declaration_expression::push_directive(
+std::unique_ptr<cg::value> constant_declaration_expression::generate_code(
   cg::context& ctx,
-  const token& name,
-  const std::vector<std::pair<token, token>>& args)
+  [[maybe_unused]] memory_context mc) const
 {
-    // verify that 'const_eval' is not disabled.
-    if(ctx.get_directive_flag("disable", "const_eval", false))
-    {
-        throw cg::codegen_error(loc, "Cannot declare constant with 'const_eval' disabled.");
-    }
-
-    super::push_directive(ctx, name, args);
-}
-
-std::unique_ptr<cg::value> constant_declaration_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
-{
-    if(!expr->is_const_eval(ctx))
+    auto it = ctx.get_const_env().const_eval_expr_values.find(this);
+    if(it == ctx.get_const_env().const_eval_expr_values.cend())
     {
         throw cg::codegen_error(
           expr->get_location(),
           "Expression in constant declaration is not compile-time computable.");
     }
 
-    auto v = expr->evaluate(ctx);
-    if(!v)
+    auto info = it->second;
+    auto lowered_type = ctx.lower(info.type);
+
+    if(lowered_type == cg::type_kind::i32)
     {
-        throw cg::codegen_error(
-          expr->get_location(),
-          "Expression in constant declaration is not compile-time computable.");
+        ctx.add_constant(name.s, std::get<int>(it->second.value));
+        return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
     }
 
-    auto t = v->get_type();
-
-    if(t.is_array())
+    if(lowered_type == cg::type_kind::f32)
     {
-        throw cg::codegen_error(
-          expr->get_location(),
-          "Compile-time assignment not supported for arrays.");
-    }
-    if(t.is_reference())
-    {
-        throw cg::codegen_error(
-          expr->get_location(),
-          "Compile-time assignment not supported for references.");
-    }
-
-    if(t.to_string() == "i32")
-    {
-        auto* v_i32 = static_cast<cg::constant_int*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        ctx.add_constant(name.s, v_i32->get_int());
-        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
-    }
-
-    if(t.to_string() == "f32")
-    {
-        auto* v_f32 = static_cast<cg::constant_float*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        ctx.add_constant(name.s, v_f32->get_float());
-        return std::make_unique<cg::value>(cg::type{cg::type_class::f32, 0});
-    }
-
-    if(t.to_string() == "str")
-    {
-        auto* v_str = static_cast<cg::constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        ctx.add_constant(name.s, v_str->get_str());
-        return std::make_unique<cg::value>(cg::type{cg::type_class::str, 0});
+        ctx.add_constant(name.s, std::get<float>(it->second.value));
+        return std::make_unique<cg::value>(cg::type{cg::type_kind::f32});
     }
 
     throw cg::codegen_error(
       expr->get_location(),
-      std::format(
-        "Invalid token type '{}' for constant declaration.",
-        t.to_string()));
+      "Compile-time assignment only supported for i32 and f32.");
 }
 
 void constant_declaration_expression::collect_names(co::context& ctx)
@@ -1708,10 +1609,10 @@ void constant_declaration_expression::collect_names(co::context& ctx)
       sema::symbol_id::invalid,
       false);
 
-    // TODO
-    // auto const_type = type->to_type_info(type_ctx);
-    // type_ctx.add_variable(name, const_type);    // FIXME for the typing context, constants and variables are the same right now.
-    // ctx.register_constant_name(name);
+    if(expr)
+    {
+        expr->collect_names(ctx);
+    }
 }
 
 std::optional<ty::type_id> constant_declaration_expression::type_check(ty::context& ctx, sema::env& env)
@@ -1771,7 +1672,9 @@ void array_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{exprs};
 }
 
-std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
+std::unique_ptr<cg::value> array_initializer_expression::generate_code(
+  cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
 {
     std::unique_ptr<cg::value> v;
     auto array_type = ctx.get_array_type();
@@ -1785,8 +1688,11 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
             std::numeric_limits<std::int32_t>::max()));
     }
 
-    ctx.generate_const({cg::type{cg::type_class::i32, 0}}, static_cast<int>(exprs.size()));
-    ctx.generate_newarray(array_type.deref());
+    ctx.generate_const(
+      {cg::type{cg::type_kind::i32}},
+      static_cast<int>(exprs.size()));
+    ctx.generate_newarray(
+      ctx.deref(array_type.get_type()));
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
@@ -1794,7 +1700,9 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(cg::conte
 
         // the top of the stack contains the array address.
         ctx.generate_dup(array_type);
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, static_cast<std::int32_t>(i));
+        ctx.generate_const(
+          {cg::type{cg::type_kind::i32}},
+          static_cast<int>(i));
 
         auto expr_value = expr->generate_code(ctx, memory_context::load);
         if(i >= std::numeric_limits<std::int32_t>::max())
@@ -1908,7 +1816,9 @@ void struct_definition_expression::serialize(archive& ar)
     ar& expression_vector_serializer{members};
 }
 
-std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_definition_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -1928,28 +1838,29 @@ std::unique_ptr<cg::value> struct_definition_expression::generate_code(cg::conte
     std::vector<std::pair<std::string, cg::value>> struct_members =
       members
       | std::views::transform(
-        [](const auto& m)
+        [&ctx](const auto& m)
         {
             return std::make_pair(
               m->get_name().s,
               cg::value{
-                m->get_type()->to_type(),
+                ctx.lower(m->get_type()->get_type()),
                 m->get_name().s});
         })
       | std::ranges::to<std::vector>();
 
-    auto flags = static_cast<std::uint8_t>(module_::struct_flags::none);
-    if(ctx.get_last_directive("allow_cast").has_value())
-    {
-        flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
-    }
-    if(ctx.get_last_directive("native").has_value())
-    {
-        flags |= static_cast<std::uint8_t>(module_::struct_flags::native);
-    }
+    // TODO Set all of the from sema env
+    // auto flags = static_cast<std::uint8_t>(module_::struct_flags::none);
+    // if(ctx.get_last_directive("allow_cast").has_value())
+    // {
+    //     flags |= static_cast<std::uint8_t>(module_::struct_flags::allow_cast);
+    // }
+    // if(ctx.get_last_directive("native").has_value())
+    // {
+    //     flags |= static_cast<std::uint8_t>(module_::struct_flags::native);
+    // }
 
-    s->add_struct(name.s, struct_members, flags);    // FIXME do we need this?
-    ctx.add_struct(name.s, std::move(struct_members), flags);
+    s->add_struct(name.s, struct_members, 0 /* flags */);    // FIXME do we need this?
+    ctx.add_struct(name.s, std::move(struct_members), 0 /* flags */);
 
     return nullptr;
 }
@@ -2002,13 +1913,6 @@ void struct_definition_expression::define_type(ty::context& ctx) const
     ctx.seal_struct(struct_type_id);
 }
 
-bool struct_definition_expression::supports_directive(const std::string& name) const
-{
-    return super::supports_directive(name)
-           || name == "allow_cast"
-           || name == "native";
-}
-
 std::optional<ty::type_id> struct_definition_expression::type_check(ty::context& ctx, sema::env& env)
 {
     for(const auto& m: members)
@@ -2049,7 +1953,9 @@ void struct_anonymous_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -2058,22 +1964,20 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
 
-    cg::type struct_type{cg::type_class::struct_, 0, name.s, get_namespace_path()};
+    cg::type struct_type = ctx.lower(expr_type.value());
     const std::vector<std::pair<std::string, cg::value>>* t{nullptr};
 
     if(s->contains_struct(name.s, get_namespace_path()))
     {
+        // struct is defined in this module.
         t = &s->get_struct(name.s, get_namespace_path());
-        ctx.generate_new(struct_type);
     }
     else
     {
-        auto* type = ctx.get_type(name.s, get_namespace_path());
-        struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
-
+        // struct is imported.
         t = &ctx.get_type(name.s, get_namespace_path())->get_members();
-        ctx.generate_new(struct_type);
     }
+    ctx.generate_new(struct_type);
 
     for(std::size_t i = 0; i < t->size(); ++i)
     {
@@ -2092,8 +1996,10 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
                 name.s,
                 member_name));
         }
-        if(!initializer_value->get_type().is_null()
-           && initializer_value->get_type().to_string() != member_type.get_type().to_string())
+        if(initializer_value->get_type() != member_type.get_type()
+           && initializer_value->get_type().get_type_kind() == cg::type_kind::null
+           && member_type.get_type().get_type_kind() != cg::type_kind::str
+           && member_type.get_type().get_type_kind() != cg::type_kind::ref)
         {
             throw cg::codegen_error(
               loc,
@@ -2105,10 +2011,13 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
                 member_type.get_type().to_string()));
         }
 
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
+        ctx.generate_set_field(
+          std::make_unique<cg::field_access_argument>(
+            struct_type,
+            i));
     }
 
-    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
+    return std::make_unique<cg::value>(struct_type);
 }
 
 void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
@@ -2124,23 +2033,23 @@ void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
 std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(ty::context& ctx, sema::env& env)
 {
     auto struct_type_id = ctx.get_type(name.s);
-    const ty::struct_info& info = ctx.get_struct_info(struct_type_id);
+    struct_info = ctx.get_struct_info(struct_type_id);
 
-    if(initializers.size() != info.fields.size())
+    if(initializers.size() != struct_info.fields.size())
     {
         throw ty::type_error(
           name.location,
           std::format(
             "Struct '{}' has {} members, but {} are initialized.",
             name.s,
-            info.fields.size(),
+            struct_info.fields.size(),
             initializers.size()));
     }
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
         const auto& initializer = initializers[i];
-        const auto& field = info.fields[i];
+        const auto& field = struct_info.fields[i];
 
         auto initializer_type = initializer->type_check(ctx, env);
         if(!initializer_type.has_value())
@@ -2239,7 +2148,9 @@ void struct_named_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -2248,29 +2159,27 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
 
     cg::scope* s = ctx.get_global_scope();    // cannot return nullptr.
 
-    cg::type struct_type{cg::type_class::struct_, 0, name.s, get_namespace_path()};
+    cg::type struct_type = ctx.lower(expr_type.value());
     const std::vector<std::pair<std::string, cg::value>>* t{nullptr};
 
     if(s->contains_struct(name.s, get_namespace_path()))
     {
+        // struct is defined in this module.
         t = &s->get_struct(name.s, get_namespace_path());
-        ctx.generate_new(struct_type);
     }
     else
     {
-        auto* type = ctx.get_type(name.s, get_namespace_path());
-        struct_type = {cg::type_class::struct_, 0, type->get_name(), type->get_import_path()};
-
+        // struct is imported.
         t = &ctx.get_type(name.s, get_namespace_path())->get_members();
-        ctx.generate_new(struct_type);
     }
+    ctx.generate_new(struct_type);
 
     for(const auto& initializer: initializers)
     {
         const auto& member_name = initializer->get_name().s;
 
         auto it = std::ranges::find_if(
-          *t,
+          std::as_const(*t),
           [&member_name](const std::pair<std::string, cg::value>& m) -> bool
           { return m.first == member_name; });
         if(it == t->cend())
@@ -2283,6 +2192,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
         }
 
         const auto& member_type = it->second;
+        auto field_index = std::distance(t->cbegin(), it);
 
         ctx.generate_dup(cg::value{struct_type});
 
@@ -2295,8 +2205,10 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                 "Code generation for '{}.{}' initialization returned no type.",
                 name.s, member_name));
         }
-        if(!initializer_value->get_type().is_null()
-           && initializer_value->get_type().to_string() != member_type.get_type().to_string())
+        if(initializer_value->get_type() != member_type.get_type()
+           && initializer_value->get_type().get_type_kind() == cg::type_kind::null
+           && member_type.get_type().get_type_kind() != cg::type_kind::str
+           && member_type.get_type().get_type_kind() != cg::type_kind::ref)
         {
             throw cg::codegen_error(
               loc,
@@ -2308,10 +2220,13 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(cg
                 member_type.get_type().to_string()));
         }
 
-        ctx.generate_set_field(std::make_unique<cg::field_access_argument>(struct_type, member_type));
+        ctx.generate_set_field(
+          std::make_unique<cg::field_access_argument>(
+            struct_type,
+            field_index));
     }
 
-    return std::make_unique<cg::value>(cg::type{cg::type_class::struct_, 0, name.s});
+    return std::make_unique<cg::value>(struct_type);
 }
 
 void struct_named_initializer_expression::collect_names(co::context& ctx)
@@ -2504,7 +2419,9 @@ bool binary_expression::is_pure(cg::context& ctx) const
     return !is_assignment && lhs->is_pure(ctx) && rhs->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> binary_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     /*
      * Code generation for binary expressions
@@ -2591,10 +2508,11 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
         bool disable_const_eval = !ctx_const_eval;
 
-        disable_const_eval = ctx.get_directive_flag(
-          "disable",
-          "const_eval",
-          disable_const_eval);
+        // TODO
+        // disable_const_eval = ctx.get_directive_flag(
+        //   "disable",
+        //   "const_eval",
+        //   disable_const_eval);
 
         {
             // Reset constant expression evaluation on scope exit.
@@ -2603,28 +2521,33 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
               { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
             ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
+            auto it = ctx.get_const_env().const_eval_expr_values.find(this);
             if(ctx.evaluate_constant_subexpressions
-               && is_const_eval(ctx))
+               && it != ctx.get_const_env().const_eval_expr_values.cend())
             {
-                auto v = evaluate(ctx);
-                if(v)
-                {
-                    auto t = v->get_type();
-                    if(t.to_string() == "i32")
-                    {
-                        ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                        return v;
-                    }
-                    if(t.to_string() == "f32")
-                    {
-                        ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                        return v;
-                    }
+                auto info = it->second;
+                auto lowered_type = ctx.lower(info.type);
 
-                    // fall-through
+                if(lowered_type == cg::type_kind::i32)
+                {
+                    ctx.generate_const(
+                      {lowered_type},
+                      std::get<int>(info.value));
+
+                    return std::make_unique<cg::value>(lowered_type);
+                }
+                else if(lowered_type == cg::type_kind::f32)
+                {
+                    ctx.generate_const(
+                      {lowered_type},
+                      std::get<float>(info.value));
+
+                    return std::make_unique<cg::value>(lowered_type);
                 }
 
-                std::println("{}: Warning: Attempted constant expression computation failed.", ::slang::to_string(loc));
+                std::println(
+                  "{}: Warning: Attempted constant expression computation failed.",
+                  ::slang::to_string(loc));
                 // fall-through
             }
         }
@@ -2633,14 +2556,17 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         rhs_value = rhs->generate_code(ctx, memory_context::load);
 
         if(lhs_value->get_type() != rhs_value->get_type()
-           && !(is_comparison && lhs_value->get_type().is_reference() && rhs_value->get_type().is_null()))
+           && !(is_comparison
+                && (lhs_value->get_type().get_type_kind() == cg::type_kind::str
+                    || lhs_value->get_type().get_type_kind() == cg::type_kind::ref)
+                && rhs_value->get_type().get_type_kind() == cg::type_kind::null))
         {
             throw cg::codegen_error(
               loc,
               std::format(
                 "Types don't match in binary operation. L.h.s.: {}, R.h.s.: {}.",
-                lhs_value->get_type().to_string(),
-                rhs_value->get_type().to_string()));
+                ctx.get_lowering_context().get_name(lhs_value->get_type().get_type_id().value()),
+                ctx.get_lowering_context().get_name(rhs_value->get_type().get_type_id().value())));
         }
 
         auto it = binary_op_map.find(reduced_op);
@@ -2658,7 +2584,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         if(is_comparison)
         {
             // comparisons are non-compound, so this must be a non-assignment operation.
-            return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+            return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
         }
         if(!is_assignment)
         {
@@ -2683,18 +2609,21 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
-            {
-                ctx.generate_dup(*rhs_value, {cg::value{cg::type{cg::type_class::addr, 0}}});
-            }
-            else if(
-              rhs_value->get_type().is_array()
-              || rhs_value->get_type().is_reference()
-              || rhs_value->get_type().is_null())
+            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
+               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
             {
                 ctx.generate_dup(
-                  {cg::value{cg::type{cg::type_class::addr, 0}}},
-                  {cg::value{cg::type{cg::type_class::addr, 0}}});
+                  *rhs_value,
+                  {cg::value{cg::type{cg::type_kind::ref}}});
+            }
+            else if(
+              rhs_value->get_type().get_type_kind() == cg::type_kind::str
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
+            {
+                ctx.generate_dup(
+                  {cg::value{cg::type{cg::type_kind::ref}}},
+                  {cg::value{cg::type{cg::type_kind::ref}}});
             }
             else
             {
@@ -2715,35 +2644,11 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
               loc,
               "No struct info available");
         }
-        std::optional<std::string> import_path;
-        if(struct_info.value().qualified_name.has_value())
-        {
-            auto end = std::format("::{}", struct_info.value().name);
-            if(
-              !struct_info.value().qualified_name.value().ends_with(end)
-              || end.length() == struct_info.value().qualified_name.value().length())
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid qualified name '{}'.",
-                    struct_info.value().qualified_name.value()));
-            }
-            import_path = struct_info.value().qualified_name.value().substr(
-              0,
-              struct_info.value().qualified_name.value().length() - end.length());
-        }
-
-        cg::type struct_type{
-          cg::type_class::struct_,
-          0,
-          struct_info.value().name,
-          import_path};
 
         ctx.generate_set_field(
           std::make_unique<cg::field_access_argument>(
-            struct_type,
-            *lhs_store_value));
+            ctx.lower(ae_lhs->get_struct_type()),
+            ae_lhs->get_field_index()));
         return rhs_value;
     }
     /* Cases 2. (cont.), 5. (cont.) */
@@ -2752,20 +2657,21 @@ std::unique_ptr<cg::value> binary_expression::generate_code(cg::context& ctx, me
         // duplicate the value for chained assignments.
         if(mc == memory_context::load)
         {
-            if(ty::is_builtin_type(rhs_value->get_type().to_string()))
+            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
+               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
             {
                 ctx.generate_dup(*rhs_value,
-                                 {cg::value{cg::type{cg::type_class::i32, 0}},
-                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+                                 {cg::value{cg::type{cg::type_kind::i32}},
+                                  cg::value{cg::type{cg::type_kind::ref}}});
             }
             else if(
-              rhs_value->get_type().is_array()
-              || rhs_value->get_type().is_reference()
-              || rhs_value->get_type().is_null())
+              rhs_value->get_type().get_type_kind() == cg::type_kind::str
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
             {
-                ctx.generate_dup(cg::value{cg::type{cg::type_class::addr, 0}},
-                                 {cg::value{cg::type{cg::type_class::i32, 0}},
-                                  cg::value{cg::type{cg::type_class::addr, 0}}});
+                ctx.generate_dup(cg::value{cg::type{cg::type_kind::ref}},
+                                 {cg::value{cg::type{cg::type_kind::i32}},
+                                  cg::value{cg::type{cg::type_kind::ref}}});
             }
             else
             {
@@ -2976,7 +2882,9 @@ bool unary_expression::is_pure(cg::context& ctx) const
     return operand->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> unary_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -2986,8 +2894,8 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     if(op.s == "++")
     {
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().get_type_class() != cg::type_class::i32
-           && v->get_type().get_type_class() != cg::type_class::f32)
+        if(v->get_type().get_type_kind() != cg::type_kind::i32
+           && v->get_type().get_type_kind() != cg::type_kind::f32)
         {
             throw cg::codegen_error(
               loc,
@@ -2996,11 +2904,11 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_class() == cg::type_class::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_type().get_type_class() == cg::type_class::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
             ctx.generate_const(*v, 1.f);
         }
@@ -3023,11 +2931,11 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_class() == cg::type_class::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
             ctx.generate_const(*v, 1);
         }
-        else if(v->get_type().get_type_class() == cg::type_class::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
             ctx.generate_const(*v, 1.f);
         }
@@ -3042,10 +2950,11 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
     bool disable_const_eval = !ctx_const_eval;
 
-    disable_const_eval = ctx.get_directive_flag(
-      "disable",
-      "const_eval",
-      disable_const_eval);
+    // TODO
+    // disable_const_eval = ctx.get_directive_flag(
+    //   "disable",
+    //   "const_eval",
+    //   disable_const_eval);
 
     {
         // Reset constant expression evaluation on scope exit.
@@ -3054,28 +2963,33 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
           { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
         ctx.evaluate_constant_subexpressions = !disable_const_eval;
 
+        auto it = ctx.get_const_env().const_eval_expr_values.find(this);
         if(ctx.evaluate_constant_subexpressions
-           && is_const_eval(ctx))
+           && it != ctx.get_const_env().const_eval_expr_values.cend())
         {
-            auto v = evaluate(ctx);
-            if(v)
-            {
-                auto t = v->get_type();
-                if(t.to_string() == "i32")
-                {
-                    ctx.generate_const(*v, static_cast<cg::constant_int*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                    return v;
-                }
-                if(t.to_string() == "f32")
-                {
-                    ctx.generate_const(*v, static_cast<cg::constant_float*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-                    return v;
-                }
+            auto info = it->second;
+            auto lowered_type = ctx.lower(info.type);
 
-                // fall-through
+            if(lowered_type == cg::type_kind::i32)
+            {
+                ctx.generate_const(
+                  {lowered_type},
+                  std::get<int>(info.value));
+
+                return std::make_unique<cg::value>(lowered_type);
+            }
+            else if(lowered_type == cg::type_kind::f32)
+            {
+                ctx.generate_const(
+                  {lowered_type},
+                  std::get<float>(info.value));
+
+                return std::make_unique<cg::value>(lowered_type);
             }
 
-            std::println("{}: Warning: Attempted constant expression computation failed.", ::slang::to_string(loc));
+            std::println(
+              "{}: Warning: Attempted constant expression computation failed.",
+              ::slang::to_string(loc));
             // fall-through
         }
     }
@@ -3092,13 +3006,13 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         auto v = operand->generate_code(ctx, mc);
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type().get_type_class() == cg::type_class::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0));
+            args.emplace_back(std::make_unique<cg::const_argument>(0, std::nullopt));
         }
-        else if(v->get_type().get_type_class() == cg::type_class::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0.f));
+            args.emplace_back(std::make_unique<cg::const_argument>(0.f, std::nullopt));
         }
         else
         {
@@ -3117,7 +3031,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
     if(op.s == "!")
     {
         auto v = operand->generate_code(ctx, memory_context::load);
-        if(v->get_type().get_type_class() != cg::type_class::i32)
+        if(v->get_type().get_type_kind() != cg::type_kind::i32)
         {
             throw cg::codegen_error(
               loc,
@@ -3126,10 +3040,10 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
                 v->get_type().to_string()));
         }
 
-        ctx.generate_const({cg::type{cg::type_class::i32, 0}}, 0);
+        ctx.generate_const({cg::type{cg::type_kind::i32}}, 0);
         ctx.generate_binary_op(cg::binary_op::op_equal, *v);
 
-        return std::make_unique<cg::value>(cg::type{cg::type_class::i32, 0});
+        return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
     }
 
     if(op.s == "~")
@@ -3138,7 +3052,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         std::size_t pos = instrs.size();
 
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().get_type_class() != cg::type_class::i32)
+        if(v->get_type().get_type_kind() != cg::type_kind::i32)
         {
             throw cg::codegen_error(
               loc,
@@ -3148,7 +3062,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(cg::context& ctx, mem
         }
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        args.emplace_back(std::make_unique<cg::const_argument>(~0));
+        args.emplace_back(std::make_unique<cg::const_argument>(~0, std::nullopt));
 
         instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
 
@@ -3258,31 +3172,26 @@ bool new_expression::is_pure(cg::context& ctx) const
     return expr->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> new_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
         throw cg::codegen_error(loc, "Cannot store into new expression.");
     }
 
-    token type_name = type_expr->get_name();
-    if(ty::is_builtin_type(type_name.s) && type_expr->get_namespace_path().has_value())
+    cg::type element_type = ctx.lower(type_expr->get_type());
+    if(element_type.get_type_kind() == cg::type_kind::void_)
     {
         throw cg::codegen_error(
           loc,
-          "Cannot use namespaces with built-in types.");
-    }
-
-    if(type_name.s == "void")
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot create array with entries of type 'void'.");
+          "Cannot create array with elements of type 'void'.");
     }
 
     // generate array size.
     std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::load);
-    if(v->get_type().get_type_class() != cg::type_class::i32)
+    if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
           loc,
@@ -3291,15 +3200,17 @@ std::unique_ptr<cg::value> new_expression::generate_code(cg::context& ctx, memor
             v->get_type().to_string()));
     }
 
-    if(ty::is_builtin_type(type_name.s))
+    if(element_type.get_type_kind() == cg::type_kind::i32
+       || element_type.get_type_kind() == cg::type_kind::f32
+       || element_type.get_type_kind() == cg::type_kind::str)
     {
-        ctx.generate_newarray(cg::value{cg::type{cg::to_type_class(type_name.s), 0}});
-        return std::make_unique<cg::value>(cg::type{cg::to_type_class(type_name.s), 1});
+        ctx.generate_newarray(cg::value{element_type});
+        return std::make_unique<cg::value>(cg::type{cg::type_kind::ref});
     }
 
     // custom type.
-    ctx.generate_anewarray(cg::value{type_expr->to_type()});
-    return std::make_unique<cg::value>(type_expr->to_type());
+    ctx.generate_anewarray(cg::value{element_type});
+    return std::make_unique<cg::value>(cg::type_kind::ref);
 }
 
 void new_expression::collect_names(co::context& ctx)
@@ -3363,7 +3274,9 @@ std::unique_ptr<expression> null_expression::clone() const
     return std::make_unique<null_expression>(*this);
 }
 
-std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> null_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -3372,7 +3285,7 @@ std::unique_ptr<cg::value> null_expression::generate_code(cg::context& ctx, memo
 
     ctx.generate_const_null();
 
-    return std::make_unique<cg::value>(cg::type{cg::type_class::null, 0});
+    return std::make_unique<cg::value>(cg::type{cg::type_kind::null});
 }
 
 std::optional<ty::type_id> null_expression::type_check(ty::context& ctx, sema::env& env)
@@ -3404,7 +3317,9 @@ void postfix_expression::serialize(archive& ar)
     ar & op;
 }
 
-std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> postfix_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::store)
     {
@@ -3421,33 +3336,27 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(cg::context& ctx, m
             v->get_type().to_string()));
     }
 
-    if(op.s == "++")
+    if(op.s == "++"
+       || op.s == "--")
     {
         ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_type().get_type_class() == cg::type_class::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
+            ctx.generate_const(cg::value{cg::type{cg::type_kind::i32}}, 1);
         }
-        else if(v->get_type().get_type_class() == cg::type_class::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
-            ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
+            ctx.generate_const(cg::value{cg::type{cg::type_kind::f32}}, 1.f);
         }
-        ctx.generate_binary_op(cg::binary_op::op_add, *v);
 
-        ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
-    }
-    else if(op.s == "--")
-    {
-        ctx.generate_dup(*v);    // keep the value on the stack.
-        if(v->get_type().get_type_class() == cg::type_class::i32)
+        if(op.s == "++")
         {
-            ctx.generate_const(cg::value{cg::type{cg::type_class::i32, 0}}, 1);
+            ctx.generate_binary_op(cg::binary_op::op_add, *v);
         }
-        else if(v->get_type().get_type_class() == cg::type_class::f32)
+        else
         {
-            ctx.generate_const(cg::value{cg::type{cg::type_class::f32, 0}}, 1.f);
+            ctx.generate_binary_op(cg::binary_op::op_sub, *v);
         }
-        ctx.generate_binary_op(cg::binary_op::op_sub, *v);
 
         ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(*v)));
     }
@@ -3516,142 +3425,6 @@ void prototype_ast::serialize(archive& ar)
     ar & return_type;
     ar & arg_type_ids;
     ar & return_type_id;
-}
-
-/**
- * Transform a `type_info` from the type system to a value
- * digestible by the code generator.
- *
- * @param base_type The base type, as a string.
- * @param builtin Whether the base type is a builtin type.
- * @param rank Array rank, or `std::nullopt`.
- * @param name An optional name for the value.
- * @param import_path Optional import path of the type.
- * @returns Returns a unique pointer of type `cg::value`.
- * @throws Throws a `ty::type_error` if the import path for a built-in type is set.
- */
-static std::unique_ptr<cg::value> to_value(
-  const std::string& base_type,
-  bool builtin,
-  std::optional<std::size_t> rank,
-  std::optional<std::string> name,
-  std::optional<std::string> import_path)
-{
-    if(builtin)
-    {
-        if(import_path.has_value())
-        {
-            throw ty::type_error(
-              std::format(
-                "Built-in type '{}' cannot have an import path.",
-                base_type));
-        }
-
-        return std::make_unique<cg::value>(
-          cg::type{
-            cg::to_type_class(base_type),
-            rank.value_or(0)},
-          std::move(name));
-    }
-
-    return std::make_unique<cg::value>(
-      cg::type{
-        cg::type_class::struct_,
-        rank.value_or(0),
-        base_type,
-        std::move(import_path)},
-      std::move(name));
-}
-
-cg::function* prototype_ast::generate_code(cg::context& ctx, memory_context mc) const
-{
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for prototype.");
-    }
-
-    if(args.size() != arg_type_ids.size())
-    {
-        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
-    }
-
-    std::vector<std::unique_ptr<cg::value>> function_args;
-    function_args.reserve(args.size());
-    for(std::size_t i = 0; i < args.size(); ++i)
-    {
-        std::optional<std::size_t> rank{std::nullopt};
-        if(arg_type_info[i].second.kind == ty::type_kind::array)
-        {
-            rank = std::get<ty::array_info>(arg_type_info[i].second.data).rank;
-        }
-
-        function_args.emplace_back(
-          to_value(
-            arg_type_info[i].first,
-            arg_type_info[i].second.kind == ty::type_kind::builtin,
-            rank,
-            std::get<0>(args[i]).s,
-            std::nullopt /* TODO import path - maybe don't even store it here? */
-            ));
-    }
-
-    std::optional<std::size_t> rank{std::nullopt};
-    if(return_type_info.second.kind == ty::type_kind::array)
-    {
-        rank = std::get<ty::array_info>(return_type_info.second.data).rank;
-    }
-
-    std::unique_ptr<cg::value> ret = to_value(
-      return_type_info.first,
-      return_type_info.second.kind == ty::type_kind::builtin,
-      rank,
-      std::nullopt,
-      std::nullopt /* TODO import path - maybe don't even store it here? */
-    );
-    return ctx.create_function(name.s, std::move(ret), std::move(function_args));
-}
-
-void prototype_ast::generate_native_binding(const std::string& lib_name, cg::context& ctx) const
-{
-    if(args.size() != arg_type_ids.size())
-    {
-        throw cg::codegen_error(loc, "Argument count differs from argument type count.");
-    }
-
-    std::vector<std::unique_ptr<cg::value>> function_args;
-    function_args.reserve(args.size());
-    for(std::size_t i = 0; i < args.size(); ++i)
-    {
-        std::optional<std::size_t> rank{std::nullopt};
-        if(arg_type_info[i].second.kind == ty::type_kind::array)
-        {
-            rank = std::get<ty::array_info>(arg_type_info[i].second.data).rank;
-        }
-
-        function_args.emplace_back(
-          to_value(
-            arg_type_info[i].first,
-            arg_type_info[i].second.kind == ty::type_kind::builtin,
-            rank,
-            std::get<0>(args[i]).s,
-            std::nullopt /* TODO import path - maybe don't even store it here? */
-            ));
-    }
-
-    std::optional<std::size_t> rank{std::nullopt};
-    if(return_type_info.second.kind == ty::type_kind::array)
-    {
-        rank = std::get<ty::array_info>(return_type_info.second.data).rank;
-    }
-
-    std::unique_ptr<cg::value> ret = to_value(
-      return_type_info.first,
-      return_type_info.second.kind == ty::type_kind::builtin,
-      rank,
-      std::nullopt,
-      std::nullopt /* TODO import path - maybe don't even store it here? */
-    );
-    ctx.create_native_function(lib_name, name.s, std::move(ret), std::move(function_args));
 }
 
 void prototype_ast::collect_names(co::context& ctx)
@@ -3751,7 +3524,9 @@ bool block::is_pure(cg::context& ctx) const
       });
 }
 
-std::unique_ptr<cg::value> block::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> block::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc == memory_context::none)
     {
@@ -3919,96 +3694,108 @@ void function_expression::serialize(archive& ar)
     ar& expression_serializer{body};
 }
 
-std::unique_ptr<cg::value> function_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> function_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
-    auto d = ctx.get_last_directive("native");
-    if(!d.has_value())
+    if(mc != memory_context::none)
     {
-        if(mc != memory_context::none)
-        {
-            throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
-        }
+        throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
+    }
 
-        cg::function* fn = prototype->generate_code(ctx);
-        cg::function_guard fg{ctx, fn};
-        cg::scope_guard sg{ctx, fn->get_scope()};
+    // TODO
+    throw std::runtime_error("function_expression::generate_code");
 
-        cg::basic_block* bb = cg::basic_block::create(ctx, "entry");
-        fn->append_basic_block(bb);
+    if(!ctx.get_sema_env().has_attribute(symbol_id.value(), attribs::attribute_kind::native))
+    {
+        std::vector<std::unique_ptr<cg::value>> args;
+        std::unique_ptr<cg::value> ret;
 
-        ctx.set_insertion_point(bb);
+        // ctx.create_function(
+        //   prototype->get_name().s);
 
-        if(!body)
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "No function body defined for '{}'.",
-                prototype->get_name().s));
-        }
+        //     cg::function* fn = prototype->generate_code(ctx);
+        //     cg::function_guard fg{ctx, fn};
+        //     cg::scope_guard sg{ctx, fn->get_scope()};
 
-        auto v = body->generate_code(ctx);
+        //     cg::basic_block* bb = cg::basic_block::create(ctx, "entry");
+        //     fn->append_basic_block(bb);
 
-        // verify that the break-continue-stack is empty.
-        if(ctx.get_break_continue_stack_size() != 0)
-        {
-            throw cg::codegen_error(
-              loc,
-              "Internal error: Break-continue stack is not empty.");
-        }
+        //     ctx.set_insertion_point(bb);
 
-        auto* ip = ctx.get_insertion_point(true);
-        if(!ip->ends_with_return())
-        {
-            // for `void` return types, we insert a return instruction. otherwise, the
-            // return statement is missing and we throw an error.
-            auto ret_type = std::get<0>(fn->get_signature());
-            if(!ret_type.is_void())
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Missing return statement in function '{}'.",
-                    fn->get_name()));
-            }
+        //     if(!body)
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           std::format(
+        //             "No function body defined for '{}'.",
+        //             prototype->get_name().s));
+        //     }
 
-            ctx.generate_ret(v ? std::make_optional(*v) : std::nullopt);
-        }
+        //     auto v = body->generate_code(ctx);
+
+        //     // verify that the break-continue-stack is empty.
+        //     if(ctx.get_break_continue_stack_size() != 0)
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           "Internal error: Break-continue stack is not empty.");
+        //     }
+
+        //     auto* ip = ctx.get_insertion_point(true);
+        //     if(!ip->ends_with_return())
+        //     {
+        //         // for `void` return types, we insert a return instruction. otherwise, the
+        //         // return statement is missing and we throw an error.
+        //         auto ret_type = std::get<0>(fn->get_signature());
+        //         if(!ret_type.is_void())
+        //         {
+        //             throw cg::codegen_error(
+        //               loc,
+        //               std::format(
+        //                 "Missing return statement in function '{}'.",
+        //                 fn->get_name()));
+        //         }
+
+        //         ctx.generate_ret(v ? std::make_optional(*v) : std::nullopt);
+        //     }
     }
     else
     {
-        auto& directive = *d;
-        if(directive.args.size() != 1 || directive.args[0].first.s != "lib")
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Native function '{}': Expected argument 'lib' for directive.",
-                prototype->get_name().s));
-        }
+        //     auto& directive = *d;
+        //     if(directive.args.size() != 1 || directive.args[0].first.s != "lib")
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           std::format(
+        //             "Native function '{}': Expected argument 'lib' for directive.",
+        //             prototype->get_name().s));
+        //     }
 
-        if(directive.args[0].second.type != token_type::str_literal && directive.args[0].second.type != token_type::identifier)
-        {
-            throw cg::codegen_error(
-              loc,
-              "Expected 'lib=<identifier>' or 'lib=<string-literal>'.");
-        }
+        //     if(directive.args[0].second.type != token_type::str_literal && directive.args[0].second.type != token_type::identifier)
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           "Expected 'lib=<identifier>' or 'lib=<string-literal>'.");
+        //     }
 
-        if(directive.args[0].second.type == token_type::str_literal
-           && !directive.args[0].second.value.has_value())
-        {
-            throw cg::codegen_error(
-              loc,
-              "Directive argument has no value for <string-literal>.");
-        }
+        //     if(directive.args[0].second.type == token_type::str_literal
+        //        && !directive.args[0].second.value.has_value())
+        //     {
+        //         throw cg::codegen_error(
+        //           loc,
+        //           "Directive argument has no value for <string-literal>.");
+        //     }
 
-        std::string lib_name =
-          (directive.args[0].second.type == token_type::str_literal)
-            ? std::get<std::string>(*directive.args[0].second.value)    // NOLINT(bugprone-unchecked-optional-access)
-            : directive.args[0].second.s;
+        //     std::string lib_name =
+        //       (directive.args[0].second.type == token_type::str_literal)
+        //         ? std::get<std::string>(*directive.args[0].second.value)    // NOLINT(bugprone-unchecked-optional-access)
+        //         : directive.args[0].second.s;
 
-        prototype->generate_native_binding(lib_name, ctx);
+        //     prototype->generate_native_binding(lib_name, ctx);
     }
+
+    throw std::runtime_error("function_expression::generate_code");
 
     return nullptr;
 }
@@ -4040,12 +3827,6 @@ void function_expression::collect_names(co::context& ctx)
     }
 
     ctx.pop_scope();
-}
-
-bool function_expression::supports_directive(const std::string& name) const
-{
-    return super::supports_directive(name)
-           || name == "native";
 }
 
 std::optional<ty::type_id> function_expression::type_check(ty::context& ctx, sema::env& env)
@@ -4102,7 +3883,9 @@ bool call_expression::is_pure([[maybe_unused]] cg::context& ctx) const
     return false;
 }
 
-std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> call_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     // Code generation for function calls.
     if(mc == memory_context::store)
@@ -4114,15 +3897,21 @@ std::unique_ptr<cg::value> call_expression::generate_code(cg::context& ctx, memo
     {
         arg->generate_code(ctx, memory_context::load);
     }
-    ctx.generate_invoke(std::make_unique<cg::function_argument>(callee.s, get_namespace_path()));
+    ctx.generate_invoke(
+      std::make_unique<cg::function_argument>(
+        symbol_id.value()));
 
     auto return_type = ctx.get_prototype(callee.s, get_namespace_path()).get_return_type();
     if(index_expr)
     {
         // evaluate the index expression.
         index_expr->generate_code(ctx, memory_context::load);
-        ctx.generate_load(std::make_unique<cg::type_argument>(return_type.deref()), true);
-        return std::make_unique<cg::value>(return_type.deref());
+        ctx.generate_load(
+          std::make_unique<cg::type_argument>(
+            ctx.deref(return_type.get_type())),
+          true);
+        return std::make_unique<cg::value>(
+          ctx.deref(return_type.get_type()));
     }
 
     return std::make_unique<cg::value>(std::move(return_type));
@@ -4339,7 +4128,9 @@ void return_statement::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> return_statement::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> return_statement::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -4454,7 +4245,9 @@ void if_statement::serialize(archive& ar)
     ar& expression_serializer{else_block};
 }
 
-std::unique_ptr<cg::value> if_statement::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> if_statement::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -4603,7 +4396,9 @@ void while_statement::serialize(archive& ar)
     ar& expression_serializer{while_block};
 }
 
-std::unique_ptr<cg::value> while_statement::generate_code(cg::context& ctx, memory_context mc) const
+std::unique_ptr<cg::value> while_statement::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
 {
     if(mc != memory_context::none)
     {
@@ -4699,7 +4494,9 @@ std::unique_ptr<expression> break_statement::clone() const
     return std::make_unique<break_statement>(*this);
 }
 
-std::unique_ptr<cg::value> break_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
+std::unique_ptr<cg::value> break_statement::generate_code(
+  cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
@@ -4715,7 +4512,9 @@ std::unique_ptr<expression> continue_statement::clone() const
     return std::make_unique<continue_statement>(*this);
 }
 
-std::unique_ptr<cg::value> continue_statement::generate_code(cg::context& ctx, [[maybe_unused]] memory_context mc) const
+std::unique_ptr<cg::value> continue_statement::generate_code(
+  cg::context& ctx,
+  [[maybe_unused]] memory_context mc) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);

@@ -29,8 +29,10 @@ add_executable(slang
     src/compiler/attribute.cpp
     src/compiler/codegen.cpp
     src/compiler/collect.cpp
+    src/compiler/constant.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
+    src/compiler/lowering.cpp
     src/compiler/location.cpp
     src/compiler/macro.cpp
     src/compiler/opt/cfg.cpp

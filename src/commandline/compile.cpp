@@ -201,8 +201,8 @@ void compile::invoke(const std::vector<std::string>& args)
     const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
     ld::context loader_ctx{file_mgr};
-    cg::context codegen_ctx;
     sema::env env;
+    cg::context codegen_ctx{env};
     co::context co_ctx{env};
     ty::context type_ctx;
     rs::context resolver_ctx{env};

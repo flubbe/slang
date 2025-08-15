@@ -49,8 +49,10 @@ add_executable(test_parser
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
@@ -74,6 +76,9 @@ add_executable(test_codegen
     test_codegen.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/typing.cpp
+    ../src/utils.cpp
 )
 target_link_libraries(test_codegen GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
 target_compile_options(test_codegen PRIVATE
@@ -95,8 +100,10 @@ add_executable(test_compile_ir
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -127,8 +134,10 @@ add_executable(test_type_system
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
@@ -164,8 +173,10 @@ add_executable(test_resolve
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
@@ -202,9 +213,11 @@ add_executable(test_opt_cfg
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
@@ -241,9 +254,11 @@ add_executable(test_output
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
@@ -293,8 +308,10 @@ add_executable(test_ast_serialization
     ../src/compiler/attribute.cpp
     ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp

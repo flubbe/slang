@@ -51,7 +51,7 @@ void run_test(
     co::context co_ctx{env};
     rs::context resolver_ctx{env};
     ty::context type_ctx;
-    cg::context codegen_ctx;
+    cg::context codegen_ctx{env};
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 

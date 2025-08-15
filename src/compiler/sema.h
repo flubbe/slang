@@ -36,6 +36,12 @@ namespace slang::sema
 using slang::attribs::attribute_info;
 using slang::attribs::attribute_kind;
 
+/** Semantic error. */
+class semantic_error : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
 /** Symbol type. */
 enum class symbol_type : std::uint8_t
 {
@@ -266,7 +272,7 @@ struct env
      */
     bool has_attribute(
       symbol_id id,
-      attribute_kind kind);
+      attribute_kind kind) const;
 
     /**
      * Return the value of an attribute.
@@ -277,7 +283,7 @@ struct env
      */
     std::string get_attribute(
       symbol_id id,
-      attribute_kind kind);
+      attribute_kind kind) const;
 };
 
 /**

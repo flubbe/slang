@@ -131,7 +131,7 @@ void env::attach_attribute(
 
 bool env::has_attribute(
   symbol_id id,
-  attribute_kind kind)
+  attribute_kind kind) const
 {
     auto it = attribute_map.find(id);
     if(it == attribute_map.end())

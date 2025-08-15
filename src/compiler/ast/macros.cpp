@@ -279,8 +279,11 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
     {
         // evaluate the index expression.
         index_expr->generate_code(ctx, memory_context::load);
-        ctx.generate_load(std::make_unique<cg::type_argument>(return_type->deref()), true);
-        return std::make_unique<cg::value>(return_type->deref());
+
+        auto type = ctx.deref(return_type->get_type());
+        ctx.generate_load(
+          std::make_unique<cg::type_argument>(type));
+        return std::make_unique<cg::value>(type);
     }
 
     return return_type;
@@ -505,12 +508,6 @@ std::unique_ptr<cg::value> macro_expression::generate_code(
 {
     // empty, as macros don't generate code.
     return nullptr;
-}
-
-bool macro_expression::supports_directive(const std::string& name) const
-{
-    return super::supports_directive(name)
-           || name == "builtin";
 }
 
 std::optional<ty::type_id> macro_expression::type_check(
