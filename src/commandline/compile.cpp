@@ -11,7 +11,7 @@
 #include <format>
 #include <print>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
 #include "compiler/macro.h"
 #include "compiler/opt/cfg.h"
@@ -201,21 +201,27 @@ void compile::invoke(const std::vector<std::string>& args)
     const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
     ld::context loader_ctx{file_mgr};
-    sema::env env;
-    cg::context codegen_ctx{env};
-    co::context co_ctx{env};
+    sema::env sema_env;
+    const_::env const_env;
     ty::context type_ctx;
-    rs::context resolver_ctx{env};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env};
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
     macro::env macro_env;
     opt::cfg::context cfg_context{codegen_ctx};
-    slang::instruction_emitter emitter{codegen_ctx, macro_env};
-
+    slang::instruction_emitter emitter{
+      sema_env,
+      const_env,
+      macro_env,
+      lowering_ctx,
+      codegen_ctx};
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
     ast->collect_names(co_ctx);
     ast->resolve_names(resolver_ctx);
-    ast->collect_attributes(env);
-    ast->collect_macros(env, macro_env);
+    ast->collect_attributes(sema_env);
+    ast->collect_macros(sema_env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
@@ -223,10 +229,10 @@ void compile::invoke(const std::vector<std::string>& args)
             resolver_ctx.resolve_imports(loader_ctx);
         } while(ld::context::resolve_macros(macro_env, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, macro_env, module_macro_asts));
-    ast->declare_types(type_ctx, env);
+    ast->declare_types(type_ctx, sema_env);
     ast->define_types(type_ctx);
-    ast->declare_functions(type_ctx, env);
-    ast->type_check(type_ctx, env);
+    ast->declare_functions(type_ctx, sema_env);
+    ast->type_check(type_ctx, sema_env);
     ast->generate_code(codegen_ctx);
 
     cfg_context.run();

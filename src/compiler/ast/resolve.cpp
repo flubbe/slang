@@ -9,7 +9,7 @@
  */
 
 #include "shared/module.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "ast.h"
@@ -81,24 +81,36 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
 
     symbol_id = ctx.resolve(
       name.s,
-      sema::symbol_type::variable_declaration,
+      sema::symbol_type::variable,
       scope_id.value());
-    if(!symbol_id.has_value())
+    if(symbol_id.has_value())
     {
-        symbol_id = ctx.resolve(
-          name.s,
-          sema::symbol_type::constant_declaration,
-          scope_id.value());
-
-        if(!symbol_id.has_value())
-        {
-            throw cg::codegen_error(
-              name.location,
-              std::format(
-                "Could not resolve symbol '{}'.",
-                name.s));
-        }
+        return;
     }
+
+    symbol_id = ctx.resolve(
+      name.s,
+      sema::symbol_type::argument,
+      scope_id.value());
+    if(symbol_id.has_value())
+    {
+        return;
+    }
+
+    symbol_id = ctx.resolve(
+      name.s,
+      sema::symbol_type::constant,
+      scope_id.value());
+    if(symbol_id.has_value())
+    {
+        return;
+    }
+
+    throw cg::codegen_error(
+      name.location,
+      std::format(
+        "Could not resolve symbol '{}'.",
+        name.s));
 }
 
 /*
@@ -276,7 +288,7 @@ void call_expression::resolve_names(rs::context& ctx)
 
     symbol_id = ctx.resolve(
       name,
-      sema::symbol_type::function_definition,
+      sema::symbol_type::function,
       scope_id.value());
     if(!symbol_id.has_value())
     {

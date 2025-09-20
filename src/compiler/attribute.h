@@ -40,6 +40,14 @@ enum class attribute_kind
 /** Attributes. */
 struct attribute_info
 {
+    /** Payload type. */
+    using payload_type = std::variant<
+      std::monostate,
+      std::vector<
+        std::pair<
+          std::string,
+          std::string>>>;
+
     /** Attribute kind. */
     attribute_kind kind;
 
@@ -47,13 +55,7 @@ struct attribute_info
     source_location loc;
 
     /** Attribute payload. */
-    std::variant<
-      std::monostate,
-      std::vector<
-        std::pair<
-          std::string,
-          std::string>>>
-      payload;
+    payload_type payload;
 };
 
 /**

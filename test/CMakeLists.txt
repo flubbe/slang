@@ -47,7 +47,7 @@ add_executable(test_parser
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
@@ -74,7 +74,9 @@ add_test(NAME parser COMMAND test_parser)
 
 add_executable(test_codegen
     test_codegen.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/typing.cpp
@@ -97,8 +99,8 @@ add_executable(test_compile_ir
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
@@ -131,8 +133,8 @@ add_executable(test_type_system
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
@@ -170,8 +172,8 @@ add_executable(test_resolve
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
@@ -210,8 +212,8 @@ add_executable(test_opt_cfg
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
@@ -251,8 +253,8 @@ add_executable(test_output
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
@@ -304,9 +306,9 @@ add_executable(test_ast_serialization
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/archives/file.cpp
     ../src/compiler/attribute.cpp
-    ../src/compiler/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp

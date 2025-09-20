@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/typing.h"
 #include "builtins.h"
 

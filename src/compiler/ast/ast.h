@@ -1066,7 +1066,7 @@ class access_expression : public expression
     std::unique_ptr<expression> lhs, rhs;
 
     /** Struct type of the l.h.s. Set during type checking. */
-    ty::type_id lhs_type;
+    std::optional<ty::type_id> struct_type;
 
     /** Struct info. Set during type checking. */
     std::optional<ty::struct_info> struct_info;
@@ -1087,7 +1087,7 @@ public:
     : super{other}
     , lhs{other.lhs->clone()}
     , rhs{other.rhs->clone()}
-    , lhs_type{other.lhs_type}
+    , struct_type{other.struct_type}
     {
     }
     access_expression(access_expression&&) = default;
@@ -1165,12 +1165,14 @@ public:
         return lhs.get();
     }
 
-    /** Return the accessed struct's type info. */
+    /**
+     * Return the accessed struct's type info.
+     *
+     * @throws Throws a `type_error` if the struct type was not set.
+     * @returns The struct type.
+     */
     [[nodiscard]]
-    ty::type_id get_struct_type() const
-    {
-        return lhs_type;
-    }
+    ty::type_id get_struct_type() const;
 
     /** Get struct info. */
     [[nodiscard]]
@@ -1339,6 +1341,9 @@ class variable_reference_expression : public named_expression
     /** An optional expression for element access. */
     std::unique_ptr<expression> element_expr;
 
+    /** The array type. Only valid for arrays. */
+    std::optional<ty::type_id> array_type;
+
     /** Expansions for macro names. */
     std::unique_ptr<expression> expansion;
 
@@ -1486,6 +1491,13 @@ public:
     void set_expansion(std::unique_ptr<expression> exp)
     {
         expansion = std::move(exp);
+    }
+
+    /** Get the array type, or `std::nullopt` for non-arrays. */
+    [[nodiscard]]
+    std::optional<ty::type_id> get_array_type() const
+    {
+        return array_type;
     }
 };
 
@@ -1817,7 +1829,6 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
@@ -1855,14 +1866,27 @@ public:
     void define_type(ty::context& ctx) const;
 };
 
+/** Field info. */
+struct field_info
+{
+    /** Field index. */
+    std::size_t field_index;
+
+    /** Type id. */
+    ty::type_id field_type_id;
+
+    /** Struct type id. */
+    ty::type_id struct_type_id;
+};
+
 /** Anonymous struct initialization. */
 class struct_anonymous_initializer_expression : public named_expression
 {
     /** Anonymous initializers. */
     std::vector<std::unique_ptr<expression>> initializers;
 
-    /** Struct info. Set during type check. */
-    ty::struct_info struct_info;
+    /** Field info, in order of declaration. Set during type check. */
+    std::vector<field_info> fields;
 
 public:
     /** Set the super class. */
@@ -2038,6 +2062,9 @@ class struct_named_initializer_expression : public named_expression
 {
     /** Initialized members. */
     std::vector<std::unique_ptr<named_initializer>> initializers;
+
+    /** Field info, in order of declaration. Set during type check. */
+    std::vector<field_info> fields;
 
 public:
     /** Set the super class. */
@@ -2498,7 +2525,7 @@ public:
 /**
  * Function prototype.
  *
- * @note Not a subclass of `expression` because the signature of `generate_code` does not match.
+ * @note Not a subclass of `expression` because there is no code generation.
  */
 class prototype_ast
 {
@@ -2525,19 +2552,8 @@ class prototype_ast
     /** Argument type info. Set during type checking. */
     std::vector<ty::type_id> arg_type_ids;
 
-    /** Argument type info. */
-    std::vector<
-      std::pair<std::string,    /* base type*/
-                ty::type_info>> /* type info */
-      arg_type_info;
-
     /** Return type info. Set during type checking. */
     ty::type_id return_type_id;
-
-    /** Return type info. */
-    std::pair<std::string,   /* base type */
-              ty::type_info> /* type info */
-      return_type_info;
 
 public:
     /** Default constructor. */
@@ -2619,25 +2635,15 @@ public:
         return arg_type_ids;
     }
 
-    /** Get the argument type info vector. */
+    /** Return the arguments symbol ids and type ids. */
     [[nodiscard]]
-    const std::vector<std::pair<std::string, ty::type_info>>& get_arg_type_info() const
-    {
-        return arg_type_info;
-    }
+    std::vector<std::pair<sema::symbol_id, ty::type_id>> get_arg_infos() const;
 
     /** Return the return type id. */
     [[nodiscard]]
     ty::type_id get_return_type_id() const
     {
         return return_type_id;
-    }
-
-    /** Get the return type info. */
-    [[nodiscard]]
-    const std::pair<std::string, ty::type_info>& get_return_type_info() const
-    {
-        return return_type_info;
     }
 };
 

@@ -15,7 +15,6 @@
 #include <variant>
 
 #include "compiler/sema.h"
-#include "compiler/type.h"
 
 /*
  * Forward declarations.
@@ -28,13 +27,27 @@ class expression; /* ast.h */
 namespace slang::const_
 {
 
-namespace ty = slang::typing;
+/** Constant type. */
+enum class constant_type
+{
+    i32, /* An i32 constant. */
+    f32, /* An f32 constant. */
+    str  /* A string constant*/
+};
+
+/**
+ * Convert a `constant_type` into a readable string.
+ *
+ * @param c The constant type.
+ * @returns Returns a string representation of the constant type.
+ */
+std::string to_string(constant_type c);
 
 /** Information about a constant. */
 struct const_info
 {
     /** Result type. */
-    ty::type_id type;
+    constant_type type;
 
     /** Value. */
     std::variant<
@@ -56,6 +69,9 @@ struct const_info
     }
 };
 
+/** Constant id (for interned constants). */
+using constant_id = std::uint64_t;
+
 /** Constant evaluation environment. */
 struct env
 {
@@ -65,6 +81,12 @@ struct env
       const_info,
       sema::symbol_id::hash>
       const_info_map;
+
+    /** Constant literals. */
+    std::unordered_map<
+      constant_id,
+      const_info>
+      const_literal_map;
 
     /** Const-eval expressions. */
     std::unordered_map<
@@ -93,6 +115,8 @@ struct env
     /**
      * Set the result of a constant evaluation for a symbol.
      *
+     * @note Overwrites a possibly existing value for the symbol.
+     *
      * @param id Symbol id.
      * @param info The constant info to set.
      */
@@ -108,6 +132,14 @@ struct env
      */
     std::optional<const_info> get_const_info(
       sema::symbol_id id) const;
+
+    /**
+     * Intern a string constant.
+     *
+     * @param s The string.
+     * @returns Returns an index for the string.
+     */
+    constant_id intern(std::string s);
 
     /**
      * Set whether an expression was found to be const-eval.

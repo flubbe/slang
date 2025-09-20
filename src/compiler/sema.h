@@ -45,12 +45,13 @@ class semantic_error : public std::runtime_error
 /** Symbol type. */
 enum class symbol_type : std::uint8_t
 {
-    module_import,
-    constant_declaration,
-    variable_declaration,
-    function_definition,
-    macro_definition,
-    struct_definition
+    module_,
+    constant,
+    variable,
+    argument,
+    function,
+    macro,
+    struct_
 };
 
 /**
@@ -245,7 +246,6 @@ struct env
      * @param type The symbol's type.
      * @param scope_id The symbol's scope.
      * @returns Returns the symbol id or `std::nullopt` if the symbol was not found.
-     * @throws Throws a `std::runtime_error` if the scope id is not found.
      */
     [[nodiscard]]
     std::optional<symbol_id> get_symbol_id(
@@ -275,13 +275,13 @@ struct env
       attribute_kind kind) const;
 
     /**
-     * Return the value of an attribute.
+     * Return the payload of an attribute.
      *
      * @param id Symbol id.
      * @param kind The attribute kind.
-     * @returns Returns the payload/value of an attribute.
+     * @returns Returns the payload/value of an attribute, or `std::nullopt` if the attribute is not found.
      */
-    std::string get_attribute(
+    std::optional<attribute_info::payload_type> get_attribute_payload(
       symbol_id id,
       attribute_kind kind) const;
 };

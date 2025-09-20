@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"

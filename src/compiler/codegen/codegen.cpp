@@ -10,11 +10,11 @@
 
 #include <format>
 
+#include "compiler/ast/ast.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "shared/type_utils.h"
-#include "ast/ast.h"
 #include "codegen.h"
 #include "loader.h"
 #include "utils.h"
@@ -109,7 +109,7 @@ std::string to_string(type_cast tc)
  * type.
  */
 
-std::string type::to_string() const
+std::string type::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
     static const std::unordered_map<type_kind, std::string> map = {
       {type_kind::void_, "void"},
@@ -122,6 +122,15 @@ std::string type::to_string() const
     auto it = map.find(back_end_type);
     if(it != map.end())
     {
+        if(type_id.has_value()
+           && resolver != nullptr)
+        {
+            return std::format(
+              "{}",
+              it->second,
+              resolver->type_name(type_id.value()));
+        }
+
         return it->second;
     }
 
@@ -132,12 +141,35 @@ std::string type::to_string() const
  * value.
  */
 
-std::string value::to_string() const
+std::string value::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
+    // named values.
     if(name.has_value())
     {
+        // resolve front-end type, if possible.
+        if(ty.get_type_id().has_value()
+           && resolver != nullptr)
+        {
+            return std::format(
+              "{} %{}    ; {}",
+              ty.to_string(),
+              name.value(),
+              resolver->type_name(ty.get_type_id().value()));
+        }
+
         return std::format("{} %{}", ty.to_string(), name.value());
     }
+
+    // resolve front-end type, if possible.
+    if(ty.get_type_id().has_value()
+       && resolver != nullptr)
+    {
+        return std::format(
+          "{}    ; {}",
+          ty.to_string(),
+          resolver->type_name(ty.get_type_id().value()));
+    }
+
     return std::format("{}", ty.to_string());
 }
 
@@ -145,12 +177,19 @@ std::string value::to_string() const
  * const_argument.
  */
 
-std::string const_argument::to_string() const
+std::string const_argument::to_string(const name_resolver* resolver) const
 {
     auto kind = v->get_type().get_type_kind();
 
     if(kind == type_kind::i32)
     {
+        if(resolver)
+        {
+            return std::format(
+              "{}",
+              static_cast<constant_i32*>(v.get())->get_int());
+        }
+
         return std::format(
           "i32 {}",
           static_cast<constant_i32*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -158,6 +197,13 @@ std::string const_argument::to_string() const
 
     if(kind == type_kind::f32)
     {
+        if(resolver)
+        {
+            return std::format(
+              "{}",
+              static_cast<constant_f32*>(v.get())->get_float());
+        }
+
         return std::format(
           "f32 {}",
           static_cast<constant_f32*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -165,9 +211,32 @@ std::string const_argument::to_string() const
 
     if(kind == type_kind::str)
     {
+        const auto* v_ptr = static_cast<const constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        std::string s = v_ptr->to_string();
+
+        if(resolver == nullptr)
+        {
+            return std::format(
+              "str {}",
+              s);
+        }
+
+        // resolve the string to its value and truncate after 10 characters.
+        std::string resolved_s = resolver->constant(v_ptr->get_id());
+
+        // TODO Handle escape sequences in the string.
+
+        // We get a possibly longer string from the resolver.
+        if(resolved_s.length() > 10)    // NOLINT(readability-magic-numbers)
+        {
+            resolved_s = std::format(
+              "{}...",
+              resolved_s.substr(0, 10));    // NOLINT(readability-magic-numbers)
+        }
+
         return std::format(
-          "str @{}",
-          static_cast<constant_str*>(v.get())->get_constant_index());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          "{}",
+          resolved_s);
     }
 
     throw codegen_error(std::format("Unrecognized const_argument type."));
@@ -177,7 +246,7 @@ std::string const_argument::to_string() const
  * instruction.
  */
 
-std::string instruction::to_string() const
+std::string instruction::to_string(const name_resolver* resolver) const
 {
     std::string buf;
     if(!args.empty())
@@ -188,6 +257,22 @@ std::string instruction::to_string() const
             buf += args[i]->to_string() + ", ";
         }
         buf += args.back()->to_string();
+
+        if(resolver != nullptr)
+        {
+            std::string resolved_args;
+
+            for(std::size_t i = 0; i < args.size() - 1; ++i)
+            {
+                resolved_args += args[i]->to_string(resolver) + ", ";
+            }
+            resolved_args += args.back()->to_string(resolver);
+
+            if(!resolved_args.empty())
+            {
+                buf += std::format("    ; {}", resolved_args);
+            }
+        }
     }
     return std::format("{}{}", name, buf);
 }
@@ -196,7 +281,7 @@ std::string instruction::to_string() const
  * basic_block.
  */
 
-std::string basic_block::to_string() const
+std::string basic_block::to_string(const name_resolver* resolver) const
 {
     if(instrs.empty())
     {
@@ -206,9 +291,9 @@ std::string basic_block::to_string() const
     std::string buf = std::format("{}:\n", label);
     for(std::size_t i = 0; i < instrs.size() - 1; ++i)
     {
-        buf += std::format(" {}\n", instrs[i]->to_string());
+        buf += std::format(" {}\n", instrs[i]->to_string(resolver));
     }
-    buf += std::format(" {}", instrs.back()->to_string());
+    buf += std::format(" {}", instrs.back()->to_string(resolver));
     return buf;
 }
 
@@ -356,23 +441,6 @@ std::size_t scope::get_index(const std::string& name) const
     throw codegen_error(std::format("Name '{}' not found in scope.", name));
 }
 
-void scope::add_argument(std::unique_ptr<value> arg)
-{
-    if(!arg->has_name())
-    {
-        throw codegen_error("Cannot add unnamed argument to scope.");
-    }
-
-    if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
-    {
-        throw codegen_error(
-          std::format(
-            "Name '{}' already contained in scope.",
-            arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
-    }
-    args.emplace_back(std::move(arg));
-}
-
 void scope::add_local(std::unique_ptr<value> arg)
 {
     if(!arg->has_name())
@@ -388,32 +456,6 @@ void scope::add_local(std::unique_ptr<value> arg)
             arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
     locals.emplace_back(std::move(arg));
-}
-
-void scope::add_struct(
-  std::string name,
-  std::vector<std::pair<std::string, value>> members,
-  std::uint8_t flags,
-  std::optional<std::string> import_path)
-{
-    auto it = std::ranges::find_if(
-      structs,
-      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-      {
-          return p.first == name
-                 && p.second.get_import_path() == import_path;
-      });
-    if(it != structs.end())
-    {
-        if(import_path.has_value())
-        {
-            throw codegen_error(std::format("Type '{}' from '{}' already exists in scope.", name, import_path.value()));
-        }
-        throw codegen_error(std::format("Type '{}' already exists in scope.", name));
-    }
-
-    std::string name_copy = name;
-    structs.insert({name, struct_{std::move(name_copy), std::move(members), flags, import_path}});
 }
 
 const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
@@ -464,16 +506,23 @@ basic_block* function::remove_basic_block(const std::string& label)
     return bb;
 }
 
-std::string function::to_string() const
+std::string function::to_string(const name_resolver* resolver) const
 {
     std::string buf;
     if(native)
     {
-        buf = std::format("native ({}) {} @{}(", import_library, return_type->to_string(), name);
+        buf = std::format(
+          "native ({}) {} @{}(",
+          import_library,
+          return_type->to_string(),
+          name);
     }
     else
     {
-        buf = std::format("define {} @{}(", return_type->to_string(), name);
+        buf = std::format(
+          "define {} @{}(",
+          return_type->to_string(),
+          name);
     }
 
     const auto& args = scope.get_args();
@@ -481,9 +530,13 @@ std::string function::to_string() const
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            buf += std::format("{}, ", args[i]->to_string());
+            buf += std::format(
+              "{}, ",
+              args[i]->to_string());    // no resolver; only print lowered type.
         }
-        buf += std::format("{})", args.back()->to_string());
+        buf += std::format(
+          "{})",
+          args.back()->to_string());    // no resolver; only print lowered type.
     }
     else
     {
@@ -492,14 +545,50 @@ std::string function::to_string() const
 
     if(!native)
     {
-        buf += " {\n";
+        bool all_type_ids_exist = return_type->get_type().get_type_id().has_value();
+        for(const auto& arg: args)
+        {
+            all_type_ids_exist &= arg->get_type().get_type_id().has_value();
+        }
+
+        if(resolver != nullptr
+           && all_type_ids_exist)
+        {
+            buf += std::format(
+              " {{    ; {} (",
+              resolver->type_name(return_type->get_type().get_type_id().value()));
+
+            if(!args.empty())
+            {
+                for(std::size_t i = 0; i < args.size() - 1; ++i)
+                {
+                    buf += std::format(
+                      "{}, ",
+                      resolver->type_name(args[i]->get_type().get_type_id().value()));
+                }
+                buf += std::format(
+                  "{}",
+                  resolver->type_name(args.back()->get_type().get_type_id().value()));
+            }
+
+            buf += ")\n";
+        }
+        else
+        {
+            buf += " {\n";
+        }
+
         for(const auto& v: scope.get_locals())
         {
-            buf += std::format("local {}\n", v->to_string());
+            buf += std::format(
+              "local {}\n",
+              v->to_string(resolver));
         }
         for(const auto& b: instr_blocks)
         {
-            buf += std::format("{}\n", b->to_string());
+            buf += std::format(
+              "{}\n",
+              b->to_string(resolver));
         }
         buf += "}";
     }
@@ -511,16 +600,22 @@ std::string function::to_string() const
  * type.
  */
 
-std::string struct_::to_string() const
+std::string struct_::to_string(const name_resolver* resolver) const
 {
     std::string buf = std::format("%{} = type {{\n", name);
     if(!members.empty())
     {
         for(std::size_t i = 0; i < members.size() - 1; ++i)
         {
-            buf += std::format(" {} %{},\n", members[i].second.get_type().to_string(), members[i].first);
+            buf += std::format(
+              " {} %{},\n",
+              members[i].second.get_type().to_string(resolver),
+              members[i].first);
         }
-        buf += std::format(" {} %{},\n", members.back().second.get_type().to_string(), members.back().first);
+        buf += std::format(
+          " {} %{},\n",
+          members.back().second.get_type().to_string(resolver),
+          members.back().first);
     }
     buf += "}";
     return buf;
@@ -599,53 +694,30 @@ std::size_t context::get_import_index(
                   import_path));
 }
 
-struct_* context::add_struct(
-  std::string name,
-  std::vector<std::pair<std::string, value>> members,
-  std::uint8_t flags,
-  std::optional<std::string> import_path)
-{
-    if(std::ranges::find_if(
-         types,
-         [&name](const std::unique_ptr<struct_>& t) -> bool
-         {
-             return t->get_name() == name;
-         })
-       != types.end())
-    {
-        throw codegen_error(std::format("Type '{}' already defined.", name));
-    }
-
-    return types.emplace_back(
-                  std::make_unique<struct_>(
-                    name,
-                    std::move(members),
-                    flags,
-                    std::move(import_path)))
-      .get();
-}
-
 struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
 {
-    auto it = std::ranges::find_if(
-      types,
-      [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
-      {
-          return t->get_name() == name
-                 && ((!import_path.has_value() && !t->get_import_path().has_value())
-                     || *import_path == *t->get_import_path());
-      });
-    if(it == types.end())
-    {
-        if(import_path.has_value())
-        {
-            throw codegen_error(std::format("Type '{}' from import '{}' not found.", name, *import_path));
-        }
+    // TODO remove?
+    throw std::runtime_error("context::get_type");
 
-        throw codegen_error(std::format("Type '{}' not found.", name));
-    }
+    // auto it = std::ranges::find_if(
+    //   types,
+    //   [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
+    //   {
+    //       return t->get_name() == name
+    //              && ((!import_path.has_value() && !t->get_import_path().has_value())
+    //                  || *import_path == *t->get_import_path());
+    //   });
+    // if(it == types.end())
+    // {
+    //     if(import_path.has_value())
+    //     {
+    //         throw codegen_error(std::format("Type '{}' from import '{}' not found.", name, *import_path));
+    //     }
 
-    return it->get();
+    //     throw codegen_error(std::format("Type '{}' not found.", name));
+    // }
+
+    // return it->get();
 }
 
 /** Same as `std::false_type`, but taking a parameter argument. */
@@ -681,179 +753,74 @@ constexpr module_::constant_type map_constant_type()
     }
 }
 
-/**
- * Add a constant to the corresponding table. That is, it is added to the import table
- * if `import_path` is specified, and to the module's constant table otherwise.
- *
- * @param module_constants The module's constant table.
- * @param imported_constants The module's imported constants.
- * @param name The constant's name.
- * @param value The constant's value.
- * @param import_path An import path or `std::nullopt`.
- */
-template<typename T>
-void add_constant(
-  std::vector<constant_table_entry>& module_constants,
-  std::vector<constant_table_entry>& imported_constants,
-  std::string name,
-  const T& value,
-  std::optional<std::string> import_path)
-{
-    if(import_path.has_value())
-    {
-        // add constant to imported constants table.
-        auto it = std::ranges::find_if(
-          imported_constants,
-          [&name, &import_path](const constant_table_entry& entry) -> bool
-          {
-              return entry.name.has_value() && *entry.name == name && entry.import_path == import_path;
-          });
-        if(it != imported_constants.end())
-        {
-            throw codegen_error(std::format("Imported constant with name '{}' already exists.", name));
-        }
-
-        imported_constants.emplace_back(
-          map_constant_type<T>(),
-          std::move(value),
-          std::move(import_path),
-          std::move(name));
-    }
-    else
-    {
-        // add constant to constants table.
-        auto it = std::ranges::find_if(
-          module_constants,
-          [&name](const constant_table_entry& entry) -> bool
-          {
-              return entry.name.has_value() && *entry.name == name;
-          });
-        if(it != module_constants.end())
-        {
-            throw codegen_error(std::format("Constant with name '{}' already exists.", name));
-        }
-
-        module_constants.emplace_back(
-          map_constant_type<T>(),
-          std::move(value),
-          std::move(import_path),
-          std::move(name),
-          true);
-    }
-}
-
-void context::add_constant(
-  std::string name,
-  std::int32_t i,
-  std::optional<std::string> import_path)
-{
-    slang::codegen::add_constant(
-      constants,
-      imported_constants,
-      std::move(name),
-      i,
-      std::move(import_path));
-}
-
-void context::add_constant(
-  std::string name,
-  float f,
-  std::optional<std::string> import_path)
-{
-    slang::codegen::add_constant(
-      constants,
-      imported_constants,
-      std::move(name),
-      f,
-      std::move(import_path));
-}
-
-void context::add_constant(
-  std::string name,
-  const std::string& s,
-  std::optional<std::string> import_path)
-{
-    slang::codegen::add_constant(
-      constants,
-      imported_constants,
-      std::move(name),
-      s,
-      std::move(import_path));
-}
-
-void context::register_constant_name(token name)
-{
-    constant_names.emplace(std::move(name));
-}
-
 bool context::has_registered_constant_name(const std::string& name)
 {
-    return std::ranges::find_if(
-             constant_names,
-             [&name](const token& s) -> bool
-             {
-                 return s.s == name;
-             })
-           != constant_names.end();
+    // TODO
+    throw std::runtime_error("context::has_registered_constant_name");
 }
 
 std::size_t context::get_string(std::string str)
 {
-    auto it = std::ranges::find_if(
-      constants,
-      [&str](const module_::constant_table_entry& t) -> bool
-      {
-          return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
-      });
-    if(it != constants.end())
-    {
-        it->import_path = std::nullopt;
-        return std::distance(constants.begin(), it);
-    }
+    // TODO
+    throw std::runtime_error("constext::get_string");
 
-    constants.emplace_back(module_::constant_type::str, std::move(str));
-    return constants.size() - 1;
+    // auto it = std::ranges::find_if(
+    //   constants,
+    //   [&str](const module_::constant_table_entry& t) -> bool
+    //   {
+    //       return t.type == module_::constant_type::str && std::get<std::string>(t.data) == str;
+    //   });
+    // if(it != constants.end())
+    // {
+    //     it->import_path = std::nullopt;
+    //     return std::distance(constants.begin(), it);
+    // }
+
+    // constants.emplace_back(module_::constant_type::str, std::move(str));
+    // return constants.size() - 1;
 }
 
 std::optional<constant_table_entry> context::get_constant(
   const std::string& name,
   const std::optional<std::string>& import_path)
 {
-    /*
-     * First try to find the constant in the module's constant table.
-     * If not found, search the import table and copy the constant into
-     * the import table.
-     */
-    auto it = std::ranges::find_if(
-      constants,
-      [&name, &import_path](const constant_table_entry& entry) -> bool
-      {
-          return entry.name == name && entry.import_path == import_path;
-      });
-    if(it != constants.cend())
-    {
-        return *it;
-    }
+    throw std::runtime_error("context::get_constant");
 
-    it = std::ranges::find_if(
-      imported_constants,
-      [&name, &import_path](const constant_table_entry& entry) -> bool
-      {
-          return entry.name == name && entry.import_path == import_path;
-      });
-    if(it != imported_constants.end())
-    {
-        // copy string constants to constant table.
-        if(it->type == module_::constant_type::str)
-        {
-            return constants.emplace_back(*it);
-        }
+    // /*
+    //  * First try to find the constant in the module's constant table.
+    //  * If not found, search the import table and copy the constant into
+    //  * the import table.
+    //  */
+    // auto it = std::ranges::find_if(
+    //   constants,
+    //   [&name, &import_path](const constant_table_entry& entry) -> bool
+    //   {
+    //       return entry.name == name && entry.import_path == import_path;
+    //   });
+    // if(it != constants.cend())
+    // {
+    //     return *it;
+    // }
 
-        // return primitive constant.
-        return *it;
-    }
+    // it = std::ranges::find_if(
+    //   imported_constants,
+    //   [&name, &import_path](const constant_table_entry& entry) -> bool
+    //   {
+    //       return entry.name == name && entry.import_path == import_path;
+    //   });
+    // if(it != imported_constants.end())
+    // {
+    //     // copy string constants to constant table.
+    //     if(it->type == module_::constant_type::str)
+    //     {
+    //         return constants.emplace_back(*it);
+    //     }
 
-    return std::nullopt;
+    //     // return primitive constant.
+    //     return *it;
+    // }
+
+    // return std::nullopt;
 }
 
 void context::add_prototype(
@@ -917,7 +884,12 @@ function* context::create_function(std::string name,
         throw codegen_error(std::format("Function '{}' already defined.", name));
     }
 
-    return funcs.emplace_back(std::make_unique<function>(std::move(name), std::move(return_type), std::move(args))).get();
+    return funcs.emplace_back(
+                  std::make_unique<function>(
+                    std::move(name),
+                    std::move(return_type),
+                    std::move(args)))
+      .get();
 }
 
 void context::create_native_function(std::string lib_name,
@@ -971,7 +943,7 @@ void context::set_insertion_point(basic_block* ip)
 
 void context::push_struct_access(type ty)
 {
-    struct_access.push_back(std::move(ty));
+    struct_access.push_back(ty);
 }
 
 void context::pop_struct_access()
@@ -1089,24 +1061,31 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     insertion_point->add_instruction(std::make_unique<instruction>("jnz", std::move(args)));
 }
 
-void context::generate_const(const value& vt, std::variant<int, float, std::string> v)
+void context::generate_const(
+  const value& vt,
+  std::variant<int, float, const_::constant_id> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     if(vt.get_type().get_type_kind() == type_kind::i32)
     {
-        auto arg = std::make_unique<const_argument>(std::get<int>(v), std::nullopt);
+        auto arg = std::make_unique<const_argument>(
+          std::get<int>(v),
+          std::nullopt);
         args.emplace_back(std::move(arg));
     }
     else if(vt.get_type().get_type_kind() == type_kind::f32)
     {
-        auto arg = std::make_unique<const_argument>(std::get<float>(v), std::nullopt);
+        auto arg = std::make_unique<const_argument>(
+          std::get<float>(v),
+          std::nullopt);
         args.emplace_back(std::move(arg));
     }
     else if(vt.get_type().get_type_kind() == type_kind::str)
     {
-        auto arg = std::make_unique<const_argument>(std::get<std::string>(v), std::nullopt);
-        arg->register_const(*this);
+        auto arg = std::make_unique<const_argument>(
+          std::get<const_::constant_id>(v),
+          std::nullopt);
         args.emplace_back(std::move(arg));
     }
     else
@@ -1117,7 +1096,10 @@ void context::generate_const(const value& vt, std::variant<int, float, std::stri
             ::slang::codegen::to_string(
               vt.get_type().get_type_kind())));
     }
-    insertion_point->add_instruction(std::make_unique<instruction>("const", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "const",
+        std::move(args)));
 }
 
 void context::generate_const_null()
@@ -1297,78 +1279,69 @@ static std::string make_printable(const std::string& s)
 /**
  * Print a constant including its type.
  *
- * @param index The constant's index in the constant table.
- * @param c The constant table entry.
+ * @param id The constant id.
+ * @param info The constant info.
  * @returns A string containing the constant's information.
  */
-static std::string print_constant(std::size_t index, const module_::constant_table_entry& c)
+static std::string print_constant(
+  const_::constant_id id,
+  const const_::const_info& info)
 {
     std::string buf;
 
-    if(c.type == module_::constant_type::i32)
+    if(info.type == const_::constant_type::i32)
     {
-        buf += std::format(".i32 @{} {}", index, std::get<std::int32_t>(c.data));
+        buf += std::format(".i32 @{} {}", id, std::get<int>(info.value));
     }
-    else if(c.type == module_::constant_type::f32)
+    else if(info.type == const_::constant_type::f32)
     {
-        buf += std::format(".f32 @{} {}", index, std::get<float>(c.data));
+        buf += std::format(".f32 @{} {}", id, std::get<float>(info.value));
     }
-    else if(c.type == module_::constant_type::str)
+    else if(info.type == const_::constant_type::str)
     {
-        buf += std::format(".string @{} \"{}\"", index, make_printable(std::get<std::string>(c.data)));
+        buf += std::format(".string @{} \"{}\"", id, make_printable(std::get<std::string>(info.value)));
     }
     else
     {
-        buf += std::format(".<unknown> @{}", index);
+        buf += std::format(".<unknown> @{}", id);
     }
 
     return buf;
 };
 
-std::string context::to_string() const
+std::string context::to_string(const name_resolver* resolver) const
 {
     std::string buf;
 
-    // constants.
-    if(!constants.empty())
+    // constant literals.
+    if(!const_env.const_literal_map.empty())
     {
-        for(std::size_t i = 0; i < constants.size() - 1; ++i)
+        for(const auto& [id, info]: const_env.const_literal_map)
         {
-            buf += std::format("{}\n", print_constant(i, constants[i]));
+            buf += std::format("{}\n", print_constant(id, info));
         }
-        buf += print_constant(constants.size() - 1, constants.back());
 
         // don't append a newline if the constant table is the only non-empty buffer.
-        if(!types.empty() || !funcs.empty())
+        if(funcs.empty())
         {
-            buf += "\n";
+            buf.pop_back();
         }
     }
 
-    // types.
-    if(!types.empty())
-    {
-        for(std::size_t i = 0; i < types.size() - 1; ++i)
-        {
-            buf += std::format("{}\n", types[i]->to_string());
-        }
-        buf += std::format("{}", types.back()->to_string());
-
-        // don't append a newline if there are no functions.
-        if(!funcs.empty())
-        {
-            buf += "\n";
-        }
-    }
+    // FIXME This prints the type definitions, but we likely
+    //       don't want to go through the type lowering context
+    //       (but maybe instead have a small facade to the type context
+    //       or print the type definitions somewhere else entirely)
+    buf += lowering_ctx.to_string();
 
     // functions.
     if(!funcs.empty())
     {
         for(std::size_t i = 0; i < funcs.size() - 1; ++i)
         {
-            buf += std::format("{}\n", funcs[i]->to_string());
+            buf += std::format("{}\n", funcs[i]->to_string(resolver));
         }
-        buf += std::format("{}", funcs.back()->to_string());
+        buf += std::format("{}", funcs.back()->to_string(resolver));
     }
 
     return buf;

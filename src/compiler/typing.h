@@ -248,13 +248,13 @@ public:
     /**
      * Get a struct's field type id by index (including array-related properties).
      *
-     * @param struct_id The struct type id.
-     * @param index Field index.
+     * @param struct_type_id The struct type id.
+     * @param field_index Field index.
      * @returns Returns a type id for a field.
      */
     type_id get_field_type(
-      type_id struct_id,
-      std::size_t index) const;
+      type_id struct_type_id,
+      std::size_t field_index) const;
 
     /**
      * Get a struct's field index by name (including array-related properties

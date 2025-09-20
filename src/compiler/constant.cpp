@@ -16,6 +16,17 @@
 namespace slang::const_
 {
 
+std::string to_string(constant_type c)
+{
+    switch(c)
+    {
+    case constant_type::i32: return "i32";
+    case constant_type::f32: return "f32";
+    case constant_type::str: return "str";
+    default: return "<unknown>";
+    }
+}
+
 void env::set_const_info(
   sema::symbol_id id,
   const_info info)
@@ -47,6 +58,39 @@ std::optional<const_info> env::get_const_info(
     }
 
     return it->second;
+}
+
+constant_id env::intern(std::string s)
+{
+    auto it = std::ranges::find_if(
+      const_literal_map,
+      [&s](const auto& p) -> bool
+      {
+          return p.second.type == constant_type::str
+                 && std::get<std::string>(p.second.value) == s;
+      });
+    if(it != const_literal_map.end())
+    {
+        return it->first;
+    }
+
+    if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
+    {
+        // should never happen.
+        throw std::runtime_error(
+          std::format(
+            "Too many strings in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            std::numeric_limits<std::size_t>::max()));
+    }
+
+    constant_id id = const_literal_map.size();
+    const_literal_map.insert(
+      {id,
+       const_info{
+         .type = constant_type::str,
+         .value = std::move(s)}});
+
+    return id;
 }
 
 void env::set_expression_const_eval(

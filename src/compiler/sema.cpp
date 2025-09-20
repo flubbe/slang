@@ -22,34 +22,39 @@ namespace slang::sema
 
 std::string to_string(symbol_type t)
 {
-    if(t == symbol_type::module_import)
+    if(t == symbol_type::module_)
     {
-        return "module_import";
+        return "module_";
     }
 
-    if(t == symbol_type::constant_declaration)
+    if(t == symbol_type::constant)
     {
-        return "constant_declaration";
+        return "constant";
     }
 
-    if(t == symbol_type::function_definition)
+    if(t == symbol_type::function)
     {
-        return "function_definition";
+        return "function";
     }
 
-    if(t == symbol_type::struct_definition)
+    if(t == symbol_type::struct_)
     {
-        return "struct_definition";
+        return "struct";
     }
 
-    if(t == symbol_type::variable_declaration)
+    if(t == symbol_type::variable)
     {
-        return "variable_declaration";
+        return "variable";
     }
 
-    if(t == symbol_type::macro_definition)
+    if(t == symbol_type::argument)
     {
-        return "macro_definition";
+        return "argument";
+    }
+
+    if(t == symbol_type::macro)
+    {
+        return "macro";
     }
 
     throw std::runtime_error(
@@ -146,6 +151,30 @@ bool env::has_attribute(
                  return attrib.kind == kind;
              })
            != it->second.end();
+}
+
+std::optional<attribute_info::payload_type> env::get_attribute_payload(
+  symbol_id id,
+  attribute_kind kind) const
+{
+    auto it = attribute_map.find(id);
+    if(it == attribute_map.end())
+    {
+        return std::nullopt;
+    }
+
+    auto attrib_it = std::ranges::find_if(
+      it->second,
+      [kind](const attribute_info& attrib) -> bool
+      {
+          return attrib.kind == kind;
+      });
+    if(attrib_it == it->second.end())
+    {
+        return std::nullopt;
+    }
+
+    return attrib_it->payload;
 }
 
 std::string to_string(const env& env)

@@ -11,10 +11,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
-#include <vector>
-
-#include "token.h"
 
 namespace slang::typing
 {

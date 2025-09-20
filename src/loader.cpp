@@ -13,7 +13,7 @@
 
 #include "compiler/ast/ast.h"
 #include "compiler/ast/node_registry.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/type_utils.h"

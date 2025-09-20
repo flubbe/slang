@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
@@ -28,6 +28,110 @@ namespace ty = slang::typing;
 
 namespace
 {
+
+class test_name_resolver : public cg::name_resolver
+{
+    /** The semantic environment. */
+    sema::env& sema_env;
+
+    /** The constant environment. */
+    const_::env& const_env;
+
+    /** The type context. */
+    ty::context& type_ctx;
+
+public:
+    /** Deleted constructors. */
+    test_name_resolver() = delete;
+    test_name_resolver(const test_name_resolver&) = delete;
+    test_name_resolver(const test_name_resolver&&) = delete;
+
+    /**
+     * Create a name resolver for the tests.
+     *
+     * @param sema_env The semantic environment.
+     * @param const_env The constant environment.
+     * @param type_ctx The type context.
+     */
+    test_name_resolver(
+      sema::env& sema_env,
+      const_::env& const_env,
+      ty::context& type_ctx)
+    : sema_env{sema_env}
+    , const_env{const_env}
+    , type_ctx{type_ctx}
+    {
+    }
+
+    /** Default destructor. */
+    ~test_name_resolver() override = default;
+
+    /** Deleted assignment operators. */
+    test_name_resolver& operator=(const test_name_resolver&) = delete;
+    test_name_resolver& operator=(test_name_resolver&&) = delete;
+
+    [[nodiscard]]
+    std::string symbol_name(sema::symbol_id id) const override
+    {
+        auto it = sema_env.symbol_table.find(id);
+        if(it == sema_env.symbol_table.end())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Symbol with id {} not found in symbol table.",
+                id.value));
+        }
+
+        return it->second.qualified_name;
+    }
+
+    [[nodiscard]]
+    std::string type_name(ty::type_id id) const override
+    {
+        return type_ctx.to_string(id);
+    }
+
+    [[nodiscard]]
+    std::string field_name(
+      ty::type_id type_id,    // NOLINT(bugprone-easily-swappable-parameters)
+      std::size_t field_index) const override
+    {
+        auto info = type_ctx.get_struct_info(type_id);
+        return info.fields.at(field_index).name;
+    }
+
+    [[nodiscard]]
+    std::string constant(
+      const_::constant_id id) const override
+    {
+        auto it = const_env.const_literal_map.find(id);
+        if(it == const_env.const_literal_map.end())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Constant with id {} not found in constant literal table.",
+                id));
+        }
+
+        switch(it->second.type)
+        {
+        case const_::constant_type::i32:
+            return std::format("{}", std::get<int>(it->second.value));
+        case const_::constant_type::f32:
+            return std::format("{}", std::get<float>(it->second.value));
+        case const_::constant_type::str:
+            return std::format("{}", std::get<std::string>(it->second.value));
+        default:
+            // fall-through.
+        }
+
+        throw std::runtime_error(
+          std::format(
+            "Constant with id {} has unknown type '{}'.",
+            id,
+            static_cast<int>(it->second.type)));
+    }
+};
 
 cg::context get_context(
   sema::env& sema_env,
@@ -61,6 +165,8 @@ TEST(compile_ir, empty)
     rs::context resolver_ctx{sema_env};
     cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+    test_name_resolver resolver{sema_env, const_env, type_ctx};
+
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
     ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -70,7 +176,7 @@ TEST(compile_ir, empty)
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
-    EXPECT_EQ(ctx.to_string().length(), 0);
+    EXPECT_EQ(ctx.to_string(&resolver).length(), 0);
 }
 
 TEST(compile_ir, double_definition)
@@ -221,6 +327,8 @@ TEST(compile_ir, builtin_return_values)
         rs::context resolver_ctx{sema_env};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -230,11 +338,11 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f() {\n"
+        EXPECT_EQ(ctx.to_string(&resolver),
+                  "define i32 @f() {    ; i32 ()\n"
                   "entry:\n"
-                  " const i32 1\n"
-                  " ret i32\n"
+                  " const i32 1    ; 1\n"
+                  " ret i32    ; i32\n"
                   "}");
     }
     {
@@ -262,6 +370,8 @@ TEST(compile_ir, builtin_return_values)
         rs::context resolver_ctx{sema_env};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -271,11 +381,11 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
-                  "define f32 @f() {\n"
+        EXPECT_EQ(ctx.to_string(&resolver),
+                  "define f32 @f() {    ; f32 ()\n"
                   "entry:\n"
-                  " const f32 1.323\n"
-                  " ret f32\n"
+                  " const f32 1.323    ; 1.323\n"
+                  " ret f32    ; f32\n"
                   "}");
     }
     {
@@ -303,6 +413,8 @@ TEST(compile_ir, builtin_return_values)
         rs::context resolver_ctx{sema_env};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -312,12 +424,12 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   ".string @0 \"test\"\n"
-                  "define str @f() {\n"
+                  "define str @f() {    ; str ()\n"
                   "entry:\n"
-                  " const str @0\n"
-                  " ret str\n"
+                  " const str @0    ; test\n"
+                  " ret str    ; str\n"
                   "}");
     }
 }
@@ -523,6 +635,8 @@ TEST(compile_ir, function_arguments_and_locals)
         rs::context resolver_ctx{sema_env};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -532,15 +646,15 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+        EXPECT_EQ(ctx.to_string(&resolver),
+                  "define i32 @f(i32 %i, i32 %j, f32 %k) {    ; i32 (i32, i32, f32)\n"
                   "entry:\n"
-                  " const i32 3\n"
-                  " dup i32\n"
-                  " store i32 %j\n"
-                  " store i32 %i\n"
-                  " load i32 %j\n"
-                  " ret i32\n"
+                  " const i32 3    ; 3\n"
+                  " dup i32    ; i32\n"
+                  " store i32 %j    ; i32\n"
+                  " store i32 %i    ; i32\n"
+                  " load i32 %j    ; i32\n"
+                  " ret i32    ; i32\n"
                   "}");
     }
 }
@@ -572,6 +686,8 @@ TEST(compile_ir, arrays)
         rs::context resolver_ctx{sema_env};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
         ASSERT_NO_THROW(ast->collect_attributes(sema_env));
@@ -581,22 +697,22 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
-                  "define void @f() {\n"
-                  "local [i32] %b\n"
+        EXPECT_EQ(ctx.to_string(&resolver),
+                  "define void @f() {    ; void ()\n"
+                  "local ref %b    ; i32[]\n"
                   "entry:\n"
-                  " const i32 2\n"
-                  " newarray i32\n"
-                  " dup [i32]\n"      // array_ref
-                  " const i32 0\n"    // index
-                  " const i32 1\n"    // value
-                  " store_element i32\n"
-                  " dup [i32]\n"      // array_ref
-                  " const i32 1\n"    // index
-                  " const i32 2\n"    // value
-                  " store_element i32\n"
-                  " store [i32] %b\n"
-                  " ret void\n"
+                  " const i32 2    ; 2\n"
+                  " newarray i32    ; i32\n"
+                  " dup ref<type#5>    ; i32[]\n"    // array_ref
+                  " const i32 0    ; 0\n"            // index
+                  " const i32 1    ; 1\n"            // value
+                  " store_element i32    ; i32\n"
+                  " dup ref<type#5>    ; i32[]\n"    // array_ref
+                  " const i32 1    ; 1\n"            // index
+                  " const i32 2    ; 2\n"            // value
+                  " store_element i32    ; i32\n"
+                  " store ref %b    ; i32[]\n"
+                  " ret void    ; void\n"
                   "}");
     }
     {
@@ -635,22 +751,22 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define [i32] @f() {\n"
-                  "local [i32] %b\n"
+                  "define ref @f() {\n"
+                  "local ref %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup [i32]\n"      // array_ref
-                  " const i32 0\n"    // index
-                  " const i32 1\n"    // value
+                  " dup ref<type#5>\n"    // array_ref
+                  " const i32 0\n"        // index
+                  " const i32 1\n"        // value
                   " store_element i32\n"
-                  " dup [i32]\n"      // array_ref
-                  " const i32 1\n"    // index
-                  " const i32 2\n"    // value
+                  " dup ref<type#5>\n"    // array_ref
+                  " const i32 1\n"        // index
+                  " const i32 2\n"        // value
                   " store_element i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"
-                  " ret [i32]\n"
+                  " store ref %b\n"
+                  " load ref %b\n"
+                  " ret ref<type#5>\n"
                   "}");
     }
     {
@@ -692,16 +808,16 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local [i32] %b\n"
+                  "local ref %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"    // array_ref
-                  " const i32 1\n"      // index
-                  " const i32 2\n"      // value
+                  " store ref %b\n"
+                  " load ref %b\n"    // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
                   " store_element i32\n"
-                  " load [i32] %b\n"
+                  " load ref %b\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -746,20 +862,20 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local [i32] %b\n"
+                  "local ref %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"          // array_ref
-                  " const i32 0\n"            // index
-                  " load [i32] %b\n"          // array_ref
-                  " const i32 1\n"            // index
-                  " const i32 2\n"            // value
-                  " dup i32, i32, @addr\n"    // duplicate i32 value and store it (i32, @addr) down the stack
+                  " store ref %b\n"
+                  " load ref %b\n"          // array_ref
+                  " const i32 0\n"          // index
+                  " load ref %b\n"          // array_ref
+                  " const i32 1\n"          // index
+                  " const i32 2\n"          // value
+                  " dup i32, i32, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
                   " store_element i32\n"
                   " store_element i32\n"
-                  " load [i32] %b\n"
+                  " load ref %b\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -1510,7 +1626,7 @@ TEST(compile_ir, function_calls)
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
                   "define void @g() {\n"
@@ -1563,8 +1679,8 @@ TEST(compile_ir, function_calls)
                   " const i32 1\n"
                   " const f32 2.3\n"
                   " const str @0\n"
-                  " invoke @h\n"
-                  " invoke @g\n"
+                  " invoke <func#6>\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
                   "define void @g(i32 %a, f32 %b, str %c, i32 %d) {\n"
@@ -1621,7 +1737,7 @@ TEST(compile_ir, function_calls)
                   " mul i32\n"
                   " add i32\n"
                   " const f32 2.3\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
                   "define void @g(i32 %i, f32 %j) {\n"
@@ -1710,9 +1826,9 @@ TEST(compile_ir, function_calls)
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " pop i32\n"
-                  " invoke @h\n"
+                  " invoke <func#2>\n"
                   " pop f32\n"
                   " ret void\n"
                   "}\n"
@@ -1776,17 +1892,17 @@ TEST(compile_ir, function_calls)
                   "}\n"
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
-                  " pop S\n"
+                  " invoke <func#3>\n"
+                  " pop ref<type#5>\n"
                   " ret void\n"
                   "}\n"
-                  "define S @g() {\n"
+                  "define ref @g() {\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref<type#5>\n"
                   " const i32 1\n"
-                  " set_field %S, i32 %i\n"
-                  " ret S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " ret ref<type#5>\n"
                   "}");
     }
 }
@@ -1964,24 +2080,26 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " f32 %j,\n"
                   "}\n"
-                  "define void @test() {\n"
-                  "local S %s\n"
+                  "define void @test() {    ; void ()\n"
+                  "local ref %s    ; S\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
-                  " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
-                  " const i32 3\n"
+                  " new ref<type#5>    ; S\n"
+                  " dup ref<type#5>    ; S\n"
+                  " const i32 2    ; 2\n"
+                  " set_field <type#5>.<field#0>    ; %S.i\n"
+                  " dup ref<type#5>    ; S\n"
+                  " const i32 3    ; 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
-                  " ret void\n"
+                  " set_field <type#5>.<field#1>    ; %S.j\n"
+                  " store ref %s    ; S\n"
+                  " ret void    ; void\n"
                   "}");
     }
     {
@@ -2028,17 +2146,17 @@ TEST(compile_ir, structs)
                   " i32 %i,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref<type#5>\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " dup ref<type#5>\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " store ref %s\n"
                   " ret void\n"
                   "}");
     }
@@ -2086,17 +2204,17 @@ TEST(compile_ir, structs)
                   " f32 %j,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref<type#5>\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref<type#5>\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %s\n"
                   " ret void\n"
                   "}");
     }
@@ -2146,24 +2264,24 @@ TEST(compile_ir, structs)
                   " f32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref<type#5>\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref<type#5>\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
-                  " load S %s\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %s\n"
+                  " load ref %s\n"
                   " const i32 1\n"
-                  " set_field %S, i32 %i\n"
-                  " load S %s\n"
-                  " get_field %S, i32 %i\n"
-                  " load S %s\n"
-                  " get_field %S, f32 %j\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " load ref %s\n"
+                  " get_field <type#5>.<field#0>\n"
+                  " load ref %s\n"
+                  " get_field <type#5>.<field#1>\n"
                   " cast f32_to_i32\n"
                   " add i32\n"
                   " ret i32\n"
@@ -2215,27 +2333,27 @@ TEST(compile_ir, structs)
                   " i32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref<type#5>\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref<type#5>\n"
                   " const i32 3\n"
-                  " set_field %S, i32 %j\n"
-                  " store S %s\n"
-                  " load S %s\n"               // [addr]
-                  " load S %s\n"               // [addr, addr]
-                  " const i32 1\n"             // [addr, addr, 1]
-                  " dup i32, @addr\n"          // [addr, 1, addr, 1]
-                  " set_field %S, i32 %j\n"    // [addr, 1]
-                  " set_field %S, i32 %i\n"    // []
-                  " load S %s\n"               // [addr]
-                  " get_field %S, i32 %i\n"    // [1]
-                  " load S %s\n"               // [1, addr]
-                  " get_field %S, i32 %j\n"    // [1, 1]
-                  " add i32\n"                 // [2]
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %s\n"
+                  " load ref %s\n"                     // [addr]
+                  " load ref %s\n"                     // [addr, addr]
+                  " const i32 1\n"                     // [addr, addr, 1]
+                  " dup i32, ref\n"                    // [addr, 1, addr, 1]
+                  " set_field <type#5>.<field#1>\n"    // [addr, 1]
+                  " set_field <type#5>.<field#0>\n"    // []
+                  " load ref %s\n"                     // [addr]
+                  " get_field <type#5>.<field#0>\n"    // [1]
+                  " load ref %s\n"                     // [1, addr]
+                  " get_field <type#5>.<field#1>\n"    // [1, 1]
+                  " add i32\n"                         // [2]
                   " ret i32\n"
                   "}");
     }
@@ -2286,22 +2404,22 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %s\n"                    // []                                   s = addr1
                   " ret void\n"
                   "}");
     }
@@ -2349,25 +2467,25 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " get_field %S, i32 %i\n"     // [i]
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %s\n"                    // []                                   s = addr1
+                  " load ref %s\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " get_field <type#5>.<field#0>\n"    // [i]
                   " ret i32\n"
                   "}");
     }
@@ -2417,37 +2535,37 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " load S %s\n"                // [s.next, s]
-                  " set_field %S, S %next\n"    // []                                   s.next.next = s
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " get_field %S, S %next\n"    // [s.next.next]
-                  " const i32 2\n"              // [s.next.next, 2]
-                  " set_field %S, i32 %i\n"     // []                                   s.next.next.i = 2
-                  " load S %s\n"                // [s]
-                  " get_field %S, i32 %i\n"     // [i]
-                  " load S %s\n"                // [i, s]
-                  " get_field %S, S %next\n"    // [i, s.next]
-                  " get_field %S, i32 %i\n"     // [i, s.next.i]
-                  " add i32\n"                  // [i + s.next.i]
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %s\n"                    // []                                   s = addr1
+                  " load ref %s\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " load ref %s\n"                     // [s.next, s]
+                  " set_field <type#5>.<field#1>\n"    // []                                   s.next.next = s
+                  " load ref %s\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " get_field <type#5>.<field#1>\n"    // [s.next.next]
+                  " const i32 2\n"                     // [s.next.next, 2]
+                  " set_field <type#5>.<field#0>\n"    // []                                   s.next.next.i = 2
+                  " load ref %s\n"                     // [s]
+                  " get_field <type#5>.<field#0>\n"    // [i]
+                  " load ref %s\n"                     // [i, s]
+                  " get_field <type#5>.<field#1>\n"    // [i, s.next]
+                  " get_field <type#5>.<field#0>\n"    // [i, s.next.i]
+                  " add i32\n"                         // [i + s.next.i]
                   " ret i32\n"
                   "}");
     }
@@ -2494,24 +2612,24 @@ TEST(compile_ir, nested_structs)
                   " Link %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local Link %root\n"
+                  "local ref %root\n"
                   "entry:\n"
-                  " new Link\n"                       // [addr1]
-                  " dup Link\n"                       // [addr1, addr1]
-                  " new Link\n"                       // [addr1, addr1, addr2]
-                  " dup Link\n"                       // [addr1, addr1, addr2, addr2]
-                  " const_null\n"                     // [addr1, addr1, addr2, addr2, null]
-                  " set_field %Link, Link %next\n"    // [addr1, addr1, addr2]                   addr2.next = null
-                  " set_field %Link, Link %next\n"    // [addr1]                                 addr1.next = addr2
-                  " store Link %root\n"               // []                                      root = addr1
-                  " load Link %root\n"                // [root]
-                  " get_field %Link, Link %next\n"    // [root.next]
-                  " load Link %root\n"                // [root.next, root]
-                  " set_field %Link, Link %next\n"    // []                                      root.next.next = root
-                  " load Link %root\n"                // [root]
-                  " get_field %Link, Link %next\n"    // [root.next]
-                  " const_null\n"                     // [root.next, null]
-                  " set_field %Link, Link %next\n"    // []                                      root.next.next = null
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                   addr2.next = null
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                                 addr1.next = addr2
+                  " store ref %root\n"                 // []                                      root = addr1
+                  " load ref %root\n"                  // [root]
+                  " get_field <type#5>.<field#0>\n"    // [root.next]
+                  " load ref %root\n"                  // [root.next, root]
+                  " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = root
+                  " load ref %root\n"                  // [root]
+                  " get_field <type#5>.<field#0>\n"    // [root.next]
+                  " const_null\n"                      // [root.next, null]
+                  " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = null
                   " ret void\n"
                   "}");
     }

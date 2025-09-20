@@ -21,20 +21,42 @@
 
 namespace slang::codegen
 {
-class context;
-class instruction;
-class function;
+class context;     /* codegen/codegen.h */
+class instruction; /* codegen/codegen.h */
+class function;    /* codegen/codegen.h */
 }    // namespace slang::codegen
+
+namespace slang::const_
+{
+struct env; /* constant.h */
+}    // namespace slang::const_
+
+namespace slang::lowering
+{
+class context; /* lowering.h */
+}    // namespace slang::lowering
 
 namespace slang::macro
 {
-struct env;
+struct env; /* macro.h */
 }    // namespace slang::macro
+
+namespace slang::sema
+{
+struct env; /* sema.h */
+}    // namespace slang::sema
+
+namespace typing
+{
+class context; /* typing.h */
+}    // namespace typing
 
 namespace slang
 {
 
 namespace cg = slang::codegen;
+namespace tl = slang::lowering;
+namespace ty = slang::typing;
 
 /** An error during instruction emission. */
 class emitter_error : public std::runtime_error
@@ -45,10 +67,31 @@ class emitter_error : public std::runtime_error
 /** Export table builder. */
 class export_table_builder
 {
+    /** Reference to the instruction emitter. */
+    class instruction_emitter& emitter;
+
     /** Export table. */
     std::vector<module_::exported_symbol> export_table;
 
 public:
+    /**
+     * Constructor.
+     *
+     * @param emitter The instruction emitter.
+     */
+    export_table_builder(class instruction_emitter& emitter)
+    : emitter{emitter}
+    {
+    }
+
+    /** Deleted copy and move constructors. */
+    export_table_builder(const export_table_builder&) = delete;
+    export_table_builder(export_table_builder&&) = delete;
+
+    /** Deleted assignments. */
+    export_table_builder& operator=(const export_table_builder&) = delete;
+    export_table_builder& operator=(export_table_builder&&) = delete;
+
     /** Clear the export table. */
     void clear()
     {
@@ -106,12 +149,9 @@ public:
     /**
      * Add a type to the export table.
      *
-     * @param ctx The context used for type resolution.
      * @param type The type definition.
      */
-    void add_type(
-      const cg::context& ctx,
-      const std::unique_ptr<cg::struct_>& type);
+    void add_type(const std::unique_ptr<cg::struct_>& type);
 
     /**
      * Add a constant to the export table.
@@ -157,11 +197,22 @@ public:
  */
 class instruction_emitter
 {
-    /** The associated codegen context. */
-    cg::context& ctx;
+    friend class export_table_builder;
+
+    /** Semantic environment. */
+    sema::env& sema_env;
+
+    /** Constant environment.  */
+    const_::env& const_env;
 
     /** The associated macro environment. */
     macro::env& macro_env;
+
+    /** Type context. */
+    ty::context& type_ctx;
+
+    /** The associated codegen context. */
+    cg::context& codegen_ctx;
 
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
@@ -209,15 +260,25 @@ public:
     /**
      * Construct an instruction emitter.
      *
-     * @param ctx A codegen context.
+     * @param sema_env The semantic environment.
+     * @param const_env The constant environment.
      * @param macro_env The macro environment.
+     * @param type_ctx The type context.
+     * @param codegen_ctx A codegen context.
      */
     instruction_emitter(
-      cg::context& ctx,
-      macro::env& macro_env)
-    : ctx{ctx}
+      sema::env& sema_env,
+      const_::env& const_env,
+      macro::env& macro_env,
+      ty::context& type_ctx,
+      cg::context& codegen_ctx)
+    : sema_env{sema_env}
+    , const_env{const_env}
     , macro_env{macro_env}
+    , type_ctx{type_ctx}
+    , codegen_ctx{codegen_ctx}
     , instruction_buffer{false, std::endian::little}
+    , exports{*this}
     {
     }
 

@@ -50,10 +50,10 @@ sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
 {
     switch(s)
     {
-    case module_::symbol_type::constant: return sema::symbol_type::constant_declaration;
-    case module_::symbol_type::function: return sema::symbol_type::function_definition;
-    case module_::symbol_type::macro: return sema::symbol_type::macro_definition;
-    case module_::symbol_type::type: return sema::symbol_type::struct_definition;
+    case module_::symbol_type::constant: return sema::symbol_type::constant;
+    case module_::symbol_type::function: return sema::symbol_type::function;
+    case module_::symbol_type::macro: return sema::symbol_type::macro;
+    case module_::symbol_type::type: return sema::symbol_type::struct_;
     default:
         throw std::runtime_error(
           std::format(
@@ -81,7 +81,7 @@ void context::resolve_imports(
 
     for(auto& [id, info]: env.symbol_table)
     {
-        if(info.type != sema::symbol_type::module_import)
+        if(info.type != sema::symbol_type::module_)
         {
             continue;
         }

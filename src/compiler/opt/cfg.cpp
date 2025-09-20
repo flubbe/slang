@@ -10,7 +10,7 @@
 
 #include <print>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "cfg.h"
 
 namespace slang::opt::cfg

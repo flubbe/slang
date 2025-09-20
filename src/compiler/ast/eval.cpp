@@ -9,7 +9,7 @@
  */
 
 #include "shared/module.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/typing.h"
 #include "ast.h"
 #include "utils.h"
@@ -33,21 +33,21 @@ std::optional<const_::const_info> literal_expression::evaluate(
     if(tok.type == token_type::int_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = type_ctx.get_i32_type(),
+          {.type = const_::constant_type::i32,
            .value = std::get<std::int32_t>(tok.value.value())});
     }
 
     if(tok.type == token_type::fp_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = type_ctx.get_f32_type(),
+          {.type = const_::constant_type::f32,
            .value = std::get<float>(tok.value.value())});
     }
 
     if(tok.type == token_type::str_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = type_ctx.get_str_type(),
+          {.type = const_::constant_type::str,
            .value = std::get<std::string>(tok.value.value())});
     }
 
@@ -116,23 +116,23 @@ struct binary_operation_helper
               loc,
               std::format(
                 "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
-                ctx.to_string(lhs.type),
-                ctx.to_string(rhs.type)));
+                const_::to_string(lhs.type),
+                const_::to_string(rhs.type)));
         }
 
-        if(lhs.type == ctx.get_i32_type())
+        if(lhs.type == const_::constant_type::i32)
         {
             return {
-              .type = ctx.get_i32_type(),
+              .type = const_::constant_type::i32,
               .value = func_i32(
                 std::get<std::int32_t>(lhs.value),
                 std::get<std::int32_t>(rhs.value))};
         }
 
-        if(lhs.type == ctx.get_f32_type())
+        if(lhs.type == const_::constant_type::f32)
         {
             return {
-              .type = ctx.get_f32_type(),
+              .type = const_::constant_type::f32,
               .value = func_f32(
                 std::get<float>(lhs.value),
                 std::get<float>(rhs.value))};
@@ -142,8 +142,8 @@ struct binary_operation_helper
           loc,
           std::format(
             "Invalid type '{}' for binary operator evaluation.",
-            ctx.to_string(lhs.type),
-            ctx.to_string(rhs.type)));
+            const_::to_string(lhs.type),
+            const_::to_string(rhs.type)));
     }
 };
 
@@ -389,17 +389,17 @@ struct unary_operation_helper
 
     const_::const_info operator()(const const_::const_info& v) const
     {
-        if(v.type == ctx.get_i32_type())
+        if(v.type == const_::constant_type::i32)
         {
             return {
-              .type = ctx.get_i32_type(),
+              .type = const_::constant_type::i32,
               .value = func_i32(std::get<std::int32_t>(v.value))};
         }
 
-        if(v.type == ctx.get_f32_type())
+        if(v.type == const_::constant_type::f32)
         {
             return {
-              .type = ctx.get_f32_type(),
+              .type = const_::constant_type::f32,
               .value = func_f32(std::get<float>(v.value))};
         }
 
@@ -407,7 +407,7 @@ struct unary_operation_helper
           loc,
           std::format(
             "Invalid type '{}' for unary operator evaluation.",
-            ctx.to_string(v.type)));
+            const_::to_string(v.type)));
     }
 };
 

@@ -12,6 +12,7 @@
 
 #include <unordered_map>
 
+#include "compiler/codegen/type.h"
 #include "type.h"
 
 /*
@@ -25,8 +26,8 @@ class context; /* typing.h */
 
 namespace slang::codegen
 {
-enum class type_kind : std::uint8_t; /* codegen.h */
-class type;                          /* codegen.h */
+enum class type_kind : std::uint8_t; /* codegen/codegen.h */
+class type;                          /* codegen/codegen.h */
 }    // namespace slang::codegen
 
 namespace slang::lowering
@@ -51,6 +52,16 @@ class context
       cg::type>
       type_cache;
 
+    /** Built-in types. */
+    cg::type null_type;
+    cg::type void_type;
+    cg::type i32_type;
+    cg::type f32_type;
+    cg::type str_type;
+
+    /** Initialize the built-in types. */
+    void initialize_builtins();
+
 public:
     /** Deleted constructors. */
     context() = delete;
@@ -65,6 +76,7 @@ public:
     context(const ty::context& type_ctx)
     : type_ctx{type_ctx}
     {
+        initialize_builtins();
     }
 
     /** Destructor. */
@@ -103,8 +115,14 @@ public:
      *
      * @param type The type to dereference.
      * @param Returns the dereferences type.
+     * @throws Throws a `cg::codegen_error` if the front-end type is not set,
+     *         or `type` is not an array type.
      */
     cg::type deref(const cg::type& type);
+
+    /** Print the contents as a readable string. */
+    [[nodiscard]]
+    std::string to_string() const;
 };
 
 }    // namespace slang::lowering

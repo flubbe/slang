@@ -27,7 +27,7 @@ add_executable(slang
     src/compiler/ast/node_registry.cpp
     src/compiler/ast/resolve.cpp
     src/compiler/attribute.cpp
-    src/compiler/codegen.cpp
+    src/compiler/codegen/codegen.cpp
     src/compiler/collect.cpp
     src/compiler/constant.cpp
     src/compiler/emitter.cpp

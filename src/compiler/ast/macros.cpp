@@ -9,7 +9,7 @@
  */
 
 #include "archives/archive.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
@@ -486,7 +486,7 @@ void macro_expression::collect_names(
         "{}::{}",
         ctx.get_canonical_scope_name(ctx.get_current_scope()),
         name.s),
-      sema::symbol_type::macro_definition,
+      sema::symbol_type::macro,
       name.location,
       sema::symbol_id::invalid,
       false,
