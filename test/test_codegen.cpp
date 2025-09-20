@@ -509,7 +509,9 @@ TEST(codegen, locals_store)
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        fn->create_local(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
+        fn->get_scope()->add_local(
+          std::make_unique<cg::value>(
+            cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
         cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
@@ -659,7 +661,7 @@ TEST(codegen, invoke)
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(
+        fn_f->get_scope()->add_local(
           std::make_unique<cg::value>(
             cg::type{
               mock_i32_type,
@@ -711,7 +713,7 @@ TEST(codegen, invoke)
         const sema::symbol_id function_symbol_id = co_ctx.declare(
           "g",
           "g",
-          sema::symbol_type::varaible,
+          sema::symbol_type::variable,
           {0, 0},
           mock_scope_id,
           false,
@@ -792,22 +794,22 @@ TEST(codegen, invoke)
 
         EXPECT_EQ(
           codegen_ctx.to_string(&resolver),
-          "define i32 @f(i32 %a) {\n"
-          "local i32 %b\n"
+          "define i32 @f(i32 %a) {    ; i32 (i32)\n"
+          "local i32 %b    ; i32\n"
           "entry:\n"
-          " const i32 -1\n"
-          " store i32 %b\n"
-          " load i32 %b\n"
-          " load i32 %a\n"
-          " invoke @g\n"
-          " ret i32\n"
+          " const i32 -1    ; -1\n"
+          " store i32 %b    ; i32\n"
+          " load i32 %b    ; i32\n"
+          " load i32 %a    ; i32\n"
+          " invoke <func#0>    ; @g\n"
+          " ret i32    ; i32\n"
           "}\n"
-          "define i32 @g(i32 %a, i32 %b) {\n"
+          "define i32 @g(i32 %a, i32 %b) {    ; i32 (i32, i32)\n"
           "entry:\n"
-          " load i32 %a\n"
-          " load i32 %b\n"
-          " mul i32\n"
-          " ret i32\n"
+          " load i32 %a    ; i32\n"
+          " load i32 %b    ; i32\n"
+          " mul i32    ; i32\n"
+          " ret i32    ; i32\n"
           "}");
     }
     {
@@ -850,7 +852,7 @@ TEST(codegen, invoke)
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->create_local(
+        fn_f->get_scope()->add_local(
           std::make_unique<cg::value>(
             cg::type{
               mock_i32_type,
@@ -985,23 +987,23 @@ TEST(codegen, invoke)
 
         EXPECT_EQ(
           codegen_ctx.to_string(&resolver),
-          "define i32 @f(i32 %a) {\n"
-          "local i32 %b\n"
+          "define i32 @f(i32 %a) {    ; i32 (i32)\n"
+          "local i32 %b    ; i32\n"
           "entry:\n"
-          " const i32 -1\n"
-          " store i32 %b\n"
-          " load i32 %b\n"
-          " load i32 %a\n"
-          " load @g\n"
+          " const i32 -1    ; -1\n"
+          " store i32 %b    ; i32\n"
+          " load i32 %b    ; i32\n"
+          " load i32 %a    ; i32\n"
+          " load <func#0>    ; @g\n"
           " invoke_dynamic\n"
-          " ret i32\n"
+          " ret i32    ; i32\n"
           "}\n"
-          "define i32 @g(i32 %a, i32 %b) {\n"
+          "define i32 @g(i32 %a, i32 %b) {    ; i32 (i32, i32)\n"
           "entry:\n"
-          " load i32 %a\n"
-          " load i32 %b\n"
-          " mul i32\n"
-          " ret i32\n"
+          " load i32 %a    ; i32\n"
+          " load i32 %b    ; i32\n"
+          " mul i32    ; i32\n"
+          " ret i32    ; i32\n"
           "}");
     }
 }
@@ -1057,6 +1059,7 @@ TEST(codegen, strings)
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
+                  ".string @0 \"\\x09Test\\x0a\"\n"
                   "define str @f() {\n"
                   "entry:\n"
                   " const str @0\n"

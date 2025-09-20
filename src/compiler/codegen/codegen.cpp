@@ -823,52 +823,6 @@ std::optional<constant_table_entry> context::get_constant(
     // return std::nullopt;
 }
 
-void context::add_prototype(
-  std::string name,
-  value return_type,
-  std::vector<value> args,
-  std::optional<std::string> import_path)
-{
-    if(std::ranges::find_if(
-         prototypes,
-         [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-         {
-             return p->get_name() == name
-                    && p->get_import_path() == import_path;
-         })
-       != prototypes.end())
-    {
-        throw codegen_error(std::format("Prototype '{}' already defined.", name));
-    }
-
-    prototypes.emplace_back(
-      std::make_unique<prototype>(
-        std::move(name),
-        std::move(return_type),
-        std::move(args),
-        std::move(import_path)));
-}
-
-const prototype& context::get_prototype(const std::string& name, std::optional<std::string> import_path) const
-{
-    auto it = std::ranges::find_if(
-      std::as_const(prototypes),
-      [&name, &import_path](const std::unique_ptr<prototype>& p) -> bool
-      {
-          return p->get_name() == name
-                 && p->get_import_path() == import_path;
-      });
-    if(it == prototypes.cend())
-    {
-        if(import_path.has_value())
-        {
-            throw codegen_error(std::format("Prototype '{}' not found in '{}'.", name, *import_path));
-        }
-        throw codegen_error(std::format("Prototype '{}' not found.", name));
-    }
-    return **it;
-}
-
 function* context::create_function(std::string name,
                                    std::unique_ptr<value> return_type,
                                    std::vector<std::unique_ptr<value>> args)

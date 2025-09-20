@@ -1407,89 +1407,6 @@ public:
     function_guard& operator=(function_guard&&) = delete;
 };
 
-/**
- * Function prototype information.
- */
-class prototype
-{
-    /** The function's name. */
-    std::string name;
-
-    /** The return type of the function. */
-    value return_type;
-
-    /** The argument types. */
-    std::vector<value> arg_types;
-
-    /** The module path for imported functions and `std::nullopt` for prototypes within the current module. */
-    std::optional<std::string> import_path;
-
-public:
-    /** Defaulted and deleted constructors. */
-    prototype() = delete;
-    prototype(const prototype&) = default;
-    prototype(prototype&&) = default;
-
-    /** Default assignments. */
-    prototype& operator=(const prototype&) = default;
-    prototype& operator=(prototype&&) = default;
-
-    /**
-     * Construct a function prototype.
-     *
-     * @param name The function's name.
-     * @param return_type The function's return type.
-     * @param arg_type The function's argument types.
-     * @param import_path The import path of the module for imported functions.
-     */
-    prototype(
-      std::string name,
-      value return_type,
-      std::vector<value> arg_types,
-      std::optional<std::string> import_path = std::nullopt)
-    : name{std::move(name)}
-    , return_type{std::move(return_type)}
-    , arg_types{std::move(arg_types)}
-    , import_path{std::move(import_path)}
-    {
-    }
-
-    /** Get the function's name. */
-    [[nodiscard]]
-    const std::string& get_name() const
-    {
-        return name;
-    }
-
-    /** Get the function's return type. */
-    [[nodiscard]]
-    const value& get_return_type() const
-    {
-        return return_type;
-    }
-
-    /** Get the function's argument types. */
-    [[nodiscard]]
-    const std::vector<value>& get_arg_types() const
-    {
-        return arg_types;
-    }
-
-    /** Return whether this is an imported function. */
-    [[nodiscard]]
-    bool is_import() const
-    {
-        return import_path.has_value();
-    }
-
-    /** Return the import path. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
-    }
-};
-
 /** A function.*/
 class function
 {
@@ -1598,12 +1515,6 @@ public:
     bool ends_with_return() const
     {
         return !instr_blocks.empty() && instr_blocks.back()->ends_with_return();
-    }
-
-    /** Create a local variable. */
-    void create_local(std::unique_ptr<value> v)
-    {
-        scope.add_local(std::move(v));
     }
 
     /** Get the function's scope. */
@@ -1819,9 +1730,6 @@ class context
     /** Struct stack for access resolution. */
     std::vector<type> struct_access;
 
-    /** List of function prototypes. */
-    std::vector<std::unique_ptr<prototype>> prototypes;
-
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
@@ -2023,36 +1931,6 @@ public:
     std::optional<constant_table_entry> get_constant(
       const std::string& name,
       const std::optional<std::string>& import_path = std::nullopt);
-
-    /**
-     * Add a function prototype.
-     *
-     * Throws a `codegen_error` if the prototype already exists.
-     *
-     * @param name The function's name.
-     * @param return_type The function's return type.
-     * @param args The function's arguments.
-     * @param import_path The import path for the prototype.
-     */
-    void add_prototype(
-      std::string name,
-      value return_type,
-      std::vector<value> args,
-      std::optional<std::string> import_path = std::nullopt);
-
-    /**
-     * Get a function's prototype.
-     *
-     * Throws a `codegen_error` if the prototype is not found.
-     *
-     * @param name The function's name.
-     * @param import_path The import path of the function, or `std::nullopt`.
-     * @returns A reference the the function's prototype.
-     */
-    [[nodiscard]]
-    const prototype& get_prototype(
-      const std::string& name,
-      std::optional<std::string> import_path) const;
 
     /**
      * Add a function definition.

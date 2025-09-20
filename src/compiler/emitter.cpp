@@ -443,26 +443,29 @@ void instruction_emitter::collect_imports()
                                 symbol_info_it->second.qualified_name));
                         }
 
-                        auto import_it = std::ranges::find_if(
-                          codegen_ctx.prototypes,
-                          [arg, &declaring_module_symbol_it](const std::unique_ptr<cg::prototype>& p) -> bool
-                          {
-                              return p->is_import()
-                                     && *p->get_import_path() == declaring_module_symbol_it->second.qualified_name
-                                     && p->get_name() == *arg->get_value()->get_name();
-                          });
-                        if(import_it == codegen_ctx.prototypes.end())
-                        {
-                            throw emitter_error(
-                              std::format(
-                                "Could not resolve imported function '{}'.",
-                                arg->get_value()->get_name().value_or("<unknown>")));
-                        }
+                        // TODO
+                        throw std::runtime_error("instruction_emitter::collect_imports");
 
-                        codegen_ctx.add_import(
-                          module_::symbol_type::function,
-                          (*import_it)->get_import_path().value(),    // NOLINT(bugprone-unchecked-optional-access)
-                          (*import_it)->get_name());
+                        // auto import_it = std::ranges::find_if(
+                        //   codegen_ctx.prototypes,
+                        //   [arg, &declaring_module_symbol_it](const std::unique_ptr<cg::prototype>& p) -> bool
+                        //   {
+                        //       return p->is_import()
+                        //              && *p->get_import_path() == declaring_module_symbol_it->second.qualified_name
+                        //              && p->get_name() == *arg->get_value()->get_name();
+                        //   });
+                        // if(import_it == codegen_ctx.prototypes.end())
+                        // {
+                        //     throw emitter_error(
+                        //       std::format(
+                        //         "Could not resolve imported function '{}'.",
+                        //         arg->get_value()->get_name().value_or("<unknown>")));
+                        // }
+
+                        // codegen_ctx.add_import(
+                        //   module_::symbol_type::function,
+                        //   (*import_it)->get_import_path().value(),    // NOLINT(bugprone-unchecked-optional-access)
+                        //   (*import_it)->get_name());
                     }
                 }
                 else if(instr->get_name() == "new")
@@ -934,32 +937,35 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
             return;
         }
 
-        // resolve imports.
-        auto import_it = std::ranges::find_if(
-          codegen_ctx.prototypes,
-          [arg, &info](const std::unique_ptr<cg::prototype>& p) -> bool
-          {
-              return p->is_import()
-                     && *p->get_import_path() == info.value().qualified_module_name
-                     && p->get_name() == *arg->get_value()->get_name();
-          });
-        if(import_it == codegen_ctx.prototypes.end())
-        {
-            throw emitter_error(
-              std::format(
-                "Could not resolve imported function '{}'.",
-                arg->get_value()->get_name().value_or("<invalid-name>")));
-        }
+        // TODO
+        throw std::runtime_error("instruction_emitter::emit_instruction");
 
-        vle_int index{
-          -utils::numeric_cast<std::int64_t>(
-            codegen_ctx.get_import_index(
-              module_::symbol_type::function,
-              (*import_it)->get_import_path().value_or("<invalid-import-path>"),
-              (*import_it)->get_name()))
-          - 1};
-        emit(instruction_buffer, opcode::invoke);
-        instruction_buffer & index;
+        // resolve imports.
+        // auto import_it = std::ranges::find_if(
+        //   codegen_ctx.prototypes,
+        //   [arg, &info](const std::unique_ptr<cg::prototype>& p) -> bool
+        //   {
+        //       return p->is_import()
+        //              && *p->get_import_path() == info.value().qualified_module_name
+        //              && p->get_name() == *arg->get_value()->get_name();
+        //   });
+        // if(import_it == codegen_ctx.prototypes.end())
+        // {
+        //     throw emitter_error(
+        //       std::format(
+        //         "Could not resolve imported function '{}'.",
+        //         arg->get_value()->get_name().value_or("<invalid-name>")));
+        // }
+
+        // vle_int index{
+        //   -utils::numeric_cast<std::int64_t>(
+        //     codegen_ctx.get_import_index(
+        //       module_::symbol_type::function,
+        //       (*import_it)->get_import_path().value_or("<invalid-import-path>"),
+        //       (*import_it)->get_name()))
+        //   - 1};
+        // emit(instruction_buffer, opcode::invoke);
+        // instruction_buffer & index;
     }
     else if(name == "ret")
     {
