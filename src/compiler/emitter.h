@@ -46,10 +46,11 @@ namespace slang::sema
 struct env; /* sema.h */
 }    // namespace slang::sema
 
-namespace typing
+namespace slang::typing
 {
-class context; /* typing.h */
-}    // namespace typing
+struct struct_info; /* typing.h */
+class context;      /* typing.h */
+}    // namespace slang::typing
 
 namespace slang
 {
@@ -147,11 +148,11 @@ public:
       std::string import_library);
 
     /**
-     * Add a type to the export table.
+     * Add a struct to the export table.
      *
-     * @param type The type definition.
+     * @param info The struct definition.
      */
-    void add_type(const std::unique_ptr<cg::struct_>& type);
+    void add_struct(const ty::struct_info& info);
 
     /**
      * Add a constant to the export table.
@@ -219,6 +220,9 @@ class instruction_emitter
 
     /** Exports. */
     export_table_builder exports;
+
+    /** Constant table. */
+    std::vector<cg::constant_table_entry> constant_table;
 
     /** Referenced jump targets. */
     std::set<std::string> jump_targets;

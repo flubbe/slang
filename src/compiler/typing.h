@@ -286,6 +286,15 @@ public:
      */
     type_info get_type_info(type_id id) const;
 
+    /** Returns the type info map. */
+    const std::unordered_map<
+      type_id,
+      type_info>&
+      get_type_info_map() const
+    {
+        return type_info_map;
+    }
+
     /**
      * Get the base type for a type.
      *

@@ -1466,10 +1466,6 @@ public:
         return {};
     }
 
-    /** Get the value of the object, or `std::nullopt` if it is not in scope. */
-    [[nodiscard]]
-    std::optional<cg::value> get_value(cg::context& ctx) const;
-
     /** Whether this variable was expanded by an expression. */
     [[nodiscard]]
     bool has_expansion() const

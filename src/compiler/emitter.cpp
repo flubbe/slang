@@ -18,6 +18,8 @@
 #include "macro.h"
 #include "utils.h"
 
+#include <print>    // FIXME
+
 namespace cg = slang::codegen;
 namespace ast = slang::ast;
 
@@ -199,76 +201,78 @@ static std::optional<import_info> get_import_info(
     return get_import_info(symbol_it->first.value, sema_env);
 }
 
-void export_table_builder::add_type(const std::unique_ptr<cg::struct_>& type)
+void export_table_builder::add_struct(const ty::struct_info& type)
 {
-    if(std::ranges::find_if(
-         export_table,
-         [&type](const module_::exported_symbol& entry) -> bool
-         { return entry.type == module_::symbol_type::type
-                  && entry.name == type->get_name(); })
-       != export_table.end())
-    {
-        throw emitter_error(
-          std::format(
-            "Cannot add type to export table: '{}' already exists.",
-            type->get_name()));
-    }
+    throw std::runtime_error("export_table_builder::add_struct");
 
-    std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members =
-      type->get_members()
-      | std::views::transform(
-        [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
-        {
-            const auto& t = std::get<1>(m);
-            auto type_id = t.get_type().get_type_id();
-            if(!type_id.has_value())
-            {
-                throw emitter_error("Type has no id.");
-            }
+    // if(std::ranges::find_if(
+    //      export_table,
+    //      [&type](const module_::exported_symbol& entry) -> bool
+    //      { return entry.type == module_::symbol_type::type
+    //               && entry.name == type->get_name(); })
+    //    != export_table.end())
+    // {
+    //     throw emitter_error(
+    //       std::format(
+    //         "Cannot add type to export table: '{}' already exists.",
+    //         type->get_name()));
+    // }
 
-            std::optional<import_info> info = get_import_info(type_id.value(), emitter.sema_env);
-            std::optional<std::size_t> import_index = std::nullopt;
+    // std::vector<std::pair<std::string, module_::field_descriptor>> transformed_members =
+    //   type->get_members()
+    //   | std::views::transform(
+    //     [this](const std::pair<std::string, cg::value>& m) -> std::pair<std::string, module_::field_descriptor>
+    //     {
+    //         const auto& t = std::get<1>(m);
+    //         auto type_id = t.get_type().get_type_id();
+    //         if(!type_id.has_value())
+    //         {
+    //             throw emitter_error("Type has no id.");
+    //         }
 
-            if(info.has_value())
-            {
-                // find the import index.
-                auto import_it = std::ranges::find_if(
-                  emitter.codegen_ctx.imports,
-                  [&info](const cg::imported_symbol& s) -> bool
-                  {
-                      return s.type == module_::symbol_type::type
-                             && s.name == info.value().name
-                             && s.import_path == info.value().qualified_module_name;
-                  });
-                if(import_it == emitter.codegen_ctx.imports.end())
-                {
-                    throw emitter_error(
-                      std::format(
-                        "Type '{}' from package '{}' not found in import table.",
-                        info.value().name,
-                        info.value().qualified_module_name));
-                }
+    //         std::optional<import_info> info = get_import_info(type_id.value(), emitter.sema_env);
+    //         std::optional<std::size_t> import_index = std::nullopt;
 
-                import_index = std::distance(emitter.codegen_ctx.imports.begin(), import_it);
-            }
+    //         if(info.has_value())
+    //         {
+    //             // find the import index.
+    //             auto import_it = std::ranges::find_if(
+    //               emitter.codegen_ctx.imports,
+    //               [&info](const cg::imported_symbol& s) -> bool
+    //               {
+    //                   return s.type == module_::symbol_type::type
+    //                          && s.name == info.value().name
+    //                          && s.import_path == info.value().qualified_module_name;
+    //               });
+    //             if(import_it == emitter.codegen_ctx.imports.end())
+    //             {
+    //                 throw emitter_error(
+    //                   std::format(
+    //                     "Type '{}' from package '{}' not found in import table.",
+    //                     info.value().name,
+    //                     info.value().qualified_module_name));
+    //             }
 
-            return std::make_pair(
-              std::get<0>(m),
-              module_::field_descriptor{
-                emitter.type_ctx.to_string(
-                  emitter.type_ctx.get_base_type(
-                    type_id.value())),
-                emitter.type_ctx.is_array(type_id.value()),
-                import_index});
-        })
-      | std::ranges::to<std::vector>();
+    //             import_index = std::distance(emitter.codegen_ctx.imports.begin(), import_it);
+    //         }
 
-    export_table.emplace_back(
-      module_::symbol_type::type,
-      type->get_name(),
-      module_::struct_descriptor{
-        .flags = type->get_flags(),
-        .member_types = std::move(transformed_members)});
+    //         return std::make_pair(
+    //           std::get<0>(m),
+    //           module_::field_descriptor{
+    //             emitter.type_ctx.to_string(
+    //               emitter.type_ctx.get_base_type(
+    //                 type_id.value())),
+    //             emitter.type_ctx.is_array(type_id.value()),
+    //             import_index});
+    //     })
+    //   | std::ranges::to<std::vector>();
+
+    // export_table.emplace_back(
+    //   module_::symbol_type::type,
+    //   type->get_name(),
+    //   module_::struct_descriptor{
+    //     .flags = type->get_flags(),
+    //     .member_types = std::move(transformed_members)});
 }
 
 void export_table_builder::add_constant(std::string name, std::size_t i)
@@ -579,8 +583,23 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
   cg::context& codegen_ctx,
   const cg::type& t)
 {
+    if(!t.get_type_id().has_value())
+    {
+        throw emitter_error(
+          "Type had no id during emission.");
+    }
+
     auto info = type_ctx.get_type_info(
       type_ctx.get_base_type(t.get_type_id().value()));
+
+    if(info.kind != ty::type_kind::struct_)
+    {
+        return std::nullopt;
+    }
+
+    std::print("type id: {},  type kind: {}\n",
+               t.get_type_id().value(),
+               ty::to_string(info.kind));
 
     throw std::runtime_error("get_import_index_or_nullopt");
 
@@ -700,10 +719,12 @@ void instruction_emitter::emit_instruction(const std::unique_ptr<cg::function>& 
                 throw std::runtime_error(std::format("Invalid type 'str' for instruction '{}'.", name));
             }
 
+            // FIXME Explicitly construct the constant table first and get the id's from there.
+            const_::constant_id id = static_cast<const cg::constant_str*>(v)->get_id();
             emit(
               instruction_buffer,
               *str_opcode,
-              vle_int{static_cast<const cg::constant_str*>(v)->get_constant_index()});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              vle_int{static_cast<std::int64_t>(id)});    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         }
         else
         {
@@ -1320,24 +1341,41 @@ void instruction_emitter::run()
     std::size_t import_count = codegen_ctx.imports.size();
 
     // exported constants.
-    throw std::runtime_error("instruction_emitter::run (constants)");
-    // for(std::size_t i = 0; i < codegen_ctx.constants.size(); ++i)
-    // {
-    //     const auto& c = codegen_ctx.constants[i];
-    //     if(!c.add_to_exports)
-    //     {
-    //         continue;
-    //     }
-    //     if(!c.name.has_value())
-    //     {
-    //         throw emitter_error("Cannot export a constant without a name.");
-    //     }
+    constant_table.clear();
+    constant_table.reserve(const_env.const_literal_map.size());
 
-    //     exports.add_constant(c.name.value(), i);
-    // }
+    for(const auto& [id, info]: const_env.const_info_map)
+    {
+        // FIXME Export constants.
+        std::print("FIXME constant table: {}\n", sema_env.symbol_table[id].name);
+
+        // const auto& c = codegen_ctx.constants[i];
+        // if(!c.add_to_exports)
+        // {
+        //     continue;
+        // }
+        // if(!c.name.has_value())
+        // {
+        //     throw emitter_error("Cannot export a constant without a name.");
+        // }
+
+        // exports.add_constant(c.name.value(), i);
+    }
 
     // exported types.
-    throw std::runtime_error("instruction_emitter::run (types)");
+    for(const auto& [id, info]: type_ctx.get_type_info_map())
+    {
+        if(info.kind != ty::type_kind::struct_)
+        {
+            continue;
+        }
+
+        // TODO Filter imported struct definitions.
+
+        const auto& struct_info = std::get<ty::struct_info>(info.data);
+        exports.add_struct(struct_info);
+    }
+
     // for(const auto& it: codegen_ctx.types)
     // {
     //     if(it->is_import())
@@ -1699,26 +1737,25 @@ module_::language_module instruction_emitter::to_module() const
     /*
      * Constants.
      */
-    throw std::runtime_error("instruction_emitter::to_module (constants)");
-    // std::vector<cg::constant_table_entry> exported_constants;
-    // std::ranges::copy_if(
-    //   std::as_const(codegen_ctx.constants),
-    //   std::back_inserter(exported_constants),
-    //   [](const cg::constant_table_entry& entry) -> bool
-    //   {
-    //       return !entry.import_path.has_value();
-    //   });
+    std::vector<cg::constant_table_entry> exported_constants;
+    std::ranges::copy_if(
+      std::as_const(constant_table),
+      std::back_inserter(exported_constants),
+      [](const cg::constant_table_entry& entry) -> bool
+      {
+          return !entry.import_path.has_value();
+      });
 
-    // std::vector<module_::constant_table_entry> constants =
-    //   exported_constants
-    //   | std::views::transform(
-    //     [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
-    //     {
-    //         return {entry.type, entry.data};
-    //     })
-    //   | std::ranges::to<std::vector>();
+    std::vector<module_::constant_table_entry> constants =
+      exported_constants
+      | std::views::transform(
+        [](const cg::constant_table_entry& entry) -> module_::constant_table_entry
+        {
+            return {entry.type, entry.data};
+        })
+      | std::ranges::to<std::vector>();
 
-    // mod.set_constant_table(constants);
+    mod.set_constant_table(constants);
 
     /*
      * Exports.

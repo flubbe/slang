@@ -1083,101 +1083,6 @@ public:
     static basic_block* create(class context& ctx, std::string name);
 };
 
-/** A user-defined type. */
-class struct_
-{
-    friend class context;
-
-    /** The type's name. */
-    std::string name;
-
-    /** The type's members as pairs `(name, type)`. */
-    std::vector<std::pair<std::string, value>> members;
-
-    /** Flags. */
-    std::uint8_t flags = 0;
-
-    /** The module path for imported types and `std::nullopt` for types within the current module. */
-    std::optional<std::string> import_path;
-
-public:
-    /** Default constructors. */
-    struct_() = default;
-    struct_(const struct_&) = default;
-    struct_(struct_&&) = default;
-
-    /** Destructor. */
-    ~struct_() = default;
-
-    /** Default assignment. */
-    struct_& operator=(const struct_&) = default;
-    struct_& operator=(struct_&&) = default;
-
-    /**
-     * Construct a new struct.
-     *
-     * @param name The type's name.
-     * @param members The type's members.
-     * @param flags THe type's flags.
-     * @param import_path The import path of the module for imported types.
-     */
-    struct_(
-      std::string name,
-      std::vector<std::pair<std::string, value>> members,
-      std::uint8_t flags = 0,
-      std::optional<std::string> import_path = std::nullopt)
-    : name{std::move(name)}
-    , members{std::move(members)}
-    , flags{flags}
-    , import_path{std::move(import_path)}
-    {
-    }
-
-    /** Get the type's name. */
-    [[nodiscard]]
-    std::string get_name() const
-    {
-        return name;
-    }
-
-    /** Get the type's members. */
-    [[nodiscard]]
-    const std::vector<std::pair<std::string, value>>& get_members() const
-    {
-        return members;
-    }
-
-    /** Get the type's flags. */
-    [[nodiscard]]
-    std::uint8_t get_flags() const
-    {
-        return flags;
-    }
-
-    /** Return whether this is an imported type. */
-    [[nodiscard]]
-    bool is_import() const
-    {
-        return import_path.has_value();
-    }
-
-    /** Return the import path. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
-    }
-
-    /**
-     * String representation of a type.
-     *
-     * @param resolver Optional name resolver.
-     * @returns Returns a string representation of the type.
-     */
-    [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const;
-};
-
 /**
  * A scope has a name and holds variables.
  */
@@ -1194,9 +1099,6 @@ class scope
 
     /** Variables inside the scope. */
     std::vector<std::unique_ptr<value>> locals;
-
-    /** Structs. */
-    std::unordered_map<std::string, struct_> structs;
 
 public:
     /** Constructors. */
@@ -1243,16 +1145,6 @@ public:
     bool contains(const std::string& name) const;
 
     /**
-     * Check if the scope contains a struct.
-     *
-     * @param name The struct's name.
-     * @param import_path An optional import path.
-     * @returns True if the struct exists.
-     */
-    [[nodiscard]]
-    bool contains_struct(const std::string& name, const std::optional<std::string>& import_path = std::nullopt) const;
-
-    /**
      * Get the variable for the given name.
      *
      * @param name The variable's name.
@@ -1297,20 +1189,6 @@ public:
     {
         return locals;
     }
-
-    /**
-     * Get the struct in this scope.
-     *
-     * @param name The struct's name.
-     * @param import_path Optional import path of the struct. If set to `std::nullopt`, only structs within
-     *                    the current module are searched.
-     * @returns Returns the struct definition.
-     * @throws Throws a `codegen_error` if the struct is not found.
-     */
-    [[nodiscard]]
-    const std::vector<std::pair<std::string, value>>&
-      get_struct(const std::string& name,
-                 std::optional<std::string> import_path = std::nullopt) const;
 
     /** Get the outer scope. */
     [[nodiscard]]
@@ -1892,19 +1770,6 @@ public:
       std::string name) const;
 
     /**
-     * Get a struct definition.
-     *
-     * Throws a `codegen_error` if the struct is unknown.
-     *
-     * @param name The struct name.
-     * @param import_path Import path.
-     */
-    [[nodiscard]]
-    struct_* get_type(
-      const std::string& name,
-      std::optional<std::string> import_path = std::nullopt);
-
-    /**
      * Check whether a name was registered as a constant.
      *
      * @param name The name to check.
@@ -2047,48 +1912,6 @@ public:
     {
         return s == global_scope.get();
     }
-
-    /**
-     * Push a name onto the struct access resolution stack.
-     *
-     * @param ty The struct.
-     */
-    void push_struct_access(type ty);
-
-    /** Pop a name from the struct access resolution stack. */
-    void pop_struct_access();
-
-    /** Whether we are accessing a struct. */
-    [[nodiscard]]
-    bool is_struct_access() const
-    {
-        return !struct_access.empty();
-    }
-
-    /**
-     * Get the currently accessed struct.
-     *
-     * @throws Throws a `codegen_error` if no struct is accessed.
-     */
-    [[nodiscard]]
-    type get_accessed_struct() const;
-
-    /**
-     * Get a member of a struct by name.
-     *
-     * @param loc Source location of the access.
-     * @param struct_name Name of the struct.
-     * @param member_name Name of the accessed member.
-     * @param import_path Import path of the struct. Optional for module-local structs.
-     * @returns Returns a type describing the struct member.
-     * @throws Throws a `codegen_error` if the struct or the requested member could not be found.
-     */
-    [[nodiscard]]
-    value get_struct_member(
-      source_location loc,
-      const std::string& struct_name,
-      const std::string& member_name,
-      std::optional<std::string> import_path = std::nullopt) const;
 
     /**
      * Enter a function. Only one function can be entered at a time.

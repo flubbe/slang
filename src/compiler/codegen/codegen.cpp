@@ -353,18 +353,6 @@ bool scope::contains(const std::string& name) const
     return false;
 }
 
-bool scope::contains_struct(const std::string& name, const std::optional<std::string>& import_path) const
-{
-    auto it = std::ranges::find_if(
-      structs,
-      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-      {
-          return p.first == name
-                 && p.second.get_import_path() == import_path;
-      });
-    return it != structs.cend();
-}
-
 value* scope::get_value(const std::string& name)
 {
     auto it = std::ranges::find_if(
@@ -456,26 +444,6 @@ void scope::add_local(std::unique_ptr<value> arg)
             arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
     locals.emplace_back(std::move(arg));
-}
-
-const std::vector<std::pair<std::string, value>>& scope::get_struct(const std::string& name, std::optional<std::string> import_path) const
-{
-    auto it = std::ranges::find_if(
-      structs,
-      [&name, &import_path](const std::pair<std::string, struct_>& p) -> bool
-      {
-          return p.first == name
-                 && p.second.get_import_path() == import_path;
-      });
-    if(it == structs.cend())
-    {
-        if(import_path.has_value())
-        {
-            throw codegen_error(std::format("Type '{}' from '{}' not found in scope.", name, import_path.value()));
-        }
-        throw codegen_error(std::format("Type '{}' not found in scope.", name));
-    }
-    return it->second.get_members();
 }
 
 /*
@@ -597,31 +565,6 @@ std::string function::to_string(const name_resolver* resolver) const
 }
 
 /*
- * type.
- */
-
-std::string struct_::to_string(const name_resolver* resolver) const
-{
-    std::string buf = std::format("%{} = type {{\n", name);
-    if(!members.empty())
-    {
-        for(std::size_t i = 0; i < members.size() - 1; ++i)
-        {
-            buf += std::format(
-              " {} %{},\n",
-              members[i].second.get_type().to_string(resolver),
-              members[i].first);
-        }
-        buf += std::format(
-          " {} %{},\n",
-          members.back().second.get_type().to_string(resolver),
-          members.back().first);
-    }
-    buf += "}";
-    return buf;
-}
-
-/*
  * context.
  */
 
@@ -692,32 +635,6 @@ std::size_t context::get_import_index(
                   name,
                   slang::module_::to_string(type),
                   import_path));
-}
-
-struct_* context::get_type(const std::string& name, std::optional<std::string> import_path)
-{
-    // TODO remove?
-    throw std::runtime_error("context::get_type");
-
-    // auto it = std::ranges::find_if(
-    //   types,
-    //   [&name, &import_path](const std::unique_ptr<struct_>& t) -> bool
-    //   {
-    //       return t->get_name() == name
-    //              && ((!import_path.has_value() && !t->get_import_path().has_value())
-    //                  || *import_path == *t->get_import_path());
-    //   });
-    // if(it == types.end())
-    // {
-    //     if(import_path.has_value())
-    //     {
-    //         throw codegen_error(std::format("Type '{}' from import '{}' not found.", name, *import_path));
-    //     }
-
-    //     throw codegen_error(std::format("Type '{}' not found.", name));
-    // }
-
-    // return it->get();
 }
 
 /** Same as `std::false_type`, but taking a parameter argument. */
@@ -889,63 +806,6 @@ void context::set_insertion_point(basic_block* ip)
     {
         insertion_point->set_inserting_context(this);
     }
-}
-
-/*
- * Struct access.
- */
-
-void context::push_struct_access(type ty)
-{
-    struct_access.push_back(ty);
-}
-
-void context::pop_struct_access()
-{
-    if(!struct_access.empty())
-    {
-        struct_access.pop_back();
-    }
-    else
-    {
-        throw codegen_error("Cannot pop struct from access stack: The stack is empty.");
-    }
-}
-
-type context::get_accessed_struct() const
-{
-    if(struct_access.empty())
-    {
-        throw codegen_error("Cannot get struct access name: No struct accessed.");
-    }
-
-    return struct_access.back();
-}
-
-value context::get_struct_member(
-  source_location loc,
-  const std::string& struct_name,
-  const std::string& member_name,
-  std::optional<std::string> import_path) const
-{
-    const scope* s = get_global_scope();
-    const auto& members = s->get_struct(struct_name, std::move(import_path));
-
-    auto it = std::ranges::find_if(
-      std::as_const(members),
-      [&member_name](const std::pair<std::string, value>& v)
-      {
-          return v.first == member_name;
-      });
-    if(it == members.cend())
-    {
-        throw codegen_error(
-          loc,
-          std::format("Struct '{}' does not contain a field with name '{}'.",
-                      struct_name, member_name));
-    }
-
-    return it->second;
 }
 
 /*
