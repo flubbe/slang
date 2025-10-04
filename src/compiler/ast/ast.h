@@ -150,7 +150,31 @@ public:
      *
      * @throws Throws a `std::runtime_error` if the expression is not a variable declaration.
      */
+    [[nodiscard]]
     virtual class variable_declaration_expression* as_variable_declaration();
+
+    /** Whether this expression is a constant declaration. */
+    [[nodiscard]]
+    bool is_constant_declaration() const
+    {
+        return get_id() == node_identifier::constant_declaration_expression;
+    }
+
+    /**
+     * Get the expression as a constant declaration.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a constant declaration.
+     */
+    [[nodiscard]]
+    virtual class constant_declaration_expression* as_constant_declaration();
+
+    /**
+     * Get the expression as a constant declaration.
+     *
+     * @throws Throws a `std::runtime_error` if the expression is not a constant declaration.
+     */
+    [[nodiscard]]
+    virtual const class constant_declaration_expression* as_constant_declaration() const;
 
     /** Whether this expression is a variable reference. */
     [[nodiscard]]
@@ -164,6 +188,7 @@ public:
      *
      * @throws Throws a `std::runtime_error` if the expression is not a variable reference.
      */
+    [[nodiscard]]
     virtual class variable_reference_expression* as_variable_reference();
 
     /** Whether this expression is an access of an array element. */
@@ -395,10 +420,13 @@ public:
     /** Type definition. */
     void define_types(ty::context& ctx) const;
 
+    /** Bind constant declarations (no evaluation). */
+    void bind_constant_declarations(sema::env& sema_env, const_::env& const_env) const;
+
     /** Constant evaluation and folding. */
     void evaluate_constant_expressions(
-      [[maybe_unused]] ty::context& ctx,
-      [[maybe_unused]] const_::env& env);
+      ty::context& ctx,
+      const_::env& env);
 
     /**
      * Expand macros stored.
@@ -621,6 +649,10 @@ public:
     {
         return name;
     }
+
+    /** Get the name including namespaces. */
+    [[nodiscard]]
+    std::string get_qualified_name() const;
 };
 
 /** String, integer or floating-point literals. */
@@ -1655,6 +1687,18 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]]
+    constant_declaration_expression* as_constant_declaration() override
+    {
+        return this;
+    }
+
+    [[nodiscard]]
+    const constant_declaration_expression* as_constant_declaration() const override
+    {
+        return this;
+    }
+
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
@@ -1677,6 +1721,13 @@ public:
     const std::unique_ptr<type_expression>& get_type() const
     {
         return type;
+    }
+
+    /** Get the r.h.s. expression. */
+    [[nodiscard]]
+    const expression* get_expr() const
+    {
+        return expr.get();
     }
 };
 
@@ -2979,6 +3030,10 @@ public:
         return callee;
     }
 
+    /** Return the callee's name including namespaces. */
+    [[nodiscard]]
+    std::string get_qualified_callee_name() const;
+
     /** Return the argument expressions. */
     [[nodiscard]]
     std::vector<expression*> get_args() const
@@ -3602,6 +3657,7 @@ public:
     }
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] std::string to_string() const override;
 

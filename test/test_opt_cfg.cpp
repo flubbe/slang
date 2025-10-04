@@ -20,15 +20,20 @@
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
+namespace const_ = slang::const_;
 namespace sema = slang::sema;
 namespace ty = slang::typing;
+namespace tl = slang::lowering;
 
 namespace
 {
 
-cg::context get_context(sema::env& env)
+cg::context get_context(
+  sema::env& sema_env,
+  const_::env& const_env,
+  tl::context& lowering_ctx)
 {
-    cg::context ctx{env};
+    cg::context ctx{sema_env, const_env, lowering_ctx};
     ctx.evaluate_constant_subexpressions = false;
     return ctx;
 }
@@ -61,14 +66,16 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
-    sema::env env;
-    co::context co_ctx{env};
+    sema::env sema_env;
+    const_::env const_env;
+    co::context co_ctx{sema_env};
     ty::context type_ctx;
-    cg::context codegen_ctx = get_context(env);
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
     slang::opt::cfg::context cfg_context{codegen_ctx};
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
-    ASSERT_NO_THROW(ast->type_check(type_ctx, env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(cfg_context.run());
 

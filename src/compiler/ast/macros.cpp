@@ -281,8 +281,8 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
         index_expr->generate_code(ctx, memory_context::load);
 
         auto type = ctx.deref(return_type->get_type());
-        ctx.generate_load(
-          std::make_unique<cg::type_argument>(type));
+        ctx.generate_load_element(
+          cg::type_argument{type});
         return std::make_unique<cg::value>(type);
     }
 
@@ -389,6 +389,33 @@ std::unique_ptr<cg::value> macro_branch::generate_code(
   memory_context mc) const
 {
     return body->generate_code(ctx, mc);
+}
+
+void macro_branch::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    // FIXME macro branches are uniquely identified by their
+    //       parent macro name and its parameters.
+    ctx.push_scope(std::nullopt, loc);
+
+    for(const auto& [arg_name, arg_type]: args)
+    {
+        ctx.declare(
+          arg_name.s,
+          std::format(
+            "{}::{}",
+            ctx.get_canonical_scope_name(ctx.get_current_scope()),
+            arg_name.s),
+          sema::symbol_type::macro_argument,
+          arg_name.location,
+          sema::symbol_id::invalid,
+          false);
+    }
+
+    body->collect_names(ctx, false);
+
+    ctx.pop_scope();
 }
 
 std::string macro_branch::to_string() const
@@ -511,13 +538,13 @@ std::unique_ptr<cg::value> macro_expression::generate_code(
 }
 
 std::optional<ty::type_id> macro_expression::type_check(
-  [[maybe_unused]] ty::context& ctx,
-  [[maybe_unused]] sema::env& env)
+  ty::context& ctx,
+  sema::env& env)
 {
     // Check that all necessary imports exist in the type context.
 
     visit_nodes(
-      [this, &ctx](expression& e) -> void
+      [this, &ctx, &env](expression& e) -> void
       {
           std::optional<std::string> namespace_path{std::nullopt};
 
@@ -536,7 +563,7 @@ std::optional<ty::type_id> macro_expression::type_check(
               }
 
               // TODO check imports.
-              throw std::runtime_error("macro_expression::type_check");
+              throw std::runtime_error("macro_expression::type_check (imports)");
 
               //   if(!ctx.has_import(namespace_path.value()))
               //   {
@@ -550,25 +577,33 @@ std::optional<ty::type_id> macro_expression::type_check(
 
           if(e.is_call_expression())
           {
-              // FIXME Add a `has_symbol` function.
-              //   ctx.get_function_signature(e.as_call_expression()->get_callee(), namespace_path);
-              throw std::runtime_error("macro_expression::type_check");
+              if(!env.get_symbol_id(
+                       e.as_call_expression()->get_qualified_callee_name(),
+                       sema::symbol_type::function,
+                       scope_id.value())
+                    .has_value())
+              {
+                  throw ty::type_error(
+                    e.get_location(),
+                    std::format(
+                      "Unresolved symbol '{}'.",
+                      e.as_call_expression()->get_qualified_callee_name()));
+              }
           }
           else if(e.is_macro_invocation())
           {
-              // FIXME Add a `has_symbol` function.
-              //   if(!ctx.has_macro(e.as_macro_invocation()->get_name().s, namespace_path))
-              //   {
-              //       throw ty::type_error(
-              //         loc,
-              //         std::format(
-              //           "Unresolved symbol '{}{}',",
-              //           namespace_path.has_value()
-              //             ? std::format("{}::", namespace_path.value())
-              //             : std::string{""},
-              //           e.as_macro_invocation()->get_name().s));
-              //   }
-              throw std::runtime_error("macro_expression::type_check");
+              if(!env.get_symbol_id(
+                       e.as_macro_invocation()->get_qualified_name(),
+                       sema::symbol_type::macro,
+                       scope_id.value())
+                    .has_value())
+              {
+                  throw ty::type_error(
+                    loc,
+                    std::format(
+                      "Unresolved symbol '{}',",
+                      e.as_macro_invocation()->get_qualified_name()));
+              }
           }
       },
       false,

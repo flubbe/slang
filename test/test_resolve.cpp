@@ -53,8 +53,8 @@ TEST(resolve, std)
         sema::env sema_env;
         const_::env const_env;
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
         ty::context type_ctx;
+        rs::context resolver_ctx{sema_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -94,8 +94,8 @@ TEST(resolve, std)
         sema::env sema_env;
         const_::env const_env;
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
         ty::context type_ctx;
+        rs::context resolver_ctx{sema_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -137,8 +137,8 @@ TEST(resolve, std)
         sema::env sema_env;
         const_::env const_env;
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
         ty::context type_ctx;
+        rs::context resolver_ctx{sema_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -149,7 +149,6 @@ TEST(resolve, std)
         ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->define_types(type_ctx));
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
-        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
 }

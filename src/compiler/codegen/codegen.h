@@ -171,13 +171,6 @@ public:
         return {ty, name};
     }
 
-    /** Copy the unnamed value. */
-    [[nodiscard]]
-    value unnamed() const
-    {
-        return {ty, std::nullopt};
-    }
-
     /**
      * Get the value as a readable string.
      *
@@ -369,10 +362,6 @@ public:
      */
     [[nodiscard]]
     virtual std::string to_string(const name_resolver* resolver = nullptr) const = 0;
-
-    /** Get the argument type. */
-    [[nodiscard]]
-    virtual const value* get_value() const = 0;
 };
 
 /**
@@ -438,7 +427,7 @@ public:
     [[nodiscard]] std::string to_string(const name_resolver* resolver = nullptr) const override;
 
     [[nodiscard]]
-    const value* get_value() const override
+    const value* get_value() const
     {
         return v.get();
     }
@@ -453,16 +442,16 @@ class function_argument : public argument
     sema::symbol_id symbol_id;
 
 public:
-    /** Defaulted and deleted constructors. */
+    /** Defaulted constructors. */
     function_argument() = default;
-    function_argument(const function_argument&) = delete;
+    function_argument(const function_argument&) = default;
     function_argument(function_argument&&) = default;
 
     /** Default destructor. */
     ~function_argument() override = default;
 
-    /** Defaulted and deleted assignments. */
-    function_argument& operator=(const function_argument&) = delete;
+    /** Defaulted assignments. */
+    function_argument& operator=(const function_argument&) = default;
     function_argument& operator=(function_argument&&) = default;
 
     /**
@@ -495,22 +484,13 @@ public:
     {
         return symbol_id;
     }
-
-    [[nodiscard]]
-    const value* get_value() const override
-    {
-        throw std::runtime_error("function_argument::get_value");
-    }
 };
 
 /** Type argument. */
 class type_argument : public argument
 {
     /** The type. */
-    value vt;
-
-    /** An optional import path for the function. */
-    std::optional<std::string> import_path = std::nullopt;
+    type lowered_type;
 
 public:
     /** Defaulted and deleted constructors. */
@@ -528,28 +508,11 @@ public:
     /**
      * Create a type argument.
      *
-     * @param v Value containing the type information to use.
+     * @param lowered_type The lowered type.
      */
-    explicit type_argument(value vt)
-    : vt{vt.copy_type()}
+    explicit type_argument(type lowered_type)
+    : lowered_type{lowered_type}
     {
-    }
-
-    /**
-     * Set the import path.
-     *
-     * @param path The import path, or `std::nullopt`.
-     */
-    void set_import_path(std::optional<std::string> import_path)
-    {
-        this->import_path = std::move(import_path);
-    }
-
-    /** Get the import path. */
-    [[nodiscard]]
-    const std::optional<std::string>& get_import_path() const
-    {
-        return import_path;
     }
 
     [[nodiscard]]
@@ -557,30 +520,31 @@ public:
     {
         // try to resolve type id.
         if(resolver
-           && vt.get_type().get_type_id().has_value())
+           && lowered_type.get_type_id().has_value())
         {
             return std::format(
               "{}",
-              resolver->type_name(vt.get_type().get_type_id().value()));
+              resolver->type_name(lowered_type.get_type_id().value()));
         }
 
         // if the type id exists, append it.
-        if(vt.get_type().get_type_kind() == type_kind::ref
-           && vt.get_type().get_type_id().has_value())
+        if(lowered_type.get_type_kind() == type_kind::ref
+           && lowered_type.get_type_id().has_value())
         {
             return std::format(
               "{}<type#{}>",
-              ::slang::codegen::to_string(vt.get_type().get_type_kind()),
-              vt.get_type().get_type_id().value());
+              ::slang::codegen::to_string(lowered_type.get_type_kind()),
+              lowered_type.get_type_id().value());
         }
 
-        return vt.get_type().to_string();
+        return lowered_type.to_string();
     }
 
+    /** Return the lowered type. */
     [[nodiscard]]
-    const value* get_value() const override
+    type get_lowered_type() const
     {
-        return &vt;
+        return lowered_type;
     }
 };
 
@@ -627,7 +591,7 @@ public:
     }
 
     [[nodiscard]]
-    const value* get_value() const override
+    const value* get_value() const
     {
         return var.get();
     }
@@ -673,15 +637,6 @@ public:
     std::string to_string([[maybe_unused]] const name_resolver* resolver = nullptr) const override
     {
         return std::format("%{}", label);
-    }
-
-    [[nodiscard]]
-    const value* get_value() const override
-    {
-        throw codegen_error(
-          std::format(
-            "Cannot get type from label '{}'.",
-            to_string()));
     }
 };
 
@@ -769,7 +724,7 @@ public:
     }
 
     [[nodiscard]]
-    const value* get_value() const override
+    const value* get_value() const    // FIXME Remove / replace by get_target_type
     {
         return &result_value;
     }
@@ -849,12 +804,6 @@ public:
           "<type#{}>.<field#{}>",
           struct_type.get_type_id().value(),
           field_index);
-    }
-
-    [[nodiscard]]
-    const value* get_value() const override
-    {
-        return nullptr;
     }
 };
 
@@ -1741,35 +1690,6 @@ public:
     }
 
     /**
-     * Add a symbol to the import table. No-op if the symbol already exists.
-     *
-     * @param type The symbol type.
-     * @param import_path Path of the module that exports the symbol.
-     * @param name The symbol's name.
-     * @throws Throws a `codegen_error` if the symbol already exists but the symbol type does not match.
-     */
-    void add_import(
-      module_::symbol_type type,
-      std::string import_path,
-      std::string name);
-
-    /**
-     * Get the import index of a symbol. If the symbol is not found in the imports,
-     * a `codegen_error` is thrown.
-     *
-     * @param type The symbol type.
-     * @param import_path Path of the module that exports the symbol.
-     * @param name The symbol's name.
-     * @return The symbol's index in the import table.
-     * @throws Throws a `codegen_error` if the symbol is not found.
-     */
-    [[nodiscard]]
-    std::size_t get_import_index(
-      module_::symbol_type type,
-      std::string import_path,
-      std::string name) const;
-
-    /**
      * Check whether a name was registered as a constant.
      *
      * @param name The name to check.
@@ -2087,7 +2007,7 @@ public:
      * @param op The binary operation to execute.
      * @param op_type The type specifier for the operation.
      */
-    void generate_binary_op(binary_op op, const value& op_type);
+    void generate_binary_op(binary_op op, const type& op_type);
 
     /**
      * Generate an unconditional branch instruction.
@@ -2133,7 +2053,7 @@ public:
      * @param val The value.
      */
     void generate_const(
-      const value& vt,
+      const type& vt,
       std::variant<int, float, const_::constant_id> val);
 
     /** Load 'null' onto the stack. */
@@ -2142,10 +2062,26 @@ public:
     /**
      * Duplicate the top stack value.
      *
-     * @param vt The value type.
-     * @param vals The values to skip on the stack before insertion.
+     * @param vt The value's type.
      */
-    void generate_dup(value vt, std::vector<value> vals = {});
+    void generate_dup(type vt);
+
+    /**
+     * Duplicate the top stack value and insert it two values down.
+     *
+     * @param vt The value's type.
+     * @param skip_type The value to skip on the stack before insertion.
+     */
+    void generate_dup_x1(type vt, type skip_type);
+
+    /**
+     * Duplicate the top stack value and insert it three values down.
+     *
+     * @param vt The value's type.
+     * @param skip_type1 The first value to skip on the stack before insertion.
+     * @param skip_type2 The second value to skip on the stack before insertion.
+     */
+    void generate_dup_x2(type vt, type skip_type1, type skip_type2);
 
     /**
      * Load a field of a struct instance onto the stack.
@@ -2155,55 +2091,63 @@ public:
     void generate_get_field(std::unique_ptr<field_access_argument> arg);
 
     /**
-     * Statically or dynamically invoke a function. If the invocation
-     * is dynamic, the function is loaded from the stack.
+     * Statically invoke a function.
      *
-     * @param name The function's name for statically invoked functions.
+     * @param f The function to call.
      */
-    void generate_invoke(std::optional<std::unique_ptr<function_argument>> name = std::nullopt);
+    void generate_invoke(function_argument f);
+
+    /** Dynamically invoke a function that was pushed on the stack. */
+    void generate_invoke_dynamic();
 
     /**
-     * Load an array element onto the stack
+     * Load a variable onto the stack.
      *
-     * @param arg The variable to load or `nullptr` for a reference already loaded onto the stack.
-     * @param load_element Whether we are loading an element from an array.
+     * @param v The variable to load.
      */
-    void generate_load(std::unique_ptr<argument> arg, bool load_element = false);
+    void generate_load(variable_argument v);
+
+    /**
+     * Load an array element onto the stack.
+     *
+     * @param t The variable type of the array.
+     */
+    void generate_load_element(type_argument t);
 
     /**
      * Create a new instance of a type.
      *
-     * @param vt The type.
+     * @param t The type.
      */
-    void generate_new(const value& vt);
+    void generate_new(const type& t);
 
     /**
      * Create a new array of a given built-in type.
      *
-     * @param vt The array type.
+     * @param t The array type.
      */
-    void generate_newarray(const value& vt);
+    void generate_newarray(const type& t);
 
     /**
      * Create a new array of a given custom type.
      *
-     * @param vt The array type.
+     * @param t The array type.
      */
-    void generate_anewarray(const value& vt);
+    void generate_anewarray(const type& t);
 
     /**
      * Pop a value from the stack.
      *
-     * @param vt The value type.
+     * @param t The value type.
      */
-    void generate_pop(const value& vt);
+    void generate_pop(const type& vt);
 
     /**
      * Return from a function.
      *
      * @param arg The returned type or std::nullopt.
      */
-    void generate_ret(std::optional<value> arg = std::nullopt);
+    void generate_ret(std::optional<type> arg = std::nullopt);
 
     /**
      * Store the top of the stack into a field of a struct instance on the stack.
@@ -2213,12 +2157,18 @@ public:
     void generate_set_field(std::unique_ptr<field_access_argument> arg);
 
     /**
-     * Store the top of the stack into a variable or an array element.
+     * Store the top of the stack into a variable.
      *
      * @param arg The variable to store into.
-     * @param store_element Whether we are storing an element into an array.
      */
-    void generate_store(std::unique_ptr<argument> arg, bool store_element = false);
+    void generate_store(variable_argument v);
+
+    /**
+     * Store the top of the stack into an array element.
+     *
+     * @param t The variable type of the array.
+     */
+    void generate_store_element(type_argument t);
 
     /**
      * Generate a label to be used by branches and jump instructions.

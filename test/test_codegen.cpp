@@ -239,13 +239,11 @@ TEST(codegen, generate_function)
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
         codegen_ctx.generate_const(
-          {cg::type{
-            mock_i32_type, cg::type_kind::i32}},
+          {mock_i32_type, cg::type_kind::i32},
           -31);    // NOLINT(readability-magic-numbers)
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type, cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -293,15 +291,13 @@ TEST(codegen, generate_function)
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
-            std::make_unique<cg::value>(
-              cg::type{
-                mock_i32_type, cg::type_kind::i32},
-              "a")));
-        codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
+          cg::variable_argument{std::make_unique<cg::value>(
             cg::type{
-              mock_i32_type, cg::type_kind::i32}));
+              mock_i32_type, cg::type_kind::i32},
+            "a")});
+        codegen_ctx.generate_ret(
+          std::make_optional<cg::type>(
+            mock_i32_type, cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -355,24 +351,21 @@ TEST(codegen, operators)
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type, cg::type_kind::i32},
-              "a")));
+              "a")});
         codegen_ctx.generate_const(
-          {cg::type{
-            mock_i32_type, cg::type_kind::i32}},
+          {mock_i32_type, cg::type_kind::i32},
           1);
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_add,
-          {cg::type{
-            mock_i32_type, cg::type_kind::i32}});
+          {mock_i32_type, cg::type_kind::i32});
 
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type, cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -440,21 +433,24 @@ TEST(codegen, conditional_branch)
         codegen_ctx.set_insertion_point(cond);
         EXPECT_EQ(codegen_ctx.get_insertion_point(), cond);
 
-        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
-        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 1);
-        codegen_ctx.generate_binary_op(cg::binary_op::op_equal, {cg::type{mock_i32_type, cg::type_kind::i32}});
+        codegen_ctx.generate_load(
+          cg::variable_argument{
+            std::make_unique<cg::value>(
+              cg::type{mock_i32_type, cg::type_kind::i32}, "a")});
+        codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 1);
+        codegen_ctx.generate_binary_op(cg::binary_op::op_equal, {mock_i32_type, cg::type_kind::i32});
         codegen_ctx.generate_cond_branch(then_block, else_block);
 
         codegen_ctx.set_insertion_point(then_block);
-        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 1);
-        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
+        codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 1);
+        codegen_ctx.generate_ret(std::make_optional<cg::type>(mock_i32_type, cg::type_kind::i32));
 
         codegen_ctx.set_insertion_point(else_block);
         codegen_ctx.generate_branch(cont_block);
 
         codegen_ctx.set_insertion_point(cont_block);
-        codegen_ctx.generate_const({cg::type{mock_i32_type, cg::type_kind::i32}}, 0);
-        codegen_ctx.generate_ret(std::make_optional<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}));
+        codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 0);
+        codegen_ctx.generate_ret(std::make_optional<cg::type>(mock_i32_type, cg::type_kind::i32));
 
         EXPECT_TRUE(then_block->is_valid());
         EXPECT_TRUE(else_block->is_valid());
@@ -522,8 +518,12 @@ TEST(codegen, locals_store)
         codegen_ctx.set_insertion_point(block);
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
-        codegen_ctx.generate_load(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")));
-        codegen_ctx.generate_store(std::make_unique<cg::variable_argument>(std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")));
+        codegen_ctx.generate_load(
+          cg::variable_argument{
+            std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")});
+        codegen_ctx.generate_store(
+          cg::variable_argument{
+            std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")});
 
         codegen_ctx.generate_ret();
 
@@ -679,32 +679,31 @@ TEST(codegen, invoke)
         EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
         codegen_ctx.generate_const(
-          {cg::type{
-            mock_i32_type,
-            cg::type_kind::i32}},
+          {mock_i32_type,
+           cg::type_kind::i32},
           -1);
         codegen_ctx.generate_store(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")));
+              "a")});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
           std::nullopt,
@@ -720,13 +719,13 @@ TEST(codegen, invoke)
           std::nullopt);
 
         codegen_ctx.generate_invoke(
-          std::make_unique<cg::function_argument>(function_symbol_id));
+          cg::function_argument{
+            function_symbol_id});
 
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type,
+            cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -765,30 +764,28 @@ TEST(codegen, invoke)
         EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")));
+              "a")});
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,
-          {cg::type{
-            mock_i32_type,
-            cg::type_kind::i32}});
+          {mock_i32_type,
+           cg::type_kind::i32});
 
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type,
+            cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -870,32 +867,31 @@ TEST(codegen, invoke)
         EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
         codegen_ctx.generate_const(
-          {cg::type{
-            mock_i32_type,
-            cg::type_kind::i32}},
+          {mock_i32_type,
+           cg::type_kind::i32},
           -1);
         codegen_ctx.generate_store(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")));
+              "a")});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
           std::nullopt,
@@ -910,16 +906,16 @@ TEST(codegen, invoke)
           false,
           std::nullopt);
 
-        codegen_ctx.generate_load(
-          std::make_unique<cg::function_argument>(
-            function_symbol_id));
-        codegen_ctx.generate_invoke();
+        codegen_ctx.generate_const(
+          {mock_i32_type,
+           cg::type_kind::i32},
+          0);
+        codegen_ctx.generate_invoke_dynamic();
 
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type,
+            cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -958,30 +954,28 @@ TEST(codegen, invoke)
         EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")));
+              "a")});
         codegen_ctx.generate_load(
-          std::make_unique<cg::variable_argument>(
+          cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")));
+              "b")});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,
-          {cg::type{
-            mock_i32_type,
-            cg::type_kind::i32}});
+          {mock_i32_type,
+           cg::type_kind::i32});
 
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}));
+          std::make_optional<cg::type>(
+            mock_i32_type,
+            cg::type_kind::i32));
 
         EXPECT_TRUE(block->is_valid());
 
@@ -994,7 +988,7 @@ TEST(codegen, invoke)
           " store i32 %b    ; i32\n"
           " load i32 %b    ; i32\n"
           " load i32 %a    ; i32\n"
-          " load <func#0>    ; @g\n"
+          " const i32 0    ; 0\n"
           " invoke_dynamic\n"
           " ret i32    ; i32\n"
           "}\n"
@@ -1050,11 +1044,11 @@ TEST(codegen, strings)
         const const_::constant_id string_id = const_env.intern("\tTest\n");
 
         codegen_ctx.generate_const(
-          {cg::type{mock_str_type, cg::type_kind::str}},
+          {mock_str_type, cg::type_kind::str},
           string_id);
         codegen_ctx.generate_ret(
-          std::make_optional<cg::value>(
-            cg::type{mock_str_type, cg::type_kind::str}));
+          std::make_optional<cg::type>(
+            mock_str_type, cg::type_kind::str));
 
         EXPECT_TRUE(block->is_valid());
 

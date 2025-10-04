@@ -91,7 +91,16 @@ void context::resolve_imports(
         module_::module_resolver& resolver = loader.resolve_module(
           info.qualified_name, transitive_import);
 
+        // TODO check if the module needs to be interned.
+        // TODO load dependencies
+
         const module_::module_header& header = resolver.get_module().get_header();
+
+        std::vector<
+          std::pair<
+            ty::type_id,
+            const module_::struct_descriptor*>>
+          type_descriptors;
 
         for(const auto& it: header.exports)
         {
@@ -101,6 +110,7 @@ void context::resolve_imports(
                 info.qualified_name,
                 it.name);
 
+            // import symbols.
             import_collector.declare(
               it.name,
               qualified_name,
@@ -109,6 +119,58 @@ void context::resolve_imports(
               id,
               transitive_import,
               &it);
+
+            // import type declaration.
+            if(it.type == module_::symbol_type::type)
+            {
+                const auto& desc = std::get<module_::struct_descriptor>(it.desc);
+
+                auto struct_type_id = type_ctx.declare_struct(
+                  it.name,
+                  qualified_name);
+
+                type_descriptors.emplace_back(
+                  struct_type_id, &desc);
+            }
+        }
+
+        for(const auto& [struct_type_id, desc]: type_descriptors)
+        {
+            for(const auto& [field_name, field_desc]: desc->member_types)
+            {
+                ty::type_id field_type_id;
+
+                const auto& base_type = field_desc.base_type.base_type();
+                if(type_ctx.has_type(base_type)
+                   && type_ctx.is_builtin(type_ctx.get_type(base_type)))
+                {
+                    field_type_id = type_ctx.get_type(base_type);
+                }
+                else
+                {
+                    auto qualified_field_type = std::format(
+                      "{}::{}",
+                      info.qualified_name,
+                      base_type);
+
+                    field_type_id = type_ctx.get_type(qualified_field_type);
+                }
+
+                std::optional<std::size_t> array_rank = field_desc.base_type.get_array_dims();
+                if(array_rank.has_value())
+                {
+                    field_type_id = type_ctx.get_array(
+                      field_type_id,
+                      array_rank.value());
+                }
+
+                type_ctx.add_field(
+                  struct_type_id,
+                  field_name,
+                  field_type_id);
+            }
+
+            type_ctx.seal_struct(struct_type_id);
         }
     }
 
@@ -119,53 +181,53 @@ void context::resolve_imports(
           env.symbol_table,
           [&info](const std::pair<sema::symbol_id, sema::symbol_info>& p) -> bool
           {
-              return p.second.name == info.name;
+              return p.second.type == info.type
+                     && p.second.qualified_name == info.qualified_name;
           });
         if(symbol_it != env.symbol_table.end())
         {
-            if(symbol_it->second.qualified_name != info.qualified_name)
-            {
-                std::println(
-                  "{}: Warning: Import '{}' ('{}'): A symbol with the same name already exists in symbol table. Declaration at: {}",
-                  to_string(info.loc),
-                  info.name,
-                  info.qualified_name,
-                  to_string(symbol_it->second.loc));
-            }
+            std::println(
+              "{}: Warning: Import '{}' ('{}'): A symbol with the same name already exists in symbol table. Declaration at: {}",
+              to_string(info.loc),
+              info.name,
+              info.qualified_name,
+              to_string(symbol_it->second.loc));
 
             continue;
         }
 
         env.symbol_table.insert({id, info});
 
-        auto scope_it = env.scope_map.find(env.global_scope_id);
-        if(scope_it == env.scope_map.end())
-        {
-            throw std::runtime_error(
-              std::format(
-                "No global scope (id '{}') in semantic environment.",
-                static_cast<int>(env.global_scope_id)));
-        }
-        auto binding_it = scope_it->second.bindings.find(info.name);
-        if(binding_it != scope_it->second.bindings.end())
-        {
-            if(binding_it->second.contains(info.type))
-            {
-                throw std::runtime_error(
-                  std::format(
-                    "Symbol '{}' of type '{}' already bound.",
-                    info.name,
-                    sema::to_string(info.type)));
-            }
+        // TODO Revisit this.
 
-            binding_it->second.insert({info.type, id});
-        }
-        else
-        {
-            scope_it->second.bindings.insert(
-              {info.name,
-               {{info.type, id}}});
-        }
+        // auto scope_it = env.scope_map.find(env.global_scope_id);
+        // if(scope_it == env.scope_map.end())
+        // {
+        //     throw std::runtime_error(
+        //       std::format(
+        //         "No global scope (id '{}') in semantic environment.",
+        //         static_cast<int>(env.global_scope_id)));
+        // }
+        // auto binding_it = scope_it->second.bindings.find(info.name);
+        // if(binding_it != scope_it->second.bindings.end())
+        // {
+        //     if(binding_it->second.contains(info.type))
+        //     {
+        //         throw std::runtime_error(
+        //           std::format(
+        //             "Symbol '{}' of type '{}' already bound.",
+        //             info.name,
+        //             sema::to_string(info.type)));
+        //     }
+
+        //     binding_it->second.insert({info.type, id});
+        // }
+        // else
+        // {
+        //     scope_it->second.bindings.insert(
+        //       {info.name,
+        //        {{info.type, id}}});
+        // }
 
         if(import_env.transitive_imports.contains(id))
         {

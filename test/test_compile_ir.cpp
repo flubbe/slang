@@ -162,7 +162,7 @@ TEST(compile_ir, empty)
     ty::context type_ctx;
     tl::context lowering_ctx{type_ctx};
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, type_ctx};
     cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
     test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -281,7 +281,7 @@ TEST(compile_ir, empty_function)
     ty::context type_ctx;
     tl::context lowering_ctx{type_ctx};
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, type_ctx};
     cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -324,7 +324,7 @@ TEST(compile_ir, builtin_return_values)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -367,7 +367,7 @@ TEST(compile_ir, builtin_return_values)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -410,7 +410,7 @@ TEST(compile_ir, builtin_return_values)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -457,7 +457,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -498,7 +498,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -543,7 +543,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -588,7 +588,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -632,7 +632,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -683,7 +683,7 @@ TEST(compile_ir, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
@@ -738,7 +738,7 @@ TEST(compile_ir, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -794,7 +794,7 @@ TEST(compile_ir, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -848,7 +848,7 @@ TEST(compile_ir, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -867,12 +867,12 @@ TEST(compile_ir, arrays)
                   " const i32 2\n"
                   " newarray i32\n"
                   " store ref %b\n"
-                  " load ref %b\n"          // array_ref
-                  " const i32 0\n"          // index
-                  " load ref %b\n"          // array_ref
-                  " const i32 1\n"          // index
-                  " const i32 2\n"          // value
-                  " dup i32, i32, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
+                  " load ref %b\n"             // array_ref
+                  " const i32 0\n"             // index
+                  " load ref %b\n"             // array_ref
+                  " const i32 1\n"             // index
+                  " const i32 2\n"             // value
+                  " dup_x2 i32, i32, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
                   " store_element i32\n"
                   " store_element i32\n"
                   " load ref %b\n"
@@ -956,7 +956,7 @@ TEST(compile_ir, unary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1002,7 +1002,7 @@ TEST(compile_ir, unary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1054,7 +1054,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1102,7 +1102,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1150,7 +1150,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1198,7 +1198,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1250,7 +1250,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1302,7 +1302,7 @@ TEST(compile_ir, binary_operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1355,8 +1355,8 @@ TEST(compile_ir, postfix_operators)
     sema::env sema_env;
     const_::env const_env;
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env};
     ty::context type_ctx;
+    rs::context resolver_ctx{sema_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
@@ -1410,7 +1410,7 @@ TEST(compile_ir, compound_assignments)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1460,7 +1460,7 @@ TEST(compile_ir, compound_assignments)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1517,7 +1517,7 @@ TEST(compile_ir, compound_assignments)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1572,7 +1572,7 @@ TEST(compile_ir, compound_assignments)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1611,7 +1611,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1660,7 +1660,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1716,7 +1716,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1768,7 +1768,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1811,7 +1811,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1874,7 +1874,7 @@ TEST(compile_ir, function_calls)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1937,7 +1937,7 @@ TEST(compile_ir, if_statement)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -1989,7 +1989,7 @@ TEST(compile_ir, break_fail)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2026,7 +2026,7 @@ TEST(compile_ir, continue_fail)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2068,7 +2068,7 @@ TEST(compile_ir, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2128,7 +2128,7 @@ TEST(compile_ir, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2186,7 +2186,7 @@ TEST(compile_ir, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2246,7 +2246,7 @@ TEST(compile_ir, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2315,7 +2315,7 @@ TEST(compile_ir, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2346,7 +2346,7 @@ TEST(compile_ir, structs)
                   " load ref %s\n"                     // [addr]
                   " load ref %s\n"                     // [addr, addr]
                   " const i32 1\n"                     // [addr, addr, 1]
-                  " dup i32, ref\n"                    // [addr, 1, addr, 1]
+                  " dup_x1 i32, ref\n"                 // [addr, 1, addr, 1]
                   " set_field <type#5>.<field#1>\n"    // [addr, 1]
                   " set_field <type#5>.<field#0>\n"    // []
                   " load ref %s\n"                     // [addr]
@@ -2386,7 +2386,7 @@ TEST(compile_ir, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2449,7 +2449,7 @@ TEST(compile_ir, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2517,7 +2517,7 @@ TEST(compile_ir, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
@@ -2595,7 +2595,7 @@ TEST(compile_ir, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, type_ctx};
         cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));

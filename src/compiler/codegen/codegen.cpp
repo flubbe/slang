@@ -568,75 +568,6 @@ std::string function::to_string(const name_resolver* resolver) const
  * context.
  */
 
-void context::add_import(module_::symbol_type type, std::string import_path, std::string name)
-{
-    auto it = std::ranges::find_if(
-      imports,
-      [&name](const imported_symbol& s) -> bool
-      {
-          return name == s.name;
-      });
-    if(it != imports.end())
-    {
-        // check whether the imports match.
-        if(import_path != it->import_path)
-        {
-            throw codegen_error(std::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
-        }
-
-        if(it->type != type)
-        {
-            throw codegen_error(
-              std::format("Found different symbol types for import '{}': '{}' and '{}'.",
-                          name,
-                          slang::module_::to_string(it->type),
-                          slang::module_::to_string(type)));
-        }
-    }
-    else
-    {
-        // add the import.
-        imports.emplace_back(type, std::move(name), std::move(import_path));
-    }
-}
-
-std::size_t context::get_import_index(
-  module_::symbol_type type,
-  std::string import_path,
-  std::string name) const
-{
-    auto it = std::ranges::find_if(
-      imports,
-      [&name](const imported_symbol& s) -> bool
-      {
-          return name == s.name;
-      });
-    if(it != imports.cend())
-    {
-        if(it->import_path != import_path)
-        {
-            throw codegen_error(std::format("Found different paths for name '{}': '{}' and '{}'", name, import_path, it->import_path));
-        }
-
-        if(it->type != type)
-        {
-            throw codegen_error(
-              std::format("Found different symbol types for import '{}': '{}' and '{}'.",
-                          name,
-                          slang::module_::to_string(it->type),
-                          slang::module_::to_string(type)));
-        }
-
-        return std::distance(imports.cbegin(), it);
-    }
-
-    throw codegen_error(
-      std::format("Symbol '{}' of type '{}' with path '{}' not found in imports.",
-                  name,
-                  slang::module_::to_string(type),
-                  import_path));
-}
-
 /** Same as `std::false_type`, but taking a parameter argument. */
 template<typename T>
 struct false_type : public std::false_type
@@ -818,7 +749,7 @@ void context::generate_arraylength()
     insertion_point->add_instruction(std::make_unique<instruction>("arraylength"));
 }
 
-void context::generate_binary_op(binary_op op, const value& op_type)
+void context::generate_binary_op(binary_op op, const type& op_type)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
@@ -852,7 +783,7 @@ void context::generate_cast(type_cast tc)
 void context::generate_checkcast(type target_type)
 {
     validate_insertion_point();
-    auto arg0 = std::make_unique<type_argument>(value{std::move(target_type)});
+    auto arg0 = std::make_unique<type_argument>(target_type);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     insertion_point->add_instruction(std::make_unique<instruction>("checkcast", std::move(args)));
@@ -876,26 +807,26 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
 }
 
 void context::generate_const(
-  const value& vt,
+  const type& vt,
   std::variant<int, float, const_::constant_id> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt.get_type().get_type_kind() == type_kind::i32)
+    if(vt.get_type_kind() == type_kind::i32)
     {
         auto arg = std::make_unique<const_argument>(
           std::get<int>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type().get_type_kind() == type_kind::f32)
+    else if(vt.get_type_kind() == type_kind::f32)
     {
         auto arg = std::make_unique<const_argument>(
           std::get<float>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type().get_type_kind() == type_kind::str)
+    else if(vt.get_type_kind() == type_kind::str)
     {
         auto arg = std::make_unique<const_argument>(
           std::get<const_::constant_id>(v),
@@ -908,7 +839,7 @@ void context::generate_const(
           std::format(
             "Invalid type kind '{}' for constant.",
             ::slang::codegen::to_string(
-              vt.get_type().get_type_kind())));
+              vt.get_type_kind())));
     }
     insertion_point->add_instruction(
       std::make_unique<instruction>(
@@ -922,21 +853,40 @@ void context::generate_const_null()
     insertion_point->add_instruction(std::make_unique<instruction>("const_null", std::vector<std::unique_ptr<argument>>{}));
 }
 
-void context::generate_dup(value vt, std::vector<value> vals)
+void context::generate_dup(type vt)
 {
-    if(vals.size() >= std::numeric_limits<std::int32_t>::max())
-    {
-        throw codegen_error(std::format("Depth in dup instruction exceeds maximum value ({} >= {}).", vals.size(), std::numeric_limits<std::int32_t>::max()));
-    }
-
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(std::move(vt)));
-    for(auto& v: vals)
-    {
-        args.emplace_back(std::make_unique<type_argument>(std::move(v)));
-    }
-    insertion_point->add_instruction(std::make_unique<instruction>("dup", std::move(args)));
+    args.emplace_back(std::make_unique<type_argument>(vt));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "dup",
+        std::move(args)));
+}
+
+void context::generate_dup_x1(type vt, type skip_type)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(std::make_unique<type_argument>(skip_type));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "dup_x1",
+        std::move(args)));
+}
+
+void context::generate_dup_x2(type vt, type skip_type1, type skip_type2)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(std::make_unique<type_argument>(skip_type1));
+    args.emplace_back(std::make_unique<type_argument>(skip_type2));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "dup_x2",
+        std::move(args)));
 }
 
 void context::generate_get_field(std::unique_ptr<field_access_argument> arg)
@@ -946,82 +896,97 @@ void context::generate_get_field(std::unique_ptr<field_access_argument> arg)
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
 
-    insertion_point->add_instruction(std::make_unique<instruction>("get_field", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "get_field",
+        std::move(args)));
 }
 
-void context::generate_invoke(std::optional<std::unique_ptr<function_argument>> name)
-{
-    validate_insertion_point();
-
-    if(name.has_value())
-    {
-        std::vector<std::unique_ptr<argument>> args;
-        args.emplace_back(std::move(*name));
-        insertion_point->add_instruction(std::make_unique<instruction>("invoke", std::move(args)));
-    }
-    else
-    {
-        insertion_point->add_instruction(std::make_unique<instruction>("invoke_dynamic"));
-    }
-}
-
-void context::generate_load(std::unique_ptr<argument> arg, bool load_element)
+void context::generate_invoke(function_argument f)
 {
     validate_insertion_point();
 
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::move(arg));
-
-    if(load_element)
-    {
-        insertion_point->add_instruction(std::make_unique<instruction>("load_element", std::move(args)));
-    }
-    else
-    {
-        insertion_point->add_instruction(std::make_unique<instruction>("load", std::move(args)));
-    }
+    args.emplace_back(std::make_unique<function_argument>(f));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "invoke",
+        std::move(args)));
 }
 
-void context::generate_new(const value& vt)
+void context::generate_invoke_dynamic()
+{
+    validate_insertion_point();
+
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "invoke_dynamic"));
+}
+
+void context::generate_load(variable_argument v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(
+      std::make_unique<variable_argument>(
+        std::move(v)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "load",
+        std::move(args)));
+}
+
+void context::generate_load_element(type_argument t)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(t));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "load_element",
+        std::move(args)));
+}
+
+void context::generate_new(const type& t)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(std::make_unique<type_argument>(t));
     insertion_point->add_instruction(std::make_unique<instruction>("new", std::move(args)));
 }
 
-void context::generate_newarray(const value& vt)
+void context::generate_newarray(const type& t)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(std::make_unique<type_argument>(t));
     insertion_point->add_instruction(std::make_unique<instruction>("newarray", std::move(args)));
 }
 
-void context::generate_anewarray(const value& vt)
+void context::generate_anewarray(const type& t)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(std::make_unique<type_argument>(t));
     insertion_point->add_instruction(std::make_unique<instruction>("anewarray", std::move(args)));
 }
 
-void context::generate_pop(const value& vt)
+void context::generate_pop(const type& t)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
 
-    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(std::make_unique<type_argument>(t));
     insertion_point->add_instruction(std::make_unique<instruction>("pop", std::move(args)));
 }
 
-void context::generate_ret(std::optional<value> arg)
+void context::generate_ret(std::optional<type> arg)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     if(!arg)
     {
-        args.emplace_back(std::make_unique<type_argument>(value{type{type_kind::void_}}));
+        args.emplace_back(std::make_unique<type_argument>(type{type_kind::void_}));
     }
     else
     {
@@ -1040,21 +1005,30 @@ void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
     insertion_point->add_instruction(std::make_unique<instruction>("set_field", std::move(args)));
 }
 
-void context::generate_store(std::unique_ptr<argument> arg, bool store_element)
+void context::generate_store(variable_argument v)
 {
     validate_insertion_point();
-
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::move(arg));
+    args.emplace_back(
+      std::make_unique<variable_argument>(
+        std::move(v)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "store",
+        std::move(args)));
+}
 
-    if(store_element)
-    {
-        insertion_point->add_instruction(std::make_unique<instruction>("store_element", std::move(args)));
-    }
-    else
-    {
-        insertion_point->add_instruction(std::make_unique<instruction>("store", std::move(args)));
-    }
+void context::generate_store_element(type_argument t)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(
+      std::make_unique<type_argument>(
+        std::move(t)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "store_element",
+        std::move(args)));
 }
 
 std::string context::generate_label()

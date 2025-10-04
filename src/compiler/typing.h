@@ -114,11 +114,17 @@ struct struct_info
     /** Fields by name. */
     std::unordered_map<std::string, std::size_t> fields_by_name;
 
+    /** Origin module (index into the import table). */
+    std::optional<std::size_t> origin_module_index;
+
     /** Sealed after definition. */
     bool is_sealed{false};
 
     /** Whether to allow casts from any non-primitive type. */
     bool allow_cast{false};
+
+    /** Whether this struct has a native implementation. */
+    bool native{false};
 };
 
 /** Type info. */
@@ -267,6 +273,13 @@ public:
     std::size_t get_field_index(
       type_id struct_type_id,
       const std::string& field_name) const;
+
+    /**
+     * Check if the context contains a specific type.
+     *
+     * @param name The name to check.
+     */
+    bool has_type(const std::string& name) const;
 
     /**
      * Get the id of an existing type.

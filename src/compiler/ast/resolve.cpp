@@ -79,38 +79,42 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
           "No scope information available.");
     }
 
-    symbol_id = ctx.resolve(
-      name.s,
-      sema::symbol_type::variable,
-      scope_id.value());
-    if(symbol_id.has_value())
+    if(name.type == token_type::macro_identifier)
     {
-        return;
+        symbol_id = ctx.resolve(
+          name.s,
+          sema::symbol_type::macro_argument,
+          scope_id.value());
+    }
+    else
+    {
+        symbol_id = ctx.resolve(
+          name.s,
+          sema::symbol_type::variable,
+          scope_id.value());
+        if(symbol_id.has_value())
+        {
+            return;
+        }
+
+        symbol_id = ctx.resolve(
+          name.s,
+          sema::symbol_type::constant,
+          scope_id.value());
+        if(symbol_id.has_value())
+        {
+            return;
+        }
     }
 
-    symbol_id = ctx.resolve(
-      name.s,
-      sema::symbol_type::argument,
-      scope_id.value());
-    if(symbol_id.has_value())
+    if(!symbol_id.has_value())
     {
-        return;
+        throw cg::codegen_error(
+          name.location,
+          std::format(
+            "Could not resolve symbol '{}'.",
+            name.s));
     }
-
-    symbol_id = ctx.resolve(
-      name.s,
-      sema::symbol_type::constant,
-      scope_id.value());
-    if(symbol_id.has_value())
-    {
-        return;
-    }
-
-    throw cg::codegen_error(
-      name.location,
-      std::format(
-        "Could not resolve symbol '{}'.",
-        name.s));
 }
 
 /*
@@ -278,13 +282,7 @@ void call_expression::resolve_names(rs::context& ctx)
           "No scope information available.");
     }
 
-    auto prefix = utils::join(namespace_stack, "::");
-    if(!prefix.empty())
-    {
-        prefix += "::";
-    }
-
-    auto name = std::format("{}{}", prefix, callee.s);
+    const auto name = get_qualified_callee_name();
 
     symbol_id = ctx.resolve(
       name,

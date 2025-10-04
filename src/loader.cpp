@@ -41,20 +41,23 @@ resolve_error::resolve_error(const source_location& loc, const std::string& mess
  * resolver context.
  */
 
-static module_::module_resolver& resolve_module(
-  file_manager& file_mgr,
-  std::unordered_map<
-    std::string,
-    std::unique_ptr<module_::module_resolver>>& resolvers,
+module_::module_resolver& context::resolve_module(
   const std::string& import_name,
   bool transitive)
 {
+    // module is already resolved.
     auto it = resolvers.find(import_name);
     if(it != resolvers.end())
     {
-        throw resolve_error(std::format("Module '{}' is already resolved.", import_name));
+        if(it->second->is_transitive() && !transitive)
+        {
+            it->second->make_explicit();
+        }
+
+        return *it->second;
     }
 
+    // load the module.
     std::string import_path = import_name;
     slang::utils::replace_all(import_path, package::delimiter, "/");
 
@@ -72,25 +75,6 @@ static module_::module_resolver& resolve_module(
          resolved_path,
          transitive)});
     return *resolvers[import_name].get();
-}
-
-module_::module_resolver& context::resolve_module(
-  const std::string& import_name,
-  bool transitive)
-{
-    auto it = resolvers.find(import_name);
-    if(it != resolvers.end())
-    {
-        // module is already resolved.
-        if(it->second->is_transitive() && !transitive)
-        {
-            it->second->make_explicit();
-        }
-
-        return *it->second;
-    }
-
-    return slang::loader::resolve_module(file_mgr, resolvers, import_name, transitive);
 }
 
 bool context::resolve_macros(macro::env& env, ty::context& type_ctx)

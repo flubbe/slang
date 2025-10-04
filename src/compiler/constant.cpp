@@ -39,7 +39,7 @@ void env::set_const_info(
             throw sema::semantic_error(
               std::format(
                 "Constant info already exists for the symbol '{}' with a different value.",
-                static_cast<int>(id.value)));
+                id.value));
         }
     }
     else
@@ -58,6 +58,85 @@ std::optional<const_info> env::get_const_info(
     }
 
     return it->second;
+}
+
+void env::register_constant(sema::symbol_id id)
+{
+    if(constant_registry.contains(id))
+    {
+        throw sema::semantic_error(
+          std::format(
+            "Constant already registered for the symbol '{}'.",
+            id.value));
+    }
+
+    constant_registry.insert(id);
+}
+
+constant_id env::intern(std::int32_t i)
+{
+    auto it = std::ranges::find_if(
+      const_literal_map,
+      [i](const auto& p) -> bool
+      {
+          return p.second.type == constant_type::i32
+                 && std::get<std::int32_t>(p.second.value) == i;
+      });
+    if(it != const_literal_map.end())
+    {
+        return it->first;
+    }
+
+    if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
+    {
+        // should never happen.
+        throw std::runtime_error(
+          std::format(
+            "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            std::numeric_limits<std::size_t>::max()));
+    }
+
+    constant_id id = const_literal_map.size();
+    const_literal_map.insert(
+      {id,
+       const_info{
+         .type = constant_type::i32,
+         .value = i}});
+
+    return id;
+}
+
+constant_id env::intern(float f)
+{
+    auto it = std::ranges::find_if(
+      const_literal_map,
+      [f](const auto& p) -> bool
+      {
+          return p.second.type == constant_type::f32
+                 && std::get<float>(p.second.value) == f;
+      });
+    if(it != const_literal_map.end())
+    {
+        return it->first;
+    }
+
+    if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
+    {
+        // should never happen.
+        throw std::runtime_error(
+          std::format(
+            "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            std::numeric_limits<std::size_t>::max()));
+    }
+
+    constant_id id = const_literal_map.size();
+    const_literal_map.insert(
+      {id,
+       const_info{
+         .type = constant_type::f32,
+         .value = f}});
+
+    return id;
 }
 
 constant_id env::intern(std::string s)
@@ -79,7 +158,7 @@ constant_id env::intern(std::string s)
         // should never happen.
         throw std::runtime_error(
           std::format(
-            "Too many strings in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
             std::numeric_limits<std::size_t>::max()));
     }
 

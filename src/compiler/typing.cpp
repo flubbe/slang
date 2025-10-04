@@ -374,6 +374,19 @@ std::size_t context::get_field_index(
     return field_it->second;
 }
 
+bool context::has_type(const std::string& name) const
+{
+    auto it = std::ranges::find_if(
+      type_info_map,
+      [this, &name](const auto& p) -> bool
+      {
+          // NOTE Returns/checks the qualified name for imports
+          return to_string(p.first) == name;
+      });
+
+    return it != type_info_map.end();
+}
+
 type_id context::get_type(const std::string& name) const
 {
     // TODO Qualified names?
@@ -504,6 +517,11 @@ std::optional<type_id> context::get_expression_type(const ast::expression& expr)
     }
 
     return it->second;
+}
+
+bool context::is_builtin(type_id id) const
+{
+    return get_type_info(id).kind == type_kind::builtin;
 }
 
 bool context::is_nullable(type_id id) const

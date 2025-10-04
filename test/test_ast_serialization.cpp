@@ -21,9 +21,11 @@
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
+namespace const_ = slang::const_;
 namespace ld = slang::loader;
 namespace rs = slang::resolve;
 namespace sema = slang::sema;
+namespace tl = slang::lowering;
 namespace ty = slang::typing;
 
 namespace
@@ -48,10 +50,12 @@ void run_test(
 
     ld::context loader_ctx{mgr};
     sema::env env;
-    co::context co_ctx{env};
-    rs::context resolver_ctx{env};
+    const_::env const_env;
     ty::context type_ctx;
-    cg::context codegen_ctx{env};
+    co::context co_ctx{env};
+    rs::context resolver_ctx{env, type_ctx};
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx{env, const_env, lowering_ctx};
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 

@@ -65,33 +65,92 @@ class emitter_error : public std::runtime_error
     using std::runtime_error::runtime_error;
 };
 
+/** Import table builder. */
+class import_table_builder
+{
+    /** The import table. */
+    std::vector<module_::imported_symbol> import_table;
+
+public:
+    /** Default constructors. */
+    import_table_builder() = default;
+    import_table_builder(const import_table_builder&) = default;
+    import_table_builder(import_table_builder&&) = default;
+
+    /** Default assignment operators. */
+    import_table_builder& operator=(const import_table_builder&) = default;
+    import_table_builder& operator=(import_table_builder&&) = default;
+
+    /**
+     * Add a package to the import table.
+     *
+     * @param qualified_name The qualified package name.
+     * @returns Returns the import index of the package.
+     */
+    std::size_t intern_package(const std::string& qualified_name);
+
+    /**
+     * Get the package import index.
+     *
+     * @param qualified_name The qualified package name.
+     * @returns Returns the import index of the package.
+     * @throws Throws an `emitter_error` if the package could not be found.
+     */
+    std::size_t get_package(const std::string& qualifed_name) const;
+
+    /**
+     * Add a function to the import table.
+     *
+     * @param package_index Index of the package defining the function.
+     * @param name The function's name.
+     * @returns Returns the import index of the function.
+     */
+    std::size_t intern_function(std::size_t package_index, const std::string& name);
+
+    /**
+     * Get a function's import index.
+     *
+     * @param package_index Index of the package defining the function.
+     * @param name The function's name.
+     * @returns Returns the import index of the function.
+     * @throws Throws an `emitter_error` if the function could not be found.
+     */
+    std::size_t get_function(std::size_t package_index, const std::string& name) const;
+
+    /**
+     * Add a struct to the import table.
+     *
+     * @param qualified_name The qualified struct name.
+     * @returns Returns the import index of the struct.
+     */
+    std::size_t intern_struct(const std::string& qualified_name);
+
+    /**
+     * Get a struct's import index.
+     *
+     * @param package_index Index of the package defining the struct.
+     * @param name The struct's name.
+     * @returns Returns the import index of the struct.
+     * @throws Throws an `emitter_error` if the struct could not be found.
+     */
+    std::size_t get_struct(std::size_t package_index, const std::string& name) const;
+};
+
 /** Export table builder. */
 class export_table_builder
 {
-    /** Reference to the instruction emitter. */
-    class instruction_emitter& emitter;
-
     /** Export table. */
     std::vector<module_::exported_symbol> export_table;
 
 public:
-    /**
-     * Constructor.
-     *
-     * @param emitter The instruction emitter.
-     */
-    export_table_builder(class instruction_emitter& emitter)
-    : emitter{emitter}
-    {
-    }
+    /** Default constructors. */
+    export_table_builder() = default;
+    export_table_builder(const export_table_builder&) = default;
+    export_table_builder(export_table_builder&&) = default;
 
-    /** Deleted copy and move constructors. */
-    export_table_builder(const export_table_builder&) = delete;
-    export_table_builder(export_table_builder&&) = delete;
-
-    /** Deleted assignments. */
-    export_table_builder& operator=(const export_table_builder&) = delete;
-    export_table_builder& operator=(export_table_builder&&) = delete;
+    /** Default assignments. */
+    export_table_builder& operator=(const export_table_builder&) = default;
+    export_table_builder& operator=(export_table_builder&&) = default;
 
     /** Clear the export table. */
     void clear()
@@ -150,9 +209,12 @@ public:
     /**
      * Add a struct to the export table.
      *
+     * @param emitter The instruction emitter.
      * @param info The struct definition.
      */
-    void add_struct(const ty::struct_info& info);
+    void add_struct(
+      const instruction_emitter& emitter,
+      const ty::struct_info& info);
 
     /**
      * Add a constant to the export table.
@@ -218,11 +280,17 @@ class instruction_emitter
     /** Memory buffer for instruction emission. */
     memory_write_archive instruction_buffer;
 
+    /** Imports. */
+    import_table_builder imports;
+
     /** Exports. */
     export_table_builder exports;
 
     /** Constant table. */
-    std::vector<cg::constant_table_entry> constant_table;
+    std::vector<module_::constant_table_entry> constant_table;
+
+    /** Map of constant ids to table indices. */
+    std::unordered_map<const_::constant_id, std::size_t> constant_map;
 
     /** Referenced jump targets. */
     std::set<std::string> jump_targets;
@@ -282,7 +350,6 @@ public:
     , type_ctx{type_ctx}
     , codegen_ctx{codegen_ctx}
     , instruction_buffer{false, std::endian::little}
-    , exports{*this}
     {
     }
 

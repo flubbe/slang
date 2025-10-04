@@ -11,6 +11,7 @@
 #pragma once
 
 #include "sema.h"
+#include "typing.h"
 
 /*
  * Forward declarations.
@@ -24,12 +25,16 @@ namespace slang::resolve
 {
 
 namespace ld = slang::loader;
+namespace ty = slang::typing;
 
 /** Name resolution context. */
 class context
 {
     /** Semantic environment. */
     sema::env& env;
+
+    /** Type context. */
+    ty::context& type_ctx;
 
 public:
     /** Defaulted and deleted constructors. */
@@ -41,9 +46,13 @@ public:
      * Set up a resolution context.
      *
      * @param env The semantic environment.
+     * @param type_ctx The type context.
      */
-    context(sema::env& env)
+    context(
+      sema::env& env,
+      ty::context& type_ctx)
     : env{env}
+    , type_ctx{type_ctx}
     {
     }
 

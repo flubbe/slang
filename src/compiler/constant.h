@@ -100,6 +100,9 @@ struct env
       const_info>
       const_eval_expr_values;
 
+    /** Registered constant symbols. */
+    std::set<sema::symbol_id> constant_registry;
+
     /** Default constructors. */
     env() = default;
     env(const env&) = default;
@@ -134,10 +137,33 @@ struct env
       sema::symbol_id id) const;
 
     /**
+     * Register a symbol as a constant.
+     *
+     * @param id The symbol id.
+     */
+    void register_constant(sema::symbol_id id);
+
+    /**
+     * Intern an `i32` constant.
+     *
+     * @param i The `i32` constant.
+     * @returns Returns a constant id for the value.
+     */
+    constant_id intern(std::int32_t i);
+
+    /**
+     * Intern an `f32` constant.
+     *
+     * @param f The `f32` constant.
+     * @returns Returns a constant id for the value.
+     */
+    constant_id intern(float f);
+
+    /**
      * Intern a string constant.
      *
      * @param s The string.
-     * @returns Returns an index for the string.
+     * @returns Returns a constant id for the string.
      */
     constant_id intern(std::string s);
 
@@ -152,7 +178,7 @@ struct env
       bool is_const_eval);
 
     /**
-     * Check if an expression is known to be (not) const-eval.
+     * Check if an expression is known to (not) be const-eval.
      *
      * @param expr The ast node / expression to check.
      * @returns Returns `true` if the expression is const-eval, and `false` if it is not.
@@ -195,6 +221,15 @@ struct env
      * @returns Returns the expression's value.
      */
     const const_info& get_expression_value(
+      const ast::expression& expr) const;
+
+    /**
+     * Return the constant id for an expresssion.
+     *
+     * @param expr The ast node / expression.
+     * @returns Returns the expression's constant id.
+     */
+    constant_id get_constant_id(
       const ast::expression& expr) const;
 };
 

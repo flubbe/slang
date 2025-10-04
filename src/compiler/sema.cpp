@@ -47,14 +47,14 @@ std::string to_string(symbol_type t)
         return "variable";
     }
 
-    if(t == symbol_type::argument)
-    {
-        return "argument";
-    }
-
     if(t == symbol_type::macro)
     {
         return "macro";
+    }
+
+    if(t == symbol_type::macro_argument)
+    {
+        return "macro_argument";
     }
 
     throw std::runtime_error(

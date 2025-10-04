@@ -205,7 +205,7 @@ void compile::invoke(const std::vector<std::string>& args)
     const_::env const_env;
     ty::context type_ctx;
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
     macro::env macro_env;
@@ -214,7 +214,7 @@ void compile::invoke(const std::vector<std::string>& args)
       sema_env,
       const_env,
       macro_env,
-      lowering_ctx,
+      type_ctx,
       codegen_ctx};
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
@@ -232,7 +232,9 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->declare_types(type_ctx, sema_env);
     ast->define_types(type_ctx);
     ast->declare_functions(type_ctx, sema_env);
+    ast->bind_constant_declarations(sema_env, const_env);
     ast->type_check(type_ctx, sema_env);
+    ast->evaluate_constant_expressions(type_ctx, const_env);
     ast->generate_code(codegen_ctx);
 
     cfg_context.run();

@@ -18,7 +18,7 @@ namespace slang::attribs
 {
 
 /** Kind-string map. */
-static std::unordered_map<std::string, attribute_kind> attribute_string_map =
+static const std::unordered_map<std::string, attribute_kind> attribute_string_map =
   {
     {"allow_cast", attribute_kind::allow_cast},
     {"builtin", attribute_kind::builtin},
