@@ -1572,9 +1572,6 @@ class context
     /** List of basic blocks. */
     std::vector<std::unique_ptr<basic_block>> basic_blocks;
 
-    /** Imported symbols. */
-    std::vector<imported_symbol> imports;
-
     /** A label counter for unique label generation. */
     std::size_t label_count = 0;
 
@@ -1583,9 +1580,6 @@ class context
 
     /** Holds the array type when declaring an array. */
     std::optional<value> array_type = std::nullopt;
-
-    /** Expressions with value known at compile-time. */
-    std::unordered_map<const ast::expression*, std::unique_ptr<value>> expression_values;
 
 protected:
     /**

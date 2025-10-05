@@ -81,6 +81,12 @@ public:
     import_table_builder& operator=(const import_table_builder&) = default;
     import_table_builder& operator=(import_table_builder&&) = default;
 
+    /** Return the import table size. */
+    std::size_t size() const
+    {
+        return import_table.size();
+    }
+
     /**
      * Add a package to the import table.
      *
@@ -134,6 +140,13 @@ public:
      * @throws Throws an `emitter_error` if the struct could not be found.
      */
     std::size_t get_struct(std::size_t package_index, const std::string& name) const;
+
+    /**
+     * Write the import table to a module.
+     *
+     * @param mod The module to write to.
+     */
+    void write(module_::language_module& mod) const;
 };
 
 /** Export table builder. */

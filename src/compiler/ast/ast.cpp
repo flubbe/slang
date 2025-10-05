@@ -724,8 +724,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(ty::context& ctx, se
     }
 
     // casts for struct types. this is checked at run-time.
-    // FIXME Should be resolved in type_expression.
-    expr_type = ctx.resolve_type(target_type->get_name().s);    // no array casts.
+    expr_type = ctx.resolve_type(target_type->get_qualified_name());    // no array casts.
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -1258,6 +1257,21 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
       std::format(
         "Identifier '{}' is not a value.",
         info.name));
+}
+
+void variable_reference_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    if(element_expr)
+    {
+        element_expr->collect_names(ctx);
+    }
+
+    if(expansion)
+    {
+        expansion->collect_names(ctx);
+    }
 }
 
 std::optional<ty::type_id> variable_reference_expression::type_check(ty::context& ctx, sema::env& env)
@@ -3800,7 +3814,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                 prototype->get_name().s));
         }
 
-        const std::string& lib_name =
+        std::string lib_name =
           std::ranges::find_if(
             key_value_pairs,
             [](const std::pair<std::string, std::string>& p) -> bool
@@ -3808,6 +3822,20 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                 return p.first == "lib";
             })
             ->second;
+
+        // Library name might be in quotation marks.
+        if(lib_name[0] == '\"' && lib_name.back() == '\"')
+        {
+            lib_name = lib_name.substr(1, lib_name.size() - 2);
+        }
+        if(lib_name.length() == 0)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Native function '{}': Invalid libary name in 'lib' attribute.",
+                prototype->get_name().s));
+        }
 
         /*
          * Generate binding.
@@ -3968,6 +3996,15 @@ void call_expression::collect_names(co::context& ctx)
 
 std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::env& env)
 {
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Function '{}' has no symbol id.",
+            callee.s));
+    }
+
     const auto& callee_symbol_info = env.symbol_table[symbol_id.value()];
     if(callee_symbol_info.type != sema::symbol_type::function)
     {
@@ -4034,6 +4071,8 @@ std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::e
     }
     else
     {
+        // FIXME The types here should already be resolved.
+
         const auto* exp_sym = std::get<const module_::exported_symbol*>(callee_symbol_info.reference.value());
         if(exp_sym == nullptr)
         {
@@ -4053,7 +4092,22 @@ std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::e
         }
 
         auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
-        return_type = ctx.resolve_type(desc.signature.return_type.base_type());
+
+        std::string type_str = desc.signature.return_type.base_type();
+        if(type_str.find("::") == std::string::npos)
+        {
+            // Could be a built-in type or a local type.
+            if(!ctx.has_type(type_str)
+               || !ctx.is_builtin(ctx.get_type(type_str)))
+            {
+                type_str = std::format(
+                  "{}::{}",
+                  env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
+                  type_str);
+            }
+        }
+
+        return_type = ctx.resolve_type(type_str);
         if(desc.signature.return_type.is_array())
         {
             return_type = ctx.get_array(return_type, 1);
@@ -4071,7 +4125,21 @@ std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::e
 
         for(std::size_t i = 0; i < args.size(); ++i)
         {
-            auto expected_arg_type = ctx.resolve_type(desc.signature.arg_types[i].base_type());
+            std::string type_str = desc.signature.arg_types[i].base_type();
+            if(type_str.find("::") == std::string::npos)
+            {
+                // Could be a built-in type or a local type.
+                if(!ctx.has_type(type_str)
+                   || !ctx.is_builtin(ctx.get_type(type_str)))
+                {
+                    type_str = std::format(
+                      "{}::{}",
+                      env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
+                      type_str);
+                }
+            }
+
+            auto expected_arg_type = ctx.resolve_type(type_str);
             if(desc.signature.arg_types[i].is_array())
             {
                 expected_arg_type = ctx.get_array(expected_arg_type, 1);

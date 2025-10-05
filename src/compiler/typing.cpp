@@ -389,8 +389,6 @@ bool context::has_type(const std::string& name) const
 
 type_id context::get_type(const std::string& name) const
 {
-    // TODO Qualified names?
-
     auto it = std::ranges::find_if(
       type_info_map,
       [this, &name](const auto& p) -> bool
@@ -398,15 +396,15 @@ type_id context::get_type(const std::string& name) const
           // NOTE Returns/checks the qualified name for imports
           return to_string(p.first) == name;
       });
-    if(it == type_info_map.end())
+    if(it != type_info_map.end())
     {
-        throw type_error(
-          std::format(
-            "Type '{}' not found.",
-            name));
+        return it->first;
     }
 
-    return it->first;
+    throw type_error(
+      std::format(
+        "Type '{}' not found.",
+        name));
 }
 
 type_info context::get_type_info(type_id id) const
@@ -461,22 +459,10 @@ std::size_t context::get_array_rank(type_id id) const
     return std::get<array_info>(it->second.data).rank;
 }
 
+// FIXME is this needed?
 type_id context::resolve_type(const std::string& name)
 {
-    std::vector<std::string> name_components = utils::split(name, "::");
-
-    if(name_components.empty())
-    {
-        throw type_error("Empty name in resolve_type.");
-    }
-
-    if(name_components.size() == 1)
-    {
-        return get_type(name);
-    }
-
-    // TODO
-    throw std::runtime_error("context::resolve_type: resolution for scoped types not implemented.");
+    return get_type(name);
 }
 
 bool context::has_expression_type(const ast::expression& expr) const

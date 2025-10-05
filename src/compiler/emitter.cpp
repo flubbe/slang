@@ -208,6 +208,17 @@ std::size_t import_table_builder::get_struct(
     return std::distance(import_table.begin(), it);
 }
 
+void import_table_builder::write(module_::language_module& mod) const
+{
+    for(const auto& it: import_table)
+    {
+        mod.add_import(
+          it.type,
+          it.name,
+          it.package_index);
+    }
+}
+
 /*
  * export_table_builder implementation.
  */
@@ -572,6 +583,74 @@ void instruction_emitter::collect_imports()
 {
     for(auto& f: codegen_ctx.funcs)
     {
+        auto* s = f->get_scope();
+        const auto& func_args = s->get_args();
+        const auto& func_locals = s->get_locals();
+
+        for(const auto& arg: func_args)
+        {
+            std::optional<ty::type_id> id = arg->get_type().get_type_id();
+            if(!id.has_value())
+            {
+                throw emitter_error(
+                  std::format(
+                    "'{}': Argument has no type id.",
+                    f->get_name()));
+            }
+
+            ty::type_info info = type_ctx.get_type_info(id.value());
+            if(info.kind == ty::type_kind::struct_)
+            {
+                const auto& struct_info = std::get<ty::struct_info>(info.data);
+                if(struct_info.qualified_name.has_value())
+                {
+                    imports.intern_struct(struct_info.qualified_name.value());
+                }
+            }
+        }
+
+        for(const auto& local: func_locals)
+        {
+            std::optional<ty::type_id> id = local->get_type().get_type_id();
+            if(!id.has_value())
+            {
+                throw emitter_error(
+                  std::format(
+                    "'{}': Local has no type id.",
+                    f->get_name()));
+            }
+
+            ty::type_info info = type_ctx.get_type_info(id.value());
+            if(info.kind == ty::type_kind::struct_)
+            {
+                const auto& struct_info = std::get<ty::struct_info>(info.data);
+                if(struct_info.qualified_name.has_value())
+                {
+                    imports.intern_struct(struct_info.qualified_name.value());
+                }
+            }
+        }
+
+        std::pair<cg::type, std::vector<cg::type>> sig = f->get_signature();
+        std::optional<ty::type_id> return_type_id = sig.first.get_type_id();
+        if(!return_type_id.has_value())
+        {
+            throw emitter_error(
+              std::format(
+                "'{}': Return type has no type id.",
+                f->get_name()));
+        }
+
+        ty::type_info return_type_info = type_ctx.get_type_info(return_type_id.value());
+        if(return_type_info.kind == ty::type_kind::struct_)
+        {
+            const auto& struct_info = std::get<ty::struct_info>(return_type_info.data);
+            if(struct_info.qualified_name.has_value())
+            {
+                imports.intern_struct(struct_info.qualified_name.value());
+            }
+        }
+
         for(const auto& it: f->get_basic_blocks())
         {
             for(auto& instr: it->get_instructions())
@@ -616,13 +695,16 @@ void instruction_emitter::collect_imports()
                           symbol_info_it->second.name);
                     }
                 }
-                else if(instr->get_name() == "new")
+                else if(instr->get_name() == "new"
+                        || instr->get_name() == "anewarray"
+                        || instr->get_name() == "checkcast")
                 {
                     if(instr->get_args().size() != 1)
                     {
                         throw emitter_error(
                           std::format(
-                            "Expected 1 argument for 'new', got {}.",
+                            "Expected 1 argument for '{}', got {}.",
+                            instr->get_name(),
                             instr->get_args().size()));
                     }
 
@@ -1578,7 +1660,7 @@ void instruction_emitter::run()
     collect_imports();
 
     // the import count is not allowed to change, so store it here and check later.
-    std::size_t import_count = codegen_ctx.imports.size();
+    std::size_t import_count = imports.size();
 
     // exported constants.
     constant_table.clear();
@@ -1628,34 +1710,6 @@ void instruction_emitter::run()
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         exports.add_struct(*this, struct_info);
     }
-
-    // for(const auto& it: codegen_ctx.types)
-    // {
-    //     if(it->is_import())
-    //     {
-    //         // Verify that the type is in the import table.
-    //         auto import_it = std::ranges::find_if(
-    //           std::as_const(codegen_ctx.imports),
-    //           [&it](const cg::imported_symbol& s) -> bool
-    //           {
-    //               return s.type == module_::symbol_type::type
-    //                      && s.name == it->get_name()
-    //                      && s.import_path == it->get_import_path();
-    //           });
-    //         if(import_it == codegen_ctx.imports.cend())
-    //         {
-    //             throw std::runtime_error(
-    //               std::format(
-    //                 "Type '{}' from package '{}' not found in import table.",
-    //                 it->get_name(),
-    //                 it->get_import_path().value_or("<invalid-import-path>")));
-    //         }
-    //     }
-    //     else
-    //     {
-    //         exports.add_type(it);
-    //     }
-    // }
 
     // exported functions.
     for(const auto& f: codegen_ctx.funcs)
@@ -1724,6 +1778,11 @@ void instruction_emitter::run()
     {
         if(m->is_import())
         {
+            // TODO
+            throw std::runtime_error("instruction_emitter::run (macros)");
+
+            /*
+
             // Macros are only valid at compile-time, so
             // they should not appear in the import table.
             auto import_it = std::ranges::find_if(
@@ -1742,6 +1801,8 @@ void instruction_emitter::run()
                     m->get_name(),
                     m->get_import_path().value_or("<invalid-import-path>")));
             }
+
+            */
         }
         else
         {
@@ -1768,7 +1829,7 @@ void instruction_emitter::run()
          */
         auto* s = f->get_scope();
         const auto& func_args = s->get_args();
-        const auto& func_locals = f->get_scope()->get_locals();
+        const auto& func_locals = s->get_locals();
         const std::size_t local_count = func_args.size() + func_locals.size();
 
         std::vector<module_::variable_descriptor> locals{local_count};
@@ -1886,17 +1947,19 @@ void instruction_emitter::run()
     }
 
     // check that the import and export counts did not change.
-    if(import_count != codegen_ctx.imports.size())
+    if(import_count != imports.size())
     {
         throw emitter_error(
-          std::format("Import count changed during instruction emission ({} -> {}).",
-                      import_count, codegen_ctx.imports.size()));
+          std::format(
+            "Import count changed during instruction emission ({} -> {}).",
+            import_count, imports.size()));
     }
     if(export_count != exports.size())
     {
         throw emitter_error(
-          std::format("Export count changed during instruction emission ({} -> {}).",
-                      export_count, exports.size()));
+          std::format(
+            "Export count changed during instruction emission ({} -> {}).",
+            export_count, exports.size()));
     }
 }
 
@@ -1905,91 +1968,9 @@ module_::language_module instruction_emitter::to_module() const
     module_::language_module mod;
 
     /*
-     * imports.
+     * Imports.
      */
-
-    // Find packages which are not already in the import table.
-    std::vector<std::string> packages;
-    for(const auto& it: codegen_ctx.imports)
-    {
-        if(it.type == module_::symbol_type::package)
-        {
-            auto p_it = std::ranges::find(std::as_const(packages), it.name);
-            if(p_it != packages.cend())
-            {
-                packages.erase(p_it);
-            }
-        }
-        else
-        {
-            // ensure we import the symbol's package.
-            auto p_it = std::ranges::find_if(
-              std::as_const(codegen_ctx.imports),
-              [&it](const auto& s) -> bool
-              {
-                  return s.type == module_::symbol_type::package && s.name == it.import_path;
-              });
-            if(p_it == codegen_ctx.imports.cend())
-            {
-                auto p_it = std::ranges::find(std::as_const(packages), it.name);
-                if(p_it == packages.cend())
-                {
-                    packages.push_back(it.import_path);
-                }
-            }
-        }
-    }
-
-    // Write import table. Additional packages from the search above are appended.
-    std::vector<cg::imported_symbol> template_header;
-    auto add_symbol_to_template = [&template_header](const cg::imported_symbol& s)
-    {
-        if(std::ranges::find_if(
-             std::as_const(template_header),
-             [&s](const cg::imported_symbol& it)
-             {
-                 return s.type == it.type
-                        && s.name == it.name
-                        && s.import_path == it.import_path;
-             })
-           == template_header.cend())
-        {
-            template_header.emplace_back(s);
-        }
-    };
-
-    for(const auto& it: codegen_ctx.imports)
-    {
-        add_symbol_to_template(it);
-    }
-    for(const auto& it: packages)
-    {
-        add_symbol_to_template({module_::symbol_type::package, it, std::string{}});
-    }
-
-    for(const auto& it: template_header)
-    {
-        if(it.type == module_::symbol_type::package)
-        {
-            mod.add_import(it.type, it.name);
-        }
-        else
-        {
-            auto import_it = std::ranges::find_if(
-              std::as_const(template_header),
-              [&it](const auto& s) -> bool
-              {
-                  return s.type == module_::symbol_type::package && s.name == it.import_path;
-              });
-
-            if(import_it == template_header.cend())
-            {
-                throw std::runtime_error(std::format("Package '{}' not found in package table.", it.import_path));
-            }
-
-            mod.add_import(it.type, it.name, std::distance(template_header.cbegin(), import_it));
-        }
-    }
+    imports.write(mod);
 
     /*
      * Constants.

@@ -86,13 +86,19 @@ void context::resolve_imports(
             continue;
         }
 
+        if(resolved_modules.contains(info.qualified_name))
+        {
+            continue;
+        }
+
         bool transitive_import = env.transitive_imports.contains(id);
 
         module_::module_resolver& resolver = loader.resolve_module(
           info.qualified_name, transitive_import);
 
-        // TODO check if the module needs to be interned.
-        // TODO load dependencies
+        resolved_modules[info.qualified_name] = &loader;
+
+        // TODO load dependencies ?
 
         const module_::module_header& header = resolver.get_module().get_header();
 

@@ -36,6 +36,9 @@ class context
     /** Type context. */
     ty::context& type_ctx;
 
+    /** Resolved modules with their loaders (map `qualified_name -> loader`). */
+    std::unordered_map<std::string, ld::context*> resolved_modules;
+
 public:
     /** Defaulted and deleted constructors. */
     context() = delete;

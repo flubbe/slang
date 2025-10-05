@@ -1459,6 +1459,7 @@ public:
       const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;

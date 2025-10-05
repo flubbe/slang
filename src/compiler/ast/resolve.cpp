@@ -294,8 +294,7 @@ void call_expression::resolve_names(rs::context& ctx)
           callee.location,
           std::format(
             "Could not resolve function '{}'.",
-            name,
-            callee.s));
+            name));
     }
 
     std::ranges::for_each(

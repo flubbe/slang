@@ -219,8 +219,11 @@ void compile::invoke(const std::vector<std::string>& args)
     codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
 
     ast->collect_names(co_ctx);
-    ast->resolve_names(resolver_ctx);
     ast->collect_attributes(sema_env);
+
+    resolver_ctx.resolve_imports(loader_ctx);
+    ast->resolve_names(resolver_ctx);
+
     ast->collect_macros(sema_env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
@@ -229,6 +232,7 @@ void compile::invoke(const std::vector<std::string>& args)
             resolver_ctx.resolve_imports(loader_ctx);
         } while(ld::context::resolve_macros(macro_env, type_ctx));
     } while(ast->expand_macros(codegen_ctx, type_ctx, macro_env, module_macro_asts));
+
     ast->declare_types(type_ctx, sema_env);
     ast->define_types(type_ctx);
     ast->declare_functions(type_ctx, sema_env);
