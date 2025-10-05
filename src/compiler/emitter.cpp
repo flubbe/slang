@@ -406,11 +406,16 @@ void export_table_builder::add_struct(
 
                 if(it->second.declaring_module != sema::symbol_info::current_module_id)
                 {
-                    // check the import exists.
+                    // get the package index.
                     const auto& package_symbol_info = emitter.sema_env.symbol_table.at(
                       it->second.declaring_module);
-                    field_type_import_index = emitter.imports.get_package(
+                    auto package_index = emitter.imports.get_package(
                       package_symbol_info.qualified_name);
+
+                    // get the field type import index.
+                    field_type_import_index = emitter.imports.get_struct(
+                      package_index,
+                      base_type);
                 }
             }
             else
@@ -581,6 +586,41 @@ std::set<std::string> instruction_emitter::collect_jump_targets() const
 
 void instruction_emitter::collect_imports()
 {
+    // walk types.
+    for(const auto& [id, symbol_info]: sema_env.symbol_table)
+    {
+        if(symbol_info.type != sema::symbol_type::struct_)
+        {
+            continue;
+        }
+
+        if(symbol_info.declaring_module != sema::symbol_info::current_module_id)
+        {
+            continue;
+        }
+
+        const auto& type_info = type_ctx.get_type_info(
+          type_ctx.get_type(symbol_info.name));
+
+        const auto& struct_info = std::get<ty::struct_info>(type_info.data);
+        for(const auto& field_info: struct_info.fields)
+        {
+            const auto& field_type_info = type_ctx.get_type_info(field_info.type);
+            if(field_type_info.kind != ty::type_kind::struct_)
+            {
+                continue;
+            }
+
+            if(!std::get<ty::struct_info>(field_type_info.data).qualified_name.has_value())
+            {
+                continue;
+            }
+
+            imports.intern_struct(std::get<ty::struct_info>(field_type_info.data).qualified_name.value());
+        }
+    }
+
+    // walk functions.
     for(auto& f: codegen_ctx.funcs)
     {
         auto* s = f->get_scope();
@@ -1592,11 +1632,13 @@ static module_::constant_type to_module_constant(const_::constant_type type)
     {
         return module_::constant_type::i32;
     }
-    else if(type == const_::constant_type::f32)
+
+    if(type == const_::constant_type::f32)
     {
         return module_::constant_type::f32;
     }
-    else if(type == const_::constant_type::str)
+
+    if(type == const_::constant_type::str)
     {
         return module_::constant_type::str;
     }
@@ -1652,6 +1694,9 @@ void instruction_emitter::run()
     // clear buffers and tables.
     instruction_buffer.clear();
     exports.clear();
+    imports.clear();
+    constant_table.clear();
+    constant_map.clear();
 
     // collect jump targets.
     jump_targets = collect_jump_targets();
@@ -1663,10 +1708,7 @@ void instruction_emitter::run()
     std::size_t import_count = imports.size();
 
     // exported constants.
-    constant_table.clear();
     constant_table.reserve(const_env.const_literal_map.size());
-
-    constant_map.clear();
 
     for(const auto& [id, info]: const_env.const_literal_map)
     {

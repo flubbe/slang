@@ -74,6 +74,23 @@ fn test_linked_list() -> void
 }
 
 /*
+ * std structs.
+ */
+
+struct T {
+    s: std::i32s
+};
+
+fn test_std_structs() -> void
+{
+    let s: std::i32s = std::i32s{
+        value: 123
+    };
+
+    std::assert(s.value == 123, "s.value == 123");
+}
+
+/*
  * test main.
  */
 
@@ -81,6 +98,8 @@ fn main(args: [str]) -> i32
 {
     test_struct();
     test_linked_list();
+
+    test_std_structs();
 
     return 0;
 }

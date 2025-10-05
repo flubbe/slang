@@ -81,6 +81,12 @@ public:
     import_table_builder& operator=(const import_table_builder&) = default;
     import_table_builder& operator=(import_table_builder&&) = default;
 
+    /** Clear the import table. */
+    void clear()
+    {
+        import_table.clear();
+    }
+
     /** Return the import table size. */
     std::size_t size() const
     {

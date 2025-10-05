@@ -254,6 +254,16 @@ field_properties module_loader::get_field_properties(
             type_name));
     }
 
+    if(field_index >= type_it->second.member_types.size())
+    {
+        throw interpreter_error(
+          std::format(
+            "Field index out of bounds for type '{}' ({} >= {}).",
+            type_name,
+            field_index,
+            type_it->second.member_types.size()));
+    }
+
     auto field_info = type_it->second.member_types.at(field_index);
     return {
       .size = field_info.second.size,
@@ -295,16 +305,8 @@ void module_loader::decode_structs()
             }
             else
             {
-                if(!struct_map.contains(member_type.base_type.base_type()))
+                if(member_type.base_type.import_index.has_value())
                 {
-                    if(!member_type.base_type.import_index.has_value())
-                    {
-                        throw interpreter_error(
-                          std::format(
-                            "Cannot resolve size for type '{}': Type not found.",
-                            member_type.base_type.base_type()));
-                    }
-
                     std::size_t index = member_type.base_type.import_index.value();
                     if(index >= mod.header.imports.size())
                     {

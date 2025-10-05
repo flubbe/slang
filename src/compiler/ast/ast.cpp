@@ -2019,7 +2019,7 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(t
         throw ty::type_error(
           name.location,
           std::format(
-            "Struct '{}' has {} members, but {} are initialized.",
+            "Struct '{}' has {} member(s), but {} are initialized.",
             name.s,
             struct_info.fields.size(),
             initializers.size()));
@@ -2219,7 +2219,7 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(ty::c
         throw ty::type_error(
           name.location,
           std::format(
-            "Struct '{}' has {} members, but {} are initialized.",
+            "Struct '{}' has {} member(s), but {} are initialized.",
             name.s,
             info.fields.size(),
             initializers.size()));
