@@ -147,7 +147,7 @@ public:
      * @param file_mgr The file manager to use for module resolution.
      * @param max_call_stack_depth The maximum allowed function call stack depth.
      */
-    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 500)
+    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 400)
     : file_mgr{file_mgr}
     , max_call_stack_depth{max_call_stack_depth}
     {

@@ -14,6 +14,7 @@
 
 #include "compiler/codegen/codegen.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "compiler/opt/cfg.h"
 
@@ -21,6 +22,7 @@ namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
+namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace ty = slang::typing;
 namespace tl = slang::lowering;
@@ -68,13 +70,18 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     sema::env sema_env;
     const_::env const_env;
-    co::context co_ctx{sema_env};
     ty::context type_ctx;
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
     slang::opt::cfg::context cfg_context{codegen_ctx};
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(cfg_context.run());
