@@ -103,14 +103,6 @@ public:
     std::string get_name(ty::type_id id) const;
 
     /**
-     * Return the type name for a lowered type.
-     *
-     * @param id The lowered type.
-     * @returns Returns a readable type name.
-     */
-    std::string get_name(cg::type_kind kind) const;
-
-    /**
      * Dereference a type. Needs to have the front-end type id set.
      *
      * @param type The type to dereference.

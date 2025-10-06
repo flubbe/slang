@@ -151,19 +151,6 @@ std::size_t import_table_builder::get_function(
 std::size_t import_table_builder::intern_struct(
   const std::string& qualified_name)
 {
-    auto it = std::ranges::find_if(
-      import_table,
-      [&qualified_name](const module_::imported_symbol& entry) -> bool
-      {
-          return entry.type == module_::symbol_type::type
-                 && entry.name == qualified_name;
-      });
-    if(it != import_table.end())
-    {
-        return std::distance(import_table.begin(), it);
-    }
-
-    // Add the package containing the struct.
     auto delim_pos = qualified_name.rfind("::");
     if(delim_pos == std::string::npos)
     {
@@ -175,6 +162,27 @@ std::size_t import_table_builder::intern_struct(
 
     std::size_t package_index = intern_package(
       qualified_name.substr(0, delim_pos));
+
+    const std::string struct_name = qualified_name.substr(delim_pos + 2);
+    if(struct_name.empty())
+    {
+        throw emitter_error(
+          std::format(
+            "Cannot intern struct: Empty name."));
+    }
+
+    auto it = std::ranges::find_if(
+      import_table,
+      [&struct_name, package_index](const module_::imported_symbol& entry) -> bool
+      {
+          return entry.type == module_::symbol_type::type
+                 && entry.package_index == package_index
+                 && entry.name == struct_name;
+      });
+    if(it != import_table.end())
+    {
+        return std::distance(import_table.begin(), it);
+    }
 
     // Add the struct.
     import_table.emplace_back(

@@ -52,12 +52,7 @@ const cg::type& context::lower(ty::type_id id)
 
 std::string context::get_name(ty::type_id id) const
 {
-    throw std::runtime_error("context::get_name (type id)");
-}
-
-std::string context::get_name(cg::type_kind kind) const
-{
-    throw std::runtime_error("context::get_name (kind)");
+    return type_ctx.to_string(id);
 }
 
 cg::type context::deref(const cg::type& type)
