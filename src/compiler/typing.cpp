@@ -312,7 +312,7 @@ type_id context::get_field_type(
             to_string(it->first)));
     }
 
-    auto& info = std::get<struct_info>(it->second.data);
+    const auto& info = std::get<struct_info>(it->second.data);
     if(field_index >= info.fields.size())
     {
         throw type_error(
@@ -360,7 +360,7 @@ std::size_t context::get_field_index(
             to_string(it->first)));
     }
 
-    auto& info = std::get<struct_info>(it->second.data);
+    const auto& info = std::get<struct_info>(it->second.data);
     auto field_it = info.fields_by_name.find(name);
     if(field_it == info.fields_by_name.end())
     {
@@ -419,6 +419,63 @@ type_info context::get_type_info(type_id id) const
     }
 
     return it->second;
+}
+
+std::pair<bool, bool> context::get_type_flags(type_id id) const
+{
+    auto it = type_info_map.find(id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "Type with id '{}' not found.",
+            id));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get flags for non-struct type '{}'.",
+            to_string(id)));
+    }
+
+    return std::make_pair(
+      std::get<struct_info>(it->second.data).native,
+      std::get<struct_info>(it->second.data).allow_cast);
+}
+
+void context::set_type_flags(
+  type_id id,
+  std::optional<bool> native,
+  std::optional<bool> allow_cast)
+{
+    auto it = type_info_map.find(id);
+    if(it == type_info_map.end())
+    {
+        throw type_error(
+          std::format(
+            "Type with id '{}' not found.",
+            id));
+    }
+
+    if(it->second.kind != type_kind::struct_)
+    {
+        throw type_error(
+          std::format(
+            "Cannot get flags for non-struct type '{}'.",
+            to_string(id)));
+    }
+
+    if(native.has_value())
+    {
+        std::get<struct_info>(it->second.data).native = native.value();
+    }
+
+    if(allow_cast.has_value())
+    {
+        std::get<struct_info>(it->second.data).allow_cast = allow_cast.value();
+    }
 }
 
 type_id context::get_base_type(type_id id) const

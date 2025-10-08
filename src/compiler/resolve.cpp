@@ -135,6 +135,11 @@ void context::resolve_imports(
                   it.name,
                   qualified_name);
 
+                type_ctx.set_type_flags(
+                  struct_type_id,
+                  (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0,
+                  (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) != 0);
+
                 type_descriptors.emplace_back(
                   struct_type_id, &desc);
             }

@@ -299,6 +299,28 @@ public:
      */
     type_info get_type_info(type_id id) const;
 
+    /**
+     * Return struct flags.
+     *
+     * @param id The type id.
+     * @returns Returns a pair `(native, allow_cast)`.
+     * @throws Throws a `type_error` if the type is not known or not a struct.
+     */
+    std::pair<bool, bool> get_type_flags(type_id id) const;
+
+    /**
+     * Set struct flags.
+     *
+     * @param id The type id.
+     * @param native Whether the struct is native, or `std::nullopt`.
+     * @param allow_cast Whether to allow casting, or `std::nullopt`.
+     * @throws Throws a `type_error` if the type is not known or not a struct.
+     */
+    void set_type_flags(
+      type_id id,
+      std::optional<bool> native,
+      std::optional<bool> allow_cast);
+
     /** Returns the type info map. */
     const std::unordered_map<
       type_id,
