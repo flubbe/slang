@@ -151,8 +151,8 @@ public:
         return max_size;
     }
 
-    /** Duplicate the top i32 on the stack. */
-    void dup_i32()
+    /** Duplicate the top 32-bit value. */
+    void dup()
     {
         if(stack.size() < 4)
         {
@@ -170,22 +170,22 @@ public:
           stack.end());
     }
 
-    /** Duplicate the top f32 on the stack. */
-    void dup_f32()
+    /** Duplicate the top 64-bit value. */
+    void dup2()
     {
-        if(stack.size() < 4)
+        if(stack.size() < 8)
         {
             throw interpreter_error("Stack underflow.");
         }
 
-        if(stack.size() + 4 > max_size)
+        if(stack.size() + 8 > max_size)
         {
             throw interpreter_error("Stack overflow.");
         }
 
         stack.insert(
           stack.end(),
-          stack.end() - 4,
+          stack.end() - 8,
           stack.end());
     }
 

@@ -857,7 +857,9 @@ void context::generate_dup(type vt)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(vt)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup",
@@ -868,8 +870,12 @@ void context::generate_dup_x1(type vt, type skip_type)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
-    args.emplace_back(std::make_unique<type_argument>(skip_type));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(vt)));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(skip_type)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup_x1",
@@ -880,9 +886,15 @@ void context::generate_dup_x2(type vt, type skip_type1, type skip_type2)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(vt));
-    args.emplace_back(std::make_unique<type_argument>(skip_type1));
-    args.emplace_back(std::make_unique<type_argument>(skip_type2));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(vt)));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(skip_type1)));
+    args.emplace_back(
+      std::make_unique<stack_value_argument>(
+        lowering_ctx.get_stack_value(skip_type2)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup_x2",

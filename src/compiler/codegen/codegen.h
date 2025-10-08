@@ -640,6 +640,49 @@ public:
     }
 };
 
+/** Stack value argument. */
+class stack_value_argument : public argument
+{
+    /** The stack value. */
+    stack_value value;
+
+public:
+    /** Defaulted and deleted constructors. */
+    stack_value_argument() = delete;
+    stack_value_argument(const stack_value_argument&) = default;
+    stack_value_argument(stack_value_argument&&) = default;
+
+    /** Default destructor. */
+    ~stack_value_argument() override = default;
+
+    /** Default assignments. */
+    stack_value_argument& operator=(const stack_value_argument&) = default;
+    stack_value_argument& operator=(stack_value_argument&&) = default;
+
+    /**
+     * Create a stack value argument.
+     *
+     * @param value The stack value.
+     */
+    explicit stack_value_argument(stack_value value)
+    : value{value}
+    {
+    }
+
+    [[nodiscard]]
+    std::string to_string(const name_resolver* resolver = nullptr) const override
+    {
+        return ::slang::to_string(value);
+    }
+
+    /** Return the stack value. */
+    [[nodiscard]]
+    stack_value get_value() const
+    {
+        return value;
+    }
+};
+
 /** Type casts. */
 enum class type_cast : std::uint8_t
 {

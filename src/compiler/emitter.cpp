@@ -1166,116 +1166,62 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "dup")
     {
-        emit_typed(opcode::idup, opcode::fdup, opcode::adup, opcode::adup);
+        const auto* arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto v = arg->get_value();
+
+        if(v == stack_value::cat1)
+        {
+            emit(instruction_buffer, opcode::dup);
+        }
+        else if(v == stack_value::cat2)
+        {
+            emit(instruction_buffer, opcode::dup2);
+        }
+        else if(v == stack_value::ref)
+        {
+            emit(instruction_buffer, opcode::adup);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid stack value type '{}' for instruction '{}'.",
+                ::slang::to_string(v),
+                name));
+        }
     }
     else if(name == "dup_x1")
     {
         // get the duplicated value.
-        const auto* v_arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto v_lowered_type = v_arg->get_lowered_type();
-
-        // dup_x1 supports emission without specifying a front-end type id.
-        std::optional<std::size_t> v_import_index =
-          v_lowered_type.get_type_id().has_value()
-            ? get_import_index_or_nullopt(
-                type_ctx,
-                sema_env,
-                imports,
-                v_lowered_type)
-            : std::nullopt;
-
-        module_::variable_type v_type = {
-          ::cg::to_string(v_lowered_type.get_type_kind()),
-          std::nullopt,
-          std::nullopt,
-          v_import_index};
+        const auto* v_arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto v = v_arg->get_value();
 
         // get the stack argument.
-        const auto* stack_arg = static_cast<const cg::type_argument*>(args[1].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto stack_lowered_type = stack_arg->get_lowered_type();
-
-        // dup_x1 supports emission without specifying a front-end type id.
-        std::optional<std::size_t> stack_import_index =
-          stack_lowered_type.get_type_id().has_value()
-            ? get_import_index_or_nullopt(
-                type_ctx,
-                sema_env,
-                imports,
-                stack_lowered_type)
-            : std::nullopt;
-
-        module_::variable_type stack_type = {
-          ::cg::to_string(stack_lowered_type.get_type_kind()),
-          std::nullopt,
-          std::nullopt,
-          stack_import_index};
+        const auto* stack_arg = static_cast<const cg::stack_value_argument*>(args[1].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto s = stack_arg->get_value();
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x1);
-        instruction_buffer & v_type & stack_type;
+        instruction_buffer & v & s;
     }
     else if(name == "dup_x2")
     {
         // get the duplicated value.
-        const auto* v_arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto v_lowered_type = v_arg->get_lowered_type();
+        const auto* v_arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto v = v_arg->get_value();
 
-        // dup_x2 supports emission without specifying a front-end type id.
-        std::optional<std::size_t> v_import_index =
-          v_lowered_type.get_type_id().has_value()
-            ? get_import_index_or_nullopt(
-                type_ctx,
-                sema_env,
-                imports,
-                v_lowered_type)
-            : std::nullopt;
-
-        module_::variable_type v_type = {
-          ::cg::to_string(v_lowered_type.get_type_kind()),
-          std::nullopt,
-          std::nullopt,
-          v_import_index};
-
-        // get the stack arguments.
-        const cg::type_argument* stack_args[] = {
-          static_cast<const cg::type_argument*>(args[1].get()),    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<const cg::type_argument*>(args[2].get())     // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        // get the stack argument.
+        const cg::stack_value_argument* stack_args[2] = {
+          static_cast<const cg::stack_value_argument*>(args[1].get()),    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<const cg::stack_value_argument*>(args[2].get())     // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         };
-        cg::type stack_lowered_types[] = {
-          stack_args[0]->get_lowered_type(),
-          stack_args[1]->get_lowered_type(),
-        };
-
-        // dup_x2 supports emission without specifying a front-end type id.
-        std::optional<std::size_t> stack_import_indices[] = {
-          stack_lowered_types[0].get_type_id().has_value()
-            ? get_import_index_or_nullopt(
-                type_ctx,
-                sema_env,
-                imports,
-                stack_lowered_types[0])
-            : std::nullopt,
-          stack_lowered_types[1].get_type_id().has_value()
-            ? get_import_index_or_nullopt(
-                type_ctx,
-                sema_env,
-                imports,
-                stack_lowered_types[1])
-            : std::nullopt};
-
-        module_::variable_type stack_types[] = {
-          {::cg::to_string(stack_lowered_types[0].get_type_kind()),
-           std::nullopt,
-           std::nullopt,
-           stack_import_indices[0]},
-          {::cg::to_string(stack_lowered_types[1].get_type_kind()),
-           std::nullopt,
-           std::nullopt,
-           stack_import_indices[1]}};
+        stack_value s[2] = {
+          stack_args[0]->get_value(),
+          stack_args[1]->get_value()};
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x2);
-        instruction_buffer & v_type& stack_types[0] & stack_types[1];
+        instruction_buffer & v& s[0] & s[1];
     }
     else if(name == "pop")
     {

@@ -650,7 +650,7 @@ TEST(compile_ir, function_arguments_and_locals)
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {    ; i32 (i32, i32, f32)\n"
                   "entry:\n"
                   " const i32 3    ; 3\n"
-                  " dup i32    ; i32\n"
+                  " dup cat1    ; cat1\n"
                   " store i32 %j    ; i32\n"
                   " store i32 %i    ; i32\n"
                   " load i32 %j    ; i32\n"
@@ -703,13 +703,13 @@ TEST(compile_ir, arrays)
                   "entry:\n"
                   " const i32 2    ; 2\n"
                   " newarray i32    ; i32\n"
-                  " dup ref<type#5>    ; i32[]\n"    // array_ref
-                  " const i32 0    ; 0\n"            // index
-                  " const i32 1    ; 1\n"            // value
+                  " dup ref    ; ref\n"      // array_ref
+                  " const i32 0    ; 0\n"    // index
+                  " const i32 1    ; 1\n"    // value
                   " store_element i32    ; i32\n"
-                  " dup ref<type#5>    ; i32[]\n"    // array_ref
-                  " const i32 1    ; 1\n"            // index
-                  " const i32 2    ; 2\n"            // value
+                  " dup ref    ; ref\n"      // array_ref
+                  " const i32 1    ; 1\n"    // index
+                  " const i32 2    ; 2\n"    // value
                   " store_element i32    ; i32\n"
                   " store ref %b    ; i32[]\n"
                   " ret void    ; void\n"
@@ -756,13 +756,13 @@ TEST(compile_ir, arrays)
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup ref<type#5>\n"    // array_ref
-                  " const i32 0\n"        // index
-                  " const i32 1\n"        // value
+                  " dup ref\n"        // array_ref
+                  " const i32 0\n"    // index
+                  " const i32 1\n"    // value
                   " store_element i32\n"
-                  " dup ref<type#5>\n"    // array_ref
-                  " const i32 1\n"        // index
-                  " const i32 2\n"        // value
+                  " dup ref\n"        // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
                   " store_element i32\n"
                   " store ref %b\n"
                   " load ref %b\n"
@@ -867,12 +867,12 @@ TEST(compile_ir, arrays)
                   " const i32 2\n"
                   " newarray i32\n"
                   " store ref %b\n"
-                  " load ref %b\n"             // array_ref
-                  " const i32 0\n"             // index
-                  " load ref %b\n"             // array_ref
-                  " const i32 1\n"             // index
-                  " const i32 2\n"             // value
-                  " dup_x2 i32, i32, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
+                  " load ref %b\n"               // array_ref
+                  " const i32 0\n"               // index
+                  " load ref %b\n"               // array_ref
+                  " const i32 1\n"               // index
+                  " const i32 2\n"               // value
+                  " dup_x2 cat1, cat1, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
                   " store_element i32\n"
                   " store_element i32\n"
                   " load ref %b\n"
@@ -1376,7 +1376,7 @@ TEST(compile_ir, postfix_operators)
               " const i32 0\n"
               " store i32 %i\n"
               " load i32 %i\n"
-              " dup i32\n"
+              " dup cat1\n"
               " const i32 1\n"
               " add i32\n"
               " store i32 %i\n"
@@ -1485,7 +1485,7 @@ TEST(compile_ir, compound_assignments)
                   " load i32 %j\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " dup i32\n"
+                  " dup cat1\n"
                   " store i32 %j\n"
                   " add i32\n"
                   " store i32 %i\n"
@@ -1899,7 +1899,7 @@ TEST(compile_ir, function_calls)
                   "define ref @g() {\n"
                   "entry:\n"
                   " new ref<type#5>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 1\n"
                   " set_field <type#5>.<field#0>\n"
                   " ret ref<type#5>\n"
@@ -2091,10 +2091,10 @@ TEST(compile_ir, structs)
                   "local ref %s    ; S\n"
                   "entry:\n"
                   " new ref<type#5>    ; S\n"
-                  " dup ref<type#5>    ; S\n"
+                  " dup ref    ; ref\n"
                   " const i32 2    ; 2\n"
                   " set_field <type#5>.<field#0>    ; %S.i\n"
-                  " dup ref<type#5>    ; S\n"
+                  " dup ref    ; ref\n"
                   " const i32 3    ; 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#1>    ; %S.j\n"
@@ -2149,10 +2149,10 @@ TEST(compile_ir, structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
                   " set_field <type#5>.<field#1>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#0>\n"
@@ -2207,10 +2207,10 @@ TEST(compile_ir, structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
                   " set_field <type#5>.<field#0>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#1>\n"
@@ -2267,10 +2267,10 @@ TEST(compile_ir, structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
                   " set_field <type#5>.<field#0>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#1>\n"
@@ -2336,17 +2336,17 @@ TEST(compile_ir, structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
                   " set_field <type#5>.<field#0>\n"
-                  " dup ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " set_field <type#5>.<field#1>\n"
                   " store ref %s\n"
                   " load ref %s\n"                     // [addr]
                   " load ref %s\n"                     // [addr, addr]
                   " const i32 1\n"                     // [addr, addr, 1]
-                  " dup_x1 i32, ref\n"                 // [addr, 1, addr, 1]
+                  " dup_x1 cat1, ref\n"                // [addr, 1, addr, 1]
                   " set_field <type#5>.<field#1>\n"    // [addr, 1]
                   " set_field <type#5>.<field#0>\n"    // []
                   " load ref %s\n"                     // [addr]
@@ -2407,15 +2407,15 @@ TEST(compile_ir, nested_structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " const i32 1\n"                     // [addr1, addr1, 1]
                   " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " new ref<type#5>\n"                 // [addr1, addr1, addr2]
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
                   " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
@@ -2470,15 +2470,15 @@ TEST(compile_ir, nested_structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " const i32 1\n"                     // [addr1, addr1, 1]
                   " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " new ref<type#5>\n"                 // [addr1, addr1, addr2]
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
                   " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
@@ -2538,15 +2538,15 @@ TEST(compile_ir, nested_structs)
                   "local ref %s\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " const i32 1\n"                     // [addr1, addr1, 1]
                   " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " new ref<type#5>\n"                 // [addr1, addr1, addr2]
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
                   " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
@@ -2615,9 +2615,9 @@ TEST(compile_ir, nested_structs)
                   "local ref %root\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
-                  " dup ref<type#5>\n"                 // [addr1, addr1]
+                  " dup ref\n"                         // [addr1, addr1]
                   " new ref<type#5>\n"                 // [addr1, addr1, addr2]
-                  " dup ref<type#5>\n"                 // [addr1, addr1, addr2, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                   addr2.next = null
                   " set_field <type#5>.<field#0>\n"    // [addr1]                                 addr1.next = addr2

@@ -72,11 +72,6 @@ static opcode get_return_opcode(const module_::variable_type& return_type)
         return opcode::sret;
     }
 
-    if(return_type.base_type() == "@addr" || return_type.base_type() == "@array")
-    {
-        return opcode::aret;
-    }
-
     // FIXME Assume all other types are references.
     return opcode::aret;
 }
@@ -341,12 +336,16 @@ opcode context::exec(
 
             switch(instr_opcode)
             {
-            case opcode::idup: [[fallthrough]];
-            case opcode::fdup:
+            case opcode::dup:
             {
-                frame.stack.dup_i32();
+                frame.stack.dup();
                 break;
-            } /* opcode::idup, opcode::fdup */
+            } /* opcode::dup */
+            case opcode::dup2:
+            {
+                frame.stack.dup2();
+                break;
+            } /* opcode::dup2 */
             case opcode::adup:
             {
                 frame.stack.dup_addr();

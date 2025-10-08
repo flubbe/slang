@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "compiler/codegen/type.h"
+#include "shared/stack_value.h"
 #include "type.h"
 
 /*
@@ -111,6 +112,14 @@ public:
      *         or `type` is not an array type.
      */
     cg::type deref(const cg::type& type);
+
+    /**
+     * Get stack type size.
+     *
+     * @param type The type.
+     * @returns Returns the stack type size as a `stack_value`.
+     */
+    stack_value get_stack_value(const cg::type& type) const;
 
     /** Print the contents as a readable string. */
     [[nodiscard]]

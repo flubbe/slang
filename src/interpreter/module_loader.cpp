@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include "shared/stack_value.h"
 #include "shared/type_utils.h"
 #include "interpreter.h"
 #include "package.h"
@@ -48,13 +49,45 @@ static bool is_garbage_collected(const slang::module_::field_descriptor& info) n
     return info.base_type.is_array() || is_garbage_collected(info.base_type);
 }
 
+/**
+ * Return the size of a stack value.
+ *
+ * @param v The stack value.
+ * @return Returns the value's size, in bytes.
+ */
+static std::size_t get_stack_value_size(stack_value v)
+{
+    switch(v)
+    {
+    case stack_value::cat1: return sizeof(std::int32_t);
+    case stack_value::cat2: return sizeof(std::int64_t);
+    case stack_value::ref: return sizeof(void*);
+    default: /* fall-through */
+    }
+
+    throw interpreter_error(
+      std::format(
+        "Cannot get size for stack value '{}'",
+        static_cast<int>(v)));
+}
+
+/**
+ * Check if a stack value is garbage collected.
+ *
+ * @param v The value.
+ * @returns Return whether a stack value is garbage collected.
+ */
+static bool is_garbage_collected(stack_value v) noexcept
+{
+    return v == stack_value::ref;
+}
+
 /** Byte sizes and alignments for built-in types. */
 static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
   {"void", {0, 0}},
   {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
   {"f32", {sizeof(float), std::alignment_of_v<float>}},
   {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
-  {"@addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
@@ -623,10 +656,12 @@ std::int32_t module_loader::decode_instruction(
     case opcode::adup:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(sizeof(void*));
-    case opcode::idup: [[fallthrough]];
-    case opcode::fdup:
+    case opcode::dup:
         recorder->record(static_cast<opcode>(instr));
-        return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(sizeof(std::int32_t));
+    case opcode::dup2:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(sizeof(std::int64_t));
     case opcode::pop:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
@@ -801,81 +836,69 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x1:
     {
         // type arguments.
-        module_::variable_type t1;
-        module_::variable_type t2;
-        ar & t1 & t2;
-
-        // "void" is not allowed.
-        if(t1.base_type() == "void" || t2.base_type() == "void")
-        {
-            throw interpreter_error("Error decoding dup_x1 instruction: Invalid argument type 'void'.");
-        }
+        stack_value v1;
+        stack_value v2;
+        ar & v1 & v2;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties(t1);
-        auto properties2 = get_type_properties(t2);
+        auto size1 = get_stack_value_size(v1);
+        auto size2 = get_stack_value_size(v2);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
+        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
 
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size1),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size1) + sizeof(size1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size2),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
           reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2));
-        return static_cast<std::int32_t>(properties1.size);
+        recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2));
+        return static_cast<std::int32_t>(size1);
     }
     /* dup_x2. */
     case opcode::dup_x2:
     {
         // type arguments.
-        module_::variable_type t1;
-        module_::variable_type t2;
-        module_::variable_type t3;
-        ar & t1 & t2 & t3;
-
-        // "void" is not allowed.
-        if(t1.base_type() == "void" || t2.base_type() == "void" || t3.base_type() == "void")
-        {
-            throw interpreter_error("Error decoding dup_x2 instruction: Invalid argument type 'void'.");
-        }
+        stack_value v1;
+        stack_value v2;
+        stack_value v3;
+        ar & v1 & v2 & v3;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties(t1);
-        auto properties2 = get_type_properties(t2);
-        auto properties3 = get_type_properties(t3);
+        auto size1 = get_stack_value_size(v1);
+        auto size2 = get_stack_value_size(v2);
+        auto size3 = get_stack_value_size(v3);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
+        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
 
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size1),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size1) + sizeof(size1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size2),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties3.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties3.size) + sizeof(properties3.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size3),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size3) + sizeof(size3));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
           reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2), to_string(t3));
-        return static_cast<std::int32_t>(properties1.size);
+        recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2), to_string(v3));
+        return static_cast<std::int32_t>(size1);
     } /* invoke. */
     case opcode::invoke:
     {
