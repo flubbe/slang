@@ -15,8 +15,6 @@
 #include "ast.h"
 #include "utils.h"
 
-#include <print>
-
 namespace slang::ast
 {
 

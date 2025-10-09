@@ -44,6 +44,7 @@ add_executable(test_parser
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/attribute.cpp
@@ -98,6 +99,7 @@ add_executable(test_compile_ir
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
@@ -131,6 +133,7 @@ add_executable(test_type_system
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen/codegen.cpp
@@ -170,6 +173,7 @@ add_executable(test_resolve
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen/codegen.cpp
@@ -210,6 +214,7 @@ add_executable(test_opt_cfg
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen/codegen.cpp
@@ -251,6 +256,7 @@ add_executable(test_output
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen/codegen.cpp
@@ -303,7 +309,7 @@ add_executable(test_ast_serialization
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/codegen/codegen.cpp

@@ -24,6 +24,7 @@ add_executable(slang
     src/compiler/ast/builtins.cpp
     src/compiler/ast/eval.cpp
     src/compiler/ast/macros.cpp
+    src/compiler/ast/node_ids.cpp
     src/compiler/ast/node_registry.cpp
     src/compiler/ast/resolve.cpp
     src/compiler/attribute.cpp
