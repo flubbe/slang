@@ -187,7 +187,13 @@ struct env
     std::optional<bool> is_expression_const_eval(
       const ast::expression& expr)
     {
-        return const_eval_exprs.contains(&expr);
+        auto it = const_eval_exprs.find(&expr);
+        if(it == const_eval_exprs.end())
+        {
+            return std::nullopt;
+        }
+
+        return it->second;
     }
 
     /**

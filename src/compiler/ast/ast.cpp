@@ -284,58 +284,55 @@ void expression::evaluate_constant_expressions(
     visit_nodes(
       [&ctx, &env](const expression& expr) -> void
       {
-          if(!env.is_expression_evaluated(expr)
-             && expr.is_const_eval(env))
+          // Evaluate constant expression.
+          if(!env.is_expression_evaluated(expr))
           {
-              std::optional<const_::const_info> result = expr.evaluate(ctx, env);
-              if(result.has_value())
+              env.set_expression_const_eval(expr, false);
+              if(expr.is_const_eval(env))
               {
-                  env.set_expression_value(expr, std::move(result.value()));
+                  std::optional<const_::const_info> result = expr.evaluate(ctx, env);
+                  if(result.has_value())
+                  {
+                      env.set_expression_const_eval(expr, true);
+                      env.set_expression_value(expr, std::move(result.value()));
+                  }
+              }
+          }
+
+          // Associate values to declared constants.
+          if(expr.is_constant_declaration())
+          {
+              const auto* const_decl = expr.as_constant_declaration();
+
+              std::optional<sema::symbol_id> symbol_id = const_decl->get_symbol_id();
+              if(symbol_id.has_value()
+                 && env.constant_registry.contains(symbol_id.value()))
+              {
+                  if(env.const_info_map.contains(symbol_id.value()))
+                  {
+                      throw std::runtime_error(
+                        std::format(
+                          "{}: Symbol id already contained in constant map.",
+                          ::slang::to_string(expr.get_location())));
+                  }
+
+                  const auto* const_expr = const_decl->get_expr();
+                  if(!const_expr)
+                  {
+                      throw std::runtime_error(
+                        std::format(
+                          "{}: Constant expression has invalid handle.",
+                          ::slang::to_string(expr.get_location())));
+                  }
+
+                  env.set_const_info(
+                    symbol_id.value(),
+                    env.get_expression_value(*const_expr));
               }
           }
       },
       false, /* don't visit this node */
-      false  /* pre-order traversal */
-    );
-
-    visit_nodes(
-      [&ctx, &env](const expression& expr) -> void
-      {
-          if(!expr.is_constant_declaration())
-          {
-              return;
-          }
-
-          const auto* const_decl = expr.as_constant_declaration();
-
-          std::optional<sema::symbol_id> symbol_id = const_decl->get_symbol_id();
-          if(symbol_id.has_value()
-             && env.constant_registry.contains(symbol_id.value()))
-          {
-              if(env.const_info_map.contains(symbol_id.value()))
-              {
-                  throw std::runtime_error(
-                    std::format(
-                      "{}: Symbol id already contained in constant map.",
-                      ::slang::to_string(expr.get_location())));
-              }
-
-              const auto* const_expr = const_decl->get_expr();
-              if(!const_expr)
-              {
-                  throw std::runtime_error(
-                    std::format(
-                      "{}: Constant expression has invalid handle.",
-                      ::slang::to_string(expr.get_location())));
-              }
-
-              env.const_info_map.insert(
-                {symbol_id.value(),
-                 env.get_expression_value(*const_expr)});    // FIXME single source of truth?
-          }
-      },
-      false, /* don't visit this node */
-      false  /* pre-order traversal */
+      true   /* post-order traversal */
     );
 }
 
@@ -1194,8 +1191,37 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
                 info.name));
         }
 
-        // TODO
-        throw std::runtime_error("variable_reference_expression::generate_code (constant)");
+        if(const_info->type == const_::constant_type::i32)
+        {
+            ctx.generate_const({cg::type_kind::i32}, std::get<int>(const_info->value));
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::i32},
+              name.s);
+        }
+        else if(const_info->type == const_::constant_type::f32)
+        {
+            ctx.generate_const({cg::type_kind::f32}, std::get<float>(const_info->value));
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::f32},
+              name.s);
+        }
+        else if(const_info->type == const_::constant_type::str)
+        {
+            ctx.generate_const(
+              {cg::type_kind::str},
+              ctx.intern(
+                std::get<std::string>(const_info->value)));
+
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::str},
+              name.s);
+        }
+
+        // unsupported type.
+        throw cg::codegen_error(
+          std::format(
+            "Unsupported constant type '{}'.",
+            static_cast<int>(const_info->type)));
     }
 
     case sema::symbol_type::variable:
@@ -1642,7 +1668,13 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(ty::conte
         return ctx.get_expression_type(*this);
     }
 
-    auto annotated_type = ctx.get_type(type->get_name().s);
+    auto annotated_type_id = ctx.get_type(type->get_qualified_name());
+    if(type->is_array())
+    {
+        annotated_type_id = ctx.get_array(annotated_type_id, 1);
+    }
+    env.type_map.insert({symbol_id.value(), annotated_type_id});
+
     auto rhs = expr->type_check(ctx, env);
     if(!rhs.has_value())
     {
@@ -1652,7 +1684,7 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(ty::conte
     }
 
     // Either the types match, or the type is a reference type which is set to 'null'.
-    if(!ctx.are_types_compatible(annotated_type, rhs.value()))
+    if(!ctx.are_types_compatible(annotated_type_id, rhs.value()))
     {
         throw ty::type_error(
           name.location,
@@ -1660,8 +1692,8 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(ty::conte
             "R.h.s. has type '{}' (type id {}), which does not match the constant's type '{}' (type id {}).",
             ctx.to_string(rhs.value()),
             rhs.value(),
-            ctx.to_string(annotated_type),
-            annotated_type));
+            ctx.to_string(annotated_type_id),
+            annotated_type_id));
     }
 
     return std::nullopt;

@@ -72,7 +72,7 @@ std::optional<const_::const_info> namespace_access_expression::evaluate(
 bool variable_reference_expression::is_const_eval(const_::env& env) const
 {
     // check whether we're referencing a constant.
-    return env.get_const_info(symbol_id.value()) != std::nullopt;
+    return env.constant_registry.contains(symbol_id.value());
 }
 
 std::optional<const_::const_info> variable_reference_expression::evaluate(
@@ -330,8 +330,14 @@ std::optional<const_::const_info> binary_expression::evaluate(
         visit_nodes(
           [&type_ctx, &env](const ast::expression& node)
           {
-              // NOTE Whether evaluation is possible is checked by `is_const_eval`.
-              env.set_expression_value(node, node.evaluate(type_ctx, env).value());
+              env.set_expression_const_eval(node, false);
+
+              std::optional<const_::const_info> result = node.evaluate(type_ctx, env);
+              if(result.has_value())
+              {
+                  env.set_expression_const_eval(node, true);
+                  env.set_expression_value(node, result.value());
+              }
           },
           false, /* don't visit this node */
           true   /* post-order traversal */
@@ -505,8 +511,14 @@ std::optional<const_::const_info> unary_expression::evaluate(
         visit_nodes(
           [&type_ctx, &env](const ast::expression& node)
           {
-              // NOTE Whether evaluation is possible is checked by `is_const_eval`.
-              env.set_expression_value(node, node.evaluate(type_ctx, env).value());
+              env.set_expression_const_eval(node, false);
+
+              std::optional<const_::const_info> result = node.evaluate(type_ctx, env);
+              if(result.has_value())
+              {
+                  env.set_expression_const_eval(node, true);
+                  env.set_expression_value(node, result.value());
+              }
           },
           false, /* don't visit this node */
           true   /* post-order traversal */
