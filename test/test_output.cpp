@@ -76,7 +76,7 @@ TEST(output, native_binding)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -267,7 +267,7 @@ TEST(output, emitter)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -331,7 +331,7 @@ TEST(output, hello_world)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -386,7 +386,7 @@ TEST(output, hello_world)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -456,7 +456,7 @@ TEST(output, operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -508,7 +508,7 @@ TEST(output, operators)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -566,7 +566,7 @@ TEST(output, string_operations)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -618,7 +618,7 @@ TEST(output, string_operations)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -695,7 +695,7 @@ TEST(output, prefix_postfix)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -777,7 +777,7 @@ TEST(output, control_flow)
     ty::context type_ctx;
     tl::context lowering_ctx{type_ctx};
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, type_ctx};
+    rs::context resolver_ctx{sema_env, const_env, type_ctx};
     cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
     slang::macro::env macro_env;
     slang::instruction_emitter emitter{
@@ -839,7 +839,7 @@ TEST(output, loops)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -910,7 +910,7 @@ TEST(output, loops)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -964,7 +964,7 @@ TEST(output, infinite_recursion)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1025,7 +1025,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1114,7 +1114,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1165,7 +1165,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1209,7 +1209,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1253,7 +1253,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1302,7 +1302,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1380,7 +1380,7 @@ TEST(output, arrays)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1448,7 +1448,7 @@ TEST(output, return_discard)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1516,7 +1516,7 @@ TEST(output, return_discard)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1571,7 +1571,7 @@ TEST(output, return_discard)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1625,7 +1625,7 @@ TEST(output, missing_return)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1677,7 +1677,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1733,7 +1733,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1795,7 +1795,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1848,7 +1848,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1902,7 +1902,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -1957,7 +1957,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2014,7 +2014,7 @@ TEST(output, structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2073,7 +2073,7 @@ TEST(output, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2137,7 +2137,7 @@ TEST(output, nested_structs)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2198,7 +2198,7 @@ TEST(output, type_imports)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2252,7 +2252,7 @@ TEST(output, null_assignment)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2302,7 +2302,7 @@ TEST(output, null_access)
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
         slang::macro::env macro_env;
         slang::instruction_emitter emitter{
@@ -2364,7 +2364,7 @@ TEST(output, multiple_modules)
             ty::context type_ctx;
             tl::context lowering_ctx{type_ctx};
             co::context co_ctx{sema_env};
-            rs::context resolver_ctx{sema_env, type_ctx};
+            rs::context resolver_ctx{sema_env, const_env, type_ctx};
             cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
             slang::macro::env macro_env;
             slang::instruction_emitter emitter{

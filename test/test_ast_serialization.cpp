@@ -53,7 +53,7 @@ void run_test(
     const_::env const_env;
     ty::context type_ctx;
     co::context co_ctx{env};
-    rs::context resolver_ctx{env, type_ctx};
+    rs::context resolver_ctx{env, const_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx{env, const_env, lowering_ctx};
 

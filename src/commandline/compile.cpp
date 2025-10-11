@@ -205,7 +205,7 @@ void compile::invoke(const std::vector<std::string>& args)
     const_::env const_env;
     ty::context type_ctx;
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, type_ctx};
+    rs::context resolver_ctx{sema_env, const_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
     macro::env macro_env;

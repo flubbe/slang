@@ -46,6 +46,9 @@ std::string to_string(constant_type c);
 /** Information about a constant. */
 struct const_info
 {
+    /** Origin module. */
+    sema::symbol_id origin_module_id;
+
     /** Result type. */
     constant_type type;
 

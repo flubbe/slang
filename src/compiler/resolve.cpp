@@ -33,7 +33,7 @@ std::optional<sema::symbol_id> context::resolve(
   sema::symbol_type type,
   sema::scope_id scope_id)
 {
-    return env.get_symbol_id(
+    return sema_env.get_symbol_id(
       name,
       type,
       scope_id);
@@ -69,6 +69,12 @@ void context::resolve_imports(
     sema::env import_env;
     co::context import_collector{import_env};
 
+    std::unordered_map<
+      sema::symbol_id,
+      module_::constant_table_entry,
+      sema::symbol_id::hash>
+      imported_constants;    // symbol id -> constant table entry.
+
     // set up global scope.
     if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
     {
@@ -76,10 +82,10 @@ void context::resolve_imports(
     }
 
     // set up next ids.
-    import_env.next_scope_id = env.next_scope_id;
-    import_env.next_symbol_id = env.next_symbol_id;
+    import_env.next_scope_id = sema_env.next_scope_id;
+    import_env.next_symbol_id = sema_env.next_symbol_id;
 
-    for(auto& [id, info]: env.symbol_table)
+    for(auto& [module_id, info]: sema_env.symbol_table)
     {
         if(info.type != sema::symbol_type::module_)
         {
@@ -91,7 +97,7 @@ void context::resolve_imports(
             continue;
         }
 
-        bool transitive_import = env.transitive_imports.contains(id);
+        bool transitive_import = sema_env.transitive_imports.contains(module_id);
 
         module_::module_resolver& resolver = loader.resolve_module(
           info.qualified_name, transitive_import);
@@ -117,17 +123,32 @@ void context::resolve_imports(
                 it.name);
 
             // import symbols.
-            import_collector.declare(
+            auto symbol_id = import_collector.declare(
               it.name,
               qualified_name,
               to_sema_symbol_type(it.type),
               info.loc,
-              id,
+              module_id,
               transitive_import,
               &it);
 
-            // import type declaration.
-            if(it.type == module_::symbol_type::type)
+            if(it.type == module_::symbol_type::constant)
+            {
+                auto import_index = std::get<std::size_t>(it.desc);
+                if(import_index >= header.constants.size())
+                {
+                    throw std::runtime_error(
+                      std::format(
+                        "Constant index {} for constant {} out of bounds.",
+                        import_index,
+                        it.name));
+                }
+
+                imported_constants.insert(
+                  {symbol_id,
+                   header.constants[import_index]});
+            }
+            else if(it.type == module_::symbol_type::type)
             {
                 const auto& desc = std::get<module_::struct_descriptor>(it.desc);
 
@@ -185,17 +206,80 @@ void context::resolve_imports(
         }
     }
 
+    // Move constants into type environment.
+    for(const auto& [id, entry]: imported_constants)
+    {
+        auto type_it = import_env.type_map.find(id);
+        if(type_it != import_env.type_map.end())
+        {
+            // should never happen.
+            throw std::runtime_error(
+              std::format(
+                "Symbol id for imported constant already registered in type map."));
+        }
+
+        auto symbol_info_it = import_env.symbol_table.find(id);
+        if(symbol_info_it == import_env.symbol_table.end())
+        {
+            // should never happen.
+            throw std::runtime_error(
+              std::format(
+                "Symbol info for constant not found in symbol table."));
+        }
+
+        const_env.register_constant(id);
+
+        if(entry.type == module_::constant_type::i32)
+        {
+            sema_env.type_map.insert({id, type_ctx.get_i32_type()});
+            const_env.set_const_info(
+              id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::i32,
+                .value = std::get<int>(entry.data)});
+        }
+        else if(entry.type == module_::constant_type::f32)
+        {
+            sema_env.type_map.insert({id, type_ctx.get_f32_type()});
+            const_env.set_const_info(
+              id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::f32,
+                .value = std::get<float>(entry.data)});
+        }
+        else if(entry.type == module_::constant_type::str)
+        {
+            sema_env.type_map.insert({id, type_ctx.get_str_type()});
+            const_env.set_const_info(
+              id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::str,
+                .value = std::get<std::string>(entry.data)});
+        }
+        else
+        {
+            // throw an error (for future expansion).
+            throw std::runtime_error(
+              std::format(
+                "Import for constants of type with numeric value {} not implemented.",
+                static_cast<int>(entry.type)));
+        }
+    }
+
     // Move symbols into semantic environment.
     for(auto& [id, info]: import_env.symbol_table)
     {
         auto symbol_it = std::ranges::find_if(
-          env.symbol_table,
+          sema_env.symbol_table,
           [&info](const std::pair<sema::symbol_id, sema::symbol_info>& p) -> bool
           {
               return p.second.type == info.type
                      && p.second.qualified_name == info.qualified_name;
           });
-        if(symbol_it != env.symbol_table.end())
+        if(symbol_it != sema_env.symbol_table.end())
         {
             std::println(
               "{}: Warning: Import '{}' ('{}'): A symbol with the same name already exists in symbol table. Declaration at: {}",
@@ -207,7 +291,7 @@ void context::resolve_imports(
             continue;
         }
 
-        env.symbol_table.insert({id, info});
+        sema_env.symbol_table.insert({id, info});
 
         // TODO Revisit this.
 
@@ -242,12 +326,12 @@ void context::resolve_imports(
 
         if(import_env.transitive_imports.contains(id))
         {
-            env.transitive_imports.insert(id);
+            sema_env.transitive_imports.insert(id);
         }
     }
 
-    env.next_scope_id = import_env.next_scope_id;
-    env.next_symbol_id = import_env.next_symbol_id;
+    sema_env.next_scope_id = import_env.next_scope_id;
+    sema_env.next_symbol_id = import_env.next_symbol_id;
 }
 
 }    // namespace slang::resolve

@@ -100,6 +100,7 @@ constant_id env::intern(std::int32_t i)
     const_literal_map.insert(
       {id,
        const_info{
+         .origin_module_id = sema::symbol_info::current_module_id,
          .type = constant_type::i32,
          .value = i}});
 
@@ -133,6 +134,7 @@ constant_id env::intern(float f)
     const_literal_map.insert(
       {id,
        const_info{
+         .origin_module_id = sema::symbol_info::current_module_id,
          .type = constant_type::f32,
          .value = f}});
 
@@ -166,6 +168,7 @@ constant_id env::intern(std::string s)
     const_literal_map.insert(
       {id,
        const_info{
+         .origin_module_id = sema::symbol_info::current_module_id,
          .type = constant_type::str,
          .value = std::move(s)}});
 

@@ -54,7 +54,7 @@ TEST(resolve, std)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -95,7 +95,7 @@ TEST(resolve, std)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -138,7 +138,7 @@ TEST(resolve, std)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 

@@ -80,14 +80,14 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
     if(name.type == token_type::macro_identifier)
     {
         symbol_id = ctx.resolve(
-          name.s,
+          get_qualified_name(),
           sema::symbol_type::macro_argument,
           scope_id.value());
     }
     else
     {
         symbol_id = ctx.resolve(
-          name.s,
+          get_qualified_name(),
           sema::symbol_type::variable,
           scope_id.value());
         if(symbol_id.has_value())
@@ -96,7 +96,7 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         }
 
         symbol_id = ctx.resolve(
-          name.s,
+          get_qualified_name(),
           sema::symbol_type::constant,
           scope_id.value());
         if(symbol_id.has_value())
@@ -110,8 +110,8 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         throw cg::codegen_error(
           name.location,
           std::format(
-            "Could not resolve symbol '{}'.",
-            name.s));
+            "Could not resolve identifier '{}'.",
+            get_qualified_name()));
     }
 }
 

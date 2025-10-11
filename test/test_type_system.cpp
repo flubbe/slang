@@ -75,9 +75,10 @@ TEST(type_system, name_collection)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -100,9 +101,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -121,9 +123,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -142,9 +145,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -163,9 +167,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -184,9 +189,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -205,9 +211,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -228,9 +235,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -251,9 +259,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -273,9 +282,10 @@ TEST(type_system, variables)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -299,9 +309,10 @@ TEST(type_system, explicit_cast)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -321,9 +332,10 @@ TEST(type_system, explicit_cast)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -343,9 +355,10 @@ TEST(type_system, explicit_cast)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -365,9 +378,10 @@ TEST(type_system, explicit_cast)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -411,9 +425,10 @@ TEST(type_system, binary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -433,9 +448,10 @@ TEST(type_system, binary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -455,9 +471,10 @@ TEST(type_system, binary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -477,9 +494,10 @@ TEST(type_system, binary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -499,9 +517,10 @@ TEST(type_system, binary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -528,9 +547,10 @@ TEST(type_system, unary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -551,9 +571,10 @@ TEST(type_system, unary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -573,9 +594,10 @@ TEST(type_system, unary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -595,9 +617,10 @@ TEST(type_system, unary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -617,9 +640,10 @@ TEST(type_system, unary_operators)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
@@ -645,9 +669,10 @@ TEST(type_system, functions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -670,9 +695,10 @@ TEST(type_system, functions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
@@ -695,9 +721,10 @@ TEST(type_system, functions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
     {
@@ -718,6 +745,7 @@ TEST(type_system, functions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
@@ -741,9 +769,10 @@ TEST(type_system, functions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
 }
@@ -775,7 +804,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -813,7 +842,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -847,7 +876,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -885,7 +914,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -919,7 +948,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -953,7 +982,7 @@ TEST(type_system, arrays)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -988,7 +1017,7 @@ TEST(type_system, structs)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1013,6 +1042,7 @@ TEST(type_system, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
 
@@ -1035,6 +1065,7 @@ TEST(type_system, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
 
@@ -1065,7 +1096,7 @@ TEST(type_system, structs)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1102,7 +1133,7 @@ TEST(type_system, structs)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1137,7 +1168,7 @@ TEST(type_system, structs)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1172,7 +1203,7 @@ TEST(type_system, structs)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1209,9 +1240,10 @@ TEST(type_system, function_calls)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1242,9 +1274,10 @@ TEST(type_system, function_calls)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1275,9 +1308,10 @@ TEST(type_system, function_calls)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1308,9 +1342,10 @@ TEST(type_system, function_calls)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1342,9 +1377,10 @@ TEST(type_system, function_calls)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1376,9 +1412,10 @@ TEST(type_system, return_expressions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         EXPECT_NO_THROW(ast->collect_names(co_ctx));
         EXPECT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1404,9 +1441,10 @@ TEST(type_system, return_expressions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1438,9 +1476,10 @@ TEST(type_system, return_expressions)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1474,9 +1513,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1506,9 +1546,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1540,9 +1581,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1574,9 +1616,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1608,9 +1651,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1642,9 +1686,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1676,9 +1721,10 @@ TEST(type_system, element_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1711,9 +1757,10 @@ TEST(type_system, examples)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1744,9 +1791,10 @@ TEST(type_system, examples)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         sema::env sema_env;
+        const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -1785,7 +1833,7 @@ TEST(type_system, examples)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -1837,7 +1885,7 @@ TEST(type_system, native_binding)
         const_::env const_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 

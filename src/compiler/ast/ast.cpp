@@ -1324,8 +1324,8 @@ std::optional<ty::type_id> variable_reference_expression::type_check(ty::context
             throw ty::type_error(
               loc,
               std::format(
-                "Variable '{}' has no symbol id.",
-                name.s));
+                "Identifier '{}' has no symbol id.",
+                get_qualified_name()));
         }
 
         if(!env.type_map.contains(symbol_id.value()))
@@ -1333,8 +1333,8 @@ std::optional<ty::type_id> variable_reference_expression::type_check(ty::context
             throw ty::type_error(
               loc,
               std::format(
-                "Variable '{}' not in type map.",
-                name.s));
+                "Identifier '{}' not in type map.",
+                get_qualified_name()));
         }
 
         type = env.type_map[symbol_id.value()];

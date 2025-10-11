@@ -1674,6 +1674,12 @@ void instruction_emitter::run()
 
     for(const auto& [symbol_id, info]: const_env.const_info_map)
     {
+        // only export constants declared in the current module.
+        if(info.origin_module_id != sema::symbol_info::current_module_id)
+        {
+            continue;
+        }
+
         auto symbol_info = sema_env.symbol_table.at(symbol_id);
 
         exports.add_constant(

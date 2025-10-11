@@ -72,7 +72,7 @@ TEST(opt_cfg, remove_unreachable_blocks)
     const_::env const_env;
     ty::context type_ctx;
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, type_ctx};
+    rs::context resolver_ctx{sema_env, const_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
     slang::opt::cfg::context cfg_context{codegen_ctx};

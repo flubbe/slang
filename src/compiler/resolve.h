@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "constant.h"
 #include "sema.h"
 #include "typing.h"
 
@@ -24,6 +25,7 @@ class context;
 namespace slang::resolve
 {
 
+namespace const_ = slang::const_;
 namespace ld = slang::loader;
 namespace ty = slang::typing;
 
@@ -31,7 +33,10 @@ namespace ty = slang::typing;
 class context
 {
     /** Semantic environment. */
-    sema::env& env;
+    sema::env& sema_env;
+
+    /** Constant environment. */
+    const_::env& const_env;
 
     /** Type context. */
     ty::context& type_ctx;
@@ -48,13 +53,16 @@ public:
     /**
      * Set up a resolution context.
      *
-     * @param env The semantic environment.
+     * @param sema_env The semantic environment.
+     * @param const_env The constant environment.
      * @param type_ctx The type context.
      */
     context(
-      sema::env& env,
+      sema::env& sema_env,
+      const_::env& const_env,
       ty::context& type_ctx)
-    : env{env}
+    : sema_env{sema_env}
+    , const_env{const_env}
     , type_ctx{type_ctx}
     {
     }
