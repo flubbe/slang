@@ -389,11 +389,19 @@ bool context::has_type(const std::string& name) const
 
 type_id context::get_type(const std::string& name) const
 {
+    bool is_name_qualified = name.find("::") != std::string::npos;
+
     auto it = std::ranges::find_if(
       type_info_map,
-      [this, &name](const auto& p) -> bool
+      [this, &name, is_name_qualified](const auto& p) -> bool
       {
-          // NOTE Returns/checks the qualified name for imports
+          if(is_name_qualified)
+          {
+              return p.second.kind == ty::type_kind::struct_
+                     && std::get<ty::struct_info>(p.second.data).qualified_name.has_value()
+                     && std::get<ty::struct_info>(p.second.data).qualified_name.value() == name;
+          }
+
           return to_string(p.first) == name;
       });
     if(it != type_info_map.end())
