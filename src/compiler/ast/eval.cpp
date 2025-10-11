@@ -34,7 +34,7 @@ std::optional<const_::const_info> literal_expression::evaluate(
     {
         return std::make_optional<const_::const_info>(
           {.type = const_::constant_type::i32,
-           .value = std::get<std::int32_t>(tok.value.value())});
+           .value = std::get<int>(tok.value.value())});
     }
 
     if(tok.type == token_type::fp_literal)
@@ -125,14 +125,75 @@ struct binary_operation_helper
             return {
               .type = const_::constant_type::i32,
               .value = func_i32(
-                std::get<std::int32_t>(lhs.value),
-                std::get<std::int32_t>(rhs.value))};
+                std::get<int>(lhs.value),
+                std::get<int>(rhs.value))};
         }
 
         if(lhs.type == const_::constant_type::f32)
         {
             return {
               .type = const_::constant_type::f32,
+              .value = func_f32(
+                std::get<float>(lhs.value),
+                std::get<float>(rhs.value))};
+        }
+
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Invalid type '{}' for binary operator evaluation.",
+            const_::to_string(lhs.type),
+            const_::to_string(rhs.type)));
+    }
+};
+
+struct comparison_helper
+{
+    ty::context& ctx;
+
+    source_location loc;
+    std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
+    std::function<std::int32_t(float, float)> func_f32;
+
+    comparison_helper(
+      ty::context& ctx,
+      const binary_expression& expr,
+      std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32,
+      std::function<std::int32_t(float, float)> func_f32)
+    : ctx{ctx}
+    , loc{expr.get_location()}
+    , func_i32{std::move(func_i32)}
+    , func_f32{std::move(func_f32)}
+    {
+    }
+
+    const_::const_info operator()(
+      const const_::const_info& lhs,
+      const const_::const_info& rhs) const
+    {
+        if(lhs.type != rhs.type)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Operand types don't match for binary operator evaluation: '{}' != '{}'.",
+                const_::to_string(lhs.type),
+                const_::to_string(rhs.type)));
+        }
+
+        if(lhs.type == const_::constant_type::i32)
+        {
+            return {
+              .type = const_::constant_type::i32,
+              .value = func_i32(
+                std::get<int>(lhs.value),
+                std::get<int>(rhs.value))};
+        }
+
+        if(lhs.type == const_::constant_type::f32)
+        {
+            return {
+              .type = const_::constant_type::i32,
               .value = func_f32(
                 std::get<float>(lhs.value),
                 std::get<float>(rhs.value))};
@@ -284,7 +345,7 @@ std::optional<const_::const_info> binary_expression::evaluate(
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '||'."); }}},
     };
 
-    static const std::unordered_map<std::string, binary_operation_helper> comp_map = {
+    static const std::unordered_map<std::string, comparison_helper> comp_map = {
       {"<", {type_ctx, 
              *this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
@@ -399,7 +460,7 @@ struct unary_operation_helper
         {
             return {
               .type = const_::constant_type::i32,
-              .value = func_i32(std::get<std::int32_t>(v.value))};
+              .value = func_i32(std::get<int>(v.value))};
         }
 
         if(v.type == const_::constant_type::f32)
