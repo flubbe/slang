@@ -629,13 +629,12 @@ void instruction_emitter::collect_imports()
     // walk functions.
     for(auto& f: codegen_ctx.funcs)
     {
-        auto* s = f->get_scope();
-        const auto& func_args = s->get_args();
-        const auto& func_locals = s->get_locals();
+        const auto& func_args = f->get_args();
+        const auto& func_locals = f->get_locals();
 
         for(const auto& arg: func_args)
         {
-            std::optional<ty::type_id> id = arg.second->get_type().get_type_id();
+            std::optional<ty::type_id> id = arg.second.get_type_id();
             if(!id.has_value())
             {
                 throw emitter_error(
@@ -657,7 +656,7 @@ void instruction_emitter::collect_imports()
 
         for(const auto& local: func_locals)
         {
-            std::optional<ty::type_id> id = local.second->get_type().get_type_id();
+            std::optional<ty::type_id> id = local.second.get_type_id();
             if(!id.has_value())
             {
                 throw emitter_error(
@@ -1024,13 +1023,16 @@ void instruction_emitter::emit_instruction(
         const auto* arg = static_cast<const cg::variable_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         const cg::value* v = arg->get_value();
 
-        if(!v->has_name())
+        if(!v->has_symbol_id())
         {
-            throw std::runtime_error(std::format("Cannot emit instruction '{}': Argument value has no name.", name));
+            throw std::runtime_error(
+              std::format(
+                "Cannot emit instruction '{}': Argument value has no symbol id.",
+                name));
         }
         vle_int index{
           utils::numeric_cast<std::int64_t>(
-            func->get_scope()->get_index(v->get_name().value()))};
+            func->get_index(v->get_symbol_id().value()))};
 
         if(type_ctx.is_array(v->get_type().get_type_id().value()))
         {
@@ -1127,7 +1129,7 @@ void instruction_emitter::emit_instruction(
         {
             const_::constant_id id = static_cast<const cg::constant_str*>(
                                        arg->get_value())
-                                       ->get_id();
+                                       ->get_constant_id();
             auto it = constant_map.find(id);
             if(it == constant_map.end())
             {
@@ -1830,9 +1832,8 @@ void instruction_emitter::run()
         /*
          * allocate and map locals.
          */
-        auto* s = f->get_scope();
-        const auto& func_args = s->get_args();
-        const auto& func_locals = s->get_locals();
+        const auto& func_args = f->get_args();
+        const auto& func_locals = f->get_locals();
         const std::size_t local_count = func_args.size() + func_locals.size();
 
         std::vector<module_::variable_descriptor> locals{local_count};
@@ -1843,34 +1844,31 @@ void instruction_emitter::run()
             unset_indices.insert(unset_indices.end(), i);
         }
 
-        for(const auto& it: func_args)
+        for(const auto& [sym_id, ty]: func_args)
         {
-            auto name = it.second->get_name();
-            if(!name.has_value())
-            {
-                throw emitter_error(
-                  std::format(
-                    "{}: Unnamed variable in function '{}'.",
-                    to_string(it.first),
-                    f->get_name()));
-            }
-
-            std::size_t index = s->get_index(
-              it.second->get_name().value_or("<invalid-name>"));
+            std::size_t index = f->get_index(sym_id);
             if(!unset_indices.contains(index))
             {
+                auto info_it = sema_env.symbol_table.find(sym_id);
+                if(info_it != sema_env.symbol_table.end())
+                {
+                    throw emitter_error(
+                      std::format(
+                        "{}: Tried to map local '{}' with index '{}' multiple times.",
+                        f->get_name(),
+                        info_it->second.name,
+                        index));
+                }
+
                 throw emitter_error(
                   std::format(
-                    "{}: Tried to map local '{}' with index '{}' multiple times.",
-                    to_string(it.first),
-                    *name,
+                    "{}: Tried to map local with index '{}' multiple times.",
+                    f->get_name(),
                     index));
             }
             unset_indices.erase(index);
 
-            auto t = it.second->get_type();
-
-            auto type_id = t.get_type_id().value();
+            auto type_id = ty.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);
             bool is_array = type_ctx.is_array(type_id);
             auto array_rank = type_ctx.get_array_rank(type_id);
@@ -1886,37 +1884,34 @@ void instruction_emitter::run()
                   type_ctx,
                   sema_env,
                   imports,
-                  t)}};
+                  ty)}};
         }
 
-        for(const auto& it: func_locals)
+        for(const auto& [sym_id, ty]: func_locals)
         {
-            auto name = it.second->get_name();
-            if(!name.has_value())
-            {
-                throw emitter_error(
-                  std::format(
-                    "{}: Unnamed variable in function '{}'.",
-                    to_string(it.first),
-                    f->get_name()));
-            }
-
-            std::size_t index = s->get_index(
-              it.second->get_name().value_or("<invalid-name>"));
+            std::size_t index = f->get_index(sym_id);
             if(!unset_indices.contains(index))
             {
+                auto info_it = sema_env.symbol_table.find(sym_id);
+                if(info_it != sema_env.symbol_table.end())
+                {
+                    throw emitter_error(
+                      std::format(
+                        "{}: Tried to map local '{}' with index '{}' multiple times.",
+                        f->get_name(),
+                        info_it->second.name,
+                        index));
+                }
+
                 throw emitter_error(
                   std::format(
-                    "{}: Tried to map local '{}' with index '{}' multiple times.",
-                    to_string(it.first),
-                    *name,
+                    "{}: Tried to map local with index '{}' multiple times.",
+                    f->get_name(),
                     index));
             }
             unset_indices.erase(index);
 
-            auto t = it.second->get_type();
-
-            auto type_id = t.get_type_id().value();
+            auto type_id = ty.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);
             bool is_array = type_ctx.is_array(type_id);
             auto array_rank = type_ctx.get_array_rank(type_id);
@@ -1932,7 +1927,7 @@ void instruction_emitter::run()
                   type_ctx,
                   sema_env,
                   imports,
-                  t)}};
+                  ty)}};
         }
 
         if(!unset_indices.empty())

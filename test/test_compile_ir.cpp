@@ -82,6 +82,11 @@ public:
                 id.value));
         }
 
+        if(it->second.declaring_module == sema::symbol_info::current_module_id)
+        {
+            return it->second.name;
+        }
+
         return it->second.qualified_name;
     }
 
@@ -339,10 +344,10 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(&resolver),
-                  "define i32 @f() {    ; i32 ()\n"
+                  "define i32 @f() {\n"
                   "entry:\n"
-                  " const i32 1    ; 1\n"
-                  " ret i32    ; i32\n"
+                  " const i32 1\n"
+                  " ret i32\n"
                   "}");
     }
     {
@@ -382,10 +387,10 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(&resolver),
-                  "define f32 @f() {    ; f32 ()\n"
+                  "define f32 @f() {\n"
                   "entry:\n"
-                  " const f32 1.323    ; 1.323\n"
-                  " ret f32    ; f32\n"
+                  " const f32 1.323\n"
+                  " ret f32\n"
                   "}");
     }
     {
@@ -426,10 +431,10 @@ TEST(compile_ir, builtin_return_values)
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   ".string @0 \"test\"\n"
-                  "define str @f() {    ; str ()\n"
+                  "define str @f() {\n"
                   "entry:\n"
-                  " const str @0    ; test\n"
-                  " ret str    ; str\n"
+                  " const str @0\n"
+                  " ret str\n"
                   "}");
     }
 }
@@ -470,7 +475,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define void @f(i32 %i, str %j, f32 %k) {\n"
+                  "define void @f(i32 %1, str %2, f32 %3) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
@@ -511,12 +516,12 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, str %j, f32 %k) {\n"
-                  "local i32 %a\n"
+                  "define i32 @f(i32 %1, str %2, f32 %3) {\n"
+                  "local i32 %4\n"
                   "entry:\n"
                   " const i32 1\n"
-                  " store i32 %a\n"
-                  " load i32 %a\n"
+                  " store i32 %4\n"
+                  " load i32 %4\n"
                   " ret i32\n"
                   "}");
     }
@@ -556,12 +561,12 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
-                  "local i32 %a\n"
+                  "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
+                  "local i32 %4\n"
                   "entry:\n"
-                  " load i32 %j\n"
-                  " store i32 %a\n"
-                  " load i32 %a\n"
+                  " load i32 %2\n"
+                  " store i32 %4\n"
+                  " load i32 %4\n"
                   " ret i32\n"
                   "}");
     }
@@ -601,11 +606,11 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+                  "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
                   "entry:\n"
                   " const i32 3\n"
-                  " store i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %1\n"
+                  " load i32 %2\n"
                   " ret i32\n"
                   "}");
     }
@@ -647,14 +652,14 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(&resolver),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {    ; i32 (i32, i32, f32)\n"
+                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "entry:\n"
-                  " const i32 3    ; 3\n"
-                  " dup cat1    ; cat1\n"
-                  " store i32 %j    ; i32\n"
-                  " store i32 %i    ; i32\n"
-                  " load i32 %j    ; i32\n"
-                  " ret i32    ; i32\n"
+                  " const i32 3\n"
+                  " dup cat1\n"
+                  " store i32 %j\n"
+                  " store i32 %i\n"
+                  " load i32 %j\n"
+                  " ret i32\n"
                   "}");
     }
 }
@@ -698,21 +703,21 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(&resolver),
-                  "define void @f() {    ; void ()\n"
-                  "local ref %b    ; i32[]\n"
+                  "define void @f() {\n"
+                  "local ref %b\n"
                   "entry:\n"
-                  " const i32 2    ; 2\n"
-                  " newarray i32    ; i32\n"
-                  " dup ref    ; ref\n"      // array_ref
-                  " const i32 0    ; 0\n"    // index
-                  " const i32 1    ; 1\n"    // value
-                  " store_element i32    ; i32\n"
-                  " dup ref    ; ref\n"      // array_ref
-                  " const i32 1    ; 1\n"    // index
-                  " const i32 2    ; 2\n"    // value
-                  " store_element i32    ; i32\n"
-                  " store ref %b    ; i32[]\n"
-                  " ret void    ; void\n"
+                  " const i32 2\n"
+                  " newarray i32\n"
+                  " dup ref\n"        // array_ref
+                  " const i32 0\n"    // index
+                  " const i32 1\n"    // value
+                  " store_element i32\n"
+                  " dup ref\n"        // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
+                  " store_element i32\n"
+                  " store ref %b\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -752,7 +757,7 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define ref @f() {\n"
-                  "local ref %b\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
@@ -764,8 +769,8 @@ TEST(compile_ir, arrays)
                   " const i32 1\n"    // index
                   " const i32 2\n"    // value
                   " store_element i32\n"
-                  " store ref %b\n"
-                  " load ref %b\n"
+                  " store ref %1\n"
+                  " load ref %1\n"
                   " ret ref<type#5>\n"
                   "}");
     }
@@ -808,16 +813,16 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local ref %b\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store ref %b\n"
-                  " load ref %b\n"    // array_ref
+                  " store ref %1\n"
+                  " load ref %1\n"    // array_ref
                   " const i32 1\n"    // index
                   " const i32 2\n"    // value
                   " store_element i32\n"
-                  " load ref %b\n"
+                  " load ref %1\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -862,20 +867,20 @@ TEST(compile_ir, arrays)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local ref %b\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store ref %b\n"
-                  " load ref %b\n"               // array_ref
+                  " store ref %1\n"
+                  " load ref %1\n"               // array_ref
                   " const i32 0\n"               // index
-                  " load ref %b\n"               // array_ref
+                  " load ref %1\n"               // array_ref
                   " const i32 1\n"               // index
                   " const i32 2\n"               // value
                   " dup_x2 cat1, cat1, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
                   " store_element i32\n"
                   " store_element i32\n"
-                  " load ref %b\n"
+                  " load ref %1\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -969,15 +974,15 @@ TEST(compile_ir, unary_operators)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @local(i32 %a) {\n"
-                  "local i32 %b\n"
+                  "define i32 @local(i32 %1) {\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
                   " const i32 1\n"
                   " sub i32\n"
-                  " store i32 %b\n"
-                  " load i32 %a\n"
-                  " load i32 %b\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " add i32\n"
                   " ret i32\n"
                   "}");
@@ -1015,15 +1020,15 @@ TEST(compile_ir, unary_operators)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @local(i32 %a) {\n"
-                  "local i32 %b\n"
+                  "define i32 @local(i32 %1) {\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 -1\n"
                   " const i32 1\n"
                   " xor i32\n"
-                  " store i32 %b\n"
-                  " load i32 %a\n"
-                  " load i32 %b\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " add i32\n"
                   " ret i32\n"
                   "}");
@@ -1068,15 +1073,15 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
                   " mul i32\n"
                   " const i32 3\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1116,15 +1121,15 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
                   " const i32 3\n"
                   " add i32\n"
                   " mul i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1164,15 +1169,15 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 6\n"
                   " const i32 2\n"
                   " const i32 3\n"
                   " sub i32\n"
                   " div i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1212,7 +1217,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
@@ -1223,8 +1228,8 @@ TEST(compile_ir, binary_operators)
                   " const i32 1\n"
                   " shr i32\n"
                   " or i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1264,7 +1269,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
@@ -1275,8 +1280,8 @@ TEST(compile_ir, binary_operators)
                   " const i32 4\n"
                   " and i32\n"
                   " or i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1316,7 +1321,7 @@ TEST(compile_ir, binary_operators)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 5\n"
                   " const i32 7\n"
@@ -1327,8 +1332,8 @@ TEST(compile_ir, binary_operators)
                   " cmpge i32\n"
                   " and i32\n"
                   " xor i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1371,15 +1376,15 @@ TEST(compile_ir, postfix_operators)
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
-              "local i32 %i\n"
+              "local i32 %1\n"
               "entry:\n"
               " const i32 0\n"
-              " store i32 %i\n"
-              " load i32 %i\n"
+              " store i32 %1\n"
+              " load i32 %1\n"
               " dup cat1\n"
               " const i32 1\n"
               " add i32\n"
-              " store i32 %i\n"
+              " store i32 %1\n"
               " pop i32\n"
               " ret void\n"
               "}");
@@ -1424,15 +1429,15 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1474,22 +1479,22 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
-                  "local i32 %j\n"
+                  "local i32 %1\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
+                  " store i32 %1\n"
                   " const i32 1\n"
-                  " store i32 %j\n"
-                  " load i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " const i32 1\n"
                   " add i32\n"
                   " dup cat1\n"
-                  " store i32 %j\n"
+                  " store i32 %2\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1531,20 +1536,20 @@ TEST(compile_ir, compound_assignments)
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
-                  "local i32 %j\n"
+                  "local i32 %1\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
+                  " store i32 %1\n"
                   " const i32 1\n"
-                  " store i32 %j\n"
-                  " load i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " const i32 2\n"
                   " add i32\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1683,7 +1688,7 @@ TEST(compile_ir, function_calls)
                   " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
-                  "define void @g(i32 %a, f32 %b, str %c, i32 %d) {\n"
+                  "define void @g(i32 %2, f32 %3, str %4, i32 %5) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}\n"
@@ -1740,7 +1745,7 @@ TEST(compile_ir, function_calls)
                   " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
-                  "define void @g(i32 %i, f32 %j) {\n"
+                  "define void @g(i32 %2, f32 %3) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
@@ -1950,9 +1955,9 @@ TEST(compile_ir, if_statement)
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @test_if_else(i32 %a) {\n"
+                  "define i32 @test_if_else(i32 %1) {\n"
                   "entry:\n"
-                  " load i32 %a\n"
+                  " load i32 %1\n"
                   " const i32 0\n"
                   " cmpg i32\n"
                   " jnz %0, %2\n"
@@ -2087,19 +2092,19 @@ TEST(compile_ir, structs)
                   " i32 %i,\n"
                   " f32 %j,\n"
                   "}\n"
-                  "define void @test() {    ; void ()\n"
-                  "local ref %s    ; S\n"
+                  "define void @test() {\n"
+                  "local ref %s\n"
                   "entry:\n"
-                  " new ref<type#5>    ; S\n"
-                  " dup ref    ; ref\n"
-                  " const i32 2    ; 2\n"
-                  " set_field <type#5>.<field#0>    ; %S.i\n"
-                  " dup ref    ; ref\n"
-                  " const i32 3    ; 3\n"
+                  " new S\n"
+                  " dup ref\n"
+                  " const i32 2\n"
+                  " set_field %S.i\n"
+                  " dup ref\n"
+                  " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field <type#5>.<field#1>    ; %S.j\n"
-                  " store ref %s    ; S\n"
-                  " ret void    ; void\n"
+                  " set_field %S.j\n"
+                  " store ref %s\n"
+                  " ret void\n"
                   "}");
     }
     {
@@ -2146,7 +2151,7 @@ TEST(compile_ir, structs)
                   " i32 %i,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"
                   " dup ref\n"
@@ -2156,7 +2161,7 @@ TEST(compile_ir, structs)
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#0>\n"
-                  " store ref %s\n"
+                  " store ref %4\n"
                   " ret void\n"
                   "}");
     }
@@ -2204,7 +2209,7 @@ TEST(compile_ir, structs)
                   " f32 %j,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"
                   " dup ref\n"
@@ -2214,7 +2219,7 @@ TEST(compile_ir, structs)
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#1>\n"
-                  " store ref %s\n"
+                  " store ref %4\n"
                   " ret void\n"
                   "}");
     }
@@ -2264,7 +2269,7 @@ TEST(compile_ir, structs)
                   " f32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"
                   " dup ref\n"
@@ -2274,13 +2279,13 @@ TEST(compile_ir, structs)
                   " const i32 3\n"
                   " cast i32_to_f32\n"
                   " set_field <type#5>.<field#1>\n"
-                  " store ref %s\n"
-                  " load ref %s\n"
+                  " store ref %4\n"
+                  " load ref %4\n"
                   " const i32 1\n"
                   " set_field <type#5>.<field#0>\n"
-                  " load ref %s\n"
+                  " load ref %4\n"
                   " get_field <type#5>.<field#0>\n"
-                  " load ref %s\n"
+                  " load ref %4\n"
                   " get_field <type#5>.<field#1>\n"
                   " cast f32_to_i32\n"
                   " add i32\n"
@@ -2333,7 +2338,7 @@ TEST(compile_ir, structs)
                   " i32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"
                   " dup ref\n"
@@ -2342,16 +2347,16 @@ TEST(compile_ir, structs)
                   " dup ref\n"
                   " const i32 3\n"
                   " set_field <type#5>.<field#1>\n"
-                  " store ref %s\n"
-                  " load ref %s\n"                     // [addr]
-                  " load ref %s\n"                     // [addr, addr]
+                  " store ref %4\n"
+                  " load ref %4\n"                     // [addr]
+                  " load ref %4\n"                     // [addr, addr]
                   " const i32 1\n"                     // [addr, addr, 1]
                   " dup_x1 cat1, ref\n"                // [addr, 1, addr, 1]
                   " set_field <type#5>.<field#1>\n"    // [addr, 1]
                   " set_field <type#5>.<field#0>\n"    // []
-                  " load ref %s\n"                     // [addr]
+                  " load ref %4\n"                     // [addr]
                   " get_field <type#5>.<field#0>\n"    // [1]
-                  " load ref %s\n"                     // [1, addr]
+                  " load ref %4\n"                     // [1, addr]
                   " get_field <type#5>.<field#1>\n"    // [1, 1]
                   " add i32\n"                         // [2]
                   " ret i32\n"
@@ -2404,7 +2409,7 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
                   " dup ref\n"                         // [addr1, addr1]
@@ -2419,7 +2424,7 @@ TEST(compile_ir, nested_structs)
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
-                  " store ref %s\n"                    // []                                   s = addr1
+                  " store ref %4\n"                    // []                                   s = addr1
                   " ret void\n"
                   "}");
     }
@@ -2467,7 +2472,7 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
                   " dup ref\n"                         // [addr1, addr1]
@@ -2482,8 +2487,8 @@ TEST(compile_ir, nested_structs)
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
-                  " store ref %s\n"                    // []                                   s = addr1
-                  " load ref %s\n"                     // [s]
+                  " store ref %4\n"                    // []                                   s = addr1
+                  " load ref %4\n"                     // [s]
                   " get_field <type#5>.<field#1>\n"    // [s.next]
                   " get_field <type#5>.<field#0>\n"    // [i]
                   " ret i32\n"
@@ -2535,7 +2540,7 @@ TEST(compile_ir, nested_structs)
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local ref %s\n"
+                  "local ref %4\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
                   " dup ref\n"                         // [addr1, addr1]
@@ -2550,19 +2555,19 @@ TEST(compile_ir, nested_structs)
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
                   " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
-                  " store ref %s\n"                    // []                                   s = addr1
-                  " load ref %s\n"                     // [s]
+                  " store ref %4\n"                    // []                                   s = addr1
+                  " load ref %4\n"                     // [s]
                   " get_field <type#5>.<field#1>\n"    // [s.next]
-                  " load ref %s\n"                     // [s.next, s]
+                  " load ref %4\n"                     // [s.next, s]
                   " set_field <type#5>.<field#1>\n"    // []                                   s.next.next = s
-                  " load ref %s\n"                     // [s]
+                  " load ref %4\n"                     // [s]
                   " get_field <type#5>.<field#1>\n"    // [s.next]
                   " get_field <type#5>.<field#1>\n"    // [s.next.next]
                   " const i32 2\n"                     // [s.next.next, 2]
                   " set_field <type#5>.<field#0>\n"    // []                                   s.next.next.i = 2
-                  " load ref %s\n"                     // [s]
+                  " load ref %4\n"                     // [s]
                   " get_field <type#5>.<field#0>\n"    // [i]
-                  " load ref %s\n"                     // [i, s]
+                  " load ref %4\n"                     // [i, s]
                   " get_field <type#5>.<field#1>\n"    // [i, s.next]
                   " get_field <type#5>.<field#0>\n"    // [i, s.next.i]
                   " add i32\n"                         // [i + s.next.i]
@@ -2612,7 +2617,7 @@ TEST(compile_ir, nested_structs)
                   " Link %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local ref %root\n"
+                  "local ref %3\n"
                   "entry:\n"
                   " new ref<type#5>\n"                 // [addr1]
                   " dup ref\n"                         // [addr1, addr1]
@@ -2621,12 +2626,12 @@ TEST(compile_ir, nested_structs)
                   " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
                   " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                   addr2.next = null
                   " set_field <type#5>.<field#0>\n"    // [addr1]                                 addr1.next = addr2
-                  " store ref %root\n"                 // []                                      root = addr1
-                  " load ref %root\n"                  // [root]
+                  " store ref %3\n"                    // []                                      root = addr1
+                  " load ref %3\n"                     // [root]
                   " get_field <type#5>.<field#0>\n"    // [root.next]
-                  " load ref %root\n"                  // [root.next, root]
+                  " load ref %3\n"                     // [root.next, root]
                   " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = root
-                  " load ref %root\n"                  // [root]
+                  " load ref %3\n"                     // [root]
                   " get_field <type#5>.<field#0>\n"    // [root.next]
                   " const_null\n"                      // [root.next, null]
                   " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = null

@@ -15,6 +15,7 @@
 
 #include "compiler/codegen/codegen.h"
 #include "compiler/collect.h"
+#include "compiler/name_utils.h"
 #include "compiler/sema.h"
 #include "compiler/typing.h"
 
@@ -29,10 +30,12 @@ namespace
 {
 
 // Mock type ids.
-constexpr ty::type_id mock_null_type = 0;
+// Correspond to the type id's in the lowering context's builtin initialization.
+
+// constexpr ty::type_id mock_null_type = 0;
 constexpr ty::type_id mock_void_type = 1;
 constexpr ty::type_id mock_i32_type = 2;
-constexpr ty::type_id mock_f32_type = 3;
+// constexpr ty::type_id mock_f32_type = 3;
 constexpr ty::type_id mock_str_type = 4;
 
 TEST(codegen, initialize_context)
@@ -54,8 +57,9 @@ TEST(codegen, create_function)
 
     auto* fn = codegen_ctx.create_function(
       "test",
-      std::make_unique<cg::value>(cg::type{
-        mock_void_type, cg::type_kind::void_}),
+      cg::type{
+        mock_void_type,
+        cg::type_kind::void_},
       {});
     ASSERT_NE(fn, nullptr);
 
@@ -65,8 +69,9 @@ TEST(codegen, create_function)
 
     auto* other_fn = codegen_ctx.create_function(
       "test2",
-      std::make_unique<cg::value>(cg::type{
-        mock_i32_type, cg::type_kind::i32}),
+      cg::type{
+        mock_i32_type,
+        cg::type_kind::i32},
       {});
     ASSERT_NE(other_fn, nullptr);
     ASSERT_NE(fn, other_fn);
@@ -80,9 +85,8 @@ TEST(codegen, create_function)
     EXPECT_THROW(static_cast<void>(    // ignore return value, since the function should throw anyway.
                    codegen_ctx.create_function(
                      "test",
-                     std::make_unique<cg::value>(
-                       cg::type{
-                         mock_i32_type, cg::type_kind::i32}),
+                     cg::type{
+                       mock_i32_type, cg::type_kind::i32},
                      {})),
                  cg::codegen_error);
 }
@@ -97,8 +101,8 @@ TEST(codegen, insertion_points)
 
     auto* fn = codegen_ctx.create_function(
       "test",
-      std::make_unique<cg::value>(cg::type{
-        mock_void_type, cg::type_kind::void_}),
+      cg::type{
+        mock_void_type, cg::type_kind::void_},
       {});
     ASSERT_NE(fn, nullptr);
 
@@ -132,8 +136,8 @@ TEST(codegen, validate_basic_block)
 
     auto* fn = codegen_ctx.create_function(
       "test",
-      std::make_unique<cg::value>(cg::type{
-        mock_void_type, cg::type_kind::void_}),
+      cg::type{
+        mock_void_type, cg::type_kind::void_},
       {});
     ASSERT_NE(fn, nullptr);
 
@@ -156,32 +160,70 @@ TEST(codegen, validate_basic_block)
     EXPECT_FALSE(fn_block->is_valid());
 }
 
+/**
+ * Helper to add an argument to a function.
+ *
+ * @param ctx The collection context associated to a semantic environment.
+ * @param arg The function's argument list to add the argument to.
+ * @param name The argument's name.
+ * @param ty The argument's type.
+ */
+static void add_arg(
+  co::context& ctx,
+  std::vector<
+    std::pair<
+      sema::symbol_id,
+      cg::type>>&
+    args,
+  const std::string& name,
+  cg::type ty)
+{
+    auto id = ctx.declare(
+      name,
+      name,
+      sema::symbol_type::argument,
+      {0, 0},
+      sema::symbol_id::invalid,
+      false);
+
+    args.emplace_back(id, ty);
+}
+
 TEST(codegen, generate_function)
 {
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> void
          * {
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(cg::type{
-            mock_void_type, cg::type_kind::void_}),
-          std::move(args));
+          cg::type{
+            mock_void_type, cg::type_kind::void_},
+          args);
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -197,17 +239,20 @@ TEST(codegen, generate_function)
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define void @f(i32 %a) {\n"
+                  "define void @f(i32 %0) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
     }
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> i32
@@ -215,19 +260,23 @@ TEST(codegen, generate_function)
          *     return -31;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}),
-          std::move(args));
+          cg::type{
+            mock_i32_type, cg::type_kind::i32},
+          args);
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -248,7 +297,7 @@ TEST(codegen, generate_function)
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define i32 @f(i32 %a) {\n"
+                  "define i32 @f(i32 %0) {\n"
                   "entry:\n"
                   " const i32 -31\n"
                   " ret i32\n"
@@ -256,10 +305,13 @@ TEST(codegen, generate_function)
     }
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> i32
@@ -267,19 +319,23 @@ TEST(codegen, generate_function)
          *     return a;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}),
-          std::move(args));
+          cg::type{
+            mock_i32_type, cg::type_kind::i32},
+          args);
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -294,7 +350,7 @@ TEST(codegen, generate_function)
           cg::variable_argument{std::make_unique<cg::value>(
             cg::type{
               mock_i32_type, cg::type_kind::i32},
-            "a")});
+            args[0].first)});
         codegen_ctx.generate_ret(
           std::make_optional<cg::type>(
             mock_i32_type, cg::type_kind::i32));
@@ -302,9 +358,9 @@ TEST(codegen, generate_function)
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define i32 @f(i32 %a) {\n"
+                  "define i32 @f(i32 %0) {\n"
                   "entry:\n"
-                  " load i32 %a\n"
+                  " load i32 %0\n"
                   " ret i32\n"
                   "}");
     }
@@ -314,10 +370,13 @@ TEST(codegen, operators)
 {
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> i32
@@ -325,19 +384,23 @@ TEST(codegen, operators)
          *     return a + 1;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}),
-          std::move(args));
+          cg::type{
+            mock_i32_type, cg::type_kind::i32},
+          args);
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
@@ -355,7 +418,7 @@ TEST(codegen, operators)
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type, cg::type_kind::i32},
-              "a")});
+              args[0].first)});
         codegen_ctx.generate_const(
           {mock_i32_type, cg::type_kind::i32},
           1);
@@ -370,9 +433,9 @@ TEST(codegen, operators)
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define i32 @f(i32 %a) {\n"
+                  "define i32 @f(i32 %0) {\n"
                   "entry:\n"
-                  " load i32 %a\n"
+                  " load i32 %0\n"
                   " const i32 1\n"
                   " add i32\n"
                   " ret i32\n"
@@ -384,10 +447,13 @@ TEST(codegen, conditional_branch)
 {
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> i32
@@ -399,19 +465,23 @@ TEST(codegen, conditional_branch)
          *     return 0;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32}),
-          std::move(args));
+          cg::type{
+            mock_i32_type, cg::type_kind::i32},
+          args);
 
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
@@ -436,7 +506,8 @@ TEST(codegen, conditional_branch)
         codegen_ctx.generate_load(
           cg::variable_argument{
             std::make_unique<cg::value>(
-              cg::type{mock_i32_type, cg::type_kind::i32}, "a")});
+              cg::type{mock_i32_type, cg::type_kind::i32},
+              args[0].first)});
         codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 1);
         codegen_ctx.generate_binary_op(cg::binary_op::op_equal, {mock_i32_type, cg::type_kind::i32});
         codegen_ctx.generate_cond_branch(then_block, else_block);
@@ -457,9 +528,9 @@ TEST(codegen, conditional_branch)
         EXPECT_TRUE(cont_block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define i32 @f(i32 %a) {\n"
+                  "define i32 @f(i32 %0) {\n"
                   "entry:\n"
-                  " load i32 %a\n"
+                  " load i32 %0\n"
                   " const i32 1\n"
                   " cmpeq i32\n"
                   " jnz %then, %else\n"
@@ -475,14 +546,46 @@ TEST(codegen, conditional_branch)
     }
 }
 
+/**
+ * Helper to add a local variable to a function.
+ *
+ * @param ctx The collection context associated to a semantic environment.
+ * @param fn The function to add the local to.
+ * @param name The local's name.
+ * @param ty The local's type.
+ */
+static sema::symbol_id add_local(
+  co::context& ctx,
+  cg::function* fn,
+  std::string name,
+  cg::type ty)
+{
+    auto local_id = ctx.declare(
+      name,
+      slang::name::qualified_name(fn->get_name(), name),
+      sema::symbol_type::variable,
+      {0, 0},
+      sema::symbol_id::invalid,
+      false);
+
+    fn->add_local(
+      local_id,
+      ty);
+
+    return local_id;
+}
+
 TEST(codegen, locals_store)
 {
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
+
+        co_ctx.push_scope(std::nullopt, {0, 0});
 
         /*
          * fn f(a: i32) -> void
@@ -490,25 +593,31 @@ TEST(codegen, locals_store)
          *     let b: i32 = a;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args;
-        args.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args;
+        add_arg(
+          co_ctx,
+          args,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(cg::type{
-            mock_void_type, cg::type_kind::void_}),
-          std::move(args));
+          cg::type{
+            mock_void_type, cg::type_kind::void_},
+          args);
         ASSERT_NE(fn, nullptr);
         EXPECT_EQ(fn->get_name(), "f");
 
-        fn->get_scope()->add_local(
-          slang::source_location{0, 0},
-          std::make_unique<cg::value>(
-            cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
+        auto local_id = add_local(
+          co_ctx,
+          fn,
+          "b",
+          cg::type{mock_i32_type, cg::type_kind::i32});
 
         cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn->append_basic_block(block);
@@ -521,21 +630,25 @@ TEST(codegen, locals_store)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "a")});
+            std::make_unique<cg::value>(
+              cg::type{mock_i32_type, cg::type_kind::i32},
+              args[0].first)});
         codegen_ctx.generate_store(
           cg::variable_argument{
-            std::make_unique<cg::value>(cg::type{mock_i32_type, cg::type_kind::i32}, "b")});
+            std::make_unique<cg::value>(
+              cg::type{mock_i32_type, cg::type_kind::i32},
+              local_id)});
 
         codegen_ctx.generate_ret();
 
         EXPECT_TRUE(block->is_valid());
 
         EXPECT_EQ(codegen_ctx.to_string(),
-                  "define void @f(i32 %a) {\n"
-                  "local i32 %b\n"
+                  "define void @f(i32 %0) {\n"
+                  "local i32 %1\n"
                   "entry:\n"
-                  " load i32 %a\n"
-                  " store i32 %b\n"
+                  " load i32 %0\n"
+                  " store i32 %1\n"
                   " ret void\n"
                   "}");
     }
@@ -545,9 +658,6 @@ class test_name_resolver : public cg::name_resolver
 {
     /** The semantic environment. */
     sema::env& sema_env;
-
-    /** The constant environment. */
-    const_::env& const_env;
 
     /** The type context. */
     ty::context& type_ctx;
@@ -562,15 +672,12 @@ public:
      * Create a name resolver for the tests.
      *
      * @param sema_env The semantic environment.
-     * @param const_env The constant environment.
      * @param type_ctx The type context.
      */
     test_name_resolver(
       sema::env& sema_env,
-      const_::env& const_env,
       ty::context& type_ctx)
     : sema_env{sema_env}
-    , const_env{const_env}
     , type_ctx{type_ctx}
     {
     }
@@ -594,7 +701,7 @@ public:
                 id.value));
         }
 
-        return it->second.qualified_name;
+        return it->second.name;
     }
 
     [[nodiscard]]
@@ -630,7 +737,9 @@ TEST(codegen, invoke)
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
-        test_name_resolver resolver{sema_env, const_env, type_ctx};
+        co_ctx.push_scope(std::nullopt, {0, 0});
+
+        test_name_resolver resolver{sema_env, type_ctx};
 
         /*
          * fn f(a: i32) -> i32
@@ -644,31 +753,32 @@ TEST(codegen, invoke)
          *     return a*b;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args_f;
+        add_arg(
+          co_ctx,
+          args_f,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn_f = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}),
-          std::move(args_f));
+          cg::type{
+            mock_i32_type,
+            cg::type_kind::i32},
+          args_f);
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->get_scope()->add_local(
-          slang::source_location{0, 0},
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "b"));
+        auto local_id = add_local(
+          co_ctx,
+          fn_f,
+          "b",
+          cg::type{mock_i32_type, cg::type_kind::i32});
 
         cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn_f->append_basic_block(block);
@@ -690,7 +800,7 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              local_id)});
 
         codegen_ctx.generate_load(
           cg::variable_argument{
@@ -698,14 +808,14 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              local_id)});
         codegen_ctx.generate_load(
           cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")});
+              args_f[0].first)});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
           std::nullopt,
@@ -731,27 +841,30 @@ TEST(codegen, invoke)
 
         EXPECT_TRUE(block->is_valid());
 
-        std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "a"));
-        args_g.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "b"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args_g;
+        add_arg(
+          co_ctx,
+          args_g,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
+        add_arg(
+          co_ctx,
+          args_g,
+          "b",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn_g = codegen_ctx.create_function(
           "g",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}),
-          std::move(args_g));
+          cg::type{
+            mock_i32_type,
+            cg::type_kind::i32},
+          args_g);
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -771,14 +884,14 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")});
+              args_g[0].first)});
         codegen_ctx.generate_load(
           cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              args_g[1].first)});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,
           {mock_i32_type,
@@ -793,33 +906,35 @@ TEST(codegen, invoke)
 
         EXPECT_EQ(
           codegen_ctx.to_string(&resolver),
-          "define i32 @f(i32 %a) {    ; i32 (i32)\n"
-          "local i32 %b    ; i32\n"
+          "define i32 @f(i32 %a) {\n"
+          "local i32 %b\n"
           "entry:\n"
-          " const i32 -1    ; -1\n"
-          " store i32 %b    ; i32\n"
-          " load i32 %b    ; i32\n"
-          " load i32 %a    ; i32\n"
-          " invoke <func#0>    ; @g\n"
-          " ret i32    ; i32\n"
+          " const i32 -1\n"
+          " store i32 %b\n"
+          " load i32 %b\n"
+          " load i32 %a\n"
+          " invoke @g\n"
+          " ret i32\n"
           "}\n"
-          "define i32 @g(i32 %a, i32 %b) {    ; i32 (i32, i32)\n"
+          "define i32 @g(i32 %a, i32 %b) {\n"
           "entry:\n"
-          " load i32 %a    ; i32\n"
-          " load i32 %b    ; i32\n"
-          " mul i32    ; i32\n"
-          " ret i32    ; i32\n"
+          " load i32 %a\n"
+          " load i32 %b\n"
+          " mul i32\n"
+          " ret i32\n"
           "}");
     }
     {
         sema::env sema_env;
+        co::context co_ctx{sema_env};
         const_::env const_env;
         ty::context type_ctx;
-        co::context co_ctx{sema_env};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
-        test_name_resolver resolver{sema_env, const_env, type_ctx};
+        co_ctx.push_scope(std::nullopt, {0, 0});
+
+        test_name_resolver resolver{sema_env, type_ctx};
 
         /*
          * fn f(a: i32) -> i32
@@ -833,31 +948,32 @@ TEST(codegen, invoke)
          *     return a*b;
          * }
          */
-        std::vector<std::unique_ptr<cg::value>> args_f;
-        args_f.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "a"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args_f;
+        add_arg(
+          co_ctx,
+          args_f,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn_f = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}),
-          std::move(args_f));
+          cg::type{
+            mock_i32_type,
+            cg::type_kind::i32},
+          args_f);
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
 
-        fn_f->get_scope()->add_local(
-          slang::source_location{0, 0},
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "b"));
+        auto local_id = add_local(
+          co_ctx,
+          fn_f,
+          "b",
+          cg::type{mock_i32_type, cg::type_kind::i32});
 
         cg::basic_block* block = cg::basic_block::create(codegen_ctx, "entry");
         fn_f->append_basic_block(block);
@@ -879,7 +995,7 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              local_id)});
 
         codegen_ctx.generate_load(
           cg::variable_argument{
@@ -887,20 +1003,20 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              local_id)});
         codegen_ctx.generate_load(
           cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")});
+              args_f[0].first)});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
           std::nullopt,
           {0, 0});
 
-        const sema::symbol_id function_symbol_id = co_ctx.declare(
+        co_ctx.declare(
           "g",
           "g",
           sema::symbol_type::variable,
@@ -922,27 +1038,30 @@ TEST(codegen, invoke)
 
         EXPECT_TRUE(block->is_valid());
 
-        std::vector<std::unique_ptr<cg::value>> args_g;
-        args_g.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "a"));
-        args_g.emplace_back(
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32},
-            "b"));
+        std::vector<
+          std::pair<
+            sema::symbol_id,
+            cg::type>>
+          args_g;
+        add_arg(
+          co_ctx,
+          args_g,
+          "a",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
+        add_arg(
+          co_ctx,
+          args_g,
+          "b",
+          cg::type{
+            mock_i32_type, cg::type_kind::i32});
 
         auto* fn_g = codegen_ctx.create_function(
           "g",
-          std::make_unique<cg::value>(
-            cg::type{
-              mock_i32_type,
-              cg::type_kind::i32}),
-          std::move(args_g));
+          cg::type{
+            mock_i32_type,
+            cg::type_kind::i32},
+          args_g);
         ASSERT_NE(fn_g, nullptr);
         EXPECT_EQ(fn_g->get_name(), "g");
 
@@ -962,14 +1081,14 @@ TEST(codegen, invoke)
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "a")});
+              args_g[0].first)});
         codegen_ctx.generate_load(
           cg::variable_argument{
             std::make_unique<cg::value>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
-              "b")});
+              args_g[1].first)});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,
           {mock_i32_type,
@@ -984,23 +1103,23 @@ TEST(codegen, invoke)
 
         EXPECT_EQ(
           codegen_ctx.to_string(&resolver),
-          "define i32 @f(i32 %a) {    ; i32 (i32)\n"
-          "local i32 %b    ; i32\n"
+          "define i32 @f(i32 %a) {\n"
+          "local i32 %b\n"
           "entry:\n"
-          " const i32 -1    ; -1\n"
-          " store i32 %b    ; i32\n"
-          " load i32 %b    ; i32\n"
-          " load i32 %a    ; i32\n"
-          " const i32 0    ; 0\n"
+          " const i32 -1\n"
+          " store i32 %b\n"
+          " load i32 %b\n"
+          " load i32 %a\n"
+          " const i32 0\n"
           " invoke_dynamic\n"
-          " ret i32    ; i32\n"
+          " ret i32\n"
           "}\n"
-          "define i32 @g(i32 %a, i32 %b) {    ; i32 (i32, i32)\n"
+          "define i32 @g(i32 %a, i32 %b) {\n"
           "entry:\n"
-          " load i32 %a    ; i32\n"
-          " load i32 %b    ; i32\n"
-          " mul i32    ; i32\n"
-          " ret i32    ; i32\n"
+          " load i32 %a\n"
+          " load i32 %b\n"
+          " mul i32\n"
+          " ret i32\n"
           "}");
     }
 }
@@ -1015,6 +1134,8 @@ TEST(codegen, strings)
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx(sema_env, const_env, lowering_ctx);
 
+        co_ctx.push_scope(std::nullopt, {0, 0});
+
         /*
          * fn f() -> str
          * {
@@ -1024,8 +1145,7 @@ TEST(codegen, strings)
 
         auto* fn_f = codegen_ctx.create_function(
           "f",
-          std::make_unique<cg::value>(
-            cg::type{mock_str_type, cg::type_kind::str}),
+          cg::type{mock_str_type, cg::type_kind::str},
           {});
         ASSERT_NE(fn_f, nullptr);
         EXPECT_EQ(fn_f->get_name(), "f");
@@ -1040,7 +1160,7 @@ TEST(codegen, strings)
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
         EXPECT_EQ(block->get_inserting_context(), &codegen_ctx);
 
-        const sema::scope_id mock_scope_id = co_ctx.push_scope(
+        co_ctx.push_scope(
           std::nullopt,
           {0, 0});
 

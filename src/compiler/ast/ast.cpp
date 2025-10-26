@@ -1198,14 +1198,14 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
             ctx.generate_const({cg::type_kind::i32}, std::get<int>(const_info->value));
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::i32},
-              name.s);
+              symbol_id.value());
         }
         else if(const_info->type == const_::constant_type::f32)
         {
             ctx.generate_const({cg::type_kind::f32}, std::get<float>(const_info->value));
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::f32},
-              name.s);
+              symbol_id.value());
         }
         else if(const_info->type == const_::constant_type::str)
         {
@@ -1216,7 +1216,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
 
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::str},
-              name.s);
+              symbol_id.value());
         }
 
         // unsupported type.
@@ -1236,7 +1236,9 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
             {
                 ctx.generate_load(
                   cg::variable_argument{
-                    std::make_unique<cg::value>(type, name.s)});
+                    std::make_unique<cg::value>(
+                      type,
+                      symbol_id.value())});
             }
             else
             {
@@ -1244,7 +1246,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
                   cg::variable_argument{
                     std::make_unique<cg::value>(
                       ctx.lower(array_type.value()),
-                      name.s)});
+                      symbol_id.value())});
 
                 element_expr->generate_code(ctx, memory_context::load);
                 ctx.generate_load_element(
@@ -1259,7 +1261,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
                   cg::variable_argument{
                     std::make_unique<cg::value>(
                       ctx.lower(array_type.value()),
-                      name.s)});
+                      symbol_id.value())});
                 element_expr->generate_code(ctx, memory_context::load);
 
                 // if we're storing an element, generation of the store opcode needs to be deferred to the caller.
@@ -1270,11 +1272,11 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
                   cg::variable_argument{
                     std::make_unique<cg::value>(
                       type,
-                      name.s)});
+                      symbol_id.value())});
             }
         }
 
-        return std::make_unique<cg::value>(type, name.s);
+        return std::make_unique<cg::value>(type, symbol_id.value());
     }
     default:
         // fall-through.
@@ -1514,23 +1516,26 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
             "Invalid memory context for variable declaration."));
     }
 
-    // TODO This needs to be replaced by sema env lookups.
-    cg::scope* s = ctx.get_scope();
-    if(s == nullptr)
+    if(!symbol_id.has_value())
     {
-        throw cg::codegen_error(
-          loc,
+        throw ty::type_error(
+          name.location,
           std::format(
-            "No scope available for adding locals."));
+            "Variable '{}' has no symbol id.",
+            name.s));
     }
 
+    auto lowered_type = ctx.lower(type->get_type());
     std::unique_ptr<cg::value> v = std::make_unique<cg::value>(
-      ctx.lower(type->get_type()), name.s);
+      lowered_type, symbol_id.value());
 
-    // TODO This needs to be replaced by sema env lookups.
-    s->add_local(
-      name.location,
-      std::make_unique<cg::value>(*v));
+    auto* fn = ctx.get_current_function();
+    if(fn != nullptr)
+    {
+        fn->add_local(
+          symbol_id.value(),
+          lowered_type);
+    }
 
     if(is_array())
     {
@@ -3764,43 +3769,28 @@ std::unique_ptr<cg::value> function_expression::generate_code(
 
         std::vector<
           std::pair<
-            source_location,
-            std::unique_ptr<cg::value>>>
+            sema::symbol_id,
+            cg::type>>
           args =
             prototype->get_arg_infos()
             | std::views::transform(
-              [this, &ctx, &symbol_table](const std::pair<sema::symbol_id, ty::type_id>& p)
-                -> std::pair<source_location, std::unique_ptr<cg::value>>
+              [&ctx, &symbol_table](const std::pair<sema::symbol_id, ty::type_id>& p)
+                -> std::pair<sema::symbol_id, cg::type>
               {
-                  auto it = symbol_table.find(std::get<0>(p));
-                  if(it == symbol_table.end())
-                  {
-                      throw cg::codegen_error(
-                        loc,
-                        std::format(
-                          "{}: Argument not found in symbol table (symbol id: {}).",
-                          prototype->get_name().s,
-                          std::get<0>(p).value));
-                  }
-
                   return std::make_pair(
-                    it->second.loc,
-                    std::make_unique<cg::value>(
-                      ctx.lower(std::get<1>(p)),
-                      it->second.name));
+                    std::get<0>(p),
+                    ctx.lower(std::get<1>(p)));
               })
             | std::ranges::to<std::vector>();
 
-        std::unique_ptr<cg::value> ret = std::make_unique<cg::value>(
-          ctx.lower(prototype->get_return_type_id()));
+        auto ret_type = ctx.lower(prototype->get_return_type_id());
 
         cg::function* fn = ctx.create_function(
           prototype->get_name().s,
-          std::move(ret),
+          ret_type,
           std::move(args));
 
         cg::function_guard fg{ctx, fn};
-        cg::scope_guard sg{ctx, fn->get_scope()};
 
         cg::basic_block* bb = cg::basic_block::create(ctx, "entry");
         fn->append_basic_block(bb);
@@ -3897,36 +3887,26 @@ std::unique_ptr<cg::value> function_expression::generate_code(
 
         std::vector<
           std::pair<
-            source_location,
-            std::unique_ptr<cg::value>>>
+            sema::symbol_id,
+            cg::type>>
           args =
             prototype->get_arg_infos()
             | std::views::transform(
-              [this, &ctx](const std::pair<sema::symbol_id, ty::type_id>& p) -> std::pair<source_location, std::unique_ptr<cg::value>>
+              [&ctx](const std::pair<sema::symbol_id, ty::type_id>& p)
+                -> std::pair<sema::symbol_id, cg::type>
               {
-                  auto sym_it = ctx.get_sema_env().symbol_table.find(p.first);
-                  if(sym_it == ctx.get_sema_env().symbol_table.end())
-                  {
-                      throw cg::codegen_error(
-                        get_location(),
-                        std::format(
-                          "{}: Could not get symbol info for native function argument.",
-                          prototype->get_name().s));
-                  }
-
                   return std::make_pair(
-                    sym_it->second.loc,
-                    std::make_unique<cg::value>(ctx.lower(p.second)));
+                    std::get<0>(p),
+                    ctx.lower(p.second));
               })
             | std::ranges::to<std::vector>();
 
-        std::unique_ptr<cg::value> ret = std::make_unique<cg::value>(
-          ctx.lower(prototype->get_return_type_id()));
+        auto ret_type = ctx.lower(prototype->get_return_type_id());
 
         ctx.create_native_function(
           lib_name,
           prototype->get_name().s,
-          std::move(ret),
+          ret_type,
           std::move(args));
     }
 

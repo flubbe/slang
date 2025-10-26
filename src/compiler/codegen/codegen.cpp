@@ -144,20 +144,21 @@ std::string type::to_string([[maybe_unused]] const name_resolver* resolver) cons
 std::string value::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
     // named values.
-    if(name.has_value())
+    if(symbol_id.has_value())
     {
-        // resolve front-end type, if possible.
         if(ty.get_type_id().has_value()
            && resolver != nullptr)
         {
             return std::format(
-              "{} %{}    ; {}",
+              "{} %{}",
               ty.to_string(),
-              name.value(),
-              resolver->type_name(ty.get_type_id().value()));
+              resolver->symbol_name(symbol_id.value()));
         }
 
-        return std::format("{} %{}", ty.to_string(), name.value());
+        return std::format(
+          "{} %{}",
+          ty.to_string(),
+          symbol_id.value().value);
     }
 
     // resolve front-end type, if possible.
@@ -165,9 +166,8 @@ std::string value::to_string([[maybe_unused]] const name_resolver* resolver) con
        && resolver != nullptr)
     {
         return std::format(
-          "{}    ; {}",
-          ty.to_string(),
-          resolver->type_name(ty.get_type_id().value()));
+          "{}",
+          ty.to_string());
     }
 
     return std::format("{}", ty.to_string());
@@ -183,13 +183,6 @@ std::string const_argument::to_string(const name_resolver* resolver) const
 
     if(kind == type_kind::i32)
     {
-        if(resolver)
-        {
-            return std::format(
-              "{}",
-              static_cast<constant_i32*>(v.get())->get_int());
-        }
-
         return std::format(
           "i32 {}",
           static_cast<constant_i32*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -197,13 +190,6 @@ std::string const_argument::to_string(const name_resolver* resolver) const
 
     if(kind == type_kind::f32)
     {
-        if(resolver)
-        {
-            return std::format(
-              "{}",
-              static_cast<constant_f32*>(v.get())->get_float());
-        }
-
         return std::format(
           "f32 {}",
           static_cast<constant_f32*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -214,29 +200,9 @@ std::string const_argument::to_string(const name_resolver* resolver) const
         const auto* v_ptr = static_cast<const constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         std::string s = v_ptr->to_string();
 
-        if(resolver == nullptr)
-        {
-            return std::format(
-              "str {}",
-              s);
-        }
-
-        // resolve the string to its value and truncate after 10 characters.
-        std::string resolved_s = resolver->constant(v_ptr->get_id());
-
-        // TODO Handle escape sequences in the string.
-
-        // We get a possibly longer string from the resolver.
-        if(resolved_s.length() > 10)    // NOLINT(readability-magic-numbers)
-        {
-            resolved_s = std::format(
-              "{}...",
-              resolved_s.substr(0, 10));    // NOLINT(readability-magic-numbers)
-        }
-
         return std::format(
-          "{}",
-          resolved_s);
+          "str {}",
+          s);
     }
 
     throw codegen_error(std::format("Unrecognized const_argument type."));
@@ -254,25 +220,9 @@ std::string instruction::to_string(const name_resolver* resolver) const
         buf = " ";
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
-            buf += args[i]->to_string() + ", ";
+            buf += args[i]->to_string(resolver) + ", ";
         }
-        buf += args.back()->to_string();
-
-        if(resolver != nullptr)
-        {
-            std::string resolved_args;
-
-            for(std::size_t i = 0; i < args.size() - 1; ++i)
-            {
-                resolved_args += args[i]->to_string(resolver) + ", ";
-            }
-            resolved_args += args.back()->to_string(resolver);
-
-            if(!resolved_args.empty())
-            {
-                buf += std::format("    ; {}", resolved_args);
-            }
-        }
+        buf += args.back()->to_string(resolver);
     }
     return std::format("{}{}", name, buf);
 }
@@ -313,148 +263,29 @@ bool basic_block::is_valid() const
 }
 
 /*
- * scope.
+ * function.
  */
 
-bool scope::contains(const std::string& name) const
+void function::add_local(
+  sema::symbol_id id,
+  type ty)
 {
-    if(std::ranges::find_if(
-         args,
-         [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
-         {
-             if(!v.second->has_name())
-             {
-                 throw codegen_error("Scope contains unnamed value.");
-             }
-
-             return *v.second->get_name() == name;
-         })
-       != args.cend())
-    {
-        return true;
-    }
-
     if(std::ranges::find_if(
          locals,
-         [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
+         [id](const auto& p) -> bool
          {
-             if(!v.second->has_name())
-             {
-                 throw codegen_error("Scope contains unnamed value.");
-             }
-
-             return *v.second->get_name() == name;
+             return p.first == id;
          })
-       != locals.cend())
-    {
-        return true;
-    }
-
-    return false;
-}
-
-value* scope::get_value(const std::string& name)
-{
-    auto it = std::ranges::find_if(
-      args,
-      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
-      {
-          if(!v.second->has_name())
-          {
-              throw codegen_error("Scope contains unnamed value.");
-          }
-
-          return *v.second->get_name() == name;
-      });
-    if(it != args.end())
-    {
-        return it->second.get();
-    }
-
-    it = std::ranges::find_if(
-      locals,
-      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
-      {
-          if(!v.second->has_name())
-          {
-              throw codegen_error("Scope contains unnamed value.");
-          }
-
-          return *v.second->get_name() == name;
-      });
-
-    if(it != locals.end())
-    {
-        return it->second.get();
-    }
-
-    return nullptr;
-}
-
-std::size_t scope::get_index(const std::string& name) const
-{
-    auto it = std::ranges::find_if(
-      args,
-      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
-      {
-          if(!v.second->has_name())
-          {
-              throw codegen_error("Scope contains unnamed value.");
-          }
-
-          return *v.second->get_name() == name;
-      });
-    if(it != args.cend())
-    {
-        return std::distance(args.cbegin(), it);
-    }
-
-    it = std::ranges::find_if(
-      locals,
-      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
-      {
-          if(!v.second->has_name())
-          {
-              throw codegen_error("Scope contains unnamed value.");
-          }
-
-          return *v.second->get_name() == name;
-      });
-
-    if(it != locals.cend())
-    {
-        return args.size() + std::distance(locals.cbegin(), it);
-    }
-
-    throw codegen_error(std::format("Name '{}' not found in scope.", name));
-}
-
-void scope::add_local(
-  source_location loc,
-  std::unique_ptr<value> arg)
-{
-    if(!arg->has_name())
-    {
-        throw codegen_error("Cannot add unnamed argument to scope.");
-    }
-
-    if(contains(arg->get_name().value()))    // NOLINT(bugprone-unchecked-optional-access)
+       != locals.end())
     {
         throw codegen_error(
           std::format(
-            "{}: Name '{}' already contained in scope.",
-            slang::to_string(loc),
-            arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
+            "{}: Cannot add local to function: Symbol already exists.",
+            get_name()));
     }
-    locals.emplace_back(
-      std::make_pair(
-        loc,
-        std::move(arg)));
-}
 
-/*
- * function.
- */
+    locals.emplace_back(id, ty);
+}
 
 basic_block* function::remove_basic_block(const std::string& label)
 {
@@ -480,6 +311,37 @@ basic_block* function::remove_basic_block(const std::string& label)
     return bb;
 }
 
+std::size_t function::get_index(sema::symbol_id id) const
+{
+    auto it = std::ranges::find_if(
+      args,
+      [id](const auto& p) -> bool
+      {
+          return p.first == id;
+      });
+    if(it != args.cend())
+    {
+        return std::distance(args.begin(), it);
+    }
+
+    it = std::ranges::find_if(
+      locals,
+      [id](const auto& p) -> bool
+      {
+          return p.first == id;
+      });
+    if(it != locals.cend())
+    {
+        return args.size() + std::distance(locals.begin(), it);
+    }
+
+    throw codegen_error(
+      std::format(
+        "{}: Symbol with id '{}' not found in arguments or locals.",
+        get_name(),
+        id.value));
+}
+
 std::string function::to_string(const name_resolver* resolver) const
 {
     std::string buf;
@@ -488,29 +350,41 @@ std::string function::to_string(const name_resolver* resolver) const
         buf = std::format(
           "native ({}) {} @{}(",
           import_library,
-          return_type->to_string(),
+          return_type.to_string(),
           name);
     }
     else
     {
         buf = std::format(
           "define {} @{}(",
-          return_type->to_string(),
+          return_type.to_string(),
           name);
     }
 
-    const auto& args = scope.get_args();
+    auto symbol_id_to_name = [resolver](sema::symbol_id id) -> std::string
+    {
+        if(resolver)
+        {
+            return std::format("%{}", resolver->symbol_name(id));
+        }
+
+        return std::format("%{}", id.value);
+    };
+
     if(!args.empty())
     {
         for(std::size_t i = 0; i < args.size() - 1; ++i)
         {
             buf += std::format(
-              "{}, ",
-              args[i].second->to_string());    // no resolver; only print lowered type.
+              "{} {}, ",
+              args[i].second.to_string(),    // no resolver; only print lowered type.
+              symbol_id_to_name(args[i].first));
         }
+
         buf += std::format(
-          "{})",
-          args.back().second->to_string());    // no resolver; only print lowered type.
+          "{} {})",
+          args.back().second.to_string(),    // no resolver; only print lowered type.
+          symbol_id_to_name(args.back().first));
     }
     else
     {
@@ -519,44 +393,14 @@ std::string function::to_string(const name_resolver* resolver) const
 
     if(!native)
     {
-        bool all_type_ids_exist = return_type->get_type().get_type_id().has_value();
-        for(const auto& arg: args)
-        {
-            all_type_ids_exist &= arg.second->get_type().get_type_id().has_value();
-        }
+        buf += " {\n";
 
-        if(resolver != nullptr
-           && all_type_ids_exist)
+        for(const auto& v: locals)
         {
             buf += std::format(
-              " {{    ; {} (",
-              resolver->type_name(return_type->get_type().get_type_id().value()));
-
-            if(!args.empty())
-            {
-                for(std::size_t i = 0; i < args.size() - 1; ++i)
-                {
-                    buf += std::format(
-                      "{}, ",
-                      resolver->type_name(args[i].second->get_type().get_type_id().value()));
-                }
-                buf += std::format(
-                  "{}",
-                  resolver->type_name(args.back().second->get_type().get_type_id().value()));
-            }
-
-            buf += ")\n";
-        }
-        else
-        {
-            buf += " {\n";
-        }
-
-        for(const auto& [_, v]: scope.get_locals())
-        {
-            buf += std::format(
-              "local {}\n",
-              v->to_string(resolver));
+              "local {} {}\n",
+              v.second.to_string(),    // no resolver; only print lowered type.
+              symbol_id_to_name(v.first));
         }
         for(const auto& b: instr_blocks)
         {
@@ -679,11 +523,11 @@ std::optional<constant_table_entry> context::get_constant(
 
 function* context::create_function(
   std::string name,
-  std::unique_ptr<value> return_type,
+  type return_type,
   std::vector<
     std::pair<
-      source_location,
-      std::unique_ptr<value>>>
+      sema::symbol_id,
+      type>>
     args)
 {
     if(std::ranges::find_if(
@@ -708,11 +552,11 @@ function* context::create_function(
 void context::create_native_function(
   std::string lib_name,
   std::string name,
-  std::unique_ptr<value> return_type,
+  type return_type,
   std::vector<
     std::pair<
-      source_location,
-      std::unique_ptr<value>>>
+      sema::symbol_id,
+      type>>
     args)
 {
     if(std::ranges::find_if(

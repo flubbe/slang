@@ -15,8 +15,6 @@
 #include "ast.h"
 #include "utils.h"
 
-#include <print>
-
 namespace slang::ast
 {
 
@@ -206,8 +204,6 @@ void struct_anonymous_initializer_expression::resolve_names(rs::context& ctx)
 
 void named_initializer::resolve_names(rs::context& ctx)
 {
-    std::print("qualified name: {}\n", get_qualified_name());
-    std::print("expr: {}\n", expr->to_string());
     expr->resolve_names(ctx);
 }
 
@@ -223,8 +219,6 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
           name.location,
           "No scope information available.");
     }
-
-    std::print("struct_named_initializer_expression qualified name: {}\n", get_qualified_name());
 
     const std::string qualified_name = get_qualified_name();
 

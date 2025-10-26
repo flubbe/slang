@@ -88,7 +88,7 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     EXPECT_EQ(codegen_ctx.to_string(),
               R"(define i32 @f() {
-local i32 %i
+local i32 %1
 entry:
  const i32 12
  ret i32

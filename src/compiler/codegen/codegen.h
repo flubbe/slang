@@ -133,12 +133,8 @@ class value
     /** The value's type */
     type ty;
 
-    /**
-     * An optional name for the value.
-     *
-     * FIXME needed by class `scope`, should be replaced by a symbol id.
-     */
-    std::optional<std::string> name;
+    /** An optional symbol id for the value. */
+    std::optional<sema::symbol_id> symbol_id;
 
 public:
     /** Default constructors. */
@@ -157,11 +153,11 @@ public:
      * Construct a value.
      *
      * @param type The value type.
-     * @param name Optional name for this value.
+     * @param symbol_id Optional name for this value.
      */
-    value(type ty, std::optional<std::string> name = std::nullopt)
-    : ty{std::move(ty)}
-    , name{std::move(name)}
+    value(type ty, std::optional<sema::symbol_id> symbol_id = std::nullopt)
+    : ty{ty}
+    , symbol_id{symbol_id}
     {
     }
 
@@ -169,7 +165,7 @@ public:
     [[nodiscard]]
     value copy_type() const
     {
-        return {ty, name};
+        return {ty, symbol_id};
     }
 
     /**
@@ -188,18 +184,18 @@ public:
         return ty;
     }
 
-    /** Get the value's name. */
+    /** Get the value's symbol id. */
     [[nodiscard]]
-    const std::optional<std::string>& get_name() const
+    const std::optional<sema::symbol_id>& get_symbol_id() const
     {
-        return name;
+        return symbol_id;
     }
 
-    /** Return whether the value has a name. */
+    /** Return whether the value has a symbol id. */
     [[nodiscard]]
-    bool has_name() const
+    bool has_symbol_id() const
     {
-        return name.has_value();
+        return symbol_id.has_value();
     }
 };
 
@@ -219,14 +215,14 @@ public:
      * Construct a constant integer.
      *
      * @param i The integer.
-     * @param name An optional name.
+     * @param id An optional symbol id.
      */
     constant_i32(
       int i,
-      std::optional<std::string> name = std::nullopt)
+      std::optional<sema::symbol_id> id = std::nullopt)
     : value{
         type{type_kind::i32},
-        std::move(name)}
+        id}
     , i{i}
     {
     }
@@ -262,14 +258,14 @@ public:
      * Construct a constant float.
      *
      * @param f The float.
-     * @param name An optional name.
+     * @param id An optional symbol id.
      */
     constant_f32(
       float f,
-      std::optional<std::string> name = std::nullopt)
+      std::optional<sema::symbol_id> id = std::nullopt)
     : value{
         type{type_kind::f32},
-        std::move(name)}
+        id}
     , f{f}
     {
     }
@@ -293,7 +289,7 @@ public:
 class constant_str : public value
 {
     /** The string id. */
-    const_::constant_id id;
+    const_::constant_id const_id;
 
 public:
     /** Default constructors. */
@@ -304,16 +300,16 @@ public:
     /**
      * Construct a constant string value.
      *
-     * @param id The string id.
-     * @param name An optional name.
+     * @param const_id The string id.
+     * @param sym_id An optional symbol id.
      */
     constant_str(
-      const_::constant_id id,
-      std::optional<std::string> name = std::nullopt)
+      const_::constant_id const_id,
+      std::optional<sema::symbol_id> sym_id = std::nullopt)
     : value{
         type{type_kind::str},
-        std::move(name)}
-    , id{id}
+        sym_id}
+    , const_id{const_id}
     {
     }
 
@@ -328,14 +324,14 @@ public:
     [[nodiscard]]
     std::string to_string() const
     {
-        return std::format("@{}", id);
+        return std::format("@{}", const_id);
     }
 
     /** Return the string id. */
     [[nodiscard]]
-    const_::constant_id get_id() const
+    const_::constant_id get_constant_id() const
     {
-        return id;
+        return const_id;
     }
 };
 
@@ -383,12 +379,12 @@ public:
      * Create a constant argument holding an `i32`.
      *
      * @param i The value to hold.
-     * @param name An optional name.
+     * @param id An optional symbol id.
      */
     const_argument(
       int i,
-      std::optional<std::string> name)
-    : v{std::make_unique<constant_i32>(i, std::move(name))}
+      std::optional<sema::symbol_id> id)
+    : v{std::make_unique<constant_i32>(i, id)}
     {
     }
 
@@ -396,12 +392,12 @@ public:
      * Create a constant argument holding an `f32`.
      *
      * @param f The value to hold.
-     * @param name An optional name.
+     * @param name An optional symbol id.
      */
     const_argument(
       float f,
-      std::optional<std::string> name)
-    : v{std::make_unique<constant_f32>(f, std::move(name))}
+      std::optional<sema::symbol_id> id)
+    : v{std::make_unique<constant_f32>(f, id)}
     {
     }
 
@@ -409,12 +405,12 @@ public:
      * Create a constant argument holding a `str`.
      *
      * @param s Constant id for the string.
-     * @param name An optional name.
+     * @param name An optional symbol id.
      */
     const_argument(
       const_::constant_id s,
-      std::optional<std::string> name)
-    : v{std::make_unique<constant_str>(s, std::move(name))}
+      std::optional<sema::symbol_id> id)
+    : v{std::make_unique<constant_str>(s, id)}
     {
     }
 
@@ -581,14 +577,7 @@ public:
     [[nodiscard]]
     std::string to_string(const name_resolver* resolver = nullptr) const override
     {
-        if(resolver)
-        {
-            return std::format(
-              "{}",
-              resolver->type_name(var->get_type().get_type_id().value()));
-        }
-
-        return var->to_string();
+        return var->to_string(resolver);
     }
 
     [[nodiscard]]
@@ -671,7 +660,9 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      [[maybe_unused]] const name_resolver* resolver = nullptr)
+      const override
     {
         return ::slang::to_string(value);
     }
@@ -759,11 +750,6 @@ public:
     [[nodiscard]]
     std::string to_string([[maybe_unused]] const name_resolver* resolver = nullptr) const override
     {
-        if(resolver)
-        {
-            return {};
-        }
-
         return std::format("{}", ::slang::codegen::to_string(cast));
     }
 
@@ -1077,197 +1063,6 @@ public:
 };
 
 /**
- * A scope has a name and holds variables.
- */
-class scope
-{
-    /** The scope's name. */
-    std::string name;
-
-    /** Reference to the outer scope (if any). */
-    scope* outer{nullptr};
-
-    /** Arguments for function scopes. */
-    std::vector<
-      std::pair<
-        source_location,
-        std::unique_ptr<value>>>
-      args;
-
-    /** Variables inside the scope. */
-    std::vector<
-      std::pair<source_location,
-                std::unique_ptr<value>>>
-      locals;
-
-public:
-    /** Constructors. */
-    scope() = default;
-    scope(const scope&) = delete;
-    scope(scope&&) = default;
-
-    /** Destructor. */
-    ~scope() = default;
-
-    /** Assignments. */
-    scope& operator=(const scope&) = delete;
-    scope& operator=(scope&&) = default;
-
-    /**
-     * Create a scope from a name (e.g. "<global>").
-     *
-     * @param name The scope's name.
-     */
-    explicit scope(std::string name)
-    : name{std::move(name)}
-    {
-    }
-
-    /**
-     * Create a scope and initialize it with function arguments.
-     *
-     * @param name The scope's name (usually the same as the function's name)
-     * @param args The function's arguments.
-     */
-    scope(
-      std::string name,
-      std::vector<
-        std::pair<
-          source_location,
-          std::unique_ptr<value>>>
-        args)
-    : name{std::move(name)}
-    , args{std::move(args)}
-    {
-    }
-
-    /**
-     * Check if the name is already contained in this scope as an argument or a local variable.
-     *
-     * @returns True if the name exists.
-     * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
-     */
-    [[nodiscard]]
-    bool contains(const std::string& name) const;
-
-    /**
-     * Get the variable for the given name.
-     *
-     * @param name The variable's name.
-     * @returns The variable or nullptr.
-     * @throws Throws a `codegen_error` if an unnamed value is found within the scope.
-     */
-    [[nodiscard]]
-    value* get_value(const std::string& name);
-
-    /**
-     * Get the index on argument or a local. Indices are with respect to
-     * the list `[arg1, ... argN, local1, ... localM]`.
-     *
-     * Indices are not constant during code generation. They are constant
-     * during instruction emission.
-     *
-     * @param name Name or the local or the argument.
-     * @throws A `codegen_error` the the name could not be found.
-     */
-    [[nodiscard]]
-    std::size_t get_index(const std::string& name) const;
-
-    /**
-     * Add a local variable.
-     *
-     * @param loc The local's source location.
-     * @param arg The variable.
-     * @throws Throws a `codegen_error` if the supplied local has no name or if the
-     *         scope already has an object with the same name.
-     */
-    void add_local(
-      source_location loc,
-      std::unique_ptr<value> arg);
-
-    /** Get the arguments for this scope. */
-    [[nodiscard]]
-    const std::vector<
-      std::pair<
-        source_location,
-        std::unique_ptr<value>>>& get_args() const
-    {
-        return args;
-    }
-
-    /** Get the locals for this scope. */
-    [[nodiscard]]
-    const std::vector<
-      std::pair<
-        source_location,
-        std::unique_ptr<value>>>& get_locals() const
-    {
-        return locals;
-    }
-
-    /** Get the outer scope. */
-    [[nodiscard]]
-    auto get_outer(this auto&& self)
-    {
-        return self.outer;
-    }
-
-    /**
-     * Get a string representation of the scope.
-     *
-     * @param resolver Optional name resolver.
-     * @returns Returns a string representation of the scope.
-     */
-    [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const
-    {
-        if(outer)
-        {
-            return name::qualified_name(
-              outer->to_string(resolver),
-              name);
-        }
-
-        return name;
-    }
-};
-
-/**
- * A scope guard that automatically gets called when the scope is exited.
- */
-class scope_guard
-{
-    /** The associated context. */
-    context& ctx;
-
-    /** The scope. */
-    scope* s;
-
-public:
-    /** No default constructor. */
-    scope_guard() = delete;
-
-    /** Deleted copy and move constructors. */
-    scope_guard(const scope_guard&) = delete;
-    scope_guard(scope_guard&&) = delete;
-
-    /**
-     * Construct a scope guard.
-     *
-     * @param ctx The associated context.
-     * @param s The scope.
-     */
-    scope_guard(context& ctx, scope* s);
-
-    /** Destructor. */
-    ~scope_guard();
-
-    /** Deleted assignments.*/
-    scope_guard& operator=(const scope_guard&) = delete;
-    scope_guard& operator=(scope_guard&&) = delete;
-};
-
-/**
  * A guard that signals function entry and exit.
  */
 class function_guard
@@ -1284,10 +1079,10 @@ public:
     function_guard(function_guard&&) = delete;
 
     /**
-     * Construct a scope guard.
+     * Construct a function guard.
      *
      * @param ctx The associated context.
-     * @param s The scope.
+     * @param fn The function.
      */
     function_guard(context& ctx, class function* fn);
 
@@ -1312,10 +1107,21 @@ class function
     std::string import_library;
 
     /** The function's return type. */
-    std::unique_ptr<value> return_type;
+    type return_type;
 
-    /** The function variable scope. */
-    slang::codegen::scope scope;
+    /** The function's arguments. */
+    std::vector<
+      std::pair<
+        sema::symbol_id,
+        type>>
+      args;
+
+    /** Locals. */
+    std::vector<
+      std::pair<
+        sema::symbol_id,
+        type>>
+      locals;
 
     /** Function instructions. */
     std::list<basic_block*> instr_blocks;
@@ -1335,16 +1141,16 @@ public:
      */
     function(
       std::string name,
-      std::unique_ptr<value> return_type,
+      type return_type,
       std::vector<
         std::pair<
-          source_location,
-          std::unique_ptr<value>>>
+          sema::symbol_id,
+          type>>
         args)
     : name{name}
     , native{false}
     , return_type{std::move(return_type)}
-    , scope{std::move(name), std::move(args)}
+    , args{std::move(args)}
     {
     }
 
@@ -1359,17 +1165,17 @@ public:
     function(
       std::string import_library,
       std::string name,
-      std::unique_ptr<value> return_type,
+      type return_type,
       std::vector<
         std::pair<
-          source_location,
-          std::unique_ptr<value>>>
+          sema::symbol_id,
+          type>>
         args)
     : name{name}
     , native{true}
     , import_library{import_library}
     , return_type{std::move(return_type)}
-    , scope{std::move(name), std::move(args)}
+    , args{std::move(args)}
     {
     }
 
@@ -1386,6 +1192,16 @@ public:
     {
         return name;
     }
+
+    /**
+     * Add a local variable.
+     *
+     * @param id The local's symbol id.
+     * @param ty The local's type.
+     */
+    void add_local(
+      sema::symbol_id id,
+      type ty);
 
     /**
      * Append an instruction block.
@@ -1417,26 +1233,19 @@ public:
         return !instr_blocks.empty() && instr_blocks.back()->ends_with_return();
     }
 
-    /** Get the function's scope. */
-    [[nodiscard]]
-    auto get_scope(this auto&& self)
-    {
-        return &self.scope;
-    }
-
     /** Returns the function's signature as a pair `(return_type, arg_types)`. */
     [[nodiscard]]
     std::pair<type, std::vector<type>> get_signature() const
     {
         std::vector<type> arg_types =
-          scope.get_args()
+          args
           | std::views::transform(
             [](const auto& arg) -> type
             {
-                return arg.second->get_type();
+                return arg.second;
             })
           | std::ranges::to<std::vector>();
-        return {return_type->get_type(), std::move(arg_types)};
+        return {return_type, std::move(arg_types)};
     }
 
     /** Return whether this is a native function. */
@@ -1466,6 +1275,37 @@ public:
 
         return import_library;
     }
+
+    /** Return the function's arguments. */
+    [[nodiscard]]
+    const std::vector<
+      std::pair<
+        sema::symbol_id,
+        type>>
+      get_args() const
+    {
+        return args;
+    }
+
+    /** Return the function's locals. */
+    [[nodiscard]]
+    const std::vector<
+      std::pair<
+        sema::symbol_id,
+        type>>
+      get_locals() const
+    {
+        return locals;
+    }
+
+    /**
+     * Return the index of an argument or local.
+     *
+     * @param id The symbol id of the argument or local.
+     * @returns Returns the index.
+     * @throws Throws a `codegen_error` if the given symbol id was not found.
+     */
+    std::size_t get_index(sema::symbol_id id) const;
 
     /**
      * Return the basic blocks.
@@ -1618,18 +1458,6 @@ class context
     /** Type lowering context. */
     tl::context& lowering_ctx;
 
-    /** Global scope. */
-    std::unique_ptr<scope> global_scope{std::make_unique<scope>("<global>")};
-
-    /** The current scope stack. */
-    std::vector<scope*> current_scopes;
-
-    /** Scope name stack for name resolution. */
-    std::vector<std::string> resolution_scopes;
-
-    /** Struct stack for access resolution. */
-    std::vector<type> struct_access;
-
     /** List of functions. */
     std::vector<std::unique_ptr<function>> funcs;
 
@@ -1698,7 +1526,15 @@ public:
     /** Destructor. */
     ~context()
     {
-        set_insertion_point(nullptr);
+        try
+        {
+            // FIXME This could throw a `codegen_error`.
+            set_insertion_point(nullptr);
+        }
+        catch(const codegen_error&)
+        {
+            /* ignore */
+        }
     }
 
     /** Assignments. */
@@ -1797,11 +1633,12 @@ public:
     [[nodiscard]]
     function* create_function(
       std::string name,
-      std::unique_ptr<value> return_type,
+      type return_type,
       std::vector<
         std::pair<
-          source_location,
-          std::unique_ptr<value>>> args);
+          sema::symbol_id,
+          type>>
+        args);
 
     /**
      * Add a function with a native implementation in a library.
@@ -1816,11 +1653,11 @@ public:
     void create_native_function(
       std::string lib_name,
       std::string name,
-      std::unique_ptr<value> return_type,
+      type return_type,
       std::vector<
         std::pair<
-          source_location,
-          std::unique_ptr<value>>>
+          sema::symbol_id,
+          type>>
         args);
 
     /** Generate a unique macro invocation id. */
@@ -1849,62 +1686,6 @@ public:
             throw codegen_error("Invalid insertion point.");
         }
         return insertion_point;
-    }
-
-    /**
-     * Enter a new scope.
-     *
-     * @param s The new scope.
-     */
-    void enter_scope(scope* s)
-    {
-        current_scopes.push_back(s);
-    }
-
-    /**
-     * Exit a scope.
-     *
-     * @param s The scope to leave. Has to be the last entered scope.
-     */
-    void exit_scope(scope* s)
-    {
-        if(current_scopes.empty())
-        {
-            throw codegen_error("No scope to leave.");
-        }
-
-        if(current_scopes.back() != s)
-        {
-            throw codegen_error("Tried exiting wrong scope.");
-        }
-
-        current_scopes.pop_back();
-    }
-
-    /** Get the current scope. */
-    [[nodiscard]]
-    auto* get_scope(this auto&& self)
-    {
-        if(!self.current_scopes.empty())
-        {
-            return self.current_scopes.back();
-        }
-
-        return self.global_scope.get();
-    }
-
-    /** Get the global scope. */
-    [[nodiscard]]
-    auto* get_global_scope(this auto&& self)
-    {
-        return self.global_scope.get();
-    }
-
-    /** Return whether a given scope is the global scope. */
-    [[nodiscard]]
-    bool is_global_scope(const scope* s) const
-    {
-        return s == global_scope.get();
     }
 
     /**
@@ -2291,22 +2072,6 @@ inline void basic_block::set_inserting_context(context* ctx)
 inline basic_block* basic_block::create(context& ctx, std::string name)
 {
     return ctx.basic_blocks.emplace_back(new basic_block(name)).get();
-}
-
-/*
- * scope_guard implementation.
- */
-
-inline scope_guard::scope_guard(context& ctx, scope* s)
-: ctx{ctx}
-, s{s}
-{
-    ctx.enter_scope(s);
-}
-
-inline scope_guard::~scope_guard()
-{
-    ctx.exit_scope(s);
 }
 
 /*
