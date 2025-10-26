@@ -52,7 +52,7 @@ std::string to_string(node_identifier node_id)
     case node_identifier::macro_expression_list: return "macro_expression_list";
     case node_identifier::macro_expression: return "macro_expression";
     case node_identifier::format_macro_expression: return "format_macro_expression";
-    default: /* fall-through */
+    default:; /* fall-through */
     }
 
     return "unknown";

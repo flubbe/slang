@@ -126,7 +126,7 @@ public:
             return std::format("{}", std::get<float>(it->second.value));
         case const_::constant_type::str:
             return std::format("{}", std::get<std::string>(it->second.value));
-        default:
+        default:;
             // fall-through.
         }
 

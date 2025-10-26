@@ -1278,7 +1278,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
 
         return std::make_unique<cg::value>(type, symbol_id.value());
     }
-    default:
+    default:;
         // fall-through.
     }
 

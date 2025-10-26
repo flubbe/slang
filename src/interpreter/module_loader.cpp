@@ -62,7 +62,7 @@ static std::size_t get_stack_value_size(stack_value v)
     case stack_value::cat1: return sizeof(std::int32_t);
     case stack_value::cat2: return sizeof(std::int64_t);
     case stack_value::ref: return sizeof(void*);
-    default: /* fall-through */
+    default:; /* fall-through */
     }
 
     throw interpreter_error(
