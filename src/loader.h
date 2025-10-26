@@ -117,6 +117,24 @@ public:
       bool transitive);
 
     /**
+     * Get the module resolver for a given name.
+     *
+     * @param import_name The module's import name.
+     * @returns A reference to the resolved module.
+     * @throws Throws a `resolve_error` if the module does not have a resolver.
+     */
+    const module_::module_resolver& get_resolver(
+      const std::string& import_name) const;
+
+    /**
+     * Resolve a module name.
+     *
+     * @param name The module's name.
+     * @returns Returns the resolved name.
+     */
+    std::string resolve_name(const std::string& name) const;
+
+    /**
      * Resolve macros.
      *
      * @note Macro resolution might lead to additional imports being needed. That is,

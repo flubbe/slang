@@ -25,6 +25,7 @@
 #include "compiler/constant.h"
 #include "compiler/directive.h"
 #include "compiler/lowering.h"
+#include "compiler/name_utils.h"
 #include "compiler/sema.h"
 #include "compiler/type.h"
 #include "shared/module.h"
@@ -1087,10 +1088,17 @@ class scope
     scope* outer{nullptr};
 
     /** Arguments for function scopes. */
-    std::vector<std::unique_ptr<value>> args;
+    std::vector<
+      std::pair<
+        source_location,
+        std::unique_ptr<value>>>
+      args;
 
     /** Variables inside the scope. */
-    std::vector<std::unique_ptr<value>> locals;
+    std::vector<
+      std::pair<source_location,
+                std::unique_ptr<value>>>
+      locals;
 
 public:
     /** Constructors. */
@@ -1121,7 +1129,13 @@ public:
      * @param name The scope's name (usually the same as the function's name)
      * @param args The function's arguments.
      */
-    scope(std::string name, std::vector<std::unique_ptr<value>> args)
+    scope(
+      std::string name,
+      std::vector<
+        std::pair<
+          source_location,
+          std::unique_ptr<value>>>
+        args)
     : name{std::move(name)}
     , args{std::move(args)}
     {
@@ -1162,22 +1176,31 @@ public:
     /**
      * Add a local variable.
      *
+     * @param loc The local's source location.
      * @param arg The variable.
      * @throws Throws a `codegen_error` if the supplied local has no name or if the
      *         scope already has an object with the same name.
      */
-    void add_local(std::unique_ptr<value> arg);
+    void add_local(
+      source_location loc,
+      std::unique_ptr<value> arg);
 
     /** Get the arguments for this scope. */
     [[nodiscard]]
-    const std::vector<std::unique_ptr<value>>& get_args() const
+    const std::vector<
+      std::pair<
+        source_location,
+        std::unique_ptr<value>>>& get_args() const
     {
         return args;
     }
 
     /** Get the locals for this scope. */
     [[nodiscard]]
-    const std::vector<std::unique_ptr<value>>& get_locals() const
+    const std::vector<
+      std::pair<
+        source_location,
+        std::unique_ptr<value>>>& get_locals() const
     {
         return locals;
     }
@@ -1200,8 +1223,7 @@ public:
     {
         if(outer)
         {
-            return std::format(
-              "{}::{}",
+            return name::qualified_name(
               outer->to_string(resolver),
               name);
         }
@@ -1314,7 +1336,11 @@ public:
     function(
       std::string name,
       std::unique_ptr<value> return_type,
-      std::vector<std::unique_ptr<value>> args)
+      std::vector<
+        std::pair<
+          source_location,
+          std::unique_ptr<value>>>
+        args)
     : name{name}
     , native{false}
     , return_type{std::move(return_type)}
@@ -1334,7 +1360,11 @@ public:
       std::string import_library,
       std::string name,
       std::unique_ptr<value> return_type,
-      std::vector<std::unique_ptr<value>> args)
+      std::vector<
+        std::pair<
+          source_location,
+          std::unique_ptr<value>>>
+        args)
     : name{name}
     , native{true}
     , import_library{import_library}
@@ -1403,7 +1433,7 @@ public:
           | std::views::transform(
             [](const auto& arg) -> type
             {
-                return arg->get_type();
+                return arg.second->get_type();
             })
           | std::ranges::to<std::vector>();
         return {return_type->get_type(), std::move(arg_types)};
@@ -1768,7 +1798,10 @@ public:
     function* create_function(
       std::string name,
       std::unique_ptr<value> return_type,
-      std::vector<std::unique_ptr<value>> args);
+      std::vector<
+        std::pair<
+          source_location,
+          std::unique_ptr<value>>> args);
 
     /**
      * Add a function with a native implementation in a library.
@@ -1784,7 +1817,11 @@ public:
       std::string lib_name,
       std::string name,
       std::unique_ptr<value> return_type,
-      std::vector<std::unique_ptr<value>> arg);
+      std::vector<
+        std::pair<
+          source_location,
+          std::unique_ptr<value>>>
+        args);
 
     /** Generate a unique macro invocation id. */
     [[nodiscard]]

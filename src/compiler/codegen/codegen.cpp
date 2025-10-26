@@ -320,14 +320,14 @@ bool scope::contains(const std::string& name) const
 {
     if(std::ranges::find_if(
          args,
-         [&name](const std::unique_ptr<value>& v) -> bool
+         [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
          {
-             if(!v->has_name())
+             if(!v.second->has_name())
              {
                  throw codegen_error("Scope contains unnamed value.");
              }
 
-             return *v->get_name() == name;
+             return *v.second->get_name() == name;
          })
        != args.cend())
     {
@@ -336,14 +336,14 @@ bool scope::contains(const std::string& name) const
 
     if(std::ranges::find_if(
          locals,
-         [&name](const std::unique_ptr<value>& v) -> bool
+         [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
          {
-             if(!v->has_name())
+             if(!v.second->has_name())
              {
                  throw codegen_error("Scope contains unnamed value.");
              }
 
-             return *v->get_name() == name;
+             return *v.second->get_name() == name;
          })
        != locals.cend())
     {
@@ -357,35 +357,35 @@ value* scope::get_value(const std::string& name)
 {
     auto it = std::ranges::find_if(
       args,
-      [&name](const std::unique_ptr<value>& v) -> bool
+      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
       {
-          if(!v->has_name())
+          if(!v.second->has_name())
           {
               throw codegen_error("Scope contains unnamed value.");
           }
 
-          return *v->get_name() == name;
+          return *v.second->get_name() == name;
       });
     if(it != args.end())
     {
-        return it->get();
+        return it->second.get();
     }
 
     it = std::ranges::find_if(
       locals,
-      [&name](const std::unique_ptr<value>& v) -> bool
+      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
       {
-          if(!v->has_name())
+          if(!v.second->has_name())
           {
               throw codegen_error("Scope contains unnamed value.");
           }
 
-          return *v->get_name() == name;
+          return *v.second->get_name() == name;
       });
 
     if(it != locals.end())
     {
-        return it->get();
+        return it->second.get();
     }
 
     return nullptr;
@@ -395,14 +395,14 @@ std::size_t scope::get_index(const std::string& name) const
 {
     auto it = std::ranges::find_if(
       args,
-      [&name](const std::unique_ptr<value>& v) -> bool
+      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
       {
-          if(!v->has_name())
+          if(!v.second->has_name())
           {
               throw codegen_error("Scope contains unnamed value.");
           }
 
-          return *v->get_name() == name;
+          return *v.second->get_name() == name;
       });
     if(it != args.cend())
     {
@@ -411,14 +411,14 @@ std::size_t scope::get_index(const std::string& name) const
 
     it = std::ranges::find_if(
       locals,
-      [&name](const std::unique_ptr<value>& v) -> bool
+      [&name](const std::pair<source_location, std::unique_ptr<value>>& v) -> bool
       {
-          if(!v->has_name())
+          if(!v.second->has_name())
           {
               throw codegen_error("Scope contains unnamed value.");
           }
 
-          return *v->get_name() == name;
+          return *v.second->get_name() == name;
       });
 
     if(it != locals.cend())
@@ -429,7 +429,9 @@ std::size_t scope::get_index(const std::string& name) const
     throw codegen_error(std::format("Name '{}' not found in scope.", name));
 }
 
-void scope::add_local(std::unique_ptr<value> arg)
+void scope::add_local(
+  source_location loc,
+  std::unique_ptr<value> arg)
 {
     if(!arg->has_name())
     {
@@ -440,10 +442,14 @@ void scope::add_local(std::unique_ptr<value> arg)
     {
         throw codegen_error(
           std::format(
-            "Name '{}' already contained in scope.",
+            "{}: Name '{}' already contained in scope.",
+            slang::to_string(loc),
             arg->get_name().value()));    // NOLINT(bugprone-unchecked-optional-access)
     }
-    locals.emplace_back(std::move(arg));
+    locals.emplace_back(
+      std::make_pair(
+        loc,
+        std::move(arg)));
 }
 
 /*
@@ -500,11 +506,11 @@ std::string function::to_string(const name_resolver* resolver) const
         {
             buf += std::format(
               "{}, ",
-              args[i]->to_string());    // no resolver; only print lowered type.
+              args[i].second->to_string());    // no resolver; only print lowered type.
         }
         buf += std::format(
           "{})",
-          args.back()->to_string());    // no resolver; only print lowered type.
+          args.back().second->to_string());    // no resolver; only print lowered type.
     }
     else
     {
@@ -516,7 +522,7 @@ std::string function::to_string(const name_resolver* resolver) const
         bool all_type_ids_exist = return_type->get_type().get_type_id().has_value();
         for(const auto& arg: args)
         {
-            all_type_ids_exist &= arg->get_type().get_type_id().has_value();
+            all_type_ids_exist &= arg.second->get_type().get_type_id().has_value();
         }
 
         if(resolver != nullptr
@@ -532,11 +538,11 @@ std::string function::to_string(const name_resolver* resolver) const
                 {
                     buf += std::format(
                       "{}, ",
-                      resolver->type_name(args[i]->get_type().get_type_id().value()));
+                      resolver->type_name(args[i].second->get_type().get_type_id().value()));
                 }
                 buf += std::format(
                   "{}",
-                  resolver->type_name(args.back()->get_type().get_type_id().value()));
+                  resolver->type_name(args.back().second->get_type().get_type_id().value()));
             }
 
             buf += ")\n";
@@ -546,7 +552,7 @@ std::string function::to_string(const name_resolver* resolver) const
             buf += " {\n";
         }
 
-        for(const auto& v: scope.get_locals())
+        for(const auto& [_, v]: scope.get_locals())
         {
             buf += std::format(
               "local {}\n",
@@ -671,9 +677,14 @@ std::optional<constant_table_entry> context::get_constant(
     // return std::nullopt;
 }
 
-function* context::create_function(std::string name,
-                                   std::unique_ptr<value> return_type,
-                                   std::vector<std::unique_ptr<value>> args)
+function* context::create_function(
+  std::string name,
+  std::unique_ptr<value> return_type,
+  std::vector<
+    std::pair<
+      source_location,
+      std::unique_ptr<value>>>
+    args)
 {
     if(std::ranges::find_if(
          funcs,
@@ -694,10 +705,15 @@ function* context::create_function(std::string name,
       .get();
 }
 
-void context::create_native_function(std::string lib_name,
-                                     std::string name,
-                                     std::unique_ptr<value> return_type,
-                                     std::vector<std::unique_ptr<value>> args)
+void context::create_native_function(
+  std::string lib_name,
+  std::string name,
+  std::unique_ptr<value> return_type,
+  std::vector<
+    std::pair<
+      source_location,
+      std::unique_ptr<value>>>
+    args)
 {
     if(std::ranges::find_if(
          funcs,

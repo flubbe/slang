@@ -11,6 +11,7 @@
 #include "archives/archive.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
+#include "compiler/name_utils.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
@@ -401,12 +402,13 @@ void macro_branch::collect_names(co::context& ctx)
 
     for(const auto& [arg_name, arg_type]: args)
     {
+        const std::string canonical_name = name::qualified_name(
+          ctx.get_canonical_scope_name(ctx.get_current_scope()),
+          arg_name.s);
+
         ctx.declare(
           arg_name.s,
-          std::format(
-            "{}::{}",
-            ctx.get_canonical_scope_name(ctx.get_current_scope()),
-            arg_name.s),
+          canonical_name,
           sema::symbol_type::macro_argument,
           arg_name.location,
           sema::symbol_id::invalid,
@@ -507,12 +509,13 @@ void macro_expression::collect_names(
 {
     super::collect_names(ctx);
 
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
+
     symbol_id = ctx.declare(
       name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
+      canonical_name,
       sema::symbol_type::macro,
       name.location,
       sema::symbol_id::invalid,

@@ -836,8 +836,8 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x1:
     {
         // type arguments.
-        stack_value v1;
-        stack_value v2;
+        stack_value v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        stack_value v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
         ar & v1 & v2;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.

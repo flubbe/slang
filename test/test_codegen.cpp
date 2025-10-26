@@ -506,6 +506,7 @@ TEST(codegen, locals_store)
         EXPECT_EQ(fn->get_name(), "f");
 
         fn->get_scope()->add_local(
+          slang::source_location{0, 0},
           std::make_unique<cg::value>(
             cg::type{mock_i32_type, cg::type_kind::i32}, "b"));
 
@@ -662,6 +663,7 @@ TEST(codegen, invoke)
         EXPECT_EQ(fn_f->get_name(), "f");
 
         fn_f->get_scope()->add_local(
+          slang::source_location{0, 0},
           std::make_unique<cg::value>(
             cg::type{
               mock_i32_type,
@@ -850,6 +852,7 @@ TEST(codegen, invoke)
         EXPECT_EQ(fn_f->get_name(), "f");
 
         fn_f->get_scope()->add_local(
+          slang::source_location{0, 0},
           std::make_unique<cg::value>(
             cg::type{
               mock_i32_type,

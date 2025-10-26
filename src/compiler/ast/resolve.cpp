@@ -15,8 +15,24 @@
 #include "ast.h"
 #include "utils.h"
 
+#include <print>
+
 namespace slang::ast
 {
+
+/*
+ * type_expression.
+ */
+
+void type_expression::resolve_names(rs::context& ctx)
+{
+    // FIXME The type could be a built-in type, which is not visible
+    //       by the resolver context.
+    ctx.resolve(
+      get_qualified_name(),
+      sema::symbol_type::type,
+      sema::scope::invalid_id);
+}
 
 /*
  * type_cast_expression.
@@ -24,6 +40,7 @@ namespace slang::ast
 
 void type_cast_expression::resolve_names(rs::context& ctx)
 {
+    target_type->resolve_names(ctx);
     expr->resolve_names(ctx);
 }
 
@@ -60,6 +77,13 @@ void directive_expression::resolve_names(rs::context& ctx)
 
 void variable_reference_expression::resolve_names(rs::context& ctx)
 {
+    if(!scope_id.has_value())
+    {
+        throw cg::codegen_error(
+          name.location,
+          "No scope information available.");
+    }
+
     if(element_expr)
     {
         element_expr->resolve_names(ctx);
@@ -68,13 +92,6 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
     if(expansion)
     {
         expansion->resolve_names(ctx);
-    }
-
-    if(!scope_id.has_value())
-    {
-        throw cg::codegen_error(
-          name.location,
-          "No scope information available.");
     }
 
     if(name.type == token_type::macro_identifier)
@@ -121,6 +138,8 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
 
 void variable_declaration_expression::resolve_names(rs::context& ctx)
 {
+    type->resolve_names(ctx);
+
     if(expr)
     {
         expr->resolve_names(ctx);
@@ -187,6 +206,8 @@ void struct_anonymous_initializer_expression::resolve_names(rs::context& ctx)
 
 void named_initializer::resolve_names(rs::context& ctx)
 {
+    std::print("qualified name: {}\n", get_qualified_name());
+    std::print("expr: {}\n", expr->to_string());
     expr->resolve_names(ctx);
 }
 
@@ -196,6 +217,30 @@ void named_initializer::resolve_names(rs::context& ctx)
 
 void struct_named_initializer_expression::resolve_names(rs::context& ctx)
 {
+    if(!scope_id.has_value())
+    {
+        throw cg::codegen_error(
+          name.location,
+          "No scope information available.");
+    }
+
+    std::print("struct_named_initializer_expression qualified name: {}\n", get_qualified_name());
+
+    const std::string qualified_name = get_qualified_name();
+
+    symbol_id = ctx.resolve(
+      qualified_name,
+      sema::symbol_type::type,
+      scope_id.value());
+    if(!symbol_id.has_value())
+    {
+        throw cg::codegen_error(
+          name.location,
+          std::format(
+            "Could not resolve type '{}'.",
+            qualified_name));
+    }
+
     std::ranges::for_each(
       initializers,
       [&ctx](std::unique_ptr<named_initializer>& e)

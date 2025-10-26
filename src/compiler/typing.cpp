@@ -17,9 +17,6 @@
 #include "typing.h"
 #include "utils.h"
 
-// DEBUG
-#include <print>
-
 namespace ty = slang::typing;
 
 namespace slang::typing

@@ -52,7 +52,7 @@ enum class symbol_type : std::uint8_t
     function,
     macro,
     macro_argument,
-    struct_
+    type
 };
 
 /**

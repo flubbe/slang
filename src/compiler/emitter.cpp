@@ -16,6 +16,7 @@
 #include "shared/opcodes.h"
 #include "emitter.h"
 #include "macro.h"
+#include "name_utils.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
@@ -151,25 +152,11 @@ std::size_t import_table_builder::get_function(
 std::size_t import_table_builder::intern_struct(
   const std::string& qualified_name)
 {
-    auto delim_pos = qualified_name.rfind("::");
-    if(delim_pos == std::string::npos)
-    {
-        throw emitter_error(
-          std::format(
-            "Cannot get package: Name '{}' is not qualified.",
-            qualified_name));
-    }
-
+    auto package_name = name::module_path(qualified_name);
     std::size_t package_index = intern_package(
-      qualified_name.substr(0, delim_pos));
+      std::string{package_name});
 
-    const std::string struct_name = qualified_name.substr(delim_pos + 2);
-    if(struct_name.empty())
-    {
-        throw emitter_error(
-          std::format(
-            "Cannot intern struct: Empty name."));
-    }
+    const std::string struct_name = name::unqualified_name(qualified_name);
 
     auto it = std::ranges::find_if(
       import_table,
@@ -187,7 +174,7 @@ std::size_t import_table_builder::intern_struct(
     // Add the struct.
     import_table.emplace_back(
       module_::symbol_type::type,
-      qualified_name.substr(delim_pos + 2),
+      struct_name,
       package_index);
     return import_table.size() - 1;
 }
@@ -395,12 +382,23 @@ void export_table_builder::add_struct(
             else if(base_type_info.kind == ty::type_kind::struct_)
             {
                 const auto& field_type_info_data = std::get<ty::struct_info>(base_type_info.data);
+                bool compare_qualified = field_type_info_data.qualified_name.has_value();
+
                 auto it = std::ranges::find_if(
                   emitter.sema_env.symbol_table,
-                  [&field_type_info_data](const std::pair<sema::symbol_id, sema::symbol_info>& s) -> bool
+                  [&field_type_info_data, compare_qualified](const std::pair<sema::symbol_id, sema::symbol_info>& s) -> bool
                   {
-                      return s.second.type == sema::symbol_type::struct_
-                             && s.second.name == field_type_info_data.name;
+                      if(s.second.type != sema::symbol_type::type)
+                      {
+                          return false;
+                      }
+
+                      if(compare_qualified)
+                      {
+                          return s.second.qualified_name == field_type_info_data.qualified_name.value();
+                      }
+
+                      return s.second.name == field_type_info_data.name;
                   });
                 if(it == emitter.sema_env.symbol_table.end())
                 {
@@ -410,7 +408,7 @@ void export_table_builder::add_struct(
                         field_type_info_data.name));
                 }
 
-                base_type = it->second.name;
+                base_type = name::unqualified_name(it->second.name);
 
                 if(it->second.declaring_module != sema::symbol_info::current_module_id)
                 {
@@ -597,7 +595,7 @@ void instruction_emitter::collect_imports()
     // walk types.
     for(const auto& [id, symbol_info]: sema_env.symbol_table)
     {
-        if(symbol_info.type != sema::symbol_type::struct_)
+        if(symbol_info.type != sema::symbol_type::type)
         {
             continue;
         }
@@ -637,7 +635,7 @@ void instruction_emitter::collect_imports()
 
         for(const auto& arg: func_args)
         {
-            std::optional<ty::type_id> id = arg->get_type().get_type_id();
+            std::optional<ty::type_id> id = arg.second->get_type().get_type_id();
             if(!id.has_value())
             {
                 throw emitter_error(
@@ -659,7 +657,7 @@ void instruction_emitter::collect_imports()
 
         for(const auto& local: func_locals)
         {
-            std::optional<ty::type_id> id = local->get_type().get_type_id();
+            std::optional<ty::type_id> id = local.second->get_type().get_type_id();
             if(!id.has_value())
             {
                 throw emitter_error(
@@ -736,11 +734,13 @@ void instruction_emitter::collect_imports()
                                 symbol_info_it->second.qualified_name));
                         }
 
+                        std::string function_name = name::unqualified_name(
+                          symbol_info_it->second.name);
                         std::size_t package_index = imports.intern_package(
                           declaring_module_symbol_it->second.qualified_name);
                         imports.intern_function(
                           package_index,
-                          symbol_info_it->second.name);
+                          function_name);
                     }
                 }
                 else if(instr->get_name() == "new"
@@ -859,7 +859,7 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
       sema_env.symbol_table,
       [&struct_info](const std::pair<sema::symbol_id, sema::symbol_info>& s) -> bool
       {
-          return s.second.type == sema::symbol_type::struct_
+          return s.second.type == sema::symbol_type::type
                  && s.second.qualified_name == struct_info.qualified_name;
       });
     if(it == sema_env.symbol_table.cend())
@@ -880,7 +880,10 @@ static std::optional<std::size_t> get_import_index_or_nullopt(
       it->second.declaring_module);
 
     auto package_index = imports.get_package(package_symbol_info.name);
-    return imports.get_struct(package_index, struct_info.name);
+
+    // strip package name from import.
+    std::string import_name = name::unqualified_name(struct_info.name);
+    return imports.get_struct(package_index, import_name);
 }
 
 /** Argument count for a given instruction. */    // FIXME ?
@@ -1221,7 +1224,7 @@ void instruction_emitter::emit_instruction(
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x2);
-        instruction_buffer & v& s[0] & s[1];
+        instruction_buffer & v & s[0] & s[1];
     }
     else if(name == "pop")
     {
@@ -1273,8 +1276,9 @@ void instruction_emitter::emit_instruction(
             return;
         }
 
+        std::string function_name = name::unqualified_name(symbol_info.name);
         std::size_t package_index = imports.get_package(info->qualified_module_name);
-        std::size_t function_index = imports.get_function(package_index, symbol_info.name);
+        std::size_t function_index = imports.get_function(package_index, function_name);
 
         vle_int index{-utils::numeric_cast<std::int64_t>(function_index) - 1};
         emit(instruction_buffer, opcode::invoke);
@@ -1319,20 +1323,17 @@ void instruction_emitter::emit_instruction(
         {
             // FIXME Use a type id, not a string.
 
-            auto delim_pos = struct_info.qualified_name.value().rfind("::");
-            if(delim_pos == std::string::npos)
-            {
-                throw emitter_error(
-                  std::format(
-                    "Cannot get package: Name '{}' is not qualified.",
-                    struct_info.qualified_name.value()));
-            }
-
+            auto module_path = name::module_path(
+              struct_info.qualified_name.value());
             std::size_t package_index = imports.get_package(
-              struct_info.qualified_name.value().substr(0, delim_pos));
+              std::string{module_path});
+
+            // strip package name from import.
+            std::string struct_import_name = name::unqualified_name(
+              struct_info.name);
 
             struct_index = vle_int{-utils::numeric_cast<std::int64_t>(
-                                     imports.get_struct(package_index, struct_info.name))
+                                     imports.get_struct(package_index, struct_import_name))
                                    - 1};
         }
         else
@@ -1696,7 +1697,7 @@ void instruction_emitter::run()
     // exported types.
     for(const auto& [id, symbol_info]: sema_env.symbol_table)
     {
-        if(symbol_info.type != sema::symbol_type::struct_)
+        if(symbol_info.type != sema::symbol_type::type)
         {
             continue;
         }
@@ -1844,20 +1845,30 @@ void instruction_emitter::run()
 
         for(const auto& it: func_args)
         {
-            auto name = it->get_name();
+            auto name = it.second->get_name();
             if(!name.has_value())
             {
-                throw emitter_error(std::format("Unnamed variable in function '{}'.", f->get_name()));
+                throw emitter_error(
+                  std::format(
+                    "{}: Unnamed variable in function '{}'.",
+                    to_string(it.first),
+                    f->get_name()));
             }
 
-            std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
+            std::size_t index = s->get_index(
+              it.second->get_name().value_or("<invalid-name>"));
             if(!unset_indices.contains(index))
             {
-                throw emitter_error(std::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
+                throw emitter_error(
+                  std::format(
+                    "{}: Tried to map local '{}' with index '{}' multiple times.",
+                    to_string(it.first),
+                    *name,
+                    index));
             }
             unset_indices.erase(index);
 
-            auto t = it->get_type();
+            auto t = it.second->get_type();
 
             auto type_id = t.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);
@@ -1880,20 +1891,30 @@ void instruction_emitter::run()
 
         for(const auto& it: func_locals)
         {
-            auto name = it->get_name();
+            auto name = it.second->get_name();
             if(!name.has_value())
             {
-                throw emitter_error(std::format("Unnamed variable in function '{}'.", f->get_name()));
+                throw emitter_error(
+                  std::format(
+                    "{}: Unnamed variable in function '{}'.",
+                    to_string(it.first),
+                    f->get_name()));
             }
 
-            std::size_t index = s->get_index(it->get_name().value_or("<invalid-name>"));
+            std::size_t index = s->get_index(
+              it.second->get_name().value_or("<invalid-name>"));
             if(!unset_indices.contains(index))
             {
-                throw emitter_error(std::format("Tried to map local '{}' with index '{}' multiple times.", *name, index));
+                throw emitter_error(
+                  std::format(
+                    "{}: Tried to map local '{}' with index '{}' multiple times.",
+                    to_string(it.first),
+                    *name,
+                    index));
             }
             unset_indices.erase(index);
 
-            auto t = it->get_type();
+            auto t = it.second->get_type();
 
             auto type_id = t.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);
@@ -1916,7 +1937,10 @@ void instruction_emitter::run()
 
         if(!unset_indices.empty())
         {
-            throw emitter_error(std::format("Inconsistent local count for function '{}'.", f->get_name()));
+            throw emitter_error(
+              std::format(
+                "Inconsistent local count for function '{}'.",
+                f->get_name()));
         }
 
         /*

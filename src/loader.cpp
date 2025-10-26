@@ -77,6 +77,38 @@ module_::module_resolver& context::resolve_module(
     return *resolvers[import_name].get();
 }
 
+const module_::module_resolver& context::get_resolver(
+  const std::string& import_name) const
+{
+    // module is already resolved.
+    auto it = resolvers.find(import_name);
+    if(it == resolvers.end())
+    {
+        throw resolve_error(
+          std::format(
+            "Cannot resolve module: '{}' not loaded.",
+            import_name));
+    }
+
+    return *it->second;
+}
+
+std::string context::resolve_name(const std::string& name) const
+{
+    std::string import_path = name;
+    slang::utils::replace_all(import_path, package::delimiter, "/");
+
+    fs::path fs_path = fs::path{import_path};
+    if(!fs_path.has_extension())
+    {
+        fs_path = fs_path.replace_extension(package::module_ext);
+    }
+
+    file_mgr.resolve(fs_path);
+
+    return name;
+}
+
 bool context::resolve_macros(macro::env& env, ty::context& type_ctx)
 {
     bool needs_import_resolution = false;

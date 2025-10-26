@@ -454,7 +454,9 @@ std::string named_expression::get_qualified_name() const
     {
         return name.s;
     }
-    return std::format("{}::{}", path.value(), name.s);
+    return name::qualified_name(
+      path.value(),
+      name.s);
 }
 
 /*
@@ -1161,7 +1163,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
         throw cg::codegen_error(
           loc,
           std::format(
-            "{}: Refernece not found in symbol table (symbol id: {}).",
+            "{}: Reference not found in symbol table (symbol id: {}).",
             get_name().s,
             symbol_id.value().value));
     }
@@ -1421,7 +1423,9 @@ std::string type_expression::get_qualified_name() const
     std::optional<std::string> namespace_path = get_namespace_path();
     if(namespace_path.has_value())
     {
-        return std::format("{}::{}", namespace_path.value(), type_name.s);
+        return name::qualified_name(
+          namespace_path.value(),
+          type_name.s);
     }
     return type_name.s;
 }
@@ -1480,12 +1484,13 @@ void variable_declaration_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
+
     symbol_id = ctx.declare(
       name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
+      canonical_name,
       sema::symbol_type::variable,
       name.location,
       sema::symbol_id::invalid,
@@ -1509,6 +1514,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
             "Invalid memory context for variable declaration."));
     }
 
+    // TODO This needs to be replaced by sema env lookups.
     cg::scope* s = ctx.get_scope();
     if(s == nullptr)
     {
@@ -1520,7 +1526,11 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
 
     std::unique_ptr<cg::value> v = std::make_unique<cg::value>(
       ctx.lower(type->get_type()), name.s);
-    s->add_local(std::make_unique<cg::value>(*v));
+
+    // TODO This needs to be replaced by sema env lookups.
+    s->add_local(
+      name.location,
+      std::make_unique<cg::value>(*v));
 
     if(is_array())
     {
@@ -1643,12 +1653,13 @@ void constant_declaration_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
+
     symbol_id = ctx.declare(
       name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
+      canonical_name,
       sema::symbol_type::constant,
       name.location,
       sema::symbol_id::invalid,
@@ -1872,19 +1883,20 @@ void struct_definition_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
+
     symbol_id = ctx.declare(
       name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
-      sema::symbol_type::struct_,
+      canonical_name,
+      sema::symbol_type::type,
       name.location,
       sema::symbol_id::invalid,
       false,
       this);
 
-    ctx.push_scope(std::format("{}@struct", name.s), name.location);
+    ctx.push_scope(std::format("{}@struct", canonical_name), name.location);
     for(auto& m: members)
     {
         m->collect_names(ctx);
@@ -3454,12 +3466,13 @@ void prototype_ast::collect_names(co::context& ctx)
 {
     for(auto& arg: args)
     {
+        const std::string canonical_name = name::qualified_name(
+          ctx.get_canonical_scope_name(ctx.get_current_scope()),
+          std::get<0>(arg).s);
+
         std::get<1>(arg) = ctx.declare(
           std::get<0>(arg).s,
-          std::format(
-            "{}::{}",
-            ctx.get_canonical_scope_name(ctx.get_current_scope()),
-            std::get<0>(arg).s),
+          canonical_name,
           sema::symbol_type::variable,
           std::get<0>(arg).location,
           sema::symbol_id::invalid,
@@ -3749,25 +3762,34 @@ std::unique_ptr<cg::value> function_expression::generate_code(
     {
         const auto& symbol_table = ctx.get_sema_env().symbol_table;
 
-        std::vector<std::unique_ptr<cg::value>> args =
-          prototype->get_arg_infos()
-          | std::views::transform(
-            [this, &ctx, &symbol_table](const std::pair<sema::symbol_id, ty::type_id>& p) -> std::unique_ptr<cg::value>
-            {
-                auto it = symbol_table.find(std::get<0>(p));
-                if(it == symbol_table.end())
-                {
-                    throw cg::codegen_error(
-                      loc,
-                      std::format(
-                        "{}: Argument not found in symbol table (symbol id: {}).",
-                        prototype->get_name().s,
-                        std::get<0>(p).value));
-                }
+        std::vector<
+          std::pair<
+            source_location,
+            std::unique_ptr<cg::value>>>
+          args =
+            prototype->get_arg_infos()
+            | std::views::transform(
+              [this, &ctx, &symbol_table](const std::pair<sema::symbol_id, ty::type_id>& p)
+                -> std::pair<source_location, std::unique_ptr<cg::value>>
+              {
+                  auto it = symbol_table.find(std::get<0>(p));
+                  if(it == symbol_table.end())
+                  {
+                      throw cg::codegen_error(
+                        loc,
+                        std::format(
+                          "{}: Argument not found in symbol table (symbol id: {}).",
+                          prototype->get_name().s,
+                          std::get<0>(p).value));
+                  }
 
-                return std::make_unique<cg::value>(ctx.lower(std::get<1>(p)), it->second.name);
-            })
-          | std::ranges::to<std::vector>();
+                  return std::make_pair(
+                    it->second.loc,
+                    std::make_unique<cg::value>(
+                      ctx.lower(std::get<1>(p)),
+                      it->second.name));
+              })
+            | std::ranges::to<std::vector>();
 
         std::unique_ptr<cg::value> ret = std::make_unique<cg::value>(
           ctx.lower(prototype->get_return_type_id()));
@@ -3873,14 +3895,30 @@ std::unique_ptr<cg::value> function_expression::generate_code(
          * Generate binding.
          */
 
-        std::vector<std::unique_ptr<cg::value>> args =
-          prototype->get_arg_type_ids()
-          | std::views::transform(
-            [&ctx](const ty::type_id& t) -> std::unique_ptr<cg::value>
-            {
-                return std::make_unique<cg::value>(ctx.lower(t));
-            })
-          | std::ranges::to<std::vector>();
+        std::vector<
+          std::pair<
+            source_location,
+            std::unique_ptr<cg::value>>>
+          args =
+            prototype->get_arg_infos()
+            | std::views::transform(
+              [this, &ctx](const std::pair<sema::symbol_id, ty::type_id>& p) -> std::pair<source_location, std::unique_ptr<cg::value>>
+              {
+                  auto sym_it = ctx.get_sema_env().symbol_table.find(p.first);
+                  if(sym_it == ctx.get_sema_env().symbol_table.end())
+                  {
+                      throw cg::codegen_error(
+                        get_location(),
+                        std::format(
+                          "{}: Could not get symbol info for native function argument.",
+                          prototype->get_name().s));
+                  }
+
+                  return std::make_pair(
+                    sym_it->second.loc,
+                    std::make_unique<cg::value>(ctx.lower(p.second)));
+              })
+            | std::ranges::to<std::vector>();
 
         std::unique_ptr<cg::value> ret = std::make_unique<cg::value>(
           ctx.lower(prototype->get_return_type_id()));
@@ -3900,13 +3938,13 @@ void function_expression::collect_names(co::context& ctx)
     super::collect_names(ctx);
 
     const auto& name = prototype->get_name();
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
 
     symbol_id = ctx.declare(
       name.s,
-      std::format(
-        "{}::{}",
-        ctx.get_canonical_scope_name(ctx.get_current_scope()),
-        name.s),
+      canonical_name,
       sema::symbol_type::function,
       name.location,
       sema::symbol_id::invalid,
@@ -4132,8 +4170,17 @@ std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::e
             if(!ctx.has_type(type_str)
                || !ctx.is_builtin(ctx.get_type(type_str)))
             {
-                type_str = std::format(
-                  "{}::{}",
+                auto module_symbol_it = env.symbol_table.find(callee_symbol_info.declaring_module);
+                if(module_symbol_it == env.symbol_table.end())
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Declaring module for external symbol '{}' not found.",
+                        callee_symbol_info.qualified_name));
+                }
+
+                type_str = name::qualified_name(
                   env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
                   type_str);
             }
@@ -4164,8 +4211,7 @@ std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::e
                 if(!ctx.has_type(type_str)
                    || !ctx.is_builtin(ctx.get_type(type_str)))
                 {
-                    type_str = std::format(
-                      "{}::{}",
+                    type_str = name::qualified_name(
                       env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
                       type_str);
                 }
@@ -4255,7 +4301,9 @@ std::string call_expression::get_qualified_callee_name() const
     {
         return callee.s;
     }
-    return std::format("{}::{}", path.value(), callee.s);
+    return name::qualified_name(
+      path.value(),
+      callee.s);
 }
 
 /*

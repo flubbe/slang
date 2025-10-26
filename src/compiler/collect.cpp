@@ -12,6 +12,7 @@
 #include <ranges>
 
 #include "compiler/collect.h"
+#include "compiler/name_utils.h"
 
 namespace slang::collect
 {
@@ -297,7 +298,7 @@ std::string context::get_canonical_scope_name(sema::scope_id id) const
     for(id = s->parent; id != sema::scope::invalid_id && has_scope(env, id);)
     {
         const auto* s = get_scope(id);
-        name = std::format("{}::{}", s->name, name);
+        name = name::qualified_name(s->name, name);
 
         id = s->parent;
     }
@@ -309,8 +310,7 @@ std::string context::get_canonical_scope_name(sema::scope_id id) const
             throw std::runtime_error("Scope not found in scope table.");
         }
 
-        return std::format(
-          "{}::{}",
+        return name::qualified_name(
           reference->get_canonical_scope_name(id),
           name);
     }

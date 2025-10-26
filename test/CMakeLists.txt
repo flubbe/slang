@@ -80,6 +80,7 @@ add_executable(test_codegen
     ../src/compiler/constant.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/typing.cpp
     ../src/utils.cpp
 )

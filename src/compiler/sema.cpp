@@ -37,7 +37,7 @@ std::string to_string(symbol_type t)
         return "function";
     }
 
-    if(t == symbol_type::struct_)
+    if(t == symbol_type::type)
     {
         return "struct";
     }

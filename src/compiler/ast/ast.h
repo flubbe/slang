@@ -780,6 +780,7 @@ public:
     [[nodiscard]] std::unique_ptr<type_expression> clone() const;
     void serialize(archive& ar);
 
+    void resolve_names(rs::context& ctx);
     void type_check(ty::context& ctx, sema::env& env);
 
     /** Get the location. */
