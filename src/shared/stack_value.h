@@ -57,7 +57,7 @@ inline archive& operator&(archive& ar, stack_value& v)
     auto v_base = static_cast<stack_value_base>(v);
     ar & v_base;
 
-    if(v >= static_cast<stack_value>(stack_value::stack_value_count))
+    if(v_base >= static_cast<stack_value_base>(stack_value::stack_value_count))
     {
         throw serialization_error(
           std::format(
