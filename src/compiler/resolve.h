@@ -11,6 +11,7 @@
 #pragma once
 
 #include "constant.h"
+#include "macro.h"
 #include "sema.h"
 #include "typing.h"
 
@@ -41,6 +42,9 @@ class context
     /** Constant environment. */
     const_::env& const_env;
 
+    /** Macro environment. */
+    macro::env& macro_env;
+
     /** Type context. */
     ty::context& type_ctx;
 
@@ -60,6 +64,12 @@ class context
     module_id generate_module_id()
     {
         return next_module_id++;
+    }
+
+    /** Return a new symbol id. */
+    sema::symbol_id generate_symbol_id()
+    {
+        return sema_env.next_symbol_id++;
     }
 
     /**
@@ -118,6 +128,18 @@ class context
       const module_::module_header& header);
 
     /**
+     * Import a macro into the semantic and macro environments.
+     *
+     * @param symbol_id The generated symbol id.
+     * @param symbol The exported symbol.
+     * @param module_name The origin module name.
+     */
+    void import_macro(
+      sema::symbol_id symbol_id,
+      const module_::exported_symbol& symbol,
+      const std::string& module_name);
+
+    /**
      * Import a type into the semantic and type environments.
      *
      * @param symbol_id The generated symbol id.
@@ -144,14 +166,17 @@ public:
      *
      * @param sema_env The semantic environment.
      * @param const_env The constant environment.
+     * @param macro_env The macro environment.
      * @param type_ctx The type context.
      */
     context(
       sema::env& sema_env,
       const_::env& const_env,
+      macro::env& macro_env,
       ty::context& type_ctx)
     : sema_env{sema_env}
     , const_env{const_env}
+    , macro_env{macro_env}
     , type_ctx{type_ctx}
     {
     }

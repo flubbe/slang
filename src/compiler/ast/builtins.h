@@ -122,6 +122,9 @@ class format_macro_expression : public expression
     /** Format specifiers/placeholders. Set during type checking. */
     std::vector<format_string_placeholder> placeholders;
 
+    /** Expansion. */
+    std::unique_ptr<expression> expansion;
+
 public:
     /** Set the super class. */
     using super = expression;
@@ -168,6 +171,8 @@ public:
     std::unique_ptr<cg::value> generate_code(
       cg::context& ctx,
       memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
     [[nodiscard]] std::optional<ty::type_id> type_check(
       [[maybe_unused]] ty::context& ctx,
       [[maybe_unused]] sema::env& env) override;
@@ -195,6 +200,16 @@ public:
                  })
                | std::ranges::to<std::vector>();
     }
+
+    /**
+     * Macro expansion (after type checking).
+     *
+     * @param ctx The type context.
+     * @param env The semantic environment.
+     */
+    void expand_late_macros(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 }    // namespace slang::ast

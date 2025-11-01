@@ -1783,36 +1783,10 @@ void instruction_emitter::run()
     {
         if(m->is_import())
         {
-            // TODO
-            throw std::runtime_error("instruction_emitter::run (macros)");
-
-            /*
-
-            // Macros are only valid at compile-time, so
-            // they should not appear in the import table.
-            auto import_it = std::ranges::find_if(
-              std::as_const(codegen_ctx.imports),
-              [&m](const cg::imported_symbol& s) -> bool
-              {
-                  return s.type == module_::symbol_type::macro
-                         && s.name == m->get_name()
-                         && s.import_path == m->get_import_path();
-              });
-            if(import_it != codegen_ctx.imports.cend())
-            {
-                throw std::runtime_error(
-                  std::format(
-                    "Macro '{}' from package '{}' should not appear in import table.",
-                    m->get_name(),
-                    m->get_import_path().value_or("<invalid-import-path>")));
-            }
-
-            */
+            continue;
         }
-        else
-        {
-            exports.add_macro(m->get_name(), m->get_desc());
-        }
+
+        exports.add_macro(m->get_name(), m->get_desc());
     }
 
     // the export count is not allowed to change after this point, so store it here and check later.

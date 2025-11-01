@@ -149,6 +149,28 @@ void context::import_function(
     }
 }
 
+void context::import_macro(
+  sema::symbol_id symbol_id,
+  const module_::exported_symbol& symbol,
+  const std::string& module_name)
+{
+    const auto& desc = std::get<module_::macro_descriptor>(symbol.desc);
+
+    auto symbol_info_it = sema_env.symbol_table.find(symbol_id);
+    if(symbol_info_it == sema_env.symbol_table.end())
+    {
+        throw std::runtime_error(
+          std::format(
+            "No symbol info registered in symbol table for id '{}'.",
+            symbol_id.value));
+    }
+
+    macro_env.add_macro(
+      name::unqualified_name(symbol_info_it->second.name),
+      desc,
+      module_name);
+}
+
 ty::type_id context::resolve_imported_type(
   const module_::variable_type& t,
   const source_location& loc,
@@ -254,7 +276,7 @@ std::optional<sema::symbol_id> context::resolve_external(
     }
 
     // import the symbol.
-    auto new_symbol_id = ++sema_env.next_symbol_id.value;
+    auto new_symbol_id = generate_symbol_id();
 
     auto global_scope_it = sema_env.scope_map.find(sema_env.global_scope_id);
     if(global_scope_it == sema_env.scope_map.end())
@@ -321,13 +343,25 @@ std::optional<sema::symbol_id> context::resolve_external(
     }
     else if(external_reference->type == module_::symbol_type::macro)
     {
-        // TODO
-        throw std::runtime_error("resolve: macro");
+        import_macro(
+          new_symbol_id,
+          *external_reference,
+          module_name);
     }
     else if(external_reference->type == module_::symbol_type::package)
     {
-        // TODO
-        throw std::runtime_error("resolve: package");
+        // only check the package is resolved.
+        if(!sema_env.get_symbol_id(
+                      external_reference->name,    // FIXME qualified name?
+                      sema::symbol_type::module_,
+                      sema_env.global_scope_id)
+              .has_value())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Expected module reference '{}' to already be resolved.",
+                external_reference->name));
+        }
     }
     else if(external_reference->type == module_::symbol_type::type)
     {

@@ -429,8 +429,11 @@ public:
       const_::env& env);
 
     /**
-     * Expand macros stored.
+     * Macro expansion (before type checking). Expands macro invocations by the corresponding
+     * macro AST's while taking care of macro hygiene.
      *
+     * @param co_ctx Name collection context.
+     * @param rs_ctx Name resolution context.
      * @param codegen_ctx Code generation context.
      * @param type_ctx Type system context.
      * @param macro_env Macro collection / expansion environment.
@@ -438,10 +441,30 @@ public:
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
     bool expand_macros(
+      co::context& co_ctx,
+      rs::context& rs_ctx,
       cg::context& codegen_ctx,
       ty::context& type_ctx,
       macro::env& macro_env,
       const std::vector<expression*>& macro_asts);
+
+    /**
+     * Macro expansion (after type checking). Calls the corresponding
+     * function on the macro.
+     *
+     * @note Explicitly checks for the built-in `format!` macro, since this is
+     *       the only macro using type information.
+     *
+     * @param co_ctx Name collection context.
+     * @param rs_ctx Name resolution context.
+     * @param type_ctx Type system context.
+     * @param sema_env The semantic environment.
+     */
+    void expand_late_macros(
+      co::context& co_ctx,
+      rs::context& rs_ctx,
+      ty::context& type_ctx,
+      sema::env& env);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -493,7 +516,9 @@ public:
      *
      * @param ctx Type system context.
      */
-    virtual std::optional<ty::type_id> type_check([[maybe_unused]] ty::context& ctx, [[maybe_unused]] sema::env& env)
+    virtual std::optional<ty::type_id> type_check(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] sema::env& env)
     {
         return std::nullopt;
     }
@@ -3224,6 +3249,10 @@ public:
     {
         expansion = std::move(exp);
     }
+
+    /** Return the callee's name including namespaces. */
+    [[nodiscard]]
+    std::string get_qualified_callee_name() const;
 };
 
 /*

@@ -353,6 +353,28 @@ void call_expression::resolve_names(rs::context& ctx)
 
 void macro_invocation::resolve_names(rs::context& ctx)
 {
+    if(!scope_id.has_value())
+    {
+        throw cg::codegen_error(
+          name.location,
+          "No scope information available.");
+    }
+
+    const auto qualified_name = get_qualified_callee_name();
+
+    symbol_id = ctx.resolve(
+      qualified_name,
+      sema::symbol_type::macro,
+      scope_id.value());
+    if(!symbol_id.has_value())
+    {
+        throw cg::codegen_error(
+          name.location,
+          std::format(
+            "Could not resolve macro '{}'.",
+            qualified_name));
+    }
+
     std::ranges::for_each(
       exprs,
       [&ctx](std::unique_ptr<expression>& e)

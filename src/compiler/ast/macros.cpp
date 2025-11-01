@@ -31,6 +31,8 @@ namespace slang::ast
  */
 
 bool expression::expand_macros(
+  co::context& co_ctx,
+  rs::context& rs_ctx,
   cg::context& codegen_ctx,
   ty::context& type_ctx,
   macro::env& macro_env,
@@ -46,7 +48,9 @@ bool expression::expand_macros(
 
     // replace macro nodes by the macro AST.
     auto macro_expansion_visitor =
-      [&codegen_ctx,
+      [&co_ctx,
+       &rs_ctx,
+       &codegen_ctx,
        &macro_env,
        &macro_asts,
        &macro_expansion_count,
@@ -98,6 +102,21 @@ bool expression::expand_macros(
 
             macro_expr->set_expansion(
               (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+
+            if(!macro_expr->scope_id.has_value())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' has no scope.",
+                    macro_expr->get_name().s));
+            }
+
+            co_ctx.push_scope(macro_expr->scope_id.value());
+            macro_expr->expansion->collect_names(co_ctx);
+            co_ctx.pop_scope();
+
+            macro_expr->expansion->resolve_names(rs_ctx);
         }
         else
         {
@@ -159,6 +178,21 @@ bool expression::expand_macros(
 
                 expanded_imported_macros.push_back(macro_expr);
             }
+
+            if(!macro_expr->scope_id.has_value())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' has no scope.",
+                    macro_expr->get_name().s));
+            }
+
+            co_ctx.push_scope(macro_expr->scope_id.value());
+            macro_expr->expansion->collect_names(co_ctx);
+            co_ctx.pop_scope();
+
+            macro_expr->expansion->resolve_names(rs_ctx);
         }
 
         ++macro_expansion_count;
@@ -246,6 +280,45 @@ bool expression::expand_macros(
     }
 
     return macro_expansion_count != 0;
+}
+
+void expression::expand_late_macros(
+  co::context& co_ctx,
+  rs::context& rs_ctx,
+  ty::context& type_ctx,
+  sema::env& env)
+{
+    auto expansion_visitor = [&co_ctx, &rs_ctx, &type_ctx, &env](expression& e)
+    {
+        if(e.get_id() != node_identifier::format_macro_expression)
+        {
+            return;
+        }
+
+        auto* macro_expr = static_cast<format_macro_expression*>(&e);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        macro_expr->expand_late_macros(type_ctx, env);
+
+        if(!macro_expr->scope_id.has_value())
+        {
+            throw cg::codegen_error(
+              macro_expr->get_location(),
+              "Macro 'format!' has no scope.");
+        }
+
+        co_ctx.push_scope(macro_expr->scope_id.value());
+        macro_expr->collect_names(co_ctx);
+        co_ctx.pop_scope();
+
+        macro_expr->resolve_names(rs_ctx);
+
+        // set the expression types of the expanded macro.
+        (void)macro_expr->type_check(type_ctx, env);
+    };
+
+    visit_nodes(
+      expansion_visitor,
+      false,
+      false);
 }
 
 /*
@@ -366,6 +439,18 @@ std::string macro_invocation::to_string() const
     }
     ret += "))";
     return ret;
+}
+
+std::string macro_invocation::get_qualified_callee_name() const
+{
+    std::optional<std::string> path = get_namespace_path();
+    if(!path.has_value())
+    {
+        return name.s;
+    }
+    return name::qualified_name(
+      path.value(),
+      name.s);
 }
 
 /*

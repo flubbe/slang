@@ -193,6 +193,7 @@ void expression::collect_macros(
           // not a filter, since the filter also removes child nodes.
           if(expr.get_id() == node_identifier::macro_expression)
           {
+              // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
               static_cast<const macro_expression*>(&expr)->collect_macro(sema_env, macro_env);
           }
       },
@@ -4000,6 +4001,15 @@ std::unique_ptr<cg::value> call_expression::generate_code(
   cg::context& ctx,
   memory_context mc) const
 {
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Callee '{}' has no symbol id.",
+            callee.s));
+    }
+
     // Code generation for function calls.
     if(mc == memory_context::store)
     {
