@@ -1593,34 +1593,6 @@ public:
     }
 
     /**
-     * Check whether a name was registered as a constant.
-     *
-     * @param name The name to check.
-     */
-    bool has_registered_constant_name(const std::string& name);
-
-    /**
-     * Get a reference to a string or create a new one if it does not exist.
-     *
-     * @param str The string.
-     * @returns An index into the constant table.
-     */
-    [[nodiscard]]
-    std::size_t get_string(std::string str);
-
-    /**
-     * Get a constant from the constant table.
-     *
-     * @param name The constant's name.
-     * @param import_path The constant's import path.
-     * @returns Returns a `constant_table_entry` if the constant was found, and `std::nullopt` otherwise.
-     */
-    [[nodiscard]]
-    std::optional<constant_table_entry> get_constant(
-      const std::string& name,
-      const std::optional<std::string>& import_path = std::nullopt);
-
-    /**
      * Add a function definition.
      *
      * Throws a `codegen_error` if the function name already exists.

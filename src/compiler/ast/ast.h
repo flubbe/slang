@@ -3177,22 +3177,26 @@ public:
     std::vector<expression*> get_children() override
     {
         std::vector<expression*> children;
-        children.reserve(
-          exprs.size()
-          + static_cast<std::size_t>(index_expr != nullptr)
-          + static_cast<std::size_t>(expansion != nullptr));
-
-        for(auto& e: exprs)
+        if(expansion != nullptr)
         {
-            children.emplace_back(e.get());
+            children.reserve(1 + static_cast<std::size_t>(index_expr != nullptr));
+            children.emplace_back(expansion.get());
         }
+        else
+        {
+            children.reserve(
+              exprs.size()
+              + static_cast<std::size_t>(index_expr != nullptr));
+
+            for(auto& e: exprs)
+            {
+                children.emplace_back(e.get());
+            }
+        }
+
         if(index_expr)
         {
             children.emplace_back(index_expr.get());
-        }
-        if(expansion)
-        {
-            children.emplace_back(expansion.get());
         }
 
         return children;
@@ -3201,22 +3205,26 @@ public:
     std::vector<const expression*> get_children() const override
     {
         std::vector<const expression*> children;
-        children.reserve(
-          exprs.size()
-          + static_cast<std::size_t>(index_expr != nullptr)
-          + static_cast<std::size_t>(expansion != nullptr));
-
-        for(auto& e: exprs)
+        if(expansion != nullptr)
         {
-            children.emplace_back(e.get());
+            children.reserve(1 + static_cast<std::size_t>(index_expr != nullptr));
+            children.emplace_back(expansion.get());
         }
+        else
+        {
+            children.reserve(
+              exprs.size()
+              + static_cast<std::size_t>(index_expr != nullptr));
+
+            for(auto& e: exprs)
+            {
+                children.emplace_back(e.get());
+            }
+        }
+
         if(index_expr)
         {
             children.emplace_back(index_expr.get());
-        }
-        if(expansion)
-        {
-            children.emplace_back(expansion.get());
         }
 
         return children;
@@ -3690,6 +3698,7 @@ public:
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]

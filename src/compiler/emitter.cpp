@@ -779,44 +779,6 @@ void instruction_emitter::collect_imports()
             }
         }
     }
-
-    for(const auto& m: macro_env.macros)
-    {
-        const auto& desc = m->get_desc();
-        if(!desc.serialized_ast.has_value())
-        {
-            throw emitter_error(
-              std::format(
-                "Macro '{}' has empty AST.",
-                m->get_name()));
-        }
-
-        memory_read_archive ar{
-          desc.serialized_ast.value(),
-          true,
-          std::endian::little};
-
-        std::unique_ptr<ast::expression> macro_ast;
-        ar& ast::expression_serializer{macro_ast};
-
-        macro_ast->visit_nodes(
-          [this](const ast::expression& e) -> void
-          {
-              if(e.is_macro_invocation()
-                 && e.get_namespace_path().has_value())
-              {
-                  // TODO
-                  throw std::runtime_error("instruction_emitter::collect_imports (macros)");
-
-                  //   codegen_ctx.add_import(
-                  //     module_::symbol_type::macro,
-                  //     e.get_namespace_path().value(),    // NOLINT(bugprone-unchecked-optional-access)
-                  //     e.as_named_expression()->get_name().s);
-              }
-          },
-          true,
-          false);
-    }
 }
 
 /**

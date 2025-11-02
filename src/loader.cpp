@@ -153,22 +153,6 @@ bool context::resolve_macros(macro::env& env, ty::context& type_ctx)
           },
           false,
           false);
-
-        // Add import from macro AST to type context.
-        macro_ast->visit_nodes(
-          [&type_ctx, &needs_import_resolution](const ast::expression& e) -> void
-          {
-              if(e.is_macro_invocation()
-                 && e.get_namespace_path().has_value())
-              {
-                  // TODO type context
-                  throw std::runtime_error("resolve_macros");
-              }
-
-              // TODO Function calls need to be resolved.
-          },
-          true,
-          false);
     }
 
     return needs_import_resolution;

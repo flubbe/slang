@@ -439,7 +439,7 @@ void macro_branch::resolve_names(rs::context& ctx)
 
 void macro_expression_list::resolve_names([[maybe_unused]] rs::context& ctx)
 {
-    throw cg::codegen_error(loc, "Non-expanded macro expression list.");
+    // no-op.
 }
 
 /*
