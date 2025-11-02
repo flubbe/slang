@@ -166,6 +166,34 @@ public:
         reference = std::nullopt);
 
     /**
+     * Declare an external symbol. The symbol is added to the global scope.
+     *
+     * @note Multiple calls for the same symbol are allowed.
+     *
+     * @param qualified_name Fully qualified symbol name.
+     * @param type The symbol type.
+     * @param loc The symbol's location in the source.
+     * @returns Returns `true` if a new symbol for the declaration was inserted
+     *          into the semantic environment.
+     */
+    bool declare_external(
+      std::string qualified_name,
+      sema::symbol_type type,
+      source_location loc);
+
+    /**
+     * Check if a given symbol already exists, respecting the current
+     * scope information.
+     *
+     * @param name Qualified or unqualified name of the symbol. If the name is fully qualified,
+     *             the symbol will be searched in the global scope.
+     * @returns Returns whether the symbol exists in the semantic environment.
+     */
+    bool has_symbol(
+      const std::string& name,
+      sema::symbol_type type) const;
+
+    /**
      * Enter a scope by pushing it onto the scope stack.
      *
      * @param name An optional name. If not supplied, a name will be generated based on source location.

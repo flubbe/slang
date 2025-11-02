@@ -12,6 +12,7 @@
 
 #include "compiler/codegen/codegen.h"
 #include "compiler/loader.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
@@ -21,6 +22,7 @@ namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
 namespace ld = slang::loader;
+namespace macro = slang::macro;
 namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace tl = slang::lowering;
@@ -52,9 +54,10 @@ TEST(resolve, std)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -93,9 +96,10 @@ TEST(resolve, std)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 
@@ -136,9 +140,10 @@ TEST(resolve, std)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         co::context co_ctx{sema_env};
         ty::context type_ctx;
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         tl::context lowering_ctx{type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
 

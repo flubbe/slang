@@ -196,6 +196,114 @@ sema::symbol_id context::declare(
     return new_symbol_id;
 }
 
+bool context::declare_external(
+  std::string qualified_name,
+  sema::symbol_type type,
+  source_location loc)
+{
+    sema::scope* s = get_scope(context::global_scope_id);
+
+    auto it = std::ranges::find_if(
+      s->bindings,
+      [&qualified_name, type](const auto& b) -> bool
+      {
+          if(b.first != qualified_name)
+          {
+              return false;
+          }
+
+          return b.second.contains(type);
+      });
+    if(it != s->bindings.end())
+    {
+        auto symbol_id = it->second[type];
+
+        // Redefinitions are allowed (e.g. multiple module referencing the same module / symbol).
+        if(env.transitive_imports.contains(symbol_id))
+        {
+            env.transitive_imports.erase(symbol_id);
+        }
+
+        return false;
+    }
+
+    // insert new declaration.
+    auto new_symbol_id = generate_symbol_id();
+
+    it = std::ranges::find_if(
+      s->bindings,
+      [&qualified_name](const auto& b) -> bool
+      {
+          return b.first == qualified_name;
+      });
+    if(it == s->bindings.end())
+    {
+        s->bindings.insert(
+          {qualified_name,
+           std::unordered_map<sema::symbol_type, sema::symbol_id>{
+             {type, new_symbol_id}}});
+    }
+    else
+    {
+        it->second.insert({type, new_symbol_id});
+    }
+
+    auto [entry, success] = env.symbol_table.insert(
+      {new_symbol_id,
+       sema::symbol_info{
+         .name = qualified_name,
+         .qualified_name = qualified_name,
+         .type = type,
+         .loc = loc,
+         .scope = current_scope,
+         .declaring_module = sema::symbol_id::invalid,
+         .reference = std::nullopt}});
+    if(!success)
+    {
+        throw redefinition_error(
+          entry->second.name,
+          type,
+          loc,
+          entry->second.loc);
+    }
+
+    return true;
+}
+
+bool context::has_symbol(
+  const std::string& name,
+  sema::symbol_type type) const
+{
+    if(name.find("::") != std::string::npos)
+    {
+        auto it = std::ranges::find_if(
+          env.symbol_table,
+          [&name, type](const auto& p) -> bool
+          {
+              return p.second.type == type
+                     && p.second.qualified_name == name;
+          });
+
+        return it != env.symbol_table.cend();
+    }
+
+    const sema::scope* s = get_scope(current_scope);
+
+    auto it = std::ranges::find_if(
+      s->bindings,
+      [&name, type](const auto& b) -> bool
+      {
+          if(b.first != name)
+          {
+              return false;
+          }
+
+          return b.second.contains(type);
+      });
+
+    return it != s->bindings.cend();
+}
+
 sema::scope_id context::push_scope(
   const std::optional<std::string>& name,
   source_location loc)

@@ -137,7 +137,7 @@ bool context::resolve_macros(
 
         // update namespace information.
         macro_ast->visit_nodes(
-          [&needs_import_resolution](ast::expression& e) -> void
+          [&co_ctx, &needs_import_resolution](ast::expression& e) -> void
           {
               if(e.get_id() != ast::node_identifier::namespace_access_expression)
               {
@@ -149,9 +149,17 @@ bool context::resolve_macros(
               {
                   e.update_namespace();
 
-                  // TODO check that the package is (transitively) resolved.
+                  co_ctx.push_scope(co::context::global_scope_id);
 
-                  // needs_import_resolution = true; // FIXME enable once package is marked as import
+                  if(co_ctx.declare_external(
+                       e.get_namespace_path().value(),
+                       sema::symbol_type::module_,
+                       e.get_location()))
+                  {
+                      needs_import_resolution = true;
+                  }
+
+                  co_ctx.pop_scope();
               }
           },
           false,

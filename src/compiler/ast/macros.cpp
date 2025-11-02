@@ -224,7 +224,7 @@ bool expression::expand_macros(
                   const auto& path = namespace_path.value();
 
                   // TODO type context
-                  throw std::runtime_error("expression::expand_macros");
+                  //                  throw std::runtime_error("expression::expand_macros");
               }
           },
           true,
