@@ -691,7 +691,9 @@ void type_cast_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> type_cast_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> type_cast_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     target_type->type_check(ctx, env);
 
@@ -773,7 +775,9 @@ void namespace_access_expression::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_id> namespace_access_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> namespace_access_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     expr_type = expr->type_check(ctx, env);
     if(!expr_type.has_value())
@@ -904,7 +908,9 @@ void access_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> access_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> access_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     auto type = lhs->type_check(ctx, env);
     if(!type.has_value())
@@ -1041,7 +1047,9 @@ void directive_expression::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_id> directive_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> directive_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     expr_type = expr->type_check(ctx, env);
     if(expr_type.has_value())
@@ -1305,7 +1313,9 @@ void variable_reference_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> variable_reference_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> variable_reference_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     array_type = std::nullopt;
 
@@ -1558,7 +1568,9 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
     return nullptr;
 }
 
-std::optional<ty::type_id> variable_declaration_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> variable_declaration_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(ctx.has_expression_type(*this))
     {
@@ -1677,7 +1689,9 @@ void constant_declaration_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> constant_declaration_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> constant_declaration_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     // Prevent double declaration of constant.
     if(ctx.has_expression_type(*this))
@@ -1816,7 +1830,9 @@ void array_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> array_initializer_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> array_initializer_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     std::optional<ty::type_id> element_type = std::nullopt;
     for(auto& it: exprs)
@@ -1942,7 +1958,9 @@ void struct_definition_expression::define_type(ty::context& ctx) const
     ctx.seal_struct(struct_type_id);
 }
 
-std::optional<ty::type_id> struct_definition_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> struct_definition_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     for(const auto& m: members)
     {
@@ -2059,8 +2077,16 @@ void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
+    // don't check twice, otherwise the fields will be initialized multiple times.
+    if(ctx.has_expression_type(*this))
+    {
+        return ctx.get_expression_type(*this);
+    }
+
     auto struct_type_id = ctx.get_type(get_qualified_name());    // FIXME should use symbol id?
     const auto& struct_info = ctx.get_struct_info(struct_type_id);
 
@@ -2155,7 +2181,9 @@ void named_initializer::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_id> named_initializer::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> named_initializer::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     return expr->type_check(ctx, env);
 }
@@ -2259,8 +2287,16 @@ void struct_named_initializer_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> struct_named_initializer_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> struct_named_initializer_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
+    // don't check twice, otherwise the fields will be initialized multiple times.
+    if(ctx.has_expression_type(*this))
+    {
+        return ctx.get_expression_type(*this);
+    }
+
     auto struct_type_id = ctx.get_type(get_qualified_name());    // FIXME should use symbol id?
     const ty::struct_info& info = ctx.get_struct_info(struct_type_id);
 
@@ -2738,7 +2774,9 @@ void binary_expression::collect_names(co::context& ctx)
     rhs->collect_names(ctx);
 }
 
-std::optional<ty::type_id> binary_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> binary_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
     {
@@ -3120,7 +3158,9 @@ void unary_expression::collect_names(co::context& ctx)
     operand->collect_names(ctx);
 }
 
-std::optional<ty::type_id> unary_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> unary_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(!ctx.has_expression_type(*operand))
     {
@@ -3256,7 +3296,9 @@ void new_expression::collect_names(co::context& ctx)
     expr->collect_names(ctx);
 }
 
-std::optional<ty::type_id> new_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> new_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     type_expr->type_check(ctx, env);
 
@@ -3327,7 +3369,9 @@ std::unique_ptr<cg::value> null_expression::generate_code(
     return std::make_unique<cg::value>(cg::type{cg::type_kind::null});
 }
 
-std::optional<ty::type_id> null_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> null_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     expr_type = ctx.get_null_type();
     ctx.set_expression_type(*this, expr_type);
@@ -3419,7 +3463,9 @@ void postfix_expression::collect_names(co::context& ctx)
     identifier->collect_names(ctx);
 }
 
-std::optional<ty::type_id> postfix_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> postfix_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     auto identifier_type = identifier->type_check(ctx, env);
     if(!identifier_type.has_value())
@@ -3689,7 +3735,9 @@ void block::collect_names(co::context& ctx, bool push_anonymous_scope)
     }
 }
 
-std::optional<ty::type_id> block::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> block::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     for(auto& expr: exprs | std::views::take(exprs.size() - 1))
     {
@@ -3943,7 +3991,9 @@ void function_expression::collect_names(co::context& ctx)
     ctx.pop_scope();
 }
 
-std::optional<ty::type_id> function_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> function_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(body)
     {
@@ -4054,7 +4104,9 @@ void call_expression::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> call_expression::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> call_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(!symbol_id.has_value())
     {
@@ -4347,7 +4399,9 @@ void return_statement::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> return_statement::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> return_statement::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     if(!env.current_function_name.has_value())
     {
@@ -4527,7 +4581,9 @@ void if_statement::collect_names(co::context& ctx)
     }
 }
 
-std::optional<ty::type_id> if_statement::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> if_statement::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     auto condition_type = condition->type_check(ctx, env);
     if(!condition_type.has_value())
@@ -4639,7 +4695,9 @@ void while_statement::collect_names(co::context& ctx)
     while_block->collect_names(ctx);
 }
 
-std::optional<ty::type_id> while_statement::type_check(ty::context& ctx, sema::env& env)
+std::optional<ty::type_id> while_statement::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     auto condition_type = condition->type_check(ctx, env);
     if(!condition_type.has_value())

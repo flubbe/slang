@@ -987,10 +987,23 @@ std::unique_ptr<expression> macro_expression::expand(
         else if(e.is_struct_member_access())
         {
             // rename macro variable.
-            auto* expr = e.as_access_expression()->get_left_expression()->as_named_expression();
-            if(original_local_names.contains(expr->name.s))
+            expression* expr = e.as_access_expression()->get_left_expression();
+            while(expr != nullptr && expr->is_struct_member_access())
             {
-                expr->name.s = make_local_name(invocation_id, expr->name.s);
+                expr = expr->as_access_expression()->get_left_expression();
+            }
+
+            if(expr == nullptr || !expr->is_named_expression())
+            {
+                throw cg::codegen_error(
+                  e.get_location(),
+                  "Could not get variable name for struct access.");
+            }
+
+            auto* expr_named = expr->as_named_expression();
+            if(original_local_names.contains(expr_named->name.s))
+            {
+                expr_named->name.s = make_local_name(invocation_id, expr_named->name.s);
             }
         }
     };
