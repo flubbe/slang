@@ -20,6 +20,9 @@
 #include "resolve.h"
 #include "utils.h"
 
+// DEBUG
+#include <print>
+
 namespace slang::resolve
 {
 
@@ -265,6 +268,8 @@ std::optional<sema::symbol_id> context::resolve_external(
   module_id module_id,
   const sema::symbol_info& info)
 {
+    std::print("resolve_external: {}\n", module_name);
+
     // check if the symbol is already resolved.
     auto sym_id = sema_env.get_symbol_id(
       info.qualified_name,

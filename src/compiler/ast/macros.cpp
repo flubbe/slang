@@ -10,6 +10,7 @@
 
 #include "archives/archive.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/name_utils.h"
 #include "compiler/typing.h"
@@ -17,7 +18,6 @@
 #include "ast.h"
 #include "builtins.h"
 #include "node_registry.h"
-#include "loader.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;

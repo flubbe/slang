@@ -13,13 +13,13 @@
 
 #include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "commandline.h"
-#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
@@ -234,7 +234,7 @@ void compile::invoke(const std::vector<std::string>& args)
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
             resolver_ctx.resolve_imports(loader_ctx);
-        } while(ld::context::resolve_macros(macro_env, type_ctx));
+        } while(ld::context::resolve_macros(co_ctx, macro_env, type_ctx));
     } while(ast->expand_macros(
       co_ctx,
       resolver_ctx,

@@ -33,8 +33,9 @@ add_executable(slang
     src/compiler/constant.cpp
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
-    src/compiler/lowering.cpp
+    src/compiler/loader.cpp
     src/compiler/location.cpp
+    src/compiler/lowering.cpp
     src/compiler/macro.cpp
     src/compiler/opt/cfg.cpp
     src/compiler/parser.cpp
@@ -53,7 +54,6 @@ add_executable(slang
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp
-    src/loader.cpp
     src/main.cpp
     src/module_resolver.cpp
     src/package.cpp

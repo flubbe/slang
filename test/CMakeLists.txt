@@ -52,6 +52,7 @@ add_executable(test_parser
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
@@ -61,7 +62,6 @@ add_executable(test_parser
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
-    ../src/loader.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
@@ -108,6 +108,7 @@ add_executable(test_compile_ir
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/resolve.cpp
@@ -116,7 +117,6 @@ add_executable(test_compile_ir
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/loader.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
@@ -142,6 +142,7 @@ add_executable(test_type_system
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
@@ -152,7 +153,6 @@ add_executable(test_type_system
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/loader.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
@@ -183,6 +183,7 @@ add_executable(test_resolve
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/location.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
@@ -192,7 +193,6 @@ add_executable(test_resolve
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/loader.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
@@ -224,6 +224,7 @@ add_executable(test_opt_cfg
     ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
@@ -235,7 +236,6 @@ add_executable(test_opt_cfg
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
-    ../src/loader.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
@@ -266,6 +266,7 @@ add_executable(test_output
     ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
@@ -277,7 +278,6 @@ add_executable(test_output
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
-    ../src/loader.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
@@ -319,6 +319,7 @@ add_executable(test_ast_serialization
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
@@ -329,7 +330,6 @@ add_executable(test_ast_serialization
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
-    ../src/loader.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )

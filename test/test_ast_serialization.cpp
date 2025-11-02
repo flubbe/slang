@@ -12,17 +12,19 @@
 
 #include "compiler/ast/node_registry.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/loader.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "archives/file.h"
-#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
 namespace ld = slang::loader;
+namespace macro = slang::macro;
 namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace tl = slang::lowering;
@@ -51,9 +53,10 @@ void run_test(
     ld::context loader_ctx{mgr};
     sema::env env;
     const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
     co::context co_ctx{env};
-    rs::context resolver_ctx{env, const_env, type_ctx};
+    rs::context resolver_ctx{env, const_env, macro_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx{env, const_env, lowering_ctx};
 

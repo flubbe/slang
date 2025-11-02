@@ -11,12 +11,12 @@
 #include <format>
 
 #include "compiler/ast/ast.h"
+#include "compiler/loader.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "shared/type_utils.h"
 #include "codegen.h"
-#include "loader.h"
 #include "utils.h"
 
 namespace slang::codegen

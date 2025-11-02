@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "compiler/codegen/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
@@ -22,6 +23,7 @@ namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
+namespace macro = slang::macro;
 namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace ty = slang::typing;
@@ -70,9 +72,10 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     sema::env sema_env;
     const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, const_env, type_ctx};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
     slang::opt::cfg::context cfg_context{codegen_ctx};

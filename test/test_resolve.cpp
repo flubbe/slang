@@ -11,10 +11,10 @@
 #include <gtest/gtest.h>
 
 #include "compiler/codegen/codegen.h"
+#include "compiler/loader.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
-#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;

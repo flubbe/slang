@@ -12,6 +12,7 @@
 
 #include <stdexcept>
 
+#include "compiler/collect.h"
 #include "compiler/token.h"
 #include "shared/module.h"
 #include "filemanager.h"
@@ -33,6 +34,7 @@ struct env;
 namespace slang::loader
 {
 
+namespace co = slang::collect;
 namespace ty = slang::typing;
 
 /**
@@ -140,11 +142,13 @@ public:
      * @note Macro resolution might lead to additional imports being needed. That is,
      *       if the function returns `true`, import resolution needs to be run.
      *
+     * @param co_ctx Collection context.
      * @param env Macro collection / expansion environment.
      * @param type_ctx The type context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
     static bool resolve_macros(
+      co::context& co_ctx,
       macro::env& env,
       ty::context& type_ctx);
 };

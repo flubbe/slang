@@ -17,6 +17,7 @@
 #include "compiler/codegen/codegen.h"
 #include "compiler/constant.h"
 #include "compiler/emitter.h"
+#include "compiler/loader.h"
 #include "compiler/lowering.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -24,13 +25,13 @@
 #include "compiler/typing.h"
 #include "compiler/ast/node_registry.h"
 #include "shared/module.h"
-#include "loader.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
 namespace ld = slang::loader;
+namespace macro = slang::macro;
 namespace rs = slang::resolve;
 namespace sema = slang::sema;
 namespace tl = slang::lowering;
@@ -73,12 +74,12 @@ TEST(output, native_binding)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -264,12 +265,12 @@ TEST(output, emitter)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -328,12 +329,12 @@ TEST(output, hello_world)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -383,12 +384,12 @@ TEST(output, hello_world)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -453,12 +454,12 @@ TEST(output, operators)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -505,12 +506,12 @@ TEST(output, operators)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -563,12 +564,12 @@ TEST(output, string_operations)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -615,12 +616,12 @@ TEST(output, string_operations)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -692,12 +693,12 @@ TEST(output, prefix_postfix)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -774,12 +775,12 @@ TEST(output, control_flow)
     ld::context loader_ctx{mgr};
     sema::env sema_env;
     const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
     tl::context lowering_ctx{type_ctx};
     co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, const_env, type_ctx};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
     cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-    slang::macro::env macro_env;
     slang::instruction_emitter emitter{
       sema_env,
       const_env,
@@ -836,12 +837,12 @@ TEST(output, loops)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -907,12 +908,12 @@ TEST(output, loops)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -961,12 +962,12 @@ TEST(output, infinite_recursion)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1022,12 +1023,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1111,12 +1112,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1162,12 +1163,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1206,12 +1207,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1250,12 +1251,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1299,12 +1300,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1377,12 +1378,12 @@ TEST(output, arrays)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1445,12 +1446,12 @@ TEST(output, return_discard)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1513,12 +1514,12 @@ TEST(output, return_discard)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1568,12 +1569,12 @@ TEST(output, return_discard)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1622,12 +1623,12 @@ TEST(output, missing_return)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1674,12 +1675,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1730,12 +1731,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1792,12 +1793,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1845,12 +1846,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1899,12 +1900,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -1954,12 +1955,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2011,12 +2012,12 @@ TEST(output, structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2070,12 +2071,12 @@ TEST(output, nested_structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2134,12 +2135,12 @@ TEST(output, nested_structs)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2195,12 +2196,12 @@ TEST(output, type_imports)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2249,12 +2250,12 @@ TEST(output, null_assignment)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2299,12 +2300,12 @@ TEST(output, null_access)
         ld::context loader_ctx{mgr};
         sema::env sema_env;
         const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, type_ctx};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::macro::env macro_env;
         slang::instruction_emitter emitter{
           sema_env,
           const_env,
@@ -2361,12 +2362,12 @@ TEST(output, multiple_modules)
             ld::context loader_ctx{mgr};
             sema::env sema_env;
             const_::env const_env;
+            macro::env macro_env;
             ty::context type_ctx;
             tl::context lowering_ctx{type_ctx};
             co::context co_ctx{sema_env};
-            rs::context resolver_ctx{sema_env, const_env, type_ctx};
+            rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
             cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-            slang::macro::env macro_env;
             slang::instruction_emitter emitter{
               sema_env,
               const_env,

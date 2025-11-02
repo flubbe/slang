@@ -11,14 +11,14 @@
 #include <format>
 #include <ranges>
 
-#include "compiler/ast/ast.h"
-#include "compiler/ast/node_registry.h"
-#include "compiler/codegen/codegen.h"
-#include "compiler/macro.h"
-#include "compiler/typing.h"
+#include "ast/ast.h"
+#include "ast/node_registry.h"
+#include "codegen/codegen.h"
 #include "shared/type_utils.h"
-#include "package.h"
 #include "loader.h"
+#include "macro.h"
+#include "typing.h"
+#include "package.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
@@ -109,7 +109,10 @@ std::string context::resolve_name(const std::string& name) const
     return name;
 }
 
-bool context::resolve_macros(macro::env& env, ty::context& type_ctx)
+bool context::resolve_macros(
+  co::context& co_ctx,
+  macro::env& env,
+  ty::context& type_ctx)
 {
     bool needs_import_resolution = false;
 
@@ -134,22 +137,22 @@ bool context::resolve_macros(macro::env& env, ty::context& type_ctx)
 
         // update namespace information.
         macro_ast->visit_nodes(
-          [](ast::expression& e) -> void
+          [&needs_import_resolution](ast::expression& e) -> void
           {
               if(e.get_id() != ast::node_identifier::namespace_access_expression)
               {
                   return;
               }
 
-              if(!e.is_macro_invocation())
+              if(e.is_macro_invocation()
+                 || e.is_call_expression())
               {
-                  return;
+                  e.update_namespace();
+
+                  // TODO check that the package is (transitively) resolved.
+
+                  // needs_import_resolution = true; // FIXME enable once package is marked as import
               }
-
-              // this updates the namespace information.
-              (void)e.as_macro_invocation();
-
-              // TODO Function calls need to be resolved.
           },
           false,
           false);
