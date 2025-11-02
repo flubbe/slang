@@ -113,7 +113,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     // Flags.
 
-    bool evaluate_constant_subexpressions = result.count("no-eval-const-subexpr") > 0;
+    bool evaluate_constant_subexpressions = result.count("no-eval-const-subexpr") == 0;
     if(verbose)
     {
         if(!evaluate_constant_subexpressions)
@@ -216,7 +216,11 @@ void compile::invoke(const std::vector<std::string>& args)
       macro_env,
       type_ctx,
       codegen_ctx};
-    codegen_ctx.evaluate_constant_subexpressions = evaluate_constant_subexpressions;
+
+    if(!evaluate_constant_subexpressions)
+    {
+        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
+    }
 
     ast->collect_names(co_ctx);
     ast->collect_attributes(sema_env);

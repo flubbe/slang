@@ -1440,6 +1440,16 @@ struct constant_table_entry : public module_::constant_table_entry
     }
 };
 
+/** Codegen control flags. */
+using codegen_flag_type = std::uint32_t;
+
+/** Codegen attributes. */
+enum class codegen_flags : codegen_flag_type
+{
+    none = 0,               /** No attributes set. */
+    enable_const_eval_ = 1, /** Evaluate constant (sub-)expressions. Enabled by default. */
+};
+
 /** Code generator context. */
 class context
 {
@@ -1482,6 +1492,10 @@ class context
     /** Holds the array type when declaring an array. */
     std::optional<value> array_type = std::nullopt;
 
+    /** Codegen flags. */
+    codegen_flag_type flags{
+      static_cast<codegen_flag_type>(codegen_flags::enable_const_eval_)};
+
 protected:
     /**
      * Check that the insertion point is not null.
@@ -1495,10 +1509,6 @@ protected:
             throw codegen_error("Invalid insertion point (nullptr).");
         }
     }
-
-public:
-    /** Whether to evaluate constant subexpressions during code generation. */
-    bool evaluate_constant_subexpressions{true};
 
 public:
     /** Constructors. */
@@ -1813,6 +1823,30 @@ public:
     std::size_t get_break_continue_stack_size() const
     {
         return basic_block_brk_cnt.size();
+    }
+
+    /** Get codegen flags. */
+    codegen_flag_type get_flags() const
+    {
+        return flags;
+    }
+
+    /** Set all codegen flags. */
+    void set_flags(codegen_flag_type flags)
+    {
+        this->flags = flags;
+    }
+
+    /** Check if a flag is set. */
+    bool has_flag(codegen_flags flag)
+    {
+        return (flags & static_cast<codegen_flag_type>(flag)) != 0;
+    }
+
+    /** Clear a specific flag. */
+    void clear_flag(codegen_flags flag)
+    {
+        flags &= ~static_cast<codegen_flag_type>(flag);
     }
 
     /*

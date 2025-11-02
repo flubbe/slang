@@ -1038,6 +1038,52 @@ std::unique_ptr<cg::value> directive_expression::generate_code(
   cg::context& ctx,
   memory_context mc) const
 {
+    // enable/disable codegen flags.
+    auto saved_flags = ctx.get_flags();
+    auto new_flags = saved_flags;
+
+    auto update_flags = [&new_flags](const std::string& name, bool enable) -> void
+    {
+        cg::codegen_flags flag = cg::codegen_flags::none;
+
+        if(name == "const_eval")
+        {
+            flag = cg::codegen_flags::enable_const_eval_;
+        }
+
+        if(enable)
+        {
+            new_flags |= static_cast<cg::codegen_flag_type>(flag);
+        }
+        else
+        {
+            new_flags &= ~static_cast<cg::codegen_flag_type>(flag);
+        }
+    };
+
+    if(name.s == "enable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(key.s, true);
+        }
+    }
+    else if(name.s == "disable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(key.s, false);
+        }
+    }
+
+    auto _ = gsl::finally(
+      [&ctx, saved_flags]()
+      {
+          ctx.set_flags(saved_flags);
+      });
+
+    ctx.set_flags(new_flags);
+
     return expr->generate_code(ctx, mc);
 }
 
@@ -2568,55 +2614,38 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
     if(!is_assignment || is_compound)
     {
         // Evaluate constant subexpressions.
-        bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
-        bool disable_const_eval = !ctx_const_eval;
-
-        // TODO
-        // disable_const_eval = ctx.get_directive_flag(
-        //   "disable",
-        //   "const_eval",
-        //   disable_const_eval);
-
+        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
         {
-            // Reset constant expression evaluation on scope exit.
-            auto _ = gsl::finally(
-              [&ctx, ctx_const_eval]
-              { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
-            ctx.evaluate_constant_subexpressions = !disable_const_eval;
+            auto info = const_eval_it->second;
 
-            auto it = ctx.get_const_env().const_eval_expr_values.find(this);
-            if(ctx.evaluate_constant_subexpressions
-               && it != ctx.get_const_env().const_eval_expr_values.cend())
+            if(info.type == const_::constant_type::i32)
             {
-                auto info = it->second;
+                const auto back_end_type = cg::type_kind::i32;
 
-                if(info.type == const_::constant_type::i32)
-                {
-                    const auto back_end_type = cg::type_kind::i32;
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<int>(info.value));
 
-                    ctx.generate_const(
-                      {back_end_type},
-                      std::get<int>(info.value));
-
-                    return std::make_unique<cg::value>(back_end_type);
-                }
-
-                if(info.type == const_::constant_type::f32)
-                {
-                    const auto back_end_type = cg::type_kind::f32;
-
-                    ctx.generate_const(
-                      {back_end_type},
-                      std::get<float>(info.value));
-
-                    return std::make_unique<cg::value>(back_end_type);
-                }
-
-                std::println(
-                  "{}: Warning: Attempted constant expression computation failed.",
-                  ::slang::to_string(loc));
-                // fall-through
+                return std::make_unique<cg::value>(back_end_type);
             }
+
+            if(info.type == const_::constant_type::f32)
+            {
+                const auto back_end_type = cg::type_kind::f32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<float>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            std::println(
+              "{}: Warning: Attempted constant expression computation failed.",
+              ::slang::to_string(loc));
+            // fall-through
         }
 
         lhs_value = lhs->generate_code(ctx, memory_context::load);
@@ -3018,55 +3047,38 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
     }
 
     // Evaluate constant subexpressions.
-    bool ctx_const_eval = ctx.evaluate_constant_subexpressions;
-    bool disable_const_eval = !ctx_const_eval;
-
-    // TODO
-    // disable_const_eval = ctx.get_directive_flag(
-    //   "disable",
-    //   "const_eval",
-    //   disable_const_eval);
-
+    auto it = ctx.get_const_env().const_eval_expr_values.find(this);
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+       && it != ctx.get_const_env().const_eval_expr_values.cend())
     {
-        // Reset constant expression evaluation on scope exit.
-        auto _ = gsl::finally(
-          [&ctx, ctx_const_eval]
-          { ctx.evaluate_constant_subexpressions = ctx_const_eval; });
-        ctx.evaluate_constant_subexpressions = !disable_const_eval;
+        const auto& info = it->second;
 
-        auto it = ctx.get_const_env().const_eval_expr_values.find(this);
-        if(ctx.evaluate_constant_subexpressions
-           && it != ctx.get_const_env().const_eval_expr_values.cend())
+        if(info.type == const_::constant_type::i32)
         {
-            const auto& info = it->second;
+            const auto back_end_type = cg::type{cg::type_kind::i32};
 
-            if(info.type == const_::constant_type::i32)
-            {
-                const auto back_end_type = cg::type{cg::type_kind::i32};
+            ctx.generate_const(
+              back_end_type,
+              std::get<int>(info.value));
 
-                ctx.generate_const(
-                  back_end_type,
-                  std::get<int>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            if(info.type == const_::constant_type::f32)
-            {
-                const auto back_end_type = cg::type{cg::type_kind::f32};
-
-                ctx.generate_const(
-                  back_end_type,
-                  std::get<float>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            std::println(
-              "{}: Warning: Attempted constant expression computation failed.",
-              ::slang::to_string(loc));
-            // fall-through
+            return std::make_unique<cg::value>(back_end_type);
         }
+
+        if(info.type == const_::constant_type::f32)
+        {
+            const auto back_end_type = cg::type{cg::type_kind::f32};
+
+            ctx.generate_const(
+              back_end_type,
+              std::get<float>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        std::println(
+          "{}: Warning: Attempted constant expression computation failed.",
+          ::slang::to_string(loc));
+        // fall-through
     }
 
     if(op.s == "+")

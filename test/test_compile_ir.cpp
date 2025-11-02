@@ -144,7 +144,7 @@ cg::context get_context(
   tl::context& lowering_ctx)
 {
     cg::context ctx{sema_env, const_env, lowering_ctx};
-    ctx.evaluate_constant_subexpressions = false;
+    ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
     return ctx;
 }
 
