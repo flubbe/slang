@@ -77,14 +77,12 @@ class context
      *
      * @param module_name The module name.
      * @param module_id The module the symbol is in.
-     * @param module_env Semantic environment of the module.
      * @param info Symbol information.
      * @returns Returns the symbol info or `std::nullopt` on failure.
      */
     std::optional<sema::symbol_id> resolve_external(
       const std::string& module_name,
       module_id module_id,
-      const sema::env& module_env,
       const sema::symbol_info& info);
 
     /**

@@ -256,7 +256,7 @@ bool context::declare_external(
          .type = type,
          .loc = loc,
          .scope = current_scope,
-         .declaring_module = sema::symbol_id::invalid,
+         .declaring_module = sema::symbol_info::current_module_id,
          .reference = std::nullopt}});
     if(!success)
     {

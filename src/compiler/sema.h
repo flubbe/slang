@@ -243,7 +243,8 @@ struct env
     /**
      * Get a symbol id.
      *
-     * @param name The symbol's name (qualified or unqualified).
+     * @note Qualified names are detected by containing `::`.
+     * @param name The symbol's name, qualified or unqualified.
      * @param type The symbol's type.
      * @param scope_id The symbol's scope.
      * @returns Returns the symbol id or `std::nullopt` if the symbol was not found.
@@ -253,6 +254,18 @@ struct env
       const std::string& name,
       symbol_type type,
       scope_id id) const;
+
+    /**
+     * Get a symbol id.
+     *
+     * @param qualified_name The symbol's qualified name.
+     * @param type The symbol's type.
+     * @returns Returns the symbol id or `std::nullopt` if the symbol was not found.
+     */
+    [[nodiscard]]
+    std::optional<symbol_id> get_symbol_id(
+      const std::string& qualified_name,
+      symbol_type type) const;
 
     /**
      * Add attribute.

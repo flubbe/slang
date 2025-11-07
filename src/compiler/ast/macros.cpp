@@ -192,53 +192,8 @@ bool expression::expand_macros(
         ++macro_expansion_count;
     };
 
-    auto function_import_visitor = [&codegen_ctx, &type_ctx](expression& e)
-    {
-        if(!e.is_macro_invocation())
-        {
-            return;
-        }
-
-        auto* macro_expr = e.as_macro_invocation();
-        if(!macro_expr->has_expansion())
-        {
-            return;
-        }
-
-        // Handle transitive import names.
-        macro_expr->expansion->visit_nodes(
-          [&codegen_ctx, &type_ctx](expression& e) -> void
-          {
-              if(!e.is_call_expression())
-              {
-                  return;
-              }
-
-              // function calls can never be made for transitive imports,
-              // that is, all modules have to be explicit imports here.
-
-              auto* c = e.as_call_expression();
-              std::optional<std::string> namespace_path = c->get_namespace_path();
-              if(namespace_path.has_value())
-              {
-                  const auto& path = namespace_path.value();
-
-                  // TODO type context
-                  //                  throw std::runtime_error("expression::expand_macros");
-              }
-          },
-          true,
-          false);
-    };
-
     visit_nodes(
       macro_expansion_visitor,
-      true,  /* visit this node */
-      false, /* pre-order traversal */
-      filter_macros);
-
-    visit_nodes(
-      function_import_visitor,
       true,  /* visit this node */
       false, /* pre-order traversal */
       filter_macros);
@@ -267,11 +222,6 @@ bool expression::expand_macros(
                       // Set the namespace to the import's name (stored in macro_expr).
                       e.set_namespace(macro_expr->get_namespace());
                   }
-
-                  //   auto* m = e.as_macro_invocation();
-                  //   m->name.s = name::qualified_name(
-                  //     m->get_namespace_path().value(),
-                  //     m->name.s);
               }
           },
           true,

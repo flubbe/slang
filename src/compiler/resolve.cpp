@@ -232,10 +232,6 @@ void context::import_type(
 
     for(const auto& m: desc.member_types)
     {
-        const std::string qualified_type_name = name::qualified_name(
-          module_name,
-          m.second.base_type.base_type());
-
         bool has_type = type_ctx.has_type(m.second.base_type.base_type());
         bool is_builtin = has_type
                           && type_ctx.is_builtin(
@@ -263,18 +259,65 @@ void context::import_type(
 std::optional<sema::symbol_id> context::resolve_external(
   const std::string& module_name,
   module_id module_id,
-  const sema::env& module_env,
   const sema::symbol_info& info)
 {
     // check if the symbol is already resolved.
     auto sym_id = sema_env.get_symbol_id(
       info.qualified_name,
-      info.type,
-      sema_env.global_scope_id);
+      info.type);
     if(sym_id.has_value())
     {
-        return sym_id.value();
+        return sym_id;
     }
+
+    // add declaring module.
+    auto declaring_module_it = sema_env.symbol_table.find(info.declaring_module);
+    if(declaring_module_it == sema_env.symbol_table.cend())
+    {
+        throw std::runtime_error(
+          std::format(
+            "Cannot insert symbol '{}' into global scope: Declaring module not found in symbol table.",
+            info.qualified_name));
+    }
+    if(declaring_module_it->second.type != sema::symbol_type::module_)
+    {
+        throw std::runtime_error(
+          std::format(
+            "Cannot insert symbol '{}' into global scope: Symbol does not reference a declaring module.",
+            info.qualified_name));
+    }
+
+    auto declaring_module_symbol_id = [this, &info, &declaring_module_it]() -> sema::symbol_id
+    {
+        if(auto id = sema_env.get_symbol_id(
+             declaring_module_it->second.qualified_name,
+             sema::symbol_type::module_);
+           id.has_value())
+        {
+            return id.value();
+        }
+
+        auto declaring_module_symbol_id = generate_symbol_id();
+        auto [entry, success] = sema_env.symbol_table.insert(
+          {declaring_module_symbol_id,
+           sema::symbol_info{
+             .name = declaring_module_it->second.name,
+             .qualified_name = declaring_module_it->second.qualified_name,
+             .type = sema::symbol_type::module_,
+             .loc = info.loc,
+             .scope = sema_env.global_scope_id,
+             .declaring_module = sema::symbol_info::current_module_id,
+             .reference = std::nullopt}});
+        if(!success)
+        {
+            throw std::runtime_error(
+              std::format(
+                "Could not insert symbol '{}' into global namespace.",
+                info.qualified_name));
+        }
+
+        return declaring_module_symbol_id;
+    }();
 
     // import the symbol.
     auto new_symbol_id = generate_symbol_id();
@@ -301,7 +344,7 @@ std::optional<sema::symbol_id> context::resolve_external(
          .type = info.type,
          .loc = info.loc,
          .scope = sema_env.global_scope_id,
-         .declaring_module = info.declaring_module,    // FIXME This might refer to its parent within the external sema env.
+         .declaring_module = declaring_module_symbol_id,
          .reference = info.reference}});
     if(!success)
     {
@@ -399,8 +442,7 @@ std::optional<sema::symbol_id> context::resolve(
         // Resolve module.
         auto mod_symbol_id = sema_env.get_symbol_id(
           mod_name,
-          sema::symbol_type::module_,
-          sema_env.global_scope_id);
+          sema::symbol_type::module_);
         if(mod_symbol_id == std::nullopt)
         {
             return std::nullopt;
@@ -479,7 +521,6 @@ std::optional<sema::symbol_id> context::resolve(
         return resolve_external(
           mod_name,
           mod_id->second,
-          mod_env->second,
           external_symbol->second);
     }
 
@@ -512,6 +553,12 @@ sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
     }
 }
 
+/**
+ * Return the modules in a module graph topologically ordered.
+ *
+ * @param module_graph The module graph, given as `(name, dependencies)`.
+ * @returns Returns the unique modules from the graph in topological order.
+ */
 static std::vector<std::string> topological_order(
   const std::unordered_map<
     std::string,
@@ -534,7 +581,7 @@ static std::vector<std::string> topological_order(
     }
 
     std::unordered_map<std::string, std::size_t> indeg;
-    for(auto& [m, deps]: module_graph)
+    for(const auto& [m, deps]: module_graph)
     {
         indeg[m] = deps.size();
     }
@@ -570,7 +617,7 @@ static std::vector<std::string> topological_order(
 
     if(order.size() != module_graph.size())
     {
-        throw std::runtime_error("Cycle detected in module graph");
+        throw std::runtime_error("Module graph is incomplete or contains a cycle.");
     }
 
     return order;
@@ -579,16 +626,8 @@ static std::vector<std::string> topological_order(
 void context::resolve_imports(
   ld::context& loader)
 {
-    sema::env module_import_env;
-    co::context module_import_collector{module_import_env};
-
-    module_import_env.next_symbol_id = sema_env.next_symbol_id;
-
-    if(module_import_collector.push_scope("<global>", {0, 0})
-       != co::context::global_scope_id)
-    {
-        throw std::runtime_error("Got unexpected scope id for global scope.");
-    }
+    co::context import_collector{sema_env};
+    import_collector.push_scope(sema_env.global_scope_id);
 
     std::unordered_map<
       sema::symbol_id,
@@ -622,7 +661,7 @@ void context::resolve_imports(
         auto [it, success] = unresolved_modules.insert(
           {info.qualified_name,
            info.declaring_module});
-        if(!success && info.declaring_module == sema::symbol_id::invalid)
+        if(!success && info.declaring_module == sema::symbol_info::current_module_id)
         {
             it->second = sema::symbol_info::current_module_id;
         }
@@ -674,41 +713,47 @@ void context::resolve_imports(
 
         auto unqualified_name = name::unqualified_name(qualified_module_name);
 
-        sema::symbol_id module_id = sema::symbol_id::invalid;
-        if(!transitive)
+        sema::symbol_id module_symbol_id =
+          [this,
+           &loc,
+           transitive,
+           &import_collector,
+           &unqualified_name,
+           &qualified_module_name,
+           &importing_module]() -> sema::symbol_id
         {
-            // we should already have a module id
-            auto opt_id = sema_env.get_symbol_id(
-              qualified_module_name,
-              sema::symbol_type::module_,
-              sema_env.global_scope_id);
-
-            if(!opt_id.has_value())
+            if(!transitive)
             {
-                throw std::runtime_error(
-                  std::format(
-                    "No symbol id for non-transitive module '{}'.",
-                    qualified_module_name));
+                // we should already have a module id
+                auto opt_id = sema_env.get_symbol_id(
+                  qualified_module_name,
+                  sema::symbol_type::module_);
+
+                if(!opt_id.has_value())
+                {
+                    throw std::runtime_error(
+                      std::format(
+                        "No symbol id for non-transitive module '{}'.",
+                        qualified_module_name));
+                }
+
+                return opt_id.value();
             }
 
-            module_id = opt_id.value();
-        }
-        else
-        {
-            module_id = module_import_collector.declare(
+            return import_collector.declare(
               unqualified_name,
               qualified_module_name,
               sema::symbol_type::module_,
               loc,
               importing_module,
               transitive);
-        }
+        }();
 
-        module_ids[qualified_module_name] = module_id;
+        module_ids[qualified_module_name] = module_symbol_id;
         module_graph[qualified_module_name] = {};
         pending_modules[qualified_module_name] = {
           resolver,
-          module_id};
+          module_symbol_id};
 
         auto& module_graph_entry = module_graph[qualified_module_name];
 
@@ -720,8 +765,13 @@ void context::resolve_imports(
             }
 
             std::string qualified_name = loader.resolve_name(it.name);
-            module_graph_entry.insert(qualified_name);
 
+            if(module_map.contains(qualified_name))
+            {
+                continue;
+            }
+
+            module_graph_entry.insert(qualified_name);
             if(module_graph.contains(qualified_name))
             {
                 continue;
@@ -735,7 +785,7 @@ void context::resolve_imports(
             unresolved_modules.insert(
               std::make_pair(
                 qualified_name,
-                module_id));
+                module_symbol_id));
 
             module_locations.insert(
               {qualified_name,
@@ -743,14 +793,7 @@ void context::resolve_imports(
         }
     }
 
-    sema_env.next_symbol_id = module_import_env.next_symbol_id;
-    if(module_import_env.next_scope_id != co::context::global_scope_id + 1)
-    {
-        throw std::runtime_error(
-          "Inconsistent semantic environment after import: Non-global scopes were created.");
-    }
-
-    std::vector<std::string> module_load_order = topological_order(module_graph);
+    const std::vector<std::string> module_load_order = topological_order(module_graph);
 
     for(const auto& qualified_module_name: module_load_order)
     {
@@ -797,7 +840,7 @@ void context::resolve_imports(
               qualified_module_name,
               it.name);
 
-            auto symbol_id = import_collector.declare(
+            import_collector.declare(
               it.name,
               qualified_name,
               to_sema_symbol_type(it.type),

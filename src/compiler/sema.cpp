@@ -127,6 +127,24 @@ std::optional<symbol_id> env::get_symbol_id(
     return std::nullopt;
 }
 
+std::optional<symbol_id> env::get_symbol_id(
+  const std::string& name,
+  symbol_type type) const
+{
+    auto it = std::ranges::find_if(
+      symbol_table,
+      [&name](const std::pair<symbol_id, symbol_info>& p) -> bool
+      {
+          return p.second.qualified_name == name;
+      });
+    if(it == symbol_table.end())
+    {
+        return std::nullopt;
+    }
+
+    return it->first;
+}
+
 void env::attach_attribute(
   symbol_id id,
   attribute_info attrib)
