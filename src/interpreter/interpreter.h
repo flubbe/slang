@@ -99,9 +99,8 @@ class context
      * @param size The function's bytecode size.
      * @param locals The locals for the function.
      * @param frame The stack frame for the function.
-     * @return The function's return opcode.
      */
-    opcode exec(
+    void exec(
       const module_loader& loader,
       std::size_t entry_point,
       std::size_t size,
@@ -166,6 +165,31 @@ public:
      *         or if the function `func` is `nullptr`.
      */
     void register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func);
+
+    /**
+     * Register a type layout. If a layout of the same name already exists, a `gc_error` is thrown.
+     *
+     * @param name Name of the type.
+     * @param layout The type layout, given as a list of offsets of pointers.
+     * @returns Returns a layout identifier.
+     * @throws Throws a `gc_error´ if the layout already exists.
+     */
+    std::size_t register_type_layout(std::string name, std::vector<std::size_t> layout)
+    {
+        return gc.register_type_layout(std::move(name), std::move(layout));
+    }
+
+    /**
+     * Get a type layout id from the type's name.
+     *
+     * @param name Name of the type.
+     * @returns Returns the layout identifier.
+     * @throws Throws a ´gc_error` if the name was not found.
+     */
+    std::size_t get_type_layout_id(const std::string& name) const
+    {
+        return gc.get_type_layout_id(name);
+    }
 
     /**
      * Resolve a module given it's import name. This loads the module if it is not
