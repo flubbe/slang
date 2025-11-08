@@ -642,7 +642,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
 
     // only cast if necessary.
     cg::type lowered_type = ctx.lower(target_type->get_type());
-    if(lowered_type != v->get_type())    // FIXME namespaces
+    if(lowered_type != v->get_type())
     {
         if(lowered_type.get_type_kind() == cg::type_kind::i32
            && v->get_type().get_type_kind() == cg::type_kind::f32)
@@ -713,8 +713,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(
     if(cast_from != primitive_type_casts.end())
     {
         auto cast_to = cast_from->second.find(
-          ctx.resolve_type(
-            target_type->get_name().s));    // FIXME Should be resolved in type_expression.
+          target_type->get_type());
         if(cast_to == cast_from->second.end())
         {
             throw ty::type_error(
@@ -1365,21 +1364,21 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
 {
     array_type = std::nullopt;
 
-    ty::type_id type;    // FIXME set to invalid id
-    if(expansion)
+    ty::type_id type = [this, &ctx, &env]() -> ty::type_id
     {
-        std::optional<ty::type_id> t = expansion->type_check(ctx, env);
-        if(!t.has_value())
+        if(expansion)
         {
-            throw ty::type_error(
-              expansion->get_location(),
-              "Expression has no type.");
+            std::optional<ty::type_id> t = expansion->type_check(ctx, env);
+            if(!t.has_value())
+            {
+                throw ty::type_error(
+                  expansion->get_location(),
+                  "Expression has no type.");
+            }
+
+            return t.value();
         }
 
-        type = t.value();
-    }
-    else
-    {
         if(!symbol_id.has_value())
         {
             throw ty::type_error(
@@ -1398,8 +1397,8 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
                 get_qualified_name()));
         }
 
-        type = env.type_map[symbol_id.value()];
-    }
+        return env.type_map[symbol_id.value()];
+    }();
 
     if(element_expr)
     {

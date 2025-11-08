@@ -868,8 +868,6 @@ class type_cast_expression : public expression
     /** The target type. */
     std::unique_ptr<type_expression> target_type;
 
-    // FIXME Use a back-end target type for code generation?
-
 public:
     /** Set the super class. */
     using super = expression;

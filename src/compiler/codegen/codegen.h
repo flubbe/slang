@@ -696,9 +696,6 @@ class cast_argument : public argument
     /** The type cast. */
     type_cast cast;
 
-    /** Result type id. */
-    value result_value;
-
     /** Result type of the cast. */
     type_kind result_type;
 
@@ -736,8 +733,6 @@ public:
         {
             throw codegen_error("Unknown cast type.");
         }
-
-        result_value = value{result_type};
     }
 
     /** Return the cast type. */
@@ -751,12 +746,6 @@ public:
     std::string to_string([[maybe_unused]] const name_resolver* resolver = nullptr) const override
     {
         return std::format("{}", ::slang::codegen::to_string(cast));
-    }
-
-    [[nodiscard]]
-    const value* get_value() const    // FIXME Remove / replace by get_target_type
-    {
-        return &result_value;
     }
 };
 
