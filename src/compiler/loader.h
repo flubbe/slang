@@ -144,13 +144,11 @@ public:
      *
      * @param co_ctx Collection context.
      * @param env Macro collection / expansion environment.
-     * @param type_ctx The type context.
      * @returns `true` if macros were resolved, and `false` otherwise.
      */
     static bool resolve_macros(
       co::context& co_ctx,
-      macro::env& env,
-      ty::context& type_ctx);
+      macro::env& env);
 };
 
 }    // namespace slang::loader

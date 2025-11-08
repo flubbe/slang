@@ -34,7 +34,6 @@ bool expression::expand_macros(
   co::context& co_ctx,
   rs::context& rs_ctx,
   cg::context& codegen_ctx,
-  ty::context& type_ctx,
   macro::env& macro_env,
   const std::vector<expression*>& macro_asts)
 {
@@ -202,7 +201,7 @@ bool expression::expand_macros(
     {
         // adjust local namespaces and transitive import names.
         macro_expr->expansion->visit_nodes(
-          [&type_ctx, &macro_expr](expression& e) -> void
+          [&macro_expr](expression& e) -> void
           {
               if(e.is_macro_invocation())
               {
@@ -561,13 +560,13 @@ std::unique_ptr<cg::value> macro_expression::generate_code(
 }
 
 std::optional<ty::type_id> macro_expression::type_check(
-  ty::context& ctx,
+  [[maybe_unused]] ty::context& ctx,
   sema::env& env)
 {
     // Check that all necessary imports exist in the type context.
 
     visit_nodes(
-      [this, &ctx, &env](expression& e) -> void
+      [this, &env](expression& e) -> void
       {
           std::optional<std::string> namespace_path{std::nullopt};
 
@@ -654,6 +653,15 @@ std::string macro_expression::to_string() const
 
 void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env) const
 {
+    if(!symbol_id.has_value())
+    {
+        throw std::runtime_error(
+          std::format(
+            "{}: Macro '{}' has no symbol id.",
+            ::slang::to_string(get_location()),
+            get_qualified_name()));
+    }
+
     std::vector<std::pair<std::string, module_::directive_descriptor>> attributes;
 
     // FIXME Module macro descriptors have to be updated.

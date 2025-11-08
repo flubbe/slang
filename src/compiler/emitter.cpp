@@ -622,6 +622,8 @@ void instruction_emitter::collect_imports()
                 continue;
             }
 
+            // the linter does not seem to detect the above check.
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             imports.intern_struct(std::get<ty::struct_info>(field_type_info.data).qualified_name.value());
         }
     }
@@ -1089,7 +1091,7 @@ void instruction_emitter::emit_instruction(
         }
         else if(type_kind == cg::type_kind::str)
         {
-            const_::constant_id id = static_cast<const cg::constant_str*>(
+            const_::constant_id id = static_cast<const cg::constant_str*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                                        arg->get_value())
                                        ->get_constant_id();
             auto it = constant_map.find(id);
@@ -1178,11 +1180,11 @@ void instruction_emitter::emit_instruction(
         auto v = v_arg->get_value();
 
         // get the stack argument.
-        const cg::stack_value_argument* stack_args[2] = {
+        std::array<const cg::stack_value_argument*, 2> stack_args = {
           static_cast<const cg::stack_value_argument*>(args[1].get()),    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
           static_cast<const cg::stack_value_argument*>(args[2].get())     // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         };
-        stack_value s[2] = {
+        std::array<stack_value, 2> s = {
           stack_args[0]->get_value(),
           stack_args[1]->get_value()};
 
@@ -1435,6 +1437,14 @@ void instruction_emitter::emit_instruction(
         const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         const cg::type type = arg->get_lowered_type();                             // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
 
+        if(!type.get_type_id().has_value())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Cannot emit instruction '{}': No type specified.",
+                name));
+        }
+
         // resolve type to index.
         vle_int struct_index{0};
 
@@ -1593,11 +1603,13 @@ static std::variant<
     {
         return std::get<int>(data);
     }
-    else if(type == const_::constant_type::f32)
+
+    if(type == const_::constant_type::f32)
     {
         return std::get<float>(data);
     }
-    else if(type == const_::constant_type::str)
+
+    if(type == const_::constant_type::str)
     {
         return std::get<std::string>(data);
     }
@@ -1682,6 +1694,14 @@ void instruction_emitter::run()
     for(const auto& f: codegen_ctx.funcs)
     {
         auto [signature_ret_type, signature_arg_types] = f->get_signature();
+
+        if(!signature_ret_type.get_type_id().has_value())
+        {
+            throw emitter_error(
+              std::format(
+                "{}: No return type.",
+                f->get_name()));
+        }
 
         auto type_id = signature_ret_type.get_type_id().value();
         auto base_type_id = type_ctx.get_base_type(type_id);
@@ -1804,6 +1824,15 @@ void instruction_emitter::run()
             }
             unset_indices.erase(index);
 
+            if(!ty.get_type_id().has_value())
+            {
+                throw emitter_error(
+                  std::format(
+                    "{}: Argument {} has no symbol id.",
+                    f->get_name(),
+                    index));
+            }
+
             auto type_id = ty.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);
             bool is_array = type_ctx.is_array(type_id);
@@ -1846,6 +1875,15 @@ void instruction_emitter::run()
                     index));
             }
             unset_indices.erase(index);
+
+            if(!ty.get_type_id().has_value())
+            {
+                throw emitter_error(
+                  std::format(
+                    "{}: Local {} has no symbol id.",
+                    f->get_name(),
+                    index));
+            }
 
             auto type_id = ty.get_type_id().value();
             auto base_type_id = type_ctx.get_base_type(type_id);

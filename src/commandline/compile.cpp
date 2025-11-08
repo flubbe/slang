@@ -234,12 +234,11 @@ void compile::invoke(const std::vector<std::string>& args)
         do    // NOLINT(cppcoreguidelines-avoid-do-while)
         {
             resolver_ctx.resolve_imports(loader_ctx);
-        } while(ld::context::resolve_macros(co_ctx, macro_env, type_ctx));
+        } while(ld::context::resolve_macros(co_ctx, macro_env));
     } while(ast->expand_macros(
       co_ctx,
       resolver_ctx,
       codegen_ctx,
-      type_ctx,
       macro_env,
       module_macro_asts));
 

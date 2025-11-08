@@ -22,8 +22,8 @@ namespace slang::ast
  */
 
 std::optional<const_::const_info> literal_expression::evaluate(
-  ty::context& type_ctx,
-  const_::env& env) const
+  [[maybe_unused]] ty::context& type_ctx,
+  [[maybe_unused]] const_::env& env) const
 {
     if(!tok.value.has_value())
     {

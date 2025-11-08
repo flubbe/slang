@@ -177,7 +177,7 @@ std::string value::to_string([[maybe_unused]] const name_resolver* resolver) con
  * const_argument.
  */
 
-std::string const_argument::to_string(const name_resolver* resolver) const
+std::string const_argument::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
     auto kind = v->get_type().get_type_kind();
 

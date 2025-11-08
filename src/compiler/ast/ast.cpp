@@ -251,11 +251,11 @@ void expression::define_types(ty::context& ctx) const
 }
 
 void expression::bind_constant_declarations(
-  sema::env& sema_env,
+  [[maybe_unused]] sema::env& sema_env,
   const_::env& const_env) const
 {
     visit_nodes(
-      [&sema_env, &const_env](const expression& expr) -> void
+      [&const_env](const expression& expr) -> void
       {
           if(!expr.is_constant_declaration())
           {
@@ -3383,7 +3383,7 @@ std::unique_ptr<cg::value> null_expression::generate_code(
 
 std::optional<ty::type_id> null_expression::type_check(
   ty::context& ctx,
-  sema::env& env)
+  [[maybe_unused]] sema::env& env)
 {
     expr_type = ctx.get_null_type();
     ctx.set_expression_type(*this, expr_type);
@@ -3826,8 +3826,6 @@ std::unique_ptr<cg::value> function_expression::generate_code(
          symbol_id.value(),
          attribs::attribute_kind::native))
     {
-        const auto& symbol_table = ctx.get_sema_env().symbol_table;
-
         std::vector<
           std::pair<
             sema::symbol_id,
@@ -3835,7 +3833,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
           args =
             prototype->get_arg_infos()
             | std::views::transform(
-              [&ctx, &symbol_table](const std::pair<sema::symbol_id, ty::type_id>& p)
+              [&ctx](const std::pair<sema::symbol_id, ty::type_id>& p)
                 -> std::pair<sema::symbol_id, cg::type>
               {
                   return std::make_pair(

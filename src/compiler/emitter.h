@@ -108,7 +108,7 @@ public:
      * @returns Returns the import index of the package.
      * @throws Throws an `emitter_error` if the package could not be found.
      */
-    std::size_t get_package(const std::string& qualifed_name) const;
+    std::size_t get_package(const std::string& qualified_name) const;
 
     /**
      * Add a function to the import table.
@@ -229,11 +229,11 @@ public:
      * Add a struct to the export table.
      *
      * @param emitter The instruction emitter.
-     * @param info The struct definition.
+     * @param type The struct definition.
      */
     void add_struct(
       const instruction_emitter& emitter,
-      const ty::struct_info& info);
+      const ty::struct_info& type);
 
     /**
      * Add a constant to the export table.

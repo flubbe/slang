@@ -111,8 +111,7 @@ std::string context::resolve_name(const std::string& name) const
 
 bool context::resolve_macros(
   co::context& co_ctx,
-  macro::env& env,
-  ty::context& type_ctx)
+  macro::env& env)
 {
     bool needs_import_resolution = false;
 
