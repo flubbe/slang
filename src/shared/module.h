@@ -299,7 +299,7 @@ class variable_type
 {
     friend class si::module_loader;
     friend class si::arguments_scope;
-    friend archive& operator&(archive& ar, variable_type& ts);
+    friend archive& operator&(archive& ar, variable_type& ty);
 
     /**
      * The decoded type string.

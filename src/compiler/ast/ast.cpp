@@ -3953,7 +3953,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
     }
     else
     {
-        auto native_payload = ctx.get_sema_env().get_attribute_payload(
+        auto native_payload = ctx.get_sema_env().get_attribute_payload(    // checked above // NOLINT(bugprone-unchecked-optional-access)
                                                   symbol_id.value(),
                                                   attribs::attribute_kind::native)
                                 .value();
@@ -3962,7 +3962,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
 
         if(std::ranges::count_if(
              key_value_pairs,
-             [](const std::pair<std::string, std::string&> p) -> bool
+             [](const std::pair<std::string, std::string&>& p) -> bool
              {
                  return p.first == "lib";
              })

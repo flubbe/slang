@@ -168,7 +168,7 @@ TEST(codegen, validate_basic_block)
  * @param name The argument's name.
  * @param ty The argument's type.
  */
-static void add_arg(
+void add_arg(
   co::context& ctx,
   std::vector<
     std::pair<
@@ -554,10 +554,10 @@ TEST(codegen, conditional_branch)
  * @param name The local's name.
  * @param ty The local's type.
  */
-static sema::symbol_id add_local(
+sema::symbol_id add_local(
   co::context& ctx,
   cg::function* fn,
-  std::string name,
+  const std::string& name,
   cg::type ty)
 {
     auto local_id = ctx.declare(

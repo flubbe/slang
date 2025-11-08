@@ -546,7 +546,7 @@ void context::set_expression_type(const ast::expression& expr, std::optional<typ
               std::format(
                 "Could not set type: Expression type differs from last evaluation ('{}' != '{}').",
                 expression_types[&expr].has_value()
-                  ? to_string(expression_types[&expr].value())
+                  ? to_string(expression_types[&expr].value())    // NOLINT(bugprone-unchecked-optional-access)
                   : std::string{"<none>"},
                 id.has_value()
                   ? to_string(id.value())
