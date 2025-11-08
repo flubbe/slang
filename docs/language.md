@@ -95,8 +95,45 @@ Ignoring comments, a program consists of:
         5. `break` and `continue` statements:
             Break or continue a `while` loop.
         6. `return [<expression>]`: Return from a function.
-    2. Expressions: TODO
+    2. Expressions:
+        1. Literals:
+
+            Integer, floating-point, and string literals.
+        2. Variable and member access:
+
+            A variable is referenced by its name.
+            Members of structs or arrays are accessed using the `.` and `[]` operators:
+            ```
+            <struct-name>.<member-name>
+            <array-name>[<index-expression>]
+            ```
+        3. Function calls:
+
+            ```
+            <function-name>(<arg-expr1>, ..., <arg-exprN>);
+            ```
+            The argument expressions are evaluated left to right before the call.
+        4. Binary operators for number types:
+
+            Standard arithmetic (`+`, `-`, `*`, `/`, `%`),
+            left/right shifts (`<<`, `>>`), comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`),
+            logical (`&&`, `||`, `!`) and bitwise (`&`, `|`, `^`) operators are supported (shifts, logical and bitwise operators only for `i32`).
+
+            Operator precedence follows conventional rules, with parentheses `(<expr>)`
+            used for explicit grouping.
+
+        5. Unary operators for number types:
+
+            Unary `+` (identity), `-` (negation) and `!` (logical not, only for `i32`) apply to a single operand.
+
+        6. Assignments:
+            ```
+            <target> = <expression>;
+            ```
+            Assigns the result of the right-hand expression to the target variable or member.
+
     3. Type casts: 
+    
         An expression type can be cast to another type
         when adhering to type cast rules. Type casts are indicated
         by `as` used after the to-be cast expression:
@@ -183,7 +220,13 @@ uses whatever the underlying C++ implementation provides, but e.g. `f32` is only
 
 ## Modules
 
-TODO
+A _module_ is a single (source or compiled) file. It is identified by a path of the form:
+```
+path::to::module
+```
+Modules are resolved by traversing the search path list.
+
+A _package_ is a collection of modules in a directory.
 
 ## The standard library
 
@@ -263,5 +306,3 @@ See the example consisting of
 - [examples/native_integration.cpp](../examples/native_integration.cpp), 
 - [examples/native_integration.sl](../examples/native_integration.sl)
 - [examples/CMakeLists.txt](../examples/CMakeLists.txt).
-
-TODO 
