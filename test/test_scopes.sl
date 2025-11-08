@@ -15,6 +15,15 @@ fn test_local_scopes() -> void
     {
         let i: i32 = 2;
         std::assert(i == 2, "i == 2");
+
+        {
+            let j: f32 = 1.23;
+            std::assert(j == 1.23, "j == 1.23");
+
+            i = 0;
+        }
+
+        std::assert(i == 0, "i == 0");
     }
 
     std::assert(i == 1, "i == 1");
