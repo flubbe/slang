@@ -62,6 +62,7 @@ Ignoring comments, a program consists of:
         <statement-or-expressionM>
     }
     ```
+    Any `{ ... }` block introduces a new scope.
     1. Statements:
         1. Empty statement `;`.
         2. Variable declarations: `let <name> : <type> [=<expression>];`. 
