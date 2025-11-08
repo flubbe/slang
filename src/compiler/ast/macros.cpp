@@ -87,7 +87,7 @@ bool expression::expand_macros(
                         std::format("Unnamed expression in macro list."));
                   }
 
-                  return macro_expr->get_name().s == m->as_named_expression()->get_name().s;
+                  return macro_expr->get_name() == m->as_named_expression()->get_name();
               });
 
             if(it == macro_asts.cend())
@@ -96,7 +96,7 @@ bool expression::expand_macros(
                   macro_expr->get_location(),
                   std::format(
                     "Macro '{}' not found.",
-                    macro_expr->get_name().s));
+                    macro_expr->get_name()));
             }
 
             macro_expr->set_expansion(
@@ -108,14 +108,14 @@ bool expression::expand_macros(
                   macro_expr->get_location(),
                   std::format(
                     "Macro '{}' has no scope.",
-                    macro_expr->get_name().s));
+                    macro_expr->get_name()));
             }
         }
         else
         {
             // expand imported macro.
             auto* m = macro_env.get_macro(
-              macro_expr->get_name().s,
+              macro_expr->get_name(),
               macro_expr->get_namespace_path());
 
             // check for built-in macros.
@@ -135,7 +135,7 @@ bool expression::expand_macros(
                       macro_expr->get_location(),
                       std::format(
                         "Could not load macro '{}' (no data).",
-                        macro_expr->get_name().s));
+                        macro_expr->get_name()));
                 }
 
                 memory_read_archive ar{
@@ -178,7 +178,7 @@ bool expression::expand_macros(
                   macro_expr->get_location(),
                   std::format(
                     "Macro '{}' has no scope.",
-                    macro_expr->get_name().s));
+                    macro_expr->get_name()));
             }
         }
 
@@ -212,7 +212,7 @@ bool expression::expand_macros(
                         macro_expr->get_location(),
                         std::format(
                           "Macro '{}' has no namespace path.",
-                          macro_expr->get_name().s));
+                          macro_expr->get_name()));
                   }
 
                   if(e.get_id() != ast::node_identifier::namespace_access_expression
@@ -341,7 +341,45 @@ std::optional<ty::type_id> macro_invocation::type_check(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    auto expr_type = expansion->type_check(ctx, env);
+    auto return_type = expansion->type_check(ctx, env);
+
+    if(index_expr)
+    {
+        if(!return_type.has_value())
+        {
+            throw ty::type_error(
+              index_expr->get_location(),
+              "Indexing into expression without type.");
+        }
+
+        auto v = index_expr->type_check(ctx, env);
+        if(!v.has_value())
+        {
+            throw ty::type_error(
+              index_expr->get_location(),
+              "Index expression has no type.");
+        }
+        if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Expected <integer> for array element access, got '{}'.",
+                ctx.to_string(v.value())));
+        }
+
+        if(!ctx.is_array(return_type.value()))
+        {
+            throw ty::type_error(loc, "Cannot use subscript on non-array type.");
+        }
+
+        expr_type = ctx.array_element_type(return_type.value());
+    }
+    else
+    {
+        expr_type = return_type;
+    }
+
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -350,7 +388,7 @@ std::optional<ty::type_id> macro_invocation::type_check(
 std::string macro_invocation::to_string() const
 {
     std::string ret = std::format(
-      "MacroInvocation(callee={}, exprs=(", get_name().s);
+      "MacroInvocation(callee={}, exprs=(", get_name());
 
     if(!exprs.empty())
     {
@@ -783,7 +821,7 @@ static const macro_branch* get_matching_branch(
           loc,
           std::format(
             "Could not match branch for macro '{}' defined at {}.",
-            macro_expr->as_named_expression()->get_name().s,
+            macro_expr->as_named_expression()->get_name(),
             slang::to_string(macro_expr->get_location())));
     }
 
@@ -1007,7 +1045,7 @@ std::unique_ptr<expression> macro_expression::expand(
               std::as_const(arg_pos),
               [ref_expr](const auto& p) -> bool
               {
-                  return ref_expr->get_name().s == p.first;
+                  return ref_expr->get_name() == p.first;
               });
             if(it == arg_pos.cend())
             {

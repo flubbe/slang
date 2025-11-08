@@ -149,8 +149,8 @@ void expression::collect_attributes(sema::env& env) const
           // not a filter, since the filter also removes child nodes.
           if(expr.get_id() == node_identifier::directive_expression)
           {
-              const auto* dir_expr = static_cast<const directive_expression*>(&expr);
-              const std::string& name = dir_expr->get_name().s;
+              const auto* dir_expr = static_cast<const directive_expression*>(&expr);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              const std::string& name = dir_expr->get_name();
 
               auto kind = attribs::get_attribute_kind(name);
               if(!kind.has_value())
@@ -210,7 +210,7 @@ void expression::declare_functions(ty::context& ctx, sema::env& env)
           // not a filter, since the filter also removes child nodes.
           if(expr.get_id() == node_identifier::function_expression)
           {
-              static_cast<function_expression*>(&expr)->declare_function(ctx, env);
+              static_cast<function_expression*>(&expr)->declare_function(ctx, env);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
           }
       },
       false, /* don't visit this node */
@@ -226,7 +226,7 @@ void expression::declare_types(ty::context& ctx, sema::env& env)
           // not a filter, since the filter also removes child nodes.
           if(expr.get_id() == node_identifier::struct_definition_expression)
           {
-              static_cast<struct_definition_expression*>(&expr)->declare_type(ctx, env);
+              static_cast<struct_definition_expression*>(&expr)->declare_type(ctx, env);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
           }
       },
       false, /* don't visit this node */
@@ -242,7 +242,7 @@ void expression::define_types(ty::context& ctx) const
           // not a filter, since the filter also removes child nodes.
           if(expr.get_id() == node_identifier::struct_definition_expression)
           {
-              static_cast<const struct_definition_expression*>(&expr)->define_type(ctx);
+              static_cast<const struct_definition_expression*>(&expr)->define_type(ctx);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
           }
       },
       false, /* don't visit this node */
@@ -720,7 +720,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(
               loc,
               std::format(
                 "Invalid cast to non-primitive type '{}'.",
-                target_type->get_name().s));
+                target_type->get_name()));
         }
     }
 
@@ -849,7 +849,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(
         }
         auto* identifier_expr = rhs->as_named_expression();
 
-        if(identifier_expr->get_name().s == "length")
+        if(identifier_expr->get_name() == "length")
         {
             if(mc == memory_context::store)
             {
@@ -865,7 +865,7 @@ std::unique_ptr<cg::value> access_expression::generate_code(
           rhs->get_location(),
           std::format(
             "Unknown array property '{}'.",
-            identifier_expr->get_name().s));
+            identifier_expr->get_name()));
     }
 
     /*
@@ -946,7 +946,7 @@ std::optional<ty::type_id> access_expression::type_check(
     }
 
     const auto* identifier_node = rhs->as_variable_reference();
-    field_index = ctx.get_field_index(type.value(), identifier_node->get_name().s);
+    field_index = ctx.get_field_index(type.value(), identifier_node->get_name());
     expr_type = ctx.get_field_type(type.value(), field_index);
     ctx.set_expression_type(*this, expr_type);
 
@@ -1218,7 +1218,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
           loc,
           std::format(
             "{}: Reference not found in symbol table (symbol id: {}).",
-            get_name().s,
+            get_name(),
             symbol_id.value().value));
     }
 
@@ -1517,7 +1517,7 @@ std::string type_expression::to_string() const
 
     return std::format(
       "TypeExpression(name={}, namespaces=({}), array={})",
-      get_name().s,
+      get_name(),
       namespace_string,
       array);
 }
@@ -1973,7 +1973,7 @@ void struct_definition_expression::collect_names(co::context& ctx)
 
 void struct_definition_expression::declare_type(ty::context& ctx, sema::env& env)
 {
-    struct_type_id = ctx.declare_struct(get_name().s, std::nullopt);
+    struct_type_id = ctx.declare_struct(get_name(), std::nullopt);
     auto& struct_info = ctx.get_struct_info(struct_type_id);
 
     if(env.has_attribute(
@@ -1997,7 +1997,7 @@ void struct_definition_expression::define_type(ty::context& ctx) const
     {
         ctx.add_field(
           struct_type_id,
-          m->get_name().s,
+          m->get_name(),
           ctx.get_type(m->get_type()->get_qualified_name()));
     }
     ctx.seal_struct(struct_type_id);
@@ -2237,7 +2237,7 @@ std::string named_initializer::to_string() const
 {
     return std::format(
       "NamedInitializer(name={}, expr={})",
-      get_name().s,
+      get_name(),
       expr->to_string());
 }
 
@@ -2359,7 +2359,7 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
     std::vector<std::string> initialized_member_names;    // used in check for duplicates
     for(const auto& initializer: initializers)
     {
-        const auto& member_name = initializer->get_name().s;
+        const auto& member_name = initializer->get_name();
 
         if(std::ranges::find_if(
              initialized_member_names,
@@ -2441,12 +2441,12 @@ std::string struct_named_initializer_expression::to_string() const
         {
             ret += std::format(
               "name={}, expr={}, ",
-              initializers[i]->get_name().s,
+              initializers[i]->get_name(),
               initializers[i]->get_expression()->to_string());
         }
         ret += std::format(
           "name={}, expr={}",
-          initializers.back()->get_name().s,
+          initializers.back()->get_name(),
           initializers.back()->get_expression()->to_string());
     }
     ret += ")";
@@ -3818,7 +3818,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
           loc,
           std::format(
             "Function '{}' has no symbol id.",
-            prototype->get_name().s));
+            prototype->get_name()));
     }
 
     if(!ctx.get_sema_env().has_attribute(
@@ -3844,7 +3844,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
         auto ret_type = ctx.lower(prototype->get_return_type_id());
 
         cg::function* fn = ctx.create_function(
-          prototype->get_name().s,
+          prototype->get_name(),
           ret_type,
           std::move(args));
 
@@ -3861,7 +3861,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
               loc,
               std::format(
                 "No function body defined for '{}'.",
-                prototype->get_name().s));
+                prototype->get_name()));
         }
 
         auto v = body->generate_code(ctx);
@@ -3913,7 +3913,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
               loc,
               std::format(
                 "Native function '{}': Expected single argument for 'lib' attribute.",
-                prototype->get_name().s));
+                prototype->get_name()));
         }
 
         std::string lib_name =
@@ -3936,7 +3936,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
               loc,
               std::format(
                 "Native function '{}': Invalid libary name in 'lib' attribute.",
-                prototype->get_name().s));
+                prototype->get_name()));
         }
 
         /*
@@ -3963,7 +3963,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
 
         ctx.create_native_function(
           lib_name,
-          prototype->get_name().s,
+          prototype->get_name(),
           ret_type,
           std::move(args));
     }
@@ -3975,7 +3975,7 @@ void function_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    const auto& name = prototype->get_name();
+    const auto& name = prototype->get_name_token();
     const std::string canonical_name = name::qualified_name(
       ctx.get_canonical_scope_name(ctx.get_current_scope()),
       name.s);
@@ -4007,7 +4007,7 @@ std::optional<ty::type_id> function_expression::type_check(
     if(body)
     {
         env.current_function_return_type = prototype->get_return_type_id();
-        env.current_function_name = prototype->get_name().s;
+        env.current_function_name = prototype->get_name();
 
         body->type_check(ctx, env);
 

@@ -14,6 +14,12 @@ macro sum! {
     };
 }
 
+macro identity! {
+    ($x: expr) => {
+        $x;
+    };
+}
+
 fn ret_i32() -> i32 {
     return -123;
 }
@@ -99,6 +105,10 @@ fn test_macro() -> void {
 
     let s5: i32 = sum!(1, 1, sum!(1, 1), 1, 1);
     std::assert(s5 == 6, "s5 == 6");
+
+    let a: [i32] = [1, 2, 3];
+    let b: i32 = identity!(a)[1];
+    std::assert(b == 2, "b == 2");
 }
 
 fn main(args: [str]) -> i32

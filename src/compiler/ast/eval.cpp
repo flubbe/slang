@@ -128,7 +128,9 @@ struct binary_operation_helper
             return {
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = func_i32(std::get<int>(lhs.value), std::get<int>(rhs.value))};
+              .value = func_i32(
+                static_cast<std::int32_t>(std::get<int>(lhs.value)),
+                static_cast<std::int32_t>(std::get<int>(rhs.value)))};
         }
 
         if(lhs.type == const_::constant_type::f32)
@@ -190,8 +192,8 @@ struct comparison_helper
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = func_i32(
-                std::get<int>(lhs.value),
-                std::get<int>(rhs.value))};
+                static_cast<std::int32_t>(std::get<int>(lhs.value)),
+                static_cast<std::int32_t>(std::get<int>(rhs.value)))};
         }
 
         if(lhs.type == const_::constant_type::f32)
@@ -466,7 +468,7 @@ struct unary_operation_helper
             return {
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = func_i32(std::get<int>(v.value))};
+              .value = func_i32(static_cast<std::int32_t>(std::get<int>(v.value)))};
         }
 
         if(v.type == const_::constant_type::f32)

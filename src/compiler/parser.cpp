@@ -1110,7 +1110,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
                 const auto* named_member_expr = member_names[i]->as_named_expression();
                 named_initializer_vector.emplace_back(
                   std::make_unique<ast::named_initializer>(
-                    named_member_expr->get_name(), std::move(initializers[i])));
+                    named_member_expr->get_name_token(), std::move(initializers[i])));
             }
 
             return std::make_unique<ast::struct_named_initializer_expression>(
