@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-#include "compiler/ast/ast.h"
+#include "ast/ast.h"
 #include "lexer.h"
 
 namespace slang
@@ -26,19 +26,9 @@ namespace slang
  */
 class parser_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a parser_error.
-     *
-     * @note Use the other constructor if you want to include token location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit parser_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a syntax_error.
      *
@@ -53,19 +43,9 @@ public:
  */
 class syntax_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a syntax_error.
-     *
-     * @note Use the other constructor if you want to include token location information in the error message.
-     *
-     * @param message The error message.
-     */
-    explicit syntax_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 
+public:
     /**
      * Construct a syntax_error.
      *
@@ -92,8 +72,12 @@ protected:
     /** The lexer common to all internal parse calls. */
     lexer* current_lexer{nullptr};
 
-    /** The parsed AST. */
-    std::shared_ptr<ast::expression> ast;
+    /**
+     * The parsed AST. Since the program essentially consist of a sequence
+     * of expressions, it is represented by an `ast::block`. This is also
+     * important for scoping later, since this block acts as the global scope.
+     */
+    std::shared_ptr<ast::block> ast;
 
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
@@ -275,7 +259,7 @@ public:
     void parse(lexer& lexer);
 
     /** Get the AST. */
-    std::shared_ptr<ast::expression> get_ast() const
+    std::shared_ptr<ast::block> get_ast() const
     {
         return ast;
     }

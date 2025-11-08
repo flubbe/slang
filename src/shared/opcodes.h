@@ -37,8 +37,8 @@ enum class opcode : opcode_base
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */
     aastore,     /** Store address from stack into array. */
-    idup,        /** Duplicate top i32 of the stack. */
-    fdup,        /** Duplicate top f32 of the stack. */
+    dup,         /** Duplicate top category 1 value of the stack. */
+    dup2,        /** Duplicate top category 2 value of the stack. */
     adup,        /** Duplicate top address of the stack. */
     dup_x1,      /** Duplicate top stack element and push it 2 elements down the stack. */
     dup_x2,      /** Duplicate top stack element and push it 3 elements down the stack. */
@@ -102,16 +102,7 @@ std::string to_string(opcode op);
 /** A opcode error. */
 class opcode_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `opcode_error`.
-     *
-     * @param message The error message.
-     */
-    explicit opcode_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /**
@@ -120,7 +111,7 @@ public:
  * @param ar The archive to use for serialization.
  * @param op The opcode to serialize.
  *
- * @throws Throws an opcode_error if the (read) opcode is invalid.
+ * @throws Throws an `opcode_error` if the (read) opcode is invalid.
  */
 archive& operator&(archive& ar, opcode& op);
 

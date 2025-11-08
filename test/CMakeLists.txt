@@ -27,6 +27,7 @@ add_test(NAME package COMMAND test_package)
 add_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/location.cpp
     ../src/compiler/token.cpp
 )
 target_link_libraries(test_lexer GTest::gtest GTest::gtest_main)
@@ -38,17 +39,31 @@ add_test(NAME lexer COMMAND test_lexer)
 
 add_executable(test_parser
     test_parser.cpp
+    ../src/archives/file.cpp
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_parser GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -60,17 +75,13 @@ add_test(NAME parser COMMAND test_parser)
 
 add_executable(test_codegen
     test_codegen.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/token.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_codegen GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -82,17 +93,31 @@ add_test(NAME codegen COMMAND test_codegen)
 
 add_executable(test_compile_ir
     test_compile_ir.cpp
+    ../src/archives/file.cpp
+    ../src/compiler/parser.cpp
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/resolve.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
-    ../src/compiler/parser.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_compile_ir GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -109,16 +134,26 @@ add_executable(test_type_system
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_type_system GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -139,16 +174,26 @@ add_executable(test_resolve
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_resolve GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -165,20 +210,34 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_opt_cfg
     test_opt_cfg.cpp
+    ../src/archives/file.cpp
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_opt_cfg GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -198,18 +257,28 @@ add_executable(test_output
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/emitter.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_output GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
@@ -241,18 +310,27 @@ add_executable(test_ast_serialization
     ../src/compiler/ast/builtins.cpp
     ../src/compiler/ast/eval.cpp
     ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/codegen/codegen.cpp
     ../src/archives/file.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
-    ../src/resolve.cpp
     ../src/utils.cpp
 )
 target_link_libraries(test_ast_serialization GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)

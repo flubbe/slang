@@ -9,17 +9,19 @@
  */
 
 #include "archives/archive.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
+#include "compiler/loader.h"
+#include "compiler/macro.h"
+#include "compiler/name_utils.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
 #include "builtins.h"
 #include "node_registry.h"
-#include "resolve.h"
 
 namespace cg = slang::codegen;
 namespace ty = slang::typing;
-namespace rs = slang::resolve;
+namespace ld = slang::loader;
 
 namespace slang::ast
 {
@@ -29,8 +31,10 @@ namespace slang::ast
  */
 
 bool expression::expand_macros(
+  co::context& co_ctx,
+  rs::context& rs_ctx,
   cg::context& codegen_ctx,
-  ty::context& type_ctx,
+  macro::env& macro_env,
   const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count{0};
@@ -43,8 +47,11 @@ bool expression::expand_macros(
 
     // replace macro nodes by the macro AST.
     auto macro_expansion_visitor =
-      [&macro_asts,
+      [&co_ctx,
+       &rs_ctx,
        &codegen_ctx,
+       &macro_env,
+       &macro_asts,
        &macro_expansion_count,
        &expanded_imported_macros](expression& e)
     {
@@ -94,12 +101,21 @@ bool expression::expand_macros(
 
             macro_expr->set_expansion(
               (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+
+            if(!macro_expr->scope_id.has_value())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' has no scope.",
+                    macro_expr->get_name().s));
+            }
         }
         else
         {
             // expand imported macro.
-            auto* m = codegen_ctx.get_macro(
-              macro_expr->get_name(),
+            auto* m = macro_env.get_macro(
+              macro_expr->get_name().s,
               macro_expr->get_namespace_path());
 
             // check for built-in macros.
@@ -155,57 +171,24 @@ bool expression::expand_macros(
 
                 expanded_imported_macros.push_back(macro_expr);
             }
+
+            if(!macro_expr->scope_id.has_value())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' has no scope.",
+                    macro_expr->get_name().s));
+            }
         }
+
+        co_ctx.push_scope(macro_expr->scope_id.value());
+        macro_expr->expansion->collect_names(co_ctx);
+        co_ctx.pop_scope();
+
+        macro_expr->expansion->resolve_names(rs_ctx);
 
         ++macro_expansion_count;
-    };
-
-    auto function_import_visitor = [&codegen_ctx, &type_ctx](expression& e)
-    {
-        if(!e.is_macro_invocation())
-        {
-            return;
-        }
-
-        auto* macro_expr = e.as_macro_invocation();
-        if(!macro_expr->has_expansion())
-        {
-            return;
-        }
-
-        // Handle transitive import names.
-        macro_expr->expansion->visit_nodes(
-          [&codegen_ctx, &type_ctx](expression& e) -> void
-          {
-              if(!e.is_call_expression())
-              {
-                  return;
-              }
-
-              // function calls can never be made for transitive imports,
-              // that is, all modules have to be explicit imports here.
-
-              auto* c = e.as_call_expression();
-              std::optional<std::string> namespace_path = c->get_namespace_path();
-              if(namespace_path.has_value())
-              {
-                  const auto& path = namespace_path.value();
-                  if(!type_ctx.has_import(path))
-                  {
-                      type_ctx.add_import(path, false);
-
-                      // TODO Do we need to validate that `path` is part of an import statement?
-                  }
-                  else if(type_ctx.is_transitive_import(path))
-                  {
-                      // make import explicit.
-                      type_ctx.add_import(path, false);
-                      codegen_ctx.make_import_explicit(path);
-                  }
-              }
-          },
-          true,
-          false);
     };
 
     visit_nodes(
@@ -214,32 +197,30 @@ bool expression::expand_macros(
       false, /* pre-order traversal */
       filter_macros);
 
-    visit_nodes(
-      function_import_visitor,
-      true,  /* visit this node */
-      false, /* pre-order traversal */
-      filter_macros);
-
     for(auto& macro_expr: expanded_imported_macros)
     {
         // adjust local namespaces and transitive import names.
         macro_expr->expansion->visit_nodes(
-          [&macro_expr, &type_ctx](expression& e) -> void
+          [&macro_expr](expression& e) -> void
           {
               if(e.is_macro_invocation())
               {
+                  auto macro_namespace = macro_expr->get_namespace_path();
+                  if(!macro_namespace.has_value())
+                  {
+                      throw cg::codegen_error(
+                        macro_expr->get_location(),
+                        std::format(
+                          "Macro '{}' has no namespace path.",
+                          macro_expr->get_name().s));
+                  }
+
                   if(e.get_id() != ast::node_identifier::namespace_access_expression
                      && !e.get_namespace_path().has_value())
                   {
                       // Set the namespace to the import's name (stored in macro_expr).
                       e.set_namespace(macro_expr->get_namespace());
                   }
-
-                  auto* m = e.as_macro_invocation();
-                  m->name.s = rs::make_import_name(
-                    m->name.s,
-                    type_ctx.is_transitive_import(
-                      m->get_namespace_path().value()));
               }
           },
           true,
@@ -247,6 +228,45 @@ bool expression::expand_macros(
     }
 
     return macro_expansion_count != 0;
+}
+
+void expression::expand_late_macros(
+  co::context& co_ctx,
+  rs::context& rs_ctx,
+  ty::context& type_ctx,
+  sema::env& env)
+{
+    auto expansion_visitor = [&co_ctx, &rs_ctx, &type_ctx, &env](expression& e)
+    {
+        if(e.get_id() != node_identifier::format_macro_expression)
+        {
+            return;
+        }
+
+        auto* macro_expr = static_cast<format_macro_expression*>(&e);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        macro_expr->expand_late_macros(type_ctx, env);
+
+        if(!macro_expr->scope_id.has_value())
+        {
+            throw cg::codegen_error(
+              macro_expr->get_location(),
+              "Macro 'format!' has no scope.");
+        }
+
+        co_ctx.push_scope(macro_expr->scope_id.value());
+        macro_expr->collect_names(co_ctx);
+        co_ctx.pop_scope();
+
+        macro_expr->resolve_names(rs_ctx);
+
+        // set the expression types of the expanded macro.
+        (void)macro_expr->type_check(type_ctx, env);
+    };
+
+    visit_nodes(
+      expansion_visitor,
+      false,
+      false);
 }
 
 /*
@@ -276,10 +296,44 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    return expansion->generate_code(ctx, mc);
+    auto return_type = expansion->generate_code(ctx, mc);
+    if(index_expr)
+    {
+        // evaluate the index expression.
+        index_expr->generate_code(ctx, memory_context::load);
+
+        auto type = ctx.deref(return_type->get_type());
+        ctx.generate_load_element(
+          cg::type_argument{type});
+        return std::make_unique<cg::value>(type);
+    }
+
+    return return_type;
 }
 
-std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
+void macro_invocation::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    for(auto& expr: exprs)
+    {
+        expr->collect_names(ctx);
+    }
+
+    if(index_expr)
+    {
+        index_expr->collect_names(ctx);
+    }
+
+    if(expansion)
+    {
+        expansion->collect_names(ctx);
+    }
+}
+
+std::optional<ty::type_id> macro_invocation::type_check(
+  ty::context& ctx,
+  sema::env& env)
 {
     // Type checking for macros.
     if(!expansion)
@@ -287,38 +341,8 @@ std::optional<ty::type_info> macro_invocation::type_check(ty::context& ctx)
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    if(expansion->is_macro_branch())
-    {
-        macro_branch* branch = expansion->as_macro_branch();
-        const std::vector<expression*> exprs = branch->get_body()->get_children();
-        if(exprs.empty())
-        {
-            return {};
-        }
-
-        ctx.enter_anonymous_scope(get_location());
-
-        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
-        {
-            exprs[i]->type_check(ctx);
-        }
-
-        auto expr_type = exprs.back()->type_check(ctx);
-        if(expr_type.has_value())
-        {
-            ctx.set_expression_type(this, expr_type.value());
-        }
-
-        ctx.exit_anonymous_scope();
-
-        return expr_type;
-    }
-
-    auto expr_type = expansion->type_check(ctx);
-    if(expr_type.has_value())
-    {
-        ctx.set_expression_type(this, expr_type.value());
-    }
+    auto expr_type = expansion->type_check(ctx, env);
+    ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
 }
@@ -344,6 +368,18 @@ std::string macro_invocation::to_string() const
     return ret;
 }
 
+std::string macro_invocation::get_qualified_callee_name() const
+{
+    std::optional<std::string> path = get_namespace_path();
+    if(!path.has_value())
+    {
+        return name.s;
+    }
+    return name::qualified_name(
+      path.value(),
+      name.s);
+}
+
 /*
  * macro_branch.
  */
@@ -366,6 +402,41 @@ std::unique_ptr<cg::value> macro_branch::generate_code(
   memory_context mc) const
 {
     return body->generate_code(ctx, mc);
+}
+
+void macro_branch::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    // FIXME macro branches are uniquely identified by their
+    //       parent macro name and its parameters.
+    ctx.push_scope(std::nullopt, loc);
+
+    for(const auto& [arg_name, arg_type]: args)
+    {
+        const std::string canonical_name = name::qualified_name(
+          ctx.get_canonical_scope_name(ctx.get_current_scope()),
+          arg_name.s);
+
+        ctx.declare(
+          arg_name.s,
+          canonical_name,
+          sema::symbol_type::macro_argument,
+          arg_name.location,
+          sema::symbol_id::invalid,
+          false);
+    }
+
+    body->collect_names(ctx, false);
+
+    ctx.pop_scope();
+}
+
+std::optional<ty::type_id> macro_branch::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    return body->type_check(ctx, env);
 }
 
 std::string macro_branch::to_string() const
@@ -403,10 +474,9 @@ void macro_expression_list::serialize(archive& ar)
 }
 
 void macro_expression_list::collect_names(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] ty::context& type_ctx) const
+  [[maybe_unused]] co::context& ctx)
 {
-    throw cg::codegen_error(loc, "Non-expanded macro expression list.");
+    // no-op.
 }
 
 std::unique_ptr<cg::value> macro_expression_list::generate_code(
@@ -416,7 +486,9 @@ std::unique_ptr<cg::value> macro_expression_list::generate_code(
     throw cg::codegen_error(loc, "Non-expanded macro expression list.");
 }
 
-std::optional<ty::type_info> macro_expression_list::type_check([[maybe_unused]] ty::context& ctx)
+std::optional<ty::type_id> macro_expression_list::type_check(
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
 {
     return std::nullopt;
 }
@@ -452,39 +524,31 @@ void macro_expression::serialize(archive& ar)
 }
 
 void macro_expression::collect_names(
-  cg::context& ctx,
-  [[maybe_unused]] ty::context& type_ctx) const
+  co::context& ctx)
 {
-    std::vector<std::pair<std::string, module_::directive_descriptor>> directives =
-      ctx.get_directives()
-      | std::views::transform(
-        [](const cg::directive& d) -> std::pair<std::string, module_::directive_descriptor>
-        {
-            std::vector<std::pair<std::string, std::string>> args =
-              d.args
-              | std::views::transform(
-                [](const std::pair<token, token>& arg) -> std::pair<std::string, std::string>
-                {
-                    return std::make_pair(arg.first.s, arg.second.s);
-                })
-              | std::ranges::to<std::vector>();
+    super::collect_names(ctx);
 
-            return std::make_pair(d.name.s, module_::directive_descriptor{std::move(args)});
-        })
-      | std::ranges::to<std::vector>();
+    const std::string canonical_name = name::qualified_name(
+      ctx.get_canonical_scope_name(ctx.get_current_scope()),
+      name.s);
 
-    memory_write_archive ar{true, std::endian::little};
-    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
-    ar& expression_serializer{cloned_expr};
-
-    ctx.add_macro(
+    symbol_id = ctx.declare(
       name.s,
-      module_::macro_descriptor{
-        std::move(directives),
-        ar.get_buffer()},
-      get_namespace_path());
+      canonical_name,
+      sema::symbol_type::macro,
+      name.location,
+      sema::symbol_id::invalid,
+      false,
+      this);
 
-    type_ctx.add_macro(name.s, get_namespace_path());
+    ctx.push_scope(std::format("{}@macro", name.s), name.location);
+
+    for(auto& macro_branch: branches)
+    {
+        macro_branch->collect_names(ctx);
+    }
+
+    ctx.pop_scope();
 }
 
 std::unique_ptr<cg::value> macro_expression::generate_code(
@@ -495,18 +559,14 @@ std::unique_ptr<cg::value> macro_expression::generate_code(
     return nullptr;
 }
 
-bool macro_expression::supports_directive(const std::string& name) const
-{
-    return super::supports_directive(name)
-           || name == "builtin";
-}
-
-std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::context& ctx)
+std::optional<ty::type_id> macro_expression::type_check(
+  [[maybe_unused]] ty::context& ctx,
+  sema::env& env)
 {
     // Check that all necessary imports exist in the type context.
 
     visit_nodes(
-      [this, &ctx](expression& e) -> void
+      [this, &env](expression& e) -> void
       {
           std::optional<std::string> namespace_path{std::nullopt};
 
@@ -524,7 +584,11 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
                       ::slang::to_string(e.get_location())));
               }
 
-              if(!ctx.has_import(namespace_path.value()))
+              if(!env.get_symbol_id(
+                       namespace_path.value(),
+                       sema::symbol_type::module_,
+                       env.global_scope_id)
+                    .has_value())
               {
                   throw ty::type_error(
                     loc,
@@ -536,22 +600,32 @@ std::optional<ty::type_info> macro_expression::type_check([[maybe_unused]] ty::c
 
           if(e.is_call_expression())
           {
-              // FIXME Add a `has_symbol` function.
-              ctx.get_function_signature(e.as_call_expression()->get_callee(), namespace_path);
+              if(!env.get_symbol_id(
+                       e.as_call_expression()->get_qualified_callee_name(),
+                       sema::symbol_type::function,
+                       scope_id.value())
+                    .has_value())
+              {
+                  throw ty::type_error(
+                    e.get_location(),
+                    std::format(
+                      "Unresolved symbol '{}'.",
+                      e.as_call_expression()->get_qualified_callee_name()));
+              }
           }
           else if(e.is_macro_invocation())
           {
-              // FIXME Add a `has_symbol` function.
-              if(!ctx.has_macro(e.as_macro_invocation()->get_name().s, namespace_path))
+              if(!env.get_symbol_id(
+                       e.as_macro_invocation()->get_qualified_name(),
+                       sema::symbol_type::macro,
+                       scope_id.value())
+                    .has_value())
               {
                   throw ty::type_error(
                     loc,
                     std::format(
-                      "Unresolved symbol '{}{}',",
-                      namespace_path.has_value()
-                        ? std::format("{}::", namespace_path.value())
-                        : std::string{""},
-                      e.as_macro_invocation()->get_name().s));
+                      "Unresolved symbol '{}',",
+                      e.as_macro_invocation()->get_qualified_name()));
               }
           }
       },
@@ -577,6 +651,54 @@ std::string macro_expression::to_string() const
     return ret;
 }
 
+void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env) const
+{
+    if(!symbol_id.has_value())
+    {
+        throw std::runtime_error(
+          std::format(
+            "{}: Macro '{}' has no symbol id.",
+            ::slang::to_string(get_location()),
+            get_qualified_name()));
+    }
+
+    std::vector<std::pair<std::string, module_::directive_descriptor>> attributes;
+
+    // FIXME Module macro descriptors have to be updated.
+    if(sema_env.attribute_map.contains(symbol_id.value()))
+    {
+        attributes = sema_env.attribute_map[symbol_id.value()]
+                     | std::views::transform(
+                       [](const attribs::attribute_info& info) -> std::pair<std::string, module_::directive_descriptor>
+                       {
+                           if(info.kind == attribs::attribute_kind::builtin)
+                           {
+                               return std::make_pair(
+                                 attribs::to_string(info.kind),
+                                 module_::directive_descriptor{});
+                           }
+
+                           throw attribs::attribute_error(
+                             std::format(
+                               "{}: Attribute '{}' invalid for macro expressions.",
+                               ::slang::to_string(info.loc),
+                               attribs::to_string(info.kind)));
+                       })
+                     | std::ranges::to<std::vector>();
+    }
+
+    memory_write_archive ar{true, std::endian::little};
+    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
+    ar& expression_serializer{cloned_expr};
+
+    macro_env.add_macro(
+      name.s,
+      module_::macro_descriptor{
+        std::move(attributes),
+        ar.get_buffer()},
+      get_namespace_path());
+}
+
 /**
  * Get the best-matching macro branch for a macro invocation.
  *
@@ -588,7 +710,7 @@ std::string macro_expression::to_string() const
  *         multiple matches were found, or no matches were found.
  */
 static const macro_branch* get_matching_branch(
-  token_location loc,
+  source_location loc,
   const macro_expression* macro_expr,
   const std::vector<std::unique_ptr<expression>>& invocation_exprs)
 {
@@ -807,8 +929,15 @@ std::unique_ptr<expression> macro_expression::expand(
         {
             // rename macro variable.
             auto* expr = e.as_variable_reference();
+            bool is_global_constant =
+              ctx.get_sema_env().get_symbol_id(
+                                  expr->name.s,
+                                  sema::symbol_type::constant,
+                                  ctx.get_sema_env().global_scope_id)    // constants are always global.
+                .has_value();
+
             if(original_local_names.contains(expr->name.s)
-               || !ctx.has_registered_constant_name(expr->name.s))
+               || !is_global_constant)
             {
                 expr->name.s = make_local_name(invocation_id, expr->name.s);
             }
@@ -816,10 +945,23 @@ std::unique_ptr<expression> macro_expression::expand(
         else if(e.is_struct_member_access())
         {
             // rename macro variable.
-            auto* expr = e.as_access_expression()->get_left_expression()->as_named_expression();
-            if(original_local_names.contains(expr->name.s))
+            expression* expr = e.as_access_expression()->get_left_expression();
+            while(expr != nullptr && expr->is_struct_member_access())
             {
-                expr->name.s = make_local_name(invocation_id, expr->name.s);
+                expr = expr->as_access_expression()->get_left_expression();
+            }
+
+            if(expr == nullptr || !expr->is_named_expression())
+            {
+                throw cg::codegen_error(
+                  e.get_location(),
+                  "Could not get variable name for struct access.");
+            }
+
+            auto* expr_named = expr->as_named_expression();
+            if(original_local_names.contains(expr_named->name.s))
+            {
+                expr_named->name.s = make_local_name(invocation_id, expr_named->name.s);
             }
         }
     };

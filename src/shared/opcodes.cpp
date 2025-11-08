@@ -15,6 +15,10 @@
 namespace slang
 {
 
+/*
+ * opcodes.
+ */
+
 std::string to_string(opcode op)
 {
     switch(op)
@@ -45,8 +49,8 @@ std::string to_string(opcode op)
     case opcode::fdiv: return "fdiv";
     case opcode::i2f: return "i2f";
     case opcode::f2i: return "f2i";
-    case opcode::idup: return "idup";
-    case opcode::fdup: return "fdup";
+    case opcode::dup: return "dup";
+    case opcode::dup2: return "dup2";
     case opcode::adup: return "adup";
     case opcode::dup_x1: return "dup_x1";
     case opcode::dup_x2: return "dup_x2";

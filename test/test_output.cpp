@@ -14,18 +14,28 @@
 #include <gtest/gtest.h>
 
 #include "archives/file.h"
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
+#include "compiler/constant.h"
 #include "compiler/emitter.h"
+#include "compiler/loader.h"
+#include "compiler/lowering.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "compiler/ast/node_registry.h"
 #include "shared/module.h"
-#include "resolve.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
-namespace ty = slang::typing;
+namespace co = slang::collect;
+namespace const_ = slang::const_;
+namespace ld = slang::loader;
+namespace macro = slang::macro;
 namespace rs = slang::resolve;
+namespace sema = slang::sema;
+namespace tl = slang::lowering;
+namespace ty = slang::typing;
 
 namespace
 {
@@ -61,15 +71,30 @@ TEST(output, native_binding)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -237,15 +262,30 @@ TEST(output, emitter)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -286,15 +326,30 @@ TEST(output, hello_world)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -326,15 +381,25 @@ TEST(output, hello_world)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_THROW(ast->resolve_names(resolver_ctx), cg::codegen_error);
     }
 }
 
@@ -386,15 +451,30 @@ TEST(output, operators)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -423,15 +503,30 @@ TEST(output, operators)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        EXPECT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
 }
 
@@ -466,15 +561,30 @@ TEST(output, string_operations)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -503,15 +613,30 @@ TEST(output, string_operations)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
 }
 
@@ -565,15 +690,30 @@ TEST(output, prefix_postfix)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -632,15 +772,30 @@ TEST(output, control_flow)
     slang::file_manager mgr;
     mgr.add_search_path("lang");
 
+    ld::context loader_ctx{mgr};
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
-    rs::context resolve_ctx{mgr};
-    cg::context codegen_ctx;
-    slang::instruction_emitter emitter{codegen_ctx};
+    tl::context lowering_ctx{type_ctx};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+    slang::instruction_emitter emitter{
+      sema_env,
+      const_env,
+      macro_env,
+      type_ctx,
+      codegen_ctx};
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(emitter.run());
 
@@ -679,15 +834,30 @@ TEST(output, loops)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -735,15 +905,30 @@ TEST(output, loops)
         slang::file_manager mgr;
         mgr.add_search_path("lang");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -774,16 +959,30 @@ TEST(output, infinite_recursion)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -821,16 +1020,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -896,16 +1109,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -933,16 +1160,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
     {
         const std::string test_input =
@@ -963,16 +1204,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
     {
         const std::string test_input =
@@ -993,16 +1248,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
     {
         const std::string test_input =
@@ -1028,16 +1297,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1071,13 +1354,13 @@ TEST(output, arrays)
           "fn test_copy_fail_none() -> void\n"
           "{\n"
           " let a: [i32] = [2, 3];\n"
-          " let b: [i32];\n"    // no target array
+          " let b: [i32];\n"
           " array_copy(a, b);\n"
           "}\n"
           "fn test_copy_fail_type() -> void\n"
           "{\n"
           " let a: [i32] = [2, 3];\n"
-          " let b: [f32] = new f32[2];\n"    // wrong type
+          " let b: [f32] = new f32[2];\n"
           " array_copy(a, b);\n"
           "}\n";
 
@@ -1092,16 +1375,30 @@ TEST(output, arrays)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1146,23 +1443,37 @@ TEST(output, return_discard)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
         ASSERT_EQ(codegen_ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " pop i32\n"
                   " ret void\n"
                   "}\n"
@@ -1200,16 +1511,30 @@ TEST(output, return_discard)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1241,16 +1566,30 @@ TEST(output, return_discard)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1281,16 +1620,30 @@ TEST(output, missing_return)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_THROW(ast->generate_code(codegen_ctx), cg::codegen_error);
     }
 }
@@ -1319,16 +1672,30 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1361,18 +1728,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1410,18 +1790,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1450,18 +1843,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1491,18 +1897,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1533,18 +1952,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1577,18 +2009,31 @@ TEST(output, structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1623,18 +2068,31 @@ TEST(output, nested_structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1674,18 +2132,31 @@ TEST(output, nested_structs)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1722,17 +2193,31 @@ TEST(output, type_imports)
         slang::file_manager mgr;
         mgr.add_search_path(".");
 
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-
         ASSERT_NO_THROW(emitter.run());
 
         slang::module_::language_module mod = emitter.to_module();
@@ -1762,16 +2247,30 @@ TEST(output, null_assignment)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_THROW(ast->type_check(type_ctx), ty::type_error);
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_THROW(ast->type_check(type_ctx, sema_env), ty::type_error);
     }
 }
 
@@ -1798,16 +2297,30 @@ TEST(output, null_access)
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
         slang::file_manager mgr;
-
+        ld::context loader_ctx{mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        rs::context resolve_ctx{mgr};
-        cg::context codegen_ctx;
-        slang::instruction_emitter emitter{codegen_ctx};
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
         ASSERT_NO_THROW(emitter.run());
 
@@ -1846,15 +2359,30 @@ TEST(output, multiple_modules)
             slang::file_manager mgr;
             mgr.add_search_path(".");
 
+            ld::context loader_ctx{mgr};
+            sema::env sema_env;
+            const_::env const_env;
+            macro::env macro_env;
             ty::context type_ctx;
-            rs::context resolve_ctx{mgr};
-            cg::context codegen_ctx;
-            slang::instruction_emitter emitter{codegen_ctx};
+            tl::context lowering_ctx{type_ctx};
+            co::context co_ctx{sema_env};
+            rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+            cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+            slang::instruction_emitter emitter{
+              sema_env,
+              const_env,
+              macro_env,
+              type_ctx,
+              codegen_ctx};
 
-            ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-            ASSERT_NO_THROW(resolve_ctx.resolve_imports(codegen_ctx, type_ctx));
-            ASSERT_NO_THROW(type_ctx.resolve_types());
-            ASSERT_NO_THROW(ast->type_check(type_ctx));
+            ASSERT_NO_THROW(ast->collect_names(co_ctx));
+            ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+            ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+            ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+            ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->define_types(type_ctx));
+            ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
             ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
             ASSERT_NO_THROW(emitter.run());
 

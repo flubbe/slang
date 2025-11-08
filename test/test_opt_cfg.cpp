@@ -12,22 +12,33 @@
 
 #include <gtest/gtest.h>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "compiler/opt/cfg.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
+namespace co = slang::collect;
+namespace const_ = slang::const_;
+namespace macro = slang::macro;
+namespace rs = slang::resolve;
+namespace sema = slang::sema;
 namespace ty = slang::typing;
+namespace tl = slang::lowering;
 
 namespace
 {
 
-cg::context get_context()
+cg::context get_context(
+  sema::env& sema_env,
+  const_::env& const_env,
+  tl::context& lowering_ctx)
 {
-    cg::context ctx;
-    ctx.evaluate_constant_subexpressions = false;
+    cg::context ctx{sema_env, const_env, lowering_ctx};
+    ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
     return ctx;
 }
 
@@ -59,19 +70,28 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
-    cg::context codegen_ctx = get_context();
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
     slang::opt::cfg::context cfg_context{codegen_ctx};
 
-    ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
     ASSERT_NO_THROW(cfg_context.run());
 
     EXPECT_EQ(codegen_ctx.to_string(),
               R"(define i32 @f() {
-local i32 %i
+local i32 %1
 entry:
  const i32 12
  ret i32

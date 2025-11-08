@@ -15,65 +15,10 @@
 #include <variant>
 
 #include "archives/archive.h"
+#include "location.h"
 
 namespace slang
 {
-
-/**
- * Token location in the source.
- */
-struct token_location
-{
-    std::size_t line{1}; /** Line. */
-    std::size_t col{1};  /** Column. */
-
-    /** Default constructors. */
-    token_location() = default;
-    token_location(const token_location&) = default;
-    token_location(token_location&&) = default;
-
-    /** Assignment. */
-    token_location& operator=(const token_location&) = default;
-    token_location& operator=(token_location&&) = default;
-
-    /**
-     * Initialize line and col.
-     *
-     * @param l The line.
-     * @param c The column.
-     */
-    token_location(std::size_t l, std::size_t c)
-    : line{l}
-    , col{c}
-    {
-    }
-
-    /**
-     * Comparison.
-     *
-     * @param other The token_location to compare with.
-     */
-    bool operator==(const token_location& other) const
-    {
-        return line == other.line && col == other.col;
-    }
-};
-
-/**
- * `token_location` serializer.
- *
- * @param ar The archive to use for serialization.
- * @param loc The token location to serialize.
- */
-archive& operator&(archive& ar, token_location& loc);
-
-/**
- * Convert a token location to a string.
- *
- * @param loc The token location.
- * @return A string of the form "(line, col)".
- */
-std::string to_string(const token_location& loc);
 
 /** Token type. */
 enum class token_type
@@ -113,7 +58,7 @@ struct token
     std::string s;
 
     /** Token location. */
-    token_location location;
+    source_location location;
 
     /** Token type. */
     token_type type;
@@ -143,7 +88,7 @@ struct token
      */
     token(
       std::string s,
-      token_location location,
+      source_location location,
       token_type type = token_type::unknown,
       std::optional<std::variant<int, float, std::string>> value = std::nullopt)
     : s{std::move(s)}

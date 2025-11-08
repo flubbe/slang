@@ -200,8 +200,6 @@ void package_manager::remove(const std::string& name)
         package_path /= c;
     }
 
-    std::println("Remove: {}", package_path.string());
-
     if(fs::remove_all(package_path) == 0)
     {
         throw std::runtime_error(std::format("Could not remove package '{}'.", name));

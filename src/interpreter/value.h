@@ -370,7 +370,7 @@ public:
     explicit value(std::size_t layout_id, void* addr)
     : data{addr}
     , size{sizeof(void*)}
-    , type{"@addr", std::nullopt, layout_id, std::nullopt}
+    , type{"ref", std::nullopt, layout_id, std::nullopt}
     {
         bind(&value::create_addr, &value::destroy_addr);
     }

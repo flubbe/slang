@@ -50,16 +50,7 @@ static_assert(
 /** A serialization error. */
 class serialization_error : public std::runtime_error
 {
-public:
-    /**
-     * Construct a `serialization_error`.
-     *
-     * @param message The error message.
-     */
-    explicit serialization_error(const std::string& message)
-    : std::runtime_error{message}
-    {
-    }
+    using std::runtime_error::runtime_error;
 };
 
 /** An abstract archive for byte-order independent serialization. */
@@ -498,7 +489,7 @@ archive& operator&(archive& ar, std::unique_ptr<T>& ptr)
  * Serialize `std::pair`.
  *
  * @param ar The archive to use.
- * @param o The pair to be serialized.
+ * @param p The pair to be serialized.
  * @returns The input archive.
  */
 template<typename S, typename T>
@@ -506,6 +497,32 @@ archive& operator&(archive& ar, std::pair<S, T>& p)
 {
     ar& std::get<0>(p);
     ar& std::get<1>(p);
+    return ar;
+}
+
+/**
+ * Helper for `std::tuple` serialization.
+ *
+ * @param ar The archive to use.
+ * @param t The tuple to be serialized.
+ */
+template<typename Archive, typename Tuple, std::size_t... Is>
+void serialize_tuple(Archive& ar, Tuple& t, std::index_sequence<Is...>)
+{
+    (void)std::initializer_list<int>{(ar & std::get<Is>(t), 0)...};
+}
+
+/**
+ * Serialize `std::tuple`.
+ *
+ * @param ar The archive to use.
+ * @param t The tuple to be serialized.
+ * @returns The input archive.
+ */
+template<typename... Args>
+archive& operator&(archive& ar, std::tuple<Args...>& t)
+{
+    serialize_tuple(ar, t, std::index_sequence_for<Args...>{});
     return ar;
 }
 

@@ -41,7 +41,7 @@ struct format_string_placeholder
 class format_macro_expander
 {
     /** Location of the macro invocation. */
-    token_location loc;
+    source_location loc;
 
     /** Expressions the macro operates on. */
     const std::vector<std::unique_ptr<ast::expression>>& exprs;
@@ -89,7 +89,7 @@ public:
      * @param exprs Expressions the macro operates on.
      */
     format_macro_expander(
-      token_location loc,
+      source_location loc,
       const std::vector<std::unique_ptr<ast::expression>>& exprs)
     : loc{loc}
     , exprs{exprs}
@@ -122,6 +122,9 @@ class format_macro_expression : public expression
     /** Format specifiers/placeholders. Set during type checking. */
     std::vector<format_string_placeholder> placeholders;
 
+    /** Expansion. */
+    std::unique_ptr<expression> expansion;
+
 public:
     /** Set the super class. */
     using super = expression;
@@ -145,7 +148,7 @@ public:
      * @param exprs The argument expressions.
      */
     format_macro_expression(
-      token_location loc,
+      source_location loc,
       const std::vector<std::unique_ptr<expression>>& exprs)
     : expression{loc}
     {
@@ -165,8 +168,14 @@ public:
         return node_identifier::format_macro_expression;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    [[nodiscard]] std::optional<ty::type_info> type_check([[maybe_unused]] ty::context& ctx) override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    [[nodiscard]] std::optional<ty::type_id> type_check(
+      [[maybe_unused]] ty::context& ctx,
+      [[maybe_unused]] sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -191,6 +200,16 @@ public:
                  })
                | std::ranges::to<std::vector>();
     }
+
+    /**
+     * Macro expansion (after type checking).
+     *
+     * @param ctx The type context.
+     * @param env The semantic environment.
+     */
+    void expand_late_macros(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 }    // namespace slang::ast

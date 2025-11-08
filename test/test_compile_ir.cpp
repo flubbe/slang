@@ -12,21 +12,141 @@
 
 #include <gtest/gtest.h>
 
-#include "compiler/codegen.h"
+#include "compiler/codegen/codegen.h"
+#include "compiler/macro.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
+namespace co = slang::collect;
+namespace const_ = slang::const_;
+namespace macro = slang::macro;
+namespace rs = slang::resolve;
+namespace sema = slang::sema;
+namespace tl = slang::lowering;
 namespace ty = slang::typing;
 
 namespace
 {
 
-cg::context get_context()
+class test_name_resolver : public cg::name_resolver
 {
-    cg::context ctx;
-    ctx.evaluate_constant_subexpressions = false;
+    /** The semantic environment. */
+    sema::env& sema_env;
+
+    /** The constant environment. */
+    const_::env& const_env;
+
+    /** The type context. */
+    ty::context& type_ctx;
+
+public:
+    /** Deleted constructors. */
+    test_name_resolver() = delete;
+    test_name_resolver(const test_name_resolver&) = delete;
+    test_name_resolver(const test_name_resolver&&) = delete;
+
+    /**
+     * Create a name resolver for the tests.
+     *
+     * @param sema_env The semantic environment.
+     * @param const_env The constant environment.
+     * @param type_ctx The type context.
+     */
+    test_name_resolver(
+      sema::env& sema_env,
+      const_::env& const_env,
+      ty::context& type_ctx)
+    : sema_env{sema_env}
+    , const_env{const_env}
+    , type_ctx{type_ctx}
+    {
+    }
+
+    /** Default destructor. */
+    ~test_name_resolver() override = default;
+
+    /** Deleted assignment operators. */
+    test_name_resolver& operator=(const test_name_resolver&) = delete;
+    test_name_resolver& operator=(test_name_resolver&&) = delete;
+
+    [[nodiscard]]
+    std::string symbol_name(sema::symbol_id id) const override
+    {
+        auto it = sema_env.symbol_table.find(id);
+        if(it == sema_env.symbol_table.end())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Symbol with id {} not found in symbol table.",
+                id.value));
+        }
+
+        if(it->second.declaring_module == sema::symbol_info::current_module_id)
+        {
+            return it->second.name;
+        }
+
+        return it->second.qualified_name;
+    }
+
+    [[nodiscard]]
+    std::string type_name(ty::type_id id) const override
+    {
+        return type_ctx.to_string(id);
+    }
+
+    [[nodiscard]]
+    std::string field_name(
+      ty::type_id type_id,    // NOLINT(bugprone-easily-swappable-parameters)
+      std::size_t field_index) const override
+    {
+        auto info = type_ctx.get_struct_info(type_id);
+        return info.fields.at(field_index).name;
+    }
+
+    [[nodiscard]]
+    std::string constant(
+      const_::constant_id id) const override
+    {
+        auto it = const_env.const_literal_map.find(id);
+        if(it == const_env.const_literal_map.end())
+        {
+            throw std::runtime_error(
+              std::format(
+                "Constant with id {} not found in constant literal table.",
+                id));
+        }
+
+        switch(it->second.type)
+        {
+        case const_::constant_type::i32:
+            return std::format("{}", std::get<int>(it->second.value));
+        case const_::constant_type::f32:
+            return std::format("{}", std::get<float>(it->second.value));
+        case const_::constant_type::str:
+            return std::format("{}", std::get<std::string>(it->second.value));
+        default:;
+            // fall-through.
+        }
+
+        throw std::runtime_error(
+          std::format(
+            "Constant with id {} has unknown type '{}'.",
+            id,
+            static_cast<int>(it->second.type)));
+    }
+};
+
+cg::context get_context(
+  sema::env& sema_env,
+  const_::env& const_env,
+  tl::context& lowering_ctx)
+{
+    cg::context ctx{sema_env, const_env, lowering_ctx};
+    ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
     return ctx;
 }
 
@@ -44,14 +164,27 @@ TEST(compile_ir, empty)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
-    ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    tl::context lowering_ctx{type_ctx};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+    test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
-    EXPECT_EQ(ctx.to_string().length(), 0);
+    EXPECT_EQ(ctx.to_string(&resolver).length(), 0);
 }
 
 TEST(compile_ir, double_definition)
@@ -71,11 +204,14 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+        EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
     {
         // test: local variable redefinition
@@ -95,11 +231,14 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        EXPECT_THROW(ast->type_check(type_ctx), ty::type_error);
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+        EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
     {
         // test: function redefinition
@@ -120,9 +259,14 @@ TEST(compile_ir, double_definition)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        EXPECT_THROW(ast->collect_names(ctx, type_ctx), cg::codegen_error);
+        tl::context lowering_ctx{type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+        co::context co_ctx{sema_env};
+        EXPECT_THROW(ast->collect_names(co_ctx), co::redefinition_error);
     }
 }
 
@@ -143,11 +287,22 @@ TEST(compile_ir, empty_function)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
     ty::context type_ctx;
-    ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    tl::context lowering_ctx{type_ctx};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
@@ -176,14 +331,27 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "define i32 @f() {\n"
                   "entry:\n"
                   " const i32 1\n"
@@ -207,14 +375,27 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "define f32 @f() {\n"
                   "entry:\n"
                   " const f32 1.323\n"
@@ -238,14 +419,27 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   ".string @0 \"test\"\n"
                   "define str @f() {\n"
                   "entry:\n"
@@ -273,15 +467,26 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define void @f(i32 %i, str %j, f32 %k) {\n"
+                  "define void @f(i32 %1, str %2, f32 %3) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
@@ -304,20 +509,31 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, str %j, f32 %k) {\n"
-                  "local i32 %a\n"
+                  "define i32 @f(i32 %1, str %2, f32 %3) {\n"
+                  "local i32 %4\n"
                   "entry:\n"
                   " const i32 1\n"
-                  " store i32 %a\n"
-                  " load i32 %a\n"
+                  " store i32 %4\n"
+                  " load i32 %4\n"
                   " ret i32\n"
                   "}");
     }
@@ -339,20 +555,31 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
-                  "local i32 %a\n"
+                  "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
+                  "local i32 %4\n"
                   "entry:\n"
-                  " load i32 %j\n"
-                  " store i32 %a\n"
-                  " load i32 %a\n"
+                  " load i32 %2\n"
+                  " store i32 %4\n"
+                  " load i32 %4\n"
                   " ret i32\n"
                   "}");
     }
@@ -374,19 +601,30 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
+                  "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
                   "entry:\n"
                   " const i32 3\n"
-                  " store i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %1\n"
+                  " load i32 %2\n"
                   " ret i32\n"
                   "}");
     }
@@ -408,18 +646,31 @@ TEST(compile_ir, function_arguments_and_locals)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
                   "entry:\n"
                   " const i32 3\n"
-                  " dup i32\n"
+                  " dup cat1\n"
                   " store i32 %j\n"
                   " store i32 %i\n"
                   " load i32 %j\n"
@@ -447,28 +698,41 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "define void @f() {\n"
-                  "local [i32] %b\n"
+                  "local ref %b\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup [i32]\n"      // array_ref
+                  " dup ref\n"        // array_ref
                   " const i32 0\n"    // index
                   " const i32 1\n"    // value
                   " store_element i32\n"
-                  " dup [i32]\n"      // array_ref
+                  " dup ref\n"        // array_ref
                   " const i32 1\n"    // index
                   " const i32 2\n"    // value
                   " store_element i32\n"
-                  " store [i32] %b\n"
+                  " store ref %b\n"
                   " ret void\n"
                   "}");
     }
@@ -490,30 +754,41 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define [i32] @f() {\n"
-                  "local [i32] %b\n"
+                  "define ref @f() {\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " dup [i32]\n"      // array_ref
+                  " dup ref\n"        // array_ref
                   " const i32 0\n"    // index
                   " const i32 1\n"    // value
                   " store_element i32\n"
-                  " dup [i32]\n"      // array_ref
+                  " dup ref\n"        // array_ref
                   " const i32 1\n"    // index
                   " const i32 2\n"    // value
                   " store_element i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"
-                  " ret [i32]\n"
+                  " store ref %1\n"
+                  " load ref %1\n"
+                  " ret ref<type#5>\n"
                   "}");
     }
     {
@@ -536,25 +811,36 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local [i32] %b\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"    // array_ref
-                  " const i32 1\n"      // index
-                  " const i32 2\n"      // value
+                  " store ref %1\n"
+                  " load ref %1\n"    // array_ref
+                  " const i32 1\n"    // index
+                  " const i32 2\n"    // value
                   " store_element i32\n"
-                  " load [i32] %b\n"
+                  " load ref %1\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -580,29 +866,40 @@ TEST(compile_ir, arrays)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local [i32] %b\n"
+                  "local ref %1\n"
                   "entry:\n"
                   " const i32 2\n"
                   " newarray i32\n"
-                  " store [i32] %b\n"
-                  " load [i32] %b\n"          // array_ref
-                  " const i32 0\n"            // index
-                  " load [i32] %b\n"          // array_ref
-                  " const i32 1\n"            // index
-                  " const i32 2\n"            // value
-                  " dup i32, i32, @addr\n"    // duplicate i32 value and store it (i32, @addr) down the stack
+                  " store ref %1\n"
+                  " load ref %1\n"               // array_ref
+                  " const i32 0\n"               // index
+                  " load ref %1\n"               // array_ref
+                  " const i32 1\n"               // index
+                  " const i32 2\n"               // value
+                  " dup_x2 cat1, cat1, ref\n"    // duplicate i32 value and store it (i32, ref) down the stack
                   " store_element i32\n"
                   " store_element i32\n"
-                  " load [i32] %b\n"
+                  " load ref %1\n"
                   " const i32 0\n"
                   " load_element i32\n"
                   " ret i32\n"
@@ -678,23 +975,34 @@ TEST(compile_ir, unary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @local(i32 %a) {\n"
-                  "local i32 %b\n"
+                  "define i32 @local(i32 %1) {\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
                   " const i32 1\n"
                   " sub i32\n"
-                  " store i32 %b\n"
-                  " load i32 %a\n"
-                  " load i32 %b\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " add i32\n"
                   " ret i32\n"
                   "}");
@@ -714,23 +1022,34 @@ TEST(compile_ir, unary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @local(i32 %a) {\n"
-                  "local i32 %b\n"
+                  "define i32 @local(i32 %1) {\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 -1\n"
                   " const i32 1\n"
                   " xor i32\n"
-                  " store i32 %b\n"
-                  " load i32 %a\n"
-                  " load i32 %b\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " add i32\n"
                   " ret i32\n"
                   "}");
@@ -756,24 +1075,35 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
                   " mul i32\n"
                   " const i32 3\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -794,24 +1124,35 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
                   " const i32 3\n"
                   " add i32\n"
                   " mul i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -832,24 +1173,35 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 6\n"
                   " const i32 2\n"
                   " const i32 3\n"
                   " sub i32\n"
                   " div i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -870,16 +1222,27 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
@@ -890,8 +1253,8 @@ TEST(compile_ir, binary_operators)
                   " const i32 1\n"
                   " shr i32\n"
                   " or i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -912,16 +1275,27 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 1\n"
                   " const i32 2\n"
@@ -932,8 +1306,8 @@ TEST(compile_ir, binary_operators)
                   " const i32 4\n"
                   " and i32\n"
                   " or i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -954,16 +1328,27 @@ TEST(compile_ir, binary_operators)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 5\n"
                   " const i32 7\n"
@@ -974,8 +1359,8 @@ TEST(compile_ir, binary_operators)
                   " cmpge i32\n"
                   " and i32\n"
                   " xor i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -999,24 +1384,35 @@ TEST(compile_ir, postfix_operators)
     EXPECT_TRUE(lexer.eof());
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
-    cg::context ctx = get_context();
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
+    co::context co_ctx{sema_env};
     ty::context type_ctx;
-    ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-    ASSERT_NO_THROW(type_ctx.resolve_types());
-    ASSERT_NO_THROW(ast->type_check(type_ctx));
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    tl::context lowering_ctx{type_ctx};
+    cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
-              "local i32 %i\n"
+              "local i32 %1\n"
               "entry:\n"
               " const i32 0\n"
-              " store i32 %i\n"
-              " load i32 %i\n"
-              " dup i32\n"
+              " store i32 %1\n"
+              " load i32 %1\n"
+              " dup cat1\n"
               " const i32 1\n"
               " add i32\n"
-              " store i32 %i\n"
+              " store i32 %1\n"
               " pop i32\n"
               " ret void\n"
               "}");
@@ -1042,24 +1438,35 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
+                  "local i32 %1\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1082,31 +1489,42 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
-                  "local i32 %j\n"
+                  "local i32 %1\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
+                  " store i32 %1\n"
                   " const i32 1\n"
-                  " store i32 %j\n"
-                  " load i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " dup i32\n"
-                  " store i32 %j\n"
+                  " dup cat1\n"
+                  " store i32 %2\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1129,29 +1547,40 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
-                  "local i32 %i\n"
-                  "local i32 %j\n"
+                  "local i32 %1\n"
+                  "local i32 %2\n"
                   "entry:\n"
                   " const i32 0\n"
-                  " store i32 %i\n"
+                  " store i32 %1\n"
                   " const i32 1\n"
-                  " store i32 %j\n"
-                  " load i32 %i\n"
-                  " load i32 %j\n"
+                  " store i32 %2\n"
+                  " load i32 %1\n"
+                  " load i32 %2\n"
                   " const i32 2\n"
                   " add i32\n"
                   " add i32\n"
-                  " store i32 %i\n"
-                  " load i32 %i\n"
+                  " store i32 %1\n"
+                  " load i32 %1\n"
                   " ret i32\n"
                   "}");
     }
@@ -1174,11 +1603,22 @@ TEST(compile_ir, compound_assignments)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1203,17 +1643,28 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
                   "define void @g() {\n"
@@ -1242,11 +1693,22 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1256,11 +1718,11 @@ TEST(compile_ir, function_calls)
                   " const i32 1\n"
                   " const f32 2.3\n"
                   " const str @0\n"
-                  " invoke @h\n"
-                  " invoke @g\n"
+                  " invoke <func#6>\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
-                  "define void @g(i32 %a, f32 %b, str %c, i32 %d) {\n"
+                  "define void @g(i32 %2, f32 %3, str %4, i32 %5) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}\n"
@@ -1288,11 +1750,22 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1304,10 +1777,10 @@ TEST(compile_ir, function_calls)
                   " mul i32\n"
                   " add i32\n"
                   " const f32 2.3\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
-                  "define void @g(i32 %i, f32 %j) {\n"
+                  "define void @g(i32 %2, f32 %3) {\n"
                   "entry:\n"
                   " ret void\n"
                   "}");
@@ -1330,11 +1803,22 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
     }
     {
@@ -1363,19 +1847,30 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
+                  " invoke <func#1>\n"
                   " pop i32\n"
-                  " invoke @h\n"
+                  " invoke <func#2>\n"
                   " pop f32\n"
                   " ret void\n"
                   "}\n"
@@ -1416,11 +1911,22 @@ TEST(compile_ir, function_calls)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1429,17 +1935,17 @@ TEST(compile_ir, function_calls)
                   "}\n"
                   "define void @f() {\n"
                   "entry:\n"
-                  " invoke @g\n"
-                  " pop S\n"
+                  " invoke <func#3>\n"
+                  " pop ref<type#5>\n"
                   " ret void\n"
                   "}\n"
-                  "define S @g() {\n"
+                  "define ref @g() {\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 1\n"
-                  " set_field %S, i32 %i\n"
-                  " ret S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " ret ref<type#5>\n"
                   "}");
     }
 }
@@ -1469,17 +1975,28 @@ TEST(compile_ir, if_statement)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
-                  "define i32 @test_if_else(i32 %a) {\n"
+                  "define i32 @test_if_else(i32 %1) {\n"
                   "entry:\n"
-                  " load i32 %a\n"
+                  " load i32 %1\n"
                   " const i32 0\n"
                   " cmpg i32\n"
                   " jnz %0, %2\n"
@@ -1511,11 +2028,22 @@ TEST(compile_ir, break_fail)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1538,11 +2066,22 @@ TEST(compile_ir, continue_fail)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         EXPECT_THROW(ast->generate_code(ctx), cg::codegen_error);
     }
 }
@@ -1570,30 +2109,43 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        test_name_resolver resolver{sema_env, const_env, type_ctx};
+
+        EXPECT_EQ(ctx.to_string(&resolver),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " f32 %j,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %s\n"
                   "entry:\n"
                   " new S\n"
-                  " dup S\n"
+                  " dup ref\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field %S.i\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " set_field %S.j\n"
+                  " store ref %s\n"
                   " ret void\n"
                   "}");
     }
@@ -1618,11 +2170,22 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1631,17 +2194,17 @@ TEST(compile_ir, structs)
                   " i32 %i,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " store ref %4\n"
                   " ret void\n"
                   "}");
     }
@@ -1666,11 +2229,22 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
-        cg::context ctx = get_context();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        ASSERT_NO_THROW(ast->collect_names(ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
 
         EXPECT_EQ(ctx.to_string(),
@@ -1679,17 +2253,17 @@ TEST(compile_ir, structs)
                   " f32 %j,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %4\n"
                   " ret void\n"
                   "}");
     }
@@ -1716,38 +2290,48 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " f32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref\n"
                   " const i32 3\n"
                   " cast i32_to_f32\n"
-                  " set_field %S, f32 %j\n"
-                  " store S %s\n"
-                  " load S %s\n"
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %4\n"
+                  " load ref %4\n"
                   " const i32 1\n"
-                  " set_field %S, i32 %i\n"
-                  " load S %s\n"
-                  " get_field %S, i32 %i\n"
-                  " load S %s\n"
-                  " get_field %S, f32 %j\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " load ref %4\n"
+                  " get_field <type#5>.<field#0>\n"
+                  " load ref %4\n"
+                  " get_field <type#5>.<field#1>\n"
                   " cast f32_to_i32\n"
                   " add i32\n"
                   " ret i32\n"
@@ -1776,41 +2360,51 @@ TEST(compile_ir, structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " i32 %j,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"
-                  " dup S\n"
+                  " new ref<type#5>\n"
+                  " dup ref\n"
                   " const i32 2\n"
-                  " set_field %S, i32 %i\n"
-                  " dup S\n"
+                  " set_field <type#5>.<field#0>\n"
+                  " dup ref\n"
                   " const i32 3\n"
-                  " set_field %S, i32 %j\n"
-                  " store S %s\n"
-                  " load S %s\n"               // [addr]
-                  " load S %s\n"               // [addr, addr]
-                  " const i32 1\n"             // [addr, addr, 1]
-                  " dup i32, @addr\n"          // [addr, 1, addr, 1]
-                  " set_field %S, i32 %j\n"    // [addr, 1]
-                  " set_field %S, i32 %i\n"    // []
-                  " load S %s\n"               // [addr]
-                  " get_field %S, i32 %i\n"    // [1]
-                  " load S %s\n"               // [1, addr]
-                  " get_field %S, i32 %j\n"    // [1, 1]
-                  " add i32\n"                 // [2]
+                  " set_field <type#5>.<field#1>\n"
+                  " store ref %4\n"
+                  " load ref %4\n"                     // [addr]
+                  " load ref %4\n"                     // [addr, addr]
+                  " const i32 1\n"                     // [addr, addr, 1]
+                  " dup_x1 cat1, ref\n"                // [addr, 1, addr, 1]
+                  " set_field <type#5>.<field#1>\n"    // [addr, 1]
+                  " set_field <type#5>.<field#0>\n"    // []
+                  " load ref %4\n"                     // [addr]
+                  " get_field <type#5>.<field#0>\n"    // [1]
+                  " load ref %4\n"                     // [1, addr]
+                  " get_field <type#5>.<field#1>\n"    // [1, 1]
+                  " add i32\n"                         // [2]
                   " ret i32\n"
                   "}");
     }
@@ -1838,36 +2432,46 @@ TEST(compile_ir, nested_structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " S %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref\n"                         // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref\n"                         // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %4\n"                    // []                                   s = addr1
                   " ret void\n"
                   "}");
     }
@@ -1892,39 +2496,49 @@ TEST(compile_ir, nested_structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " get_field %S, i32 %i\n"     // [i]
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref\n"                         // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref\n"                         // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %4\n"                    // []                                   s = addr1
+                  " load ref %4\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " get_field <type#5>.<field#0>\n"    // [i]
                   " ret i32\n"
                   "}");
     }
@@ -1951,51 +2565,61 @@ TEST(compile_ir, nested_structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
                   " i32 %i,\n"
                   " S %next,\n"
                   "}\n"
                   "define i32 @test() {\n"
-                  "local S %s\n"
+                  "local ref %4\n"
                   "entry:\n"
-                  " new S\n"                    // [addr1]
-                  " dup S\n"                    // [addr1, addr1]
-                  " const i32 1\n"              // [addr1, addr1, 1]
-                  " set_field %S, i32 %i\n"     // [addr1]                              addr1.i = 1
-                  " dup S\n"                    // [addr1, addr1]
-                  " new S\n"                    // [addr1, addr1, addr2]
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const i32 3\n"              // [addr1, addr1, addr2, addr2, 3]
-                  " set_field %S, i32 %i\n"     // [addr1, addr1, addr2]                addr2.i = 3
-                  " dup S\n"                    // [addr1, addr1, addr2, addr2]
-                  " const_null\n"               // [addr1, addr1, addr2, addr2, null]
-                  " set_field %S, S %next\n"    // [addr1, addr1, addr2]                addr2.next = null
-                  " set_field %S, S %next\n"    // [addr1]                              addr1.next = addr2
-                  " store S %s\n"               // []                                   s = addr1
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " load S %s\n"                // [s.next, s]
-                  " set_field %S, S %next\n"    // []                                   s.next.next = s
-                  " load S %s\n"                // [s]
-                  " get_field %S, S %next\n"    // [s.next]
-                  " get_field %S, S %next\n"    // [s.next.next]
-                  " const i32 2\n"              // [s.next.next, 2]
-                  " set_field %S, i32 %i\n"     // []                                   s.next.next.i = 2
-                  " load S %s\n"                // [s]
-                  " get_field %S, i32 %i\n"     // [i]
-                  " load S %s\n"                // [i, s]
-                  " get_field %S, S %next\n"    // [i, s.next]
-                  " get_field %S, i32 %i\n"     // [i, s.next.i]
-                  " add i32\n"                  // [i + s.next.i]
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref\n"                         // [addr1, addr1]
+                  " const i32 1\n"                     // [addr1, addr1, 1]
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                              addr1.i = 1
+                  " dup ref\n"                         // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const i32 3\n"                     // [addr1, addr1, addr2, addr2, 3]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                addr2.i = 3
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#1>\n"    // [addr1, addr1, addr2]                addr2.next = null
+                  " set_field <type#5>.<field#1>\n"    // [addr1]                              addr1.next = addr2
+                  " store ref %4\n"                    // []                                   s = addr1
+                  " load ref %4\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " load ref %4\n"                     // [s.next, s]
+                  " set_field <type#5>.<field#1>\n"    // []                                   s.next.next = s
+                  " load ref %4\n"                     // [s]
+                  " get_field <type#5>.<field#1>\n"    // [s.next]
+                  " get_field <type#5>.<field#1>\n"    // [s.next.next]
+                  " const i32 2\n"                     // [s.next.next, 2]
+                  " set_field <type#5>.<field#0>\n"    // []                                   s.next.next.i = 2
+                  " load ref %4\n"                     // [s]
+                  " get_field <type#5>.<field#0>\n"    // [i]
+                  " load ref %4\n"                     // [i, s]
+                  " get_field <type#5>.<field#1>\n"    // [i, s.next]
+                  " get_field <type#5>.<field#0>\n"    // [i, s.next.i]
+                  " add i32\n"                         // [i + s.next.i]
                   " ret i32\n"
                   "}");
     }
@@ -2020,37 +2644,47 @@ TEST(compile_ir, nested_structs)
         EXPECT_TRUE(lexer.eof());
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
         ty::context type_ctx;
-        cg::context codegen_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
 
-        ASSERT_NO_THROW(ast->collect_names(codegen_ctx, type_ctx));
-        ASSERT_NO_THROW(type_ctx.resolve_types());
-        ASSERT_NO_THROW(ast->type_check(type_ctx));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
 
-        EXPECT_EQ(codegen_ctx.to_string(),
+        EXPECT_EQ(ctx.to_string(),
                   "%Link = type {\n"
                   " Link %next,\n"
                   "}\n"
                   "define void @test() {\n"
-                  "local Link %root\n"
+                  "local ref %3\n"
                   "entry:\n"
-                  " new Link\n"                       // [addr1]
-                  " dup Link\n"                       // [addr1, addr1]
-                  " new Link\n"                       // [addr1, addr1, addr2]
-                  " dup Link\n"                       // [addr1, addr1, addr2, addr2]
-                  " const_null\n"                     // [addr1, addr1, addr2, addr2, null]
-                  " set_field %Link, Link %next\n"    // [addr1, addr1, addr2]                   addr2.next = null
-                  " set_field %Link, Link %next\n"    // [addr1]                                 addr1.next = addr2
-                  " store Link %root\n"               // []                                      root = addr1
-                  " load Link %root\n"                // [root]
-                  " get_field %Link, Link %next\n"    // [root.next]
-                  " load Link %root\n"                // [root.next, root]
-                  " set_field %Link, Link %next\n"    // []                                      root.next.next = root
-                  " load Link %root\n"                // [root]
-                  " get_field %Link, Link %next\n"    // [root.next]
-                  " const_null\n"                     // [root.next, null]
-                  " set_field %Link, Link %next\n"    // []                                      root.next.next = null
+                  " new ref<type#5>\n"                 // [addr1]
+                  " dup ref\n"                         // [addr1, addr1]
+                  " new ref<type#5>\n"                 // [addr1, addr1, addr2]
+                  " dup ref\n"                         // [addr1, addr1, addr2, addr2]
+                  " const_null\n"                      // [addr1, addr1, addr2, addr2, null]
+                  " set_field <type#5>.<field#0>\n"    // [addr1, addr1, addr2]                   addr2.next = null
+                  " set_field <type#5>.<field#0>\n"    // [addr1]                                 addr1.next = addr2
+                  " store ref %3\n"                    // []                                      root = addr1
+                  " load ref %3\n"                     // [root]
+                  " get_field <type#5>.<field#0>\n"    // [root.next]
+                  " load ref %3\n"                     // [root.next, root]
+                  " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = root
+                  " load ref %3\n"                     // [root]
+                  " get_field <type#5>.<field#0>\n"    // [root.next]
+                  " const_null\n"                      // [root.next, null]
+                  " set_field <type#5>.<field#0>\n"    // []                                      root.next.next = null
                   " ret void\n"
                   "}");
     }

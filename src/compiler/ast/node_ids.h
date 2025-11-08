@@ -63,6 +63,14 @@ enum class node_identifier : std::uint8_t
 };
 
 /**
+ * Convert a `node_identifier` to a readable string.
+ *
+ * @param node_id The node identifier.
+ * @param Returns a readable string for the node identifier.
+ */
+std::string to_string(node_identifier node_id);
+
+/**
  * `node_identifier` serializer.
  *
  * @param ar The archive to use for serialization.

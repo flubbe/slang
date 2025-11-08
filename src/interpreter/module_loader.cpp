@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include "shared/stack_value.h"
 #include "shared/type_utils.h"
 #include "interpreter.h"
 #include "package.h"
@@ -48,13 +49,45 @@ static bool is_garbage_collected(const slang::module_::field_descriptor& info) n
     return info.base_type.is_array() || is_garbage_collected(info.base_type);
 }
 
+/**
+ * Return the size of a stack value.
+ *
+ * @param v The stack value.
+ * @return Returns the value's size, in bytes.
+ */
+static std::size_t get_stack_value_size(stack_value v)
+{
+    switch(v)
+    {
+    case stack_value::cat1: return sizeof(std::int32_t);
+    case stack_value::cat2: return sizeof(std::int64_t);
+    case stack_value::ref: return sizeof(void*);
+    default:; /* fall-through */
+    }
+
+    throw interpreter_error(
+      std::format(
+        "Cannot get size for stack value '{}'",
+        static_cast<int>(v)));
+}
+
+/**
+ * Check if a stack value is garbage collected.
+ *
+ * @param v The value.
+ * @returns Return whether a stack value is garbage collected.
+ */
+static bool is_garbage_collected(stack_value v) noexcept
+{
+    return v == stack_value::ref;
+}
+
 /** Byte sizes and alignments for built-in types. */
 static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
   {"void", {0, 0}},
   {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
   {"f32", {sizeof(float), std::alignment_of_v<float>}},
   {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
-  {"@addr", {sizeof(void*), std::alignment_of_v<void*>}},
   {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
@@ -76,7 +109,10 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
         return built_in_it->second.first;
     }
 
-    throw interpreter_error(std::format("Unable to determine type size for '{}'.", v.type.base_type()));
+    throw interpreter_error(
+      std::format(
+        "Unable to determine type size for '{}'.",
+        v.type.base_type()));
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
@@ -209,7 +245,10 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     auto type_it = struct_map.find(type.base_type());
     if(type_it == struct_map.end())
     {
-        throw interpreter_error(std::format("Cannot resolve size for type '{}': Type not found.", type.base_type()));
+        throw interpreter_error(
+          std::format(
+            "Cannot resolve size for type '{}': Type not found.",
+            type.base_type()));
     }
 
     return {
@@ -232,14 +271,30 @@ field_properties module_loader::get_field_properties(
     auto built_in_it = type_properties_map.find(type_name);
     if(built_in_it != type_properties_map.end())
     {
-        throw interpreter_error(std::format("Invalid struct type name '{}'.", type_name));
+        throw interpreter_error(
+          std::format(
+            "Invalid struct type name '{}'.",
+            type_name));
     }
 
     // structs.
     auto type_it = struct_map.find(type_name);
     if(type_it == struct_map.end())
     {
-        throw interpreter_error(std::format("Cannot resolve size for type '{}': Type not found.", type_name));
+        throw interpreter_error(
+          std::format(
+            "Cannot resolve size for type '{}': Type not found.",
+            type_name));
+    }
+
+    if(field_index >= type_it->second.member_types.size())
+    {
+        throw interpreter_error(
+          std::format(
+            "Field index out of bounds for type '{}' ({} >= {}).",
+            type_name,
+            field_index,
+            type_it->second.member_types.size()));
     }
 
     auto field_info = type_it->second.member_types.at(field_index);
@@ -283,16 +338,8 @@ void module_loader::decode_structs()
             }
             else
             {
-                if(!struct_map.contains(member_type.base_type.base_type()))
+                if(member_type.base_type.import_index.has_value())
                 {
-                    if(!member_type.base_type.import_index.has_value())
-                    {
-                        throw interpreter_error(
-                          std::format(
-                            "Cannot resolve size for type '{}': Type not found.",
-                            member_type.base_type.base_type()));
-                    }
-
                     std::size_t index = member_type.base_type.import_index.value();
                     if(index >= mod.header.imports.size())
                     {
@@ -609,10 +656,12 @@ std::int32_t module_loader::decode_instruction(
     case opcode::adup:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(sizeof(void*));
-    case opcode::idup: [[fallthrough]];
-    case opcode::fdup:
+    case opcode::dup:
         recorder->record(static_cast<opcode>(instr));
-        return static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(sizeof(std::int32_t));
+    case opcode::dup2:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(sizeof(std::int64_t));
     case opcode::pop:
         recorder->record(static_cast<opcode>(instr));
         return -static_cast<std::int32_t>(sizeof(std::int32_t));
@@ -787,81 +836,69 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x1:
     {
         // type arguments.
-        module_::variable_type t1;
-        module_::variable_type t2;
-        ar & t1 & t2;
-
-        // "void" is not allowed.
-        if(t1.base_type() == "void" || t2.base_type() == "void")
-        {
-            throw interpreter_error("Error decoding dup_x1 instruction: Invalid argument type 'void'.");
-        }
+        stack_value v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        stack_value v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        ar & v1 & v2;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties(t1);
-        auto properties2 = get_type_properties(t2);
+        auto size1 = get_stack_value_size(v1);
+        auto size2 = get_stack_value_size(v2);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
+        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
 
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size1),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size1) + sizeof(size1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size2),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
           reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2));
-        return static_cast<std::int32_t>(properties1.size);
+        recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2));
+        return static_cast<std::int32_t>(size1);
     }
     /* dup_x2. */
     case opcode::dup_x2:
     {
         // type arguments.
-        module_::variable_type t1;
-        module_::variable_type t2;
-        module_::variable_type t3;
-        ar & t1 & t2 & t3;
-
-        // "void" is not allowed.
-        if(t1.base_type() == "void" || t2.base_type() == "void" || t3.base_type() == "void")
-        {
-            throw interpreter_error("Error decoding dup_x2 instruction: Invalid argument type 'void'.");
-        }
+        stack_value v1;
+        stack_value v2;
+        stack_value v3;
+        ar & v1 & v2 & v3;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto properties1 = get_type_properties(t1);
-        auto properties2 = get_type_properties(t2);
-        auto properties3 = get_type_properties(t3);
+        auto size1 = get_stack_value_size(v1);
+        auto size2 = get_stack_value_size(v2);
+        auto size3 = get_stack_value_size(v3);
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(t1) ? 1 : 0;
+        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
 
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties1.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties1.size) + sizeof(properties1.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size1),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size1) + sizeof(size1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties2.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties2.size) + sizeof(properties2.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size2),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&properties3.size),                                // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&properties3.size) + sizeof(properties3.size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&size3),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&size3) + sizeof(size3));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
           reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-        recorder->record(static_cast<opcode>(instr), to_string(t1), to_string(t2), to_string(t3));
-        return static_cast<std::int32_t>(properties1.size);
+        recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2), to_string(v3));
+        return static_cast<std::int32_t>(size1);
     } /* invoke. */
     case opcode::invoke:
     {
@@ -874,13 +911,21 @@ std::int32_t module_loader::decode_instruction(
             std::int64_t import_index = -i.i - 1;    // this is bounded by 0 from below by the `if` check.
             if(static_cast<std::size_t>(import_index) >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format("Import index {} out of range ({} >= {}).", import_index, import_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Import index {} out of range ({} >= {}).",
+                    import_index,
+                    import_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != module_::symbol_type::function)
             {
-                throw interpreter_error(std::format("Cannot resolve call: Import header at index {} does not refer to a function.", -i.i - 1));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve call: Import header at index {} does not refer to a function.",
+                    -i.i - 1));
             }
 
             auto& exp_symbol = std::get<module_::exported_symbol*>(imp_symbol.export_reference);
@@ -899,8 +944,11 @@ std::int32_t module_loader::decode_instruction(
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
                 throw interpreter_error(
-                  std::format("Package import index {} out of range ({} >= {}).",
-                              imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                  std::format(
+                    "Package import index {} out of range ({} >= {}).",
+                    imp_symbol.package_index,
+                    imp_symbol.package_index,
+                    mod.header.imports.size()));
             }
 
             const module_loader* loader_ptr =
@@ -918,7 +966,10 @@ std::int32_t module_loader::decode_instruction(
 
             if(loader_ptr == nullptr)
             {
-                throw interpreter_error(std::format("Unresolved module import '{}'.", mod.header.imports[imp_symbol.package_index].name));
+                throw interpreter_error(
+                  std::format(
+                    "Unresolved module import '{}'.",
+                    mod.header.imports[imp_symbol.package_index].name));
             }
 
             recorder->record(static_cast<opcode>(instr), i.i, imp_symbol.name);
@@ -931,13 +982,21 @@ std::int32_t module_loader::decode_instruction(
 
         if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
         {
-            throw interpreter_error(std::format("Export index {} out of range ({} >= {}).", i.i, i.i, mod.header.exports.size()));
+            throw interpreter_error(
+              std::format(
+                "Export index {} out of range ({} >= {}).",
+                i.i,
+                i.i,
+                mod.header.exports.size()));
         }
 
         auto& exp_symbol = mod.header.exports[i.i];
         if(exp_symbol.type != module_::symbol_type::function)
         {
-            throw interpreter_error(std::format("Cannot resolve call: Header entry at index {} is not a function.", i.i));
+            throw interpreter_error(
+              std::format(
+                "Cannot resolve call: Header entry at index {} is not a function.",
+                i.i));
         }
         auto& desc = std::get<module_::function_descriptor>(exp_symbol.desc);
 
@@ -974,7 +1033,11 @@ std::int32_t module_loader::decode_instruction(
 
         if(i.i < 0 || static_cast<std::size_t>(i.i) >= details.locals.size())
         {
-            throw interpreter_error(std::format("Index '{}' for argument or local outside of valid range 0-{}.", i.i, details.locals.size()));
+            throw interpreter_error(
+              std::format(
+                "Index '{}' for argument or local outside of valid range 0-{}.",
+                i.i,
+                details.locals.size()));
         }
 
         auto offset = utils::numeric_cast<std::int64_t>(details.locals[i.i].offset);
@@ -1015,32 +1078,40 @@ std::int32_t module_loader::decode_instruction(
             std::size_t import_index = -i.i - 1;
             if(import_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Import index {} out of range ({} >= {}).",
-                  import_index, import_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Import index {} out of range ({} >= {}).",
+                    import_index,
+                    import_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Import header entry at index {} is not a type.",
-                  import_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Import header entry at index {} is not a type.",
+                    import_index));
             }
 
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Package import index {} out of range ({} >= {}).",
-                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Package import index {} out of range ({} >= {}).",
+                    imp_symbol.package_index,
+                    imp_symbol.package_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
             if(imp_package.type != module_::symbol_type::package)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve package: Import header entry at index {} is not a package.",
-                  imp_symbol.package_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve package: Import header entry at index {} is not a package.",
+                    imp_symbol.package_index));
             }
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
@@ -1066,16 +1137,21 @@ std::int32_t module_loader::decode_instruction(
 
             if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
             {
-                throw interpreter_error(std::format("Export index {} out of range ({} >= {}).",
-                                                    i.i, i.i, mod.header.exports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Export index {} out of range ({} >= {}).",
+                    i.i,
+                    i.i,
+                    mod.header.exports.size()));
             }
 
             auto& exp_symbol = mod.header.exports[i.i];
             if(exp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Export header entry at index {} is not a type.",
-                  i.i));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Export header entry at index {} is not a type.",
+                    i.i));
             }
 
             auto properties = get_type_properties(exp_symbol.name);
@@ -1109,32 +1185,40 @@ std::int32_t module_loader::decode_instruction(
             std::size_t import_index = -i.i - 1;
             if(import_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Import index {} out of range ({} >= {}).",
-                  import_index, import_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Import index {} out of range ({} >= {}).",
+                    import_index,
+                    import_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Import header entry at index {} is not a type.",
-                  import_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Import header entry at index {} is not a type.",
+                    import_index));
             }
 
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Package import index {} out of range ({} >= {}).",
-                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Package import index {} out of range ({} >= {}).",
+                    imp_symbol.package_index,
+                    imp_symbol.package_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
             if(imp_package.type != module_::symbol_type::package)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve package: Import header entry at index {} is not a package.",
-                  imp_symbol.package_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve package: Import header entry at index {} is not a package.",
+                    imp_symbol.package_index));
             }
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
@@ -1152,16 +1236,21 @@ std::int32_t module_loader::decode_instruction(
 
             if(static_cast<std::size_t>(i.i) >= mod.header.exports.size())
             {
-                throw interpreter_error(std::format("Export index {} out of range ({} >= {}).",
-                                                    i.i, i.i, mod.header.exports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Export index {} out of range ({} >= {}).",
+                    i.i,
+                    i.i,
+                    mod.header.exports.size()));
             }
 
             auto& exp_symbol = mod.header.exports[i.i];
             if(exp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Export header entry at index {} is not a type.",
-                  i.i));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Export header entry at index {} is not a type.",
+                    i.i));
             }
 
             auto properties = get_type_properties(exp_symbol.name);
@@ -1191,32 +1280,40 @@ std::int32_t module_loader::decode_instruction(
             std::size_t import_index = -struct_index.i - 1;
             if(import_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Import index {} out of range ({} >= {}).",
-                  import_index, import_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Import index {} out of range ({} >= {}).",
+                    import_index,
+                    import_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Import header entry at index {} is not a type.",
-                  import_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Import header entry at index {} is not a type.",
+                    import_index));
             }
 
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Package import index {} out of range ({} >= {}).",
-                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Package import index {} out of range ({} >= {}).",
+                    imp_symbol.package_index,
+                    imp_symbol.package_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
             if(imp_package.type != module_::symbol_type::package)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve package: Import header entry at index {} is not a package.",
-                  imp_symbol.package_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve package: Import header entry at index {} is not a package.",
+                    imp_symbol.package_index));
             }
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
@@ -1240,13 +1337,21 @@ std::int32_t module_loader::decode_instruction(
         {
             if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
             {
-                throw interpreter_error(std::format("Export index {} out of range ({} >= {}).", struct_index.i, struct_index.i, mod.header.exports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Export index {} out of range ({} >= {}).",
+                    struct_index.i,
+                    struct_index.i,
+                    mod.header.exports.size()));
             }
 
             auto& exp_symbol = mod.header.exports[struct_index.i];
             if(exp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format("Cannot resolve type: Header entry at index {} is not a type.", struct_index.i));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Header entry at index {} is not a type.",
+                    struct_index.i));
             }
 
             properties = get_field_properties(exp_symbol.name, field_index.i);
@@ -1285,32 +1390,40 @@ std::int32_t module_loader::decode_instruction(
             std::size_t import_index = -struct_index.i - 1;
             if(import_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Import index {} out of range ({} >= {}).",
-                  import_index, import_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Import index {} out of range ({} >= {}).",
+                    import_index,
+                    import_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_symbol = mod.header.imports[import_index];
             if(imp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Import header entry at index {} is not a type.",
-                  import_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Import header entry at index {} is not a type.",
+                    import_index));
             }
 
             if(imp_symbol.package_index >= mod.header.imports.size())
             {
-                throw interpreter_error(std::format(
-                  "Package import index {} out of range ({} >= {}).",
-                  imp_symbol.package_index, imp_symbol.package_index, mod.header.imports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Package import index {} out of range ({} >= {}).",
+                    imp_symbol.package_index,
+                    imp_symbol.package_index,
+                    mod.header.imports.size()));
             }
 
             auto& imp_package = mod.header.imports[imp_symbol.package_index];
             if(imp_package.type != module_::symbol_type::package)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve package: Import header entry at index {} is not a package.",
-                  imp_symbol.package_index));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve package: Import header entry at index {} is not a package.",
+                    imp_symbol.package_index));
             }
 
             module_loader& loader = ctx.resolve_module(imp_package.name);
@@ -1332,16 +1445,21 @@ std::int32_t module_loader::decode_instruction(
 
             if(static_cast<std::size_t>(struct_index.i) >= mod.header.exports.size())
             {
-                throw interpreter_error(std::format("Export index {} out of range ({} >= {}).",
-                                                    struct_index.i, struct_index.i, mod.header.exports.size()));
+                throw interpreter_error(
+                  std::format(
+                    "Export index {} out of range ({} >= {}).",
+                    struct_index.i,
+                    struct_index.i,
+                    mod.header.exports.size()));
             }
 
             auto& exp_symbol = mod.header.exports[struct_index.i];
             if(exp_symbol.type != module_::symbol_type::type)
             {
-                throw interpreter_error(std::format(
-                  "Cannot resolve type: Export header entry at index {} is not a type.",
-                  struct_index.i));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve type: Export header entry at index {} is not a type.",
+                    struct_index.i));
             }
 
             auto properties = get_type_properties(exp_symbol.name);
@@ -1356,7 +1474,11 @@ std::int32_t module_loader::decode_instruction(
         return 0; /* no stack size change */
     }
     default:
-        throw interpreter_error(std::format("Unexpected opcode '{}' ({}) during decode.", to_string(static_cast<opcode>(instr)), static_cast<int>(instr)));
+        throw interpreter_error(
+          std::format(
+            "Unexpected opcode '{}' ({}) during decode.",
+            to_string(static_cast<opcode>(instr)),
+            static_cast<int>(instr)));
     }
 }
 
@@ -1442,7 +1564,10 @@ module_loader::module_loader(
 
         if(function_map.contains(it.name))
         {
-            throw interpreter_error(std::format("Function '{}' already exists in exports.", it.name));
+            throw interpreter_error(
+              std::format(
+                "Function '{}' already exists in exports.",
+                it.name));
         }
 
         auto& desc = std::get<module_::function_descriptor>(it.desc);
@@ -1469,13 +1594,21 @@ module_loader::module_loader(
             if(mod_it == ctx.native_function_map.end())
             {
                 // TODO Add e.g. a callback to resolve the library?
-                throw interpreter_error(std::format("Cannot resolve module '{}' containing native function '{}'.", details.library_name, it.name));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve module '{}' containing native function '{}'.",
+                    details.library_name,
+                    it.name));
             }
 
             auto func_it = mod_it->second.find(it.name);
             if(func_it == mod_it->second.end())
             {
-                throw interpreter_error(std::format("Cannot resolve native function '{}' in module '{}'.", it.name, details.library_name));
+                throw interpreter_error(
+                  std::format(
+                    "Cannot resolve native function '{}' in module '{}'.",
+                    it.name,
+                    details.library_name));
             }
 
             function_map.insert(
@@ -1514,7 +1647,11 @@ function& module_loader::get_function(const std::string& name)
     auto it = function_map.find(name);
     if(it == function_map.end())
     {
-        throw interpreter_error(std::format("Cannot find function '{}' in module '{}'.", name, path.string()));
+        throw interpreter_error(
+          std::format(
+            "Cannot find function '{}' in module '{}'.",
+            name,
+            path.string()));
     }
     return it->second;
 }

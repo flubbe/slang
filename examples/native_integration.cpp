@@ -113,7 +113,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     void* const* ret = res.get<void*>();
     if(ret == nullptr)
     {
-        // `res` can be `nullptr` if the return type was not an object.
+        // `ret` can be `nullptr` if the return type was not an object.
         std::println("Got unexpected return type.");
         return EXIT_FAILURE;
     }

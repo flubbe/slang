@@ -122,6 +122,11 @@ int main(int argc, char* argv[])
         std::println("{}", e.what());
         return EXIT_FAILURE;
     }
+    catch(const std::exception& e)
+    {
+        std::println("An error occured: {}", e.what());
+        return EXIT_FAILURE;
+    }
     catch(...)
     {
         std::println("The program unexpectedly crashed.");
