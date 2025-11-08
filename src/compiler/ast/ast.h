@@ -668,7 +668,13 @@ public:
 
     /** Get the name. */
     [[nodiscard]]
-    token get_name() const
+    const std::string& get_name() const
+    {
+        return name.s;
+    }
+
+    /** Get the name token. */
+    const token& get_name_token() const
     {
         return name;
     }
@@ -815,9 +821,9 @@ public:
 
     /** Returns the type name. */
     [[nodiscard]]
-    token get_name() const
+    std::string get_name() const
     {
-        return type_name;
+        return type_name.s;
     }
 
     /**
@@ -2693,7 +2699,14 @@ public:
 
     /** Return the function name. */
     [[nodiscard]]
-    const token& get_name() const
+    const std::string& get_name() const
+    {
+        return name.s;
+    }
+
+    /** Return the name token. */
+    [[nodiscard]]
+    const token& get_name_token() const
     {
         return name;
     }
