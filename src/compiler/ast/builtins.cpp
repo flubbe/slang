@@ -152,8 +152,8 @@ void format_macro_expander::create_format_string_placeholders()
  */
 
 void format_macro_expression::expand_late_macros(
-  ty::context& ctx,
-  sema::env& env)
+  [[maybe_unused]] ty::context& ctx,
+  [[maybe_unused]] sema::env& env)
 {
     if(expansion)
     {

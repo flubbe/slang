@@ -33,6 +33,16 @@ namespace ty = slang::typing;
 /** Module id. */
 using module_id = std::uint64_t;
 
+/** Imported module specification. */
+struct import_module_spec
+{
+    /** Symbol id for the importing module. */
+    sema::symbol_id origin;
+
+    /** Source location of the import. */
+    source_location location;
+};
+
 /** Name resolution context. */
 class context
 {
@@ -73,6 +83,13 @@ class context
     }
 
     /**
+     * Collect all unresolved modules from the semantic environment.
+     *
+     * @returns Returns a map `fully_qualified_name -> import_module_spec`.
+     */
+    std::unordered_map<std::string, import_module_spec> collect_unresolved_modules();
+
+    /**
      * Resolve an external symbol.
      *
      * @param module_name The module name.
@@ -89,16 +106,12 @@ class context
      * Resolve an imported type.
      *
      * @param t The type to resolve.
-     * @param loc Location of the import.
      * @param module_name The module name of the type reference.
-     * @param header Module header of the type reference.
      * @returns Returns the type id of the resolved type.
      */
     ty::type_id resolve_imported_type(
       const module_::variable_type& t,
-      const source_location& loc,
-      const std::string& module_name,
-      const module_::module_header& header);
+      const std::string& module_name);
 
     /**
      * Import a constant into the semantic and constant environments
@@ -119,13 +132,11 @@ class context
      * @param symbol_id The generated symbol id.
      * @param symbol The exported symbol.
      * @param module_name The origin module name.
-     * @param header Symbol origin module header.
      */
     void import_function(
       sema::symbol_id symbol_id,
       const module_::exported_symbol& symbol,
-      const std::string& module_name,
-      const module_::module_header& header);
+      const std::string& module_name);
 
     /**
      * Import a macro into the semantic and macro environments.
@@ -142,18 +153,12 @@ class context
     /**
      * Import a type into the semantic and type environments.
      *
-     * @param symbol_id The generated symbol id.
-     * @param loc Location of the import.
      * @param symbol The exported symbol.
      * @param module_name The origin module name.
-     * @param header Symbol origin module header.
      */
     void import_type(
-      sema::symbol_id symbol_id,
-      const source_location& loc,
       const module_::exported_symbol& symbol,
-      const std::string& module_name,
-      const module_::module_header& header);
+      const std::string& module_name);
 
 public:
     /** Defaulted and deleted constructors. */

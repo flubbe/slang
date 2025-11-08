@@ -117,8 +117,7 @@ void context::import_constant(
 void context::import_function(
   sema::symbol_id symbol_id,
   const module_::exported_symbol& symbol,
-  const std::string& module_name,
-  const module_::module_header& header)
+  const std::string& module_name)
 {
     const auto& desc = std::get<module_::function_descriptor>(symbol.desc);
 
@@ -135,17 +134,13 @@ void context::import_function(
 
     resolve_imported_type(
       desc.signature.return_type,
-      symbol_info_it->second.loc,
-      module_name,
-      header);
+      module_name);
 
     for(const auto& arg_type: desc.signature.arg_types)
     {
         resolve_imported_type(
           arg_type,
-          symbol_info_it->second.loc,
-          module_name,
-          header);
+          module_name);
     }
 }
 
@@ -173,9 +168,7 @@ void context::import_macro(
 
 ty::type_id context::resolve_imported_type(
   const module_::variable_type& t,
-  const source_location& loc,
-  const std::string& module_name,
-  const module_::module_header& header)
+  const std::string& module_name)
 {
     std::string base_type = t.base_type();
     if(!ty::is_builtin_type(base_type))
@@ -195,11 +188,8 @@ ty::type_id context::resolve_imported_type(
 }
 
 void context::import_type(
-  sema::symbol_id symbol_id,
-  const source_location& loc,
   const module_::exported_symbol& symbol,
-  const std::string& module_name,
-  const module_::module_header& header)
+  const std::string& module_name)
 {
     const auto& desc = std::get<module_::struct_descriptor>(symbol.desc);
 
@@ -210,9 +200,7 @@ void context::import_type(
         {
             resolve_imported_type(
               m.second.base_type,
-              loc,
-              module_name,
-              header);
+              module_name);
         }
     }
 
@@ -243,9 +231,7 @@ void context::import_type(
             ? type_ctx.get_type(m.second.base_type.base_type())
             : resolve_imported_type(
                 m.second.base_type,
-                loc,
-                module_name,
-                header);
+                module_name);
 
         type_ctx.add_field(
           struct_type_id,
@@ -382,8 +368,7 @@ std::optional<sema::symbol_id> context::resolve_external(
         import_function(
           new_symbol_id,
           *external_reference,
-          module_name,
-          module_header);
+          module_name);
     }
     else if(external_reference->type == module_::symbol_type::macro)
     {
@@ -410,11 +395,8 @@ std::optional<sema::symbol_id> context::resolve_external(
     else if(external_reference->type == module_::symbol_type::type)
     {
         import_type(
-          new_symbol_id,
-          info.loc,
           *external_reference,
-          module_name,
-          module_header);
+          module_name);
     }
     else
     {
@@ -623,55 +605,48 @@ static std::vector<std::string> topological_order(
     return order;
 }
 
+std::unordered_map<std::string, import_module_spec> context::collect_unresolved_modules()
+{
+    // map the (fully-qualified) module name to its import information.
+    std::unordered_map<std::string, import_module_spec> import_specs;
+
+    for(auto& [module_id, symbol_info]: sema_env.symbol_table
+                                          | std::views::filter([](const auto& p) -> bool
+                                                               { return p.second.type == sema::symbol_type::module_; }))
+    {
+        if(module_map.contains(symbol_info.qualified_name))
+        {
+            continue;
+        }
+
+        auto [it, success] = import_specs.insert(
+          {symbol_info.qualified_name,
+           import_module_spec{
+             .origin = symbol_info.declaring_module,
+             .location = symbol_info.loc}});
+        if(!success)
+        {
+            if(symbol_info.declaring_module == sema::symbol_info::current_module_id)
+            {
+                it->second.origin = sema::symbol_info::current_module_id;
+            }
+        }
+    }
+
+    return import_specs;
+}
+
 void context::resolve_imports(
   ld::context& loader)
 {
     co::context import_collector{sema_env};
     import_collector.push_scope(sema_env.global_scope_id);
 
-    std::unordered_map<
-      sema::symbol_id,
-      module_::constant_table_entry,
-      sema::symbol_id::hash>
-      imported_constants;    // symbol id -> constant table entry.
+    // Get the unresolved modules from the semantic environment.
+    auto import_specs = collect_unresolved_modules();
 
-    // build list of modules.
-    std::unordered_map<
-      std::string,
-      sema::symbol_id>
-      unresolved_modules;    // fully-qualified module names -> declaring_module_id
-    std::unordered_map<
-      std::string,
-      source_location>
-      module_locations;
-    std::unordered_map<
-      std::string,
-      sema::symbol_id>
-      module_ids;
+    std::unordered_map<std::string, import_module_spec> resolved_import_specs;
 
-    for(auto& [module_id, info]: sema_env.symbol_table
-                                   | std::views::filter([](const auto& p) -> bool
-                                                        { return p.second.type == sema::symbol_type::module_; }))
-    {
-        if(module_map.contains(info.qualified_name))
-        {
-            continue;
-        }
-
-        auto [it, success] = unresolved_modules.insert(
-          {info.qualified_name,
-           info.declaring_module});
-        if(!success && info.declaring_module == sema::symbol_info::current_module_id)
-        {
-            it->second = sema::symbol_info::current_module_id;
-        }
-
-        module_locations.insert(
-          {info.qualified_name,
-           info.loc});
-    }
-
-    // modules awaiting load.
     std::unordered_map<
       std::string,
       std::set<std::string>>
@@ -680,47 +655,28 @@ void context::resolve_imports(
       std::string,
       std::pair<module_::module_resolver*, sema::symbol_id>>
       pending_modules;
-    std::unordered_map<std::string, sema::symbol_id> importing_modules;
 
-    while(!unresolved_modules.empty())
+    // create the module dependency graph.
+    while(!import_specs.empty())
     {
-        auto nh = unresolved_modules.extract(unresolved_modules.begin());
+        auto nh = import_specs.extract(import_specs.begin());
         const std::string& qualified_module_name = nh.key();
-        sema::symbol_id importing_module = nh.mapped();
-        bool transitive = importing_module.value != sema::symbol_info::current_module_id;
+        import_module_spec spec = nh.mapped();
+        bool transitive = spec.origin.value != sema::symbol_info::current_module_id;
 
         module_::module_resolver* resolver = &loader.resolve_module(
           qualified_module_name,
           transitive);
 
-        auto loc_it = module_locations.find(qualified_module_name);
-        if(loc_it == module_locations.end())
-        {
-            throw std::runtime_error(
-              std::format(
-                "No source location for imported module {}.",
-                qualified_module_name));
-        }
-        const source_location& loc = loc_it->second;
-
-        if(module_ids.contains(qualified_module_name))
-        {
-            throw std::runtime_error(
-              std::format(
-                "Module '{}' already loaded.",
-                qualified_module_name));
-        }
-
         auto unqualified_name = name::unqualified_name(qualified_module_name);
 
         sema::symbol_id module_symbol_id =
           [this,
-           &loc,
+           &spec,
            transitive,
            &import_collector,
            &unqualified_name,
-           &qualified_module_name,
-           &importing_module]() -> sema::symbol_id
+           &qualified_module_name]() -> sema::symbol_id
         {
             if(!transitive)
             {
@@ -744,12 +700,24 @@ void context::resolve_imports(
               unqualified_name,
               qualified_module_name,
               sema::symbol_type::module_,
-              loc,
-              importing_module,
+              spec.location,
+              spec.origin,
               transitive);
         }();
 
-        module_ids[qualified_module_name] = module_symbol_id;
+        auto [entry, success] = resolved_import_specs.insert(
+          {qualified_module_name,
+           spec});
+        if(!success)
+        {
+            throw std::runtime_error(
+              std::format(
+                "{}: Module '{}' was already resolved at {}.",
+                ::slang::to_string(entry->second.location),
+                qualified_module_name,
+                ::slang::to_string(spec.location)));
+        }
+
         module_graph[qualified_module_name] = {};
         pending_modules[qualified_module_name] = {
           resolver,
@@ -777,22 +745,20 @@ void context::resolve_imports(
                 continue;
             }
 
-            if(unresolved_modules.contains(qualified_name))
+            if(import_specs.contains(qualified_name))
             {
                 continue;
             }
 
-            unresolved_modules.insert(
-              std::make_pair(
-                qualified_name,
-                module_symbol_id));
-
-            module_locations.insert(
+            import_specs.insert(
               {qualified_name,
-               loc});
+               import_module_spec{
+                 .origin = module_symbol_id,
+                 .location = spec.location}});
         }
     }
 
+    // topologically sort the module graph and load the modules.
     const std::vector<std::string> module_load_order = topological_order(module_graph);
 
     for(const auto& qualified_module_name: module_load_order)
@@ -825,15 +791,14 @@ void context::resolve_imports(
                 continue;
             }
 
-            auto loc_it = module_locations.find(qualified_module_name);
-            if(loc_it == module_locations.end())
+            auto resolved_it = resolved_import_specs.find(qualified_module_name);
+            if(resolved_it == resolved_import_specs.end())
             {
                 throw std::runtime_error(
                   std::format(
                     "No source location for imported module {}.",
                     qualified_module_name));
             }
-            const source_location& loc = loc_it->second;
 
             // import symbols.
             auto qualified_name = name::qualified_name(
@@ -844,7 +809,7 @@ void context::resolve_imports(
               it.name,
               qualified_name,
               to_sema_symbol_type(it.type),
-              loc,
+              resolved_it->second.location,
               module_id,
               transitive,
               &it);
