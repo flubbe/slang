@@ -268,7 +268,8 @@ void unary_expression::resolve_names(rs::context& ctx)
 
 void new_expression::resolve_names(rs::context& ctx)
 {
-    expr->resolve_names(ctx);
+    type_expr->resolve_names(ctx);
+    array_length_expr->resolve_names(ctx);
 }
 
 /*
