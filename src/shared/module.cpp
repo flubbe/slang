@@ -91,7 +91,7 @@ void variable_type::set_from_encoded(const std::string& s)
     }
 }
 
-archive& operator&(archive& ar, variable_type& ts)
+archive& operator&(archive& ar, variable_type& ty)
 {
     if(ar.is_reading())
     {
@@ -113,22 +113,22 @@ archive& operator&(archive& ar, variable_type& ts)
             } while(c != ';');
         }
 
-        ts.set_from_encoded(s);
+        ty.set_from_encoded(s);
 
         vle_int i;
         ar & i;
-        ts.import_index = i.i >= 0 ? std::make_optional(i.i) : std::nullopt;
+        ty.import_index = i.i >= 0 ? std::make_optional(i.i) : std::nullopt;
     }
     else if(ar.is_writing())
     {
-        auto encoded_type = ts.encode();
+        auto encoded_type = ty.encode();
         for(char c: encoded_type)
         {
             ar & c;
         }
 
-        vle_int i{ts.import_index.has_value()
-                    ? utils::numeric_cast<std::int64_t>(ts.import_index.value())
+        vle_int i{ty.import_index.has_value()
+                    ? utils::numeric_cast<std::int64_t>(ty.import_index.value())
                     : static_cast<std::int64_t>(-1)};
         ar & i;
     }

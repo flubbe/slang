@@ -37,43 +37,54 @@ static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
-/**
- * Generate the return opcode from the signature's return type for native functions.
- *
- * @note Only used for preparing handover of return values to native code.
- * @param return_type The return type, given as `(name, is_array)`.
- * @returns A return opcode.
- * @throws Throws an `interpreter_error` if the `return_type` is invalid.
+/*
+ * Helpers.
  */
-static opcode get_return_opcode(const module_::variable_type& return_type)
+
+abi_type_class get_abi_type_class(const module_::variable_type& ty)
 {
-    if(return_type.is_array())
+    if(ty.is_array())
     {
-        return opcode::aret;
+        return abi_type_class::ref;
     }
 
-    if(return_type.base_type() == "void")
+    if(ty.base_type() == "void")
     {
-        return opcode::ret;
+        return abi_type_class::void_;
     }
 
-    if(return_type.base_type() == "i32")
+    if(ty.base_type() == "i32")
     {
-        return opcode::iret;
+        return abi_type_class::i32;
     }
 
-    if(return_type.base_type() == "f32")
+    if(ty.base_type() == "f32")
     {
-        return opcode::fret;
+        return abi_type_class::f32;
     }
 
-    if(return_type.base_type() == "str")
+    if(ty.base_type() == "str")
     {
-        return opcode::sret;
+        return abi_type_class::str;
     }
 
-    // FIXME Assume all other types are references.
-    return opcode::aret;
+    // All other types are references.
+    return abi_type_class::ref;
+}
+
+std::string to_string(abi_type_class cls)
+{
+    switch(cls)
+    {
+    case abi_type_class::void_: return "void";
+    case abi_type_class::i32: return "i32";
+    case abi_type_class::f32: return "f32";
+    case abi_type_class::str: return "str";
+    case abi_type_class::ref: return "ref";
+    default:;
+    }
+
+    return "<unknown>";
 }
 
 /*
@@ -93,9 +104,9 @@ function::function(
 , loader{loader}
 , signature{std::move(signature)}
 , native{false}
-, entry_point_or_function{entry_point}
+, entry_point_or_native_target{entry_point}
 , size{size}
-, ret_opcode{::slang::interpreter::get_return_opcode(this->signature.return_type)}
+, return_type_class{get_abi_type_class(this->signature.return_type)}
 , locals{std::move(locals)}
 , locals_size{locals_size}
 , stack_size{stack_size}
@@ -111,9 +122,9 @@ function::function(
 , loader{loader}
 , signature{std::move(signature)}
 , native{true}
-, entry_point_or_function{std::move(func)}
+, entry_point_or_native_target{std::move(func)}
 , size{0}
-, ret_opcode{::slang::interpreter::get_return_opcode(this->signature.return_type)}
+, return_type_class{get_abi_type_class(this->signature.return_type)}
 {
 }
 
@@ -266,7 +277,7 @@ static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offse
     return v;
 }
 
-opcode context::exec(
+void context::exec(
   const module_loader& loader,
   std::size_t entry_point,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t size,
@@ -326,7 +337,7 @@ opcode context::exec(
                 gc.run();
 
                 --call_stack_level;
-                return instr_opcode;
+                return;
             }
 
             if(offset == function_end)
@@ -1543,39 +1554,40 @@ value context::exec(
      * Execute the function.
      */
 
-    auto invoke_native = [&f, &frame]() -> opcode
+    auto invoke_native = [&f, &frame]() -> abi_type_class
     {
-        const auto& func = f.get_function();
+        const auto& func = f.get_native_target();
         func(frame.stack);
-        return f.get_return_opcode();
+        return f.get_return_type_class();
     };
 
-    auto invoke = [this, &loader, &f, &frame]() -> opcode
+    auto invoke = [this, &loader, &f, &frame]() -> abi_type_class
     {
-        return exec(loader, f.get_entry_point(), f.get_size(), f.get_locals(), frame);
+        exec(loader, f.get_entry_point(), f.get_size(), f.get_locals(), frame);
+        return f.get_return_type_class();
     };
 
-    opcode ret_opcode = f.is_native()
-                          ? invoke_native()
-                          : invoke();
+    abi_type_class return_type_class = f.is_native()
+                                         ? invoke_native()
+                                         : invoke();
 
     /*
      * Decode return value.
      */
     value ret;
-    if(ret_opcode == opcode::ret)
+    if(return_type_class == abi_type_class::void_)
     {
         /* return void */
     }
-    else if(ret_opcode == opcode::iret)
+    else if(return_type_class == abi_type_class::i32)
     {
         ret = value{frame.stack.pop_i32()};
     }
-    else if(ret_opcode == opcode::fret)
+    else if(return_type_class == abi_type_class::f32)
     {
         ret = value{frame.stack.pop_f32()};
     }
-    else if(ret_opcode == opcode::sret)
+    else if(return_type_class == abi_type_class::str)
     {
         auto* s = frame.stack.pop_addr<std::string>();
         if(s != nullptr)
@@ -1584,7 +1596,7 @@ value context::exec(
             gc.remove_temporary(s);
         }
     }
-    else if(ret_opcode == opcode::aret)
+    else if(return_type_class == abi_type_class::ref)
     {
         const auto& sig = f.get_signature();
 
@@ -1596,7 +1608,7 @@ value context::exec(
     {
         throw interpreter_error(std::format(
           "Invalid return opcode '{}' ({}).",
-          to_string(ret_opcode), static_cast<int>(ret_opcode)));
+          to_string(return_type_class), static_cast<int>(return_type_class)));
     }
 
     // invoke the garbage collector to clean up before returning.

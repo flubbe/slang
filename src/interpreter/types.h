@@ -398,6 +398,32 @@ public:
     }
 };
 
+/** ABI type class for type decoding and (return) type handling. */
+enum class abi_type_class : std::uint8_t
+{
+    void_, /** no type. */
+    i32,   /** 32-bit integer. */
+    f32,   /** 32-bit float.  */
+    str,   /** string. */
+    ref    /** reference. */
+};
+
+/**
+ * Get the ABI type class for a variable type.
+ *
+ * @param ty The variable type.
+ * @returns Returns the ABI type class.
+ */
+abi_type_class get_abi_type_class(const module_::variable_type& ty);
+
+/**
+ * Convert an ABI type class into a readable string.
+ *
+ * @param cls The ABI type class.
+ * @returns Returns a readable string.
+ */
+std::string to_string(abi_type_class cls);
+
 /** A function. */
 class function
 {
@@ -414,13 +440,16 @@ class function
     bool native;
 
     /** Entry point (offset into binary) or function pointer for native functions. */
-    std::variant<std::size_t, std::function<void(operand_stack&)>> entry_point_or_function;
+    std::variant<
+      std::size_t,
+      std::function<void(operand_stack&)>>
+      entry_point_or_native_target;
 
     /** Bytecode size for interpreted functions. */
     std::size_t size;
 
     /** Return opcode. */
-    opcode ret_opcode;
+    abi_type_class return_type_class;
 
     /** Locals. Not serialized. */
     std::vector<module_::variable_descriptor> locals;
@@ -523,13 +552,13 @@ public:
     /** Get the function's entry point. */
     std::size_t get_entry_point() const
     {
-        return std::get<std::size_t>(entry_point_or_function);
+        return std::get<std::size_t>(entry_point_or_native_target);
     }
 
     /** Get a std::function. */
-    const std::function<void(operand_stack&)>& get_function() const
+    const std::function<void(operand_stack&)>& get_native_target() const
     {
-        return std::get<std::function<void(operand_stack&)>>(entry_point_or_function);
+        return std::get<std::function<void(operand_stack&)>>(entry_point_or_native_target);
     }
 
     /** Get the bytecode size. */
@@ -556,10 +585,10 @@ public:
         return stack_size;
     }
 
-    /** Get the return opcode. */
-    opcode get_return_opcode() const
+    /** Get the return type class. */
+    abi_type_class get_return_type_class() const
     {
-        return ret_opcode;
+        return return_type_class;
     }
 };
 

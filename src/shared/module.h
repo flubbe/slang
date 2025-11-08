@@ -299,7 +299,7 @@ class variable_type
 {
     friend class si::module_loader;
     friend class si::arguments_scope;
-    friend archive& operator&(archive& ar, variable_type& ts);
+    friend archive& operator&(archive& ar, variable_type& ty);
 
     /**
      * The decoded type string.
@@ -417,12 +417,12 @@ public:
 };
 
 /**
- * Type string serializer.
+ * Variable type serializer.
  *
  * @param ar The archive to use for serialization.
- * @param ts The type string.
+ * @param ty The variable type.
  */
-archive& operator&(archive& ar, variable_type& ts);
+archive& operator&(archive& ar, variable_type& ty);
 
 /**
  * Convert a `variable_type` to a readable string.

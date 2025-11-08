@@ -74,6 +74,15 @@ std::optional<const_::const_info> namespace_access_expression::evaluate(
 
 bool variable_reference_expression::is_const_eval(const_::env& env) const
 {
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Reference '{}' has no symbol id.",
+            name.s));
+    }
+
     // check whether we're referencing a constant.
     return env.constant_registry.contains(symbol_id.value());
 }
@@ -82,6 +91,15 @@ std::optional<const_::const_info> variable_reference_expression::evaluate(
   [[maybe_unused]] ty::context& type_ctx,
   const_::env& env) const
 {
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Reference '{}' has no symbol id.",
+            name.s));
+    }
+
     return env.get_const_info(symbol_id.value());
 }
 
@@ -91,19 +109,15 @@ std::optional<const_::const_info> variable_reference_expression::evaluate(
 
 struct binary_operation_helper
 {
-    ty::context& ctx;
-
     source_location loc;
     std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
     std::function<float(float, float)> func_f32;
 
     binary_operation_helper(
-      ty::context& ctx,
       const binary_expression& expr,
       std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32,
       std::function<float(float, float)> func_f32)
-    : ctx{ctx}
-    , loc{expr.get_location()}
+    : loc{expr.get_location()}
     , func_i32{std::move(func_i32)}
     , func_f32{std::move(func_f32)}
     {
@@ -154,19 +168,15 @@ struct binary_operation_helper
 
 struct comparison_helper
 {
-    ty::context& ctx;
-
     source_location loc;
     std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32;
     std::function<std::int32_t(float, float)> func_f32;
 
     comparison_helper(
-      ty::context& ctx,
       const binary_expression& expr,
       std::function<std::int32_t(std::int32_t, std::int32_t)> func_i32,
       std::function<std::int32_t(float, float)> func_f32)
-    : ctx{ctx}
-    , loc{expr.get_location()}
+    : loc{expr.get_location()}
     , func_i32{std::move(func_i32)}
     , func_f32{std::move(func_f32)}
     {
@@ -262,26 +272,22 @@ std::optional<const_::const_info> binary_expression::evaluate(
 
     // clang-format off
     static const std::unordered_map<std::string, binary_operation_helper> eval_map = {
-      {"+", {type_ctx, 
-             *this, 
+      {"+", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a + b; }, 
              [](float a, float b) -> float
              { return a + b; }}},
-      {"-", {type_ctx, 
-             *this, 
+      {"-", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a - b; }, 
              [](float a, float b) -> float
              { return a - b; }}},
-      {"*", {type_ctx, 
-             *this, 
+      {"*", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a * b; }, 
              [](float a, float b) -> float
              { return a * b; }}},
-      {"/", {type_ctx, 
-             *this, 
+      {"/", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              {
                  if(b == 0)
@@ -298,8 +304,7 @@ std::optional<const_::const_info> binary_expression::evaluate(
                  }
                  return a / b; 
              }}},
-      {"%", {type_ctx, 
-             *this, 
+      {"%", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              {
                  if(b == 0)
@@ -308,44 +313,37 @@ std::optional<const_::const_info> binary_expression::evaluate(
                  }
                  return a % b; }, [](float, float) -> float
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '%'."); }}},
-      {"<<", {type_ctx, 
-              *this, 
+      {"<<", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a << (b & 0x1f); }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '<<'."); }}},
-      {">>", {type_ctx, 
-              *this, 
+      {">>", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a >> (b & 0x1f); }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '>>'."); }}},
-      {"&", {type_ctx, 
-              *this, 
+      {"&", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a & b; }, 
              [](float, float) -> float
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '&'."); }}},
-      {"^", {type_ctx, 
-              *this, 
+      {"^", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a ^ b; },
              [](float, float) -> float
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '^'."); }}},
-      {"|", {type_ctx, 
-             *this, 
+      {"|", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a | b; }, 
              [](float, float) -> float
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '|'."); }}},
-      {"&&", {type_ctx, 
-              *this, 
+      {"&&", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a && b; }, 
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '&&'."); }}},
-      {"||", {type_ctx, 
-              *this, 
+      {"||", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a || b; }, 
               [](float, float) -> float
@@ -353,38 +351,32 @@ std::optional<const_::const_info> binary_expression::evaluate(
     };
 
     static const std::unordered_map<std::string, comparison_helper> comp_map = {
-      {"<", {type_ctx, 
-             *this, 
+      {"<", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a < b; }, 
              [](float a, float b) -> std::int32_t
              { return a < b; }}},
-      {"<=", {type_ctx, 
-              *this, 
+      {"<=", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a <= b; }, 
               [](float a, float b) -> std::int32_t
               { return a <= b; }}},
-      {">", {type_ctx, 
-             *this, 
+      {">", {*this, 
              [](std::int32_t a, std::int32_t b) -> std::int32_t
              { return a > b; }, 
              [](float a, float b) -> std::int32_t
              { return a > b; }}},
-      {">=", {type_ctx, 
-              *this, 
+      {">=", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a >= b; }, 
               [](float a, float b) -> std::int32_t
               { return a >= b; }}},
-      {"==", {type_ctx, 
-              *this, 
+      {"==", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a == b; }, 
               [](float a, float b) -> std::int32_t
               { return a == b; }}},
-      {"!=", {type_ctx, 
-              *this, 
+      {"!=", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
               { return a != b; }, 
               [](float a, float b) -> std::int32_t
@@ -443,19 +435,15 @@ std::optional<const_::const_info> binary_expression::evaluate(
 
 struct unary_operation_helper
 {
-    ty::context& ctx;
-
     source_location loc;
     std::function<std::int32_t(std::int32_t)> func_i32;
     std::function<float(float)> func_f32;
 
     unary_operation_helper(
-      ty::context& ctx,
       const unary_expression& expr,
       std::function<std::int32_t(std::int32_t)> func_i32,
       std::function<float(float)> func_f32)
-    : ctx{ctx}
-    , loc{expr.get_location()}
+    : loc{expr.get_location()}
     , func_i32{std::move(func_i32)}
     , func_f32{std::move(func_f32)}
     {
@@ -521,7 +509,6 @@ std::optional<const_::const_info> unary_expression::evaluate(
 
     static const std::unordered_map<std::string, unary_operation_helper> eval_map = {
       {"+", {
-              type_ctx,
               *this,
               [](std::int32_t a) -> std::int32_t
               {
@@ -533,7 +520,6 @@ std::optional<const_::const_info> unary_expression::evaluate(
               },
             }},
       {"-", {
-              type_ctx,
               *this,
               [](std::int32_t a) -> std::int32_t
               {
@@ -545,7 +531,6 @@ std::optional<const_::const_info> unary_expression::evaluate(
               },
             }},
       {"!", {
-              type_ctx,
               *this,
               [](std::int32_t a) -> std::int32_t
               {
@@ -557,7 +542,6 @@ std::optional<const_::const_info> unary_expression::evaluate(
               },
             }},
       {"~", {
-              type_ctx,
               *this,
               [](std::int32_t a) -> std::int32_t
               {

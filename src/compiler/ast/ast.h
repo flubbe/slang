@@ -2402,7 +2402,7 @@ class new_expression : public expression
     std::optional<ty::type_id> type_expr_id;
 
     /** Array length expression. */
-    std::unique_ptr<expression> expr;
+    std::unique_ptr<expression> array_length_expr;
 
 public:
     /** Set the super class. */
@@ -2413,7 +2413,7 @@ public:
     new_expression(const new_expression& other)
     : super{other}
     , type_expr{other.type_expr->clone()}
-    , expr{other.expr->clone()}
+    , array_length_expr{other.array_length_expr->clone()}
     {
     }
     new_expression(new_expression&&) = default;
@@ -2427,15 +2427,15 @@ public:
      *
      * @param loc The location.
      * @param type The type to be allocated.
-     * @param expr The array length expression.
+     * @param array_length_expr The array length expression.
      */
     new_expression(
       source_location loc,
       std::unique_ptr<type_expression> type_expr,
-      std::unique_ptr<expression> expr)
+      std::unique_ptr<expression> array_length_expr)
     : expression{loc}
     , type_expr{std::move(type_expr)}
-    , expr{std::move(expr)}
+    , array_length_expr{std::move(array_length_expr)}
     {
     }
 
@@ -2464,12 +2464,12 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return {expr.get()};
+        return {array_length_expr.get()};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        return {expr.get()};
+        return {array_length_expr.get()};
     }
 };
 

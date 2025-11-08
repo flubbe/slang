@@ -474,7 +474,7 @@ function* context::create_function(
     return funcs.emplace_back(
                   std::make_unique<function>(
                     std::move(name),
-                    std::move(return_type),
+                    return_type,
                     std::move(args)))
       .get();
 }
@@ -504,7 +504,7 @@ void context::create_native_function(
       std::make_unique<function>(
         std::move(lib_name),
         std::move(name),
-        std::move(return_type),
+        return_type,
         std::move(args)));
 }
 
@@ -709,7 +709,7 @@ void context::generate_invoke(function_argument f)
     validate_insertion_point();
 
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<function_argument>(f));
+    args.emplace_back(std::make_unique<function_argument>(std::move(f)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "invoke",
@@ -742,7 +742,7 @@ void context::generate_load_element(type_argument t)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(t));
+    args.emplace_back(std::make_unique<type_argument>(std::move(t)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "load_element",
