@@ -905,7 +905,10 @@ TEST(interpreter, returned_struct)
             std::string* s;
         };
 
-        S* s = static_cast<S*>(*res.get<void*>());
+        void* const* ptr = res.get<void*>();
+        ASSERT_NE(ptr, nullptr);
+
+        S* s = static_cast<S*>(*ptr);
 
         EXPECT_EQ(s->i, 1);
         EXPECT_FLOAT_EQ(s->j, 2.3);

@@ -721,7 +721,7 @@ public:
 
     [[nodiscard]]
     std::string constant(
-      const_::constant_id id) const override
+      [[maybe_unused]] const_::constant_id id) const override
     {
         return {};
     }

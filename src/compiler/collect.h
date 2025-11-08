@@ -30,9 +30,6 @@ class redefinition_error : public collection_error
     /** The redefined symbol's name. */
     std::string symbol_name;
 
-    /** The symbol type. */
-    sema::symbol_type type;
-
     /** The symbol's source location. */
     source_location loc;
 
@@ -44,13 +41,11 @@ public:
      * Construct a `redefinition_error`.
      *
      * @param symbol_name Name of the re-defined symbol.
-     * @param type Type of the symbol.
      * @param loc Location of the symbol.
      * @param original_loc Location of the original definition.
      */
     explicit redefinition_error(
       const std::string& symbol_name,
-      sema::symbol_type type,
       source_location loc,
       source_location original_loc);
 };

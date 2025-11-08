@@ -133,9 +133,10 @@ std::optional<symbol_id> env::get_symbol_id(
 {
     auto it = std::ranges::find_if(
       symbol_table,
-      [&name](const std::pair<symbol_id, symbol_info>& p) -> bool
+      [&name, type](const std::pair<symbol_id, symbol_info>& p) -> bool
       {
-          return p.second.qualified_name == name;
+          return p.second.type == type
+                 && p.second.qualified_name == name;
       });
     if(it == symbol_table.end())
     {

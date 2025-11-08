@@ -150,7 +150,10 @@ type_id context::declare_struct(
          .kind = type_kind::struct_,
          .data = struct_info{
            .name = std::move(name),
-           .qualified_name = std::move(qualified_name)}}});
+           .qualified_name = std::move(qualified_name),
+           .fields = {},
+           .fields_by_name = {},
+           .origin_module_index = std::nullopt}}});
 
     return id;
 }

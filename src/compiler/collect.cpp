@@ -39,7 +39,6 @@ static bool has_scope(sema::env& env, sema::scope_id id)
 
 redefinition_error::redefinition_error(
   const std::string& symbol_name,
-  sema::symbol_type type,
   source_location loc,    // NOLINT(bugprone-easily-swappable-parameters)
   source_location original_loc)
 : collection_error{std::format(
@@ -48,7 +47,6 @@ redefinition_error::redefinition_error(
     symbol_name,
     to_string(original_loc))}
 , symbol_name{symbol_name}
-, type{type}
 , loc{loc}
 , original_loc{original_loc}
 {
@@ -81,7 +79,8 @@ sema::scope_id context::create_scope(
        sema::scope{
          .parent = parent,
          .name = name.value_or(generate_scope_name()),
-         .loc = loc}});
+         .loc = loc,
+         .bindings = {}}});
     if(!it.second)
     {
         throw collection_error(
@@ -143,7 +142,6 @@ sema::symbol_id context::declare(
 
         throw redefinition_error(
           name,
-          type,
           loc,
           original->second.loc);
     }
@@ -183,7 +181,6 @@ sema::symbol_id context::declare(
     {
         throw redefinition_error(
           entry->second.name,
-          type,
           loc,
           entry->second.loc);
     }
@@ -262,7 +259,6 @@ bool context::declare_external(
     {
         throw redefinition_error(
           entry->second.name,
-          type,
           loc,
           entry->second.loc);
     }

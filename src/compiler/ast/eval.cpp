@@ -33,21 +33,24 @@ std::optional<const_::const_info> literal_expression::evaluate(
     if(tok.type == token_type::int_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = const_::constant_type::i32,
+          {.origin_module_id = sema::symbol_info::current_module_id,
+           .type = const_::constant_type::i32,
            .value = std::get<int>(tok.value.value())});
     }
 
     if(tok.type == token_type::fp_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = const_::constant_type::f32,
+          {.origin_module_id = sema::symbol_info::current_module_id,
+           .type = const_::constant_type::f32,
            .value = std::get<float>(tok.value.value())});
     }
 
     if(tok.type == token_type::str_literal)
     {
         return std::make_optional<const_::const_info>(
-          {.type = const_::constant_type::str,
+          {.origin_module_id = sema::symbol_info::current_module_id,
+           .type = const_::constant_type::str,
            .value = std::get<std::string>(tok.value.value())});
     }
 
@@ -123,15 +126,15 @@ struct binary_operation_helper
         if(lhs.type == const_::constant_type::i32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = func_i32(
-                std::get<int>(lhs.value),
-                std::get<int>(rhs.value))};
+              .value = func_i32(std::get<int>(lhs.value), std::get<int>(rhs.value))};
         }
 
         if(lhs.type == const_::constant_type::f32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f32,
               .value = func_f32(
                 std::get<float>(lhs.value),
@@ -184,6 +187,7 @@ struct comparison_helper
         if(lhs.type == const_::constant_type::i32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = func_i32(
                 std::get<int>(lhs.value),
@@ -193,6 +197,7 @@ struct comparison_helper
         if(lhs.type == const_::constant_type::f32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = func_f32(
                 std::get<float>(lhs.value),
@@ -459,6 +464,7 @@ struct unary_operation_helper
         if(v.type == const_::constant_type::i32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = func_i32(std::get<int>(v.value))};
         }
@@ -466,6 +472,7 @@ struct unary_operation_helper
         if(v.type == const_::constant_type::f32)
         {
             return {
+              .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f32,
               .value = func_f32(std::get<float>(v.value))};
         }
