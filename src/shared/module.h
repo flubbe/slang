@@ -61,11 +61,11 @@ inline archive& operator&(archive& ar, symbol_type& s)
     auto i = static_cast<std::uint8_t>(s);
     ar & i;
 
-    if(i != static_cast<std::uint8_t>(symbol_type::package)
-       && i != static_cast<std::uint8_t>(symbol_type::function)
-       && i != static_cast<std::uint8_t>(symbol_type::type)
-       && i != static_cast<std::uint8_t>(symbol_type::constant)
-       && i != static_cast<std::uint8_t>(symbol_type::macro))
+    if(i != std::to_underlying(symbol_type::package)
+       && i != std::to_underlying(symbol_type::function)
+       && i != std::to_underlying(symbol_type::type)
+       && i != std::to_underlying(symbol_type::constant)
+       && i != std::to_underlying(symbol_type::macro))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -144,10 +144,10 @@ inline archive& operator&(archive& ar, array_type& t)
 {
     auto v = static_cast<std::uint8_t>(t);
     ar & v;
-    if(v != static_cast<std::uint8_t>(array_type::i32)
-       && v != static_cast<std::uint8_t>(array_type::f32)
-       && v != static_cast<std::uint8_t>(array_type::str)
-       && v != static_cast<std::uint8_t>(array_type::ref))
+    if(v != std::to_underlying(array_type::i32)
+       && v != std::to_underlying(array_type::f32)
+       && v != std::to_underlying(array_type::str)
+       && v != std::to_underlying(array_type::ref))
     {
         throw serialization_error("Invalid array type.");
     }
@@ -1006,7 +1006,10 @@ struct imported_symbol
      * @param name The symbol's name.
      * @param package_index The symbol's package index as an index of the import table. Unused for package imports.
      */
-    imported_symbol(symbol_type type, std::string name, std::uint32_t package_index = static_cast<std::uint32_t>(-1))
+    imported_symbol(
+      symbol_type type,
+      std::string name,
+      std::uint32_t package_index = static_cast<std::uint32_t>(-1))
     : type{type}
     , name{std::move(name)}
     , package_index{package_index}

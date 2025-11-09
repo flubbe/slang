@@ -10,12 +10,12 @@
 
 #include <algorithm>
 #include <format>
-#include <print>
 
 #include "vector.h"
 #include "gc.h"
 
 #ifdef GC_DEBUG
+#    include <print>
 #    define GC_LOG(...) std::println("GC: {}", std::format(__VA_ARGS__))
 #else
 #    define GC_LOG(...)
@@ -26,7 +26,8 @@ namespace si = slang::interpreter;
 namespace slang::gc
 {
 
-void garbage_collector::mark_object(void* obj)
+void garbage_collector::mark_object(
+  void* obj)
 {
     auto it = objects.find(obj);
     if(it == objects.end())
@@ -56,7 +57,9 @@ void garbage_collector::mark_object(void* obj)
         void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         for(auto offset: *it->second.layout)
         {
-            mark_object(*reinterpret_cast<void**>(static_cast<std::byte*>(mark_obj) + offset));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            mark_object(
+              *reinterpret_cast<void**>(                         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                static_cast<std::byte*>(mark_obj) + offset));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
 
         return;
@@ -73,7 +76,8 @@ void garbage_collector::mark_object(void* obj)
     GC_LOG("mark_object {}", obj);
     obj_info.flags |= gc_object::of_reachable;
 
-    if(obj_info.type == gc_object_type::array_str || obj_info.type == gc_object_type::array_aref)
+    if(obj_info.type == gc_object_type::array_str
+       || obj_info.type == gc_object_type::array_aref)
     {
         auto* array = static_cast<si::fixed_vector<void*>*>(obj_info.addr);
         for(void*& ref: *array)
@@ -91,7 +95,8 @@ void garbage_collector::mark_object(void* obj)
         GC_LOG("mark_object: object layout");
         for(auto offset: *obj_info.layout)
         {
-            auto* obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            auto* obj = *reinterpret_cast<void**>(                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             mark_object(obj);
         }
     }
@@ -106,7 +111,9 @@ void garbage_collector::mark_object(void* obj)
  * @throws Throws a `gc_error` if the object size is larger than `allocated_bytes`.
  */
 template<typename T>
-void object_deleter(gsl::owner<void*> obj, std::size_t& allocated_bytes)
+void object_deleter(
+  gsl::owner<void*> obj,
+  std::size_t& allocated_bytes)
 {
     delete static_cast<T*>(obj);
 
@@ -117,7 +124,8 @@ void object_deleter(gsl::owner<void*> obj, std::size_t& allocated_bytes)
     allocated_bytes -= sizeof(T);
 }
 
-void garbage_collector::delete_object(gc_object& obj_info)
+void garbage_collector::delete_object(
+  const gc_object& obj_info)
 {
     GC_LOG("delete_object {} (type {})", obj_info.addr, to_string(obj_info.type));
 
@@ -153,11 +161,15 @@ void garbage_collector::delete_object(gc_object& obj_info)
     }
     else
     {
-        throw gc_error(std::format("Invalid type '{}' for GC array.", static_cast<std::size_t>(obj_info.type)));
+        throw gc_error(
+          std::format(
+            "Invalid type '{}' for GC array.",
+            std::to_underlying(obj_info.type)));
     }
 }
 
-void* garbage_collector::add_root(void* obj)
+void* garbage_collector::add_root(
+  void* obj)
 {
     GC_LOG("add root {}", obj);
 
@@ -179,19 +191,26 @@ void* garbage_collector::add_root(void* obj)
     return obj;
 }
 
-void garbage_collector::remove_root(void* obj)
+void garbage_collector::remove_root(
+  void* obj)
 {
     GC_LOG("remove_root {}", obj);
 
     auto it = root_set.find(obj);
     if(it == root_set.end())
     {
-        throw gc_error(std::format("Cannot remove root for object at {}, since it does not exist in the GC root set.", obj));
+        throw gc_error(
+          std::format(
+            "Cannot remove root for object at {}, since it does not exist in the GC root set.",
+            obj));
     }
 
     if(it->second == 0)
     {
-        throw gc_error(std::format("Negative reference count for GC root {}", obj));
+        throw gc_error(
+          std::format(
+            "Negative reference count for GC root {}",
+            obj));
     }
     --it->second;
 
@@ -261,7 +280,11 @@ void garbage_collector::run()
 
     if(object_set_size < objects.size())
     {
-        throw gc_error(std::format("Object list grew during GC run: {} -> {}", object_set_size, objects.size()));
+        throw gc_error(
+          std::format(
+            "Object list grew during GC run: {} -> {}",
+            object_set_size,
+            objects.size()));
     }
 
 #ifdef GC_DEBUG
@@ -303,7 +326,9 @@ void garbage_collector::reset()
     GC_LOG("reset {} -> 0", object_count);
 }
 
-void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
+void* garbage_collector::add_persistent(
+  void* obj,
+  std::size_t layout_id)
 {
     GC_LOG("add_persistent {} (layout id {})", obj, layout_id);
 
@@ -315,7 +340,10 @@ void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
     auto layout_it = type_layouts.find(layout_id);
     if(layout_it == type_layouts.end())
     {
-        throw gc_error(std::format("No type for layout id {} registered.", layout_id));
+        throw gc_error(
+          std::format(
+            "No type for layout id {} registered.",
+            layout_id));
     }
 
     auto it = persistent_objects.find(obj);
@@ -335,14 +363,18 @@ void* garbage_collector::add_persistent(void* obj, std::size_t layout_id)
     return obj;
 }
 
-void garbage_collector::remove_persistent(void* obj)
+void garbage_collector::remove_persistent(
+  void* obj)
 {
     GC_LOG("remove_persistent {}", obj);
 
     auto it = persistent_objects.find(obj);
     if(it == persistent_objects.end())
     {
-        throw gc_error(std::format("Reference at {} does not exist in GC persistent object set.", obj));
+        throw gc_error(
+          std::format(
+            "Reference at {} does not exist in GC persistent object set.",
+            obj));
     }
 
     --it->second.reference_count;
@@ -352,7 +384,8 @@ void garbage_collector::remove_persistent(void* obj)
     }
 }
 
-void* garbage_collector::add_temporary(void* obj)
+void* garbage_collector::add_temporary(
+  void* obj)
 {
     GC_LOG("add_temporary {}", obj);
 
@@ -374,7 +407,8 @@ void* garbage_collector::add_temporary(void* obj)
     return obj;
 }
 
-void garbage_collector::remove_temporary(void* obj)
+void garbage_collector::remove_temporary(
+  void* obj)
 {
     GC_LOG("remove_temporary {}", obj);
 
@@ -386,12 +420,18 @@ void garbage_collector::remove_temporary(void* obj)
     auto it = temporary_objects.find(obj);
     if(it == temporary_objects.end())
     {
-        throw gc_error(std::format("Reference at {} does not exist in GC temporary object set.", obj));
+        throw gc_error(
+          std::format(
+            "Reference at {} does not exist in GC temporary object set.",
+            obj));
     }
 
     if(it->second == 0)
     {
-        throw gc_error(std::format("Temporary at {} has no references.", obj));
+        throw gc_error(
+          std::format(
+            "Temporary at {} has no references.",
+            obj));
     }
 
     --it->second;
@@ -401,20 +441,26 @@ void garbage_collector::remove_temporary(void* obj)
     }
 }
 
-gc_object_type garbage_collector::get_object_type(void* obj) const
+gc_object_type garbage_collector::get_object_type(
+  void* obj) const
 {
     GC_LOG("get_object_type {}", obj);
 
     auto it = objects.find(obj);
     if(it == objects.end())
     {
-        throw gc_error(std::format("Reference at {} does not exist in the GC object list.", obj));
+        throw gc_error(
+          std::format(
+            "Reference at {} does not exist in the GC object list.",
+            obj));
     }
 
     return it->second.type;
 }
 
-std::size_t garbage_collector::register_type_layout(std::string name, std::vector<std::size_t> layout)
+std::size_t garbage_collector::register_type_layout(
+  std::string name,
+  std::vector<std::size_t> layout)
 {
     // check if the layout already exists
     auto it = std::ranges::find_if(
@@ -425,7 +471,10 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
       });
     if(it != type_layouts.cend())
     {
-        throw gc_error(std::format("Layout for type '{}' already registered.", name));
+        throw gc_error(
+          std::format(
+            "Layout for type '{}' already registered.",
+            name));
     }
 
     // find the first free identifier.
@@ -438,7 +487,11 @@ std::size_t garbage_collector::register_type_layout(std::string name, std::vecto
         }
     }
 
-    type_layouts.insert({id, std::make_pair(std::move(name), std::move(layout))});
+    type_layouts.insert(
+      {id,
+       std::make_pair(
+         std::move(name),
+         std::move(layout))});
     return id;
 }
 
@@ -455,18 +508,25 @@ std::size_t garbage_collector::check_type_layout(
       });
     if(it == type_layouts.cend())
     {
-        throw gc_error(std::format("Layout for type '{}' not found.", name));
+        throw gc_error(
+          std::format(
+            "Layout for type '{}' not found.",
+            name));
     }
 
     if(it->second.second != layout)
     {
-        throw gc_error(std::format("A different layout was already registered for type '{}'.", name));
+        throw gc_error(
+          std::format(
+            "A different layout was already registered for type '{}'.",
+            name));
     }
 
     return it->first;
 }
 
-std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
+std::size_t garbage_collector::get_type_layout_id(
+  const std::string& name) const
 {
     auto it = std::ranges::find_if(
       std::as_const(type_layouts),
@@ -476,18 +536,25 @@ std::size_t garbage_collector::get_type_layout_id(const std::string& name) const
       });
     if(it == type_layouts.cend())
     {
-        throw gc_error(std::format("No type layout for type '{}' registered.", name));
+        throw gc_error(
+          std::format(
+            "No type layout for type '{}' registered.",
+            name));
     }
 
     return it->first;
 }
 
-std::size_t garbage_collector::get_type_layout_id(void* obj) const
+std::size_t garbage_collector::get_type_layout_id(
+  void* obj) const
 {
     auto obj_it = objects.find(obj);
     if(obj_it == objects.end())
     {
-        throw gc_error(std::format("Reference at {} does not exist in the GC object list.", obj));
+        throw gc_error(
+          std::format(
+            "Reference at {} does not exist in the GC object list.",
+            obj));
     }
 
     for(const auto& it: type_layouts)
@@ -498,10 +565,14 @@ std::size_t garbage_collector::get_type_layout_id(void* obj) const
         }
     }
 
-    throw gc_error(std::format("No type layout for type '{}' registered.", obj));
+    throw gc_error(
+      std::format(
+        "No type layout for type '{}' registered.",
+        obj));
 }
 
-std::string garbage_collector::layout_to_string(std::size_t layout_id) const
+std::string garbage_collector::layout_to_string(
+  std::size_t layout_id) const
 {
     for(const auto& it: type_layouts)
     {
@@ -511,7 +582,10 @@ std::string garbage_collector::layout_to_string(std::size_t layout_id) const
         }
     }
 
-    throw gc_error(std::format("No type layout for id {} registered.", layout_id));
+    throw gc_error(
+      std::format(
+        "No type layout for id {} registered.",
+        layout_id));
 }
 
 }    // namespace slang::gc

@@ -434,6 +434,11 @@ add_compile_exec_fail_test(
     test/test_array_fail3
 )
 add_compile_exec_test(
+    "slang builtin types"
+    TRUE
+    test/test_builtin_types
+)
+add_compile_exec_test(
     "slang cast"
     TRUE
     test/test_cast

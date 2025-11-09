@@ -56,8 +56,12 @@ class context
     /** Built-in types. */
     cg::type null_type;
     cg::type void_type;
+    cg::type i8_type;
+    cg::type i16_type;
     cg::type i32_type;
+    cg::type i64_type;
     cg::type f32_type;
+    cg::type f64_type;
     cg::type str_type;
 
     /** Initialize the built-in types. */

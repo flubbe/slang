@@ -429,7 +429,7 @@ void export_table_builder::add_struct(
                 throw emitter_error(
                   std::format(
                     "Invalid base type kind '{}'.",
-                    static_cast<int>(base_type_info.kind)));
+                    std::to_underlying(base_type_info.kind)));
             }
 
             return std::make_pair(
@@ -442,8 +442,8 @@ void export_table_builder::add_struct(
       | std::ranges::to<std::vector>();
 
     std::uint8_t flags =
-      (type.allow_cast ? static_cast<std::uint8_t>(module_::struct_flags::allow_cast) : 0)
-      | (type.native ? static_cast<std::uint8_t>(module_::struct_flags::native) : 0);
+      (type.allow_cast ? std::to_underlying(module_::struct_flags::allow_cast) : 0)
+      | (type.native ? std::to_underlying(module_::struct_flags::native) : 0);
 
     export_table.emplace_back(
       module_::symbol_type::type,
@@ -977,12 +977,15 @@ void instruction_emitter::emit_instruction(
         }
     };
 
-    auto emit_typed_one_var_arg =
+    auto emit_load_store =
       [this, &name, &args, &func](
+        opcode i8_opcode,
+        opcode i16_opcode,
         opcode i32_opcode,
+        opcode i64_opcode,
         opcode f32_opcode,
-        std::optional<opcode> str_array_opcode = std::nullopt,
-        std::optional<opcode> ref_opcode = std::nullopt)
+        opcode f64_opcode,
+        opcode ref_opcode)
     {
         const auto* arg = static_cast<const cg::variable_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         const cg::value* v = arg->get_value();
@@ -998,40 +1001,42 @@ void instruction_emitter::emit_instruction(
           utils::numeric_cast<std::int64_t>(
             func->get_index(v->get_symbol_id().value()))};
 
+        // check array types first.
         if(type_ctx.is_array(v->get_type().get_type_id().value()))
         {
-            if(!str_array_opcode.has_value())
-            {
-                throw std::runtime_error(std::format("Invalid type '{}' for instruction '{}'.", v->get_type().to_string(), name));
-            }
-
-            emit(instruction_buffer, *str_array_opcode);
+            emit(instruction_buffer, ref_opcode);
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i8)
+        {
+            emit(instruction_buffer, i8_opcode);
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i16)
+        {
+            emit(instruction_buffer, i16_opcode);
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
             emit(instruction_buffer, i32_opcode);
         }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, i64_opcode);
+        }
         else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
             emit(instruction_buffer, f32_opcode);
         }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
+        {
+            emit(instruction_buffer, f64_opcode);
+        }
         else if(v->get_type().get_type_kind() == cg::type_kind::str)
         {
-            if(!str_array_opcode.has_value())
-            {
-                throw std::runtime_error(std::format("Invalid type 'str' for instruction '{}'.", name));
-            }
-
-            emit(instruction_buffer, *str_array_opcode);
+            emit(instruction_buffer, ref_opcode);
         }
         else if(type_ctx.is_reference(v->get_type().get_type_id().value()))
         {
-            if(!ref_opcode.has_value())
-            {
-                throw std::runtime_error(std::format("Invalid reference type for instruction '{}'.", name));
-            }
-
-            emit(instruction_buffer, *ref_opcode);
+            emit(instruction_buffer, ref_opcode);
         }
         else
         {
@@ -1119,11 +1124,25 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "load")
     {
-        emit_typed_one_var_arg(opcode::iload, opcode::fload, opcode::aload, opcode::aload);
+        emit_load_store(
+          opcode::cload,
+          opcode::sload,
+          opcode::iload,
+          opcode::lload,
+          opcode::fload,
+          opcode::dload,
+          opcode::aload);
     }
     else if(name == "store")
     {
-        emit_typed_one_var_arg(opcode::istore, opcode::fstore, opcode::astore, opcode::astore);
+        emit_load_store(
+          opcode::cstore,
+          opcode::sstore,
+          opcode::istore,
+          opcode::lstore,
+          opcode::fstore,
+          opcode::dstore,
+          opcode::astore);
     }
     else if(name == "load_element")
     {
@@ -1199,16 +1218,51 @@ void instruction_emitter::emit_instruction(
     else if(name == "cast")
     {
         const auto* arg = static_cast<const cg::cast_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        if(arg->get_cast() == cg::type_cast::i32_to_f32)
+        switch(arg->get_cast())
         {
+        case cg::type_cast::i32_to_i8:
+            emit(instruction_buffer, opcode::i2c);
+            break;
+        case cg::type_cast::i32_to_i16:
+            emit(instruction_buffer, opcode::i2s);
+            break;
+        case cg::type_cast::i32_to_i64:
+            emit(instruction_buffer, opcode::i2l);
+            break;
+        case cg::type_cast::i32_to_f32:
             emit(instruction_buffer, opcode::i2f);
-        }
-        else if(arg->get_cast() == cg::type_cast::f32_to_i32)
-        {
+            break;
+        case cg::type_cast::i32_to_f64:
+            emit(instruction_buffer, opcode::i2d);
+            break;
+        case cg::type_cast::i64_to_i32:
+            emit(instruction_buffer, opcode::l2i);
+            break;
+        case cg::type_cast::i64_to_f32:
+            emit(instruction_buffer, opcode::l2f);
+            break;
+        case cg::type_cast::i64_to_f64:
+            emit(instruction_buffer, opcode::l2d);
+            break;
+        case cg::type_cast::f32_to_i32:
             emit(instruction_buffer, opcode::f2i);
-        }
-        else
-        {
+            break;
+        case cg::type_cast::f32_to_i64:
+            emit(instruction_buffer, opcode::f2l);
+            break;
+        case cg::type_cast::f32_to_f64:
+            emit(instruction_buffer, opcode::f2d);
+            break;
+        case cg::type_cast::f64_to_i32:
+            emit(instruction_buffer, opcode::d2i);
+            break;
+        case cg::type_cast::f64_to_i64:
+            emit(instruction_buffer, opcode::d2l);
+            break;
+        case cg::type_cast::f64_to_f32:
+            emit(instruction_buffer, opcode::d2f);
+            break;
+        default:
             throw emitter_error(std::format("Invalid cast type '{}'.", ::cg::to_string(arg->get_cast())));
         }
     }
@@ -1575,7 +1629,7 @@ static module_::constant_type to_module_constant(const_::constant_type type)
     throw emitter_error(
       std::format(
         "Cannot convert constant to '{}'.",
-        static_cast<int>(type)));
+        std::to_underlying(type)));
 }
 
 /**
@@ -1614,7 +1668,7 @@ static module_::constant_data_type
     throw emitter_error(
       std::format(
         "Cannot convert constant to '{}'.",
-        static_cast<int>(type)));
+        std::to_underlying(type)));
 }
 
 void instruction_emitter::run()

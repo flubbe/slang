@@ -25,14 +25,22 @@ enum class opcode : opcode_base
     iconst,      /** Load i32 constant onto stack. */
     fconst,      /** Load f32 constant onto stack. */
     sconst,      /** Load str constant onto stack. */
-    iload,       /** Load `i32` from variable onto stack. */
-    fload,       /** Load `f32` from variable onto stack. */
+    cload,       /** Load i8 from variable sign-extended onto stack. */
+    sload,       /** Load i16 from variable sign-extended onto stack. */
+    iload,       /** Load i32 from variable onto stack. */
+    lload,       /** Load i64 from variable onto stack. */
+    fload,       /** Load f32 from variable onto stack. */
+    dload,       /** Load f64 from variable onto stack. */
     aload,       /** Load address from variable onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
     aaload,      /** Load address from array onto stack. */
+    cstore,      /** Store i8 truncated from stack into variable. */
+    sstore,      /** Store i16 truncated from stack into variable. */
     istore,      /** Store i32 from stack into variable. */
+    lstore,      /** Store i64 from stack into variable. */
     fstore,      /** Store f32 from stack into variable. */
+    dstore,      /** Store f64 from stack into variable. */
     astore,      /** Store address from stack into variable. */
     iastore,     /** Store i32 from stack into array. */
     fastore,     /** Store f32 from stack into array. */
@@ -53,8 +61,20 @@ enum class opcode : opcode_base
     idiv,        /** Divide two i32 from the stack. */
     fdiv,        /** Divide two f32 from the stack.  */
     imod,        /** Modulus of the division of two i32. */
+    i2c,         /** Convert a i32 into an i8. */
+    i2s,         /** Convert a i32 into an i16. */
+    i2l,         /** Convert a i32 into an i64. */
     i2f,         /** Convert a i32 into an f32. */
+    i2d,         /** Convert a i32 into an f64. */
+    l2i,         /** Convert a i64 into an i32. */
+    l2f,         /** Convert a i64 into an f32. */
+    l2d,         /** Convert a i64 into an f64. */
     f2i,         /** Convert a f32 into an i32. */
+    f2l,         /** Convert a f32 into an i64. */
+    f2d,         /** Convert a f32 into an f64. */
+    d2i,         /** Convert a f64 into an i32. */
+    d2l,         /** Convert a f64 into an i64. */
+    d2f,         /** Convert a f64 into an f32. */
     invoke,      /** Invoke a function. */
     new_,        /** Create a new struct. */
     newarray,    /** Create a new array for i32, f32. */

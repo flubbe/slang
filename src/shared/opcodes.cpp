@@ -27,11 +27,19 @@ std::string to_string(opcode op)
     case opcode::iconst: return "iconst";
     case opcode::fconst: return "fconst";
     case opcode::sconst: return "sconst";
+    case opcode::cload: return "cload";
+    case opcode::sload: return "sload";
     case opcode::iload: return "iload";
+    case opcode::lload: return "lload";
     case opcode::fload: return "fload";
+    case opcode::dload: return "dload";
     case opcode::aload: return "aload";
+    case opcode::cstore: return "cstore";
+    case opcode::sstore: return "sstore";
     case opcode::istore: return "istore";
+    case opcode::lstore: return "lstore";
     case opcode::fstore: return "fstore";
+    case opcode::dstore: return "dstore";
     case opcode::astore: return "astore";
     case opcode::iaload: return "iaload";
     case opcode::faload: return "faload";
@@ -47,8 +55,20 @@ std::string to_string(opcode op)
     case opcode::fmul: return "fmul";
     case opcode::idiv: return "idiv";
     case opcode::fdiv: return "fdiv";
+    case opcode::i2c: return "i2c";
+    case opcode::i2s: return "i2s";
+    case opcode::i2l: return "i2l";
     case opcode::i2f: return "i2f";
+    case opcode::i2d: return "i2d";
+    case opcode::l2i: return "l2i";
+    case opcode::l2f: return "l2f";
+    case opcode::l2d: return "l2d";
     case opcode::f2i: return "f2i";
+    case opcode::f2l: return "f2l";
+    case opcode::f2d: return "f2d";
+    case opcode::d2i: return "d2i";
+    case opcode::d2l: return "d2l";
+    case opcode::d2f: return "d2f";
     case opcode::dup: return "dup";
     case opcode::dup2: return "dup2";
     case opcode::adup: return "adup";
@@ -105,7 +125,7 @@ archive& operator&(archive& ar, opcode& op)
     auto op_base = static_cast<opcode_base>(op);
     ar & op_base;
 
-    if(op_base >= static_cast<opcode_base>(opcode::opcode_count))
+    if(op_base >= std::to_underlying(opcode::opcode_count))
     {
         throw opcode_error(std::format("Invalid opcode '{}'.", op_base));
     }

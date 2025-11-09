@@ -46,7 +46,7 @@ std::string to_string(type_kind kind)
         throw std::runtime_error(
           std::format(
             "Cannot convert type kind {} to string.",
-            static_cast<int>(kind)));
+            std::to_underlying(kind)));
     }
 }
 
@@ -72,14 +72,18 @@ static std::string to_string(builtins b)
     {
     case builtins::null: return "null";
     case builtins::void_: return "void";
+    case builtins::i8: return "i8";
+    case builtins::i16: return "i16";
     case builtins::i32: return "i32";
+    case builtins::i64: return "i64";
     case builtins::f32: return "f32";
+    case builtins::f64: return "f64";
     case builtins::str: return "str";
     default:
         throw std::runtime_error(
           std::format(
             "Cannot convert builtin type {} to string.",
-            static_cast<int>(b)));
+            std::to_underlying(b)));
     }
 }
 
@@ -87,8 +91,12 @@ void context::initialize_builtins()
 {
     null_type = add_builtin(builtins::null);
     void_type = add_builtin(builtins::void_);
+    i8_type = add_builtin(builtins::i8);
+    i16_type = add_builtin(builtins::i16);
     i32_type = add_builtin(builtins::i32);
+    i64_type = add_builtin(builtins::i64);
     f32_type = add_builtin(builtins::f32);
+    f64_type = add_builtin(builtins::f64);
     str_type = add_builtin(builtins::str);
 }
 
@@ -702,7 +710,7 @@ std::string context::to_string(type_id id) const
         throw type_error(
           std::format(
             "Type with id '{}' not found in type map.",
-            static_cast<int>(id)));
+            id));
     }
 
     std::string ret;

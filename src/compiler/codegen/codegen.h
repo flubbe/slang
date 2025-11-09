@@ -473,7 +473,7 @@ public:
 
         return std::format(
           "<func#{}>",
-          static_cast<int>(symbol_id.value));
+          symbol_id.value);
     }
 
     [[nodiscard]]
@@ -678,8 +678,20 @@ public:
 /** Type casts. */
 enum class type_cast : std::uint8_t
 {
+    i32_to_i8,  /* i32 to i8 */
+    i32_to_i16, /* i32 to i16 */
+    i32_to_i64, /* i32 to i64 */
     i32_to_f32, /* i32 to f32 */
+    i32_to_f64, /* i32 to f64 */
+    i64_to_i32, /* i64 to i32 */
+    i64_to_f32, /* i64 to f32 */
+    i64_to_f64, /* i64 to f64 */
     f32_to_i32, /* f32 to i32 */
+    f32_to_i64, /* f32 to i64 */
+    f32_to_f64, /* f32 to f64 */
+    f64_to_i32, /* f64 to i32 */
+    f64_to_i64, /* f64 to i64 */
+    f64_to_f32, /* f64 to f32 */
 };
 
 /**
@@ -721,16 +733,23 @@ public:
       type_cast cast)
     : cast{cast}
     {
-        if(cast == type_cast::i32_to_f32)
+        switch(cast)
         {
-            result_type = type_kind::f32;
-        }
-        else if(cast == type_cast::f32_to_i32)
-        {
-            result_type = type_kind::i32;
-        }
-        else
-        {
+        case type_cast::i32_to_i8: result_type = type_kind::i8; break;
+        case type_cast::i32_to_i16: result_type = type_kind::i16; break;
+        case type_cast::i32_to_i64: result_type = type_kind::i64; break;
+        case type_cast::i32_to_f32: result_type = type_kind::f32; break;
+        case type_cast::i32_to_f64: result_type = type_kind::f64; break;
+        case type_cast::i64_to_i32: result_type = type_kind::i32; break;
+        case type_cast::i64_to_f32: result_type = type_kind::f32; break;
+        case type_cast::i64_to_f64: result_type = type_kind::f64; break;
+        case type_cast::f32_to_i32: result_type = type_kind::i32; break;
+        case type_cast::f32_to_i64: result_type = type_kind::i64; break;
+        case type_cast::f32_to_f64: result_type = type_kind::f64; break;
+        case type_cast::f64_to_i32: result_type = type_kind::i32; break;
+        case type_cast::f64_to_i64: result_type = type_kind::i64; break;
+        case type_cast::f64_to_f32: result_type = type_kind::f32; break;
+        default:
             throw codegen_error("Unknown cast type.");
         }
     }
@@ -1483,7 +1502,7 @@ class context
 
     /** Codegen flags. */
     codegen_flag_type flags{
-      static_cast<codegen_flag_type>(codegen_flags::enable_const_eval_)};
+      std::to_underlying(codegen_flags::enable_const_eval_)};
 
 protected:
     /**
@@ -1829,13 +1848,13 @@ public:
     /** Check if a flag is set. */
     bool has_flag(codegen_flags flag)
     {
-        return (flags & static_cast<codegen_flag_type>(flag)) != 0;
+        return (flags & std::to_underlying(flag)) != 0;
     }
 
     /** Clear a specific flag. */
     void clear_flag(codegen_flags flag)
     {
-        flags &= ~static_cast<codegen_flag_type>(flag);
+        flags &= ~std::to_underlying(flag);
     }
 
     /*

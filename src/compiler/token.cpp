@@ -20,13 +20,13 @@ archive& operator&(archive& ar, token_type& ty)
 {
     auto i = static_cast<std::uint8_t>(ty);
     ar & i;
-    if(i > static_cast<std::uint8_t>(token_type::last))
+    if(i > std::to_underlying(token_type::last))
     {
         throw serialization_error(
           std::format(
             "Invalid token type ({} > {}).",
             i,
-            static_cast<std::uint8_t>(token_type::last)));
+            std::to_underlying(token_type::last)));
     }
     ty = static_cast<token_type>(i);
 
@@ -101,7 +101,7 @@ static void serialize_token_value(
             throw serialization_error(
               std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
-                static_cast<std::int32_t>(ty)));
+                std::to_underlying(ty)));
         }
     }
     else
@@ -126,7 +126,7 @@ static void serialize_token_value(
             throw serialization_error(
               std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
-                static_cast<std::int32_t>(ty)));
+                std::to_underlying(ty)));
         }
     }
 }

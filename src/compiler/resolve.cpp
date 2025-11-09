@@ -99,7 +99,7 @@ void context::import_constant(
           std::format(
             "External symbol '{}': Unknown constant type {}.",
             symbol_info_it->second.qualified_name,
-            static_cast<int>(const_entry.type)));
+            std::to_underlying(const_entry.type)));
     }();
 
     auto [entry, success] = sema_env.type_map.insert(
@@ -215,8 +215,8 @@ void context::import_type(
 
     type_ctx.set_type_flags(
       struct_type_id,
-      (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0,
-      (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) != 0);
+      (desc.flags & std::to_underlying(module_::struct_flags::native)) != 0,
+      (desc.flags & std::to_underlying(module_::struct_flags::allow_cast)) != 0);
 
     for(const auto& m: desc.member_types)
     {
@@ -531,7 +531,7 @@ sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
         throw std::runtime_error(
           std::format(
             "Unable to get semantic symbol type from module symbol type '{}'.",
-            static_cast<int>(s)));
+            std::to_underlying(s)));
     }
 }
 

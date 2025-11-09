@@ -20,8 +20,12 @@ std::string to_string(constant_type c)
 {
     switch(c)
     {
+    case constant_type::i8: return "i8";
+    case constant_type::i16: return "i16";
     case constant_type::i32: return "i32";
+    case constant_type::i64: return "i64";
     case constant_type::f32: return "f32";
+    case constant_type::f64: return "f64";
     case constant_type::str: return "str";
     default: return "<unknown>";
     }

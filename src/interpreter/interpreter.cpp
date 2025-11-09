@@ -53,14 +53,34 @@ abi_type_class get_abi_type_class(const module_::variable_type& ty)
         return abi_type_class::void_;
     }
 
+    if(ty.base_type() == "i8")
+    {
+        return abi_type_class::i8;
+    }
+
+    if(ty.base_type() == "i16")
+    {
+        return abi_type_class::i16;
+    }
+
     if(ty.base_type() == "i32")
     {
         return abi_type_class::i32;
     }
 
+    if(ty.base_type() == "i64")
+    {
+        return abi_type_class::i64;
+    }
+
     if(ty.base_type() == "f32")
     {
         return abi_type_class::f32;
+    }
+
+    if(ty.base_type() == "f64")
+    {
+        return abi_type_class::f64;
     }
 
     if(ty.base_type() == "str")
@@ -77,8 +97,12 @@ std::string to_string(abi_type_class cls)
     switch(cls)
     {
     case abi_type_class::void_: return "void";
+    case abi_type_class::i8: return "i8";
+    case abi_type_class::i16: return "i16";
     case abi_type_class::i32: return "i32";
+    case abi_type_class::i64: return "i64";
     case abi_type_class::f32: return "f32";
+    case abi_type_class::f64: return "f64";
     case abi_type_class::str: return "str";
     case abi_type_class::ref: return "ref";
     default:;
@@ -316,7 +340,7 @@ void context::exec(
             ++offset;
 
             // validate opcode.
-            if(instr >= static_cast<opcode_base>(opcode::opcode_count))
+            if(instr >= std::to_underlying(opcode::opcode_count))
             {
                 throw interpreter_error(
                   std::format(
@@ -326,7 +350,8 @@ void context::exec(
             auto instr_opcode = static_cast<opcode>(instr);
 
             // return.
-            if(instr >= static_cast<opcode_base>(opcode::ret) && instr <= static_cast<opcode_base>(opcode::aret))
+            if(instr >= std::to_underlying(opcode::ret)
+               && instr <= std::to_underlying(opcode::aret))
             {
                 // NOTE The stack size is validated by the caller.
 
@@ -490,6 +515,26 @@ void context::exec(
                   { return dividend / divisor; });
                 break;
             } /* opcode::fdiv */
+            case opcode::i2c:
+            {
+                frame.stack.modify_top<std::int32_t, std::int32_t>(
+                  [](const std::int32_t i) -> std::int32_t
+                  { return static_cast<std::int32_t>(static_cast<std::int8_t>(i)); });
+                break;
+            } /* opcode::i2c */
+            case opcode::i2s:
+            {
+                frame.stack.modify_top<std::int32_t, std::int32_t>(
+                  [](const std::int32_t i) -> std::int32_t
+                  { return static_cast<std::int32_t>(static_cast<std::int16_t>(i)); });
+                break;
+            } /* opcode::i2s */
+            case opcode::i2l:
+            {
+                frame.stack.push_cat2<std::int64_t>(
+                  frame.stack.pop_cat1<std::int32_t>());
+                break;
+            } /* opcode::i2l */
             case opcode::i2f:
             {
                 frame.stack.modify_top<std::int32_t, float>(
@@ -497,6 +542,30 @@ void context::exec(
                   { return static_cast<float>(i); });
                 break;
             } /* opcode::i2f */
+            case opcode::i2d:
+            {
+                auto i = frame.stack.pop_cat1<std::int32_t>();
+                frame.stack.push_cat2(static_cast<double>(i));
+                break;
+            } /* opcode::i2d */
+            case opcode::l2i:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1(static_cast<std::int32_t>(i));
+                break;
+            } /* opcode::l2i */
+            case opcode::l2f:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1(static_cast<float>(i));
+                break;
+            } /* opcode::l2f */
+            case opcode::l2d:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat2<double>(static_cast<double>(i));
+                break;
+            } /* opcode::l2d */
             case opcode::f2i:
             {
                 frame.stack.modify_top<float, std::int32_t>(
@@ -504,6 +573,36 @@ void context::exec(
                   { return static_cast<std::int32_t>(f); });
                 break;
             } /* opcode::f2i */
+            case opcode::f2l:
+            {
+                auto f = frame.stack.pop_cat1<float>();
+                frame.stack.push_cat2<std::int64_t>(static_cast<std::int64_t>(f));
+                break;
+            } /* opcode::f2l */
+            case opcode::f2d:
+            {
+                auto f = frame.stack.pop_cat1<float>();
+                frame.stack.push_cat2<double>(static_cast<double>(f));
+                break;
+            } /* opcode::f2d */
+            case opcode::d2i:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(d));
+                break;
+            } /* opcode::d2i */
+            case opcode::d2l:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat2<std::int64_t>(static_cast<std::int64_t>(d));
+                break;
+            } /* opcode::d2l */
+            case opcode::d2f:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<float>(static_cast<float>(d));
+                break;
+            } /* opcode::d2f */
             case opcode::aconst_null:
             {
                 frame.stack.push_addr<void>(nullptr);
@@ -651,7 +750,7 @@ void context::exec(
             case opcode::aastore:
             {
                 void* obj = frame.stack.pop_addr<void>();
-                std::int32_t index = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 if(arr == nullptr)
@@ -671,7 +770,10 @@ void context::exec(
 
                 break;
             } /* opcode::aastore */
+            case opcode::cload:
+            case opcode::sload:
             case opcode::iload:
+            case opcode::fload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -694,8 +796,9 @@ void context::exec(
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
                 frame.stack.push_cat1(v);
                 break;
-            } /* opcode::iload */
-            case opcode::fload:
+            } /* opcode::cload, opcode::sload, opcode::iload, opcode::fload */
+            case opcode::lload:
+            case opcode::dload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -709,16 +812,16 @@ void context::exec(
                         i));
                 }
 
-                if(i + sizeof(float) > frame.locals.size())
+                if(i + sizeof(std::int64_t) > frame.locals.size())
                 {
                     throw interpreter_error("Invalid memory access.");
                 }
 
-                float v;    // NOLINT(cppcoreguidelines-init-variables)
+                std::int64_t v;    // NOLINT(cppcoreguidelines-init-variables)
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
-                frame.stack.push_cat1(v);
+                frame.stack.push_cat2(v);
                 break;
-            } /* opcode::fload */
+            } /* opcode::lload, opcode::dload */
             case opcode::aload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -744,7 +847,10 @@ void context::exec(
                 frame.stack.push_addr(addr);
                 break;
             } /* opcode::aload */
+            case opcode::cstore:
+            case opcode::sstore:
             case opcode::istore:
+            case opcode::fstore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -763,11 +869,12 @@ void context::exec(
                     throw interpreter_error("Stack overflow.");
                 }
 
-                std::int32_t v = frame.stack.pop_cat1<std::int32_t>();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::istore */
-            case opcode::fstore:
+            } /* opcode::cstore, opcode::sstore, opcode::istore, opcode::fstore */
+            case opcode::lstore:
+            case opcode::dstore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -781,15 +888,15 @@ void context::exec(
                         i));
                 }
 
-                if(i + sizeof(float) > frame.locals.size())
+                if(i + sizeof(std::int64_t) > frame.locals.size())
                 {
                     throw interpreter_error("Stack overflow.");
                 }
 
-                float v = frame.stack.pop_cat1<float>();
+                auto v = frame.stack.pop_cat2<std::int64_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::fstore */
+            } /* opcode::cstore, opcode::sstore, opcode::istore, opcode::fstore */
             case opcode::astore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -1078,7 +1185,7 @@ void context::exec(
                 auto target_layout_id = read_unchecked<std::size_t>(binary, offset);
                 auto flags = read_unchecked<std::size_t>(binary, offset);
 
-                if((flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) == 0)
+                if((flags & std::to_underlying(module_::struct_flags::allow_cast)) == 0)
                 {
                     void* obj = frame.stack.pop_addr<void>();
                     if(obj == nullptr)
@@ -1305,7 +1412,7 @@ void context::exec(
                   std::format(
                     "Opcode '{}' ({}) not implemented.",
                     to_string(instr_opcode),
-                    static_cast<std::uint8_t>(instr)));
+                    instr));
             }
         }
 

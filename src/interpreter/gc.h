@@ -282,7 +282,7 @@ class garbage_collector
      *
      * @param obj_info Info for fhe object to delete.
      */
-    void delete_object(gc_object& obj_info);
+    void delete_object(const gc_object& obj_info);
 
 public:
     /** Defaulted and deleted constructors. */

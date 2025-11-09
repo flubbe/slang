@@ -18,14 +18,22 @@ void context::initialize_builtins()
 {
     null_type = {type_ctx.get_null_type(), cg::type_kind::null};
     void_type = {type_ctx.get_void_type(), cg::type_kind::void_};
+    i8_type = {type_ctx.get_i8_type(), cg::type_kind::i8};
+    i16_type = {type_ctx.get_i16_type(), cg::type_kind::i16};
     i32_type = {type_ctx.get_i32_type(), cg::type_kind::i32};
+    i64_type = {type_ctx.get_i64_type(), cg::type_kind::i64};
     f32_type = {type_ctx.get_f32_type(), cg::type_kind::f32};
+    f64_type = {type_ctx.get_f64_type(), cg::type_kind::f64};
     str_type = {type_ctx.get_str_type(), cg::type_kind::str};
 
     type_cache.insert({type_ctx.get_null_type(), null_type});
     type_cache.insert({type_ctx.get_void_type(), void_type});
+    type_cache.insert({type_ctx.get_i8_type(), i8_type});
+    type_cache.insert({type_ctx.get_i16_type(), i16_type});
     type_cache.insert({type_ctx.get_i32_type(), i32_type});
+    type_cache.insert({type_ctx.get_i64_type(), i64_type});
     type_cache.insert({type_ctx.get_f32_type(), f32_type});
+    type_cache.insert({type_ctx.get_f64_type(), f64_type});
     type_cache.insert({type_ctx.get_str_type(), str_type});
 }
 

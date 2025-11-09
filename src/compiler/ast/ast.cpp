@@ -526,7 +526,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
           loc,
           std::format(
             "Unable to generate code for literal of type id '{}'.",
-            static_cast<int>(tok.type)));
+            std::to_underlying(tok.type)));
     }();
 
     auto literal_type = cg::type{
@@ -564,7 +564,7 @@ std::optional<ty::type_id> literal_expression::type_check(
           tok.location,
           std::format(
             "Unknown literal type with id '{}'.",
-            static_cast<int>(tok.type)));
+            std::to_underlying(tok.type)));
     }
 
     ctx.set_expression_type(*this, expr_type);
@@ -650,15 +650,198 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
     cg::type lowered_type = ctx.lower(target_type->get_type());
     if(lowered_type != v->get_type())
     {
-        if(lowered_type.get_type_kind() == cg::type_kind::i32
-           && v->get_type().get_type_kind() == cg::type_kind::f32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i8
+           || v->get_type().get_type_kind() == cg::type_kind::i16)
         {
-            ctx.generate_cast(cg::type_cast::f32_to_i32);
+            // i8 is loaded as a i32 onto the stack.
+
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                if(v->get_type().get_type_kind() != cg::type_kind::i8)
+                {
+                    ctx.generate_cast(cg::type_cast::i32_to_i8);
+                }
+                else
+                {
+                    throw cg::codegen_error(
+                      loc,
+                      std::format(
+                        "Invalid cast from {} to {}.",
+                        v->get_type().to_string(),
+                        lowered_type.to_string()));
+                }
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                if(v->get_type().get_type_kind() != cg::type_kind::i16)
+                {
+                    ctx.generate_cast(cg::type_cast::i32_to_i16);
+                }
+                else
+                {
+                    throw cg::codegen_error(
+                      loc,
+                      std::format(
+                        "Invalid cast from {} to {}.",
+                        v->get_type().to_string(),
+                        lowered_type.to_string()));
+                }
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                // no-op.
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from {} to {}.",
+                    v->get_type().to_string(),
+                    lowered_type.to_string()));
+            }
         }
-        else if(lowered_type.get_type_kind() == cg::type_kind::f32
-                && v->get_type().get_type_kind() == cg::type_kind::i32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            ctx.generate_cast(cg::type_cast::i32_to_f32);
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from i32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from i32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from f32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_f32);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from f32 to {}.",
+                    lowered_type.to_string()));
+            }
         }
         else if(lowered_type.get_type_kind() == cg::type_kind::str
                 && v->get_type().get_type_kind() != cg::type_kind::ref)
@@ -711,8 +894,60 @@ std::optional<ty::type_id> type_cast_expression::type_check(
 
     // casts for primitive types.
     const std::unordered_map<ty::type_id, std::set<ty::type_id>> primitive_type_casts = {
-      {ctx.get_i32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {ctx.get_f32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {ctx.get_i8_type(),
+       {
+         ctx.get_i8_type(),  /* no-op. */
+         ctx.get_i16_type(), /* sign-extend to i32, then narrow to i16 */
+         ctx.get_i32_type(), /* sign-extend to i32. */
+         ctx.get_i64_type(), /* sign-extend to i32, then sign-extend to i64. */
+         ctx.get_f32_type(), /* sign-extend to i32, convert to f32. */
+         ctx.get_f64_type(), /* sign-extend to i32, convert to f64. */
+       }},
+      {ctx.get_i16_type(),
+       {
+         ctx.get_i8_type(),  /* narrow to i16. */
+         ctx.get_i16_type(), /* no-op. */
+         ctx.get_i32_type(), /* sign-extend to i32. */
+         ctx.get_i64_type(), /* sign-extend to i32, then sign-extend to i64. */
+         ctx.get_f32_type(), /* sign-extend to i32, convert to f32. */
+         ctx.get_f64_type(), /* sign-extend to i32, convert to f64. */
+       }},
+      {ctx.get_i32_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i8. */
+         ctx.get_i16_type(), /* convert to i16. */
+         ctx.get_i32_type(), /* no-op. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_i64_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* no-op. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_f32_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* no-op. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_f64_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* no-op. */
+       }},
       {ctx.get_str_type(), {}}};
 
     auto cast_from = primitive_type_casts.find(type.value());
@@ -951,7 +1186,7 @@ std::optional<ty::type_id> access_expression::type_check(
           std::format(
             "{}: Expected <identifier> as accessor (got node id {}).",
             ::slang::to_string(loc),
-            static_cast<int>(rhs->get_id())));
+            std::to_underlying(rhs->get_id())));
     }
 
     const auto* identifier_node = rhs->as_variable_reference();
@@ -1063,11 +1298,11 @@ std::unique_ptr<cg::value> directive_expression::generate_code(
 
         if(enable)
         {
-            new_flags |= static_cast<cg::codegen_flag_type>(flag);
+            new_flags |= std::to_underlying(flag);
         }
         else
         {
-            new_flags &= ~static_cast<cg::codegen_flag_type>(flag);
+            new_flags &= ~std::to_underlying(flag);
         }
     };
 
@@ -1303,7 +1538,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
         throw cg::codegen_error(
           std::format(
             "Unsupported constant type '{}'.",
-            static_cast<int>(const_info->type)));
+            std::to_underlying(const_info->type)));
     }
 
     case sema::symbol_type::variable:
@@ -3845,11 +4080,11 @@ std::unique_ptr<expression> function_expression::clone() const
 void function_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    bool has_prototype = static_cast<bool>(prototype);
+    bool has_prototype = prototype != nullptr;
     ar & has_prototype;
     if(has_prototype)
     {
-        if(!static_cast<bool>(prototype))
+        if(prototype == nullptr)
         {
             prototype = std::make_unique<prototype_ast>();
         }

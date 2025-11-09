@@ -416,8 +416,12 @@ public:
 enum class abi_type_class : std::uint8_t
 {
     void_, /** no type. */
+    i8,    /** 8-bit integer. */
+    i16,   /** 16-bit integer. */
     i32,   /** 32-bit integer. */
+    i64,   /** 64-bit integer. */
     f32,   /** 32-bit float.  */
+    f64,   /** 64-bit float. */
     str,   /** string. */
     ref    /** reference. */
 };
