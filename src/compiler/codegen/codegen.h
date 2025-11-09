@@ -630,32 +630,32 @@ public:
     }
 };
 
-/** Stack value argument. */
-class stack_value_argument : public argument
+/** Type class argument. */
+class type_class_argument : public argument
 {
-    /** The stack value. */
-    stack_value value;
+    /** The type class. */
+    type_class cls;
 
 public:
     /** Defaulted and deleted constructors. */
-    stack_value_argument() = delete;
-    stack_value_argument(const stack_value_argument&) = default;
-    stack_value_argument(stack_value_argument&&) = default;
+    type_class_argument() = delete;
+    type_class_argument(const type_class_argument&) = default;
+    type_class_argument(type_class_argument&&) = default;
 
     /** Default destructor. */
-    ~stack_value_argument() override = default;
+    ~type_class_argument() override = default;
 
     /** Default assignments. */
-    stack_value_argument& operator=(const stack_value_argument&) = default;
-    stack_value_argument& operator=(stack_value_argument&&) = default;
+    type_class_argument& operator=(const type_class_argument&) = default;
+    type_class_argument& operator=(type_class_argument&&) = default;
 
     /**
-     * Create a stack value argument.
+     * Create a type class argument.
      *
-     * @param value The stack value.
+     * @param cls The type class.
      */
-    explicit stack_value_argument(stack_value value)
-    : value{value}
+    explicit type_class_argument(type_class cls)
+    : cls{cls}
     {
     }
 
@@ -664,14 +664,14 @@ public:
       [[maybe_unused]] const name_resolver* resolver = nullptr)
       const override
     {
-        return ::slang::to_string(value);
+        return ::slang::to_string(cls);
     }
 
     /** Return the stack value. */
     [[nodiscard]]
-    stack_value get_value() const
+    type_class get_class() const
     {
-        return value;
+        return cls;
     }
 };
 

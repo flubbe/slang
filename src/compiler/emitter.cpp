@@ -1135,18 +1135,18 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "dup")
     {
-        const auto* arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        const auto v = arg->get_value();
+        const auto* arg = static_cast<const cg::type_class_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto v = arg->get_class();
 
-        if(v == stack_value::cat1)
+        if(v == type_class::cat1)
         {
             emit(instruction_buffer, opcode::dup);
         }
-        else if(v == stack_value::cat2)
+        else if(v == type_class::cat2)
         {
             emit(instruction_buffer, opcode::dup2);
         }
-        else if(v == stack_value::ref)
+        else if(v == type_class::ref)
         {
             emit(instruction_buffer, opcode::adup);
         }
@@ -1162,12 +1162,12 @@ void instruction_emitter::emit_instruction(
     else if(name == "dup_x1")
     {
         // get the duplicated value.
-        const auto* v_arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto v = v_arg->get_value();
+        const auto* v_arg = static_cast<const cg::type_class_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto v = v_arg->get_class();
 
         // get the stack argument.
-        const auto* stack_arg = static_cast<const cg::stack_value_argument*>(args[1].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto s = stack_arg->get_value();
+        const auto* stack_arg = static_cast<const cg::type_class_argument*>(args[1].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto s = stack_arg->get_class();
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x1);
@@ -1176,17 +1176,17 @@ void instruction_emitter::emit_instruction(
     else if(name == "dup_x2")
     {
         // get the duplicated value.
-        const auto* v_arg = static_cast<const cg::stack_value_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto v = v_arg->get_value();
+        const auto* v_arg = static_cast<const cg::type_class_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto v = v_arg->get_class();
 
         // get the stack argument.
-        std::array<const cg::stack_value_argument*, 2> stack_args = {
-          static_cast<const cg::stack_value_argument*>(args[1].get()),    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<const cg::stack_value_argument*>(args[2].get())     // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        std::array<const cg::type_class_argument*, 2> stack_args = {
+          static_cast<const cg::type_class_argument*>(args[1].get()),    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<const cg::type_class_argument*>(args[2].get())     // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         };
-        std::array<stack_value, 2> s = {
-          stack_args[0]->get_value(),
-          stack_args[1]->get_value()};
+        std::array<type_class, 2> s = {
+          stack_args[0]->get_class(),
+          stack_args[1]->get_class()};
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x2);
@@ -1586,10 +1586,7 @@ static module_::constant_type to_module_constant(const_::constant_type type)
  * @returns Returns the value.
  * @throws Throws an `emitter_error` for unknown types.
  */
-static std::variant<
-  int,
-  float,
-  std::string>
+static module_::constant_data_type
   to_module_const_value(
     std::variant<
       std::monostate,

@@ -76,24 +76,27 @@ cg::type context::deref(const cg::type& type)
     return lower(type_ctx.get_base_type(type.get_type_id().value()));
 }
 
-stack_value context::get_stack_value(const cg::type& type) const
+type_class context::get_type_class(const cg::type& type) const
 {
     const auto tk = type.get_type_kind();
 
-    if(tk == cg::type_kind::void_)
+    switch(tk)
     {
+    case cg::type_kind::void_:
         throw cg::codegen_error(
           "Type 'void' has no stack value.");
+    case cg::type_kind::i8:
+    case cg::type_kind::i16:
+    case cg::type_kind::i32:
+    case cg::type_kind::f32:
+        return type_class::cat1;
+    case cg::type_kind::i64:
+    case cg::type_kind::f64:
+        return type_class::cat2;
+    default:;
     }
 
-    if(tk == cg::type_kind::i32 || tk == cg::type_kind::f32)
-    {
-        return stack_value::cat1;
-    }
-
-    // TODO check/return cat2 types once implemented.
-
-    return stack_value::ref;
+    return type_class::ref;
 }
 
 std::string context::to_string() const

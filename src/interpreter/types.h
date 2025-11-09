@@ -239,11 +239,14 @@ public:
     }
 
     /**
-     * Push an i32 onto the stack.
+     * Push a category 1 type (32 bit) onto the stack.
      *
-     * @param i The integer.
+     * @param i The value.
      */
-    void push_i32(std::int32_t i)
+    template<typename T>
+        requires(sizeof(T) == 4
+                 && std::is_scalar_v<T>)
+    void push_cat1(T i)
     {
         if(stack.size() + 4 > max_size)
         {
@@ -256,20 +259,23 @@ public:
     }
 
     /**
-     * Push an f32 onto the stack.
+     * Push a category 2 type (64 bit) onto the stack.
      *
-     * @param f The floating-point value.
+     * @param i The value.
      */
-    void push_f32(float f)
+    template<typename T>
+        requires(sizeof(T) == 8
+                 && std::is_scalar_v<T>)
+    void push_cat2(T i)
     {
-        if(stack.size() + 4 > max_size)
+        if(stack.size() + 8 > max_size)
         {
             throw interpreter_error("Stack overflow.");
         }
         stack.insert(
           stack.end(),
-          reinterpret_cast<std::uint8_t*>(&f),
-          reinterpret_cast<std::uint8_t*>(&f) + 4);
+          reinterpret_cast<std::uint8_t*>(&i),
+          reinterpret_cast<std::uint8_t*>(&i) + 8);
     }
 
     /**
@@ -307,32 +313,40 @@ public:
           other.stack.end());
     }
 
-    /** Pop an i32 from the stack. */
-    std::int32_t pop_i32()
+    /** Pop an category 1 type (32 bit) from the stack. */
+    template<typename T>
+        requires(sizeof(T) == 4
+                 && std::is_scalar_v<T>)
+    T pop_cat1()
     {
         if(stack.size() < 4)
         {
             throw interpreter_error("Stack underflow.");
         }
 
-        std::int32_t i;
+        T i;
         std::memcpy(&i, &stack[stack.size() - 4], 4);
         stack.resize(stack.size() - 4);
+
         return i;
     }
 
-    /** Pop an f32 from the stack. */
-    float pop_f32()
+    /** Pop an category 2 type (64 bit) from the stack. */
+    template<typename T>
+        requires(sizeof(T) == 8
+                 && std::is_scalar_v<T>)
+    T pop_cat2()
     {
-        if(stack.size() < 4)
+        if(stack.size() < 8)
         {
             throw interpreter_error("Stack underflow.");
         }
 
-        float f;
-        std::memcpy(&f, &stack[stack.size() - 4], 4);
-        stack.resize(stack.size() - 4);
-        return f;
+        T i;
+        std::memcpy(&i, &stack[stack.size() - 8], 8);
+        stack.resize(stack.size() - 8);
+
+        return i;
     }
 
     /** Modify the top value on the stack in-place. */

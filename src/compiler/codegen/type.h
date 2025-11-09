@@ -31,8 +31,12 @@ enum class type_kind : std::uint8_t
 {
     void_, /** Void type. */
     null,  /** Null type. */
+    i8,    /** 8-bit signed integer. */
+    i16,   /** 16-bit signed integer. */
     i32,   /** 32-bit signed integer.  */
+    i64,   /** 64-bit signed integer. */
     f32,   /** 32-bit IEEE754 float. */
+    f64,   /** 64-bit IEEE754 float. */
     str,   /** String. */
     ref,   /** Any reference, including arrays. */
 };

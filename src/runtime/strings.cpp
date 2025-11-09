@@ -34,7 +34,7 @@ void string_length(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("string_length: argument is not a string.");
     }
 
-    stack.push_i32(utils::numeric_cast<std::int32_t>(s->length()));
+    stack.push_cat1(utils::numeric_cast<std::int32_t>(s->length()));
 }
 
 void string_equals(si::context& ctx, si::operand_stack& stack)
@@ -59,7 +59,7 @@ void string_equals(si::context& ctx, si::operand_stack& stack)
         throw si::interpreter_error("string_equals: arguments are not strings.");
     }
 
-    stack.push_i32((*s1 == *s2) ? 1 : 0);
+    stack.push_cat1((*s1 == *s2) ? 1 : 0);
 }
 
 void string_concat(si::context& ctx, si::operand_stack& stack)

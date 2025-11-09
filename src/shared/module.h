@@ -158,8 +158,12 @@ inline archive& operator&(archive& ar, array_type& t)
 /** Constant type. */
 enum class constant_type : std::uint8_t
 {
+    i8,  /** 8-bit integer constant. */
+    i16, /** 16-bit integer constant. */
     i32, /** 32-bit integer constant. */
+    i64, /** 64-bit integer constant. */
     f32, /** 32-bit floating point constant. */
+    f64, /** 64-bit floating point constant. */
     str, /** A string. */
 };
 
@@ -168,13 +172,27 @@ inline std::string to_string(constant_type type)
 {
     switch(type)
     {
+    case constant_type::i8: return "i8";
+    case constant_type::i16: return "i16";
     case constant_type::i32: return "i32";
+    case constant_type::i64: return "i64";
     case constant_type::f32: return "f32";
+    case constant_type::f64: return "f64";
     case constant_type::str: return "str";
     }
 
     return "<unknown>";
 }
+
+/** Data type for constant table entries. */
+using constant_data_type = std::variant<
+  std::int8_t,
+  std::int16_t,
+  std::int32_t,
+  std::int64_t,
+  float,
+  double,
+  std::string>;
 
 /** Entry of the constant table. */
 struct constant_table_entry
@@ -183,7 +201,7 @@ struct constant_table_entry
     constant_type type;
 
     /** Constant data. */
-    std::variant<std::int32_t, float, std::string> data;
+    constant_data_type data;
 
     /** Default constructors. */
     constant_table_entry() = default;
@@ -203,7 +221,9 @@ struct constant_table_entry
      * @param type The constant type.
      * @param data The constant data.
      */
-    constant_table_entry(constant_type type, std::variant<std::int32_t, float, std::string> data)
+    constant_table_entry(
+      constant_type type,
+      constant_data_type data)
     : type{type}
     , data{std::move(data)}
     {
@@ -226,9 +246,12 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     auto t = static_cast<std::uint8_t>(entry.type);
     ar & t;
 
-    if(t != static_cast<std::uint8_t>(constant_type::i32)
-       && t != static_cast<std::uint8_t>(constant_type::f32)
-       && t != static_cast<std::uint8_t>(constant_type::str))
+    if(t != std::to_underlying(constant_type::i8)
+       && t != std::to_underlying(constant_type::i16)
+       && t != std::to_underlying(constant_type::i32)
+       && t != std::to_underlying(constant_type::f32)
+       && t != std::to_underlying(constant_type::f64)
+       && t != std::to_underlying(constant_type::str))
     {
         throw serialization_error("Invalid constant type.");
     }
@@ -239,6 +262,20 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     {
         switch(entry.type)
         {
+        case constant_type::i8:
+        {
+            std::int8_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
+        case constant_type::i16:
+        {
+            std::int16_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
         case constant_type::i32:
         {
             std::int32_t i;
@@ -246,9 +283,23 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             entry.data = i;
             break;
         }
+        case constant_type::i64:
+        {
+            std::int64_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
         case constant_type::f32:
         {
             float f;
+            ar & f;
+            entry.data = f;
+            break;
+        }
+        case constant_type::f64:
+        {
+            double f;
             ar & f;
             entry.data = f;
             break;
@@ -268,15 +319,39 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     {
         switch(entry.type)
         {
+        case constant_type::i8:
+        {
+            auto i = std::get<std::int8_t>(entry.data);
+            ar & i;
+            break;
+        }
+        case constant_type::i16:
+        {
+            auto i = std::get<std::int16_t>(entry.data);
+            ar & i;
+            break;
+        }
         case constant_type::i32:
         {
-            std::int32_t i = std::get<std::int32_t>(entry.data);
+            auto i = std::get<std::int32_t>(entry.data);
+            ar & i;
+            break;
+        }
+        case constant_type::i64:
+        {
+            auto i = std::get<std::int64_t>(entry.data);
             ar & i;
             break;
         }
         case constant_type::f32:
         {
-            float f = std::get<float>(entry.data);
+            auto f = std::get<float>(entry.data);
+            ar & f;
+            break;
+        }
+        case constant_type::f64:
+        {
+            auto f = std::get<double>(entry.data);
             ar & f;
             break;
         }

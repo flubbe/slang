@@ -5,7 +5,7 @@ from conan.tools.cmake import CMake, cmake_layout
 
 class slangRecipe(ConanFile):
     name = "slang"
-    version = "0.1"
+    version = "0.2"
 
     # Optional metadata
     license = "MIT"
