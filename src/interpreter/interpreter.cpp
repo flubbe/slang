@@ -10,6 +10,7 @@
 
 #include <format>
 #include <print>
+#include <utility>
 
 #include "archives/memory.h"
 #include "shared/module.h"

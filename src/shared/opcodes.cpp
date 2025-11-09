@@ -9,6 +9,7 @@
  */
 
 #include <format>
+#include <utility>
 
 #include "opcodes.h"
 

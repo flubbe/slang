@@ -11,6 +11,7 @@
 #include <format>
 #include <queue>
 #include <ranges>
+#include <utility>
 
 #include "shared/type_utils.h"
 #include "collect.h"

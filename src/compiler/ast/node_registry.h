@@ -15,6 +15,7 @@
 #include <format>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 #include "archives/archive.h"
 #include "ast.h"

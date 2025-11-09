@@ -9,6 +9,7 @@
  */
 
 #include <format>
+#include <utility>
 
 #include "shared/type_utils.h"
 #include "ast/ast.h"

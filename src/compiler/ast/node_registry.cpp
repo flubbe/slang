@@ -9,8 +9,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <format>
-
 #include "node_registry.h"
 #include "ast.h"
 #include "builtins.h"

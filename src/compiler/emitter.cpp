@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <utility>
+
 #include "archives/memory.h"
 #include "ast/ast.h"
 #include "ast/node_registry.h"
