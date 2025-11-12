@@ -144,13 +144,29 @@ void garbage_collector::delete_object(
         }
         allocated_bytes -= obj_info.size;
     }
+    else if(obj_info.type == gc_object_type::array_i8)
+    {
+        object_deleter<si::fixed_vector<std::int8_t>>(obj_info.addr, allocated_bytes);
+    }
+    else if(obj_info.type == gc_object_type::array_i16)
+    {
+        object_deleter<si::fixed_vector<std::int16_t>>(obj_info.addr, allocated_bytes);
+    }
     else if(obj_info.type == gc_object_type::array_i32)
     {
         object_deleter<si::fixed_vector<std::int32_t>>(obj_info.addr, allocated_bytes);
     }
+    else if(obj_info.type == gc_object_type::array_i64)
+    {
+        object_deleter<si::fixed_vector<std::int64_t>>(obj_info.addr, allocated_bytes);
+    }
     else if(obj_info.type == gc_object_type::array_f32)
     {
         object_deleter<si::fixed_vector<float>>(obj_info.addr, allocated_bytes);
+    }
+    else if(obj_info.type == gc_object_type::array_f64)
+    {
+        object_deleter<si::fixed_vector<double>>(obj_info.addr, allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_str)
     {

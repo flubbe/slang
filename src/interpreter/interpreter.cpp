@@ -1025,15 +1025,31 @@ void context::exec(
                     throw interpreter_error(std::format("Invalid array size '{}'.", size));
                 }
 
-                if(type == static_cast<std::uint8_t>(module_::array_type::i32))
+                if(type == std::to_underlying(module_::array_type::i8))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int8_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::i16))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int16_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::i32))
                 {
                     frame.stack.push_addr(gc.gc_new_array<std::int32_t>(size, gc::gc_object::of_temporary));
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::f32))
+                else if(type == std::to_underlying(module_::array_type::i64))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int64_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::f32))
                 {
                     frame.stack.push_addr(gc.gc_new_array<float>(size, gc::gc_object::of_temporary));
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::str))
+                else if(type == std::to_underlying(module_::array_type::f64))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<double>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::str))
                 {
                     auto* array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
                     for(std::string*& s: *array)
@@ -1042,7 +1058,7 @@ void context::exec(
                     }
                     frame.stack.push_addr(array);
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::ref))
+                else if(type == std::to_underlying(module_::array_type::ref))
                 {
                     frame.stack.push_addr(gc.gc_new_array<void*>(size, gc::gc_object::of_temporary));
                 }

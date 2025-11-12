@@ -34,8 +34,12 @@ namespace si = slang::interpreter;
  * Verify size assumptions for arrays.
  */
 
+static_assert(sizeof(si::fixed_vector<std::int8_t>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<std::int16_t>) == sizeof(void*));
 static_assert(sizeof(si::fixed_vector<std::int32_t>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<std::int64_t>) == sizeof(void*));
 static_assert(sizeof(si::fixed_vector<float>) == sizeof(void*));
+static_assert(sizeof(si::fixed_vector<double>) == sizeof(void*));
 static_assert(sizeof(si::fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(si::fixed_vector<void*>) == sizeof(void*));
 
@@ -52,8 +56,12 @@ enum class gc_object_type : std::uint8_t
 {
     str,
     obj,
+    array_i8,
+    array_i16,
     array_i32,
+    array_i64,
     array_f32,
+    array_f64,
     array_str,
     array_aref,
 };
@@ -65,8 +73,12 @@ inline std::string to_string(gc_object_type type)
     {
     case gc_object_type::str: return "str";
     case gc_object_type::obj: return "obj";
+    case gc_object_type::array_i8: return "array_i8";
+    case gc_object_type::array_i16: return "array_i16";
     case gc_object_type::array_i32: return "array_i32";
+    case gc_object_type::array_i64: return "array_i64";
     case gc_object_type::array_f32: return "array_f32";
+    case gc_object_type::array_f64: return "array_f64";
     case gc_object_type::array_str: return "array_str";
     case gc_object_type::array_aref: return "array_aref";
     }
@@ -117,8 +129,12 @@ struct gc_object
     {
         static_assert(
           std::is_same_v<T, std::string>
+            || std::is_same_v<T, si::fixed_vector<std::int8_t>>
+            || std::is_same_v<T, si::fixed_vector<std::int16_t>>
             || std::is_same_v<T, si::fixed_vector<std::int32_t>>
+            || std::is_same_v<T, si::fixed_vector<std::int64_t>>
             || std::is_same_v<T, si::fixed_vector<float>>
+            || std::is_same_v<T, si::fixed_vector<double>>
             || std::is_same_v<T, si::fixed_vector<std::string*>>
             || std::is_same_v<T, si::fixed_vector<void*>>,
           "Cannot create GC object from type.");
@@ -157,6 +173,44 @@ inline gc_object gc_object::from<std::string>(
 }
 
 template<>
+inline gc_object gc_object::from<si::fixed_vector<std::int8_t>>(
+  si::fixed_vector<std::int8_t>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
+{
+    if(layout != nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
+    }
+
+    return {
+      gc_object_type::array_i8,
+      nullptr,
+      sizeof(si::fixed_vector<std::int8_t>),
+      std::alignment_of_v<si::fixed_vector<std::int8_t>>,
+      flags, obj};
+}
+
+template<>
+inline gc_object gc_object::from<si::fixed_vector<std::int16_t>>(
+  si::fixed_vector<std::int16_t>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
+{
+    if(layout != nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
+    }
+
+    return {
+      gc_object_type::array_i16,
+      nullptr,
+      sizeof(si::fixed_vector<std::int16_t>),
+      std::alignment_of_v<si::fixed_vector<std::int16_t>>,
+      flags, obj};
+}
+
+template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
   si::fixed_vector<std::int32_t>* obj,
   std::uint8_t flags,
@@ -176,6 +230,25 @@ inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
 }
 
 template<>
+inline gc_object gc_object::from<si::fixed_vector<std::int64_t>>(
+  si::fixed_vector<std::int64_t>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
+{
+    if(layout != nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
+    }
+
+    return {
+      gc_object_type::array_i64,
+      nullptr,
+      sizeof(si::fixed_vector<std::int64_t>),
+      std::alignment_of_v<si::fixed_vector<std::int64_t>>,
+      flags, obj};
+}
+
+template<>
 inline gc_object gc_object::from<si::fixed_vector<float>>(
   si::fixed_vector<float>* obj,
   std::uint8_t flags,
@@ -191,6 +264,25 @@ inline gc_object gc_object::from<si::fixed_vector<float>>(
       nullptr,
       sizeof(si::fixed_vector<float>),
       std::alignment_of_v<si::fixed_vector<float>>,
+      flags, obj};
+}
+
+template<>
+inline gc_object gc_object::from<si::fixed_vector<double>>(
+  si::fixed_vector<double>* obj,
+  std::uint8_t flags,
+  std::vector<std::size_t>* layout)
+{
+    if(layout != nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create f64 array with a type layout.");
+    }
+
+    return {
+      gc_object_type::array_f64,
+      nullptr,
+      sizeof(si::fixed_vector<double>),
+      std::alignment_of_v<si::fixed_vector<double>>,
       flags, obj};
 }
 
