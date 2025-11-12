@@ -1807,6 +1807,232 @@ TEST(compile_ir, convert_f64)
     }
 }
 
+TEST(compile_ir, arithmetic_i8)
+{
+    {
+        {
+            const std::string test_input =
+              "fn f() -> void\n"
+              "{\n"
+              " let a: i32 = 2;\n"
+              " let b: i8 = (3*a) as i8;\n"
+              "}";
+
+            slang::lexer lexer;
+            slang::parser parser;
+
+            lexer.set_input(test_input);
+            parser.parse(lexer);
+
+            EXPECT_TRUE(lexer.eof());
+
+            std::shared_ptr<ast::expression> ast = parser.get_ast();
+            sema::env sema_env;
+            const_::env const_env;
+            macro::env macro_env;
+            ty::context type_ctx;
+            tl::context lowering_ctx{type_ctx};
+            co::context co_ctx{sema_env};
+            rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+            cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+            ASSERT_NO_THROW(ast->collect_names(co_ctx));
+            ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+            ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+            ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->define_types(type_ctx));
+            ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->generate_code(ctx));
+
+            EXPECT_EQ(ctx.to_string(),
+                      "define void @f() {\n"
+                      "local i32 %1\n"
+                      "local i8 %2\n"
+                      "entry:\n"
+                      " const i32 2\n"
+                      " store i32 %1\n"
+                      " const i32 3\n"
+                      " load i32 %1\n"
+                      " mul i32\n"
+                      " cast i32_to_i8\n"
+                      " store i8 %2\n"
+                      " ret void\n"
+                      "}");
+        }
+    }
+}
+
+TEST(compile_ir, arithmetic_i16)
+{
+    {
+        {
+            const std::string test_input =
+              "fn f() -> void\n"
+              "{\n"
+              " let a: i32 = 2;\n"
+              " let b: i16 = (3*a) as i16;\n"
+              "}";
+
+            slang::lexer lexer;
+            slang::parser parser;
+
+            lexer.set_input(test_input);
+            parser.parse(lexer);
+
+            EXPECT_TRUE(lexer.eof());
+
+            std::shared_ptr<ast::expression> ast = parser.get_ast();
+            sema::env sema_env;
+            const_::env const_env;
+            macro::env macro_env;
+            ty::context type_ctx;
+            tl::context lowering_ctx{type_ctx};
+            co::context co_ctx{sema_env};
+            rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+            cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+            ASSERT_NO_THROW(ast->collect_names(co_ctx));
+            ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+            ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+            ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->define_types(type_ctx));
+            ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+            ASSERT_NO_THROW(ast->generate_code(ctx));
+
+            EXPECT_EQ(ctx.to_string(),
+                      "define void @f() {\n"
+                      "local i32 %1\n"
+                      "local i16 %2\n"
+                      "entry:\n"
+                      " const i32 2\n"
+                      " store i32 %1\n"
+                      " const i32 3\n"
+                      " load i32 %1\n"
+                      " mul i32\n"
+                      " cast i32_to_i16\n"
+                      " store i16 %2\n"
+                      " ret void\n"
+                      "}");
+        }
+    }
+}
+
+TEST(compile_ir, logical_operators)
+{
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " let a: i32 = 1 && 2;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "local i32 %1\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " const i32 0\n"
+                  " cmpne i32\n"
+                  " jnz %0, %1\n"
+                  "0:\n"
+                  " const i32 2\n"
+                  " const i32 0\n"
+                  " cmpne i32\n"
+                  " jmp %2\n"
+                  "1:\n"
+                  " const i32 0\n"
+                  " jmp %2\n"
+                  "2:\n"
+                  " store i32 %1\n"
+                  " ret void\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f() -> void\n"
+          "{\n"
+          " let a: i32 = 1 || 2;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define void @f() {\n"
+                  "local i32 %1\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " const i32 0\n"
+                  " cmpeq i32\n"
+                  " jnz %0, %1\n"
+                  "0:\n"
+                  " const i32 2\n"
+                  " const i32 0\n"
+                  " cmpne i32\n"
+                  " jmp %2\n"
+                  "1:\n"
+                  " const i32 1\n"
+                  " jmp %2\n"
+                  "2:\n"
+                  " store i32 %1\n"
+                  " ret void\n"
+                  "}");
+    }
+}
+
 TEST(compile_ir, empty_function)
 {
     // test: code generation for empty function

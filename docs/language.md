@@ -113,7 +113,7 @@ Ignoring comments, a program consists of:
             <function-name>(<arg-expr1>, ..., <arg-exprN>);
             ```
             The argument expressions are evaluated left to right before the call.
-        4. Binary operators for number types:
+        4. Binary operators for `i32`, `i64`, `f32`, `f64`:
 
             Standard arithmetic (`+`, `-`, `*`, `/`, `%`),
             left/right shifts (`<<`, `>>`), comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`),
@@ -122,7 +122,7 @@ Ignoring comments, a program consists of:
             Operator precedence follows conventional rules, with parentheses `(<expr>)`
             used for explicit grouping.
 
-        5. Unary operators for number types:
+        5. Unary operators for `i32`, `i64`, `f32`, `f64`:
 
             Unary `+` (identity), `-` (negation) and `!` (logical not, only for `i32`) apply to a single operand.
 
@@ -140,8 +140,13 @@ Ignoring comments, a program consists of:
         ```
         <expression> as <type>
         ```
-        Casting is allowed between `i32` and `f32`, and between any
+        Casting is allowed between `i8`, `i16`, `i32`, `i64`, `f32` and `f64`, and between any
         struct and types marked with `#[allow_cast]` (see below).
+
+        The cast binds to the token on its left. For example, the parenthesis in `(-123) as i8` is mandatory.
+
+        **Note:** Arithmetic works with `i32`, `i64`, `f32` and `f64` types, and others have to be explicitly
+        casted.
 5. Macros are exported by the module and can be accessed from another module.
     They are defined via
     ```
@@ -204,8 +209,8 @@ Unknown directives are ignored.
 
 Built-in types are
 - `void`: Indicates `<no-type>`.
-- `i32`: A 32-bit integer.
-- `f32`: A 32-bit floating-point number.
+- `i8`, `i16`, `i32`, `i64`: Integers with bit widths of 8, 16, 32, and 64.
+- `f32`, `f64`: 32 and 64 bit wide floating-point numbers.
 - `str`: A string.
 - Arrays are declared as `let <name>: [<type>];`. They are of fixed length, and the length
     can be accessed with `<name>.length`. A new array can be defined as

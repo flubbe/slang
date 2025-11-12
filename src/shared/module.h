@@ -115,10 +115,14 @@ inline archive& operator&(archive& ar, symbol& s)
 /** Array type. */
 enum class array_type : std::uint8_t
 {
-    i32 = 0,
-    f32 = 1,
-    str = 2,
-    ref = 3
+    i8 = 0,
+    i16 = 1,
+    i32 = 2,
+    i64 = 3,
+    f32 = 4,
+    f64 = 5,
+    str = 6,
+    ref = 7
 };
 
 /** Convert `array_type` to a readable string. */
@@ -126,8 +130,12 @@ inline std::string to_string(array_type type)
 {
     switch(type)
     {
+    case array_type::i8: return "i8";
+    case array_type::i16: return "i16";
     case array_type::i32: return "i32";
+    case array_type::i64: return "i64";
     case array_type::f32: return "f32";
+    case array_type::f64: return "f64";
     case array_type::str: return "str";
     case array_type::ref: return "ref";
     }
@@ -145,8 +153,12 @@ inline archive& operator&(archive& ar, array_type& t)
 {
     auto v = static_cast<std::uint8_t>(t);
     ar & v;
-    if(v != std::to_underlying(array_type::i32)
+    if(v != std::to_underlying(array_type::i8)
+       && v != std::to_underlying(array_type::i16)
+       && v != std::to_underlying(array_type::i32)
+       && v != std::to_underlying(array_type::i64)
        && v != std::to_underlying(array_type::f32)
+       && v != std::to_underlying(array_type::f64)
        && v != std::to_underlying(array_type::str)
        && v != std::to_underlying(array_type::ref))
     {

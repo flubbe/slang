@@ -771,8 +771,6 @@ void context::exec(
 
                 break;
             } /* opcode::aastore */
-            case opcode::cload:
-            case opcode::sload:
             case opcode::iload:
             case opcode::fload:
             {
@@ -797,7 +795,7 @@ void context::exec(
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
                 frame.stack.push_cat1(v);
                 break;
-            } /* opcode::cload, opcode::sload, opcode::iload, opcode::fload */
+            } /* opcode::iload, opcode::fload */
             case opcode::lload:
             case opcode::dload:
             {
@@ -848,8 +846,6 @@ void context::exec(
                 frame.stack.push_addr(addr);
                 break;
             } /* opcode::aload */
-            case opcode::cstore:
-            case opcode::sstore:
             case opcode::istore:
             case opcode::fstore:
             {
@@ -873,7 +869,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat1<std::int32_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::cstore, opcode::sstore, opcode::istore, opcode::fstore */
+            } /* opcode::istore, opcode::fstore */
             case opcode::lstore:
             case opcode::dstore:
             {
@@ -897,7 +893,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat2<std::int64_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::cstore, opcode::sstore, opcode::istore, opcode::fstore */
+            } /* opcode::istore, opcode::fstore */
             case opcode::astore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */

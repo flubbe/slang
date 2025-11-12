@@ -926,26 +926,33 @@ void instruction_emitter::emit_instruction(
 
     auto emit_typed =
       [this, &name, &args](
-        opcode i32_opcode,
-        std::optional<opcode> f32_opcode = std::nullopt,
+        opcode cat1i_opcode,
+        opcode cat2i_opcode,
+        opcode cat1f_opcode,
+        opcode cat2f_opcode,
         std::optional<opcode> str_opcode = std::nullopt,
         std::optional<opcode> ref_opcode = std::nullopt)
     {
         const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         const auto type_kind = arg->get_lowered_type().get_type_kind();
 
-        if(type_kind == cg::type_kind::i32)
+        if(type_kind == cg::type_kind::i8
+           || type_kind == cg::type_kind::i16
+           || type_kind == cg::type_kind::i32)
         {
-            emit(instruction_buffer, i32_opcode);
+            emit(instruction_buffer, cat1i_opcode);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, cat2i_opcode);
         }
         else if(type_kind == cg::type_kind::f32)
         {
-            if(!f32_opcode.has_value())
-            {
-                throw std::runtime_error(std::format("Invalid type 'f32' for instruction '{}'.", name));
-            }
-
-            emit(instruction_buffer, *f32_opcode);
+            emit(instruction_buffer, cat1f_opcode);
+        }
+        else if(type_kind == cg::type_kind::f64)
+        {
+            emit(instruction_buffer, cat2f_opcode);
         }
         else if(type_kind == cg::type_kind::str)
         {
@@ -981,12 +988,10 @@ void instruction_emitter::emit_instruction(
 
     auto emit_load_store =
       [this, &name, &args, &func](
-        opcode i8_opcode,
-        opcode i16_opcode,
-        opcode i32_opcode,
-        opcode i64_opcode,
-        opcode f32_opcode,
-        opcode f64_opcode,
+        opcode cat1i_opcode,
+        opcode cat2i_opcode,
+        opcode cat1f_opcode,
+        opcode cat2f_opcode,
         opcode ref_opcode)
     {
         const auto* arg = static_cast<const cg::variable_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -1008,29 +1013,24 @@ void instruction_emitter::emit_instruction(
         {
             emit(instruction_buffer, ref_opcode);
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i8)
+        else if(
+          v->get_type().get_type_kind() == cg::type_kind::i8
+          || v->get_type().get_type_kind() == cg::type_kind::i16
+          || v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            emit(instruction_buffer, i8_opcode);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i16)
-        {
-            emit(instruction_buffer, i16_opcode);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i32)
-        {
-            emit(instruction_buffer, i32_opcode);
+            emit(instruction_buffer, cat1i_opcode);
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::i64)
         {
-            emit(instruction_buffer, i64_opcode);
+            emit(instruction_buffer, cat2i_opcode);
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
-            emit(instruction_buffer, f32_opcode);
+            emit(instruction_buffer, cat1f_opcode);
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            emit(instruction_buffer, f64_opcode);
+            emit(instruction_buffer, cat2f_opcode);
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::str)
         {
@@ -1050,23 +1050,40 @@ void instruction_emitter::emit_instruction(
 
     if(name == "add")
     {
-        emit_typed(opcode::iadd, opcode::fadd);
+        emit_typed(opcode::iadd, opcode::ladd, opcode::fadd, opcode::dadd);
     }
     else if(name == "sub")
     {
-        emit_typed(opcode::isub, opcode::fsub);
+        emit_typed(opcode::isub, opcode::lsub, opcode::fsub, opcode::dsub);
     }
     else if(name == "mul")
     {
-        emit_typed(opcode::imul, opcode::fmul);
+        emit_typed(opcode::imul, opcode::lmul, opcode::fmul, opcode::dmul);
     }
     else if(name == "div")
     {
-        emit_typed(opcode::idiv, opcode::fdiv);
+        emit_typed(opcode::idiv, opcode::ldiv, opcode::fdiv, opcode::ddiv);
     }
     else if(name == "mod")
     {
-        emit_typed(opcode::imod);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::imod);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lmod);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'mod'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "const_null")
     {
@@ -1127,8 +1144,6 @@ void instruction_emitter::emit_instruction(
     else if(name == "load")
     {
         emit_load_store(
-          opcode::cload,
-          opcode::sload,
           opcode::iload,
           opcode::lload,
           opcode::fload,
@@ -1138,8 +1153,6 @@ void instruction_emitter::emit_instruction(
     else if(name == "store")
     {
         emit_load_store(
-          opcode::cstore,
-          opcode::sstore,
           opcode::istore,
           opcode::lstore,
           opcode::fstore,
@@ -1148,11 +1161,23 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "load_element")
     {
-        emit_typed(opcode::iaload, opcode::faload, opcode::aaload, opcode::aaload);
+        emit_typed(
+          opcode::iaload,
+          opcode::laload,
+          opcode::faload,
+          opcode::daload,
+          opcode::aaload,
+          opcode::aaload);
     }
     else if(name == "store_element")
     {
-        emit_typed(opcode::iastore, opcode::fastore, opcode::aastore, opcode::aastore);
+        emit_typed(
+          opcode::iastore,
+          opcode::lastore,
+          opcode::fastore,
+          opcode::dastore,
+          opcode::aastore,
+          opcode::aastore);
     }
     else if(name == "dup")
     {
@@ -1215,7 +1240,13 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "pop")
     {
-        emit_typed(opcode::pop, opcode::pop, opcode::apop, opcode::apop);    // same instruction for i32 and f32.
+        emit_typed(
+          opcode::pop,
+          opcode::pop2,
+          opcode::pop,
+          opcode::pop2,
+          opcode::apop,
+          opcode::apop);    // same instruction for i32 and f32.
     }
     else if(name == "cast")
     {
@@ -1317,7 +1348,13 @@ void instruction_emitter::emit_instruction(
         }
         else
         {
-            emit_typed(opcode::iret, opcode::fret, opcode::sret, opcode::aret);
+            emit_typed(
+              opcode::iret,
+              opcode::lret,
+              opcode::fret,
+              opcode::dret,
+              opcode::sret,
+              opcode::aret);
         }
     }
     else if(name == "set_field"
@@ -1395,55 +1432,160 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "and")
     {
-        emit_typed(opcode::iand);
-    }
-    else if(name == "land")
-    {
-        emit_typed(opcode::land);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::iand);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::land);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'and'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "or")
     {
-        emit_typed(opcode::ior);
-    }
-    else if(name == "lor")
-    {
-        emit_typed(opcode::lor);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::ior);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lor);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'or'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "xor")
     {
-        emit_typed(opcode::ixor);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::ixor);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lxor);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'xor'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "shl")
     {
-        emit_typed(opcode::ishl);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::ishl);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lshl);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'shl'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "shr")
     {
-        emit_typed(opcode::ishr);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::ishr);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lshr);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction 'shr'.",
+                cg::to_string(arg->get_lowered_type().get_type_kind())));
+        }
     }
     else if(name == "cmpl")
     {
-        emit_typed(opcode::icmpl, opcode::fcmpl);
+        emit_typed(
+          opcode::icmpl,
+          opcode::lcmpl,
+          opcode::fcmpl,
+          opcode::dcmpl);
     }
     else if(name == "cmple")
     {
-        emit_typed(opcode::icmple, opcode::fcmple);
+        emit_typed(
+          opcode::icmple,
+          opcode::lcmple,
+          opcode::fcmple,
+          opcode::dcmple);
     }
     else if(name == "cmpg")
     {
-        emit_typed(opcode::icmpg, opcode::fcmpg);
+        emit_typed(
+          opcode::icmpg,
+          opcode::lcmpg,
+          opcode::fcmpg,
+          opcode::dcmpg);
     }
     else if(name == "cmpge")
     {
-        emit_typed(opcode::icmpge, opcode::fcmpge);
+        emit_typed(
+          opcode::icmpge,
+          opcode::lcmpge,
+          opcode::fcmpge,
+          opcode::dcmpge);
     }
     else if(name == "cmpeq")
     {
-        emit_typed(opcode::icmpeq, opcode::fcmpeq, opcode::acmpeq, opcode::acmpeq);
+        emit_typed(
+          opcode::icmpeq,
+          opcode::lcmpeq,
+          opcode::fcmpeq,
+          opcode::dcmpeq,
+          opcode::acmpeq,
+          opcode::acmpeq);
     }
     else if(name == "cmpne")
     {
-        emit_typed(opcode::icmpne, opcode::fcmpne, opcode::acmpne, opcode::acmpne);
+        emit_typed(
+          opcode::icmpne,
+          opcode::lcmpne,
+          opcode::fcmpne,
+          opcode::dcmpne,
+          opcode::acmpne,
+          opcode::acmpne);
     }
     else if(name == "jnz")
     {
@@ -1570,14 +1712,34 @@ void instruction_emitter::emit_instruction(
 
         module_::array_type type = [&type_kind]() -> module_::array_type
         {
+            if(type_kind == cg::type_kind::i8)
+            {
+                return module_::array_type::i8;
+            }
+
+            if(type_kind == cg::type_kind::i16)
+            {
+                return module_::array_type::i16;
+            }
+
             if(type_kind == cg::type_kind::i32)
             {
                 return module_::array_type::i32;
             }
 
+            if(type_kind == cg::type_kind::i64)
+            {
+                return module_::array_type::i64;
+            }
+
             if(type_kind == cg::type_kind::f32)
             {
                 return module_::array_type::f32;
+            }
+
+            if(type_kind == cg::type_kind::f64)
+            {
+                return module_::array_type::f64;
             }
 
             if(type_kind == cg::type_kind::str)

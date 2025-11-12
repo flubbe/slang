@@ -1027,15 +1027,11 @@ std::int32_t module_loader::decode_instruction(
         return get_stack_delta(desc.signature);
     }
     /* opcodes that need to resolve a variable. */
-    case opcode::cload: [[fallthrough]];
-    case opcode::sload: [[fallthrough]];
     case opcode::iload: [[fallthrough]];
     case opcode::lload: [[fallthrough]];
     case opcode::fload: [[fallthrough]];
     case opcode::dload: [[fallthrough]];
     case opcode::aload: [[fallthrough]];
-    case opcode::cstore: [[fallthrough]];
-    case opcode::sstore: [[fallthrough]];
     case opcode::istore: [[fallthrough]];
     case opcode::lstore: [[fallthrough]];
     case opcode::fstore: [[fallthrough]];
@@ -1064,9 +1060,7 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), i.i);
 
         // return correct size.
-        bool is_store = (static_cast<opcode>(instr) == opcode::cstore)
-                        || (static_cast<opcode>(instr) == opcode::sstore)
-                        || (static_cast<opcode>(instr) == opcode::istore)
+        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
                         || (static_cast<opcode>(instr) == opcode::dstore)
                         || (static_cast<opcode>(instr) == opcode::astore);

@@ -1908,7 +1908,7 @@ public:
     /**
      * Generate a conditional branch.
      *
-     * Pops 'condition off the stack. If 'condition' is != 0, jumps to `then_block`, else to `else_block`.
+     * Pops 'condition' off the stack. If 'condition' is != 0, jumps to `then_block`, else to `else_block`.
      *
      * @param then_block The block to jump to if the condition is not false. Cannot be a `nullptr`.
      * @param else_block The block to jump to if the condition is false. Can be a `nullptr`.

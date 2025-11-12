@@ -2823,6 +2823,188 @@ bool binary_expression::is_pure(cg::context& ctx) const
            && rhs->is_pure(ctx);
 }
 
+/**
+ * Generate the control logic / short-circuit evaluation for _logical and_ operations (&&).
+ *
+ * @param ctx The code generation context.
+ * @param lhs The left-hand side.
+ * @param rhs The right-hand side.
+ * @returns A value with `i32` type.
+ */
+static std::unique_ptr<cg::value> generate_logical_and(
+  cg::context& ctx,
+  const std::unique_ptr<expression>& lhs,
+  const std::unique_ptr<expression>& rhs)
+{
+    std::unique_ptr<cg::value> lhs_value, rhs_value;
+
+    lhs_value = lhs->generate_code(ctx, memory_context::load);
+    if(!lhs_value)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0)
+
+    // store where to insert the branch.
+    auto* function_insertion_point = ctx.get_insertion_point(true);
+
+    // set up basic blocks.
+    auto* lhs_true_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* lhs_false_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    /*
+     * code generation for l.h.s. being true
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
+    ctx.set_insertion_point(lhs_true_basic_block);
+
+    rhs_value = rhs->generate_code(ctx, memory_context::load);
+    if(!rhs_value)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... && (rhs != 0).
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * code generation for l.h.s. being false
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
+    ctx.set_insertion_point(lhs_false_basic_block);
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * control flow logic.
+     */
+
+    // insert blocks into function.
+    ctx.set_insertion_point(function_insertion_point);
+    ctx.generate_cond_branch(lhs_true_basic_block, lhs_false_basic_block);
+
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
+}
+
+/**
+ * Generate the control logic / short-circuit evaluation for _logical or_ operations (||).
+ *
+ * @param ctx The code generation context.
+ * @param lhs The left-hand side.
+ * @param rhs The right-hand side.
+ * @returns A value with `i32` type.
+ */
+static std::unique_ptr<cg::value> generate_logical_or(
+  cg::context& ctx,
+  const std::unique_ptr<expression>& lhs,
+  const std::unique_ptr<expression>& rhs)
+{
+    std::unique_ptr<cg::value> lhs_value, rhs_value;
+
+    lhs_value = lhs->generate_code(ctx, memory_context::load);
+    if(!lhs_value)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs != 0)
+
+    // store where to insert the branch.
+    auto* function_insertion_point = ctx.get_insertion_point(true);
+
+    // set up basic blocks.
+    auto* lhs_false_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* lhs_true_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    /*
+     * code generation for l.h.s. being false
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
+    ctx.set_insertion_point(lhs_false_basic_block);
+
+    rhs_value = rhs->generate_code(ctx, memory_context::load);
+    if(!rhs_value)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... || (rhs != 0).
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * code generation for l.h.s. being true
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
+    ctx.set_insertion_point(lhs_true_basic_block);
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * control flow logic.
+     */
+
+    // insert blocks into function.
+    ctx.set_insertion_point(function_insertion_point);
+    ctx.generate_cond_branch(lhs_false_basic_block, lhs_true_basic_block);
+
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
+}
+
 std::unique_ptr<cg::value> binary_expression::generate_code(
   cg::context& ctx,
   memory_context mc) const
@@ -2843,6 +3025,8 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
      *
      * Generated IR
      * ------------
+     *
+     * 0. Special cases for logical and/logical or.
      *
      * 1. Compound assignment to variables
      *
@@ -2889,6 +3073,24 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
      */
 
     std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
+
+    /* Case 0 (logical and/logical or). */
+    if(op.s == "&&")
+    {
+        // TODO Evaluate constant subexpressions
+
+        // Short-circuit evaluation of "lhs && rhs".
+        return generate_logical_and(ctx, lhs, rhs);
+    }
+
+    if(op.s == "||")
+    {
+        // TODO Evaluate constant subexpressions
+
+        // Short-circuit evaluation of "lhs || rhs".
+        return generate_logical_or(ctx, lhs, rhs);
+    }
+
     auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
 
     if(!is_assignment

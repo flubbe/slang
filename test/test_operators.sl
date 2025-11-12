@@ -91,6 +91,41 @@ fn test_i32_binary_operators() -> void
     }
 }
 
+fn test_logical_operators() -> void
+{
+    std::println("testing logical and...");
+    std::assert((0 && 0) == 0, "(0 && 0) == 0");
+    std::assert((0 && 1) == 0, "(0 && 1) == 0");
+    std::assert((1 && 0) == 0, "(1 && 0) == 0");
+    std::assert((1 && 1) == 1, "(1 && 1) == 1");
+
+    std::assert((123 && -3) == 1, "(123 && -3) == 1");
+    std::println("testing logical or...");
+    std::assert((0 || 0) == 0, "(0 || 0) == 0");
+    std::assert((0 || 1) == 1, "(0 || 1) == 1");
+    std::assert((1 || 0) == 1, "(1 || 0) == 1");
+    std::assert((1 || 1) == 1, "(1 || 1) == 0");
+
+    std::assert((-4 || 5) == 1, "(-4 || 5) == 1");
+
+    // test short-circuit evaluation.
+    let x: i32 = 0;
+    
+    0 && (x = 1);
+    std::assert(x == 0, "x == 0");
+
+    1 && (x = 1);
+    std::assert(x == 1, "x == 1");
+
+    x = 0;
+    0 || (x = 1);
+    std::assert(x == 1, "x == 1");
+
+    x = 0;
+    1 || (x = 1);
+    std::assert(x == 0, "x == 0");
+}
+
 fn test_f32_binary_operators() -> void
 {
     // + - * /
@@ -130,6 +165,7 @@ fn test_f32_binary_operators() -> void
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
     test_f32_binary_operators();
+    test_logical_operators(); 
 
     return 0;
 }
