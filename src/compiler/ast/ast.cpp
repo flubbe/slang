@@ -1294,7 +1294,7 @@ std::unique_ptr<cg::value> directive_expression::generate_code(
 
         if(name == "const_eval")
         {
-            flag = cg::codegen_flags::enable_const_eval_;
+            flag = cg::codegen_flags::enable_const_eval;
         }
 
         if(enable)
@@ -3113,7 +3113,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
     {
         // Evaluate constant subexpressions.
         auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
-        if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
            && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
         {
             auto info = const_eval_it->second;
@@ -3148,20 +3148,6 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
         lhs_value = lhs->generate_code(ctx, memory_context::load);
         rhs_value = rhs->generate_code(ctx, memory_context::load);
-
-        if(lhs_value->get_type().get_type_kind() != rhs_value->get_type().get_type_kind()
-           && !(is_comparison
-                && (lhs_value->get_type().get_type_kind() == cg::type_kind::str
-                    || lhs_value->get_type().get_type_kind() == cg::type_kind::ref)
-                && rhs_value->get_type().get_type_kind() == cg::type_kind::null))
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Lowered types don't match in binary operation. L.h.s.: {}, R.h.s.: {}.",
-                ::cg::to_string(lhs_value->get_type().get_type_kind()),
-                ::cg::to_string(rhs_value->get_type().get_type_kind())));
-        }
 
         auto it = binary_op_map.find(reduced_op);
         if(it == binary_op_map.end())
@@ -3346,16 +3332,82 @@ std::optional<ty::type_id> binary_expression::type_check(
 
     // some operations restrict the type.
     if(reduced_op == "%"
-       || reduced_op == "<<" || reduced_op == ">>"
-       || reduced_op == "&" || reduced_op == "^" || reduced_op == "|"
-       || reduced_op == "&&" || reduced_op == "||")
+       || reduced_op == "&" || reduced_op == "^" || reduced_op == "|")
     {
-        if(lhs_type != ctx.get_i32_type() || rhs_type != ctx.get_i32_type())
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
             throw ty::type_error(
               loc,
               std::format(
-                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+    else if(reduced_op == "<<" || reduced_op == ">>")
+    {
+        if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
+           || rhs_type != ctx.get_i32_type())
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // disallow negative literals.
+        if(rhs->is_literal())
+        {
+            const std::optional<
+              std::variant<
+                int,
+                float,
+                std::string>>& v = rhs->as_literal()->get_token().value;
+            if(!v.has_value())
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+            }
+
+            if(std::get<int>(v.value()) < 0)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Negative shift counts are not allowed."));
+            }
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+    else if(reduced_op == "&&" || reduced_op == "||")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
                 ctx.to_string(lhs_type.value()),
                 reduced_op,
                 ctx.to_string(rhs_type.value()),
@@ -3397,24 +3449,28 @@ std::optional<ty::type_id> binary_expression::type_check(
         return expr_type;
     }
 
-    // check lhs and rhs have supported types (i32 and f32 at the moment).
+    // check lhs and rhs have supported types (i32, i64, f32 and f64).
     if(lhs_type.value() != ctx.get_i32_type()
-       && lhs_type != ctx.get_f32_type())
+       && lhs_type.value() != ctx.get_i64_type()
+       && lhs_type.value() != ctx.get_f32_type()
+       && lhs_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
           loc,
           std::format(
-            "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
+            "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
             ctx.to_string(lhs_type.value())));
     }
     if(rhs_type.value() != ctx.get_i32_type()
-       && rhs_type.value() != ctx.get_f32_type())
+       && rhs_type.value() != ctx.get_i64_type()
+       && rhs_type.value() != ctx.get_f32_type()
+       && rhs_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
           loc,
           std::format(
-            "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
+            "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
             reduced_op,
             ctx.to_string(rhs_type.value())));
     }
@@ -3543,7 +3599,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     // Evaluate constant subexpressions.
     auto it = ctx.get_const_env().const_eval_expr_values.find(this);
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
        && it != ctx.get_const_env().const_eval_expr_values.cend())
     {
         const auto& info = it->second;

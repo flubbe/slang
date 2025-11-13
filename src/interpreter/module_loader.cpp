@@ -679,12 +679,12 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fdiv: [[fallthrough]];
     case opcode::imod: [[fallthrough]];
     case opcode::iand: [[fallthrough]];
-    case opcode::land: [[fallthrough]];
     case opcode::ior: [[fallthrough]];
-    case opcode::lor: [[fallthrough]];
     case opcode::ixor: [[fallthrough]];
     case opcode::ishl: [[fallthrough]];
+    case opcode::lshl: [[fallthrough]];
     case opcode::ishr: [[fallthrough]];
+    case opcode::lshr: [[fallthrough]];
     case opcode::icmpl: [[fallthrough]];
     case opcode::fcmpl: [[fallthrough]];
     case opcode::icmple: [[fallthrough]];
@@ -699,6 +699,34 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fcmpne:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+    case opcode::ladd: [[fallthrough]];
+    case opcode::dadd: [[fallthrough]];
+    case opcode::lsub: [[fallthrough]];
+    case opcode::dsub: [[fallthrough]];
+    case opcode::lmul: [[fallthrough]];
+    case opcode::dmul: [[fallthrough]];
+    case opcode::ldiv: [[fallthrough]];
+    case opcode::ddiv: [[fallthrough]];
+    case opcode::lmod: [[fallthrough]];
+    case opcode::land: [[fallthrough]];
+    case opcode::lor: [[fallthrough]];
+    case opcode::lxor:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(std::int64_t));    // same size for all (since sizeof(double) == sizeof(std::int64_t))
+    case opcode::lcmpl: [[fallthrough]];
+    case opcode::dcmpl: [[fallthrough]];
+    case opcode::lcmple: [[fallthrough]];
+    case opcode::dcmple: [[fallthrough]];
+    case opcode::lcmpg: [[fallthrough]];
+    case opcode::dcmpg: [[fallthrough]];
+    case opcode::lcmpge: [[fallthrough]];
+    case opcode::dcmpge: [[fallthrough]];
+    case opcode::lcmpeq: [[fallthrough]];
+    case opcode::dcmpeq: [[fallthrough]];
+    case opcode::lcmpne: [[fallthrough]];
+    case opcode::dcmpne:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-2 * sizeof(std::int64_t) + sizeof(std::int32_t));
     case opcode::acmpeq: [[fallthrough]];
     case opcode::acmpne:
         recorder->record(static_cast<opcode>(instr));

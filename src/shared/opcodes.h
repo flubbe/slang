@@ -87,7 +87,7 @@ enum class opcode : opcode_base
     d2f,         /** Convert a f64 into an f32. */
     invoke,      /** Invoke a function. */
     new_,        /** Create a new struct. */
-    newarray,    /** Create a new array for i32, f32. */
+    newarray,    /** Create a new array for i8, i16, i32, i64, f32, f64, str, ref. */
     anewarray,   /** Create a new array for struct types. */
     arraylength, /** Return the length of an array. */
     checkcast,   /** Check if an object is of a given type. */

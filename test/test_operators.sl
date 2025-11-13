@@ -1,5 +1,21 @@
 import std;
 
+fn test_i32_unary_operators() -> void
+{
+    // unary + - !
+    std::println("i32: unary + - !");
+    std::assert(-123 == 0 - 123, "-123 == 0 - 123");
+    std::assert(+321 == 0 + 321, "+321 == 0 + 321");
+    std::assert(!0 == 1, "!0 == 1");
+    std::assert(!1 == 0, "!1 == 0");
+    std::assert(!123 == 0, "!123 == 0");
+    std::assert(!!123 == 1, "!!123 == 1");
+
+    std::assert(-!!123 == -1, "-!!123 == -1");
+    std::assert(!-!123 == 1, "!-!123 == 1");
+    std::assert(!!-123 == 1, "!!-123 == 1");
+}
+
 fn test_i32_binary_operators() -> void
 {
     // + - * /
@@ -49,19 +65,6 @@ fn test_i32_binary_operators() -> void
     std::assert((-123 != -123) == 0, "(-123 != -123) == 0");
     std::assert((1 == 2) != (3 == 3), "(1 == 2) != (3 == 3)");
 
-    // unary + - !
-    std::println("i32: unary + - !");
-    std::assert(-123 == 0 - 123, "-123 == 0 - 123");
-    std::assert(+321 == 0 + 321, "+321 == 0 + 321");
-    std::assert(!0 == 1, "!0 == 1");
-    std::assert(!1 == 0, "!1 == 0");
-    std::assert(!123 == 0, "!123 == 0");
-    std::assert(!!123 == 1, "!!123 == 1");
-
-    std::assert(-!!123 == -1, "-!!123 == -1");
-    std::assert(!-!123 == 1, "!-!123 == 1");
-    std::assert(!!-123 == 1, "!!-123 == 1");
-
     std::println("i32: <<");
     let i: i32 = 0;
     let r: i32 = 1;
@@ -89,6 +92,34 @@ fn test_i32_binary_operators() -> void
         i--;
         r /= 2;
     }
+}
+
+fn test_i64_binary_operators() -> void
+{
+    std::println("i64: <<");
+    let i: i32 = 0;
+    let r: i64 = 1 as i64;
+    while(i < 32)
+    {
+        std::assert(1 as i64 << i == r, std::format!("shl {}", i));
+        
+        i++;
+        r *= 2 as i64;
+    }
+
+    std::assert(1 as i64 << 64 == 1 as i64, "1 << 64 == 1");
+    std::assert(1 as i64 << 65 == 2 as i64, "1 << 65 == 2");
+
+    std::println("i64: >>");
+    i = 0;
+    r = 2147483647 as i64; // FIXME Should be -9223372036854775807
+    while(i > 0)
+    {
+        std::assert((0x7fffffff >> i) as i64 == r, std::format!("i: {}", i));
+
+        i--;
+        r /= 2 as i64;
+    }    
 }
 
 fn test_logical_operators() -> void
@@ -126,6 +157,14 @@ fn test_logical_operators() -> void
     std::assert(x == 0, "x == 0");
 }
 
+fn test_f32_unary_operators() -> void
+{
+    // unary + -
+    std::println("f32: unary + -");
+    std::assert(-123.0 == 0.0 - 123.0, "-123.0 == 0.0 - 123.0");
+    std::assert(+321.0 == 0.0 + 321.0, "+321.0 == 0.0 + 321.0");
+}
+
 fn test_f32_binary_operators() -> void
 {
     // + - * /
@@ -155,17 +194,16 @@ fn test_f32_binary_operators() -> void
     std::assert((123.0 != -123.0) == 1, "(123.0 != -123.0) == 1");
     std::assert((-123.0 != -123.0) == 0, "(-123.0 != -123.0) == 0");
     std::assert((1.0 == 2.0) != (3.0 == 3.0), "(1.0 == 2.0) != (3.0 == 3.0)");    
-
-    // unary + -
-    std::println("f32: unary + -");
-    std::assert(-123.0 == 0.0 - 123.0, "-123.0 == 0.0 - 123.0");
-    std::assert(+321.0 == 0.0 + 321.0, "+321.0 == 0.0 + 321.0");
 }
 
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
+    test_i32_unary_operators();
+    test_i64_binary_operators();
     test_f32_binary_operators();
-    test_logical_operators(); 
+    test_f32_unary_operators();
+
+    test_logical_operators();
 
     return 0;
 }

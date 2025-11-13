@@ -219,7 +219,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!evaluate_constant_subexpressions)
     {
-        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
+        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval);
     }
 
     ast->collect_names(co_ctx);

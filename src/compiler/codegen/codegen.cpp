@@ -44,8 +44,12 @@ std::string to_string(type_kind kind)
     {
     case type_kind::void_: return "void";
     case type_kind::null: return "null";
+    case type_kind::i8: return "i8";
+    case type_kind::i16: return "i16";
     case type_kind::i32: return "i32";
+    case type_kind::i64: return "i64";
     case type_kind::f32: return "f32";
+    case type_kind::f64: return "f64";
     case type_kind::str: return "str";
     case type_kind::ref: return "ref";
     default:

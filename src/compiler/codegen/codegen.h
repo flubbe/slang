@@ -1455,8 +1455,8 @@ using codegen_flag_type = std::uint32_t;
 /** Codegen attributes. */
 enum class codegen_flags : codegen_flag_type
 {
-    none = 0,               /** No attributes set. */
-    enable_const_eval_ = 1, /** Evaluate constant (sub-)expressions. Enabled by default. */
+    none = 0,              /** No attributes set. */
+    enable_const_eval = 1, /** Evaluate constant (sub-)expressions. Enabled by default. */
 };
 
 /** Code generator context. */
@@ -1503,7 +1503,7 @@ class context
 
     /** Codegen flags. */
     codegen_flag_type flags{
-      std::to_underlying(codegen_flags::enable_const_eval_)};
+      std::to_underlying(codegen_flags::enable_const_eval)};
 
 protected:
     /**

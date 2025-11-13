@@ -315,12 +315,26 @@ std::optional<const_::const_info> binary_expression::evaluate(
              { throw cg::codegen_error("Invalid type 'f32' for binary operator '%'."); }}},
       {"<<", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
-              { return a << (b & 0x1f); }, // NOLINT(readability-magic-numbers)
+              { 
+                if(b < 0)
+                {
+                    throw cg::codegen_error("Negative shift counts are not allowed.");
+                }
+
+                return a << (b & 0x1f); 
+              }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '<<'."); }}},
       {">>", {*this, 
               [](std::int32_t a, std::int32_t b) -> std::int32_t
-              { return a >> (b & 0x1f); }, // NOLINT(readability-magic-numbers)
+              { 
+                if(b < 0)
+                {
+                    throw cg::codegen_error("Negative shift counts are not allowed.");
+                }
+
+                return a >> (b & 0x1f); 
+              }, // NOLINT(readability-magic-numbers)
               [](float, float) -> float
               { throw cg::codegen_error("Invalid type 'f32' for binary operator '>>'."); }}},
       {"&", {*this, 
@@ -413,9 +427,18 @@ std::optional<const_::const_info> binary_expression::evaluate(
     auto eval_it = eval_map.find(op.s);
     if(eval_it != eval_map.end())
     {
-        return eval_it->second(
-          env.get_expression_value(*lhs),
-          env.get_expression_value(*rhs));
+        try
+        {
+            return eval_it->second(
+              env.get_expression_value(*lhs),
+              env.get_expression_value(*rhs));
+        }
+        catch(const cg::codegen_error& e)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format("{}", e.what()));
+        }
     }
 
     auto comp_it = comp_map.find(op.s);
