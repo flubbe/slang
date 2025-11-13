@@ -1465,7 +1465,7 @@ public:
     [[nodiscard]]
     bool is_array_element_access() const override
     {
-        return static_cast<bool>(element_expr);
+        return element_expr != nullptr;
     }
 
     [[nodiscard]]
@@ -1531,7 +1531,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /** Get the expansion. The expansion can be `nullptr`. */
@@ -3254,7 +3254,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /**

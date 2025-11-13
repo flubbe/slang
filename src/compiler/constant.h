@@ -28,10 +28,14 @@ namespace slang::const_
 {
 
 /** Constant type. */
-enum class constant_type
+enum class constant_type : std::uint8_t
 {
+    i8,  /** An i8 constant. */
+    i16, /** An i16 constant. */
     i32, /* An i32 constant. */
+    i64, /** An i64 constant. */
     f32, /* An f32 constant. */
+    f64, /** An f64 constant. */
     str  /* A string constant*/
 };
 

@@ -8,7 +8,9 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "shared/stack_value.h"
+#include <utility>
+
+#include "shared/type_class.h"
 #include "shared/type_utils.h"
 #include "interpreter.h"
 #include "package.h"
@@ -50,45 +52,27 @@ static bool is_garbage_collected(const slang::module_::field_descriptor& info) n
 }
 
 /**
- * Return the size of a stack value.
- *
- * @param v The stack value.
- * @return Returns the value's size, in bytes.
- */
-static std::size_t get_stack_value_size(stack_value v)
-{
-    switch(v)
-    {
-    case stack_value::cat1: return sizeof(std::int32_t);
-    case stack_value::cat2: return sizeof(std::int64_t);
-    case stack_value::ref: return sizeof(void*);
-    default:; /* fall-through */
-    }
-
-    throw interpreter_error(
-      std::format(
-        "Cannot get size for stack value '{}'",
-        static_cast<int>(v)));
-}
-
-/**
  * Check if a stack value is garbage collected.
  *
  * @param v The value.
  * @returns Return whether a stack value is garbage collected.
  */
-static bool is_garbage_collected(stack_value v) noexcept
+static bool is_garbage_collected(type_class v) noexcept
 {
-    return v == stack_value::ref;
+    return v == type_class::ref;
 }
 
 /** Byte sizes and alignments for built-in types. */
 static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
   {"void", {0, 0}},
-  {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
-  {"f32", {sizeof(float), std::alignment_of_v<float>}},
-  {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},
-  {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};
+  {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
+  {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},    // cat1
+  {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},    // cat1
+  {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},    // cat2
+  {"f32", {sizeof(float), std::alignment_of_v<float>}},                  // cat1
+  {"f64", {sizeof(double), std::alignment_of_v<double>}},                // cat2
+  {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}},    // ref
+  {"@array", {sizeof(void*), std::alignment_of_v<void*>}}};              // ref
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
@@ -433,7 +417,7 @@ void module_loader::decode_structs()
         desc.alignment = alignment;
 
         // check/store layout.
-        if((desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0)
+        if((desc.flags & std::to_underlying(module_::struct_flags::native)) != 0)
         {
             desc.layout_id = ctx.get_gc().check_type_layout(make_type_name(import_name, name), layout);
         }
@@ -664,27 +648,27 @@ std::int32_t module_loader::decode_instruction(
         return static_cast<std::int32_t>(sizeof(std::int64_t));
     case opcode::pop:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(std::int32_t));
+        return static_cast<std::int32_t>(-sizeof(std::int32_t));
     case opcode::apop:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(-sizeof(void*));
     case opcode::arraylength:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(sizeof(std::int32_t));
+        return static_cast<std::int32_t>(-sizeof(void*) + sizeof(std::int32_t));
     case opcode::iaload: [[fallthrough]];
     case opcode::faload:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(-sizeof(void*));
     case opcode::aaload:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) + static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) + sizeof(void*));
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - (2 * static_cast<std::int32_t>(sizeof(std::int32_t)));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(-sizeof(void*) - 2 * sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
     case opcode::aastore:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) - sizeof(void*));
     case opcode::iadd: [[fallthrough]];
     case opcode::fadd: [[fallthrough]];
     case opcode::isub: [[fallthrough]];
@@ -695,12 +679,12 @@ std::int32_t module_loader::decode_instruction(
     case opcode::fdiv: [[fallthrough]];
     case opcode::imod: [[fallthrough]];
     case opcode::iand: [[fallthrough]];
-    case opcode::land: [[fallthrough]];
     case opcode::ior: [[fallthrough]];
-    case opcode::lor: [[fallthrough]];
     case opcode::ixor: [[fallthrough]];
     case opcode::ishl: [[fallthrough]];
+    case opcode::lshl: [[fallthrough]];
     case opcode::ishr: [[fallthrough]];
+    case opcode::lshr: [[fallthrough]];
     case opcode::icmpl: [[fallthrough]];
     case opcode::fcmpl: [[fallthrough]];
     case opcode::icmple: [[fallthrough]];
@@ -714,13 +698,53 @@ std::int32_t module_loader::decode_instruction(
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
         recorder->record(static_cast<opcode>(instr));
-        return -static_cast<std::int32_t>(sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(-sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+    case opcode::ladd: [[fallthrough]];
+    case opcode::dadd: [[fallthrough]];
+    case opcode::lsub: [[fallthrough]];
+    case opcode::dsub: [[fallthrough]];
+    case opcode::lmul: [[fallthrough]];
+    case opcode::dmul: [[fallthrough]];
+    case opcode::ldiv: [[fallthrough]];
+    case opcode::ddiv: [[fallthrough]];
+    case opcode::lmod: [[fallthrough]];
+    case opcode::land: [[fallthrough]];
+    case opcode::lor: [[fallthrough]];
+    case opcode::lxor:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(std::int64_t));    // same size for all (since sizeof(double) == sizeof(std::int64_t))
+    case opcode::lcmpl: [[fallthrough]];
+    case opcode::dcmpl: [[fallthrough]];
+    case opcode::lcmple: [[fallthrough]];
+    case opcode::dcmple: [[fallthrough]];
+    case opcode::lcmpg: [[fallthrough]];
+    case opcode::dcmpg: [[fallthrough]];
+    case opcode::lcmpge: [[fallthrough]];
+    case opcode::dcmpge: [[fallthrough]];
+    case opcode::lcmpeq: [[fallthrough]];
+    case opcode::dcmpeq: [[fallthrough]];
+    case opcode::lcmpne: [[fallthrough]];
+    case opcode::dcmpne:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-2 * sizeof(std::int64_t) + sizeof(std::int32_t));
     case opcode::acmpeq: [[fallthrough]];
     case opcode::acmpne:
         recorder->record(static_cast<opcode>(instr));
-        return -(2 * static_cast<std::int32_t>(sizeof(void*))) + static_cast<std::int32_t>(sizeof(std::int32_t));
+        return static_cast<std::int32_t>(-2 * sizeof(void*) + sizeof(std::int32_t));
+    case opcode::i2c: [[fallthrough]];
+    case opcode::i2s: [[fallthrough]];
+    case opcode::i2l: [[fallthrough]];
     case opcode::i2f: [[fallthrough]];
+    case opcode::i2d: [[fallthrough]];
+    case opcode::l2i: [[fallthrough]];
+    case opcode::l2f: [[fallthrough]];
+    case opcode::l2d: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
+    case opcode::f2l: [[fallthrough]];
+    case opcode::f2d: [[fallthrough]];
+    case opcode::d2i: [[fallthrough]];
+    case opcode::d2l: [[fallthrough]];
+    case opcode::d2f: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
@@ -830,19 +854,23 @@ std::int32_t module_loader::decode_instruction(
           reinterpret_cast<std::byte*>(&z) + sizeof(z));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), i1.i, i2.i);
-        return -static_cast<std::int32_t>(sizeof(std::int32_t));
+        return static_cast<std::int32_t>(-sizeof(std::int32_t));
     }
     /* dup_x1. */
     case opcode::dup_x1:
     {
         // type arguments.
-        stack_value v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
-        stack_value v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
         ar & v1 & v2;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto size1 = get_stack_value_size(v1);
-        auto size2 = get_stack_value_size(v2);
+        auto layout1 = target_type_layout::for_class(v1);
+        auto layout2 = target_type_layout::for_class(v2);
+
+        // convert to std::size_t to align with interpreter.
+        std::size_t size1 = layout1.size;
+        std::size_t size2 = layout2.size;
 
         // check if the type needs garbage collection.
         std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
@@ -867,15 +895,20 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x2:
     {
         // type arguments.
-        stack_value v1;
-        stack_value v2;
-        stack_value v3;
+        type_class v1;
+        type_class v2;
+        type_class v3;
         ar & v1 & v2 & v3;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
-        auto size1 = get_stack_value_size(v1);
-        auto size2 = get_stack_value_size(v2);
-        auto size3 = get_stack_value_size(v3);
+        auto layout1 = target_type_layout::for_class(v1);
+        auto layout2 = target_type_layout::for_class(v2);
+        auto layout3 = target_type_layout::for_class(v3);
+
+        // convert to std::size_t to align with interpreter.
+        std::size_t size1 = layout1.size;
+        std::size_t size2 = layout2.size;
+        std::size_t size3 = layout3.size;
 
         // check if the type needs garbage collection.
         std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
@@ -1012,7 +1045,8 @@ std::int32_t module_loader::decode_instruction(
           reinterpret_cast<const std::byte*>(&desc_ptr),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           reinterpret_cast<const std::byte*>(&desc_ptr) + sizeof(desc_ptr));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic,bugprone-sizeof-expression)
 
-        if(desc.native && !static_cast<bool>(std::get<1>(desc.details).func))
+        if(desc.native
+           && std::get<1>(desc.details).func == nullptr)
         {
             throw interpreter_error("Native function was null during decode.");
         }
@@ -1022,16 +1056,21 @@ std::int32_t module_loader::decode_instruction(
     }
     /* opcodes that need to resolve a variable. */
     case opcode::iload: [[fallthrough]];
+    case opcode::lload: [[fallthrough]];
     case opcode::fload: [[fallthrough]];
+    case opcode::dload: [[fallthrough]];
     case opcode::aload: [[fallthrough]];
     case opcode::istore: [[fallthrough]];
+    case opcode::lstore: [[fallthrough]];
     case opcode::fstore: [[fallthrough]];
+    case opcode::dstore: [[fallthrough]];
     case opcode::astore:
     {
         vle_int i;
         ar & i;
 
-        if(i.i < 0 || static_cast<std::size_t>(i.i) >= details.locals.size())
+        if(i.i < 0
+           || static_cast<std::size_t>(i.i) >= details.locals.size())
         {
             throw interpreter_error(
               std::format(
@@ -1051,20 +1090,33 @@ std::int32_t module_loader::decode_instruction(
         // return correct size.
         bool is_store = (static_cast<opcode>(instr) == opcode::istore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
+                        || (static_cast<opcode>(instr) == opcode::dstore)
                         || (static_cast<opcode>(instr) == opcode::astore);
-        bool is_ref = (static_cast<opcode>(instr) == opcode::aload)
-                      || (static_cast<opcode>(instr) == opcode::astore);
 
-        if(is_ref)
+        if((static_cast<opcode>(instr) == opcode::aload)
+           || (static_cast<opcode>(instr) == opcode::astore))
         {
+            // references.
             return is_store
-                     ? -static_cast<std::int32_t>(sizeof(void*))
+                     ? static_cast<std::int32_t>(-sizeof(void*))
                      : static_cast<std::int32_t>(sizeof(void*));
         }
 
+        if((static_cast<opcode>(instr) == opcode::lload)
+           || (static_cast<opcode>(instr) == opcode::dload)
+           || (static_cast<opcode>(instr) == opcode::lstore)
+           || (static_cast<opcode>(instr) == opcode::dstore))
+        {
+            // cat2 type.
+            return is_store
+                     ? static_cast<std::int32_t>(-sizeof(std::int64_t))
+                     : static_cast<std::int32_t>(sizeof(std::int64_t));
+        }
+
+        // cat1 type.
         return is_store
-                 ? -static_cast<std::int32_t>(sizeof(std::uint32_t))
-                 : static_cast<std::int32_t>(sizeof(std::uint32_t));    // same size for i32/f32 (since sizeof(float) == sizeof(std::uint32_t))
+                 ? static_cast<std::int32_t>(-sizeof(std::int32_t))
+                 : static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* new. */
     case opcode::new_:
@@ -1373,10 +1425,10 @@ std::int32_t module_loader::decode_instruction(
 
         if(static_cast<opcode>(instr) == opcode::setfield)
         {
-            return -static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(properties.size);
+            return static_cast<std::int32_t>(-sizeof(void*) - properties.size);
         }
 
-        return -static_cast<std::int32_t>(sizeof(void*)) + static_cast<std::int32_t>(properties.size);
+        return static_cast<std::int32_t>(-sizeof(void*) + properties.size);
     }
     /* checkcast */
     case opcode::checkcast:
@@ -1478,7 +1530,7 @@ std::int32_t module_loader::decode_instruction(
           std::format(
             "Unexpected opcode '{}' ({}) during decode.",
             to_string(static_cast<opcode>(instr)),
-            static_cast<int>(instr)));
+            std::to_integer<int>(instr)));
     }
 }
 
