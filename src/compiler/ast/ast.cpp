@@ -3032,7 +3032,8 @@ static std::unique_ptr<cg::value> generate_logical_and(
   const std::unique_ptr<expression>& lhs,
   const std::unique_ptr<expression>& rhs)
 {
-    std::unique_ptr<cg::value> lhs_value, rhs_value;
+    std::unique_ptr<cg::value> lhs_value;
+    std::unique_ptr<cg::value> rhs_value;
 
     lhs_value = lhs->generate_code(ctx, memory_context::load);
     if(!lhs_value)
@@ -3123,7 +3124,8 @@ static std::unique_ptr<cg::value> generate_logical_or(
   const std::unique_ptr<expression>& lhs,
   const std::unique_ptr<expression>& rhs)
 {
-    std::unique_ptr<cg::value> lhs_value, rhs_value;
+    std::unique_ptr<cg::value> lhs_value;
+    std::unique_ptr<cg::value> rhs_value;
 
     lhs_value = lhs->generate_code(ctx, memory_context::load);
     if(!lhs_value)
@@ -3550,7 +3552,9 @@ std::optional<ty::type_id> binary_expression::type_check(
 
     // some operations restrict the type.
     if(reduced_op == "%"
-       || reduced_op == "&" || reduced_op == "^" || reduced_op == "|")
+       || reduced_op == "&"
+       || reduced_op == "^"
+       || reduced_op == "|")
     {
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
@@ -3571,7 +3575,8 @@ std::optional<ty::type_id> binary_expression::type_check(
         ctx.set_expression_type(*this, expr_type);
         return expr_type;
     }
-    else if(reduced_op == "<<" || reduced_op == ">>")
+
+    if(reduced_op == "<<" || reduced_op == ">>")
     {
         if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
            || rhs_type != ctx.get_i32_type())
@@ -3613,7 +3618,8 @@ std::optional<ty::type_id> binary_expression::type_check(
         ctx.set_expression_type(*this, expr_type);
         return expr_type;
     }
-    else if(reduced_op == "&&" || reduced_op == "||")
+
+    if(reduced_op == "&&" || reduced_op == "||")
     {
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
@@ -3635,7 +3641,9 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // assignments and comparisons.
-    if(op.s == "=" || op.s == "==" || op.s == "!=")
+    if(op.s == "="
+       || op.s == "=="
+       || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
@@ -3676,6 +3684,7 @@ std::optional<ty::type_id> binary_expression::type_check(
             reduced_op,
             ctx.to_string(lhs_type.value())));
     }
+
     if(rhs_type.value() != ctx.get_i32_type()
        && rhs_type.value() != ctx.get_i64_type()
        && rhs_type.value() != ctx.get_f32_type()
@@ -5235,7 +5244,8 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                 ctx.generate_ret({back_end_type});
                 return nullptr;
             }
-            else if(info.type == const_::constant_type::i64)
+
+            if(info.type == const_::constant_type::i64)
             {
                 const auto back_end_type = cg::type_kind::i64;
 
@@ -5246,7 +5256,8 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                 ctx.generate_ret({back_end_type});
                 return nullptr;
             }
-            else if(info.type == const_::constant_type::f32)
+
+            if(info.type == const_::constant_type::f32)
             {
                 const auto back_end_type = cg::type_kind::f32;
 
@@ -5257,7 +5268,8 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                 ctx.generate_ret({back_end_type});
                 return nullptr;
             }
-            else if(info.type == const_::constant_type::f64)
+
+            if(info.type == const_::constant_type::f64)
             {
                 const auto back_end_type = cg::type_kind::f64;
 
@@ -5268,13 +5280,11 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                 ctx.generate_ret({back_end_type});
                 return nullptr;
             }
-            else
-            {
-                std::println(
-                  "{}: Warning: Attempted constant expression computation failed.",
-                  ::slang::to_string(loc));
-                // fall-through
-            }
+
+            std::println(
+              "{}: Warning: Attempted constant expression computation failed.",
+              ::slang::to_string(loc));
+            // fall-through
         }
 
         auto v = expr->generate_code(ctx, memory_context::load);
