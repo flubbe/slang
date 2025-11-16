@@ -55,9 +55,21 @@ std::tuple<std::int32_t> get_args([[maybe_unused]] si::context& ctx, si::operand
 }
 
 template<>
+std::tuple<std::int64_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_cat2<std::int64_t>();
+}
+
+template<>
 std::tuple<float> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
     return stack.pop_cat1<float>();
+}
+
+template<>
+std::tuple<double> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_cat2<double>();
 }
 
 }    // namespace slang::runtime

@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "compiler/typing.h"
 #include "ast.h"
 
 /*
@@ -33,8 +34,11 @@ struct format_string_placeholder
     /** One past the ending offset into the string. */
     std::size_t end{0};
 
-    /** Type: `{`, `}`, `d` (i32), `f` (f32) or `s` (str). */
-    std::optional<std::uint8_t> type{std::nullopt};
+    /** Specifier: `{`, `}`, `d` (i32/i64), `f` (f32/f64) or `s` (str). */
+    std::optional<std::uint8_t> specifier{std::nullopt};
+
+    /** Argument type. */
+    std::optional<ty::type_id> arg_type{std::nullopt};
 };
 
 /** Expansion helper for format macro. */

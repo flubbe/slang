@@ -135,7 +135,7 @@ static bool is_operator(const std::optional<char>& c)
  * @return Returns the evaluated token or std::nullopt.
  * @throws Throws a `lexical_error` if evaluation failed.
  */
-static std::optional<std::variant<int, float, std::string>> eval(const std::string& s, token_type type)
+static std::optional<const_value> eval(const std::string& s, token_type type)
 {
     if(type == token_type::str_literal)
     {
@@ -149,9 +149,9 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
             if(s.starts_with("0x"))
             {
                 constexpr int BASE = 16;
-                return std::stoi(s, nullptr, BASE);
+                return std::stol(s, nullptr, BASE);
             }
-            return std::stoi(s);
+            return std::stol(s);
         }
         catch(const std::invalid_argument&)
         {
@@ -166,7 +166,7 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
     {
         try
         {
-            return std::stof(s);
+            return std::stod(s);
         }
         catch(const std::invalid_argument& e)
         {

@@ -30,13 +30,11 @@ namespace slang::const_
 /** Constant type. */
 enum class constant_type : std::uint8_t
 {
-    i8,  /** An i8 constant. */
-    i16, /** An i16 constant. */
-    i32, /* An i32 constant. */
+    i32, /** An i32 constant. */
     i64, /** An i64 constant. */
-    f32, /* An f32 constant. */
+    f32, /** An f32 constant. */
     f64, /** An f64 constant. */
-    str  /* A string constant*/
+    str  /** A string constant*/
 };
 
 /**
@@ -59,8 +57,8 @@ struct const_info
     /** Value. */
     std::variant<
       std::monostate,
-      int,
-      float,
+      std::int64_t,
+      double,
       std::string>
       value;
 
@@ -159,12 +157,28 @@ struct env
     constant_id intern(std::int32_t i);
 
     /**
+     * Intern an `i64` constant.
+     *
+     * @param i The `i64` constant.
+     * @returns Returns a constant id for the value.
+     */
+    constant_id intern(std::int64_t i);
+
+    /**
      * Intern an `f32` constant.
      *
      * @param f The `f32` constant.
      * @returns Returns a constant id for the value.
      */
     constant_id intern(float f);
+
+    /**
+     * Intern an `f64` constant.
+     *
+     * @param d The `f64` constant.
+     * @returns Returns a constant id for the value.
+     */
+    constant_id intern(double d);
 
     /**
      * Intern a string constant.

@@ -602,13 +602,16 @@ void instruction_emitter::collect_imports()
             continue;
         }
 
-        if(symbol_info.declaring_module != sema::symbol_info::current_module_id)
+        if(symbol_info.declaring_module == sema::symbol_info::current_module_id)
         {
             continue;
         }
 
         const auto& type_info = type_ctx.get_type_info(
           type_ctx.get_type(symbol_info.name));
+
+        imports.intern_struct(
+          symbol_info.qualified_name);
 
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         for(const auto& field_info: struct_info.fields)
@@ -619,14 +622,19 @@ void instruction_emitter::collect_imports()
                 continue;
             }
 
-            if(!std::get<ty::struct_info>(field_type_info.data).qualified_name.has_value())
+            if(!std::get<ty::struct_info>(
+                  field_type_info.data)
+                  .qualified_name.has_value())
             {
                 continue;
             }
 
             // the linter does not seem to detect the above check.
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-            imports.intern_struct(std::get<ty::struct_info>(field_type_info.data).qualified_name.value());
+            imports.intern_struct(
+              std::get<ty::struct_info>(
+                field_type_info.data)
+                .qualified_name.value());
         }
     }
 
@@ -1092,7 +1100,7 @@ void instruction_emitter::emit_instruction(
     else if(name == "const")
     {
         const auto* arg = static_cast<const cg::const_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        const auto type_kind = arg->get_value()->get_type().get_type_kind();
+        const auto type_kind = arg->get_type_kind();
 
         if(type_kind == cg::type_kind::i32)
         {
@@ -1100,16 +1108,35 @@ void instruction_emitter::emit_instruction(
               instruction_buffer,
               opcode::iconst,
               static_cast<std::int32_t>(
-                static_cast<const cg::constant_i32*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                static_cast<const cg::constant_i64*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                   arg->get_value())
                   ->get_int()));
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(
+              instruction_buffer,
+              opcode::lconst,
+              static_cast<const cg::constant_i64*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                arg->get_value())
+                ->get_int());
         }
         else if(type_kind == cg::type_kind::f32)
         {
             emit(
               instruction_buffer,
               opcode::fconst,
-              static_cast<const cg::constant_f32*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              static_cast<float>(
+                static_cast<const cg::constant_f64*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+                  arg->get_value())
+                  ->get_float()));
+        }
+        else if(type_kind == cg::type_kind::f64)
+        {
+            emit(
+              instruction_buffer,
+              opcode::dconst,
+              static_cast<const cg::constant_f64*>(    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                 arg->get_value())
                 ->get_float());
         }
@@ -1780,9 +1807,19 @@ static module_::constant_type to_module_constant(const_::constant_type type)
         return module_::constant_type::i32;
     }
 
+    if(type == const_::constant_type::i64)
+    {
+        return module_::constant_type::i64;
+    }
+
     if(type == const_::constant_type::f32)
     {
         return module_::constant_type::f32;
+    }
+
+    if(type == const_::constant_type::f64)
+    {
+        return module_::constant_type::f64;
     }
 
     if(type == const_::constant_type::str)
@@ -1792,7 +1829,7 @@ static module_::constant_type to_module_constant(const_::constant_type type)
 
     throw emitter_error(
       std::format(
-        "Cannot convert constant to '{}'.",
+        "Cannot convert constant to constant type with id '{}'.",
         std::to_underlying(type)));
 }
 
@@ -1808,20 +1845,32 @@ static module_::constant_data_type
   to_module_const_value(
     std::variant<
       std::monostate,
-      int,
-      float,
+      std::int64_t,
+      double,
       std::string>
       data,
     const_::constant_type type)
 {
     if(type == const_::constant_type::i32)
     {
-        return std::get<int>(data);
+        return static_cast<std::int32_t>(
+          std::get<std::int64_t>(data));
+    }
+
+    if(type == const_::constant_type::i64)
+    {
+        return std::get<std::int64_t>(data);
     }
 
     if(type == const_::constant_type::f32)
     {
-        return std::get<float>(data);
+        return static_cast<float>(
+          std::get<double>(data));
+    }
+
+    if(type == const_::constant_type::f64)
+    {
+        return std::get<double>(data);
     }
 
     if(type == const_::constant_type::str)
@@ -1831,7 +1880,7 @@ static module_::constant_data_type
 
     throw emitter_error(
       std::format(
-        "Cannot convert constant to '{}'.",
+        "Cannot convert constant to constant type with id '{}'.",
         std::to_underlying(type)));
 }
 

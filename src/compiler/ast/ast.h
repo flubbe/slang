@@ -957,10 +957,20 @@ public:
     }
 
     [[nodiscard]]
+    bool is_const_eval(const_::env& env) const override
+    {
+        return expr->is_const_eval(env);
+    }
+
+    [[nodiscard]]
     bool is_pure(cg::context& ctx) const override
     {
         return expr->is_pure(ctx);
     }
+
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;

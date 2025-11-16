@@ -98,9 +98,25 @@ void i32_to_string(si::context& ctx, si::operand_stack& stack)
     stack.push_addr<std::string>(str);
 }
 
+void i64_to_string(si::context& ctx, si::operand_stack& stack)
+{
+    auto [i] = get_args<std::int64_t>(ctx, stack);
+    auto* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
+    str->assign(std::format("{}", i));
+    stack.push_addr<std::string>(str);
+}
+
 void f32_to_string(si::context& ctx, si::operand_stack& stack)
 {
     auto [f] = get_args<float>(ctx, stack);
+    auto* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
+    str->assign(std::format("{}", f));
+    stack.push_addr<std::string>(str);
+}
+
+void f64_to_string(si::context& ctx, si::operand_stack& stack)
+{
+    auto [f] = get_args<double>(ctx, stack);
     auto* str = ctx.get_gc().gc_new<std::string>(gc::gc_object::of_temporary);
     str->assign(std::format("{}", f));
     stack.push_addr<std::string>(str);

@@ -51,6 +51,9 @@ std::string to_string(token_type ty);
  */
 archive& operator&(archive& ar, token_type& ty);
 
+/** An evaluated constant. */
+using const_value = std::variant<std::int64_t, double, std::string>;
+
 /** An evaluated token. */
 struct token
 {
@@ -67,7 +70,7 @@ struct token
      * Evaluated token, for `token_type::int_literal`,
      * `token_type::fp_literal` and `token_type::string_literal.`
      */
-    std::optional<std::variant<int, float, std::string>> value;
+    std::optional<const_value> value;
 
     /** Default constructors. */
     token() = default;
@@ -90,7 +93,7 @@ struct token
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
-      std::optional<std::variant<int, float, std::string>> value = std::nullopt)
+      std::optional<const_value> value = std::nullopt)
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}

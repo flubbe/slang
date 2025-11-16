@@ -124,9 +124,23 @@ public:
         switch(it->second.type)
         {
         case const_::constant_type::i32:
-            return std::format("{}", std::get<int>(it->second.value));
+            return std::format(
+              "{}",
+              static_cast<std::int32_t>(
+                std::get<std::int64_t>(it->second.value)));
+        case const_::constant_type::i64:
+            return std::format(
+              "{}",
+              std::get<std::int64_t>(it->second.value));
         case const_::constant_type::f32:
-            return std::format("{}", std::get<float>(it->second.value));
+            return std::format(
+              "{}",
+              static_cast<float>(
+                std::get<double>(it->second.value)));
+        case const_::constant_type::f64:
+            return std::format(
+              "{}",
+              std::get<double>(it->second.value));
         case const_::constant_type::str:
             return std::format("{}", std::get<std::string>(it->second.value));
         default:;
@@ -2126,7 +2140,7 @@ TEST(compile_ir, builtin_return_values)
         const std::string test_input =
           "fn f() -> f32\n"
           "{\n"
-          " return 1.323;\n"
+          " return 1.323 as f32;\n"
           "}";
 
         slang::lexer lexer;
@@ -2161,7 +2175,8 @@ TEST(compile_ir, builtin_return_values)
         EXPECT_EQ(ctx.to_string(&resolver),
                   "define f32 @f() {\n"
                   "entry:\n"
-                  " const f32 1.323\n"
+                  " const f64 1.323\n"
+                  " cast f64_to_f32\n"
                   " ret f32\n"
                   "}");
     }
@@ -3439,7 +3454,7 @@ TEST(compile_ir, function_calls)
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
-          " g(1, 2.3, \"Test\", h());\n"
+          " g(1, 2.3 as f32, \"Test\", h());\n"
           "}\n"
           "fn g(a: i32, b: f32, c: str, d: i32) -> void\n"
           "{}\n"
@@ -3479,7 +3494,8 @@ TEST(compile_ir, function_calls)
                   "define void @f() {\n"
                   "entry:\n"
                   " const i32 1\n"
-                  " const f32 2.3\n"
+                  " const f64 2.3\n"
+                  " cast f64_to_f32\n"
                   " const str @0\n"
                   " invoke <func#6>\n"
                   " invoke <func#1>\n"
@@ -3499,7 +3515,7 @@ TEST(compile_ir, function_calls)
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
-          " g(1 + 2 * 3, 2.3);\n"
+          " g(1 + 2 * 3, 2.3 as f32);\n"
           "}\n"
           "fn g(i: i32, j:f32) -> void {\n"
           "}";
@@ -3539,7 +3555,8 @@ TEST(compile_ir, function_calls)
                   " const i32 3\n"
                   " mul i32\n"
                   " add i32\n"
-                  " const f32 2.3\n"
+                  " const f64 2.3\n"
+                  " cast f64_to_f32\n"
                   " invoke <func#1>\n"
                   " ret void\n"
                   "}\n"
@@ -3598,7 +3615,7 @@ TEST(compile_ir, function_calls)
           "}\n"
           "fn h() -> f32\n"
           "{\n"
-          " return -1.0;\n"
+          " return -1.0 as f32;\n"
           "}\n";
 
         slang::lexer lexer;
@@ -3645,7 +3662,8 @@ TEST(compile_ir, function_calls)
                   "define f32 @h() {\n"
                   "entry:\n"
                   " const f32 0\n"
-                  " const f32 1\n"
+                  " const f64 1\n"
+                  " cast f64_to_f32\n"
                   " sub f32\n"
                   " ret f32\n"
                   "}");

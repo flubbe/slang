@@ -171,8 +171,6 @@ inline archive& operator&(archive& ar, array_type& t)
 /** Constant type. */
 enum class constant_type : std::uint8_t
 {
-    i8,  /** 8-bit integer constant. */
-    i16, /** 16-bit integer constant. */
     i32, /** 32-bit integer constant. */
     i64, /** 64-bit integer constant. */
     f32, /** 32-bit floating point constant. */
@@ -185,8 +183,6 @@ inline std::string to_string(constant_type type)
 {
     switch(type)
     {
-    case constant_type::i8: return "i8";
-    case constant_type::i16: return "i16";
     case constant_type::i32: return "i32";
     case constant_type::i64: return "i64";
     case constant_type::f32: return "f32";
@@ -259,9 +255,7 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     auto t = static_cast<std::uint8_t>(entry.type);
     ar & t;
 
-    if(t != std::to_underlying(constant_type::i8)
-       && t != std::to_underlying(constant_type::i16)
-       && t != std::to_underlying(constant_type::i32)
+    if(t != std::to_underlying(constant_type::i32)
        && t != std::to_underlying(constant_type::f32)
        && t != std::to_underlying(constant_type::f64)
        && t != std::to_underlying(constant_type::str))
@@ -275,20 +269,6 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     {
         switch(entry.type)
         {
-        case constant_type::i8:
-        {
-            std::int8_t i;
-            ar & i;
-            entry.data = i;
-            break;
-        }
-        case constant_type::i16:
-        {
-            std::int16_t i;
-            ar & i;
-            entry.data = i;
-            break;
-        }
         case constant_type::i32:
         {
             std::int32_t i;
@@ -325,25 +305,16 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(
+              std::format(
+                "No serialization for constant type '{}'.",
+                to_string(entry.type)));
         }
     }
     else if(ar.is_writing())
     {
         switch(entry.type)
         {
-        case constant_type::i8:
-        {
-            auto i = std::get<std::int8_t>(entry.data);
-            ar & i;
-            break;
-        }
-        case constant_type::i16:
-        {
-            auto i = std::get<std::int16_t>(entry.data);
-            ar & i;
-            break;
-        }
         case constant_type::i32:
         {
             auto i = std::get<std::int32_t>(entry.data);
@@ -375,7 +346,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(
+              std::format(
+                "No serialization for constant type '{}'.",
+                to_string(entry.type)));
         }
     }
 
@@ -584,8 +558,9 @@ struct function_signature
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      */
-    function_signature(variable_type return_type,
-                       std::vector<variable_type> arg_types)
+    function_signature(
+      variable_type return_type,
+      std::vector<variable_type> arg_types)
     : return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
     {
@@ -643,7 +618,9 @@ struct native_function_details
  * @param ar The archive to use for serialization.
  * @param details The native function details.
  */
-inline archive& operator&(archive& ar, native_function_details& details)
+inline archive& operator&(
+  archive& ar,
+  native_function_details& details)
 {
     ar & details.library_name;
     return ar;
@@ -686,7 +663,10 @@ struct function_details : public symbol
      * @param offset The offset of the function
      * @param locals The function's arguments and locals.
      */
-    function_details(std::size_t size, std::size_t offset, std::vector<variable_descriptor> locals)
+    function_details(
+      std::size_t size,
+      std::size_t offset,
+      std::vector<variable_descriptor> locals)
     : symbol{size, offset}
     , locals{std::move(locals)}
     {
@@ -737,7 +717,10 @@ struct function_descriptor
      * @param native Whether the function is native.
      * @param details The function's details.
      */
-    function_descriptor(function_signature signature, bool native, std::variant<function_details, native_function_details> details)
+    function_descriptor(
+      function_signature signature,
+      bool native,
+      std::variant<function_details, native_function_details> details)
     : signature{std::move(signature)}
     , native{native}
     , details{std::move(details)}
@@ -814,7 +797,8 @@ struct directive_descriptor
      *
      * @param args Directive arguments.
      */
-    explicit directive_descriptor(std::vector<std::pair<std::string, std::string>> args)
+    explicit directive_descriptor(
+      std::vector<std::pair<std::string, std::string>> args)
     : args{std::move(args)}
     {
     }
@@ -915,15 +899,25 @@ struct field_descriptor
      * @param array Whether the field is an array type.
      * @param import_index Optional index into the import table. Only for imported types.
      */
-    field_descriptor(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
-    : base_type{std::move(base_type), array ? std::make_optional(1) : std::nullopt, std::nullopt, import_index}
+    field_descriptor(
+      std::string base_type,
+      bool array,
+      std::optional<std::size_t> import_index = std::nullopt)
+    : base_type{
+        std::move(base_type),
+        array
+          ? std::make_optional(1)
+          : std::nullopt,
+        std::nullopt,
+        import_index}
     {
     }
 
     /** Comparison. */
     bool operator==(const field_descriptor& other) const
     {
-        return base_type == other.base_type && base_type.get_array_dims() == other.base_type.get_array_dims();
+        return base_type == other.base_type
+               && base_type.get_array_dims() == other.base_type.get_array_dims();
     }
 
     /** Comparison. */

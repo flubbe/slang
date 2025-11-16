@@ -218,7 +218,7 @@ TEST(lexer, int_literals)
     EXPECT_TRUE(tokens[0].value.has_value());
     if(tokens[0].value)
     {
-        EXPECT_EQ(std::get<int>(tokens[0].value.value()), 1);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_EQ(std::get<std::int64_t>(tokens[0].value.value()), 1);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[1].s, "2");
@@ -226,7 +226,7 @@ TEST(lexer, int_literals)
     EXPECT_TRUE(tokens[1].value.has_value());
     if(tokens[1].value)
     {
-        EXPECT_EQ(std::get<int>(tokens[1].value.value()), 2);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_EQ(std::get<std::int64_t>(tokens[1].value.value()), 2);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[2].s, "123");
@@ -234,7 +234,7 @@ TEST(lexer, int_literals)
     EXPECT_TRUE(tokens[2].value.has_value());
     if(tokens[2].value)
     {
-        EXPECT_EQ(std::get<int>(tokens[2].value.value()), 123);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_EQ(std::get<std::int64_t>(tokens[2].value.value()), 123);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[3].s, "0x12");
@@ -242,7 +242,7 @@ TEST(lexer, int_literals)
     EXPECT_TRUE(tokens[3].value.has_value());
     if(tokens[3].value)
     {
-        EXPECT_EQ(std::get<int>(tokens[3].value.value()), 0x12);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_EQ(std::get<std::int64_t>(tokens[3].value.value()), 0x12);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[4].s, "0xab34");
@@ -250,7 +250,7 @@ TEST(lexer, int_literals)
     EXPECT_TRUE(tokens[4].value.has_value());
     if(tokens[4].value)
     {
-        EXPECT_EQ(std::get<int>(tokens[4].value.value()), 0xab34);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_EQ(std::get<std::int64_t>(tokens[4].value.value()), 0xab34);    // NOLINT(bugprone-unchecked-optional-access)
     }
 }
 
@@ -281,7 +281,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[0].value.has_value());
     if(tokens[0].value.has_value())
     {
-        EXPECT_NEAR(std::get<float>(tokens[0].value.value()), 1., 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[0].value.value()), 1., 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[1].s, "2.23");
@@ -289,7 +289,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[1].value.has_value());
     if(tokens[1].value.has_value())
     {
-        EXPECT_NEAR(std::get<float>(tokens[1].value.value()), 2.23, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[1].value.value()), 2.23, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[2].s, "12.3");
@@ -297,7 +297,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[2].value.has_value());
     if(tokens[2].value.has_value())
     {
-        EXPECT_NEAR(std::get<float>(tokens[2].value.value()), 12.3, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[2].value.value()), 12.3, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[3].s, "12e7");
@@ -305,7 +305,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[3].value.has_value());
     if(tokens[3].value.has_value())
     {
-        EXPECT_NEAR(std::get<float>(tokens[3].value.value()), 12e7, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[3].value.value()), 12e7, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[4].s, "12e-3");
@@ -313,7 +313,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[4].value.has_value());
     if(tokens[4].value.has_value())
     {
-        EXPECT_NEAR(std::get<float>(tokens[4].value.value()), 12e-3, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[4].value.value()), 12e-3, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[5].s, "1.3E5");
@@ -321,7 +321,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[5].value.has_value());
     if(tokens[5].value.has_value())    // NOLINT(readability-magic-numbers)
     {
-        EXPECT_NEAR(std::get<float>(tokens[5].value.value()), 1.3E5, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[5].value.value()), 1.3E5, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 
     EXPECT_EQ(tokens[6].s, "1.2e-8");
@@ -329,7 +329,7 @@ TEST(lexer, fp_literals)
     EXPECT_TRUE(tokens[6].value.has_value());
     if(tokens[6].value.has_value())    // NOLINT(readability-magic-numbers)
     {
-        EXPECT_NEAR(std::get<float>(tokens[6].value.value()), 1.2e-8, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
+        EXPECT_NEAR(std::get<double>(tokens[6].value.value()), 1.2e-8, 1e-6);    // NOLINT(bugprone-unchecked-optional-access)
     }
 }
 

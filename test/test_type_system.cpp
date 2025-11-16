@@ -114,7 +114,7 @@ TEST(type_system, variables)
         EXPECT_NO_THROW(ast->type_check(type_ctx, sema_env));
     }
     {
-        const std::string test_input = "let a: f32 = 1.0;";
+        const std::string test_input = "let a: f32 = 1.0 as f32;";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -230,7 +230,7 @@ TEST(type_system, variables)
     }
     {
         const std::string test_input =
-          "let a: f32 = 1.;\n"
+          "let a: f32 = 1.0 as f32;\n"
           "let b: f32 = a;";
 
         slang::lexer lexer;
@@ -332,7 +332,7 @@ TEST(type_system, explicit_cast)
     }
     {
         const std::string test_input =
-          "let a: i32 = ((1 + 1. as i32) as f32 * 2.) as i32;";
+          "let a: i32 = ((1 + 1. as i32) as f32 * 2. as f32) as i32;";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -428,7 +428,7 @@ TEST(type_system, binary_operators)
 {
     {
         const std::string test_input =
-          "let a: f32 = 1. + 2.;";
+          "let a: f32 = 1. as f32 + 2. as f32;";
 
         slang::lexer lexer;
         slang::parser parser;
@@ -1621,7 +1621,7 @@ TEST(type_system, element_access)
           "{\n"
           " let t: T;\n"
           " t.s.a = 3;\n"
-          " t.s.b = 1.2;\n"
+          " t.s.b = 1.2 as f32;\n"
           "}";
 
         slang::lexer lexer;

@@ -26,7 +26,9 @@ std::string to_string(opcode op)
     {
     case opcode::aconst_null: return "aconst_null";
     case opcode::iconst: return "iconst";
+    case opcode::lconst: return "lconst";
     case opcode::fconst: return "fconst";
+    case opcode::dconst: return "dconst";
     case opcode::sconst: return "sconst";
     case opcode::iload: return "iload";
     case opcode::lload: return "lload";

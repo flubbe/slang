@@ -67,9 +67,21 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::i32,
-                .value = std::get<int>(const_entry.data)});
+                .value = std::get<std::int32_t>(const_entry.data)});
 
             return type_ctx.get_i32_type();
+        }
+
+        if(const_entry.type == module_::constant_type::i64)
+        {
+            const_env.set_const_info(
+              symbol_id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::i64,
+                .value = std::get<std::int64_t>(const_entry.data)});
+
+            return type_ctx.get_i64_type();
         }
 
         if(const_entry.type == module_::constant_type::f32)
@@ -82,6 +94,18 @@ void context::import_constant(
                 .value = std::get<float>(const_entry.data)});
 
             return type_ctx.get_f32_type();
+        }
+
+        if(const_entry.type == module_::constant_type::f64)
+        {
+            const_env.set_const_info(
+              symbol_id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::f64,
+                .value = std::get<double>(const_entry.data)});
+
+            return type_ctx.get_f64_type();
         }
 
         if(const_entry.type == module_::constant_type::str)

@@ -23,7 +23,9 @@ enum class opcode : opcode_base
 {
     aconst_null, /** Load a null reference onto the stack. */
     iconst,      /** Load i32 constant onto stack. */
+    lconst,      /** Load i64 constant onto stack. */
     fconst,      /** Load f32 constant onto stack. */
+    dconst,      /** Load f64 constant onto stack. */
     sconst,      /** Load str constant onto stack. */
     iload,       /** Load i32 from variable onto stack. */
     lload,       /** Load i64 from variable onto stack. */

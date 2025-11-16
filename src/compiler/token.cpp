@@ -63,7 +63,7 @@ std::string to_string(token_type ty)
 static void serialize_token_value(
   archive& ar,
   token_type ty,
-  std::optional<std::variant<std::int32_t, float, std::string>>& v)
+  std::optional<const_value>& v)
 {
     bool has_value = v.has_value();
     ar & has_value;
@@ -81,13 +81,13 @@ static void serialize_token_value(
     {
         if(ty == token_type::int_literal)
         {
-            std::int32_t i{0};
+            std::int64_t i{0};
             ar & i;
             v = i;
         }
         else if(ty == token_type::fp_literal)
         {
-            float f{0};
+            double f{0};
             ar & f;
             v = f;
         }
@@ -109,12 +109,12 @@ static void serialize_token_value(
     {
         if(ty == token_type::int_literal)
         {
-            std::int32_t i{std::get<std::int32_t>(v.value())};
+            auto i = std::get<std::int64_t>(v.value());
             ar & i;
         }
         else if(ty == token_type::fp_literal)
         {
-            float f{std::get<float>(v.value())};
+            auto f = std::get<double>(v.value());
             ar & f;
         }
         else if(ty == token_type::str_literal)

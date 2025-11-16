@@ -223,7 +223,7 @@ std::string to_string(const env& env)
             res += std::format(
               "    {:>8}    {:>9}    {}\n",
               id,
-              s.parent,
+              static_cast<std::int64_t>(s.parent),
               name);
         }
 
@@ -265,7 +265,7 @@ std::string to_string(const env& env)
               id.value,
               to_string(info.type),
               info.scope,
-              info.declaring_module.value,
+              static_cast<std::int64_t>(info.declaring_module.value),
               to_string(info.loc),
               info.name,
               info.qualified_name);

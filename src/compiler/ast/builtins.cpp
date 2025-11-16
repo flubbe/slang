@@ -75,12 +75,16 @@ void format_macro_expander::create_format_string_placeholders()
                   format_string_placeholder{
                     .start = i,
                     .end = i + 1,
-                    .type = '{'});
+                    .specifier = '{'});
                 i += 1;
                 continue;
             }
 
-            current_placeholder = format_string_placeholder{.start = i, .end = 0, .type = 0};
+            current_placeholder = format_string_placeholder{
+              .start = i,
+              .end = 0,
+              .specifier = std::nullopt,
+              .arg_type = std::nullopt};
         }
         else if(format_string.s[i] == '}')
         {
@@ -100,9 +104,9 @@ void format_macro_expander::create_format_string_placeholders()
                         "Unsupported format specifier '{}'.",
                         current_format_specifier));
                 }
-                current_placeholder->type = !current_format_specifier.empty()
-                                              ? std::make_optional(current_format_specifier[0])
-                                              : std::nullopt;
+                current_placeholder->specifier = !current_format_specifier.empty()
+                                                   ? std::make_optional(current_format_specifier[0])
+                                                   : std::nullopt;
                 current_format_specifier.clear();
 
                 placeholders.emplace_back(*current_placeholder);
@@ -116,7 +120,7 @@ void format_macro_expander::create_format_string_placeholders()
                       format_string_placeholder{
                         .start = i,
                         .end = i + 1,
-                        .type = '}'});
+                        .specifier = '}'});
                     i += 1;
                     continue;
                 }
@@ -152,7 +156,7 @@ void format_macro_expander::create_format_string_placeholders()
  */
 
 void format_macro_expression::expand_late_macros(
-  [[maybe_unused]] ty::context& ctx,
+  ty::context& ctx,
   [[maybe_unused]] sema::env& env)
 {
     if(expansion)
@@ -186,6 +190,14 @@ void format_macro_expression::expand_late_macros(
     for(std::size_t i = 0; i < placeholders.size(); ++i)
     {
         const auto& fph = placeholders[i];
+        if(!fph.arg_type.has_value())
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "No argument type for argument at position {}.",
+                i));
+        }
 
         std::size_t expr_index = i + 1;
         const auto& expr = exprs[expr_index];
@@ -223,7 +235,7 @@ void format_macro_expression::expand_late_macros(
         }
 
         std::unique_ptr<ast::expression> conversion_ast;
-        if(fph.type == 'd')
+        if(fph.arg_type == ctx.get_i32_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
             conversion_args.emplace_back(expr->clone());
@@ -236,7 +248,20 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.type == 'f')
+        else if(fph.arg_type == ctx.get_i64_type())
+        {
+            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
+            conversion_args.emplace_back(expr->clone());
+
+            auto to_string_expr = std::make_unique<ast::call_expression>(
+              token{"i64_to_string", loc},
+              std::move(conversion_args));
+
+            conversion_ast = std::make_unique<ast::namespace_access_expression>(
+              token{"std", loc},
+              std::move(to_string_expr));
+        }
+        else if(fph.arg_type == ctx.get_f32_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
             conversion_args.emplace_back(expr->clone());
@@ -249,7 +274,20 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.type == 's')
+        else if(fph.arg_type == ctx.get_f64_type())
+        {
+            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
+            conversion_args.emplace_back(expr->clone());
+
+            auto to_string_expr = std::make_unique<ast::call_expression>(
+              token{"f64_to_string", loc},
+              std::move(conversion_args));
+
+            conversion_ast = std::make_unique<ast::namespace_access_expression>(
+              token{"std", loc},
+              std::move(to_string_expr));
+        }
+        else if(fph.arg_type == ctx.get_str_type())
         {
             // No conversion needed.
             conversion_ast = expr->clone();
@@ -259,10 +297,8 @@ void format_macro_expression::expand_late_macros(
             throw cg::codegen_error(
               expr->get_location(),
               std::format(
-                "Unknown format specified '{}'.",
-                fph.type.has_value()
-                  ? std::format("{}", fph.type.value())
-                  : std::string("<unspecified>")));
+                "No formatter for type '{}'.",
+                ctx.to_string(fph.arg_type.value())));
         }
 
         if(expansion)
@@ -401,14 +437,15 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
                 i));
         }
 
-        // FIXME Only i32, f32 and str is supported.
-        if(p.type.has_value())
+        // supported types are i32, i64, f32, f64 and str.
+        if(p.specifier.has_value())
         {
-            if((t == ctx.get_i32_type() && p.type.value() == 'd')
-               || (t == ctx.get_f32_type() && p.type.value() == 'f')
-               || (t == ctx.get_str_type() && p.type.value() == 's'))
+            if(((t == ctx.get_i32_type() || t == ctx.get_i64_type()) && p.specifier.value() == 'd')
+               || ((t == ctx.get_f32_type() || t == ctx.get_f64_type()) && p.specifier.value() == 'f')
+               || (t == ctx.get_str_type() && p.specifier.value() == 's'))
             {
-                placeholders.emplace_back(p);
+                auto& ph = placeholders.emplace_back(p);
+                ph.arg_type = t;
             }
             else
             {
@@ -422,26 +459,29 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
         else
         {
             // store type in placeholders.
-            if(t == ctx.get_i32_type())
+            if(t == ctx.get_i32_type() || t == ctx.get_i64_type())
             {
                 placeholders.emplace_back(format_string_placeholder{
                   .start = p.start,
                   .end = p.end,
-                  .type = 'd'});
+                  .specifier = 'd',
+                  .arg_type = t});
             }
-            else if(t == ctx.get_f32_type())
+            else if(t == ctx.get_f32_type() || ctx.get_f64_type())
             {
                 placeholders.emplace_back(format_string_placeholder{
                   .start = p.start,
                   .end = p.end,
-                  .type = 'f'});
+                  .specifier = 'f',
+                  .arg_type = t});
             }
             else if(t == ctx.get_str_type())
             {
                 placeholders.emplace_back(format_string_placeholder{
                   .start = p.start,
                   .end = p.end,
-                  .type = 's'});
+                  .specifier = 's',
+                  .arg_type = t});
             }
             else
             {

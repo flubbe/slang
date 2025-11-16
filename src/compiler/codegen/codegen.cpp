@@ -200,23 +200,37 @@ std::string value::to_string([[maybe_unused]] const name_resolver* resolver) con
 
 std::string const_argument::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
-    auto kind = v->get_type().get_type_kind();
-
-    if(kind == type_kind::i32)
+    if(type == type_kind::i32)
     {
         return std::format(
           "i32 {}",
-          static_cast<constant_i32*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<float>(
+            static_cast<constant_i64*>(v.get())->get_int()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(kind == type_kind::f32)
+    if(type == type_kind::i64)
+    {
+        return std::format(
+          "i64 {}",
+          static_cast<constant_i64*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    }
+
+    if(type == type_kind::f32)
     {
         return std::format(
           "f32 {}",
-          static_cast<constant_f32*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<float>(
+            static_cast<constant_f64*>(v.get())->get_float()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(kind == type_kind::str)
+    if(type == type_kind::f64)
+    {
+        return std::format(
+          "f64 {}",
+          static_cast<constant_f64*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    }
+
+    if(type == type_kind::str)
     {
         const auto* v_ptr = static_cast<const constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         std::string s = v_ptr->to_string();
@@ -619,21 +633,25 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
 
 void context::generate_const(
   const type& vt,
-  std::variant<int, float, const_::constant_id> v)
+  std::variant<std::int64_t, double, const_::constant_id> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt.get_type_kind() == type_kind::i32)
+    if(vt.get_type_kind() == type_kind::i32
+       || vt.get_type_kind() == type_kind::i64)
     {
         auto arg = std::make_unique<const_argument>(
-          std::get<int>(v),
+          vt.get_type_kind(),
+          std::get<std::int64_t>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type_kind() == type_kind::f32)
+    else if(vt.get_type_kind() == type_kind::f32
+            || vt.get_type_kind() == type_kind::f64)
     {
         auto arg = std::make_unique<const_argument>(
-          std::get<float>(v),
+          vt.get_type_kind(),
+          std::get<double>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
@@ -902,15 +920,41 @@ static std::string print_constant(
 
     if(info.type == const_::constant_type::i32)
     {
-        buf += std::format(".i32 @{} {}", id, std::get<int>(info.value));
+        buf += std::format(
+          ".i32 @{} {}",
+          id,
+          static_cast<std::int32_t>(
+            std::get<std::int64_t>(info.value)));
+    }
+    else if(info.type == const_::constant_type::i64)
+    {
+        buf += std::format(
+          ".i64 @{} {}",
+          id,
+          std::get<std::int64_t>(info.value));
     }
     else if(info.type == const_::constant_type::f32)
     {
-        buf += std::format(".f32 @{} {}", id, std::get<float>(info.value));
+        buf += std::format(
+          ".f32 @{} {}",
+          id,
+          static_cast<float>(
+            std::get<double>(info.value)));
+    }
+    else if(info.type == const_::constant_type::f64)
+    {
+        buf += std::format(
+          ".f64 @{} {}",
+          id,
+          std::get<double>(info.value));
     }
     else if(info.type == const_::constant_type::str)
     {
-        buf += std::format(".string @{} \"{}\"", id, make_printable(std::get<std::string>(info.value)));
+        buf += std::format(
+          ".string @{} \"{}\"",
+          id,
+          make_printable(
+            std::get<std::string>(info.value)));
     }
     else
     {

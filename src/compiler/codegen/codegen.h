@@ -200,17 +200,17 @@ public:
     }
 };
 
-/** A constant integer value. */
-class constant_i32 : public value
+/** A constant i64 value. */
+class constant_i64 : public value
 {
     /** The integer. */
-    int i;
+    std::int64_t i;
 
 public:
     /** Deleted and defaulted constructors. */
-    constant_i32() = delete;
-    constant_i32(const constant_i32&) = default;
-    constant_i32(constant_i32&&) = default;
+    constant_i64() = delete;
+    constant_i64(const constant_i64&) = default;
+    constant_i64(constant_i64&&) = default;
 
     /**
      * Construct a constant integer.
@@ -218,71 +218,71 @@ public:
      * @param i The integer.
      * @param id An optional symbol id.
      */
-    constant_i32(
-      int i,
+    constant_i64(
+      std::int64_t i,
       std::optional<sema::symbol_id> id = std::nullopt)
     : value{
-        type{type_kind::i32},
+        type{type_kind::i64},
         id}
     , i{i}
     {
     }
 
     /** Default destructor. */
-    ~constant_i32() = default;
+    ~constant_i64() = default;
 
     /** Default assignments. */
-    constant_i32& operator=(const constant_i32&) = default;
-    constant_i32& operator=(constant_i32&&) = default;
+    constant_i64& operator=(const constant_i64&) = default;
+    constant_i64& operator=(constant_i64&&) = default;
 
     /** Get the integer. */
     [[nodiscard]]
-    int get_int() const
+    std::int64_t get_int() const
     {
         return i;
     }
 };
 
 /** A constant floating point value. */
-class constant_f32 : public value
+class constant_f64 : public value
 {
     /** The floating point value. */
-    float f;
+    double d;
 
 public:
     /** Default constructors. */
-    constant_f32() = delete;
-    constant_f32(const constant_f32&) = default;
-    constant_f32(constant_f32&&) = default;
+    constant_f64() = delete;
+    constant_f64(const constant_f64&) = default;
+    constant_f64(constant_f64&&) = default;
 
     /**
      * Construct a constant float.
      *
-     * @param f The float.
+     * @param d The floating point value.
      * @param id An optional symbol id.
      */
-    constant_f32(
-      float f,
+    constant_f64(
+      double d,
       std::optional<sema::symbol_id> id = std::nullopt)
     : value{
-        type{type_kind::f32},
+        type{type_kind::f64},
         id}
-    , f{f}
+    , d{d}
     {
     }
 
     /** Default destructor. */
-    ~constant_f32() = default;
+    ~constant_f64() = default;
 
     /** Default assignments. */
-    constant_f32& operator=(const constant_f32&) = default;
-    constant_f32& operator=(constant_f32&&) = default;
+    constant_f64& operator=(const constant_f64&) = default;
+    constant_f64& operator=(constant_f64&&) = default;
 
     /** Get the floating point value. */
     [[nodiscard]]
-    float get_float() const
+    double get_float() const
     {
-        return f;
+        return d;
     }
 };
 
@@ -367,6 +367,9 @@ public:
  */
 class const_argument : public argument
 {
+    /** The constant type. */
+    type_kind type;
+
     /** The value. */
     std::unique_ptr<value> v;
 
@@ -377,29 +380,45 @@ public:
     const_argument(const_argument&&) = default;
 
     /**
-     * Create a constant argument holding an `i32`.
+     * Create a constant argument holding an `i64`.
      *
+     * @param type The constant type (`type_kind::i32` or `type_kind::i64`)
      * @param i The value to hold.
      * @param id An optional symbol id.
      */
     const_argument(
-      int i,
+      type_kind type,
+      std::int64_t i,
       std::optional<sema::symbol_id> id)
-    : v{std::make_unique<constant_i32>(i, id)}
+    : type{type}
+    , v{std::make_unique<constant_i64>(i, id)}
     {
+        if(type != type_kind::i32
+           && type != type_kind::i64)
+        {
+            throw std::runtime_error("Constant type does not match.");
+        }
     }
 
     /**
-     * Create a constant argument holding an `f32`.
+     * Create a constant argument holding an `f64`.
      *
-     * @param f The value to hold.
+     * @param type The constant type (`type_kind::f32` or `type_kind::f64`)
+     * @param d The value to hold.
      * @param name An optional symbol id.
      */
     const_argument(
-      float f,
+      type_kind type,
+      double d,
       std::optional<sema::symbol_id> id)
-    : v{std::make_unique<constant_f32>(f, id)}
+    : type{type}
+    , v{std::make_unique<constant_f64>(d, id)}
     {
+        if(type != type_kind::f32
+           && type != type_kind::f64)
+        {
+            throw std::runtime_error("Constant type does not match.");
+        }
     }
 
     /**
@@ -411,7 +430,8 @@ public:
     const_argument(
       const_::constant_id s,
       std::optional<sema::symbol_id> id)
-    : v{std::make_unique<constant_str>(s, id)}
+    : type{type_kind::str}
+    , v{std::make_unique<constant_str>(s, id)}
     {
     }
 
@@ -428,6 +448,12 @@ public:
     const value* get_value() const
     {
         return v.get();
+    }
+
+    [[nodiscard]]
+    type_kind get_type_kind() const
+    {
+        return type;
     }
 };
 
@@ -1924,7 +1950,11 @@ public:
      */
     void generate_const(
       const type& vt,
-      std::variant<int, float, const_::constant_id> val);
+      std::variant<
+        std::int64_t,
+        double,
+        const_::constant_id>
+        val);
 
     /** Load 'null' onto the stack. */
     void generate_const_null();

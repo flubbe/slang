@@ -272,7 +272,9 @@ These are:
 - `fn string_equals(s1: str, s2: str) -> i32`: Compare two strings for equality. 
     Returns `1` if the strings compare equal, and `0` otherwise.
 - `fn i32_to_string(i: i32) -> str`: Convert an `i32` value to a string.
+- `fn i64_to_string(i: i64) -> str`: Convert an `i64` value to a string.
 - `fn f32_to_string(f: f32) -> str`: Convert a `f32` value to a string.
+- `fn f64_to_string(f: f64) -> str`: Convert a `f64` value to a string.
 - `fn parse_i32(s: str) -> result`: Parse a string and return an `i32` integer
     wrapped in a `i32s` inside a `result`.
 - `fn parse_f32(s: str) -> result`: Parse a string and return an `f32` float

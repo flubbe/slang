@@ -435,6 +435,11 @@ void context::exec(
                 frame.stack.pop_cat1<std::int32_t>();
                 break;
             } /* opcode::pop */
+            case opcode::pop2:
+            {
+                frame.stack.pop_cat2<std::int64_t>();
+                break;
+            } /* opcode::pop2 */
             case opcode::apop:
             {
                 gc.remove_temporary(frame.stack.pop_addr<void>());
@@ -611,14 +616,14 @@ void context::exec(
             case opcode::i2c:
             {
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
-                  [](const std::int32_t i) -> std::int32_t
+                  [](std::int32_t i) -> std::int32_t
                   { return static_cast<std::int32_t>(static_cast<std::int8_t>(i)); });
                 break;
             } /* opcode::i2c */
             case opcode::i2s:
             {
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
-                  [](const std::int32_t i) -> std::int32_t
+                  [](std::int32_t i) -> std::int32_t
                   { return static_cast<std::int32_t>(static_cast<std::int16_t>(i)); });
                 break;
             } /* opcode::i2s */
@@ -631,7 +636,7 @@ void context::exec(
             case opcode::i2f:
             {
                 frame.stack.modify_top<std::int32_t, float>(
-                  [](const std::int32_t i) -> float
+                  [](std::int32_t i) -> float
                   { return static_cast<float>(i); });
                 break;
             } /* opcode::i2f */
@@ -662,7 +667,7 @@ void context::exec(
             case opcode::f2i:
             {
                 frame.stack.modify_top<float, std::int32_t>(
-                  [](const float f) -> std::int32_t
+                  [](float f) -> std::int32_t
                   { return static_cast<std::int32_t>(f); });
                 break;
             } /* opcode::f2i */
@@ -708,6 +713,13 @@ void context::exec(
                 frame.stack.push_cat1(i);
                 break;
             } /* opcode::iconst */
+            case opcode::lconst:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto i = read_unchecked<std::int64_t>(binary, offset);
+                frame.stack.push_cat2(i);
+                break;
+            } /* opcode::lconst */
             case opcode::fconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -715,6 +727,13 @@ void context::exec(
                 frame.stack.push_cat1(f);
                 break;
             } /* opcode::fconst */
+            case opcode::dconst:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto f = read_unchecked<double>(binary, offset);
+                frame.stack.push_cat2(f);
+                break;
+            } /* opcode::dconst */
             case opcode::sconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */

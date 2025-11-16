@@ -649,6 +649,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::pop:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(std::int32_t));
+    case opcode::pop2:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(std::int64_t));
     case opcode::apop:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(void*));
@@ -733,18 +736,10 @@ std::int32_t module_loader::decode_instruction(
         return static_cast<std::int32_t>(-2 * sizeof(void*) + sizeof(std::int32_t));
     case opcode::i2c: [[fallthrough]];
     case opcode::i2s: [[fallthrough]];
-    case opcode::i2l: [[fallthrough]];
     case opcode::i2f: [[fallthrough]];
-    case opcode::i2d: [[fallthrough]];
-    case opcode::l2i: [[fallthrough]];
-    case opcode::l2f: [[fallthrough]];
     case opcode::l2d: [[fallthrough]];
     case opcode::f2i: [[fallthrough]];
-    case opcode::f2l: [[fallthrough]];
-    case opcode::f2d: [[fallthrough]];
-    case opcode::d2i: [[fallthrough]];
     case opcode::d2l: [[fallthrough]];
-    case opcode::d2f: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
@@ -752,6 +747,18 @@ std::int32_t module_loader::decode_instruction(
     case opcode::aret:
         recorder->record(static_cast<opcode>(instr));
         return 0;
+    case opcode::i2l: [[fallthrough]];
+    case opcode::i2d: [[fallthrough]];
+    case opcode::f2l: [[fallthrough]];
+    case opcode::f2d:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(std::int32_t) + sizeof(std::int64_t));
+    case opcode::l2i: [[fallthrough]];
+    case opcode::l2f: [[fallthrough]];
+    case opcode::d2i: [[fallthrough]];
+    case opcode::d2f:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(std::int64_t) + sizeof(std::int32_t));
     /* opcodes with one 1-byte argument. */
     case opcode::newarray:
     {
@@ -785,13 +792,38 @@ std::int32_t module_loader::decode_instruction(
         else
         {
             float f{0.0};
-            std::memcpy(&f, &i_u32, sizeof(float));
+            std::memcpy(&f, &i_u32, sizeof(f));
             recorder->record(opcode::fconst, f);
         }
 
-        return static_cast<std::int32_t>(sizeof(std::uint32_t));
+        return static_cast<std::int32_t>(sizeof(std::int32_t));
     }
-    /* opcodes with one VLE integer. */
+    /* opcodes with one 8-byte argument. */
+    case opcode::lconst: [[fallthrough]];
+    case opcode::dconst:
+    {
+        std::uint64_t i_u64{0};
+        ar & i_u64;
+
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&i_u64),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&i_u64) + sizeof(i_u64));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+        if(static_cast<opcode>(instr) == opcode::lconst)
+        {
+            recorder->record(opcode::lconst, static_cast<std::int64_t>(i_u64));
+        }
+        else
+        {
+            double d{0.0};
+            std::memcpy(&d, &i_u64, sizeof(d));
+            recorder->record(opcode::dconst, d);
+        }
+
+        return static_cast<std::int32_t>(sizeof(std::int64_t));
+    }
+        /* opcodes with one VLE integer. */
     case opcode::sconst:
     {
         vle_int i;

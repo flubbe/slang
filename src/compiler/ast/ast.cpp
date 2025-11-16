@@ -499,28 +499,32 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
 
     auto [back_end_type, value] =
       [this, &ctx]() -> std::pair<
-                       cg::type_kind, std::variant<
-                                        int,
-                                        float,
-                                        const_::constant_id>>
+                       cg::type_kind,
+                       std::variant<
+                         std::int64_t,
+                         double,
+                         const_::constant_id>>
     {
         if(tok.type == token_type::int_literal)
         {
             return std::make_pair(
-              cg::type_kind::i32, std::get<int>(tok.value.value()));
+              cg::type_kind::i32,
+              std::get<std::int64_t>(tok.value.value()));
         }
 
         if(tok.type == token_type::fp_literal)
         {
             return std::make_pair(
-              cg::type_kind::f32, std::get<float>(tok.value.value()));
+              cg::type_kind::f64,
+              std::get<double>(tok.value.value()));
         }
 
         if(tok.type == token_type::str_literal)
         {
             return std::make_pair(
-              cg::type_kind::str, ctx.intern(
-                                    std::get<std::string>(tok.value.value())));
+              cg::type_kind::str,
+              ctx.intern(
+                std::get<std::string>(tok.value.value())));
         }
 
         throw cg::codegen_error(
@@ -547,13 +551,15 @@ std::optional<ty::type_id> literal_expression::type_check(
         throw ty::type_error(loc, "Empty literal.");
     }
 
+    // default to i32 for integer literals and f64 for floating-point literals.
+
     if(tok.type == token_type::int_literal)
     {
         expr_type = ctx.get_i32_type();
     }
     else if(tok.type == token_type::fp_literal)
     {
-        expr_type = ctx.get_f32_type();
+        expr_type = ctx.get_f64_type();
     }
     else if(tok.type == token_type::str_literal)
     {
@@ -579,7 +585,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return std::format("FloatLiteral(value={})", std::get<float>(*tok.value));
+            return std::format("FloatLiteral(value={})", std::get<double>(*tok.value));
         }
 
         return "FloatLiteral(<none>)";
@@ -589,7 +595,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return std::format("IntLiteral(value={})", std::get<int>(*tok.value));
+            return std::format("IntLiteral(value={})", std::get<std::int64_t>(*tok.value));
         }
 
         return "IntLiteral(<none>)";
@@ -649,7 +655,7 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
 
     // only cast if necessary.
     cg::type lowered_type = ctx.lower(target_type->get_type());
-    if(lowered_type != v->get_type())
+    if(lowered_type.get_type_kind() != v->get_type().get_type_kind())
     {
         if(v->get_type().get_type_kind() == cg::type_kind::i8
            || v->get_type().get_type_kind() == cg::type_kind::i16)
@@ -866,6 +872,17 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
         }
 
         return std::make_unique<cg::value>(lowered_type);
+    }
+
+    // both type kinds are the same here.
+    if(v->get_type().get_type_kind() == cg::type_kind::ref)
+    {
+        if(v->get_type().get_type_id() != target_type->get_type())
+        {
+            // casts between non-builtin types are checked at run-time.
+            ctx.generate_checkcast(lowered_type);
+            return std::make_unique<cg::value>(lowered_type);
+        }
     }
 
     return std::make_unique<cg::value>(lowered_type);
@@ -1509,17 +1526,41 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
 
         if(const_info->type == const_::constant_type::i32)
         {
-            ctx.generate_const({cg::type_kind::i32}, std::get<int>(const_info->value));
+            ctx.generate_const(
+              {cg::type_kind::i32},
+              std::get<std::int64_t>(const_info->value));
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::i32},
               symbol_id.value());
         }
 
+        if(const_info->type == const_::constant_type::i64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::i64},
+              std::get<std::int64_t>(const_info->value));
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::i64},
+              symbol_id.value());
+        }
+
         if(const_info->type == const_::constant_type::f32)
         {
-            ctx.generate_const({cg::type_kind::f32}, std::get<float>(const_info->value));
+            ctx.generate_const(
+              {cg::type_kind::f32},
+              std::get<double>(const_info->value));
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::f32},
+              symbol_id.value());
+        }
+
+        if(const_info->type == const_::constant_type::f64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::f64},
+              std::get<double>(const_info->value));
+            return std::make_unique<cg::value>(
+              cg::type{cg::type_kind::f64},
               symbol_id.value());
         }
 
@@ -3124,7 +3165,18 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
                 ctx.generate_const(
                   {back_end_type},
-                  std::get<int>(info.value));
+                  std::get<std::int64_t>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::i64)
+            {
+                const auto back_end_type = cg::type_kind::i64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
 
                 return std::make_unique<cg::value>(back_end_type);
             }
@@ -3135,7 +3187,18 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
                 ctx.generate_const(
                   {back_end_type},
-                  std::get<float>(info.value));
+                  std::get<double>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::f64)
+            {
+                const auto back_end_type = cg::type_kind::f64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
 
                 return std::make_unique<cg::value>(back_end_type);
             }
@@ -3372,11 +3435,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         // disallow negative literals.
         if(rhs->is_literal())
         {
-            const std::optional<
-              std::variant<
-                int,
-                float,
-                std::string>>& v = rhs->as_literal()->get_token().value;
+            const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
             if(!v.has_value())
             {
                 throw ty::type_error(
@@ -3385,7 +3444,7 @@ std::optional<ty::type_id> binary_expression::type_check(
                     "R.h.s. does not have a value, but is typed as 'i32' literal."));
             }
 
-            if(std::get<int>(v.value()) < 0)
+            if(std::get<std::int64_t>(v.value()) < 0)
             {
                 throw ty::type_error(
                   loc,
@@ -3543,22 +3602,26 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
     {
         auto v = operand->generate_code(ctx, mc);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
-           && v->get_type().get_type_kind() != cg::type_kind::f32)
+           && v->get_type().get_type_kind() != cg::type_kind::i64
+           && v->get_type().get_type_kind() != cg::type_kind::f32
+           && v->get_type().get_type_kind() != cg::type_kind::f64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32' or 'f32'.",
+                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32
+           || v->get_type().get_type_kind() == cg::type_kind::i64)
         {
             ctx.generate_const(v->get_type(), 1);
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32
+                || v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            ctx.generate_const(v->get_type(), 1.f);
+            ctx.generate_const(v->get_type(), 1.0);
         }
         ctx.generate_binary_op(cg::binary_op::op_add, v->get_type());
 
@@ -3572,22 +3635,26 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
     {
         auto v = operand->generate_code(ctx, mc);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
-           && v->get_type().get_type_kind() != cg::type_kind::f32)
+           && v->get_type().get_type_kind() != cg::type_kind::i64
+           && v->get_type().get_type_kind() != cg::type_kind::f32
+           && v->get_type().get_type_kind() != cg::type_kind::f64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Wrong expression type '{}' for prefix operator '--'. Expected 'i32' or 'f32'.",
+                "Wrong expression type '{}' for prefix operator '--'. Expected 'i32', 'i64', 'f32' or 'f64'.",
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32
+           || v->get_type().get_type_kind() == cg::type_kind::i64)
         {
             ctx.generate_const(v->get_type(), 1);
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32
+                || v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            ctx.generate_const(v->get_type(), 1.f);
+            ctx.generate_const(v->get_type(), 1.0);
         }
         ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
 
@@ -3610,7 +3677,18 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
             ctx.generate_const(
               back_end_type,
-              std::get<int>(info.value));
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::i64)
+        {
+            const auto back_end_type = cg::type{cg::type_kind::i64};
+
+            ctx.generate_const(
+              back_end_type,
+              std::get<std::int64_t>(info.value));
 
             return std::make_unique<cg::value>(back_end_type);
         }
@@ -3621,7 +3699,18 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
             ctx.generate_const(
               back_end_type,
-              std::get<float>(info.value));
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f64)
+        {
+            const auto back_end_type = cg::type{cg::type_kind::f64};
+
+            ctx.generate_const(
+              back_end_type,
+              std::get<double>(info.value));
 
             return std::make_unique<cg::value>(back_end_type);
         }
@@ -3646,21 +3735,47 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         std::vector<std::unique_ptr<cg::argument>> args;
         if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0, std::nullopt));
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::i32,
+                static_cast<std::int64_t>(0),
+                std::nullopt));
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        {
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::i64,
+                static_cast<std::int64_t>(0),
+                std::nullopt));
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0.f, std::nullopt));
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::f32,
+                0.0,
+                std::nullopt));
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
+        {
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::f64,
+                0.0,
+                std::nullopt));
         }
         else
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '-': Expected 'i32' or 'f32', got '{}'.",
+                "Type error for unary operator '-': Expected 'i32', 'i64', 'f32' or 'f64', got '{}'.",
                 v->get_type().to_string()));
         }
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        instrs.insert(
+          instrs.begin() + pos,    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+          std::make_unique<cg::instruction>("const", std::move(args)));
 
         ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
         return v;
@@ -3669,19 +3784,20 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
     if(op.s == "!")
     {
         auto v = operand->generate_code(ctx, memory_context::load);
-        if(v->get_type().get_type_kind() != cg::type_kind::i32)
+        if(v->get_type().get_type_kind() != cg::type_kind::i32
+           && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '!': Expected 'i32', got '{}'.",
+                "Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string()));
         }
 
-        ctx.generate_const({cg::type_kind::i32}, 0);
+        ctx.generate_const({v->get_type().get_type_kind()}, 0);
         ctx.generate_binary_op(cg::binary_op::op_equal, v->get_type());
 
-        return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
+        return std::make_unique<cg::value>(v->get_type());
     }
 
     if(op.s == "~")
@@ -3690,19 +3806,28 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         std::size_t pos = instrs.size();
 
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().get_type_kind() != cg::type_kind::i32)
+        if(v->get_type().get_type_kind() != cg::type_kind::i32
+           && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '~': Expected 'i32', got '{}'.",
+                "Type error for unary operator '~': Expected 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string()));
         }
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        args.emplace_back(std::make_unique<cg::const_argument>(~0, std::nullopt));
+        args.emplace_back(
+          std::make_unique<cg::const_argument>(
+            v->get_type().get_type_kind(),
+            static_cast<std::int64_t>(~0),
+            std::nullopt));
 
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        instrs.insert(
+          instrs.begin() + pos,    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+          std::make_unique<cg::instruction>(
+            "const",
+            std::move(args)));
 
         ctx.generate_binary_op(cg::binary_op::op_xor, v->get_type());
         return v;
@@ -3741,12 +3866,12 @@ std::optional<ty::type_id> unary_expression::type_check(
     }
 
     const std::unordered_map<std::string, std::set<ty::type_id>> valid_operand_types = {
-      {"++", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"--", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"+", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"-", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"!", {ctx.get_i32_type()}},
-      {"~", {ctx.get_i32_type()}}};
+      {"++", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"--", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"+", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"-", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"!", {ctx.get_i32_type(), ctx.get_i64_type()}},
+      {"~", {ctx.get_i32_type(), ctx.get_i64_type()}}};
 
     auto op_it = valid_operand_types.find(op.s);
     if(op_it == valid_operand_types.end())
@@ -4937,6 +5062,66 @@ std::unique_ptr<cg::value> return_statement::generate_code(
 
     if(expr)
     {
+        // Evaluate constant subexpressions.
+        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(expr.get());
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+        {
+            auto info = const_eval_it->second;
+
+            if(info.type == const_::constant_type::i32)
+            {
+                const auto back_end_type = cg::type_kind::i32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return nullptr;
+            }
+            else if(info.type == const_::constant_type::i64)
+            {
+                const auto back_end_type = cg::type_kind::i64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return nullptr;
+            }
+            else if(info.type == const_::constant_type::f32)
+            {
+                const auto back_end_type = cg::type_kind::f32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return nullptr;
+            }
+            else if(info.type == const_::constant_type::f64)
+            {
+                const auto back_end_type = cg::type_kind::f64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return nullptr;
+            }
+            else
+            {
+                std::println(
+                  "{}: Warning: Attempted constant expression computation failed.",
+                  ::slang::to_string(loc));
+                // fall-through
+            }
+        }
+
         auto v = expr->generate_code(ctx, memory_context::load);
         if(!v)
         {
