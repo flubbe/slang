@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <cmath>
 #include <print>
 #include <ranges>
 #include <set>
