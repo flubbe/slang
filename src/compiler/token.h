@@ -51,6 +51,23 @@ std::string to_string(token_type ty);
  */
 archive& operator&(archive& ar, token_type& ty);
 
+/** Numeric suffix type. */
+enum class suffix_type
+{
+    integer,        /** integers literals */
+    floating_point, /** floating-point literals */
+};
+
+/** A numeric suffix. */
+struct numeric_suffix
+{
+    /** Suffix type. */
+    suffix_type ty;
+
+    /** Bit width. */
+    std::uint32_t width;
+};
+
 /** An evaluated constant. */
 using const_value = std::variant<std::int64_t, double, std::string>;
 
@@ -67,8 +84,14 @@ struct token
     token_type type;
 
     /**
+     * Literal suffix, for `token_type::int_literal`,
+     * `token_type::fp_literal` and `token_type::str_literal.
+     */
+    std::optional<numeric_suffix> suffix;
+
+    /**
      * Evaluated token, for `token_type::int_literal`,
-     * `token_type::fp_literal` and `token_type::string_literal.`
+     * `token_type::fp_literal` and `token_type::str_literal.`
      */
     std::optional<const_value> value;
 
@@ -86,17 +109,20 @@ struct token
      *
      * @param s The token's string.
      * @param location The token's location.
-     * @param type The token's type. Defaults to token_type::unknown.
-     * @param value The token's value. Defaults to std::nullopt.
+     * @param type The token's type. Defaults to `token_type::unknown`.
+     * @param suffix Optional suffix for numeric tokens.
+     * @param value The token's value. Defaults to `std::nullopt`.
      */
     token(
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
+      std::optional<numeric_suffix> suffix = std::nullopt,
       std::optional<const_value> value = std::nullopt)
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}
+    , suffix{suffix}
     , value{std::move(value)}
     {
     }

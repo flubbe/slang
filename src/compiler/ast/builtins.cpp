@@ -217,7 +217,7 @@ void format_macro_expression::expand_late_macros(
                 concat_args.emplace_back(
                   std::make_unique<ast::literal_expression>(
                     loc,
-                    token{fragment, loc, token_type::str_literal, fragment}));
+                    token{fragment, loc, token_type::str_literal, std::nullopt, fragment}));
 
                 auto concat_expr = std::make_unique<ast::call_expression>(
                   token{"string_concat", loc},
@@ -230,7 +230,7 @@ void format_macro_expression::expand_late_macros(
             else
             {
                 expansion = std::make_unique<ast::literal_expression>(
-                  loc, token{fragment, loc, token_type::str_literal, fragment});
+                  loc, token{fragment, loc, token_type::str_literal, std::nullopt, fragment});
             }
         }
 
@@ -340,7 +340,7 @@ void format_macro_expression::expand_late_macros(
         concat_args.emplace_back(
           std::make_unique<ast::literal_expression>(
             loc,
-            token{fragment, loc, token_type::str_literal, fragment}));
+            token{fragment, loc, token_type::str_literal, std::nullopt, fragment}));
 
         auto concat_expr = std::make_unique<ast::call_expression>(
           token{"string_concat", loc},
