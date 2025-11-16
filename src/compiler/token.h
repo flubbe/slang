@@ -58,6 +58,14 @@ enum class suffix_type
     floating_point, /** floating-point literals */
 };
 
+/**
+ * Convert a suffix type into a readable string.
+ *
+ * @param ty The suffix type.
+ * @returns Returns a readable string.
+ */
+std::string to_string(suffix_type ty);
+
 /** A numeric suffix. */
 struct numeric_suffix
 {

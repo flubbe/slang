@@ -22,7 +22,7 @@ namespace slang::ast
  */
 
 std::optional<const_::const_info> literal_expression::evaluate(
-  [[maybe_unused]] ty::context& type_ctx,
+  ty::context& type_ctx,
   [[maybe_unused]] const_::env& env) const
 {
     if(!tok.value.has_value())
@@ -30,9 +30,14 @@ std::optional<const_::const_info> literal_expression::evaluate(
         throw cg::codegen_error(loc, "Literal expression has no value.");
     }
 
-    // default to i32 for integer literals and f64 for floating-point literals.
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Literal expression has no type.");
+    }
 
-    if(tok.type == token_type::int_literal)
+    if(expr_type.value() == type_ctx.get_i8_type()
+       || expr_type.value() == type_ctx.get_i16_type()
+       || expr_type.value() == type_ctx.get_i32_type())
     {
         return std::make_optional<const_::const_info>(
           {.origin_module_id = sema::symbol_info::current_module_id,
@@ -40,7 +45,23 @@ std::optional<const_::const_info> literal_expression::evaluate(
            .value = std::get<std::int64_t>(tok.value.value())});
     }
 
-    if(tok.type == token_type::fp_literal)
+    if(expr_type.value() == type_ctx.get_i64_type())
+    {
+        return std::make_optional<const_::const_info>(
+          {.origin_module_id = sema::symbol_info::current_module_id,
+           .type = const_::constant_type::i64,
+           .value = std::get<std::int64_t>(tok.value.value())});
+    }
+
+    if(expr_type.value() == type_ctx.get_f32_type())
+    {
+        return std::make_optional<const_::const_info>(
+          {.origin_module_id = sema::symbol_info::current_module_id,
+           .type = const_::constant_type::f32,
+           .value = std::get<double>(tok.value.value())});
+    }
+
+    if(expr_type.value() == type_ctx.get_f64_type())
     {
         return std::make_optional<const_::const_info>(
           {.origin_module_id = sema::symbol_info::current_module_id,
@@ -48,7 +69,7 @@ std::optional<const_::const_info> literal_expression::evaluate(
            .value = std::get<double>(tok.value.value())});
     }
 
-    if(tok.type == token_type::str_literal)
+    if(expr_type.value() == type_ctx.get_str_type())
     {
         return std::make_optional<const_::const_info>(
           {.origin_module_id = sema::symbol_info::current_module_id,
@@ -957,7 +978,7 @@ struct unary_operation_helper
             return {
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f64,
-              .value = func_f32(std::get<double>(v.value))};
+              .value = func_f64(std::get<double>(v.value))};
         }
 
         throw cg::codegen_error(

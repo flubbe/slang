@@ -334,8 +334,12 @@ void expression::evaluate_constant_expressions(
           }
       },
       false, /* don't visit this node */
-      true   /* post-order traversal */
-    );
+      true,  /* post-order traversal */
+      [](const slang::ast::expression& expr) -> bool
+      {
+          // A macro branch has no type information, so we skip it.
+          return !expr.is_macro_branch();
+      });
 }
 
 std::string expression::to_string() const
@@ -487,7 +491,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
 
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(loc, "Literal has no type.");
+        throw cg::codegen_error(loc, "Literal expression has no type.");
     }
 
     if(mc == memory_context::store)
@@ -497,29 +501,47 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
           "Cannot store into <literal>.");
     }
 
+    auto lowered_type = ctx.lower(expr_type.value());
+
     auto [back_end_type, value] =
-      [this, &ctx]() -> std::pair<
-                       cg::type_kind,
-                       std::variant<
-                         std::int64_t,
-                         double,
-                         const_::constant_id>>
+      [this, &ctx, lowered_type]() -> std::pair<
+                                     cg::type_kind,
+                                     std::variant<
+                                       std::int64_t,
+                                       double,
+                                       const_::constant_id>>
     {
-        if(tok.type == token_type::int_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::i8
+           || lowered_type.get_type_kind() == cg::type_kind::i16
+           || lowered_type.get_type_kind() == cg::type_kind::i32)
         {
             return std::make_pair(
               cg::type_kind::i32,
               std::get<std::int64_t>(tok.value.value()));
         }
 
-        if(tok.type == token_type::fp_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::i64)
+        {
+            return std::make_pair(
+              cg::type_kind::i64,
+              std::get<std::int64_t>(tok.value.value()));
+        }
+
+        if(lowered_type.get_type_kind() == cg::type_kind::f32)
+        {
+            return std::make_pair(
+              cg::type_kind::f32,
+              std::get<double>(tok.value.value()));
+        }
+
+        if(lowered_type.get_type_kind() == cg::type_kind::f64)
         {
             return std::make_pair(
               cg::type_kind::f64,
               std::get<double>(tok.value.value()));
         }
 
-        if(tok.type == token_type::str_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::str)
         {
             return std::make_pair(
               cg::type_kind::str,
@@ -530,8 +552,9 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
         throw cg::codegen_error(
           loc,
           std::format(
-            "Unable to generate code for literal of type id '{}'.",
-            std::to_underlying(tok.type)));
+            "Unable to generate code for literal of unknown type kind '{}' (type id {}) during code generation.",
+            cg::to_string(lowered_type.get_type_kind()),
+            lowered_type.get_type_id().value_or(-1)));
     }();
 
     auto literal_type = cg::type{
@@ -555,11 +578,142 @@ std::optional<ty::type_id> literal_expression::type_check(
 
     if(tok.type == token_type::int_literal)
     {
-        expr_type = ctx.get_i32_type();
+        if(tok.suffix.has_value())
+        {
+            if(tok.suffix.value().ty != suffix_type::integer)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid suffix '{}' for integer literal.",
+                    slang::to_string(tok.suffix.value().ty)));
+            }
+
+            switch(tok.suffix.value().width)
+            {
+            case 8:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int8_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i8' with value range {} to {}.",
+                        std::numeric_limits<std::int8_t>::min(),
+                        std::numeric_limits<std::int8_t>::max(),
+                        std::get<std::int64_t>(tok.value.value())));
+                }
+
+                expr_type = ctx.get_i8_type();
+                break;
+            case 16:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int16_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
+                        std::numeric_limits<std::int16_t>::min(),
+                        std::numeric_limits<std::int16_t>::max(),
+                        std::get<std::int64_t>(tok.value.value())));
+                }
+
+                expr_type = ctx.get_i16_type();
+                break;
+            case 32:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int32_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
+                        std::numeric_limits<std::int32_t>::min(),
+                        std::numeric_limits<std::int32_t>::max(),
+                        std::get<std::int64_t>(tok.value.value())));
+                }
+
+                expr_type = ctx.get_i32_type();
+                break;
+            case 64:    // NOLINT(readability-magic-numbers)
+                expr_type = ctx.get_i64_type();
+                break;
+            default:
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid width '{}' in integer literal.",
+                    tok.suffix.value().width));
+            }
+        }
+        else
+        {
+            expr_type = ctx.get_i32_type();
+        }
     }
     else if(tok.type == token_type::fp_literal)
     {
-        expr_type = ctx.get_f64_type();
+        if(tok.suffix.has_value())
+        {
+            if(tok.suffix.value().ty != suffix_type::floating_point)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid suffix '{}' for floating point literal.",
+                    slang::to_string(tok.suffix.value().ty)));
+            }
+
+            switch(tok.suffix.value().width)
+            {
+            case 32:    // NOLINT(readability-magic-numbers)
+            {
+                auto v = std::get<double>(
+                  tok.value.value());
+                auto narrowed = static_cast<float>(v);
+
+                if(!std::isfinite(narrowed)
+                   && std::isfinite(v))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}",
+                        tok.s,
+                        std::numeric_limits<float>::min(),
+                        std::numeric_limits<float>::max()));
+                }
+
+                if(narrowed == 0.0f
+                   && v != 0.0
+                   && std::isfinite(v))
+                {
+                    std::println(
+                      "{} Warning: Floating point literal '{}' underflows to 0.0 in f32.",
+                      slang::to_string(loc),
+                      tok.s);
+                }
+
+                expr_type = ctx.get_f32_type();
+                break;
+            }
+            case 64:    // NOLINT(readability-magic-numbers)
+                expr_type = ctx.get_f64_type();
+                break;
+
+            default:
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid width '{}' in floating point literal.",
+                    tok.suffix.value().width));
+            }
+        }
+        else
+        {
+            expr_type = ctx.get_f64_type();
+        }
     }
     else if(tok.type == token_type::str_literal)
     {

@@ -130,12 +130,16 @@ static bool is_operator(const std::optional<char>& c)
  * Evaluate a string, given its token type. If type is not one of `token_type::int_literal`,
  * `token_type::fp_literal` or `token_type::str_literal`, `std::nullopt` is returned.
  *
+ * @param loc Source location for error reporting.
  * @param s The string to evaluate.
  * @param type The string's token type.
  * @return Returns the evaluated token or std::nullopt.
  * @throws Throws a `lexical_error` if evaluation failed.
  */
-static std::optional<const_value> eval(const std::string& s, token_type type)
+static std::optional<const_value> eval(
+  source_location loc,
+  const std::string& s,
+  token_type type)
 {
     if(type == token_type::str_literal)
     {
@@ -151,15 +155,23 @@ static std::optional<const_value> eval(const std::string& s, token_type type)
                 constexpr int BASE = 16;
                 return std::stol(s, nullptr, BASE);
             }
-            return std::stol(s);
+            return std::stoll(s);
         }
         catch(const std::invalid_argument&)
         {
-            throw lexical_error(std::format("Invalid argument for integer conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Invalid argument for integer conversion: '{}'.",
+                to_string(loc),
+                s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(std::format("Argument out of range for integer conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Argument out of range for integer conversion: '{}'.",
+                to_string(loc),
+                s));
         }
     }
     else if(type == token_type::fp_literal)
@@ -170,11 +182,19 @@ static std::optional<const_value> eval(const std::string& s, token_type type)
         }
         catch(const std::invalid_argument& e)
         {
-            throw lexical_error(std::format("Invalid argument for floating point conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Invalid argument for floating point conversion: '{}'.",
+                to_string(loc),
+                s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(std::format("Argument out of range for floating point conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Argument out of range for floating point conversion: '{}'.",
+                to_string(loc),
+                s));
         }
     }
 
@@ -615,7 +635,7 @@ std::optional<token> lexer::next()
       loc,
       type,
       suffix,
-      eval(eval_token, type)};
+      eval(loc, eval_token, type)};
 }
 
 }    // namespace slang

@@ -34,6 +34,17 @@ archive& operator&(archive& ar, token_type& ty)
     return ar;
 }
 
+std::string to_string(suffix_type ty)
+{
+    switch(ty)
+    {
+    case suffix_type::integer: return "i";
+    case suffix_type::floating_point: return "f";
+    }
+
+    return "<unknown>";
+}
+
 std::string to_string(token_type ty)
 {
     switch(ty)

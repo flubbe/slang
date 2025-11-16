@@ -99,6 +99,9 @@ Ignoring comments, a program consists of:
         1. Literals:
 
             Integer, floating-point, and string literals.
+
+            Integers and floating-point literals can have suffixes `i8, i16, i32, i64, f32, f64` to type them.
+            A literal with no suffix has type `i32` for integers and `f64` for floating-point values.
         2. Variable and member access:
 
             A variable is referenced by its name.
