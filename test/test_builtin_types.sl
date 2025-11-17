@@ -37,6 +37,24 @@ fn test_literal_suffixes() -> void {
 
     approx_eq(f, -123.3213231f32, "f == -123.3213231f32");
     approx_eq(g as f32, 2389819.23928f64 as f32, "g == 2389819.23928f64");
+
+    let r0: i32 = a == 13i8;
+    std::assert(r0 == 1, "r0 == 1");
+
+    let r1: i32 = b != 123i16;
+    std::assert(r1 == 1, "r1 == 1");
+
+    let r2: i32 = c < 0;
+    std::assert(r2 == 0, "r2 == 0");
+
+    let r3: i32 = d > 0i64;
+    std::assert(r3 == 1, "r3 == 1");
+
+    let r4: i32 = f != 12.3f32;
+    std::assert(r4 == 1, "r4 == 1");
+
+    let r5: i32 = g < 0.f64;
+    std::assert(r5 == 0, "r5 == 0");
 }
 
 fn main(args: [str]) -> i32 {
