@@ -1188,23 +1188,91 @@ void instruction_emitter::emit_instruction(
     }
     else if(name == "load_element")
     {
-        emit_typed(
-          opcode::iaload,
-          opcode::laload,
-          opcode::faload,
-          opcode::daload,
-          opcode::aaload,
-          opcode::aaload);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i8)
+        {
+            emit(instruction_buffer, opcode::caload);
+        }
+        else if(type_kind == cg::type_kind::i16)
+        {
+            emit(instruction_buffer, opcode::saload);
+        }
+        else if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::iaload);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::laload);
+        }
+        else if(type_kind == cg::type_kind::f32)
+        {
+            emit(instruction_buffer, opcode::faload);
+        }
+        else if(type_kind == cg::type_kind::f64)
+        {
+            emit(instruction_buffer, opcode::daload);
+        }
+        else if(type_kind == cg::type_kind::str
+                || type_kind == cg::type_kind::ref
+                || type_kind == cg::type_kind::null)
+        {
+            emit(instruction_buffer, opcode::aaload);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction '{}'.",
+                cg::to_string(type_kind),
+                name));
+        }
     }
     else if(name == "store_element")
     {
-        emit_typed(
-          opcode::iastore,
-          opcode::lastore,
-          opcode::fastore,
-          opcode::dastore,
-          opcode::aastore,
-          opcode::aastore);
+        const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        const auto type_kind = arg->get_lowered_type().get_type_kind();
+
+        if(type_kind == cg::type_kind::i8)
+        {
+            emit(instruction_buffer, opcode::castore);
+        }
+        else if(type_kind == cg::type_kind::i16)
+        {
+            emit(instruction_buffer, opcode::sastore);
+        }
+        else if(type_kind == cg::type_kind::i32)
+        {
+            emit(instruction_buffer, opcode::iastore);
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            emit(instruction_buffer, opcode::lastore);
+        }
+        else if(type_kind == cg::type_kind::f32)
+        {
+            emit(instruction_buffer, opcode::fastore);
+        }
+        else if(type_kind == cg::type_kind::f64)
+        {
+            emit(instruction_buffer, opcode::dastore);
+        }
+        else if(type_kind == cg::type_kind::str
+                || type_kind == cg::type_kind::ref
+                || type_kind == cg::type_kind::null)
+        {
+            emit(instruction_buffer, opcode::aastore);
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Invalid type '{}' for instruction '{}'.",
+                cg::to_string(type_kind),
+                name));
+        }
     }
     else if(name == "dup")
     {

@@ -754,6 +754,46 @@ void context::exec(
                 frame.stack.push_addr(str);
                 break;
             } /* opcode::sconst */
+            case opcode::caload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int8_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during caload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat1(static_cast<std::int32_t>((*arr)[array_index]));
+                break;
+            } /* opcode::caload */
+            case opcode::saload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int16_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during saload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat1(static_cast<std::int32_t>((*arr)[array_index]));
+                break;
+            } /* opcode::saload */
             case opcode::iaload:
             {
                 auto array_index = frame.stack.pop_cat1<std::int32_t>();
@@ -774,6 +814,26 @@ void context::exec(
                 frame.stack.push_cat1((*arr)[array_index]);
                 break;
             } /* opcode::iaload */
+            case opcode::laload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int64_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during laload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat2(static_cast<std::int64_t>((*arr)[array_index]));
+                break;
+            } /* opcode::laload */
             case opcode::faload:
             {
                 auto array_index = frame.stack.pop_cat1<std::int32_t>();
@@ -794,6 +854,26 @@ void context::exec(
                 frame.stack.push_cat1((*arr)[array_index]);
                 break;
             } /* opcode::faload */
+            case opcode::daload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<double>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during daload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat2((*arr)[array_index]);
+                break;
+            } /* opcode::daload */
             case opcode::aaload:
             {
                 auto array_index = frame.stack.pop_cat1<std::int32_t>();
@@ -817,6 +897,48 @@ void context::exec(
                 frame.stack.push_addr(obj);
                 break;
             } /* opcode::aaload */
+            case opcode::castore:
+            {
+                auto v = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int8_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during castore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = static_cast<std::int8_t>(v);
+                break;
+            } /* opcode::castore */
+            case opcode::sastore:
+            {
+                auto v = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int16_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during sastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = static_cast<std::int16_t>(v);
+                break;
+            } /* opcode::sastore */
             case opcode::iastore:
             {
                 auto v = frame.stack.pop_cat1<std::int32_t>();
@@ -838,6 +960,27 @@ void context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::iastore */
+            case opcode::lastore:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int64_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during lastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = v;
+                break;
+            } /* opcode::lastore */
             case opcode::fastore:
             {
                 auto v = frame.stack.pop_cat1<float>();
@@ -859,6 +1002,27 @@ void context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::fastore */
+            case opcode::dastore:
+            {
+                auto v = frame.stack.pop_cat2<double>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<double>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during dastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = v;
+                break;
+            } /* opcode::dastore */
             case opcode::aastore:
             {
                 void* obj = frame.stack.pop_addr<void>();
@@ -879,7 +1043,6 @@ void context::exec(
                 }
 
                 (*arr)[index] = obj;
-
                 break;
             } /* opcode::aastore */
             case opcode::iload:

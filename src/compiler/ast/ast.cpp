@@ -3486,7 +3486,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
         }
 
         ctx.generate_store_element(
-          cg::type_argument{rhs_value->get_type()});
+          cg::type_argument{lhs_store_value->get_type()});
 
         return rhs_value;
     }
@@ -4129,8 +4129,12 @@ std::unique_ptr<cg::value> new_expression::generate_code(
             v->get_type().to_string()));
     }
 
-    if(element_type.get_type_kind() == cg::type_kind::i32
+    if(element_type.get_type_kind() == cg::type_kind::i8
+       || element_type.get_type_kind() == cg::type_kind::i16
+       || element_type.get_type_kind() == cg::type_kind::i32
+       || element_type.get_type_kind() == cg::type_kind::i64
        || element_type.get_type_kind() == cg::type_kind::f32
+       || element_type.get_type_kind() == cg::type_kind::f64
        || element_type.get_type_kind() == cg::type_kind::str)
     {
         ctx.generate_newarray(element_type);

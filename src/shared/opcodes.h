@@ -32,6 +32,8 @@ enum class opcode : opcode_base
     fload,       /** Load f32 from variable onto stack. */
     dload,       /** Load f64 from variable onto stack. */
     aload,       /** Load address from variable onto stack. */
+    caload,      /** Load i8 from array onto stack. */
+    saload,      /** Load i16 from array onto stack. */
     iaload,      /** Load i32 from array onto stack. */
     laload,      /** Load i64 from array onto stack. */
     faload,      /** Load f32 from array onto stack. */
@@ -42,6 +44,8 @@ enum class opcode : opcode_base
     fstore,      /** Store f32 from stack into variable. */
     dstore,      /** Store f64 from stack into variable. */
     astore,      /** Store address from stack into variable. */
+    castore,     /** Store i8 from stack into array. */
+    sastore,     /** Store i16 from stack into array. */
     iastore,     /** Store i32 from stack into array. */
     lastore,     /** Store i64 from stack into array. */
     fastore,     /** Store f32 from stack into array. */

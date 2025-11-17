@@ -658,17 +658,29 @@ std::int32_t module_loader::decode_instruction(
     case opcode::arraylength:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(void*) + sizeof(std::int32_t));
+    case opcode::caload: [[fallthrough]];
+    case opcode::saload: [[fallthrough]];
     case opcode::iaload: [[fallthrough]];
     case opcode::faload:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(void*));
+    case opcode::laload: [[fallthrough]];
+    case opcode::daload:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) + sizeof(std::int64_t));
     case opcode::aaload:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) + sizeof(void*));
+    case opcode::castore: [[fallthrough]];
+    case opcode::sastore: [[fallthrough]];
     case opcode::iastore: [[fallthrough]];
     case opcode::fastore:
         recorder->record(static_cast<opcode>(instr));
-        return static_cast<std::int32_t>(-sizeof(void*) - 2 * sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(-sizeof(void*) - 2 * sizeof(std::int32_t));
+    case opcode::lastore: [[fallthrough]];
+    case opcode::dastore:
+        recorder->record(static_cast<opcode>(instr));
+        return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) - sizeof(std::int64_t));
     case opcode::aastore:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-sizeof(void*) - sizeof(std::int32_t) - sizeof(void*));
@@ -701,7 +713,7 @@ std::int32_t module_loader::decode_instruction(
     case opcode::icmpne: [[fallthrough]];
     case opcode::fcmpne:
         recorder->record(static_cast<opcode>(instr));
-        return static_cast<std::int32_t>(-sizeof(std::int32_t));    // same size for all (since sizeof(float) == sizeof(std::int32_t))
+        return static_cast<std::int32_t>(-sizeof(std::int32_t));
     case opcode::ladd: [[fallthrough]];
     case opcode::dadd: [[fallthrough]];
     case opcode::lsub: [[fallthrough]];
@@ -715,7 +727,7 @@ std::int32_t module_loader::decode_instruction(
     case opcode::lor: [[fallthrough]];
     case opcode::lxor:
         recorder->record(static_cast<opcode>(instr));
-        return static_cast<std::int32_t>(-sizeof(std::int64_t));    // same size for all (since sizeof(double) == sizeof(std::int64_t))
+        return static_cast<std::int32_t>(-sizeof(std::int64_t));
     case opcode::lcmpl: [[fallthrough]];
     case opcode::dcmpl: [[fallthrough]];
     case opcode::lcmple: [[fallthrough]];

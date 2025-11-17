@@ -40,11 +40,15 @@ std::string to_string(opcode op)
     case opcode::fstore: return "fstore";
     case opcode::dstore: return "dstore";
     case opcode::astore: return "astore";
+    case opcode::caload: return "caload";
+    case opcode::saload: return "saload";
     case opcode::iaload: return "iaload";
     case opcode::laload: return "laload";
     case opcode::faload: return "faload";
     case opcode::daload: return "daload";
     case opcode::aaload: return "aaload";
+    case opcode::castore: return "castore";
+    case opcode::sastore: return "sastore";
     case opcode::iastore: return "iastore";
     case opcode::lastore: return "lastore";
     case opcode::fastore: return "fastore";
