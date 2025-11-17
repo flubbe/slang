@@ -285,7 +285,7 @@ field_properties module_loader::get_field_properties(
     return {
       .size = field_info.second.size,
       .offset = field_info.second.offset,
-      .needs_gc = is_garbage_collected(type_name)};
+      .needs_gc = is_garbage_collected(field_info.second.base_type)};
 }
 
 void module_loader::decode_structs()

@@ -113,6 +113,53 @@ fn test_builtin_arrays() -> void {
     std::assert(arr_f64[2] == -2.3 as f64, "arr_f64[2] == -2.3 as f64");
 }
 
+struct S {
+    c: i8,
+    s: i16,
+    i: i32,
+    l: i64,
+    f: f32,
+    d: f64
+};
+
+fn test_struct() -> void {
+    let s: S = S{
+        c: 1i8,
+        s: 2i16,
+        i: 3i32,
+        l: 4i64,
+        f: 5.1f32,
+        d: 6.2f64 
+    };
+
+    std::print(
+        std::format!(
+            "{} {} {} {} {} {}\n", 
+            s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));
+
+    std::assert(s.c == 1i8, "s.c == 1i8");
+    std::assert(s.s == 2i16, "s.s == 2i16");
+    std::assert(s.i == 3i32, "s.i == 3i32");
+    std::assert(s.l == 4i64, "s.l == 4i64");
+
+    std::assert(s.f == 5.1f32, "s.f == 5.1f32");
+    std::assert(s.d == 6.2f64, "s.d == 6.2f64");
+
+    s.i = -1;
+    std::assert(s.s == 2i16, "s.s == 2i16");
+    std::assert(s.i == -1, "s.i == -1");
+    std::assert(s.l == 4i64, "s.l == 4i64");
+
+    s.l = -3 as i64;
+    s.f = -1.2f32;
+    s.d = 3.4f64;
+
+    std::assert(s.i == -1, "s.i == -1");
+    std::assert(s.l == -3 as i64, "s.l == -3 as i64");
+    std::assert(s.f == -1.2f32, "s.f == -1.2f32");
+    std::assert(s.d == 3.4f64, "s.d == 3.4f64");
+}
+
 fn main(args: [str]) -> i32 {
     let a: i8 = 3 as i8;
 
@@ -122,6 +169,7 @@ fn main(args: [str]) -> i32 {
     test_literal_suffixes();
 
     test_builtin_arrays();
+    test_struct();
 
     return 0;
 }
