@@ -1533,6 +1533,14 @@ void context::exec(
                   { return i ^ v; });
                 break;
             } /* opcode::ixor */
+            case opcode::lxor:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [v](std::int64_t i) -> std::int64_t
+                  { return i ^ v; });
+                break;
+            } /* opcode::lxor */
             case opcode::ishl:
             {
                 auto a = frame.stack.pop_cat1<std::int32_t>();

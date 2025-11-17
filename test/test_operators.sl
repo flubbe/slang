@@ -83,13 +83,13 @@ fn test_i32_binary_operators() -> void
     std::println("i32: >>");
     i = 0;
     r = 2147483647;
-    while(i > 0)
+    while(i < 32)
     {
         std::assert(0x7fffffff >> i == r, std::string_concat(
             std::i32_to_string(0x7fffffff >> i), 
             std::string_concat(" == ", std::i32_to_string(r))));
 
-        i--;
+        i++;
         r /= 2;
     }
 }
@@ -115,14 +115,16 @@ fn test_i64_binary_operators() -> void
 
     std::println("i64: >>");
     i = 0;
-    r = 2147483647 as i64; // FIXME Should be -9223372036854775807
-    while(i > 0)
+    r = 9223372036854775807i64;
+    while(i < 64)
     {
-        std::assert((0x7fffffff >> i) as i64 == r, std::format!("i: {}", i));
+        std::assert(9223372036854775807i64 >> i == r, std::format!("i: {}", i));
 
-        i--;
+        i++;
         r /= 2 as i64;
-    }    
+    }
+
+    std::assert((9223372036854775807i64 ^ 9223372036854775807i64) == 0i64, "(9223372036854775807i64 ^ 9223372036854775807i64) == 0i64");
 }
 
 fn test_logical_operators() -> void
