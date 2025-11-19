@@ -76,9 +76,9 @@ struct L{
 
 fn test_local() -> void {
     let arr: [L] = new L[3];
-    arr[0] = L{1, 2.0};
-    arr[1] = L{2, 3.0};
-    arr[2] = L{3, 4.0};
+    arr[0] = L{1, 2.0 as f32};
+    arr[1] = L{2, 3.0 as f32};
+    arr[2] = L{3, 4.0 as f32};
 
     let t: std::type = arr[1] as std::type;
 
@@ -86,14 +86,14 @@ fn test_local() -> void {
         + ((t as L).i as f32) + (t as L).f
         + (arr[2].i as f32) + arr[2].f;
 
-    std::assert(std::abs(k - 15.0) < 1e-6, "k == 15.0");
+    std::assert(std::abs(k - 15.0 as f32) < 1e-6 as f32, "k == 15.0");
 }
 
 fn test_array_copy() -> void {
     let arr1: [L] = new L[3];
-    arr1[0] = L{1, 2.0};
-    arr1[1] = L{2, 3.0};
-    arr1[2] = L{3, 4.0};
+    arr1[0] = L{1, 2.0 as f32};
+    arr1[1] = L{2, 3.0 as f32};
+    arr1[2] = L{3, 4.0 as f32};
 
     let arr2: [L] = new L[3];
     std::array_copy(arr1, arr2);

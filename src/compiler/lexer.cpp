@@ -130,12 +130,16 @@ static bool is_operator(const std::optional<char>& c)
  * Evaluate a string, given its token type. If type is not one of `token_type::int_literal`,
  * `token_type::fp_literal` or `token_type::str_literal`, `std::nullopt` is returned.
  *
+ * @param loc Source location for error reporting.
  * @param s The string to evaluate.
  * @param type The string's token type.
  * @return Returns the evaluated token or std::nullopt.
  * @throws Throws a `lexical_error` if evaluation failed.
  */
-static std::optional<std::variant<int, float, std::string>> eval(const std::string& s, token_type type)
+static std::optional<const_value> eval(
+  source_location loc,
+  const std::string& s,
+  token_type type)
 {
     if(type == token_type::str_literal)
     {
@@ -149,32 +153,48 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
             if(s.starts_with("0x"))
             {
                 constexpr int BASE = 16;
-                return std::stoi(s, nullptr, BASE);
+                return std::stol(s, nullptr, BASE);
             }
-            return std::stoi(s);
+            return std::stoll(s);
         }
         catch(const std::invalid_argument&)
         {
-            throw lexical_error(std::format("Invalid argument for integer conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Invalid argument for integer conversion: '{}'.",
+                to_string(loc),
+                s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(std::format("Argument out of range for integer conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Argument out of range for integer conversion: '{}'.",
+                to_string(loc),
+                s));
         }
     }
     else if(type == token_type::fp_literal)
     {
         try
         {
-            return std::stof(s);
+            return std::stod(s);
         }
         catch(const std::invalid_argument& e)
         {
-            throw lexical_error(std::format("Invalid argument for floating point conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Invalid argument for floating point conversion: '{}'.",
+                to_string(loc),
+                s));
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(std::format("Argument out of range for floating point conversion: '{}'.", s));
+            throw lexical_error(
+              std::format(
+                "{}: Argument out of range for floating point conversion: '{}'.",
+                to_string(loc),
+                s));
         }
     }
 
@@ -185,16 +205,60 @@ static std::optional<std::variant<int, float, std::string>> eval(const std::stri
  * lexer implementation.
  */
 
+/**
+ * Validate suffix: Make sure the suffix is one of: i8, i16, i32, i64, f32, f64.
+ *
+ * @param loc Source location for error reporting.
+ * @param suffix The suffix to validate.
+ */
+static void validate_suffix(
+  source_location loc,
+  const std::optional<numeric_suffix>& suffix)
+{
+    if(!suffix.has_value())
+    {
+        return;
+    }
+
+    const auto& s = suffix.value();
+    if(s.ty == suffix_type::integer)
+    {
+        if(s.width != 8 && s.width != 16 && s.width != 32 && s.width != 64)
+        {
+            throw lexical_error(
+              std::format(
+                "{}: Invalid width {} for integer type suffix. Valid widths are 8, 16, 32, 64.",
+                slang::to_string(loc),
+                s.width));
+        }
+    }
+    else if(s.ty == suffix_type::floating_point)
+    {
+        if(s.width != 32 && s.width != 64)
+        {
+            throw lexical_error(
+              std::format(
+                "{}: Invalid width {} for floating point type suffix. Valid widths are 32, 64.",
+                slang::to_string(loc),
+                s.width));
+        }
+    }
+}
+
 std::optional<token> lexer::next()
 {
     std::string current_token;
+    std::string eval_token;    // token without suffix, for evaluation.
     token_type type = token_type::unknown;
+    std::optional<numeric_suffix> suffix;
     source_location loc;
 
     while(!eof())    // this loop is only here for catching comments
     {
-        type = token_type::unknown;    // reset type on each iteration
+        type = token_type::unknown;    // reset type on each iteration.
         current_token.clear();         // clear token on each iteration.
+        eval_token.clear();            // clear evaluation token on each iteration.
+        suffix = std::nullopt;         // clear numeric suffix on each iteration.
 
         while(is_whitespace(peek()))
         {
@@ -334,6 +398,8 @@ std::optional<token> lexer::next()
                 }
 
                 type = token_type::int_literal;
+                eval_token = current_token;
+
                 break;
             }
 
@@ -377,13 +443,49 @@ std::optional<token> lexer::next()
                 type = token_type::fp_literal;
             }
 
+            eval_token = current_token;
+
             if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
             {
-                throw lexical_error(
-                  std::format(
-                    "{}: Invalid suffix '{}' on numeric literal.",
-                    to_string(loc),
-                    *peek()));    // NOLINT(bugprone-unchecked-optional-access)
+                suffix_type type = [this, loc, &current_token]()
+                {
+                    auto type_char = *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += type_char;
+
+                    if(type_char == 'i')
+                    {
+                        return suffix_type::integer;
+                    }
+
+                    if(type_char == 'f')
+                    {
+                        return suffix_type::floating_point;
+                    }
+
+                    throw lexical_error(
+                      std::format(
+                        "{}: Invalid numeric suffix: Unknown type identifier.",
+                        to_string(loc)));
+                }();
+
+                if(!peek().has_value() || std::isdigit(*peek()) == 0)
+                {
+                    throw lexical_error(
+                      std::format(
+                        "{}: Invalid numeric suffix: Expected width specifier.",
+                        to_string(loc)));
+                }
+
+                std::string width_specifier;
+                while(peek().has_value() && (std::isdigit(*peek()) != 0))    // NOLINT(bugprone-unchecked-optional-access)
+                {
+                    width_specifier += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                }
+                current_token += width_specifier;
+
+                suffix = numeric_suffix{
+                  .ty = type,
+                  .width = static_cast<std::uint32_t>(stoi(width_specifier))};
             }
 
             break;
@@ -489,6 +591,8 @@ std::optional<token> lexer::next()
             }
 
             type = token_type::str_literal;
+            eval_token = current_token;
+
             break;
         }
 
@@ -524,7 +628,14 @@ std::optional<token> lexer::next()
         throw lexical_error("lext::next: No token parsed.");
     }
 
-    return slang::token{current_token, loc, type, eval(current_token, type)};
+    validate_suffix(loc, suffix);
+
+    return slang::token{
+      current_token,
+      loc,
+      type,
+      suffix,
+      eval(loc, eval_token, type)};
 }
 
 }    // namespace slang

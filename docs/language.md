@@ -99,6 +99,9 @@ Ignoring comments, a program consists of:
         1. Literals:
 
             Integer, floating-point, and string literals.
+
+            Integers and floating-point literals can have suffixes `i8, i16, i32, i64, f32, f64` to type them.
+            A literal with no suffix has type `i32` for integers and `f64` for floating-point values.
         2. Variable and member access:
 
             A variable is referenced by its name.
@@ -113,7 +116,7 @@ Ignoring comments, a program consists of:
             <function-name>(<arg-expr1>, ..., <arg-exprN>);
             ```
             The argument expressions are evaluated left to right before the call.
-        4. Binary operators for number types:
+        4. Binary operators for `i32`, `i64`, `f32`, `f64`:
 
             Standard arithmetic (`+`, `-`, `*`, `/`, `%`),
             left/right shifts (`<<`, `>>`), comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`),
@@ -122,7 +125,7 @@ Ignoring comments, a program consists of:
             Operator precedence follows conventional rules, with parentheses `(<expr>)`
             used for explicit grouping.
 
-        5. Unary operators for number types:
+        5. Unary operators for `i32`, `i64`, `f32`, `f64`:
 
             Unary `+` (identity), `-` (negation) and `!` (logical not, only for `i32`) apply to a single operand.
 
@@ -140,8 +143,13 @@ Ignoring comments, a program consists of:
         ```
         <expression> as <type>
         ```
-        Casting is allowed between `i32` and `f32`, and between any
+        Casting is allowed between `i8`, `i16`, `i32`, `i64`, `f32` and `f64`, and between any
         struct and types marked with `#[allow_cast]` (see below).
+
+        The cast binds to the token on its left. For example, the parenthesis in `(-123) as i8` is mandatory.
+
+        **Note:** Arithmetic works with `i32`, `i64`, `f32` and `f64` types, and others have to be explicitly
+        casted.
 5. Macros are exported by the module and can be accessed from another module.
     They are defined via
     ```
@@ -204,8 +212,8 @@ Unknown directives are ignored.
 
 Built-in types are
 - `void`: Indicates `<no-type>`.
-- `i32`: A 32-bit integer.
-- `f32`: A 32-bit floating-point number.
+- `i8`, `i16`, `i32`, `i64`: Integers with bit widths of 8, 16, 32, and 64.
+- `f32`, `f64`: 32 and 64 bit wide floating-point numbers.
 - `str`: A string.
 - Arrays are declared as `let <name>: [<type>];`. They are of fixed length, and the length
     can be accessed with `<name>.length`. A new array can be defined as
@@ -267,7 +275,9 @@ These are:
 - `fn string_equals(s1: str, s2: str) -> i32`: Compare two strings for equality. 
     Returns `1` if the strings compare equal, and `0` otherwise.
 - `fn i32_to_string(i: i32) -> str`: Convert an `i32` value to a string.
+- `fn i64_to_string(i: i64) -> str`: Convert an `i64` value to a string.
 - `fn f32_to_string(f: f32) -> str`: Convert a `f32` value to a string.
+- `fn f64_to_string(f: f64) -> str`: Convert a `f64` value to a string.
 - `fn parse_i32(s: str) -> result`: Parse a string and return an `i32` integer
     wrapped in a `i32s` inside a `result`.
 - `fn parse_f32(s: str) -> result`: Parse a string and return an `f32` float

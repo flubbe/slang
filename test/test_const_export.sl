@@ -1,10 +1,10 @@
 import std;
 
 // pi with 32 bit accuracy.
-const PI: f32 = 3.1415927;
+const PI: f32 = 3.1415927 as f32;
 
 // negative pi with 32 bit accuracy
-const NEGATIVE_PI: f32 = -3.1415927;
+const NEGATIVE_PI: f32 = -3.1415927 as f32;
 
 // constant evaluation test.
 const T: i32 = 1 + 3 * 2;

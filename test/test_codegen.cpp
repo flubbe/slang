@@ -34,9 +34,13 @@ namespace
 
 // constexpr ty::type_id mock_null_type = 0;
 constexpr ty::type_id mock_void_type = 1;
-constexpr ty::type_id mock_i32_type = 2;
-// constexpr ty::type_id mock_f32_type = 3;
-constexpr ty::type_id mock_str_type = 4;
+// constexpr ty::type_id mock_i8_type = 2;
+// constexpr ty::type_id mock_i16_type = 3;
+constexpr ty::type_id mock_i32_type = 4;
+// constexpr ty::type_id mock_i64_type = 5;
+// constexpr ty::type_id mock_f32_type = 6;
+// constexpr ty::type_id mock_f64_type = 7;
+constexpr ty::type_id mock_str_type = 8;
 
 TEST(codegen, initialize_context)
 {

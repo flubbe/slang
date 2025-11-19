@@ -15,6 +15,7 @@
 #include <format>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 #include "archives/archive.h"
 #include "ast.h"
@@ -84,13 +85,13 @@ struct expression_serializer
     {
         auto id = static_cast<std::uint8_t>(expr ? expr->get_id() : node_identifier::null);
         ar & id;
-        if(id > static_cast<std::uint8_t>(node_identifier::last))
+        if(id > std::to_underlying(node_identifier::last))
         {
             throw serialization_error(
               std::format(
                 "Invalid AST node id ({} > {}).",
                 id,
-                static_cast<std::uint8_t>(node_identifier::last)));
+                std::to_underlying(node_identifier::last)));
         }
 
         if(ar.is_reading())
@@ -168,13 +169,13 @@ struct expression_vector_serializer
             {
                 std::uint8_t id{0};
                 ar & id;
-                if(id > static_cast<std::uint8_t>(node_identifier::last))
+                if(id > std::to_underlying(node_identifier::last))
                 {
                     throw serialization_error(
                       std::format(
                         "Invalid AST node id ({} >= {}).",
                         id,
-                        static_cast<std::uint8_t>(node_identifier::last)));
+                        std::to_underlying(node_identifier::last)));
                 }
 
                 exprs.emplace_back(

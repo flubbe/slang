@@ -8,8 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <print>
-
 #include "compiler/codegen/codegen.h"
 #include "cfg.h"
 

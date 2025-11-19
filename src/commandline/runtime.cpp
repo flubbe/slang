@@ -77,10 +77,20 @@ void runtime_setup(si::context& ctx, bool verbose)
                                  {
                                      rt::i32_to_string(ctx, stack);
                                  });
+    ctx.register_native_function("slang", "i64_to_string",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::i64_to_string(ctx, stack);
+                                 });
     ctx.register_native_function("slang", "f32_to_string",
                                  [&ctx](si::operand_stack& stack)
                                  {
                                      rt::f32_to_string(ctx, stack);
+                                 });
+    ctx.register_native_function("slang", "f64_to_string",
+                                 [&ctx](si::operand_stack& stack)
+                                 {
+                                     rt::f64_to_string(ctx, stack);
                                  });
     ctx.register_native_function("slang", "parse_i32",
                                  [&ctx](si::operand_stack& stack)

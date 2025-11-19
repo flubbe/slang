@@ -957,10 +957,20 @@ public:
     }
 
     [[nodiscard]]
+    bool is_const_eval(const_::env& env) const override
+    {
+        return expr->is_const_eval(env);
+    }
+
+    [[nodiscard]]
     bool is_pure(cg::context& ctx) const override
     {
         return expr->is_pure(ctx);
     }
+
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
 
     std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
@@ -1465,7 +1475,7 @@ public:
     [[nodiscard]]
     bool is_array_element_access() const override
     {
-        return static_cast<bool>(element_expr);
+        return element_expr != nullptr;
     }
 
     [[nodiscard]]
@@ -1531,7 +1541,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /** Get the expansion. The expansion can be `nullptr`. */
@@ -3254,7 +3264,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /**

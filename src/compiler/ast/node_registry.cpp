@@ -9,8 +9,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <format>
-
 #include "node_registry.h"
 #include "ast.h"
 #include "builtins.h"
@@ -62,7 +60,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     throw std::runtime_error(
       std::format(
         "Cannot construct AST node from unknown id {}.",
-        static_cast<std::uint8_t>(id)));
+        std::to_underlying(id)));
 }
 
 }    // namespace slang::ast

@@ -154,6 +154,18 @@ struct instruction_recorder
      * Record an instruction.
      *
      * @param instr The instruction's opcode.
+     * @param d A double parameter.
+     */
+    virtual void record(
+      [[maybe_unused]] opcode instr,
+      [[maybe_unused]] double f)
+    {
+    }
+
+    /**
+     * Record an instruction.
+     *
+     * @param instr The instruction's opcode.
      * @param i A table index.
      * @param s The table entry.
      */

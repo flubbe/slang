@@ -9,6 +9,7 @@
  */
 
 #include <format>
+#include <utility>
 
 #include "token.h"
 #include "utils.h"
@@ -20,17 +21,28 @@ archive& operator&(archive& ar, token_type& ty)
 {
     auto i = static_cast<std::uint8_t>(ty);
     ar & i;
-    if(i > static_cast<std::uint8_t>(token_type::last))
+    if(i > std::to_underlying(token_type::last))
     {
         throw serialization_error(
           std::format(
             "Invalid token type ({} > {}).",
             i,
-            static_cast<std::uint8_t>(token_type::last)));
+            std::to_underlying(token_type::last)));
     }
     ty = static_cast<token_type>(i);
 
     return ar;
+}
+
+std::string to_string(suffix_type ty)
+{
+    switch(ty)
+    {
+    case suffix_type::integer: return "i";
+    case suffix_type::floating_point: return "f";
+    }
+
+    return "<unknown>";
 }
 
 std::string to_string(token_type ty)
@@ -62,7 +74,7 @@ std::string to_string(token_type ty)
 static void serialize_token_value(
   archive& ar,
   token_type ty,
-  std::optional<std::variant<std::int32_t, float, std::string>>& v)
+  std::optional<const_value>& v)
 {
     bool has_value = v.has_value();
     ar & has_value;
@@ -80,13 +92,13 @@ static void serialize_token_value(
     {
         if(ty == token_type::int_literal)
         {
-            std::int32_t i{0};
+            std::int64_t i{0};
             ar & i;
             v = i;
         }
         else if(ty == token_type::fp_literal)
         {
-            float f{0};
+            double f{0};
             ar & f;
             v = f;
         }
@@ -101,19 +113,19 @@ static void serialize_token_value(
             throw serialization_error(
               std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
-                static_cast<std::int32_t>(ty)));
+                std::to_underlying(ty)));
         }
     }
     else
     {
         if(ty == token_type::int_literal)
         {
-            std::int32_t i{std::get<std::int32_t>(v.value())};
+            auto i = std::get<std::int64_t>(v.value());
             ar & i;
         }
         else if(ty == token_type::fp_literal)
         {
-            float f{std::get<float>(v.value())};
+            auto f = std::get<double>(v.value());
             ar & f;
         }
         else if(ty == token_type::str_literal)
@@ -126,7 +138,7 @@ static void serialize_token_value(
             throw serialization_error(
               std::format(
                 "Cannot serialize value for unknown literal type '{}'.",
-                static_cast<std::int32_t>(ty)));
+                std::to_underlying(ty)));
         }
     }
 }
