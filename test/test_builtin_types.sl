@@ -23,7 +23,7 @@ fn test_i64() -> void {
 
 fn test_literal_suffixes() -> void {
     let a: i8 = 13i8;
-    let b: i16 = (-(127i16 as i32)) as i16;
+    let b: i16 = -127i16;
     let c: i32 = 8392839i32;
     let d: i64 = 238923893928329839i64;
 
@@ -160,6 +160,36 @@ fn test_struct() -> void {
     std::assert(s.d == 3.4f64, "s.d == 3.4f64");
 }
 
+fn test_unary_operators() -> void {
+    let i0: i8 = 1i8;
+    let i1: i8 = +i0;
+    i1 = -i0;
+    i1 = ~i0;
+
+    let s1: str = std::format!("{} {} {} {}", i0, +i0, -i0, ~i0);
+    std::assert(
+        std::string_equals(
+            s1,
+            "1 1 -1 -2"
+        ),
+        "s1 == 1 1 -1 -2"
+    );
+
+    let i2: i16 = -1i16;
+    let i3: i16 = +i2;
+    i3 = -i2;
+    i3 = ~i2;
+
+    let s2: str = std::format!("{} {} {} {}", i2, +i2, -i2, ~i2);
+    std::assert(
+        std::string_equals(
+            s2,
+            "-1 -1 1 0"
+        ),
+        "s1 == -1 -1 1 0"
+    );
+}
+
 fn main(args: [str]) -> i32 {
     let a: i8 = 3 as i8;
 
@@ -170,6 +200,8 @@ fn main(args: [str]) -> i32 {
 
     test_builtin_arrays();
     test_struct();
+
+    test_unary_operators();
 
     return 0;
 }

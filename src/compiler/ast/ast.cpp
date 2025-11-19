@@ -3897,7 +3897,9 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         auto v = operand->generate_code(ctx, mc);
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i8
+           || v->get_type().get_type_kind() == cg::type_kind::i16
+           || v->get_type().get_type_kind() == cg::type_kind::i32)
         {
             args.emplace_back(
               std::make_unique<cg::const_argument>(
@@ -3934,7 +3936,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '-': Expected 'i32', 'i64', 'f32' or 'f64', got '{}'.",
+                "Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
                 v->get_type().to_string()));
         }
         instrs.insert(
@@ -3970,20 +3972,31 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         std::size_t pos = instrs.size();
 
         auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().get_type_kind() != cg::type_kind::i32
-           && v->get_type().get_type_kind() != cg::type_kind::i64)
+        auto constant_type = [this, &v]() -> cg::type_kind
         {
+            if(v->get_type().get_type_kind() == cg::type_kind::i8
+               || v->get_type().get_type_kind() == cg::type_kind::i16
+               || v->get_type().get_type_kind() == cg::type_kind::i32)
+            {
+                return cg::type_kind::i32;
+            }
+
+            if(v->get_type().get_type_kind() == cg::type_kind::i64)
+            {
+                return cg::type_kind::i64;
+            }
+
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '~': Expected 'i32' or 'i64', got '{}'.",
+                "Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string()));
-        }
+        }();
 
         std::vector<std::unique_ptr<cg::argument>> args;
         args.emplace_back(
           std::make_unique<cg::const_argument>(
-            v->get_type().get_type_kind(),
+            constant_type,
             static_cast<std::int64_t>(~0),
             std::nullopt));
 
@@ -3993,8 +4006,8 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
             "const",
             std::move(args)));
 
-        ctx.generate_binary_op(cg::binary_op::op_xor, v->get_type());
-        return v;
+        ctx.generate_binary_op(cg::binary_op::op_xor, constant_type);
+        return std::make_unique<cg::value>(constant_type);
     }
 
     throw std::runtime_error(
@@ -4030,12 +4043,12 @@ std::optional<ty::type_id> unary_expression::type_check(
     }
 
     const std::unordered_map<std::string, std::set<ty::type_id>> valid_operand_types = {
-      {"++", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
-      {"--", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
-      {"+", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
-      {"-", {ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
-      {"!", {ctx.get_i32_type(), ctx.get_i64_type()}},
-      {"~", {ctx.get_i32_type(), ctx.get_i64_type()}}};
+      {"++", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"--", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"+", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"-", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"!", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type()}},
+      {"~", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type()}}};
 
     auto op_it = valid_operand_types.find(op.s);
     if(op_it == valid_operand_types.end())

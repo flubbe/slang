@@ -235,10 +235,28 @@ void format_macro_expression::expand_late_macros(
         }
 
         std::unique_ptr<ast::expression> conversion_ast;
-        if(fph.arg_type == ctx.get_i32_type())
+        if(fph.arg_type == ctx.get_i8_type()
+           || fph.arg_type == ctx.get_i16_type()
+           || fph.arg_type == ctx.get_i32_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-            conversion_args.emplace_back(expr->clone());
+
+            if(fph.arg_type != ctx.get_i32_type())
+            {
+                conversion_args.emplace_back(
+                  std::make_unique<type_cast_expression>(
+                    loc,
+                    expr->clone(),
+                    std::make_unique<type_expression>(
+                      loc,
+                      token{"i32", loc},
+                      std::vector<token>{},
+                      false)));
+            }
+            else
+            {
+                conversion_args.emplace_back(expr->clone());
+            }
 
             auto to_string_expr = std::make_unique<ast::call_expression>(
               token{"i32_to_string", loc},
