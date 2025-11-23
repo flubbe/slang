@@ -620,7 +620,7 @@ std::optional<const_::const_info> binary_expression::evaluate(
 {
     if(!is_const_eval(env))
     {
-        return {};
+        return std::nullopt;
     }
 
     // clang-format off
@@ -1018,7 +1018,7 @@ std::optional<const_::const_info> unary_expression::evaluate(
 {
     if(!is_const_eval(env))
     {
-        return {};
+        return std::nullopt;
     }
 
     // clang-format off

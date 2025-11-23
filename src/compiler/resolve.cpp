@@ -644,7 +644,7 @@ std::unordered_map<std::string, import_module_spec> context::collect_unresolved_
             continue;
         }
 
-        auto [it, success] = import_specs.insert(
+        auto [entry, success] = import_specs.insert(
           {symbol_info.qualified_name,
            import_module_spec{
              .origin = symbol_info.declaring_module,
@@ -653,7 +653,7 @@ std::unordered_map<std::string, import_module_spec> context::collect_unresolved_
         {
             if(symbol_info.declaring_module == sema::symbol_info::current_module_id)
             {
-                it->second.origin = sema::symbol_info::current_module_id;
+                entry->second.origin = sema::symbol_info::current_module_id;
             }
         }
     }

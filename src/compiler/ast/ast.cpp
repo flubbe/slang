@@ -343,6 +343,26 @@ void expression::evaluate_constant_expressions(
       });
 }
 
+void expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    visit_nodes(
+      [&ctx, &env](expression& expr) -> void
+      {
+          if(expr.get_id() == node_identifier::binary_expression)
+          {
+              static_cast<binary_expression*>(&expr)->insert_implicit_casts(ctx, env);
+          }
+          else if(expr.get_id() == node_identifier::variable_declaration_expression)
+          {
+              static_cast<variable_declaration_expression*>(&expr)->insert_implicit_casts(ctx, env);
+          }
+      },
+      false,
+      false);
+}
+
 std::string expression::to_string() const
 {
     throw std::runtime_error("Expression has no string conversion");
@@ -600,9 +620,9 @@ std::optional<ty::type_id> literal_expression::type_check(
                       loc,
                       std::format(
                         "Integer literal '{}' does not fit in type 'i8' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int8_t>::min(),
-                        std::numeric_limits<std::int8_t>::max(),
-                        std::get<std::int64_t>(tok.value.value())));
+                        std::numeric_limits<std::int8_t>::max()));
                 }
 
                 expr_type = ctx.get_i8_type();
@@ -615,9 +635,9 @@ std::optional<ty::type_id> literal_expression::type_check(
                       loc,
                       std::format(
                         "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int16_t>::min(),
-                        std::numeric_limits<std::int16_t>::max(),
-                        std::get<std::int64_t>(tok.value.value())));
+                        std::numeric_limits<std::int16_t>::max()));
                 }
 
                 expr_type = ctx.get_i16_type();
@@ -629,10 +649,10 @@ std::optional<ty::type_id> literal_expression::type_check(
                     throw ty::type_error(
                       loc,
                       std::format(
-                        "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
+                        "Integer literal '{}' does not fit in type 'i32' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
                         std::numeric_limits<std::int32_t>::min(),
-                        std::numeric_limits<std::int32_t>::max(),
-                        std::get<std::int64_t>(tok.value.value())));
+                        std::numeric_limits<std::int32_t>::max()));
                 }
 
                 expr_type = ctx.get_i32_type();
@@ -810,7 +830,8 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
 
     // only cast if necessary.
     cg::type lowered_type = ctx.lower(target_type->get_type());
-    if(lowered_type.get_type_kind() != v->get_type().get_type_kind())
+    if(always_cast
+       || lowered_type.get_type_kind() != v->get_type().get_type_kind())
     {
         if(v->get_type().get_type_kind() == cg::type_kind::i8
            || v->get_type().get_type_kind() == cg::type_kind::i16)
@@ -819,7 +840,8 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
 
             if(lowered_type.get_type_kind() == cg::type_kind::i8)
             {
-                if(v->get_type().get_type_kind() != cg::type_kind::i8)
+                if(always_cast
+                   || v->get_type().get_type_kind() != cg::type_kind::i8)
                 {
                     ctx.generate_cast(cg::type_cast::i32_to_i8);
                 }
@@ -835,7 +857,8 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
             }
             else if(lowered_type.get_type_kind() == cg::type_kind::i16)
             {
-                if(v->get_type().get_type_kind() != cg::type_kind::i16)
+                if(always_cast
+                   || v->get_type().get_type_kind() != cg::type_kind::i16)
                 {
                     ctx.generate_cast(cg::type_cast::i32_to_i16);
                 }
@@ -2108,6 +2131,8 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
               "Expression has no type.");
         }
 
+        ctx.set_expression_type(*expr.get(), rhs);
+
         if(!ctx.are_types_compatible(annotated_type_id, rhs.value()))
         {
             throw ty::type_error(
@@ -2134,6 +2159,45 @@ std::string variable_declaration_expression::to_string() const
       name.s,
       type->to_string(),
       expr ? expr->to_string() : std::string("<none>"));
+}
+
+void variable_declaration_expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(expr == nullptr)
+    {
+        return;
+    }
+
+    if(!ctx.has_expression_type(*expr.get()))
+    {
+        // only insert casts if the type is known.
+        // the type is unknown inside non-expanded macros.
+        return;
+    }
+
+    auto expr_type = ctx.get_expression_type(*expr.get());
+    if(!expr_type.has_value())
+    {
+        return;
+    }
+
+    if(expr_type.value() == ctx.get_i8_type()
+       || expr_type.value() == ctx.get_i16_type())
+    {
+        expr = std::make_unique<type_cast_expression>(
+          expr->get_location(),
+          std::move(expr),
+          std::make_unique<type_expression>(
+            expr->get_location(),
+            token{ctx.to_string(expr_type.value()), expr->get_location()},
+            std::vector<token>{},
+            ctx.is_array(expr_type.value())),
+          true /* always cast */);
+
+        expr->type_check(ctx, env);    // FIXME should not need to be re-checked.
+    }
 }
 
 /*
@@ -3294,7 +3358,7 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
     if(!is_assignment
        && mc == memory_context::store)
     {
-        throw cg::codegen_error("Invalid memory context for assignment (value needs to be writable).");
+        throw cg::codegen_error("Invalid memory context (value needs to be readable).");
     }
 
     /* Cases 2., 3., 5., 6. */
@@ -3390,6 +3454,16 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
         {
             // non-assignment operation.
             return lhs_value;
+        }
+
+        // FIXME Should this go into a desugar-phase for compound assignments?
+        if(rhs_value->get_type().get_type_kind() == cg::type_kind::i8)
+        {
+            ctx.generate_cast(cg::type_cast::i32_to_i8);
+        }
+        else if(rhs_value->get_type().get_type_kind() == cg::type_kind::i16)
+        {
+            ctx.generate_cast(cg::type_cast::i32_to_i16);
         }
     }
 
@@ -3672,7 +3746,9 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // check lhs and rhs have supported types (i32, i64, f32 and f64).
-    if(lhs_type.value() != ctx.get_i32_type()
+    if(lhs_type.value() != ctx.get_i8_type()
+       && lhs_type.value() != ctx.get_i16_type()
+       && lhs_type.value() != ctx.get_i32_type()
        && lhs_type.value() != ctx.get_i64_type()
        && lhs_type.value() != ctx.get_f32_type()
        && lhs_type.value() != ctx.get_f64_type())
@@ -3685,7 +3761,9 @@ std::optional<ty::type_id> binary_expression::type_check(
             ctx.to_string(lhs_type.value())));
     }
 
-    if(rhs_type.value() != ctx.get_i32_type()
+    if(rhs_type.value() != ctx.get_i8_type()
+       && rhs_type.value() != ctx.get_i16_type()
+       && rhs_type.value() != ctx.get_i32_type()
        && rhs_type.value() != ctx.get_i64_type()
        && rhs_type.value() != ctx.get_f32_type()
        && rhs_type.value() != ctx.get_f64_type())
@@ -3716,7 +3794,7 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
     else
     {
-        // set the type of the binary expression.
+        // set the type of the binary expression,
         expr_type = lhs_type;
     }
 
@@ -3730,6 +3808,48 @@ std::string binary_expression::to_string() const
       "Binary(op=\"{}\", lhs={}, rhs={})", op.s,
       lhs ? lhs->to_string() : std::string("<none>"),
       rhs ? rhs->to_string() : std::string("<none>"));
+}
+
+void binary_expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
+    if(!is_assignment)
+    {
+        return;
+    }
+
+    if(!ctx.has_expression_type(*rhs.get()))
+    {
+        // only insert casts if the type is known.
+        // the type is unknown inside non-expanded macros.
+        return;
+    }
+
+    auto rhs_type = ctx.get_expression_type(*rhs.get());
+    if(!rhs_type.has_value())
+    {
+        return;
+    }
+
+    if(rhs_type.value() == ctx.get_i8_type()
+       || rhs_type.value() == ctx.get_i16_type())
+    {
+        auto loc = rhs->get_location();    // save location before moving r.h.s.
+
+        rhs = std::make_unique<type_cast_expression>(
+          loc,
+          std::move(rhs),
+          std::make_unique<type_expression>(
+            loc,
+            token{ctx.to_string(rhs_type.value()), loc},
+            std::vector<token>{},
+            ctx.is_array(rhs_type.value())),
+          true /* always cast */);
+
+        rhs->type_check(ctx, env);    // FIXME should not need to be re-checked.
+    }
 }
 
 /*
@@ -4613,9 +4733,11 @@ std::optional<ty::type_id> block::type_check(
     {
         expr->type_check(ctx, env);
     }
-    auto ret = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
 
-    return ret;
+    expr_type = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
+    ctx.set_expression_type(*this, expr_type);
+
+    return expr_type;
 }
 
 std::string block::to_string() const

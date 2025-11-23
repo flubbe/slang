@@ -7,12 +7,34 @@ fn approx_eq(value: f32, expected: f32, message: str) -> void
     std::assert(std::abs(value - expected) < ABS, message);
 }
 
+macro p! {
+    () => {
+        127i8;
+    };
+}
+
 fn test_i8() -> void {
     let x: i8 = 3 as i8;
     let y: i8 = (-123) as i8;
     let z: i8 = (x as i32 + y as i32) as i8;
 
     std::assert(z == (-120) as i8, "z == -120");
+
+    let a: i8 = (100i8 + 100i8 + 100i8);
+    std::println(
+        std::format!("a = {}", a));
+    std::assert(a == 44i8, "a == 44");
+
+    let b: i8 = p!() + p!();
+    std::println(
+        std::format!("b = {}", b));
+    std::assert(b == -2i8, "b == -2");
+
+    b -= 100i8;
+    b -= 90i8;
+    std::println(
+        std::format!("b = {}", b));
+    std::assert(b == 64i8, "b == 64");
 }
 
 fn test_i64() -> void {

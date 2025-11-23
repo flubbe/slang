@@ -201,6 +201,25 @@ fn test_f32_binary_operators() -> void
     std::assert((1.0 as f32 == 2.0 as f32) != (3.0 as f32 == 3.0 as f32), "(1.0 == 2.0) != (3.0 == 3.0)");    
 }
 
+fn test_compound_assignments() -> void {
+    std::println("compound assignments");
+
+    let x: [i32] = [0, 0, 0];
+    let i: i32 = 0;
+
+    x[i += 1] += 2;
+
+    std::println(
+        std::format!(
+            "i = {} / x = [{}, {}, {}]", 
+            i, x[0], x[1], x[2]));
+
+    std::assert(x[0] == 0, "x[0] == 0");
+    std::assert(x[1] == 2, "x[1] == 2");
+    std::assert(x[2] == 0, "x[2] == 0");
+    std::assert(i == 1, "i == 1");
+}
+
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
     test_i32_unary_operators();
@@ -209,6 +228,7 @@ fn main(args: [str]) -> i32 {
     test_f32_unary_operators();
 
     test_logical_operators();
+//    test_compound_assignments();
 
     return 0;
 }

@@ -473,6 +473,11 @@ add_compile_exec_test(
     TRUE
     test/test_eval_subexpr
 )
+add_compile_exec_test(
+    "slang integer wrap"
+    TRUE
+    test/test_integer_wrap
+)
 add_compile_exec_fail_test(
     "slang invalid main signature 1"
     FALSE

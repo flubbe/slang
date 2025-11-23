@@ -428,6 +428,11 @@ public:
       ty::context& ctx,
       const_::env& env);
 
+    /** Insert AST nodes for implicit casts after type checking. */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
+
     /**
      * Macro expansion (before type checking). Expands macro invocations by the corresponding
      * macro AST's while taking care of macro hygiene.
@@ -874,6 +879,9 @@ class type_cast_expression : public expression
     /** The target type. */
     std::unique_ptr<type_expression> target_type;
 
+    /** Whether to always perform the cast, e.g. when making the implicit casts explicit. */
+    bool always_cast{false};
+
 public:
     /** Set the super class. */
     using super = expression;
@@ -886,6 +894,7 @@ public:
     : super{other}
     , expr{other.expr->clone()}
     , target_type{other.target_type->clone()}
+    , always_cast{other.always_cast}
     {
     }
     type_cast_expression(type_cast_expression&&) = default;
@@ -900,14 +909,17 @@ public:
      * @param loc The location
      * @param expr The expression.
      * @param target_type The target type.
+     * @param always_cast Whether to always insert the cast.
      */
     type_cast_expression(
       source_location loc,
       std::unique_ptr<expression> expr,
-      std::unique_ptr<type_expression> target_type)
+      std::unique_ptr<type_expression> target_type,
+      bool always_cast = false)
     : expression{loc}
     , expr{std::move(expr)}
     , target_type{std::move(target_type)}
+    , always_cast{always_cast}
     {
     }
 
@@ -1669,6 +1681,16 @@ public:
     {
         return type->is_array();
     }
+
+    /**
+     * Insert AST nodes for implicit casts after type checking.
+     *
+     * @param ctx The type context.
+     * @param env Semantic environment.
+     */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 /** Constant declaration. */
@@ -2317,6 +2339,16 @@ public:
     {
         return {lhs.get(), rhs.get()};
     }
+
+    /**
+     * Insert AST nodes for implicit casts after type checking.
+     *
+     * @param ctx The type context.
+     * @param env Semantic environment.
+     */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 /** Unary operators. */
