@@ -133,7 +133,7 @@ protected:
     std::unique_ptr<ast::expression> parse_top_level_statement();
 
     /** Parse an import statement. */
-    std::unique_ptr<ast::import_expression> parse_import();
+    std::unique_ptr<ast::import_statement> parse_import();
 
     /** Parse a function prototype. */
     std::unique_ptr<ast::prototype_ast> parse_prototype();

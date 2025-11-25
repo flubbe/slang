@@ -165,7 +165,7 @@ std::unique_ptr<ast::expression> parser::parse_top_level_statement()
 
 // import ::= 'import' path_expr ';'
 // path_expr ::= path | path '::' path_expr
-std::unique_ptr<ast::import_expression> parser::parse_import()
+std::unique_ptr<ast::import_statement> parser::parse_import()
 {
     get_next_token();    // skip "import" token.
 
@@ -201,7 +201,7 @@ std::unique_ptr<ast::import_expression> parser::parse_import()
         throw syntax_error(last_token, std::format("Expected ';', got '{}'.", last_token.s));
     }
 
-    return std::make_unique<ast::import_expression>(std::move(import_path));
+    return std::make_unique<ast::import_statement>(std::move(import_path));
 }
 
 // prototype ::= 'fn' identifier '(' args ')' -> return_type
@@ -694,7 +694,7 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt_expr()
         throw syntax_error(*current_token, std::format("Unexpected keyword '{}'.", current_token->s));
     }
 
-    auto expr = parse_expression();
+    auto expr = std::make_unique<ast::expression_statement>(parse_expression());
 
     if(current_token->s != ";")
     {

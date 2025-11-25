@@ -27,7 +27,6 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::type_cast_expression: return std::make_unique<type_cast_expression>();
     case node_identifier::namespace_access_expression: return std::make_unique<namespace_access_expression>();
     case node_identifier::access_expression: return std::make_unique<access_expression>();
-    case node_identifier::import_expression: return std::make_unique<import_expression>();
     case node_identifier::directive_expression: return std::make_unique<directive_expression>();
     case node_identifier::variable_reference_expression: return std::make_unique<variable_reference_expression>();
     case node_identifier::variable_declaration_expression: return std::make_unique<variable_declaration_expression>();
@@ -46,6 +45,8 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::function_expression: return std::make_unique<function_expression>();
     case node_identifier::call_expression: return std::make_unique<call_expression>();
     case node_identifier::macro_invocation: return std::make_unique<macro_invocation>();
+    case node_identifier::expression_statement: return std::make_unique<expression_statement>();
+    case node_identifier::import_statement: return std::make_unique<import_statement>();
     case node_identifier::return_statement: return std::make_unique<return_statement>();
     case node_identifier::if_statement: return std::make_unique<if_statement>();
     case node_identifier::while_statement: return std::make_unique<while_statement>();

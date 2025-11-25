@@ -19,6 +19,15 @@ namespace slang::ast
 {
 
 /*
+ * expression_statement.
+ */
+
+void expression_statement::resolve_names(rs::context& ctx)
+{
+    expr->resolve_names(ctx);
+}
+
+/*
  * type_expression.
  */
 

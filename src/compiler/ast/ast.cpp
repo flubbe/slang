@@ -1411,29 +1411,62 @@ ty::type_id access_expression::get_struct_type() const
 }
 
 /*
- * import_expression.
+ * expression_statement.
  */
 
-std::unique_ptr<expression> import_expression::clone() const
+std::unique_ptr<expression> expression_statement::clone() const
 {
-    return std::make_unique<import_expression>(*this);
+    return std::make_unique<expression_statement>(*this);
 }
 
-void import_expression::serialize(archive& ar)
+void expression_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+}
+
+std::unique_ptr<cg::value> expression_statement::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    return expr->generate_code(ctx, mc);
+}
+
+void expression_statement::collect_names(co::context& ctx)
+{
+    expr->collect_names(ctx);
+}
+
+std::optional<ty::type_id> expression_statement::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    return expr->type_check(ctx, env);
+}
+
+std::string expression_statement::to_string() const
+{
+    return std::format(
+      "ExpressionStatement(expr={})",
+      expr->to_string());
+}
+
+/*
+ * import_statement.
+ */
+
+std::unique_ptr<expression> import_statement::clone() const
+{
+    return std::make_unique<import_statement>(*this);
+}
+
+void import_statement::serialize(archive& ar)
 {
     super::serialize(ar);
     ar & path;
 }
 
-std::unique_ptr<cg::value> import_expression::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
-{
-    // import expressions are handled by the import resolver.
-    return nullptr;
-}
-
-void import_expression::collect_names(co::context& ctx)
+void import_statement::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
@@ -1451,12 +1484,14 @@ void import_expression::collect_names(co::context& ctx)
       false);
 }
 
-std::string import_expression::to_string() const
+std::string import_statement::to_string() const
 {
     auto transform = [](const token& p) -> std::string
     { return p.s; };
 
-    return std::format("Import(path={})", slang::utils::join(path, {transform}, "."));
+    return std::format(
+      "Import(path={})",
+      slang::utils::join(path, {transform}, "."));
 }
 
 /*
