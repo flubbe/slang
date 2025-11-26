@@ -24,7 +24,7 @@ std::string to_string(node_identifier node_id)
     case node_identifier::type_cast_expression: return "type_cast_expression";
     case node_identifier::namespace_access_expression: return "namespace_access_expression";
     case node_identifier::access_expression: return "access_expression";
-    case node_identifier::import_expression: return "import_expression";
+    case node_identifier::import_statement: return "import_statement";
     case node_identifier::directive_expression: return "directive_expression";
     case node_identifier::variable_reference_expression: return "variable_reference_expression";
     case node_identifier::variable_declaration_expression: return "variable_declaration_expression";
@@ -34,6 +34,7 @@ std::string to_string(node_identifier node_id)
     case node_identifier::struct_anonymous_initializer_expression: return "struct_anonymous_initializer_expression";
     case node_identifier::named_initializer: return "named_initializer";
     case node_identifier::struct_named_initializer_expression: return "struct_named_initializer_expression";
+    case node_identifier::assignment_expression: return "assignment_expression";
     case node_identifier::binary_expression: return "binary_expression";
     case node_identifier::unary_expression: return "unary_expression";
     case node_identifier::new_expression: return "new_expression";

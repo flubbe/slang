@@ -28,9 +28,13 @@ namespace ty = slang::typing;
 /** Type encoding pairs as `(type, encoded_type)`. */
 static const std::vector<std::pair<std::string, std::string>> type_encoding = {
   {"void", "v"},
+  {"i8", "b"},
+  {"i16", "s"},
   {"i32", "i"},
+  {"i64", "l"},
   {"f32", "f"},
-  {"str", "s"}};
+  {"f64", "d"},
+  {"str", "a"}};
 
 static constexpr char type_prefix = 'C';
 

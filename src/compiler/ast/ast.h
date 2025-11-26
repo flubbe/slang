@@ -428,6 +428,11 @@ public:
       ty::context& ctx,
       const_::env& env);
 
+    /** Insert AST nodes for implicit casts after type checking. */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
+
     /**
      * Macro expansion (before type checking). Expands macro invocations by the corresponding
      * macro AST's while taking care of macro hygiene.
@@ -751,8 +756,12 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     /** Get the token. */
@@ -810,7 +819,9 @@ public:
     void serialize(archive& ar);
 
     void resolve_names(rs::context& ctx);
-    void type_check(ty::context& ctx, sema::env& env);
+    void type_check(
+      ty::context& ctx,
+      sema::env& env);
 
     /** Get the location. */
     [[nodiscard]]
@@ -874,6 +885,9 @@ class type_cast_expression : public expression
     /** The target type. */
     std::unique_ptr<type_expression> target_type;
 
+    /** Whether to always perform the cast, e.g. when making the implicit casts explicit. */
+    bool always_cast{false};
+
 public:
     /** Set the super class. */
     using super = expression;
@@ -886,6 +900,7 @@ public:
     : super{other}
     , expr{other.expr->clone()}
     , target_type{other.target_type->clone()}
+    , always_cast{other.always_cast}
     {
     }
     type_cast_expression(type_cast_expression&&) = default;
@@ -900,14 +915,17 @@ public:
      * @param loc The location
      * @param expr The expression.
      * @param target_type The target type.
+     * @param always_cast Whether to always insert the cast.
      */
     type_cast_expression(
       source_location loc,
       std::unique_ptr<expression> expr,
-      std::unique_ptr<type_expression> target_type)
+      std::unique_ptr<type_expression> target_type,
+      bool always_cast = false)
     : expression{loc}
     , expr{std::move(expr)}
     , target_type{std::move(target_type)}
+    , always_cast{always_cast}
     {
     }
 
@@ -957,15 +975,29 @@ public:
     }
 
     [[nodiscard]]
+    bool is_const_eval(const_::env& env) const override
+    {
+        return expr->is_const_eval(env);
+    }
+
+    [[nodiscard]]
     bool is_pure(cg::context& ctx) const override
     {
         return expr->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    virtual std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override;
+
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1074,7 +1106,9 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void resolve_names(rs::context& ctx) override;
 
     std::optional<std::string> get_namespace_path() const override
@@ -1090,7 +1124,9 @@ public:
     }
 
     void collect_names(co::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1205,10 +1241,14 @@ public:
      * @note When called with `memory_context::store`, the object must be loaded onto the stack by
      *       calling `generate_object_load` beforehand.
      */
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     /** Get the left-hand side expression. */
@@ -1247,56 +1287,6 @@ public:
     {
         return field_index;
     }
-};
-
-/** Import statements. */
-class import_expression : public expression
-{
-    /** The import path. */
-    std::vector<token> path;
-
-public:
-    /** Set the super class. */
-    using super = expression;
-
-    /** Default constructor. */
-    import_expression() = default;
-
-    /** Copy and move constructors. */
-    import_expression(const import_expression& other)
-    : super{other}
-    , path{other.path}
-    {
-    }
-    import_expression(import_expression&&) = default;
-
-    /** Assignment operators. */
-    import_expression& operator=(const import_expression&) = delete;
-    import_expression& operator=(import_expression&&) = default;
-
-    /**
-     * Construct an import expression.
-     *
-     * @param path The import path.
-     */
-    explicit import_expression(std::vector<token> path)
-    : expression{path[0].location}
-    , path{std::move(path)}
-    {
-    }
-
-    [[nodiscard]]
-    node_identifier get_id() const override
-    {
-        return node_identifier::import_expression;
-    }
-
-    [[nodiscard]] std::unique_ptr<expression> clone() const override;
-    void serialize(archive& ar) override;
-
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    void collect_names(co::context& ctx) override;
-    [[nodiscard]] std::string to_string() const override;
 };
 
 /** Directives. Directives have names and contain a list of key-value pairs as arguments. */
@@ -1363,10 +1353,14 @@ public:
         return expr->is_macro_expression();
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1465,7 +1459,7 @@ public:
     [[nodiscard]]
     bool is_array_element_access() const override
     {
-        return static_cast<bool>(element_expr);
+        return element_expr != nullptr;
     }
 
     [[nodiscard]]
@@ -1486,10 +1480,14 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1531,7 +1529,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /** Get the expansion. The expansion can be `nullptr`. */
@@ -1621,10 +1619,14 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1659,6 +1661,16 @@ public:
     {
         return type->is_array();
     }
+
+    /**
+     * Insert AST nodes for implicit casts after type checking.
+     *
+     * @param ctx The type context.
+     * @param env Semantic environment.
+     */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 /** Constant declaration. */
@@ -1728,10 +1740,14 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1814,10 +1830,14 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -1907,7 +1927,9 @@ public:
 
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2017,10 +2039,14 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2099,10 +2125,14 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
 
     [[nodiscard]] std::string to_string() const override;
 
@@ -2196,10 +2226,14 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2224,6 +2258,95 @@ public:
                  })
                | std::ranges::to<std::vector>();
     }
+};
+
+/** Assignments. */
+class assignment_expression : public expression
+{
+    /** The binary operator. */
+    token op;
+
+    /** Left and right hand sides. */
+    std::unique_ptr<expression> lhs, rhs;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Defaulted and deleted constructors. */
+    assignment_expression() = default;
+    assignment_expression(const assignment_expression& other)
+    : super{other}
+    , op{other.op}
+    , lhs{other.lhs->clone()}
+    , rhs{other.rhs->clone()}
+    {
+    }
+    assignment_expression(assignment_expression&&) = default;
+
+    /** Assignment operators. */
+    assignment_expression& operator=(const assignment_expression&) = delete;
+    assignment_expression& operator=(assignment_expression&&) = default;
+
+    /**
+     * Construct an assignment expression.
+     *
+     * @param loc The location.
+     * @param op The assignment operator.
+     * @param lhs The left-hand side.
+     * @param rhs The right-hand side.
+     */
+    assignment_expression(
+      source_location loc,
+      token op,
+      std::unique_ptr<expression> lhs,
+      std::unique_ptr<expression> rhs)
+    : expression{loc}
+    , op{std::move(op)}
+    , lhs{std::move(lhs)}
+    , rhs{std::move(rhs)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::assignment_expression;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+
+    /**
+     * Insert AST nodes for implicit casts after type checking.
+     *
+     * @param ctx The type context.
+     * @param env Semantic environment.
+     */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
 };
 
 /** Binary operators. */
@@ -2291,10 +2414,14 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2375,10 +2502,14 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2455,10 +2586,14 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2520,8 +2655,12 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 };
 
@@ -2580,10 +2719,14 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2784,10 +2927,14 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context&) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -2879,10 +3026,14 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3020,10 +3171,14 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3176,10 +3331,14 @@ public:
         return expansion->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3254,7 +3413,7 @@ public:
     [[nodiscard]]
     bool has_expansion() const
     {
-        return static_cast<bool>(expansion);
+        return expansion != nullptr;
     }
 
     /**
@@ -3275,6 +3434,140 @@ public:
 /*
  * Statements.
  */
+
+/** Expression statement. */
+class expression_statement : public expression
+{
+    /** The expression. */
+    std::unique_ptr<expression> expr;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Default constructors. */
+    expression_statement() = default;
+    expression_statement(const expression_statement& other)
+    : super{other}
+    , expr{other.expr ? other.expr->clone() : nullptr}
+    {
+    }
+    expression_statement(expression_statement&&) = default;
+
+    /** Assignment operators. */
+    expression_statement& operator=(const expression_statement&) = delete;
+    expression_statement& operator=(expression_statement&&) = default;
+
+    /**
+     * Construct an expression statement.
+     *
+     * @param expr The expression.
+     */
+    explicit expression_statement(
+      std::unique_ptr<expression> expr)
+    : expr{std::move(expr)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::expression_statement;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    [[nodiscard]]
+    bool needs_pop() const override
+    {
+        return expr->needs_pop();
+    }
+
+    [[nodiscard]]
+    bool is_pure(cg::context& ctx) const override
+    {
+        return expr->is_pure(ctx);
+    }
+
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        if(expr)
+        {
+            return {expr.get()};
+        }
+        return {};
+    }
+};
+
+/** Import statement. */
+class import_statement : public expression
+{
+    /** The import path. */
+    std::vector<token> path;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Default constructor. */
+    import_statement() = default;
+
+    /** Copy and move constructors. */
+    import_statement(const import_statement& other)
+    : super{other}
+    , path{other.path}
+    {
+    }
+    import_statement(import_statement&&) = default;
+
+    /** Assignment operators. */
+    import_statement& operator=(const import_statement&) = delete;
+    import_statement& operator=(import_statement&&) = default;
+
+    /**
+     * Construct an import statement.
+     *
+     * @param path The import path.
+     */
+    explicit import_statement(std::vector<token> path)
+    : expression{path[0].location}
+    , path{std::move(path)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::import_statement;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    void collect_names(co::context& ctx) override;
+    [[nodiscard]] std::string to_string() const override;
+};
 
 /** Return statement. */
 class return_statement : public expression
@@ -3322,10 +3615,14 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3415,10 +3712,14 @@ public:
                && (!else_block || else_block->is_pure(ctx));
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3510,10 +3811,14 @@ public:
                && while_block->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3567,7 +3872,9 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
 
     [[nodiscard]]
     std::string to_string() const override
@@ -3615,7 +3922,9 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
 
     [[nodiscard]]
     std::string to_string() const override
@@ -3704,10 +4013,14 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     [[nodiscard]] std::string to_string() const override;
 
     [[nodiscard]]
@@ -3812,10 +4125,14 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
-    std::optional<ty::type_id> type_check(ty::context& ctx, sema::env& env) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
     std::string to_string() const override;
 
     /** Get the expression list. */
@@ -3899,7 +4216,9 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(cg::context& ctx, memory_context mc = memory_context::none) const override;
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] std::optional<ty::type_id> type_check(

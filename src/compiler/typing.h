@@ -52,8 +52,12 @@ enum class builtins
 {
     null,
     void_,
+    i8,
+    i16,
     i32,
+    i64,
     f32,
+    f64,
     str
 };
 
@@ -175,8 +179,12 @@ class context
     /** Builtin type ids. */
     type_id null_type;
     type_id void_type;
+    type_id i8_type;
+    type_id i16_type;
     type_id i32_type;
+    type_id i64_type;
     type_id f32_type;
+    type_id f64_type;
     type_id str_type;
 
 public:
@@ -454,16 +462,40 @@ public:
         return void_type;
     }
 
+    /** Get i8 type. */
+    type_id get_i8_type() const
+    {
+        return i8_type;
+    }
+
+    /** Get i16 type. */
+    type_id get_i16_type() const
+    {
+        return i16_type;
+    }
+
     /** Get i32 type. */
     type_id get_i32_type() const
     {
         return i32_type;
     }
 
+    /** Get i64 type. */
+    type_id get_i64_type() const
+    {
+        return i64_type;
+    }
+
     /** Get f32 type. */
     type_id get_f32_type() const
     {
         return f32_type;
+    }
+
+    /** Get f64 type. */
+    type_id get_f64_type() const
+    {
+        return f64_type;
     }
 
     /** Get str type. */

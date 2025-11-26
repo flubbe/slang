@@ -114,12 +114,28 @@ void string_concat(si::context& ctx, si::operand_stack& stack);
 void i32_to_string(si::context& ctx, si::operand_stack& stack);
 
 /**
+ * Convert an i64 integer to a string.
+ *
+ * @param ctx The interpreter context.
+ * @param stack The operand stack.
+ */
+void i64_to_string(si::context& ctx, si::operand_stack& stack);
+
+/**
  * Convert an f32 float to a string.
  *
  * @param ctx The interpreter context.
  * @param stack The operand stack.
  */
 void f32_to_string(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Convert an f64 float to a string.
+ *
+ * @param ctx The interpreter context.
+ * @param stack The operand stack.
+ */
+void f64_to_string(si::context& ctx, si::operand_stack& stack);
 
 /**
  * Parse a string to obtain an i32 integer.
