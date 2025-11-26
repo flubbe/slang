@@ -2260,6 +2260,95 @@ public:
     }
 };
 
+/** Assignments. */
+class assignment_expression : public expression
+{
+    /** The binary operator. */
+    token op;
+
+    /** Left and right hand sides. */
+    std::unique_ptr<expression> lhs, rhs;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Defaulted and deleted constructors. */
+    assignment_expression() = default;
+    assignment_expression(const assignment_expression& other)
+    : super{other}
+    , op{other.op}
+    , lhs{other.lhs->clone()}
+    , rhs{other.rhs->clone()}
+    {
+    }
+    assignment_expression(assignment_expression&&) = default;
+
+    /** Assignment operators. */
+    assignment_expression& operator=(const assignment_expression&) = delete;
+    assignment_expression& operator=(assignment_expression&&) = default;
+
+    /**
+     * Construct an assignment expression.
+     *
+     * @param loc The location.
+     * @param op The assignment operator.
+     * @param lhs The left-hand side.
+     * @param rhs The right-hand side.
+     */
+    assignment_expression(
+      source_location loc,
+      token op,
+      std::unique_ptr<expression> lhs,
+      std::unique_ptr<expression> rhs)
+    : expression{loc}
+    , op{std::move(op)}
+    , lhs{std::move(lhs)}
+    , rhs{std::move(rhs)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::assignment_expression;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    std::unique_ptr<cg::value> generate_code(
+      cg::context& ctx,
+      memory_context mc = memory_context::none) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), rhs.get()};
+    }
+
+    /**
+     * Insert AST nodes for implicit casts after type checking.
+     *
+     * @param ctx The type context.
+     * @param env Semantic environment.
+     */
+    void insert_implicit_casts(
+      ty::context& ctx,
+      sema::env& env);
+};
+
 /** Binary operators. */
 class binary_expression : public expression
 {
@@ -2345,16 +2434,6 @@ public:
     {
         return {lhs.get(), rhs.get()};
     }
-
-    /**
-     * Insert AST nodes for implicit casts after type checking.
-     *
-     * @param ctx The type context.
-     * @param env Semantic environment.
-     */
-    void insert_implicit_casts(
-      ty::context& ctx,
-      sema::env& env);
 };
 
 /** Unary operators. */

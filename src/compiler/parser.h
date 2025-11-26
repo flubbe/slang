@@ -174,10 +174,10 @@ protected:
     std::unique_ptr<ast::block> parse_block(bool skip_closing_brace = true);
 
     /**
-     * Parse a statement or expression in a block. Returns an empty `std::unique_ptr`
-     * if the statement/expression was empty.
+     * Parse a statement in a block. Returns an empty `std::unique_ptr`
+     * if the statement was empty.
      */
-    std::unique_ptr<ast::expression> parse_block_stmt_expr();
+    std::unique_ptr<ast::expression> parse_block_stmt();
 
     /** Parse a primary expression. */
     std::unique_ptr<ast::expression> parse_primary();

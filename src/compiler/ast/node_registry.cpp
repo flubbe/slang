@@ -36,6 +36,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::struct_anonymous_initializer_expression: return std::make_unique<struct_anonymous_initializer_expression>();
     case node_identifier::named_initializer: return std::make_unique<named_initializer>();
     case node_identifier::struct_named_initializer_expression: return std::make_unique<struct_named_initializer_expression>();
+    case node_identifier::assignment_expression: return std::make_unique<assignment_expression>();
     case node_identifier::binary_expression: return std::make_unique<binary_expression>();
     case node_identifier::unary_expression: return std::make_unique<unary_expression>();
     case node_identifier::new_expression: return std::make_unique<new_expression>();

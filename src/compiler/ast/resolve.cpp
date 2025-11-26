@@ -253,6 +253,16 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
 }
 
 /*
+ * assignment_expression.
+ */
+
+void assignment_expression::resolve_names(rs::context& ctx)
+{
+    lhs->resolve_names(ctx);
+    rhs->resolve_names(ctx);
+}
+
+/*
  * binary_expression.
  */
 

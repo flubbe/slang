@@ -350,9 +350,9 @@ void expression::insert_implicit_casts(
     visit_nodes(
       [&ctx, &env](expression& expr) -> void
       {
-          if(expr.get_id() == node_identifier::binary_expression)
+          if(expr.get_id() == node_identifier::assignment_expression)
           {
-              static_cast<binary_expression*>(&expr)->insert_implicit_casts(ctx, env);
+              static_cast<assignment_expression*>(&expr)->insert_implicit_casts(ctx, env);
           }
           else if(expr.get_id() == node_identifier::variable_declaration_expression)
           {
@@ -3044,44 +3044,20 @@ std::string struct_named_initializer_expression::to_string() const
 }
 
 /*
- * binary_expression.
+ * assignment_expression.
  */
 
-std::unique_ptr<expression> binary_expression::clone() const
+std::unique_ptr<expression> assignment_expression::clone() const
 {
-    return std::make_unique<binary_expression>(*this);
+    return std::make_unique<assignment_expression>(*this);
 }
 
-void binary_expression::serialize(archive& ar)
+void assignment_expression::serialize(archive& ar)
 {
     super::serialize(ar);
     ar & op;
     ar& expression_serializer{lhs};
     ar& expression_serializer{rhs};
-}
-
-/**
- * Classify a binary operator. If the operator is a compound assignment, the given operator
- * is reduced to its non-assignment form (and left unchanged otherwise).
- *
- * @param s The binary operator.
- * @returns Returns a tuple `(is_assignment, is_compound, is_comparison, reduced_op)`.
- */
-static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::string& s)
-{
-    bool is_assignment = (s == "=" || s == "+=" || s == "-="
-                          || s == "*=" || s == "/=" || s == "%="
-                          || s == "&=" || s == "|=" || s == "<<=" || s == ">>=");
-    bool is_compound = is_assignment && (s != "=");
-    bool is_comparison = (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
-
-    std::string reduced_op = s;
-    if(is_compound)
-    {
-        reduced_op.pop_back();
-    }
-
-    return {is_assignment, is_compound, is_comparison, reduced_op};
 }
 
 static const std::unordered_map<std::string, cg::binary_op> binary_op_map = {
@@ -3104,17 +3080,516 @@ static const std::unordered_map<std::string, cg::binary_op> binary_op_map = {
   {"&&", cg::binary_op::op_logical_and},
   {"||", cg::binary_op::op_logical_or}};
 
+static std::pair<bool, std::string> classify_assignment(const std::string& s)
+{
+    bool is_compound = (s != "=");
+
+    std::string reduced_op = s;
+    if(is_compound)
+    {
+        reduced_op.pop_back();
+    }
+
+    return std::make_pair(
+      is_compound,
+      std::move(reduced_op));
+}
+
+std::unique_ptr<cg::value> assignment_expression::generate_code(
+  cg::context& ctx,
+  memory_context mc) const
+{
+    std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
+
+    auto [is_compound, reduced_op] = classify_assignment(op.s);
+
+    /* Cases 2., 3., 5., 6. */
+    if(lhs->is_struct_member_access() || lhs->is_array_element_access())
+    {
+        // memory_context::store will only generate the object load.
+        // set_field is generated below.
+        lhs_store_value = lhs->generate_code(ctx, memory_context::store);
+    }
+
+    /* Cases 1., 2. (cont.), 3. (cont.), 7. */
+    if(is_compound)
+    {
+        // Evaluate constant subexpressions.
+        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+        {
+            auto info = const_eval_it->second;
+
+            if(info.type == const_::constant_type::i32)
+            {
+                const auto back_end_type = cg::type_kind::i32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::i64)
+            {
+                const auto back_end_type = cg::type_kind::i64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::f32)
+            {
+                const auto back_end_type = cg::type_kind::f32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::f64)
+            {
+                const auto back_end_type = cg::type_kind::f64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                return std::make_unique<cg::value>(back_end_type);
+            }
+
+            std::println(
+              "{}: Warning: Attempted constant expression computation failed.",
+              ::slang::to_string(loc));
+            // fall-through
+        }
+
+        lhs_value = lhs->generate_code(ctx, memory_context::load);
+        rhs_value = rhs->generate_code(ctx, memory_context::load);
+
+        auto it = binary_op_map.find(reduced_op);
+        if(it == binary_op_map.end())
+        {
+            throw std::runtime_error(
+              std::format(
+                "{}: Code generation for binary operator '{}' not implemented.",
+                slang::to_string(loc), op.s));
+        }
+
+        ctx.generate_binary_op(it->second, lhs_value->get_type());
+
+        // FIXME Should this go into a desugar-phase for compound assignments?
+        if(rhs_value->get_type().get_type_kind() == cg::type_kind::i8)
+        {
+            ctx.generate_cast(cg::type_cast::i32_to_i8);
+        }
+        else if(rhs_value->get_type().get_type_kind() == cg::type_kind::i16)
+        {
+            ctx.generate_cast(cg::type_cast::i32_to_i16);
+        }
+    }
+
+    if(!rhs_value)
+    {
+        rhs_value = rhs->generate_code(ctx, memory_context::load);
+    }
+
+    if(lhs->is_struct_member_access())
+    {
+        // duplicate the value for chained assignments.
+        if(mc == memory_context::load)
+        {
+            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
+               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_dup_x1(
+                  rhs_value->get_type(),
+                  {cg::type_kind::ref});
+            }
+            else if(
+              rhs_value->get_type().get_type_kind() == cg::type_kind::str
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
+            {
+                ctx.generate_dup_x1(
+                  {cg::type_kind::ref},
+                  {cg::type_kind::ref});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Unexpected type '{}' when generating dup instruction.",
+                    rhs_value->to_string()));
+            }
+        }
+
+        // by the above check, lhs is an access_expression.
+        access_expression* ae_lhs = lhs->as_access_expression();
+        const std::optional<ty::struct_info>& struct_info = ae_lhs->get_struct_info();
+        if(!struct_info.has_value())
+        {
+            throw cg::codegen_error(
+              loc,
+              "No struct info available");
+        }
+
+        ctx.generate_set_field(
+          std::make_unique<cg::field_access_argument>(
+            ctx.lower(ae_lhs->get_struct_type()),
+            ae_lhs->get_field_index()));
+        return rhs_value;
+    }
+    /* Cases 2. (cont.), 5. (cont.) */
+    if(lhs->is_array_element_access())
+    {
+        // duplicate the value for chained assignments.
+        if(mc == memory_context::load)
+        {
+            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
+               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_dup_x2(
+                  rhs_value->get_type(),
+                  {cg::type_kind::i32},
+                  {cg::type_kind::ref});
+            }
+            else if(
+              rhs_value->get_type().get_type_kind() == cg::type_kind::str
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
+              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
+            {
+                ctx.generate_dup_x2(
+                  {cg::type_kind::ref},
+                  {cg::type_kind::i32},
+                  {cg::type_kind::ref});
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Unexpected type '{}' when generating dup instruction.",
+                    rhs_value->to_string()));
+            }
+        }
+
+        ctx.generate_store_element(
+          cg::type_argument{lhs_store_value->get_type()});
+
+        return rhs_value;
+    }
+    /* Case 1. (cont.), 4. (cont.) */
+    // we might need to duplicate the value for chained assignments.
+    if(mc == memory_context::load)
+    {
+        ctx.generate_dup(rhs_value->get_type());
+    }
+
+    return lhs->generate_code(ctx, memory_context::store);
+}
+
+void assignment_expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(!ctx.has_expression_type(*rhs.get()))
+    {
+        // only insert casts if the type is known.
+        // the type is unknown inside non-expanded macros.
+        return;
+    }
+
+    auto rhs_type = ctx.get_expression_type(*rhs.get());
+    if(!rhs_type.has_value())
+    {
+        return;
+    }
+
+    if(rhs_type.value() == ctx.get_i8_type()
+       || rhs_type.value() == ctx.get_i16_type())
+    {
+        auto loc = rhs->get_location();    // save location before moving r.h.s.
+
+        rhs = std::make_unique<type_cast_expression>(
+          loc,
+          std::move(rhs),
+          std::make_unique<type_expression>(
+            loc,
+            token{ctx.to_string(rhs_type.value()), loc},
+            std::vector<token>{},
+            ctx.is_array(rhs_type.value())),
+          true /* always cast */);
+
+        rhs->type_check(ctx, env);    // FIXME should not need to be re-checked.
+    }
+}
+
+void assignment_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    lhs->collect_names(ctx);
+    rhs->collect_names(ctx);
+}
+
+std::optional<ty::type_id> assignment_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
+    {
+        // visit the nodes to get the types. note that if we are here,
+        // no type has been set yet, so we can traverse all nodes without
+        // doing evaluation twice.
+        visit_nodes(
+          [&ctx, &env](ast::expression& node)
+          {
+              node.type_check(ctx, env);
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+    }
+
+    auto [is_compound, reduced_op] = classify_assignment(op.s);
+
+    auto lhs_type = ctx.get_expression_type(*lhs);
+    auto rhs_type = ctx.get_expression_type(*rhs);
+
+    if(!lhs_type.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          "L.h.s. in binary expression does not have a type.");
+    }
+    if(!rhs_type.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          "R.h.s. in binary expression does not have a type.");
+    }
+
+    // some operations restrict the type.
+    if(reduced_op == "%"
+       || reduced_op == "&"
+       || reduced_op == "^"
+       || reduced_op == "|")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(reduced_op == "<<" || reduced_op == ">>")
+    {
+        if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
+           || rhs_type != ctx.get_i32_type())
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // disallow negative literals.
+        if(rhs->is_literal())
+        {
+            const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
+            if(!v.has_value())
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+            }
+
+            if(std::get<std::int64_t>(v.value()) < 0)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Negative shift counts are not allowed."));
+            }
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(reduced_op == "&&" || reduced_op == "||")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op));
+        }
+
+        // set the restricted type.
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    // assignments and comparisons.
+    if(op.s == "="
+       || op.s == "=="
+       || op.s == "!=")
+    {
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value())));
+        }
+
+        if(op.s == "=")
+        {
+            // assignments return the type of the l.h.s.
+            expr_type = lhs_type;
+            ctx.set_expression_type(*this, expr_type);
+            return expr_type;
+        }
+
+        // comparisons return i32.
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    // check lhs and rhs have supported types (i32, i64, f32 and f64).
+    if(lhs_type.value() != ctx.get_i8_type()
+       && lhs_type.value() != ctx.get_i16_type()
+       && lhs_type.value() != ctx.get_i32_type()
+       && lhs_type.value() != ctx.get_i64_type()
+       && lhs_type.value() != ctx.get_f32_type()
+       && lhs_type.value() != ctx.get_f64_type())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ctx.to_string(lhs_type.value())));
+    }
+
+    if(rhs_type.value() != ctx.get_i8_type()
+       && rhs_type.value() != ctx.get_i16_type()
+       && rhs_type.value() != ctx.get_i32_type()
+       && rhs_type.value() != ctx.get_i64_type()
+       && rhs_type.value() != ctx.get_f32_type()
+       && rhs_type.value() != ctx.get_f64_type())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ctx.to_string(rhs_type.value())));
+    }
+
+    if(lhs_type != rhs_type)
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+            ctx.to_string(lhs_type.value()),
+            reduced_op,
+            ctx.to_string(rhs_type.value())));
+    }
+
+    expr_type = lhs_type;
+    ctx.set_expression_type(*this, expr_type);
+
+    return expr_type;
+}
+
+std::string assignment_expression::to_string() const
+{
+    return std::format(
+      "Assign(op=\"{}\", lhs={}, rhs={})", op.s,
+      lhs ? lhs->to_string() : std::string("<none>"),
+      rhs ? rhs->to_string() : std::string("<none>"));
+}
+
+/*
+ * binary_expression.
+ */
+
+std::unique_ptr<expression> binary_expression::clone() const
+{
+    return std::make_unique<binary_expression>(*this);
+}
+
+void binary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
+}
+
+/**
+ * Check whether the binary operator is a comparison.
+ *
+ * @param s The binary operator.
+ * @returns Returns a tuple `(is_comparison, reduced_op)`.
+ */
+static bool is_comparison(const std::string& s)
+{
+    return (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
+}
+
 bool binary_expression::needs_pop() const
 {
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    return !is_assignment;
+    return true;
 }
 
 bool binary_expression::is_pure(cg::context& ctx) const
 {
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    return !is_assignment
-           && lhs->is_pure(ctx)
+    return lhs->is_pure(ctx)
            && rhs->is_pure(ctx);
 }
 
@@ -3310,59 +3785,9 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
      * Code generation for binary expressions
      * --------------------------------------
      *
-     * We need to distinguish the following types:
-     * 1. Assignments
-     *    a. Assignments to variables
-     *    b. Assignments to array entries
-     *    c. Assignments to struct members
-     * 2. Non-assignments
-     *
-     * Further, an assignment can be a compound assignment, which is composed
-     * of a non-assignment binary expression and an assignment.
-     *
-     * Generated IR
-     * ------------
-     *
      * 0. Special cases for logical and/logical or.
      *
-     * 1. Compound assignment to variables
-     *
-     *    v := <l.h.s. load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <store into v>
-     *
-     * 2. Compound assignment to array entries
-     *
-     *    v := <l.h.s. load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <store-element into v>
-     *
-     * 3. Compound assignment to struct members
-     *
-     *    v := <l.h.s. object load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <set-field v>
-     *
-     * 4. Assignment to variables
-     *
-     *    <r.h.s. load>
-     *    <store into l.h.s.>
-     *
-     * 5. Assignment to array entries
-     *
-     *    <r.h.s load>
-     *    <store-element into v>
-     *
-     * 6. Assignment to struct members
-     *
-     *    v := <l.h.s. object load>
-     *    <r.h.s. load>
-     *    <set-field v>
-     *
-     * 7. Non-assigning binary operation
+     * 1. Non-assigning binary operation
      *
      *    <l.h.s. load>
      *    <r.h.s. load>
@@ -3388,225 +3813,89 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
         return generate_logical_or(ctx, lhs, rhs);
     }
 
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-
-    if(!is_assignment
-       && mc == memory_context::store)
+    if(mc == memory_context::store)
     {
         throw cg::codegen_error("Invalid memory context (value needs to be readable).");
     }
 
-    /* Cases 2., 3., 5., 6. */
-    if((lhs->is_struct_member_access() || lhs->is_array_element_access())
-       && (is_assignment || is_compound))
+    // Evaluate constant subexpressions.
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
     {
-        // memory_context::store will only generate the object load.
-        // set_field is generated below.
-        lhs_store_value = lhs->generate_code(ctx, memory_context::store);
+        auto info = const_eval_it->second;
+
+        if(info.type == const_::constant_type::i32)
+        {
+            const auto back_end_type = cg::type_kind::i32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::i64)
+        {
+            const auto back_end_type = cg::type_kind::i64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f32)
+        {
+            const auto back_end_type = cg::type_kind::f32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f64)
+        {
+            const auto back_end_type = cg::type_kind::f64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::value>(back_end_type);
+        }
+
+        std::println(
+          "{}: Warning: Attempted constant expression computation failed.",
+          ::slang::to_string(loc));
+        // fall-through
     }
 
-    /* Cases 1., 2. (cont.), 3. (cont.), 7. */
-    if(!is_assignment || is_compound)
+    lhs_value = lhs->generate_code(ctx, memory_context::load);
+    rhs_value = rhs->generate_code(ctx, memory_context::load);
+
+    auto it = binary_op_map.find(op.s);
+    if(it == binary_op_map.end())
     {
-        // Evaluate constant subexpressions.
-        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
-        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
-        {
-            auto info = const_eval_it->second;
-
-            if(info.type == const_::constant_type::i32)
-            {
-                const auto back_end_type = cg::type_kind::i32;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<std::int64_t>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            if(info.type == const_::constant_type::i64)
-            {
-                const auto back_end_type = cg::type_kind::i64;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<std::int64_t>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            if(info.type == const_::constant_type::f32)
-            {
-                const auto back_end_type = cg::type_kind::f32;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<double>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            if(info.type == const_::constant_type::f64)
-            {
-                const auto back_end_type = cg::type_kind::f64;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<double>(info.value));
-
-                return std::make_unique<cg::value>(back_end_type);
-            }
-
-            std::println(
-              "{}: Warning: Attempted constant expression computation failed.",
-              ::slang::to_string(loc));
-            // fall-through
-        }
-
-        lhs_value = lhs->generate_code(ctx, memory_context::load);
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
-
-        auto it = binary_op_map.find(reduced_op);
-        if(it == binary_op_map.end())
-        {
-            throw std::runtime_error(
-              std::format(
-                "{}: Code generation for binary operator '{}' not implemented.",
-                slang::to_string(loc), op.s));
-        }
-
-        ctx.generate_binary_op(it->second, lhs_value->get_type());
-
-        /* Case 7. */
-        if(is_comparison)
-        {
-            // comparisons are non-compound, so this must be a non-assignment operation.
-            return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
-        }
-        if(!is_assignment)
-        {
-            // non-assignment operation.
-            return lhs_value;
-        }
-
-        // FIXME Should this go into a desugar-phase for compound assignments?
-        if(rhs_value->get_type().get_type_kind() == cg::type_kind::i8)
-        {
-            ctx.generate_cast(cg::type_cast::i32_to_i8);
-        }
-        else if(rhs_value->get_type().get_type_kind() == cg::type_kind::i16)
-        {
-            ctx.generate_cast(cg::type_cast::i32_to_i16);
-        }
+        throw std::runtime_error(
+          std::format(
+            "{}: Code generation for binary operator '{}' not implemented.",
+            slang::to_string(loc), op.s));
     }
 
-    /*
-     * assignments: Cases 1.-3. (cont.), 4., 5.-6. (cont.)
-     */
+    ctx.generate_binary_op(it->second, lhs_value->get_type());
 
-    /* Cases 4.-5. (cont.) */
-    if(!rhs_value)
+    if(is_comparison(op.s))
     {
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
+        return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
     }
 
-    /* Cases 3. (cont.), 6. (cont.) */
-    if(lhs->is_struct_member_access())
-    {
-        // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
-        {
-            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
-               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
-            {
-                ctx.generate_dup_x1(
-                  rhs_value->get_type(),
-                  {cg::type_kind::ref});
-            }
-            else if(
-              rhs_value->get_type().get_type_kind() == cg::type_kind::str
-              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
-              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
-            {
-                ctx.generate_dup_x1(
-                  {cg::type_kind::ref},
-                  {cg::type_kind::ref});
-            }
-            else
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Unexpected type '{}' when generating dup instruction.",
-                    rhs_value->to_string()));
-            }
-        }
-
-        // by the above check, lhs is an access_expression.
-        access_expression* ae_lhs = lhs->as_access_expression();
-        const std::optional<ty::struct_info>& struct_info = ae_lhs->get_struct_info();
-        if(!struct_info.has_value())
-        {
-            throw cg::codegen_error(
-              loc,
-              "No struct info available");
-        }
-
-        ctx.generate_set_field(
-          std::make_unique<cg::field_access_argument>(
-            ctx.lower(ae_lhs->get_struct_type()),
-            ae_lhs->get_field_index()));
-        return rhs_value;
-    }
-    /* Cases 2. (cont.), 5. (cont.) */
-    if(lhs->is_array_element_access())
-    {
-        // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
-        {
-            if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
-               || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
-            {
-                ctx.generate_dup_x2(
-                  rhs_value->get_type(),
-                  {cg::type_kind::i32},
-                  {cg::type_kind::ref});
-            }
-            else if(
-              rhs_value->get_type().get_type_kind() == cg::type_kind::str
-              || rhs_value->get_type().get_type_kind() == cg::type_kind::ref
-              || rhs_value->get_type().get_type_kind() == cg::type_kind::null)
-            {
-                ctx.generate_dup_x2(
-                  {cg::type_kind::ref},
-                  {cg::type_kind::i32},
-                  {cg::type_kind::ref});
-            }
-            else
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Unexpected type '{}' when generating dup instruction.",
-                    rhs_value->to_string()));
-            }
-        }
-
-        ctx.generate_store_element(
-          cg::type_argument{lhs_store_value->get_type()});
-
-        return rhs_value;
-    }
-    /* Case 1. (cont.), 4. (cont.) */
-    // we might need to duplicate the value for chained assignments.
-    if(mc == memory_context::load)
-    {
-        ctx.generate_dup(rhs_value->get_type());
-    }
-
-    return lhs->generate_code(ctx, memory_context::store);
+    // non-assignment operation.
+    return lhs_value;
 }
 
 void binary_expression::collect_names(co::context& ctx)
@@ -3635,8 +3924,6 @@ std::optional<ty::type_id> binary_expression::type_check(
         );
     }
 
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-
     if(op.s == ".")    // struct access
     {
         // TODO change or improve error message.
@@ -3660,10 +3947,10 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // some operations restrict the type.
-    if(reduced_op == "%"
-       || reduced_op == "&"
-       || reduced_op == "^"
-       || reduced_op == "|")
+    if(op.s == "%"
+       || op.s == "&"
+       || op.s == "^"
+       || op.s == "|")
     {
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
@@ -3673,10 +3960,10 @@ std::optional<ty::type_id> binary_expression::type_check(
               std::format(
                 "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value()),
-                reduced_op,
-                reduced_op));
+                op.s,
+                op.s));
         }
 
         // set the restricted type.
@@ -3685,7 +3972,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         return expr_type;
     }
 
-    if(reduced_op == "<<" || reduced_op == ">>")
+    if(op.s == "<<" || op.s == ">>")
     {
         if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
            || rhs_type != ctx.get_i32_type())
@@ -3695,10 +3982,10 @@ std::optional<ty::type_id> binary_expression::type_check(
               std::format(
                 "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value()),
-                reduced_op,
-                reduced_op));
+                op.s,
+                op.s));
         }
 
         // disallow negative literals.
@@ -3728,7 +4015,7 @@ std::optional<ty::type_id> binary_expression::type_check(
         return expr_type;
     }
 
-    if(reduced_op == "&&" || reduced_op == "||")
+    if(op.s == "&&" || op.s == "||")
     {
         if((lhs_type != rhs_type
             || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
@@ -3738,9 +4025,9 @@ std::optional<ty::type_id> binary_expression::type_check(
               std::format(
                 "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value()),
-                reduced_op));
+                op.s));
         }
 
         // set the restricted type.
@@ -3750,8 +4037,7 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // assignments and comparisons.
-    if(op.s == "="
-       || op.s == "=="
+    if(op.s == "=="
        || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
@@ -3762,16 +4048,8 @@ std::optional<ty::type_id> binary_expression::type_check(
               std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value())));
-        }
-
-        if(op.s == "=")
-        {
-            // assignments return the type of the l.h.s.
-            expr_type = lhs_type;
-            ctx.set_expression_type(*this, expr_type);
-            return expr_type;
         }
 
         // comparisons return i32.
@@ -3792,7 +4070,7 @@ std::optional<ty::type_id> binary_expression::type_check(
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
-            reduced_op,
+            op.s,
             ctx.to_string(lhs_type.value())));
     }
 
@@ -3807,7 +4085,7 @@ std::optional<ty::type_id> binary_expression::type_check(
           loc,
           std::format(
             "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
-            reduced_op,
+            op.s,
             ctx.to_string(rhs_type.value())));
     }
 
@@ -3818,11 +4096,11 @@ std::optional<ty::type_id> binary_expression::type_check(
           std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
             ctx.to_string(lhs_type.value()),
-            reduced_op,
+            op.s,
             ctx.to_string(rhs_type.value())));
     }
 
-    if(is_comparison)
+    if(is_comparison(op.s))
     {
         // comparisons return i32.
         expr_type = ctx.get_i32_type();
@@ -3843,48 +4121,6 @@ std::string binary_expression::to_string() const
       "Binary(op=\"{}\", lhs={}, rhs={})", op.s,
       lhs ? lhs->to_string() : std::string("<none>"),
       rhs ? rhs->to_string() : std::string("<none>"));
-}
-
-void binary_expression::insert_implicit_casts(
-  ty::context& ctx,
-  sema::env& env)
-{
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    if(!is_assignment)
-    {
-        return;
-    }
-
-    if(!ctx.has_expression_type(*rhs.get()))
-    {
-        // only insert casts if the type is known.
-        // the type is unknown inside non-expanded macros.
-        return;
-    }
-
-    auto rhs_type = ctx.get_expression_type(*rhs.get());
-    if(!rhs_type.has_value())
-    {
-        return;
-    }
-
-    if(rhs_type.value() == ctx.get_i8_type()
-       || rhs_type.value() == ctx.get_i16_type())
-    {
-        auto loc = rhs->get_location();    // save location before moving r.h.s.
-
-        rhs = std::make_unique<type_cast_expression>(
-          loc,
-          std::move(rhs),
-          std::make_unique<type_expression>(
-            loc,
-            token{ctx.to_string(rhs_type.value()), loc},
-            std::vector<token>{},
-            ctx.is_array(rhs_type.value())),
-          true /* always cast */);
-
-        rhs->type_check(ctx, env);    // FIXME should not need to be re-checked.
-    }
 }
 
 /*

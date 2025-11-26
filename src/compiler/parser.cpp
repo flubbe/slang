@@ -609,36 +609,36 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
     }
     get_next_token();
 
-    std::vector<std::unique_ptr<ast::expression>> stmts_exprs;
+    std::vector<std::unique_ptr<ast::expression>> stmts;
     while(current_token->s != "}")
     {
         if(current_token->s == "#")
         {
             auto directive = get_directive();
 
-            // evaluate expression within the context of this directive.
+            // evaluate statement within the context of this directive.
             push_directive(directive.first, directive.second);
-            auto expr = parse_block_stmt_expr();
+            auto stmt = parse_block_stmt();
             pop_directive();
 
-            if(expr)
+            if(stmt)
             {
-                stmts_exprs.emplace_back(std::make_unique<ast::directive_expression>(
+                stmts.emplace_back(std::make_unique<ast::directive_expression>(
                   std::move(directive.first),
                   std::move(directive.second),
-                  std::move(expr)));
+                  std::move(stmt)));
             }
         }
         else if(current_token->s == "{")
         {
-            stmts_exprs.emplace_back(parse_block());
+            stmts.emplace_back(parse_block());
         }
         else
         {
-            auto expr = parse_block_stmt_expr();
-            if(expr)
+            auto stmt = parse_block_stmt();
+            if(stmt)
             {
-                stmts_exprs.emplace_back(std::move(expr));
+                stmts.emplace_back(std::move(stmt));
             }
         }
     }
@@ -648,10 +648,10 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
         get_next_token(false);    // skip "}". (We might hit the end of the input.)
     }
 
-    return std::make_unique<ast::block>(loc, std::move(stmts_exprs));
+    return std::make_unique<ast::block>(loc, std::move(stmts));
 }
 
-std::unique_ptr<ast::expression> parser::parse_block_stmt_expr()
+std::unique_ptr<ast::expression> parser::parse_block_stmt()
 {
     if(current_token->s == ";")
     {
@@ -759,6 +759,10 @@ static const std::unordered_map<std::string, int> bin_op_precedence = {
   // clang-format on
 };
 
+/** Assignment operators. */
+static const std::set<std::string> assignment_operators = {
+  "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|="};
+
 int parser::get_token_precedence() const
 {
     if(!current_token.has_value())
@@ -842,7 +846,9 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
         token bin_op = *current_token;
         get_next_token();
 
+        bool is_assignment = assignment_operators.contains(bin_op.s);
         bool is_access = (bin_op.s == ".");
+
         std::unique_ptr<ast::expression> rhs = parse_unary(is_access);
 
         int next_prec = get_token_precedence();
@@ -852,8 +858,16 @@ std::unique_ptr<ast::expression> parser::parse_bin_op_rhs(int prec, std::unique_
             rhs = parse_bin_op_rhs(tok_prec, std::move(rhs));
         }
 
-        // special case for access expressions, since we treat them separately.
-        if(is_access)
+        // special case for assignments and access expressions, since we treat them separately.
+        if(is_assignment)
+        {
+            lhs = std::make_unique<ast::assignment_expression>(
+              loc,
+              std::move(bin_op),
+              std::move(lhs),
+              std::move(rhs));
+        }
+        else if(is_access)
         {
             lhs = std::make_unique<ast::access_expression>(std::move(lhs), std::move(rhs));
 

@@ -38,6 +38,7 @@ enum class node_identifier : std::uint8_t
     struct_anonymous_initializer_expression,
     named_initializer,
     struct_named_initializer_expression,
+    assignment_expression,
     binary_expression,
     unary_expression,
     new_expression,
