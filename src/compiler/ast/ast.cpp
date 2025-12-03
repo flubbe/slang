@@ -136,11 +136,29 @@ std::optional<const_::const_info> expression::evaluate(
     return std::nullopt;
 }
 
-std::unique_ptr<cg::value> expression::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void expression::generate_code(
+  [[maybe_unused]] cg::context& ctx) const
 {
-    return {};
+    // no-op.
+
+    // TODO move to statement base class.
+}
+
+std::unique_ptr<cg::value> expression::emit_lvalue(
+  [[maybe_unused]] cg::context& ctx) const
+{
+    throw cg::codegen_error(
+      loc,
+      "Expression cannot be used as an l-value.");
+}
+
+std::unique_ptr<cg::value> expression::emit_rvalue(
+  [[maybe_unused]] cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    throw cg::codegen_error(
+      loc,
+      "Expression cannot be used as an r-value.");
 }
 
 void expression::collect_attributes(sema::env& env) const
@@ -501,9 +519,9 @@ void literal_expression::serialize(archive& ar)
     ar & tok;
 }
 
-std::unique_ptr<cg::value> literal_expression::generate_code(
+std::unique_ptr<cg::value> literal_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!tok.value.has_value())
     {
@@ -513,13 +531,6 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(loc, "Literal expression has no type.");
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot store into <literal>.");
     }
 
     auto lowered_type = ctx.lower(expr_type.value());
@@ -822,11 +833,11 @@ void type_cast_expression::serialize(archive& ar)
     ar & target_type;
 }
 
-std::unique_ptr<cg::value> type_cast_expression::generate_code(
+std::unique_ptr<cg::value> type_cast_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    auto v = expr->generate_code(ctx, mc);
+    auto v = expr->emit_rvalue(ctx, true);
 
     // only cast if necessary.
     cg::type lowered_type = ctx.lower(target_type->get_type());
@@ -1192,15 +1203,35 @@ void namespace_access_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> namespace_access_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void namespace_access_expression::generate_code(
+  cg::context& ctx) const
 {
     // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
-    return expr->generate_code(ctx, mc);
+    expr->generate_code(ctx);
+}
+
+std::unique_ptr<cg::value> namespace_access_expression::emit_lvalue(
+  cg::context& ctx) const
+{
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+    return expr->emit_lvalue(ctx);
+}
+
+std::unique_ptr<cg::value> namespace_access_expression::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void namespace_access_expression::collect_names(co::context& ctx)
@@ -1254,9 +1285,8 @@ void access_expression::serialize(archive& ar)
     ar & struct_type;
 }
 
-std::unique_ptr<cg::value> access_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+std::unique_ptr<cg::value> access_expression::emit_lvalue(
+  cg::context& ctx) const
 {
     // validate expression.
     if(!expr_type.has_value())
@@ -1272,7 +1302,8 @@ std::unique_ptr<cg::value> access_expression::generate_code(
         throw cg::codegen_error(loc, "Access expression has no struct type.");
     }
 
-    auto lhs_value = lhs->generate_code(ctx, memory_context::load);
+    // load l.h.s. for access.
+    auto lhs_value = lhs->emit_rvalue(ctx);
 
     /*
      * arrays.
@@ -1290,11 +1321,68 @@ std::unique_ptr<cg::value> access_expression::generate_code(
 
         if(identifier_expr->get_name() == "length")
         {
-            if(mc == memory_context::store)
-            {
-                throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
-            }
+            throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
+        }
 
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Unknown array property '{}'.",
+            identifier_expr->get_name()));
+    }
+
+    /*
+     * structs.
+     */
+
+    // generate access instructions for rhs.
+    if(!rhs->is_named_expression())
+    {
+        return rhs->emit_lvalue(ctx);
+    }
+
+    // NOTE set_field instructions have to be generated by the caller
+
+    return std::make_unique<cg::value>(
+      ctx.lower(expr_type.value()));
+}
+
+std::unique_ptr<cg::value> access_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    // validate expression.
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Access expression has no type.");
+    }
+    if(!rhs)
+    {
+        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
+    }
+    if(!struct_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Access expression has no struct type.");
+    }
+
+    auto lhs_value = lhs->emit_rvalue(ctx);
+
+    /*
+     * arrays.
+     */
+    if(lhs_is_array)
+    {
+        if(!rhs->is_named_expression())
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Could not find name for element access in array access expression."));
+        }
+        auto* identifier_expr = rhs->as_named_expression();
+
+        if(identifier_expr->get_name() == "length")
+        {
             ctx.generate_arraylength();
             return std::make_unique<cg::value>(
               cg::type{cg::type_kind::i32});
@@ -1314,19 +1402,15 @@ std::unique_ptr<cg::value> access_expression::generate_code(
     // generate access instructions for rhs.
     if(!rhs->is_named_expression())
     {
-        return rhs->generate_code(ctx, mc);
+        return rhs->emit_rvalue(ctx);
     }
 
-    if(mc != memory_context::store)
-    {
-        auto type = cg::type{struct_type.value(), cg::type_kind::ref};
+    auto type = cg::type{struct_type.value(), cg::type_kind::ref};
 
-        ctx.generate_get_field(
-          std::make_unique<cg::field_access_argument>(
-            type,
-            field_index));
-    }
-    // NOTE set_field instructions have to be generated by the caller
+    ctx.generate_get_field(
+      std::make_unique<cg::field_access_argument>(
+        type,
+        field_index));
 
     return std::make_unique<cg::value>(
       ctx.lower(expr_type.value()));
@@ -1425,11 +1509,23 @@ void expression_statement::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> expression_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void expression_statement::generate_code(
+  cg::context& ctx) const
 {
-    return expr->generate_code(ctx, mc);
+    auto v = expr->emit_rvalue(ctx, false);
+    if(v != nullptr
+       && v->get_type().get_type_kind() != cg::type_kind::void_)
+    {
+        // clean up stack.
+        ctx.generate_pop(v->get_type());
+    }
+}
+
+std::unique_ptr<cg::value> expression_statement::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void expression_statement::collect_names(co::context& ctx)
@@ -1510,57 +1606,102 @@ void directive_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> directive_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+static void update_flags(
+  cg::codegen_flag_type& flags,
+  const std::string& name,
+  bool enable)
+{
+    cg::codegen_flags flag = cg::codegen_flags::none;
+
+    if(name == "const_eval")
+    {
+        flag = cg::codegen_flags::enable_const_eval;
+    }
+
+    if(enable)
+    {
+        flags |= std::to_underlying(flag);
+    }
+    else
+    {
+        flags &= ~std::to_underlying(flag);
+    }
+};
+
+static void update_flags(
+  const std::string& name,
+  cg::codegen_flag_type& flags,
+  const std::vector<std::pair<slang::token, slang::token>>& args)
+{
+    if(name == "enable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(flags, key.s, true);
+        }
+    }
+    else if(name == "disable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(flags, key.s, false);
+        }
+    }
+}
+
+void directive_expression::generate_code(
+  cg::context& ctx) const
 {
     // enable/disable codegen flags.
     auto saved_flags = ctx.get_flags();
-    auto new_flags = saved_flags;
-
-    auto update_flags = [&new_flags](const std::string& name, bool enable) -> void
-    {
-        cg::codegen_flags flag = cg::codegen_flags::none;
-
-        if(name == "const_eval")
-        {
-            flag = cg::codegen_flags::enable_const_eval;
-        }
-
-        if(enable)
-        {
-            new_flags |= std::to_underlying(flag);
-        }
-        else
-        {
-            new_flags &= ~std::to_underlying(flag);
-        }
-    };
-
-    if(name.s == "enable")
-    {
-        for(const auto& [key, _]: args)
-        {
-            update_flags(key.s, true);
-        }
-    }
-    else if(name.s == "disable")
-    {
-        for(const auto& [key, _]: args)
-        {
-            update_flags(key.s, false);
-        }
-    }
-
     auto _ = gsl::finally(
       [&ctx, saved_flags]()
       {
           ctx.set_flags(saved_flags);
       });
 
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
     ctx.set_flags(new_flags);
 
-    return expr->generate_code(ctx, mc);
+    expr->generate_code(ctx);
+}
+
+std::unique_ptr<cg::value> directive_expression::emit_lvalue(
+  cg::context& ctx) const
+{
+    // enable/disable codegen flags.
+    auto saved_flags = ctx.get_flags();
+    auto _ = gsl::finally(
+      [&ctx, saved_flags]()
+      {
+          ctx.set_flags(saved_flags);
+      });
+
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
+    ctx.set_flags(new_flags);
+
+    return expr->emit_lvalue(ctx);
+}
+
+std::unique_ptr<cg::value> directive_expression::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    // enable/disable codegen flags.
+    auto saved_flags = ctx.get_flags();
+    auto _ = gsl::finally(
+      [&ctx, saved_flags]()
+      {
+          ctx.set_flags(saved_flags);
+      });
+
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
+    ctx.set_flags(new_flags);
+
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void directive_expression::collect_names(co::context& ctx)
@@ -1651,9 +1792,8 @@ void variable_reference_expression::serialize(archive& ar)
     ar& expression_serializer{expansion};
 }
 
-std::unique_ptr<cg::value> variable_reference_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+std::unique_ptr<cg::value> variable_reference_expression::emit_lvalue(
+  cg::context& ctx) const
 {
     if(!symbol_id.has_value())
     {
@@ -1676,28 +1816,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
     // check for macro expansions first.
     if(expansion)
     {
-        return expansion->generate_code(ctx, mc);
-    }
-
-    if(element_expr)
-    {
-        if(!array_type.has_value())
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "{}: Cannot access elements of non-array type.",
-                name.s));
-        }
-
-        if(ctx.lower(array_type.value()).get_type_kind() != cg::type_kind::ref)
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "{}: Invalid array type.",
-                name.s));
-        }
+        return expansion->emit_lvalue(ctx);
     }
 
     const auto& sema_env = ctx.get_sema_env();
@@ -1718,15 +1837,95 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
     {
     case sema::symbol_type::constant:
     {
-        if(mc != memory_context::load)
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Cannot assign to constant '{}'.",
+            info.name));
+    }
+
+    case sema::symbol_type::variable:
+    {
+        auto type = ctx.lower(expr_type.value());
+
+        if(element_expr == nullptr)
         {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Cannot assign to constant '{}'.",
-                info.name));
+            ctx.generate_store(
+              cg::variable_argument{
+                std::make_unique<cg::value>(
+                  type,
+                  symbol_id.value())});
+        }
+        else
+        {
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::value>(
+                  ctx.lower(array_type.value()),    // NOLINT(bugprone-unchecked-optional-access)
+                  symbol_id.value())});
+
+            element_expr->emit_rvalue(ctx, true);
         }
 
+        return std::make_unique<cg::value>(type, symbol_id.value());
+    }
+    default:;
+        // fall-through.
+    }
+
+    throw cg::codegen_error(
+      loc,
+      std::format(
+        "Identifier '{}' is not a value.",
+        info.name));
+}
+
+std::unique_ptr<cg::value> variable_reference_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Reference '{}' has no symbol id.",
+            name.s));
+    }
+
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Reference '{}' has no type.",
+            name.s));
+    }
+
+    // check for macro expansions first.
+    if(expansion)
+    {
+        return expansion->emit_rvalue(ctx);
+    }
+
+    const auto& sema_env = ctx.get_sema_env();
+    auto it = sema_env.symbol_table.find(symbol_id.value());
+    if(it == sema_env.symbol_table.cend())
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "{}: Reference not found in symbol table (symbol id: {}).",
+            get_name(),
+            symbol_id.value().value));
+    }
+
+    const auto& info = it->second;
+
+    switch(info.type)
+    {
+    case sema::symbol_type::constant:
+    {
         auto const_info = ctx.get_const_env().get_const_info(symbol_id.value());
         if(!const_info.has_value())
         {
@@ -1800,50 +1999,25 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
     {
         auto type = ctx.lower(expr_type.value());
 
-        if(mc != memory_context::store)
+        if(element_expr == nullptr)
         {
-            if(element_expr == nullptr)
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      type,
-                      symbol_id.value())});
-            }
-            else
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      ctx.lower(array_type.value()),    // checked above // NOLINT(bugprone-unchecked-optional-access)
-                      symbol_id.value())});
-
-                element_expr->generate_code(ctx, memory_context::load);
-                ctx.generate_load_element(
-                  cg::type_argument{type});
-            }
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::value>(
+                  type,
+                  symbol_id.value())});
         }
         else
         {
-            if(element_expr)
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      ctx.lower(array_type.value()),
-                      symbol_id.value())});
-                element_expr->generate_code(ctx, memory_context::load);
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::value>(
+                  ctx.lower(array_type.value()),    // checked above // NOLINT(bugprone-unchecked-optional-access)
+                  symbol_id.value())});
 
-                // if we're storing an element, generation of the store opcode needs to be deferred to the caller.
-            }
-            else
-            {
-                ctx.generate_store(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      type,
-                      symbol_id.value())});
-            }
+            element_expr->emit_rvalue(ctx, true);
+            ctx.generate_load_element(
+              cg::type_argument{type});
         }
 
         return std::make_unique<cg::value>(type, symbol_id.value());
@@ -2076,18 +2250,9 @@ void variable_declaration_expression::collect_names(co::context& ctx)
     }
 }
 
-std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void variable_declaration_expression::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Invalid memory context for variable declaration."));
-    }
-
     if(!symbol_id.has_value())
     {
         throw ty::type_error(
@@ -2116,7 +2281,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
 
     if(expr)
     {
-        expr->generate_code(ctx, memory_context::load);
+        expr->emit_rvalue(ctx, true);
         ctx.generate_store(
           cg::variable_argument{std::move(v)});
     }
@@ -2125,8 +2290,6 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
     {
         ctx.clear_array_type();
     }
-
-    return nullptr;
 }
 
 std::optional<ty::type_id> variable_declaration_expression::type_check(
@@ -2251,9 +2414,8 @@ void constant_declaration_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> constant_declaration_expression::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void constant_declaration_expression::generate_code(
+  cg::context& ctx) const
 {
     // just ensure the value exists in the constant environment.
     const auto& env = ctx.get_const_env();
@@ -2265,8 +2427,6 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(
           expr->get_location(),
           "Expression in constant declaration is not compile-time computable.");
     }
-
-    return nullptr;
 }
 
 void constant_declaration_expression::collect_names(co::context& ctx)
@@ -2365,9 +2525,9 @@ void array_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{exprs};
 }
 
-std::unique_ptr<cg::value> array_initializer_expression::generate_code(
+std::unique_ptr<cg::value> array_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     std::unique_ptr<cg::value> v;
     auto array_type = ctx.get_array_type();
@@ -2397,7 +2557,7 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(
           {cg::type_kind::i32},
           static_cast<int>(i));
 
-        auto expr_value = expr->generate_code(ctx, memory_context::load);
+        auto expr_value = expr->emit_rvalue(ctx, true);
         if(i >= std::numeric_limits<std::int32_t>::max())
         {
             throw cg::codegen_error(
@@ -2620,22 +2780,15 @@ void struct_anonymous_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(
+std::unique_ptr<cg::value> struct_anonymous_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(
           loc,
           "Anonymous struct initializer has no type.");
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Invalid memory context for struct initializer.");
     }
 
     if(initializers.size() != fields.size())
@@ -2659,7 +2812,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
         const auto& initializer = initializers[i];
 
         auto member_type = ctx.lower(field_info.field_type_id);
-        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        auto initializer_value = initializer->emit_rvalue(ctx, true);
 
         if(!initializer_value)
         {
@@ -2795,11 +2948,11 @@ void named_initializer::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> named_initializer::generate_code(
+std::unique_ptr<cg::value> named_initializer::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  bool result_used) const
 {
-    return expr->generate_code(ctx, mc);
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void named_initializer::collect_names(co::context& ctx)
@@ -2838,22 +2991,15 @@ void struct_named_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
+std::unique_ptr<cg::value> struct_named_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(
           loc,
           "Named struct initializer has no type.");
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Invalid memory context for struct initializer.");
     }
 
     if(initializers.size() != fields.size())
@@ -2877,7 +3023,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
         const auto& initializer = initializers[i];
 
         auto member_type = ctx.lower(field_info.field_type_id);
-        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        auto initializer_value = initializer->emit_rvalue(ctx, true);
 
         if(!initializer_value)
         {
@@ -3095,20 +3241,19 @@ static std::pair<bool, std::string> classify_assignment(const std::string& s)
       std::move(reduced_op));
 }
 
-std::unique_ptr<cg::value> assignment_expression::generate_code(
+std::unique_ptr<cg::value> assignment_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
 
     auto [is_compound, reduced_op] = classify_assignment(op.s);
 
-    /* Cases 2., 3., 5., 6. */
+    // /* Cases 2., 3., 5., 6. */
     if(lhs->is_struct_member_access() || lhs->is_array_element_access())
     {
-        // memory_context::store will only generate the object load.
-        // set_field is generated below.
-        lhs_store_value = lhs->generate_code(ctx, memory_context::store);
+        // emit_lvalue pushes struct/array reference and index.
+        lhs_store_value = lhs->emit_lvalue(ctx);
     }
 
     /* Cases 1., 2. (cont.), 3. (cont.), 7. */
@@ -3171,8 +3316,10 @@ std::unique_ptr<cg::value> assignment_expression::generate_code(
             // fall-through
         }
 
-        lhs_value = lhs->generate_code(ctx, memory_context::load);
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
+        // FIXME lhs array accesses are evaluated twice (via lhs->emit_lvalue below).
+
+        lhs_value = lhs->emit_rvalue(ctx);
+        rhs_value = rhs->emit_rvalue(ctx, true);
 
         auto it = binary_op_map.find(reduced_op);
         if(it == binary_op_map.end())
@@ -3198,13 +3345,13 @@ std::unique_ptr<cg::value> assignment_expression::generate_code(
 
     if(!rhs_value)
     {
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
+        rhs_value = rhs->emit_rvalue(ctx, true);
     }
 
     if(lhs->is_struct_member_access())
     {
         // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
+        if(result_used)
         {
             if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
                || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
@@ -3246,13 +3393,19 @@ std::unique_ptr<cg::value> assignment_expression::generate_code(
           std::make_unique<cg::field_access_argument>(
             ctx.lower(ae_lhs->get_struct_type()),
             ae_lhs->get_field_index()));
-        return rhs_value;
+
+        if(result_used)
+        {
+            return rhs_value;
+        }
+
+        return nullptr;
     }
     /* Cases 2. (cont.), 5. (cont.) */
     if(lhs->is_array_element_access())
     {
         // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
+        if(result_used)
         {
             if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
                || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
@@ -3285,16 +3438,29 @@ std::unique_ptr<cg::value> assignment_expression::generate_code(
         ctx.generate_store_element(
           cg::type_argument{lhs_store_value->get_type()});
 
-        return rhs_value;
+        if(result_used)
+        {
+            return rhs_value;
+        }
+
+        return nullptr;
     }
+
     /* Case 1. (cont.), 4. (cont.) */
     // we might need to duplicate the value for chained assignments.
-    if(mc == memory_context::load)
+    if(result_used)
     {
         ctx.generate_dup(rhs_value->get_type());
     }
 
-    return lhs->generate_code(ctx, memory_context::store);
+    lhs->emit_lvalue(ctx);
+
+    if(result_used)
+    {
+        return rhs_value;
+    }
+
+    return nullptr;
 }
 
 void assignment_expression::insert_implicit_casts(
@@ -3609,7 +3775,7 @@ static std::unique_ptr<cg::value> generate_logical_and(
     std::unique_ptr<cg::value> lhs_value;
     std::unique_ptr<cg::value> rhs_value;
 
-    lhs_value = lhs->generate_code(ctx, memory_context::load);
+    lhs_value = lhs->emit_rvalue(ctx, true);
     if(!lhs_value)
     {
         throw cg::codegen_error(
@@ -3642,7 +3808,7 @@ static std::unique_ptr<cg::value> generate_logical_and(
     ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
     ctx.set_insertion_point(lhs_true_basic_block);
 
-    rhs_value = rhs->generate_code(ctx, memory_context::load);
+    rhs_value = rhs->emit_rvalue(ctx, true);
     if(!rhs_value)
     {
         throw cg::codegen_error(
@@ -3701,7 +3867,7 @@ static std::unique_ptr<cg::value> generate_logical_or(
     std::unique_ptr<cg::value> lhs_value;
     std::unique_ptr<cg::value> rhs_value;
 
-    lhs_value = lhs->generate_code(ctx, memory_context::load);
+    lhs_value = lhs->emit_rvalue(ctx, true);
     if(!lhs_value)
     {
         throw cg::codegen_error(
@@ -3734,7 +3900,7 @@ static std::unique_ptr<cg::value> generate_logical_or(
     ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
     ctx.set_insertion_point(lhs_false_basic_block);
 
-    rhs_value = rhs->generate_code(ctx, memory_context::load);
+    rhs_value = rhs->emit_rvalue(ctx, true);
     if(!rhs_value)
     {
         throw cg::codegen_error(
@@ -3777,9 +3943,9 @@ static std::unique_ptr<cg::value> generate_logical_or(
     return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
 }
 
-std::unique_ptr<cg::value> binary_expression::generate_code(
+std::unique_ptr<cg::value> binary_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     /*
      * Code generation for binary expressions
@@ -3811,11 +3977,6 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
         // Short-circuit evaluation of "lhs || rhs".
         return generate_logical_or(ctx, lhs, rhs);
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error("Invalid memory context (value needs to be readable).");
     }
 
     // Evaluate constant subexpressions.
@@ -3875,8 +4036,8 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
         // fall-through
     }
 
-    lhs_value = lhs->generate_code(ctx, memory_context::load);
-    rhs_value = rhs->generate_code(ctx, memory_context::load);
+    lhs_value = lhs->emit_rvalue(ctx);
+    rhs_value = rhs->emit_rvalue(ctx);
 
     auto it = binary_op_map.find(op.s);
     if(it == binary_op_map.end())
@@ -4144,18 +4305,13 @@ bool unary_expression::is_pure(cg::context& ctx) const
     return operand->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> unary_expression::generate_code(
+std::unique_ptr<cg::value> unary_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into unary expression.");
-    }
-
     if(op.s == "++")
     {
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
            && v->get_type().get_type_kind() != cg::type_kind::i64
            && v->get_type().get_type_kind() != cg::type_kind::f32
@@ -4188,7 +4344,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     if(op.s == "--")
     {
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
            && v->get_type().get_type_kind() != cg::type_kind::i64
            && v->get_type().get_type_kind() != cg::type_kind::f32
@@ -4278,14 +4434,14 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     if(op.s == "+")
     {
-        return operand->generate_code(ctx, mc);
+        return operand->emit_rvalue(ctx);
     }
 
     if(op.s == "-")
     {
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
 
         std::vector<std::unique_ptr<cg::argument>> args;
         if(v->get_type().get_type_kind() == cg::type_kind::i8
@@ -4340,7 +4496,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     if(op.s == "!")
     {
-        auto v = operand->generate_code(ctx, memory_context::load);
+        auto v = operand->emit_rvalue(ctx);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
            && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
@@ -4362,7 +4518,7 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
 
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
         auto constant_type = [this, &v]() -> cg::type_kind
         {
             if(v->get_type().get_type_kind() == cg::type_kind::i8
@@ -4505,15 +4661,10 @@ bool new_expression::is_pure(cg::context& ctx) const
     return array_length_expr->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> new_expression::generate_code(
+std::unique_ptr<cg::value> new_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into new expression.");
-    }
-
     cg::type element_type = ctx.lower(type_expr->get_type());
     if(element_type.get_type_kind() == cg::type_kind::void_)
     {
@@ -4523,7 +4674,7 @@ std::unique_ptr<cg::value> new_expression::generate_code(
     }
 
     // generate array size.
-    std::unique_ptr<cg::value> v = array_length_expr->generate_code(ctx, memory_context::load);
+    std::unique_ptr<cg::value> v = array_length_expr->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -4615,15 +4766,10 @@ std::unique_ptr<expression> null_expression::clone() const
     return std::make_unique<null_expression>(*this);
 }
 
-std::unique_ptr<cg::value> null_expression::generate_code(
+std::unique_ptr<cg::value> null_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into null expression.");
-    }
-
     ctx.generate_const_null();
 
     return std::make_unique<cg::value>(cg::type{cg::type_kind::null});
@@ -4660,16 +4806,11 @@ void postfix_expression::serialize(archive& ar)
     ar & op;
 }
 
-std::unique_ptr<cg::value> postfix_expression::generate_code(
+std::unique_ptr<cg::value> postfix_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into postfix operator expression.");
-    }
-
-    auto v = identifier->generate_code(ctx, memory_context::load);
+    auto v = identifier->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32
        && v->get_type().get_type_kind() != cg::type_kind::f32)
     {
@@ -4881,94 +5022,114 @@ bool block::is_pure(cg::context& ctx) const
       });
 }
 
-std::unique_ptr<cg::value> block::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void block::generate_code(
+  cg::context& ctx) const
 {
-    if(mc == memory_context::none)
+    bool was_terminated = false;
+
+    for(const auto& expr: exprs)
     {
-        bool was_terminated = false;
-
-        for(const auto& expr: exprs)
+        if(was_terminated)
         {
-            if(was_terminated)
+            auto* fn = ctx.get_current_function();
+            if(fn != nullptr)
             {
-                auto* fn = ctx.get_current_function();
-                if(fn != nullptr)
-                {
-                    cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-                    fn->append_basic_block(bb);
-                    ctx.set_insertion_point(bb);
-                }
-            }
-
-            if(expr->is_pure(ctx))
-            {
-                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-                // don't generate code.
-                continue;
-            }
-
-            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
-
-            // non-assigning expressions need cleanup.
-            if(expr->needs_pop())
-            {
-                if(!v)
-                {
-                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-                }
-
-                ctx.generate_pop(v->get_type());
-            }
-
-            auto* bb = ctx.get_insertion_point();
-            if(ctx.get_current_function() != nullptr
-               && bb != nullptr)
-            {
-                was_terminated = bb->is_terminated();
-            }
-            else
-            {
-                was_terminated = false;
+                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+                fn->append_basic_block(bb);
+                ctx.set_insertion_point(bb);
             }
         }
 
+        if(expr->is_pure(ctx))
+        {
+            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+            // don't generate code.
+            continue;
+        }
+
+        expr->generate_code(ctx);
+
+        auto* bb = ctx.get_insertion_point();
+        if(ctx.get_current_function() != nullptr
+           && bb != nullptr)
+        {
+            was_terminated = bb->is_terminated();
+        }
+        else
+        {
+            was_terminated = false;
+        }
+    }
+}
+
+std::unique_ptr<cg::value> block::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    if(exprs.size() == 0)
+    {
         return nullptr;
     }
 
-    if(mc == memory_context::load)
+    bool was_terminated = false;
+    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
     {
-        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        const auto& expr = exprs[i];
+        if(was_terminated)
         {
-            const auto& expr = exprs[i];
-            if(expr->is_pure(ctx))
+            auto* fn = ctx.get_current_function();
+            if(fn != nullptr)
             {
-                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-                // don't generate code.
-                continue;
-            }
-            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
-
-            // non-assigning expressions need cleanup.
-            if(expr->needs_pop())
-            {
-                if(!v)
-                {
-                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-                }
-
-                ctx.generate_pop(v->get_type());
+                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+                fn->append_basic_block(bb);
+                ctx.set_insertion_point(bb);
             }
         }
 
-        // the last expression is loaded.
-        return exprs.back()->generate_code(ctx, memory_context::load);
+        if(expr->is_pure(ctx))
+        {
+            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+            // don't generate code.
+            continue;
+        }
+
+        expr->generate_code(ctx);
+
+        auto* bb = ctx.get_insertion_point();
+        if(ctx.get_current_function() != nullptr
+           && bb != nullptr)
+        {
+            was_terminated = bb->is_terminated();
+        }
+        else
+        {
+            was_terminated = false;
+        }
     }
 
-    throw cg::codegen_error(loc, "Invalid memory context for code block.");
+    // the last expression is loaded if it is an expression.
+
+    if(was_terminated)
+    {
+        auto* fn = ctx.get_current_function();
+        if(fn != nullptr)
+        {
+            cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+            fn->append_basic_block(bb);
+            ctx.set_insertion_point(bb);
+        }
+    }
+
+    const auto& last_expr = exprs.back();
+    if(last_expr->is_expression_statement())
+    {
+        return last_expr->emit_rvalue(ctx);
+    }
+
+    last_expr->generate_code(ctx);
+    return nullptr;
 }
 
 void block::collect_names(co::context& ctx)
@@ -5055,15 +5216,9 @@ void function_expression::serialize(archive& ar)
     ar& expression_serializer{body};
 }
 
-std::unique_ptr<cg::value> function_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void function_expression::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
-    }
-
     if(!symbol_id.has_value())
     {
         throw ty::type_error(
@@ -5116,7 +5271,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                 prototype->get_name()));
         }
 
-        auto v = body->generate_code(ctx);
+        auto v = body->emit_rvalue(ctx);
 
         // verify that the break-continue-stack is empty.
         if(ctx.get_break_continue_stack_size() != 0)
@@ -5132,7 +5287,16 @@ std::unique_ptr<cg::value> function_expression::generate_code(
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
             auto ret_type = std::get<0>(fn->get_signature());
-            if(ret_type.get_type_kind() != cg::type_kind::void_)
+            if(ret_type.get_type_kind() == cg::type_kind::void_)
+            {
+                // pop the stack if needed.
+                if(v != nullptr
+                   && v->get_type().get_type_kind() != cg::type_kind::void_)
+                {
+                    ctx.generate_pop(v->get_type());
+                }
+            }
+            else
             {
                 throw cg::codegen_error(
                   loc,
@@ -5141,7 +5305,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                     fn->get_name()));
             }
 
-            ctx.generate_ret(v ? std::make_optional(v->get_type()) : std::nullopt);
+            ctx.generate_ret();
         }
     }
     else
@@ -5220,8 +5384,6 @@ std::unique_ptr<cg::value> function_expression::generate_code(
           ret_type,
           std::move(args));
     }
-
-    return nullptr;
 }
 
 void function_expression::collect_names(co::context& ctx)
@@ -5309,9 +5471,9 @@ bool call_expression::is_pure([[maybe_unused]] cg::context& ctx) const
     return false;
 }
 
-std::unique_ptr<cg::value> call_expression::generate_code(
+std::unique_ptr<cg::value> call_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!symbol_id.has_value())
     {
@@ -5322,15 +5484,9 @@ std::unique_ptr<cg::value> call_expression::generate_code(
             callee.s));
     }
 
-    // Code generation for function calls.
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into call expression.");
-    }
-
     for(const auto& arg: args)
     {
-        arg->generate_code(ctx, memory_context::load);
+        arg->emit_rvalue(ctx);
     }
     ctx.generate_invoke(
       cg::function_argument{
@@ -5341,7 +5497,7 @@ std::unique_ptr<cg::value> call_expression::generate_code(
     if(index_expr)
     {
         // evaluate the index expression.
-        index_expr->generate_code(ctx, memory_context::load);
+        index_expr->emit_rvalue(ctx);
         ctx.generate_load_element(
           cg::type_argument{ctx.deref(lowered_return_type)});
         return std::make_unique<cg::value>(
@@ -5625,15 +5781,9 @@ void return_statement::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> return_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void return_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
-    }
-
     if(expr)
     {
         // Evaluate constant subexpressions.
@@ -5652,7 +5802,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                   std::get<std::int64_t>(info.value));
 
                 ctx.generate_ret({back_end_type});
-                return nullptr;
+                return;
             }
 
             if(info.type == const_::constant_type::i64)
@@ -5664,7 +5814,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                   std::get<std::int64_t>(info.value));
 
                 ctx.generate_ret({back_end_type});
-                return nullptr;
+                return;
             }
 
             if(info.type == const_::constant_type::f32)
@@ -5676,7 +5826,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                   std::get<double>(info.value));
 
                 ctx.generate_ret({back_end_type});
-                return nullptr;
+                return;
             }
 
             if(info.type == const_::constant_type::f64)
@@ -5688,7 +5838,7 @@ std::unique_ptr<cg::value> return_statement::generate_code(
                   std::get<double>(info.value));
 
                 ctx.generate_ret({back_end_type});
-                return nullptr;
+                return;
             }
 
             std::println(
@@ -5697,19 +5847,13 @@ std::unique_ptr<cg::value> return_statement::generate_code(
             // fall-through
         }
 
-        auto v = expr->generate_code(ctx, memory_context::load);
-        if(!v)
-        {
-            throw cg::codegen_error(loc, "Expression did not yield a type.");
-        }
+        auto v = expr->emit_rvalue(ctx);
         ctx.generate_ret(v->get_type());
     }
     else
     {
         ctx.generate_ret();
     }
-
-    return nullptr;
 }
 
 void return_statement::collect_names(co::context& ctx)
@@ -5805,20 +5949,10 @@ void if_statement::serialize(archive& ar)
     ar& expression_serializer{else_block};
 }
 
-std::unique_ptr<cg::value> if_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void if_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for if_statement.");
-    }
-
-    auto v = condition->generate_code(ctx, memory_context::load);
-    if(!v)
-    {
-        throw cg::codegen_error(loc, "Condition did not yield a type.");
-    }
+    auto v = condition->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -5842,7 +5976,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(
     // code generation for if block.
     ctx.get_current_function(true)->append_basic_block(if_basic_block);
     ctx.set_insertion_point(if_basic_block);
-    if_block->generate_code(ctx, memory_context::none);
+    if_block->generate_code(ctx);
     if_ends_with_return = if_basic_block->ends_with_return();
     if(!if_ends_with_return)
     {
@@ -5860,7 +5994,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(
         else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
         ctx.get_current_function(true)->append_basic_block(else_basic_block);
         ctx.set_insertion_point(else_basic_block);
-        else_block->generate_code(ctx, memory_context::none);
+        else_block->generate_code(ctx);
         else_ends_with_return = else_basic_block->ends_with_return();
         if(!else_ends_with_return)
         {
@@ -5889,8 +6023,6 @@ std::unique_ptr<cg::value> if_statement::generate_code(
             ctx.set_insertion_point(if_basic_block);
         }
     }
-
-    return nullptr;
 }
 
 void if_statement::collect_names(co::context& ctx)
@@ -5958,15 +6090,9 @@ void while_statement::serialize(archive& ar)
     ar& expression_serializer{while_block};
 }
 
-std::unique_ptr<cg::value> while_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void while_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for while_statement.");
-    }
-
     // set up basic blocks.
     auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
@@ -5978,11 +6104,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(
 
     ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
 
-    auto v = condition->generate_code(ctx, memory_context::load);
-    if(!v)
-    {
-        throw cg::codegen_error(loc, "Condition did not yield a type.");
-    }
+    auto v = condition->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -5997,7 +6119,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(
     // while loop body.
     ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
     ctx.set_insertion_point(while_loop_basic_block);
-    while_block->generate_code(ctx, memory_context::none);
+    while_block->generate_code(ctx);
 
     ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
     ctx.generate_branch(while_loop_header_basic_block);
@@ -6007,8 +6129,6 @@ std::unique_ptr<cg::value> while_statement::generate_code(
     // emit merge block.
     ctx.get_current_function(true)->append_basic_block(merge_basic_block);
     ctx.set_insertion_point(merge_basic_block);
-
-    return nullptr;
 }
 
 void while_statement::collect_names(co::context& ctx)
@@ -6058,13 +6178,11 @@ std::unique_ptr<expression> break_statement::clone() const
     return std::make_unique<break_statement>(*this);
 }
 
-std::unique_ptr<cg::value> break_statement::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void break_statement::generate_code(
+  cg::context& ctx) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
-    return nullptr;
 }
 
 /*
@@ -6076,13 +6194,11 @@ std::unique_ptr<expression> continue_statement::clone() const
     return std::make_unique<continue_statement>(*this);
 }
 
-std::unique_ptr<cg::value> continue_statement::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void continue_statement::generate_code(
+  cg::context& ctx) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
-    return nullptr;
 }
 
 }    // namespace slang::ast

@@ -370,9 +370,9 @@ void format_macro_expression::expand_late_macros(
     }
 }
 
-std::unique_ptr<cg::value> format_macro_expression::generate_code(
+std::unique_ptr<cg::value> format_macro_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  bool result_used) const
 {
     if(!expansion)
     {
@@ -381,7 +381,7 @@ std::unique_ptr<cg::value> format_macro_expression::generate_code(
           "Empty 'format!' macro expansion.");
     }
 
-    return expansion->generate_code(ctx, mc);
+    return expansion->emit_rvalue(ctx, result_used);
 }
 
 void format_macro_expression::collect_names(co::context& ctx)

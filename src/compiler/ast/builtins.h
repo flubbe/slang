@@ -172,9 +172,9 @@ public:
         return node_identifier::format_macro_expression;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] std::optional<ty::type_id> type_check(

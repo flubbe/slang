@@ -61,16 +61,6 @@ namespace co = slang::collect;
 namespace rs = slang::resolve;
 namespace ty = slang::typing;
 
-/**
- * The memory context for an expression.
- */
-enum class memory_context
-{
-    none,  /** No explicit context. */
-    load,  /** loading context. */
-    store, /** storing context. */
-};
-
 /** Base class for all expression nodes. */
 class expression
 {
@@ -218,6 +208,13 @@ public:
      * @throws Throws a `std::runtime_error` if the expression is not a call expression.
      */
     virtual class call_expression* as_call_expression();
+
+    /** Whether the expression is a expression statement list. */
+    [[nodiscard]]
+    virtual bool is_expression_statement() const
+    {
+        return get_id() == node_identifier::expression_statement;
+    }
 
     /** Whether this expression is a macro expression. */
     [[nodiscard]]
@@ -381,14 +378,32 @@ public:
     /**
      * Generate IR.
      *
-     * @param ctx The context to use for code generation.
-     * @returns The value of this expression or nullptr.
-     * @note The default implementation does not generate code.
-     * @throws The default implementation throws `std::runtime_error`.
+     * @param ctx The code generation context.
+     * @note The default implementation is a no-op.
      */
-    virtual std::unique_ptr<cg::value> generate_code(
+    virtual void generate_code(cg::context& ctx) const;
+
+    /**
+     * Emit IR for an l-value.
+     *
+     * @param ctx The code generation context.
+     * @returns The value of this expression or nullptr.
+     * @note The default implementation throws an error (`not an l-value`).
+     */
+    virtual std::unique_ptr<cg::value> emit_lvalue(
+      cg::context& ctx) const;
+
+    /**
+     * Emit IR for an r-value.
+     *
+     * @param ctx The code generation context.
+     * @param result_used `true` if the result is used by the caller. Ignored by most AST nodes.
+     * @returns The value of this expression or nullptr.
+     * @note The default implementation throws an error (`not an r-value`).
+     */
+    virtual std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const;
+      bool result_used = false) const;
 
     /**
      * Name collection.
@@ -756,9 +771,9 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     std::optional<ty::type_id> type_check(
       ty::context& ctx,
       sema::env& env) override;
@@ -990,9 +1005,9 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1106,9 +1121,12 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    void generate_code(
+      cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_lvalue(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void resolve_names(rs::context& ctx) override;
 
     std::optional<std::string> get_namespace_path() const override
@@ -1233,17 +1251,10 @@ public:
         return lhs->is_pure(ctx) && rhs->is_pure(ctx);
     }
 
-    /**
-     * Generate IR.
-     *
-     * @param ctx The context to use for code generation.
-     * @returns The value of this expression or nullptr.
-     * @note When called with `memory_context::store`, the object must be loaded onto the stack by
-     *       calling `generate_object_load` beforehand.
-     */
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_lvalue(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1353,9 +1364,12 @@ public:
         return expr->is_macro_expression();
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    void generate_code(
+      cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_lvalue(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1480,9 +1494,10 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_lvalue(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1619,9 +1634,8 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1740,9 +1754,8 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -1830,9 +1843,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2039,9 +2052,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2125,9 +2138,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2226,9 +2239,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2317,9 +2330,9 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2414,9 +2427,9 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2502,9 +2515,9 @@ public:
       ty::context& ctx,
       const_::env& env) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2586,9 +2599,9 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2655,9 +2668,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     std::optional<ty::type_id> type_check(
       ty::context& ctx,
       sema::env& env) override;
@@ -2719,9 +2732,9 @@ public:
         return true;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -2927,9 +2940,10 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context&) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    void generate_code(cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3026,9 +3040,8 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3171,9 +3184,9 @@ public:
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3331,9 +3344,9 @@ public:
         return expansion->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3485,14 +3498,22 @@ public:
     }
 
     [[nodiscard]]
+    bool is_const_eval(const_::env& env) const override
+    {
+        return expr->is_const_eval(env);
+    }
+
+    [[nodiscard]]
     bool is_pure(cg::context& ctx) const override
     {
         return expr->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    void generate_code(
+      cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3615,9 +3636,8 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3712,9 +3732,8 @@ public:
                && (!else_block || else_block->is_pure(ctx));
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3811,9 +3830,8 @@ public:
                && while_block->is_pure(ctx);
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -3872,9 +3890,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
 
     [[nodiscard]]
     std::string to_string() const override
@@ -3922,9 +3939,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
 
     [[nodiscard]]
     std::string to_string() const override
@@ -4013,9 +4029,11 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(
+    void generate_code(
+      cg::context& ctx) const override;
+    std::unique_ptr<cg::value> emit_rvalue(
       cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+      bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -4125,9 +4143,8 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     std::optional<ty::type_id> type_check(
@@ -4216,9 +4233,8 @@ public:
         return this;
     }
 
-    std::unique_ptr<cg::value> generate_code(
-      cg::context& ctx,
-      memory_context mc = memory_context::none) const override;
+    void generate_code(
+      cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
     void resolve_names(rs::context& ctx) override;
     [[nodiscard]] std::optional<ty::type_id> type_check(
