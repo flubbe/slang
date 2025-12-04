@@ -74,14 +74,14 @@ sema::scope_id context::create_scope(
 
     auto new_scope_id = generate_scope_id();
 
-    auto it = env.scope_map.insert(
+    auto [entry, success] = env.scope_map.insert(
       {new_scope_id,
        sema::scope{
          .parent = parent,
          .name = name.value_or(generate_scope_name()),
          .loc = loc,
          .bindings = {}}});
-    if(!it.second)
+    if(!success)
     {
         throw collection_error(
           std::format(
@@ -89,7 +89,7 @@ sema::scope_id context::create_scope(
             new_scope_id));
     }
 
-    return it.first->first;
+    return entry->first;
 }
 
 sema::symbol_id context::declare(

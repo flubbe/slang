@@ -434,6 +434,11 @@ add_compile_exec_fail_test(
     test/test_array_fail3
 )
 add_compile_exec_test(
+    "slang builtin types"
+    TRUE
+    test/test_builtin_types
+)
+add_compile_exec_test(
     "slang cast"
     TRUE
     test/test_cast
@@ -467,6 +472,11 @@ add_compile_exec_test(
     "slang eval subexpr"
     TRUE
     test/test_eval_subexpr
+)
+add_compile_exec_test(
+    "slang integer wrap"
+    TRUE
+    test/test_integer_wrap
 )
 add_compile_exec_fail_test(
     "slang invalid main signature 1"

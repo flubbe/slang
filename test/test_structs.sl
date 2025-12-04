@@ -17,7 +17,7 @@ fn init_struct(i: i32, j: f32) -> S
 
 fn test_struct() -> void
 {
-    let s: S = init_struct(2, 3.141);
+    let s: S = init_struct(2, 3.141 as f32);
     std::assert(s.i + (s.j as i32) == 5, "s.i + (s.j as i32) == 5");
 }
 

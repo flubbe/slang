@@ -151,6 +151,12 @@ template<>
 std::tuple<std::int32_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
 
 template<>
+std::tuple<std::int64_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
+
+template<>
 std::tuple<float> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
+
+template<>
+std::tuple<double> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack);
 
 }    // namespace slang::runtime

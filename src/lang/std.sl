@@ -128,6 +128,15 @@ fn string_equals(s1: str, s2: str) -> i32;
 fn i32_to_string(i: i32) -> str;
 
 /**
+ * Convert an i64 integer to a string.
+ *
+ * @param i An i64 integer.
+ * @return Returns the string representation of i.
+ */
+#[native(lib="slang")]
+fn i64_to_string(i: i64) -> str;
+
+/**
  * Convert an f32 float to a string.
  *
  * @param f An f32 float.
@@ -135,6 +144,15 @@ fn i32_to_string(i: i32) -> str;
  */
 #[native(lib="slang")]
 fn f32_to_string(f: f32) -> str;
+
+/**
+ * Convert an f64 float to a string.
+ *
+ * @param f An f64 float.
+ * @return Returns the string representation of f.
+ */
+#[native(lib="slang")]
+fn f64_to_string(f: f64) -> str;
 
 /**
  * Parse a string and return an i32 integer. 
@@ -171,11 +189,11 @@ fn assert(condition: i32, msg: str) -> void;
  * Math.
  */
 
-/** pi with 32 bit accuracy. */
-const PI: f32 = 3.1415927;
+/** pi with 64 bit accuracy. */
+const PI: f64 = 3.14159265358979323846;
 
-/** sqrt(2) with 32 bit accuracy. */
-const SQRT2: f32 = 1.4142135;
+/** sqrt(2) with 64 bit accuracy. */
+const SQRT2: f64 = 1.41421356237309504880;
 
 /**
  * Compute the absolute value.

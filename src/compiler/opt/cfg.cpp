@@ -8,8 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <print>
-
 #include "compiler/codegen/codegen.h"
 #include "cfg.h"
 
@@ -31,10 +29,10 @@ void context::run_on_function(cg::function& func)
     auto insert_unique_cfg_transfer =
       [&transfer_map](const std::string& origin, const std::string& target) -> void
     {
-        auto [it, success] = transfer_map.try_emplace(origin, std::set{target});
+        auto [entry, success] = transfer_map.try_emplace(origin, std::set{target});
         if(!success)
         {
-            it->second.insert(target);
+            entry->second.insert(target);
         }
     };
 

@@ -21,7 +21,9 @@ std::string to_string(constant_type c)
     switch(c)
     {
     case constant_type::i32: return "i32";
+    case constant_type::i64: return "i64";
     case constant_type::f32: return "f32";
+    case constant_type::f64: return "f64";
     case constant_type::str: return "str";
     default: return "<unknown>";
     }
@@ -80,7 +82,7 @@ constant_id env::intern(std::int32_t i)
       [i](const auto& p) -> bool
       {
           return p.second.type == constant_type::i32
-                 && std::get<std::int32_t>(p.second.value) == i;
+                 && std::get<std::int64_t>(p.second.value) == static_cast<std::int64_t>(i);
       });
     if(it != const_literal_map.end())
     {
@@ -102,6 +104,40 @@ constant_id env::intern(std::int32_t i)
        const_info{
          .origin_module_id = sema::symbol_info::current_module_id,
          .type = constant_type::i32,
+         .value = static_cast<std::int64_t>(i)}});
+
+    return id;
+}
+
+constant_id env::intern(std::int64_t i)
+{
+    auto it = std::ranges::find_if(
+      const_literal_map,
+      [i](const auto& p) -> bool
+      {
+          return p.second.type == constant_type::i64
+                 && std::get<std::int64_t>(p.second.value) == i;
+      });
+    if(it != const_literal_map.end())
+    {
+        return it->first;
+    }
+
+    if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
+    {
+        // should never happen.
+        throw std::runtime_error(
+          std::format(
+            "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            std::numeric_limits<std::size_t>::max()));
+    }
+
+    constant_id id = const_literal_map.size();
+    const_literal_map.insert(
+      {id,
+       const_info{
+         .origin_module_id = sema::symbol_info::current_module_id,
+         .type = constant_type::i64,
          .value = i}});
 
     return id;
@@ -114,7 +150,7 @@ constant_id env::intern(float f)
       [f](const auto& p) -> bool
       {
           return p.second.type == constant_type::f32
-                 && std::get<float>(p.second.value) == f;
+                 && std::get<double>(p.second.value) == static_cast<double>(f);
       });
     if(it != const_literal_map.end())
     {
@@ -136,7 +172,41 @@ constant_id env::intern(float f)
        const_info{
          .origin_module_id = sema::symbol_info::current_module_id,
          .type = constant_type::f32,
-         .value = f}});
+         .value = static_cast<double>(f)}});
+
+    return id;
+}
+
+constant_id env::intern(double d)
+{
+    auto it = std::ranges::find_if(
+      const_literal_map,
+      [d](const auto& p) -> bool
+      {
+          return p.second.type == constant_type::f64
+                 && std::get<double>(p.second.value) == d;
+      });
+    if(it != const_literal_map.end())
+    {
+        return it->first;
+    }
+
+    if(const_literal_map.size() == std::numeric_limits<std::size_t>::max())
+    {
+        // should never happen.
+        throw std::runtime_error(
+          std::format(
+            "Too many constants in constant environment (>= std::numeric_limits<std::size_t>::max() = {})",
+            std::numeric_limits<std::size_t>::max()));
+    }
+
+    constant_id id = const_literal_map.size();
+    const_literal_map.insert(
+      {id,
+       const_info{
+         .origin_module_id = sema::symbol_info::current_module_id,
+         .type = constant_type::f64,
+         .value = d}});
 
     return id;
 }

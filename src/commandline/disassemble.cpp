@@ -79,9 +79,17 @@ public:
         {
             std::println("{}", std::get<std::int32_t>(c.data));
         }
+        else if(c.type == module_::constant_type::i64)
+        {
+            std::println("{}", std::get<std::int64_t>(c.data));
+        }
         else if(c.type == module_::constant_type::f32)
         {
             std::println("{}", std::get<float>(c.data));
+        }
+        else if(c.type == module_::constant_type::f64)
+        {
+            std::println("{}", std::get<double>(c.data));
         }
         else if(c.type == module_::constant_type::str)
         {
@@ -130,6 +138,11 @@ public:
     void record(opcode instr, float f) override
     {
         std::println("    {:>11}    {}", to_string(instr), f);
+    }
+
+    void record(opcode instr, double d) override
+    {
+        std::println("    {:>11}    {}", to_string(instr), d);
     }
 
     void record(opcode instr, std::int64_t i, std::string s) override

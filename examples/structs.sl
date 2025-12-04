@@ -11,6 +11,6 @@ fn init(i: i32, j: f32) -> S
 
 fn main(args: [str]) -> i32
 {
-    let s: S = init(2, 3.141);
+    let s: S = init(2, 3.141 as f32);
     return s.i + (s.j as i32);
 }

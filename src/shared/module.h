@@ -14,6 +14,7 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -61,11 +62,11 @@ inline archive& operator&(archive& ar, symbol_type& s)
     auto i = static_cast<std::uint8_t>(s);
     ar & i;
 
-    if(i != static_cast<std::uint8_t>(symbol_type::package)
-       && i != static_cast<std::uint8_t>(symbol_type::function)
-       && i != static_cast<std::uint8_t>(symbol_type::type)
-       && i != static_cast<std::uint8_t>(symbol_type::constant)
-       && i != static_cast<std::uint8_t>(symbol_type::macro))
+    if(i != std::to_underlying(symbol_type::package)
+       && i != std::to_underlying(symbol_type::function)
+       && i != std::to_underlying(symbol_type::type)
+       && i != std::to_underlying(symbol_type::constant)
+       && i != std::to_underlying(symbol_type::macro))
     {
         throw serialization_error("Invalid symbol type.");
     }
@@ -114,10 +115,14 @@ inline archive& operator&(archive& ar, symbol& s)
 /** Array type. */
 enum class array_type : std::uint8_t
 {
-    i32 = 0,
-    f32 = 1,
-    str = 2,
-    ref = 3
+    i8 = 0,
+    i16 = 1,
+    i32 = 2,
+    i64 = 3,
+    f32 = 4,
+    f64 = 5,
+    str = 6,
+    ref = 7
 };
 
 /** Convert `array_type` to a readable string. */
@@ -125,8 +130,12 @@ inline std::string to_string(array_type type)
 {
     switch(type)
     {
+    case array_type::i8: return "i8";
+    case array_type::i16: return "i16";
     case array_type::i32: return "i32";
+    case array_type::i64: return "i64";
     case array_type::f32: return "f32";
+    case array_type::f64: return "f64";
     case array_type::str: return "str";
     case array_type::ref: return "ref";
     }
@@ -144,10 +153,14 @@ inline archive& operator&(archive& ar, array_type& t)
 {
     auto v = static_cast<std::uint8_t>(t);
     ar & v;
-    if(v != static_cast<std::uint8_t>(array_type::i32)
-       && v != static_cast<std::uint8_t>(array_type::f32)
-       && v != static_cast<std::uint8_t>(array_type::str)
-       && v != static_cast<std::uint8_t>(array_type::ref))
+    if(v != std::to_underlying(array_type::i8)
+       && v != std::to_underlying(array_type::i16)
+       && v != std::to_underlying(array_type::i32)
+       && v != std::to_underlying(array_type::i64)
+       && v != std::to_underlying(array_type::f32)
+       && v != std::to_underlying(array_type::f64)
+       && v != std::to_underlying(array_type::str)
+       && v != std::to_underlying(array_type::ref))
     {
         throw serialization_error("Invalid array type.");
     }
@@ -159,7 +172,9 @@ inline archive& operator&(archive& ar, array_type& t)
 enum class constant_type : std::uint8_t
 {
     i32, /** 32-bit integer constant. */
+    i64, /** 64-bit integer constant. */
     f32, /** 32-bit floating point constant. */
+    f64, /** 64-bit floating point constant. */
     str, /** A string. */
 };
 
@@ -169,12 +184,24 @@ inline std::string to_string(constant_type type)
     switch(type)
     {
     case constant_type::i32: return "i32";
+    case constant_type::i64: return "i64";
     case constant_type::f32: return "f32";
+    case constant_type::f64: return "f64";
     case constant_type::str: return "str";
     }
 
     return "<unknown>";
 }
+
+/** Data type for constant table entries. */
+using constant_data_type = std::variant<
+  std::int8_t,
+  std::int16_t,
+  std::int32_t,
+  std::int64_t,
+  float,
+  double,
+  std::string>;
 
 /** Entry of the constant table. */
 struct constant_table_entry
@@ -183,7 +210,7 @@ struct constant_table_entry
     constant_type type;
 
     /** Constant data. */
-    std::variant<std::int32_t, float, std::string> data;
+    constant_data_type data;
 
     /** Default constructors. */
     constant_table_entry() = default;
@@ -203,7 +230,9 @@ struct constant_table_entry
      * @param type The constant type.
      * @param data The constant data.
      */
-    constant_table_entry(constant_type type, std::variant<std::int32_t, float, std::string> data)
+    constant_table_entry(
+      constant_type type,
+      constant_data_type data)
     : type{type}
     , data{std::move(data)}
     {
@@ -226,9 +255,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
     auto t = static_cast<std::uint8_t>(entry.type);
     ar & t;
 
-    if(t != static_cast<std::uint8_t>(constant_type::i32)
-       && t != static_cast<std::uint8_t>(constant_type::f32)
-       && t != static_cast<std::uint8_t>(constant_type::str))
+    if(t != std::to_underlying(constant_type::i32)
+       && t != std::to_underlying(constant_type::f32)
+       && t != std::to_underlying(constant_type::f64)
+       && t != std::to_underlying(constant_type::str))
     {
         throw serialization_error("Invalid constant type.");
     }
@@ -246,9 +276,23 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             entry.data = i;
             break;
         }
+        case constant_type::i64:
+        {
+            std::int64_t i;
+            ar & i;
+            entry.data = i;
+            break;
+        }
         case constant_type::f32:
         {
             float f;
+            ar & f;
+            entry.data = f;
+            break;
+        }
+        case constant_type::f64:
+        {
+            double f;
             ar & f;
             entry.data = f;
             break;
@@ -261,7 +305,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(
+              std::format(
+                "No serialization for constant type '{}'.",
+                to_string(entry.type)));
         }
     }
     else if(ar.is_writing())
@@ -270,13 +317,25 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
         {
         case constant_type::i32:
         {
-            std::int32_t i = std::get<std::int32_t>(entry.data);
+            auto i = std::get<std::int32_t>(entry.data);
+            ar & i;
+            break;
+        }
+        case constant_type::i64:
+        {
+            auto i = std::get<std::int64_t>(entry.data);
             ar & i;
             break;
         }
         case constant_type::f32:
         {
-            float f = std::get<float>(entry.data);
+            auto f = std::get<float>(entry.data);
+            ar & f;
+            break;
+        }
+        case constant_type::f64:
+        {
+            auto f = std::get<double>(entry.data);
             ar & f;
             break;
         }
@@ -287,7 +346,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(std::format("No serialization for constant type '{}'.", to_string(entry.type)));
+            throw serialization_error(
+              std::format(
+                "No serialization for constant type '{}'.",
+                to_string(entry.type)));
         }
     }
 
@@ -496,8 +558,9 @@ struct function_signature
      * @param return_type The function's return type.
      * @param arg_types The function's argument types.
      */
-    function_signature(variable_type return_type,
-                       std::vector<variable_type> arg_types)
+    function_signature(
+      variable_type return_type,
+      std::vector<variable_type> arg_types)
     : return_type{std::move(return_type)}
     , arg_types{std::move(arg_types)}
     {
@@ -555,7 +618,9 @@ struct native_function_details
  * @param ar The archive to use for serialization.
  * @param details The native function details.
  */
-inline archive& operator&(archive& ar, native_function_details& details)
+inline archive& operator&(
+  archive& ar,
+  native_function_details& details)
 {
     ar & details.library_name;
     return ar;
@@ -598,7 +663,10 @@ struct function_details : public symbol
      * @param offset The offset of the function
      * @param locals The function's arguments and locals.
      */
-    function_details(std::size_t size, std::size_t offset, std::vector<variable_descriptor> locals)
+    function_details(
+      std::size_t size,
+      std::size_t offset,
+      std::vector<variable_descriptor> locals)
     : symbol{size, offset}
     , locals{std::move(locals)}
     {
@@ -649,7 +717,10 @@ struct function_descriptor
      * @param native Whether the function is native.
      * @param details The function's details.
      */
-    function_descriptor(function_signature signature, bool native, std::variant<function_details, native_function_details> details)
+    function_descriptor(
+      function_signature signature,
+      bool native,
+      std::variant<function_details, native_function_details> details)
     : signature{std::move(signature)}
     , native{native}
     , details{std::move(details)}
@@ -726,7 +797,8 @@ struct directive_descriptor
      *
      * @param args Directive arguments.
      */
-    explicit directive_descriptor(std::vector<std::pair<std::string, std::string>> args)
+    explicit directive_descriptor(
+      std::vector<std::pair<std::string, std::string>> args)
     : args{std::move(args)}
     {
     }
@@ -827,15 +899,25 @@ struct field_descriptor
      * @param array Whether the field is an array type.
      * @param import_index Optional index into the import table. Only for imported types.
      */
-    field_descriptor(std::string base_type, bool array, std::optional<std::size_t> import_index = std::nullopt)
-    : base_type{std::move(base_type), array ? std::make_optional(1) : std::nullopt, std::nullopt, import_index}
+    field_descriptor(
+      std::string base_type,
+      bool array,
+      std::optional<std::size_t> import_index = std::nullopt)
+    : base_type{
+        std::move(base_type),
+        array
+          ? std::make_optional(1)
+          : std::nullopt,
+        std::nullopt,
+        import_index}
     {
     }
 
     /** Comparison. */
     bool operator==(const field_descriptor& other) const
     {
-        return base_type == other.base_type && base_type.get_array_dims() == other.base_type.get_array_dims();
+        return base_type == other.base_type
+               && base_type.get_array_dims() == other.base_type.get_array_dims();
     }
 
     /** Comparison. */
@@ -931,7 +1013,10 @@ struct imported_symbol
      * @param name The symbol's name.
      * @param package_index The symbol's package index as an index of the import table. Unused for package imports.
      */
-    imported_symbol(symbol_type type, std::string name, std::uint32_t package_index = static_cast<std::uint32_t>(-1))
+    imported_symbol(
+      symbol_type type,
+      std::string name,
+      std::uint32_t package_index = static_cast<std::uint32_t>(-1))
     : type{type}
     , name{std::move(name)}
     , package_index{package_index}

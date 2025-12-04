@@ -8,10 +8,12 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <cmath>
 #include <print>
 #include <ranges>
 #include <set>
 #include <stack>
+#include <utility>
 
 #include <gsl/gsl>
 
@@ -134,11 +136,29 @@ std::optional<const_::const_info> expression::evaluate(
     return std::nullopt;
 }
 
-std::unique_ptr<cg::value> expression::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void expression::generate_code(
+  [[maybe_unused]] cg::context& ctx) const
 {
-    return {};
+    // no-op.
+
+    // TODO move to statement base class.
+}
+
+std::unique_ptr<cg::lvalue> expression::emit_lvalue(
+  [[maybe_unused]] cg::context& ctx) const
+{
+    throw cg::codegen_error(
+      loc,
+      "Expression cannot be used as an l-value.");
+}
+
+std::unique_ptr<cg::rvalue> expression::emit_rvalue(
+  [[maybe_unused]] cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    throw cg::codegen_error(
+      loc,
+      "Expression cannot be used as an r-value.");
 }
 
 void expression::collect_attributes(sema::env& env) const
@@ -333,8 +353,32 @@ void expression::evaluate_constant_expressions(
           }
       },
       false, /* don't visit this node */
-      true   /* post-order traversal */
-    );
+      true,  /* post-order traversal */
+      [](const slang::ast::expression& expr) -> bool
+      {
+          // A macro branch has no type information, so we skip it.
+          return !expr.is_macro_branch();
+      });
+}
+
+void expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    visit_nodes(
+      [&ctx, &env](expression& expr) -> void
+      {
+          if(expr.get_id() == node_identifier::assignment_expression)
+          {
+              static_cast<assignment_expression*>(&expr)->insert_implicit_casts(ctx, env);
+          }
+          else if(expr.get_id() == node_identifier::variable_declaration_expression)
+          {
+              static_cast<variable_declaration_expression*>(&expr)->insert_implicit_casts(ctx, env);
+          }
+      },
+      false,
+      false);
 }
 
 std::string expression::to_string() const
@@ -475,9 +519,9 @@ void literal_expression::serialize(archive& ar)
     ar & tok;
 }
 
-std::unique_ptr<cg::value> literal_expression::generate_code(
+std::unique_ptr<cg::rvalue> literal_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!tok.value.has_value())
     {
@@ -486,47 +530,63 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
 
     if(!expr_type.has_value())
     {
-        throw cg::codegen_error(loc, "Literal has no type.");
+        throw cg::codegen_error(loc, "Literal expression has no type.");
     }
 
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot store into <literal>.");
-    }
+    auto lowered_type = ctx.lower(expr_type.value());
 
     auto [back_end_type, value] =
-      [this, &ctx]() -> std::pair<
-                       cg::type_kind, std::variant<
-                                        int,
-                                        float,
-                                        const_::constant_id>>
+      [this, &ctx, lowered_type]() -> std::pair<
+                                     cg::type_kind,
+                                     std::variant<
+                                       std::int64_t,
+                                       double,
+                                       const_::constant_id>>
     {
-        if(tok.type == token_type::int_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::i8
+           || lowered_type.get_type_kind() == cg::type_kind::i16
+           || lowered_type.get_type_kind() == cg::type_kind::i32)
         {
             return std::make_pair(
-              cg::type_kind::i32, std::get<int>(tok.value.value()));
+              cg::type_kind::i32,
+              std::get<std::int64_t>(tok.value.value()));
         }
 
-        if(tok.type == token_type::fp_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::i64)
         {
             return std::make_pair(
-              cg::type_kind::f32, std::get<float>(tok.value.value()));
+              cg::type_kind::i64,
+              std::get<std::int64_t>(tok.value.value()));
         }
 
-        if(tok.type == token_type::str_literal)
+        if(lowered_type.get_type_kind() == cg::type_kind::f32)
         {
             return std::make_pair(
-              cg::type_kind::str, ctx.intern(
-                                    std::get<std::string>(tok.value.value())));
+              cg::type_kind::f32,
+              std::get<double>(tok.value.value()));
+        }
+
+        if(lowered_type.get_type_kind() == cg::type_kind::f64)
+        {
+            return std::make_pair(
+              cg::type_kind::f64,
+              std::get<double>(tok.value.value()));
+        }
+
+        if(lowered_type.get_type_kind() == cg::type_kind::str)
+        {
+            return std::make_pair(
+              cg::type_kind::str,
+              ctx.intern(
+                std::get<std::string>(tok.value.value())));
         }
 
         throw cg::codegen_error(
           loc,
           std::format(
-            "Unable to generate code for literal of type id '{}'.",
-            static_cast<int>(tok.type)));
+            "Unable to generate code for literal of unknown type kind '{}' (type id {}) during code generation.",
+            cg::to_string(lowered_type.get_type_kind()),
+            lowered_type.get_type_id().value_or(-1)));
     }();
 
     auto literal_type = cg::type{
@@ -534,7 +594,7 @@ std::unique_ptr<cg::value> literal_expression::generate_code(
       back_end_type};
 
     ctx.generate_const(literal_type, value);
-    return std::make_unique<cg::value>(literal_type);
+    return std::make_unique<cg::rvalue>(literal_type);
 }
 
 std::optional<ty::type_id> literal_expression::type_check(
@@ -546,13 +606,146 @@ std::optional<ty::type_id> literal_expression::type_check(
         throw ty::type_error(loc, "Empty literal.");
     }
 
+    // default to i32 for integer literals and f64 for floating-point literals.
+
     if(tok.type == token_type::int_literal)
     {
-        expr_type = ctx.get_i32_type();
+        if(tok.suffix.has_value())
+        {
+            if(tok.suffix.value().ty != suffix_type::integer)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid suffix '{}' for integer literal.",
+                    slang::to_string(tok.suffix.value().ty)));
+            }
+
+            switch(tok.suffix.value().width)
+            {
+            case 8:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int8_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i8' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
+                        std::numeric_limits<std::int8_t>::min(),
+                        std::numeric_limits<std::int8_t>::max()));
+                }
+
+                expr_type = ctx.get_i8_type();
+                break;
+            case 16:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int16_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i16' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
+                        std::numeric_limits<std::int16_t>::min(),
+                        std::numeric_limits<std::int16_t>::max()));
+                }
+
+                expr_type = ctx.get_i16_type();
+                break;
+            case 32:    // NOLINT(readability-magic-numbers)
+                if(!utils::fits_in<std::int32_t>(
+                     std::get<std::int64_t>(tok.value.value())))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Integer literal '{}' does not fit in type 'i32' with value range {} to {}.",
+                        std::get<std::int64_t>(tok.value.value()),
+                        std::numeric_limits<std::int32_t>::min(),
+                        std::numeric_limits<std::int32_t>::max()));
+                }
+
+                expr_type = ctx.get_i32_type();
+                break;
+            case 64:    // NOLINT(readability-magic-numbers)
+                expr_type = ctx.get_i64_type();
+                break;
+            default:
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid width '{}' in integer literal.",
+                    tok.suffix.value().width));
+            }
+        }
+        else
+        {
+            expr_type = ctx.get_i32_type();
+        }
     }
     else if(tok.type == token_type::fp_literal)
     {
-        expr_type = ctx.get_f32_type();
+        if(tok.suffix.has_value())
+        {
+            if(tok.suffix.value().ty != suffix_type::floating_point)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid suffix '{}' for floating point literal.",
+                    slang::to_string(tok.suffix.value().ty)));
+            }
+
+            switch(tok.suffix.value().width)
+            {
+            case 32:    // NOLINT(readability-magic-numbers)
+            {
+                auto v = std::get<double>(
+                  tok.value.value());
+                auto narrowed = static_cast<float>(v);
+
+                if(!std::isfinite(narrowed)
+                   && std::isfinite(v))
+                {
+                    throw ty::type_error(
+                      loc,
+                      std::format(
+                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}",
+                        tok.s,
+                        std::numeric_limits<float>::min(),
+                        std::numeric_limits<float>::max()));
+                }
+
+                if(narrowed == 0.0f
+                   && v != 0.0
+                   && std::isfinite(v))
+                {
+                    std::println(
+                      "{} Warning: Floating point literal '{}' underflows to 0.0 in f32.",
+                      slang::to_string(loc),
+                      tok.s);
+                }
+
+                expr_type = ctx.get_f32_type();
+                break;
+            }
+            case 64:    // NOLINT(readability-magic-numbers)
+                expr_type = ctx.get_f64_type();
+                break;
+
+            default:
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Invalid width '{}' in floating point literal.",
+                    tok.suffix.value().width));
+            }
+        }
+        else
+        {
+            expr_type = ctx.get_f64_type();
+        }
     }
     else if(tok.type == token_type::str_literal)
     {
@@ -564,7 +757,7 @@ std::optional<ty::type_id> literal_expression::type_check(
           tok.location,
           std::format(
             "Unknown literal type with id '{}'.",
-            static_cast<int>(tok.type)));
+            std::to_underlying(tok.type)));
     }
 
     ctx.set_expression_type(*this, expr_type);
@@ -578,7 +771,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return std::format("FloatLiteral(value={})", std::get<float>(*tok.value));
+            return std::format("FloatLiteral(value={})", std::get<double>(*tok.value));
         }
 
         return "FloatLiteral(<none>)";
@@ -588,7 +781,7 @@ std::string literal_expression::to_string() const
     {
         if(tok.value)
         {
-            return std::format("IntLiteral(value={})", std::get<int>(*tok.value));
+            return std::format("IntLiteral(value={})", std::get<std::int64_t>(*tok.value));
         }
 
         return "IntLiteral(<none>)";
@@ -640,25 +833,211 @@ void type_cast_expression::serialize(archive& ar)
     ar & target_type;
 }
 
-std::unique_ptr<cg::value> type_cast_expression::generate_code(
+std::unique_ptr<cg::rvalue> type_cast_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    auto v = expr->generate_code(ctx, mc);
+    auto v = expr->emit_rvalue(ctx, true);
 
     // only cast if necessary.
     cg::type lowered_type = ctx.lower(target_type->get_type());
-    if(lowered_type != v->get_type())
+    if(always_cast
+       || lowered_type.get_type_kind() != v->get_type().get_type_kind())
     {
-        if(lowered_type.get_type_kind() == cg::type_kind::i32
-           && v->get_type().get_type_kind() == cg::type_kind::f32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i8
+           || v->get_type().get_type_kind() == cg::type_kind::i16)
         {
-            ctx.generate_cast(cg::type_cast::f32_to_i32);
+            // i8 is loaded as a i32 onto the stack.
+
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                if(always_cast
+                   || v->get_type().get_type_kind() != cg::type_kind::i8)
+                {
+                    ctx.generate_cast(cg::type_cast::i32_to_i8);
+                }
+                else
+                {
+                    throw cg::codegen_error(
+                      loc,
+                      std::format(
+                        "Invalid cast from {} to {}.",
+                        v->get_type().to_string(),
+                        lowered_type.to_string()));
+                }
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                if(always_cast
+                   || v->get_type().get_type_kind() != cg::type_kind::i16)
+                {
+                    ctx.generate_cast(cg::type_cast::i32_to_i16);
+                }
+                else
+                {
+                    throw cg::codegen_error(
+                      loc,
+                      std::format(
+                        "Invalid cast from {} to {}.",
+                        v->get_type().to_string(),
+                        lowered_type.to_string()));
+                }
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                // no-op.
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from {} to {}.",
+                    v->get_type().to_string(),
+                    lowered_type.to_string()));
+            }
         }
-        else if(lowered_type.get_type_kind() == cg::type_kind::f32
-                && v->get_type().get_type_kind() == cg::type_kind::i32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            ctx.generate_cast(cg::type_cast::i32_to_f32);
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from i32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_f32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::i64_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from i32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f64)
+            {
+                ctx.generate_cast(cg::type_cast::f32_to_f64);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from f32 to {}.",
+                    lowered_type.to_string()));
+            }
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
+        {
+            if(lowered_type.get_type_kind() == cg::type_kind::i8)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i8);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i16)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+                ctx.generate_cast(cg::type_cast::i32_to_i16);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i32)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i32);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::i64)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_i64);
+            }
+            else if(lowered_type.get_type_kind() == cg::type_kind::f32)
+            {
+                ctx.generate_cast(cg::type_cast::f64_to_f32);
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  loc,
+                  std::format(
+                    "Invalid cast from f32 to {}.",
+                    lowered_type.to_string()));
+            }
         }
         else if(lowered_type.get_type_kind() == cg::type_kind::str
                 && v->get_type().get_type_kind() != cg::type_kind::ref)
@@ -673,18 +1052,29 @@ std::unique_ptr<cg::value> type_cast_expression::generate_code(
         {
             if(lowered_type.get_type_kind() == cg::type_kind::str)
             {
-                return std::make_unique<cg::value>(lowered_type);
+                return std::make_unique<cg::rvalue>(lowered_type);
             }
 
             // casts between non-builtin types are checked at run-time.
             ctx.generate_checkcast(lowered_type);
-            return std::make_unique<cg::value>(lowered_type);
+            return std::make_unique<cg::rvalue>(lowered_type);
         }
 
-        return std::make_unique<cg::value>(lowered_type);
+        return std::make_unique<cg::rvalue>(lowered_type);
     }
 
-    return std::make_unique<cg::value>(lowered_type);
+    // both type kinds are the same here.
+    if(v->get_type().get_type_kind() == cg::type_kind::ref)
+    {
+        if(v->get_type().get_type_id() != target_type->get_type())
+        {
+            // casts between non-builtin types are checked at run-time.
+            ctx.generate_checkcast(lowered_type);
+            return std::make_unique<cg::rvalue>(lowered_type);
+        }
+    }
+
+    return std::make_unique<cg::rvalue>(lowered_type);
 }
 
 void type_cast_expression::collect_names(co::context& ctx)
@@ -711,8 +1101,60 @@ std::optional<ty::type_id> type_cast_expression::type_check(
 
     // casts for primitive types.
     const std::unordered_map<ty::type_id, std::set<ty::type_id>> primitive_type_casts = {
-      {ctx.get_i32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {ctx.get_f32_type(), {ctx.get_i32_type(), ctx.get_f32_type()}},
+      {ctx.get_i8_type(),
+       {
+         ctx.get_i8_type(),  /* no-op. */
+         ctx.get_i16_type(), /* sign-extend to i32, then narrow to i16 */
+         ctx.get_i32_type(), /* sign-extend to i32. */
+         ctx.get_i64_type(), /* sign-extend to i32, then sign-extend to i64. */
+         ctx.get_f32_type(), /* sign-extend to i32, convert to f32. */
+         ctx.get_f64_type(), /* sign-extend to i32, convert to f64. */
+       }},
+      {ctx.get_i16_type(),
+       {
+         ctx.get_i8_type(),  /* narrow to i16. */
+         ctx.get_i16_type(), /* no-op. */
+         ctx.get_i32_type(), /* sign-extend to i32. */
+         ctx.get_i64_type(), /* sign-extend to i32, then sign-extend to i64. */
+         ctx.get_f32_type(), /* sign-extend to i32, convert to f32. */
+         ctx.get_f64_type(), /* sign-extend to i32, convert to f64. */
+       }},
+      {ctx.get_i32_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i8. */
+         ctx.get_i16_type(), /* convert to i16. */
+         ctx.get_i32_type(), /* no-op. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_i64_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* no-op. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_f32_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* no-op. */
+         ctx.get_f64_type(), /* convert to f64. */
+       }},
+      {ctx.get_f64_type(),
+       {
+         ctx.get_i8_type(),  /* convert to i32, narrow to i8. */
+         ctx.get_i16_type(), /* convert to i32, narrow to i16. */
+         ctx.get_i32_type(), /* convert to i32. */
+         ctx.get_i64_type(), /* convert to i64. */
+         ctx.get_f32_type(), /* convert to f32. */
+         ctx.get_f64_type(), /* no-op. */
+       }},
       {ctx.get_str_type(), {}}};
 
     auto cast_from = primitive_type_casts.find(type.value());
@@ -761,15 +1203,35 @@ void namespace_access_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> namespace_access_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void namespace_access_expression::generate_code(
+  cg::context& ctx) const
 {
     // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
     auto expr_namespace_stack = namespace_stack;
     expr_namespace_stack.push_back(name.s);
     expr->set_namespace(std::move(expr_namespace_stack));
-    return expr->generate_code(ctx, mc);
+    expr->generate_code(ctx);
+}
+
+std::unique_ptr<cg::lvalue> namespace_access_expression::emit_lvalue(
+  cg::context& ctx) const
+{
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+    return expr->emit_lvalue(ctx);
+}
+
+std::unique_ptr<cg::rvalue> namespace_access_expression::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    // NOTE update_namespace is (intentionally) not const, so we cannot use it here.
+    auto expr_namespace_stack = namespace_stack;
+    expr_namespace_stack.push_back(name.s);
+    expr->set_namespace(std::move(expr_namespace_stack));
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void namespace_access_expression::collect_names(co::context& ctx)
@@ -823,9 +1285,8 @@ void access_expression::serialize(archive& ar)
     ar & struct_type;
 }
 
-std::unique_ptr<cg::value> access_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+std::unique_ptr<cg::lvalue> access_expression::emit_lvalue(
+  cg::context& ctx) const
 {
     // validate expression.
     if(!expr_type.has_value())
@@ -841,7 +1302,8 @@ std::unique_ptr<cg::value> access_expression::generate_code(
         throw cg::codegen_error(loc, "Access expression has no struct type.");
     }
 
-    auto lhs_value = lhs->generate_code(ctx, memory_context::load);
+    // load l.h.s. for access.
+    auto lhs_value = lhs->emit_rvalue(ctx);
 
     /*
      * arrays.
@@ -859,13 +1321,70 @@ std::unique_ptr<cg::value> access_expression::generate_code(
 
         if(identifier_expr->get_name() == "length")
         {
-            if(mc == memory_context::store)
-            {
-                throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
-            }
+            throw cg::codegen_error(rhs->get_location(), "Array length is read only.");
+        }
 
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Unknown array property '{}'.",
+            identifier_expr->get_name()));
+    }
+
+    /*
+     * structs.
+     */
+
+    // generate access instructions for rhs.
+    if(!rhs->is_named_expression())
+    {
+        return rhs->emit_lvalue(ctx);
+    }
+
+    // NOTE set_field instructions have to be generated by the caller
+
+    return std::make_unique<cg::lvalue>(
+      ctx.lower(expr_type.value()));
+}
+
+std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    // validate expression.
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Access expression has no type.");
+    }
+    if(!rhs)
+    {
+        throw cg::codegen_error(loc, "Access expression has no r.h.s.");
+    }
+    if(!struct_type.has_value())
+    {
+        throw cg::codegen_error(loc, "Access expression has no struct type.");
+    }
+
+    auto lhs_value = lhs->emit_rvalue(ctx);
+
+    /*
+     * arrays.
+     */
+    if(lhs_is_array)
+    {
+        if(!rhs->is_named_expression())
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Could not find name for element access in array access expression."));
+        }
+        auto* identifier_expr = rhs->as_named_expression();
+
+        if(identifier_expr->get_name() == "length")
+        {
             ctx.generate_arraylength();
-            return std::make_unique<cg::value>(
+            return std::make_unique<cg::rvalue>(
               cg::type{cg::type_kind::i32});
         }
 
@@ -883,21 +1402,17 @@ std::unique_ptr<cg::value> access_expression::generate_code(
     // generate access instructions for rhs.
     if(!rhs->is_named_expression())
     {
-        return rhs->generate_code(ctx, mc);
+        return rhs->emit_rvalue(ctx);
     }
 
-    if(mc != memory_context::store)
-    {
-        auto type = cg::type{struct_type.value(), cg::type_kind::ref};
+    auto type = cg::type{struct_type.value(), cg::type_kind::ref};
 
-        ctx.generate_get_field(
-          std::make_unique<cg::field_access_argument>(
-            type,
-            field_index));
-    }
-    // NOTE set_field instructions have to be generated by the caller
+    ctx.generate_get_field(
+      std::make_unique<cg::field_access_argument>(
+        type,
+        field_index));
 
-    return std::make_unique<cg::value>(
+    return std::make_unique<cg::rvalue>(
       ctx.lower(expr_type.value()));
 }
 
@@ -951,7 +1466,7 @@ std::optional<ty::type_id> access_expression::type_check(
           std::format(
             "{}: Expected <identifier> as accessor (got node id {}).",
             ::slang::to_string(loc),
-            static_cast<int>(rhs->get_id())));
+            std::to_underlying(rhs->get_id())));
     }
 
     const auto* identifier_node = rhs->as_variable_reference();
@@ -980,29 +1495,74 @@ ty::type_id access_expression::get_struct_type() const
 }
 
 /*
- * import_expression.
+ * expression_statement.
  */
 
-std::unique_ptr<expression> import_expression::clone() const
+std::unique_ptr<expression> expression_statement::clone() const
 {
-    return std::make_unique<import_expression>(*this);
+    return std::make_unique<expression_statement>(*this);
 }
 
-void import_expression::serialize(archive& ar)
+void expression_statement::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{expr};
+}
+
+void expression_statement::generate_code(
+  cg::context& ctx) const
+{
+    auto v = expr->emit_rvalue(ctx, false);
+    if(v != nullptr
+       && v->get_type().get_type_kind() != cg::type_kind::void_)
+    {
+        // clean up stack.
+        ctx.generate_pop(v->get_type());
+    }
+}
+
+std::unique_ptr<cg::rvalue> expression_statement::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    return expr->emit_rvalue(ctx, result_used);
+}
+
+void expression_statement::collect_names(co::context& ctx)
+{
+    expr->collect_names(ctx);
+}
+
+std::optional<ty::type_id> expression_statement::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    return expr->type_check(ctx, env);
+}
+
+std::string expression_statement::to_string() const
+{
+    return std::format(
+      "ExpressionStatement(expr={})",
+      expr->to_string());
+}
+
+/*
+ * import_statement.
+ */
+
+std::unique_ptr<expression> import_statement::clone() const
+{
+    return std::make_unique<import_statement>(*this);
+}
+
+void import_statement::serialize(archive& ar)
 {
     super::serialize(ar);
     ar & path;
 }
 
-std::unique_ptr<cg::value> import_expression::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
-{
-    // import expressions are handled by the import resolver.
-    return nullptr;
-}
-
-void import_expression::collect_names(co::context& ctx)
+void import_statement::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
@@ -1020,12 +1580,14 @@ void import_expression::collect_names(co::context& ctx)
       false);
 }
 
-std::string import_expression::to_string() const
+std::string import_statement::to_string() const
 {
     auto transform = [](const token& p) -> std::string
     { return p.s; };
 
-    return std::format("Import(path={})", slang::utils::join(path, {transform}, "."));
+    return std::format(
+      "Import(path={})",
+      slang::utils::join(path, {transform}, "."));
 }
 
 /*
@@ -1044,57 +1606,102 @@ void directive_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> directive_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+static void update_flags(
+  cg::codegen_flag_type& flags,
+  const std::string& name,
+  bool enable)
+{
+    cg::codegen_flags flag = cg::codegen_flags::none;
+
+    if(name == "const_eval")
+    {
+        flag = cg::codegen_flags::enable_const_eval;
+    }
+
+    if(enable)
+    {
+        flags |= std::to_underlying(flag);
+    }
+    else
+    {
+        flags &= ~std::to_underlying(flag);
+    }
+};
+
+static void update_flags(
+  const std::string& name,
+  cg::codegen_flag_type& flags,
+  const std::vector<std::pair<slang::token, slang::token>>& args)
+{
+    if(name == "enable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(flags, key.s, true);
+        }
+    }
+    else if(name == "disable")
+    {
+        for(const auto& [key, _]: args)
+        {
+            update_flags(flags, key.s, false);
+        }
+    }
+}
+
+void directive_expression::generate_code(
+  cg::context& ctx) const
 {
     // enable/disable codegen flags.
     auto saved_flags = ctx.get_flags();
-    auto new_flags = saved_flags;
-
-    auto update_flags = [&new_flags](const std::string& name, bool enable) -> void
-    {
-        cg::codegen_flags flag = cg::codegen_flags::none;
-
-        if(name == "const_eval")
-        {
-            flag = cg::codegen_flags::enable_const_eval_;
-        }
-
-        if(enable)
-        {
-            new_flags |= static_cast<cg::codegen_flag_type>(flag);
-        }
-        else
-        {
-            new_flags &= ~static_cast<cg::codegen_flag_type>(flag);
-        }
-    };
-
-    if(name.s == "enable")
-    {
-        for(const auto& [key, _]: args)
-        {
-            update_flags(key.s, true);
-        }
-    }
-    else if(name.s == "disable")
-    {
-        for(const auto& [key, _]: args)
-        {
-            update_flags(key.s, false);
-        }
-    }
-
     auto _ = gsl::finally(
       [&ctx, saved_flags]()
       {
           ctx.set_flags(saved_flags);
       });
 
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
     ctx.set_flags(new_flags);
 
-    return expr->generate_code(ctx, mc);
+    expr->generate_code(ctx);
+}
+
+std::unique_ptr<cg::lvalue> directive_expression::emit_lvalue(
+  cg::context& ctx) const
+{
+    // enable/disable codegen flags.
+    auto saved_flags = ctx.get_flags();
+    auto _ = gsl::finally(
+      [&ctx, saved_flags]()
+      {
+          ctx.set_flags(saved_flags);
+      });
+
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
+    ctx.set_flags(new_flags);
+
+    return expr->emit_lvalue(ctx);
+}
+
+std::unique_ptr<cg::rvalue> directive_expression::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    // enable/disable codegen flags.
+    auto saved_flags = ctx.get_flags();
+    auto _ = gsl::finally(
+      [&ctx, saved_flags]()
+      {
+          ctx.set_flags(saved_flags);
+      });
+
+    auto new_flags = saved_flags;
+    update_flags(name.s, new_flags, args);
+    ctx.set_flags(new_flags);
+
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void directive_expression::collect_names(co::context& ctx)
@@ -1185,9 +1792,8 @@ void variable_reference_expression::serialize(archive& ar)
     ar& expression_serializer{expansion};
 }
 
-std::unique_ptr<cg::value> variable_reference_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
+  cg::context& ctx) const
 {
     if(!symbol_id.has_value())
     {
@@ -1210,28 +1816,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
     // check for macro expansions first.
     if(expansion)
     {
-        return expansion->generate_code(ctx, mc);
-    }
-
-    if(element_expr)
-    {
-        if(!array_type.has_value())
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "{}: Cannot access elements of non-array type.",
-                name.s));
-        }
-
-        if(ctx.lower(array_type.value()).get_type_kind() != cg::type_kind::ref)
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "{}: Invalid array type.",
-                name.s));
-        }
+        return expansion->emit_lvalue(ctx);
     }
 
     const auto& sema_env = ctx.get_sema_env();
@@ -1252,15 +1837,97 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
     {
     case sema::symbol_type::constant:
     {
-        if(mc != memory_context::load)
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Cannot assign to constant '{}'.",
+            info.name));
+    }
+
+    case sema::symbol_type::variable:
+    {
+        auto type = ctx.lower(expr_type.value());
+
+        if(element_expr == nullptr)
         {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Cannot assign to constant '{}'.",
-                info.name));
+            ctx.generate_store(
+              cg::variable_argument{
+                std::make_unique<cg::rvalue>(
+                  type,
+                  symbol_id.value())});
+        }
+        else
+        {
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::rvalue>(
+                  ctx.lower(array_type.value()),    // NOLINT(bugprone-unchecked-optional-access)
+                  symbol_id.value())});
+
+            element_expr->emit_rvalue(ctx, true);
         }
 
+        return std::make_unique<cg::lvalue>(
+          type,
+          symbol_id.value());
+    }
+    default:;
+        // fall-through.
+    }
+
+    throw cg::codegen_error(
+      loc,
+      std::format(
+        "Identifier '{}' is not a value.",
+        info.name));
+}
+
+std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    if(!symbol_id.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Reference '{}' has no symbol id.",
+            name.s));
+    }
+
+    if(!expr_type.has_value())
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Reference '{}' has no type.",
+            name.s));
+    }
+
+    // check for macro expansions first.
+    if(expansion)
+    {
+        return expansion->emit_rvalue(ctx);
+    }
+
+    const auto& sema_env = ctx.get_sema_env();
+    auto it = sema_env.symbol_table.find(symbol_id.value());
+    if(it == sema_env.symbol_table.cend())
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "{}: Reference not found in symbol table (symbol id: {}).",
+            get_name(),
+            symbol_id.value().value));
+    }
+
+    const auto& info = it->second;
+
+    switch(info.type)
+    {
+    case sema::symbol_type::constant:
+    {
         auto const_info = ctx.get_const_env().get_const_info(symbol_id.value());
         if(!const_info.has_value())
         {
@@ -1273,17 +1940,41 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
 
         if(const_info->type == const_::constant_type::i32)
         {
-            ctx.generate_const({cg::type_kind::i32}, std::get<int>(const_info->value));
-            return std::make_unique<cg::value>(
+            ctx.generate_const(
+              {cg::type_kind::i32},
+              std::get<std::int64_t>(const_info->value));
+            return std::make_unique<cg::rvalue>(
               cg::type{cg::type_kind::i32},
+              symbol_id.value());
+        }
+
+        if(const_info->type == const_::constant_type::i64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::i64},
+              std::get<std::int64_t>(const_info->value));
+            return std::make_unique<cg::rvalue>(
+              cg::type{cg::type_kind::i64},
               symbol_id.value());
         }
 
         if(const_info->type == const_::constant_type::f32)
         {
-            ctx.generate_const({cg::type_kind::f32}, std::get<float>(const_info->value));
-            return std::make_unique<cg::value>(
+            ctx.generate_const(
+              {cg::type_kind::f32},
+              std::get<double>(const_info->value));
+            return std::make_unique<cg::rvalue>(
               cg::type{cg::type_kind::f32},
+              symbol_id.value());
+        }
+
+        if(const_info->type == const_::constant_type::f64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::f64},
+              std::get<double>(const_info->value));
+            return std::make_unique<cg::rvalue>(
+              cg::type{cg::type_kind::f64},
               symbol_id.value());
         }
 
@@ -1294,7 +1985,7 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
               ctx.intern(
                 std::get<std::string>(const_info->value)));
 
-            return std::make_unique<cg::value>(
+            return std::make_unique<cg::rvalue>(
               cg::type{cg::type_kind::str},
               symbol_id.value());
         }
@@ -1303,60 +1994,35 @@ std::unique_ptr<cg::value> variable_reference_expression::generate_code(
         throw cg::codegen_error(
           std::format(
             "Unsupported constant type '{}'.",
-            static_cast<int>(const_info->type)));
+            std::to_underlying(const_info->type)));
     }
 
     case sema::symbol_type::variable:
     {
         auto type = ctx.lower(expr_type.value());
 
-        if(mc != memory_context::store)
+        if(element_expr == nullptr)
         {
-            if(element_expr == nullptr)
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      type,
-                      symbol_id.value())});
-            }
-            else
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      ctx.lower(array_type.value()),    // checked above // NOLINT(bugprone-unchecked-optional-access)
-                      symbol_id.value())});
-
-                element_expr->generate_code(ctx, memory_context::load);
-                ctx.generate_load_element(
-                  cg::type_argument{type});
-            }
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::rvalue>(
+                  type,
+                  symbol_id.value())});
         }
         else
         {
-            if(element_expr)
-            {
-                ctx.generate_load(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      ctx.lower(array_type.value()),
-                      symbol_id.value())});
-                element_expr->generate_code(ctx, memory_context::load);
+            ctx.generate_load(
+              cg::variable_argument{
+                std::make_unique<cg::rvalue>(
+                  ctx.lower(array_type.value()),    // checked above // NOLINT(bugprone-unchecked-optional-access)
+                  symbol_id.value())});
 
-                // if we're storing an element, generation of the store opcode needs to be deferred to the caller.
-            }
-            else
-            {
-                ctx.generate_store(
-                  cg::variable_argument{
-                    std::make_unique<cg::value>(
-                      type,
-                      symbol_id.value())});
-            }
+            element_expr->emit_rvalue(ctx, true);
+            ctx.generate_load_element(
+              cg::type_argument{type});
         }
 
-        return std::make_unique<cg::value>(type, symbol_id.value());
+        return std::make_unique<cg::rvalue>(type, symbol_id.value());
     }
     default:;
         // fall-through.
@@ -1586,18 +2252,9 @@ void variable_declaration_expression::collect_names(co::context& ctx)
     }
 }
 
-std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void variable_declaration_expression::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Invalid memory context for variable declaration."));
-    }
-
     if(!symbol_id.has_value())
     {
         throw ty::type_error(
@@ -1608,7 +2265,7 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
     }
 
     auto lowered_type = ctx.lower(type->get_type());
-    std::unique_ptr<cg::value> v = std::make_unique<cg::value>(
+    std::unique_ptr<cg::rvalue> v = std::make_unique<cg::rvalue>(
       lowered_type, symbol_id.value());
 
     auto* fn = ctx.get_current_function();
@@ -1621,12 +2278,12 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
 
     if(is_array())
     {
-        ctx.set_array_type(*v);
+        ctx.set_array_type(v->get_type());
     }
 
     if(expr)
     {
-        expr->generate_code(ctx, memory_context::load);
+        expr->emit_rvalue(ctx, true);
         ctx.generate_store(
           cg::variable_argument{std::move(v)});
     }
@@ -1635,8 +2292,6 @@ std::unique_ptr<cg::value> variable_declaration_expression::generate_code(
     {
         ctx.clear_array_type();
     }
-
-    return nullptr;
 }
 
 std::optional<ty::type_id> variable_declaration_expression::type_check(
@@ -1676,6 +2331,8 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
               "Expression has no type.");
         }
 
+        ctx.set_expression_type(*expr.get(), rhs);
+
         if(!ctx.are_types_compatible(annotated_type_id, rhs.value()))
         {
             throw ty::type_error(
@@ -1704,6 +2361,45 @@ std::string variable_declaration_expression::to_string() const
       expr ? expr->to_string() : std::string("<none>"));
 }
 
+void variable_declaration_expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(expr == nullptr)
+    {
+        return;
+    }
+
+    if(!ctx.has_expression_type(*expr.get()))
+    {
+        // only insert casts if the type is known.
+        // the type is unknown inside non-expanded macros.
+        return;
+    }
+
+    auto expr_type = ctx.get_expression_type(*expr.get());
+    if(!expr_type.has_value())
+    {
+        return;
+    }
+
+    if(expr_type.value() == ctx.get_i8_type()
+       || expr_type.value() == ctx.get_i16_type())
+    {
+        expr = std::make_unique<type_cast_expression>(
+          expr->get_location(),
+          std::move(expr),
+          std::make_unique<type_expression>(
+            expr->get_location(),
+            token{ctx.to_string(expr_type.value()), expr->get_location()},
+            std::vector<token>{},
+            ctx.is_array(expr_type.value())),
+          true /* always cast */);
+
+        expr->type_check(ctx, env);    // FIXME should not need to be re-checked.
+    }
+}
+
 /*
  * constant_declaration_expression.
  */
@@ -1720,9 +2416,8 @@ void constant_declaration_expression::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> constant_declaration_expression::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void constant_declaration_expression::generate_code(
+  cg::context& ctx) const
 {
     // just ensure the value exists in the constant environment.
     const auto& env = ctx.get_const_env();
@@ -1734,8 +2429,6 @@ std::unique_ptr<cg::value> constant_declaration_expression::generate_code(
           expr->get_location(),
           "Expression in constant declaration is not compile-time computable.");
     }
-
-    return nullptr;
 }
 
 void constant_declaration_expression::collect_names(co::context& ctx)
@@ -1834,11 +2527,11 @@ void array_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{exprs};
 }
 
-std::unique_ptr<cg::value> array_initializer_expression::generate_code(
+std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    std::unique_ptr<cg::value> v;
+    std::unique_ptr<cg::rvalue> v;
     auto array_type = ctx.get_array_type();
 
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
@@ -1854,19 +2547,19 @@ std::unique_ptr<cg::value> array_initializer_expression::generate_code(
       {cg::type_kind::i32},
       static_cast<int>(exprs.size()));
     ctx.generate_newarray(
-      ctx.deref(array_type.get_type()));
+      ctx.deref(array_type));
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
         const auto& expr = exprs[i];
 
         // the top of the stack contains the array address.
-        ctx.generate_dup(array_type.get_type());
+        ctx.generate_dup(array_type);
         ctx.generate_const(
           {cg::type_kind::i32},
           static_cast<int>(i));
 
-        auto expr_value = expr->generate_code(ctx, memory_context::load);
+        auto expr_value = expr->emit_rvalue(ctx, true);
         if(i >= std::numeric_limits<std::int32_t>::max())
         {
             throw cg::codegen_error(
@@ -2089,22 +2782,15 @@ void struct_anonymous_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_code(
+std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(
           loc,
           "Anonymous struct initializer has no type.");
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Invalid memory context for struct initializer.");
     }
 
     if(initializers.size() != fields.size())
@@ -2128,7 +2814,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
         const auto& initializer = initializers[i];
 
         auto member_type = ctx.lower(field_info.field_type_id);
-        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        auto initializer_value = initializer->emit_rvalue(ctx, true);
 
         if(!initializer_value)
         {
@@ -2160,7 +2846,7 @@ std::unique_ptr<cg::value> struct_anonymous_initializer_expression::generate_cod
             field_info.field_index));
     }
 
-    return std::make_unique<cg::value>(struct_type);
+    return std::make_unique<cg::rvalue>(struct_type);
 }
 
 void struct_anonymous_initializer_expression::collect_names(co::context& ctx)
@@ -2264,11 +2950,11 @@ void named_initializer::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> named_initializer::generate_code(
+std::unique_ptr<cg::rvalue> named_initializer::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  bool result_used) const
 {
-    return expr->generate_code(ctx, mc);
+    return expr->emit_rvalue(ctx, result_used);
 }
 
 void named_initializer::collect_names(co::context& ctx)
@@ -2307,22 +2993,15 @@ void struct_named_initializer_expression::serialize(archive& ar)
     ar& expression_vector_serializer{initializers};
 }
 
-std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
+std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!expr_type.has_value())
     {
         throw cg::codegen_error(
           loc,
           "Named struct initializer has no type.");
-    }
-
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(
-          loc,
-          "Invalid memory context for struct initializer.");
     }
 
     if(initializers.size() != fields.size())
@@ -2346,7 +3025,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
         const auto& initializer = initializers[i];
 
         auto member_type = ctx.lower(field_info.field_type_id);
-        auto initializer_value = initializer->generate_code(ctx, memory_context::load);
+        auto initializer_value = initializer->emit_rvalue(ctx, true);
 
         if(!initializer_value)
         {
@@ -2378,7 +3057,7 @@ std::unique_ptr<cg::value> struct_named_initializer_expression::generate_code(
             field_info.field_index));
     }
 
-    return std::make_unique<cg::value>(struct_type);
+    return std::make_unique<cg::rvalue>(struct_type);
 }
 
 void struct_named_initializer_expression::collect_names(co::context& ctx)
@@ -2513,44 +3192,20 @@ std::string struct_named_initializer_expression::to_string() const
 }
 
 /*
- * binary_expression.
+ * assignment_expression.
  */
 
-std::unique_ptr<expression> binary_expression::clone() const
+std::unique_ptr<expression> assignment_expression::clone() const
 {
-    return std::make_unique<binary_expression>(*this);
+    return std::make_unique<assignment_expression>(*this);
 }
 
-void binary_expression::serialize(archive& ar)
+void assignment_expression::serialize(archive& ar)
 {
     super::serialize(ar);
     ar & op;
     ar& expression_serializer{lhs};
     ar& expression_serializer{rhs};
-}
-
-/**
- * Classify a binary operator. If the operator is a compound assignment, the given operator
- * is reduced to its non-assignment form (and left unchanged otherwise).
- *
- * @param s The binary operator.
- * @returns Returns a tuple `(is_assignment, is_compound, is_comparison, reduced_op)`.
- */
-static std::tuple<bool, bool, bool, std::string> classify_binary_op(const std::string& s)
-{
-    bool is_assignment = (s == "=" || s == "+=" || s == "-="
-                          || s == "*=" || s == "/=" || s == "%="
-                          || s == "&=" || s == "|=" || s == "<<=" || s == ">>=");
-    bool is_compound = is_assignment && (s != "=");
-    bool is_comparison = (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
-
-    std::string reduced_op = s;
-    if(is_compound)
-    {
-        reduced_op.pop_back();
-    }
-
-    return {is_assignment, is_compound, is_comparison, reduced_op};
 }
 
 static const std::unordered_map<std::string, cg::binary_op> binary_op_map = {
@@ -2573,109 +3228,44 @@ static const std::unordered_map<std::string, cg::binary_op> binary_op_map = {
   {"&&", cg::binary_op::op_logical_and},
   {"||", cg::binary_op::op_logical_or}};
 
-bool binary_expression::needs_pop() const
+static std::pair<bool, std::string> classify_assignment(const std::string& s)
 {
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    return !is_assignment;
-}
+    bool is_compound = (s != "=");
 
-bool binary_expression::is_pure(cg::context& ctx) const
-{
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-    return !is_assignment
-           && lhs->is_pure(ctx)
-           && rhs->is_pure(ctx);
-}
-
-std::unique_ptr<cg::value> binary_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
-{
-    /*
-     * Code generation for binary expressions
-     * --------------------------------------
-     *
-     * We need to distinguish the following types:
-     * 1. Assignments
-     *    a. Assignments to variables
-     *    b. Assignments to array entries
-     *    c. Assignments to struct members
-     * 2. Non-assignments
-     *
-     * Further, an assignment can be a compound assignment, which is composed
-     * of a non-assignment binary expression and an assignment.
-     *
-     * Generated IR
-     * ------------
-     *
-     * 1. Compound assignment to variables
-     *
-     *    v := <l.h.s. load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <store into v>
-     *
-     * 2. Compound assignment to array entries
-     *
-     *    v := <l.h.s. load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <store-element into v>
-     *
-     * 3. Compound assignment to struct members
-     *
-     *    v := <l.h.s. object load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     *    <set-field v>
-     *
-     * 4. Assignment to variables
-     *
-     *    <r.h.s. load>
-     *    <store into l.h.s.>
-     *
-     * 5. Assignment to array entries
-     *
-     *    <r.h.s load>
-     *    <store-element into v>
-     *
-     * 6. Assignment to struct members
-     *
-     *    v := <l.h.s. object load>
-     *    <r.h.s. load>
-     *    <set-field v>
-     *
-     * 7. Non-assigning binary operation
-     *
-     *    <l.h.s. load>
-     *    <r.h.s. load>
-     *    <binary-op>
-     */
-
-    std::unique_ptr<cg::value> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-
-    if(!is_assignment
-       && mc == memory_context::store)
+    std::string reduced_op = s;
+    if(is_compound)
     {
-        throw cg::codegen_error("Invalid memory context for assignment (value needs to be writable).");
+        reduced_op.pop_back();
     }
 
-    /* Cases 2., 3., 5., 6. */
-    if((lhs->is_struct_member_access() || lhs->is_array_element_access())
-       && (is_assignment || is_compound))
+    return std::make_pair(
+      is_compound,
+      std::move(reduced_op));
+}
+
+std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    std::unique_ptr<cg::rvalue> rhs_value;
+    std::unique_ptr<cg::rvalue> lhs_value;
+    std::unique_ptr<cg::lvalue> lhs_store_value;
+
+    auto [is_compound, reduced_op] = classify_assignment(op.s);
+
+    // /* Cases 2., 3., 5., 6. */
+    if(lhs->is_struct_member_access() || lhs->is_array_element_access())
     {
-        // memory_context::store will only generate the object load.
-        // set_field is generated below.
-        lhs_store_value = lhs->generate_code(ctx, memory_context::store);
+        // emit_lvalue pushes struct/array reference and index.
+        lhs_store_value = lhs->emit_lvalue(ctx);
     }
 
     /* Cases 1., 2. (cont.), 3. (cont.), 7. */
-    if(!is_assignment || is_compound)
+    if(is_compound)
     {
         // Evaluate constant subexpressions.
         auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
-        if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
            && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
         {
             auto info = const_eval_it->second;
@@ -2686,9 +3276,20 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
                 ctx.generate_const(
                   {back_end_type},
-                  std::get<int>(info.value));
+                  std::get<std::int64_t>(info.value));
 
-                return std::make_unique<cg::value>(back_end_type);
+                return std::make_unique<cg::rvalue>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::i64)
+            {
+                const auto back_end_type = cg::type_kind::i64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                return std::make_unique<cg::rvalue>(back_end_type);
             }
 
             if(info.type == const_::constant_type::f32)
@@ -2697,9 +3298,20 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
                 ctx.generate_const(
                   {back_end_type},
-                  std::get<float>(info.value));
+                  std::get<double>(info.value));
 
-                return std::make_unique<cg::value>(back_end_type);
+                return std::make_unique<cg::rvalue>(back_end_type);
+            }
+
+            if(info.type == const_::constant_type::f64)
+            {
+                const auto back_end_type = cg::type_kind::f64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                return std::make_unique<cg::rvalue>(back_end_type);
             }
 
             std::println(
@@ -2708,22 +3320,10 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
             // fall-through
         }
 
-        lhs_value = lhs->generate_code(ctx, memory_context::load);
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
+        // FIXME lhs array accesses are evaluated twice (via lhs->emit_lvalue below).
 
-        if(lhs_value->get_type().get_type_kind() != rhs_value->get_type().get_type_kind()
-           && !(is_comparison
-                && (lhs_value->get_type().get_type_kind() == cg::type_kind::str
-                    || lhs_value->get_type().get_type_kind() == cg::type_kind::ref)
-                && rhs_value->get_type().get_type_kind() == cg::type_kind::null))
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Lowered types don't match in binary operation. L.h.s.: {}, R.h.s.: {}.",
-                ::cg::to_string(lhs_value->get_type().get_type_kind()),
-                ::cg::to_string(rhs_value->get_type().get_type_kind())));
-        }
+        lhs_value = lhs->emit_rvalue(ctx);
+        rhs_value = rhs->emit_rvalue(ctx, true);
 
         auto it = binary_op_map.find(reduced_op);
         if(it == binary_op_map.end())
@@ -2736,34 +3336,26 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
 
         ctx.generate_binary_op(it->second, lhs_value->get_type());
 
-        /* Case 7. */
-        if(is_comparison)
+        // FIXME Should this go into a desugar-phase for compound assignments?
+        if(rhs_value->get_type().get_type_kind() == cg::type_kind::i8)
         {
-            // comparisons are non-compound, so this must be a non-assignment operation.
-            return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
+            ctx.generate_cast(cg::type_cast::i32_to_i8);
         }
-        if(!is_assignment)
+        else if(rhs_value->get_type().get_type_kind() == cg::type_kind::i16)
         {
-            // non-assignment operation.
-            return lhs_value;
+            ctx.generate_cast(cg::type_cast::i32_to_i16);
         }
     }
 
-    /*
-     * assignments: Cases 1.-3. (cont.), 4., 5.-6. (cont.)
-     */
-
-    /* Cases 4.-5. (cont.) */
     if(!rhs_value)
     {
-        rhs_value = rhs->generate_code(ctx, memory_context::load);
+        rhs_value = rhs->emit_rvalue(ctx, true);
     }
 
-    /* Cases 3. (cont.), 6. (cont.) */
     if(lhs->is_struct_member_access())
     {
         // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
+        if(result_used)
         {
             if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
                || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
@@ -2805,13 +3397,19 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
           std::make_unique<cg::field_access_argument>(
             ctx.lower(ae_lhs->get_struct_type()),
             ae_lhs->get_field_index()));
-        return rhs_value;
+
+        if(result_used)
+        {
+            return rhs_value;
+        }
+
+        return nullptr;
     }
     /* Cases 2. (cont.), 5. (cont.) */
     if(lhs->is_array_element_access())
     {
         // duplicate the value for chained assignments.
-        if(mc == memory_context::load)
+        if(result_used)
         {
             if(rhs_value->get_type().get_type_kind() == cg::type_kind::i32
                || rhs_value->get_type().get_type_kind() == cg::type_kind::f32)
@@ -2842,18 +3440,632 @@ std::unique_ptr<cg::value> binary_expression::generate_code(
         }
 
         ctx.generate_store_element(
-          cg::type_argument{rhs_value->get_type()});
+          cg::type_argument{
+            lhs_store_value->get_type()});
 
-        return rhs_value;
+        if(result_used)
+        {
+            return rhs_value;
+        }
+
+        return nullptr;
     }
+
     /* Case 1. (cont.), 4. (cont.) */
     // we might need to duplicate the value for chained assignments.
-    if(mc == memory_context::load)
+    if(result_used)
     {
         ctx.generate_dup(rhs_value->get_type());
     }
 
-    return lhs->generate_code(ctx, memory_context::store);
+    // FIXME Remove / store into address. Can be e.g. store/store_element
+    //       with arguments from the first emit_lvalue above.
+    // NOTE This likely changes the contract for emit_lvalue/emit_rvalue
+    //      and leaves the stora/load operations to the caller.
+    lhs->emit_lvalue(ctx);
+
+    if(result_used)
+    {
+        return rhs_value;
+    }
+
+    return nullptr;
+}
+
+void assignment_expression::insert_implicit_casts(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(!ctx.has_expression_type(*rhs.get()))
+    {
+        // only insert casts if the type is known.
+        // the type is unknown inside non-expanded macros.
+        return;
+    }
+
+    auto rhs_type = ctx.get_expression_type(*rhs.get());
+    if(!rhs_type.has_value())
+    {
+        return;
+    }
+
+    if(rhs_type.value() == ctx.get_i8_type()
+       || rhs_type.value() == ctx.get_i16_type())
+    {
+        auto loc = rhs->get_location();    // save location before moving r.h.s.
+
+        rhs = std::make_unique<type_cast_expression>(
+          loc,
+          std::move(rhs),
+          std::make_unique<type_expression>(
+            loc,
+            token{ctx.to_string(rhs_type.value()), loc},
+            std::vector<token>{},
+            ctx.is_array(rhs_type.value())),
+          true /* always cast */);
+
+        rhs->type_check(ctx, env);    // FIXME should not need to be re-checked.
+    }
+}
+
+void assignment_expression::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+    lhs->collect_names(ctx);
+    rhs->collect_names(ctx);
+}
+
+std::optional<ty::type_id> assignment_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    if(!ctx.has_expression_type(*lhs) || !ctx.has_expression_type(*rhs))
+    {
+        // visit the nodes to get the types. note that if we are here,
+        // no type has been set yet, so we can traverse all nodes without
+        // doing evaluation twice.
+        visit_nodes(
+          [&ctx, &env](ast::expression& node)
+          {
+              node.type_check(ctx, env);
+          },
+          false, /* don't visit this node */
+          true   /* post-order traversal */
+        );
+    }
+
+    auto [is_compound, reduced_op] = classify_assignment(op.s);
+
+    auto lhs_type = ctx.get_expression_type(*lhs);
+    auto rhs_type = ctx.get_expression_type(*rhs);
+
+    if(!lhs_type.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          "L.h.s. in binary expression does not have a type.");
+    }
+    if(!rhs_type.has_value())
+    {
+        throw ty::type_error(
+          loc,
+          "R.h.s. in binary expression does not have a type.");
+    }
+
+    // some operations restrict the type.
+    if(reduced_op == "%"
+       || reduced_op == "&"
+       || reduced_op == "^"
+       || reduced_op == "|")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(reduced_op == "<<" || reduced_op == ">>")
+    {
+        if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
+           || rhs_type != ctx.get_i32_type())
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op,
+                reduced_op));
+        }
+
+        // disallow negative literals.
+        if(rhs->is_literal())
+        {
+            const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
+            if(!v.has_value())
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+            }
+
+            if(std::get<std::int64_t>(v.value()) < 0)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Negative shift counts are not allowed."));
+            }
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(reduced_op == "&&" || reduced_op == "||")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value()),
+                reduced_op));
+        }
+
+        // set the restricted type.
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    // assignments and comparisons.
+    if(op.s == "="
+       || op.s == "=="
+       || op.s == "!=")
+    {
+        // Either the types match, or the type is a reference types which is set to 'null'.
+        if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+                ctx.to_string(lhs_type.value()),
+                reduced_op,
+                ctx.to_string(rhs_type.value())));
+        }
+
+        if(op.s == "=")
+        {
+            // assignments return the type of the l.h.s.
+            expr_type = lhs_type;
+            ctx.set_expression_type(*this, expr_type);
+            return expr_type;
+        }
+
+        // comparisons return i32.
+        expr_type = ctx.get_i32_type();
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    // check lhs and rhs have supported types (i32, i64, f32 and f64).
+    if(lhs_type.value() != ctx.get_i8_type()
+       && lhs_type.value() != ctx.get_i16_type()
+       && lhs_type.value() != ctx.get_i32_type()
+       && lhs_type.value() != ctx.get_i64_type()
+       && lhs_type.value() != ctx.get_f32_type()
+       && lhs_type.value() != ctx.get_f64_type())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ctx.to_string(lhs_type.value())));
+    }
+
+    if(rhs_type.value() != ctx.get_i8_type()
+       && rhs_type.value() != ctx.get_i16_type()
+       && rhs_type.value() != ctx.get_i32_type()
+       && rhs_type.value() != ctx.get_i64_type()
+       && rhs_type.value() != ctx.get_f32_type()
+       && rhs_type.value() != ctx.get_f64_type())
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
+            reduced_op,
+            ctx.to_string(rhs_type.value())));
+    }
+
+    if(lhs_type != rhs_type)
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
+            ctx.to_string(lhs_type.value()),
+            reduced_op,
+            ctx.to_string(rhs_type.value())));
+    }
+
+    expr_type = lhs_type;
+    ctx.set_expression_type(*this, expr_type);
+
+    return expr_type;
+}
+
+std::string assignment_expression::to_string() const
+{
+    return std::format(
+      "Assign(op=\"{}\", lhs={}, rhs={})", op.s,
+      lhs ? lhs->to_string() : std::string("<none>"),
+      rhs ? rhs->to_string() : std::string("<none>"));
+}
+
+/*
+ * binary_expression.
+ */
+
+std::unique_ptr<expression> binary_expression::clone() const
+{
+    return std::make_unique<binary_expression>(*this);
+}
+
+void binary_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar & op;
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{rhs};
+}
+
+/**
+ * Check whether the binary operator is a comparison.
+ *
+ * @param s The binary operator.
+ * @returns Returns a tuple `(is_comparison, reduced_op)`.
+ */
+static bool is_comparison(const std::string& s)
+{
+    return (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
+}
+
+bool binary_expression::needs_pop() const
+{
+    return true;
+}
+
+bool binary_expression::is_pure(cg::context& ctx) const
+{
+    return lhs->is_pure(ctx)
+           && rhs->is_pure(ctx);
+}
+
+/**
+ * Generate the control logic / short-circuit evaluation for _logical and_ operations (&&).
+ *
+ * @param ctx The code generation context.
+ * @param lhs The left-hand side.
+ * @param rhs The right-hand side.
+ * @returns A value with `i32` type.
+ */
+static std::unique_ptr<cg::rvalue> generate_logical_and(
+  cg::context& ctx,
+  const std::unique_ptr<expression>& lhs,
+  const std::unique_ptr<expression>& rhs)
+{
+    std::unique_ptr<cg::rvalue> lhs_value;
+    std::unique_ptr<cg::rvalue> rhs_value;
+
+    lhs_value = lhs->emit_rvalue(ctx, true);
+    if(!lhs_value)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0)
+
+    // store where to insert the branch.
+    auto* function_insertion_point = ctx.get_insertion_point(true);
+
+    // set up basic blocks.
+    auto* lhs_true_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* lhs_false_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    /*
+     * code generation for l.h.s. being true
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
+    ctx.set_insertion_point(lhs_true_basic_block);
+
+    rhs_value = rhs->emit_rvalue(ctx, true);
+    if(!rhs_value)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... && (rhs != 0).
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * code generation for l.h.s. being false
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
+    ctx.set_insertion_point(lhs_false_basic_block);
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * control flow logic.
+     */
+
+    // insert blocks into function.
+    ctx.set_insertion_point(function_insertion_point);
+    ctx.generate_cond_branch(lhs_true_basic_block, lhs_false_basic_block);
+
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+}
+
+/**
+ * Generate the control logic / short-circuit evaluation for _logical or_ operations (||).
+ *
+ * @param ctx The code generation context.
+ * @param lhs The left-hand side.
+ * @param rhs The right-hand side.
+ * @returns A value with `i32` type.
+ */
+static std::unique_ptr<cg::rvalue> generate_logical_or(
+  cg::context& ctx,
+  const std::unique_ptr<expression>& lhs,
+  const std::unique_ptr<expression>& rhs)
+{
+    std::unique_ptr<cg::rvalue> lhs_value;
+    std::unique_ptr<cg::rvalue> rhs_value;
+
+    lhs_value = lhs->emit_rvalue(ctx, true);
+    if(!lhs_value)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          lhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs != 0)
+
+    // store where to insert the branch.
+    auto* function_insertion_point = ctx.get_insertion_point(true);
+
+    // set up basic blocks.
+    auto* lhs_false_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* lhs_true_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+    /*
+     * code generation for l.h.s. being false
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
+    ctx.set_insertion_point(lhs_false_basic_block);
+
+    rhs_value = rhs->emit_rvalue(ctx, true);
+    if(!rhs_value)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          "Expression didn't produce a value.");
+    }
+    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+    {
+        throw cg::codegen_error(
+          rhs->get_location(),
+          std::format(
+            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            lhs_value->get_type().to_string()));
+    }
+
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... || (rhs != 0).
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * code generation for l.h.s. being true
+     */
+    ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
+    ctx.set_insertion_point(lhs_true_basic_block);
+    ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
+    ctx.generate_branch(merge_basic_block);
+
+    /*
+     * control flow logic.
+     */
+
+    // insert blocks into function.
+    ctx.set_insertion_point(function_insertion_point);
+    ctx.generate_cond_branch(lhs_false_basic_block, lhs_true_basic_block);
+
+    // emit merge block.
+    ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+    ctx.set_insertion_point(merge_basic_block);
+
+    return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+}
+
+std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    /*
+     * Code generation for binary expressions
+     * --------------------------------------
+     *
+     * 0. Special cases for logical and/logical or.
+     *
+     * 1. Non-assigning binary operation
+     *
+     *    <l.h.s. load>
+     *    <r.h.s. load>
+     *    <binary-op>
+     */
+
+    std::unique_ptr<cg::rvalue> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
+
+    /* Case 0 (logical and/logical or). */
+    if(op.s == "&&")
+    {
+        // TODO Evaluate constant subexpressions
+
+        // Short-circuit evaluation of "lhs && rhs".
+        return generate_logical_and(ctx, lhs, rhs);
+    }
+
+    if(op.s == "||")
+    {
+        // TODO Evaluate constant subexpressions
+
+        // Short-circuit evaluation of "lhs || rhs".
+        return generate_logical_or(ctx, lhs, rhs);
+    }
+
+    // Evaluate constant subexpressions.
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        auto info = const_eval_it->second;
+
+        if(info.type == const_::constant_type::i32)
+        {
+            const auto back_end_type = cg::type_kind::i32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::i64)
+        {
+            const auto back_end_type = cg::type_kind::i64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f32)
+        {
+            const auto back_end_type = cg::type_kind::f32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f64)
+        {
+            const auto back_end_type = cg::type_kind::f64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        std::println(
+          "{}: Warning: Attempted constant expression computation failed.",
+          ::slang::to_string(loc));
+        // fall-through
+    }
+
+    lhs_value = lhs->emit_rvalue(ctx);
+    rhs_value = rhs->emit_rvalue(ctx);
+
+    auto it = binary_op_map.find(op.s);
+    if(it == binary_op_map.end())
+    {
+        throw std::runtime_error(
+          std::format(
+            "{}: Code generation for binary operator '{}' not implemented.",
+            slang::to_string(loc), op.s));
+    }
+
+    ctx.generate_binary_op(it->second, lhs_value->get_type());
+
+    if(is_comparison(op.s))
+    {
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    // non-assignment operation.
+    return lhs_value;
 }
 
 void binary_expression::collect_names(co::context& ctx)
@@ -2882,8 +4094,6 @@ std::optional<ty::type_id> binary_expression::type_check(
         );
     }
 
-    auto [is_assignment, is_compound, is_comparison, reduced_op] = classify_binary_op(op.s);
-
     if(op.s == ".")    // struct access
     {
         // TODO change or improve error message.
@@ -2907,21 +4117,87 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // some operations restrict the type.
-    if(reduced_op == "%"
-       || reduced_op == "<<" || reduced_op == ">>"
-       || reduced_op == "&" || reduced_op == "^" || reduced_op == "|"
-       || reduced_op == "&&" || reduced_op == "||")
+    if(op.s == "%"
+       || op.s == "&"
+       || op.s == "^"
+       || op.s == "|")
     {
-        if(lhs_type != ctx.get_i32_type() || rhs_type != ctx.get_i32_type())
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
         {
             throw ty::type_error(
               loc,
               std::format(
-                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                "Got binary expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i64'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value()),
-                reduced_op));
+                op.s,
+                op.s));
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(op.s == "<<" || op.s == ">>")
+    {
+        if((lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())
+           || rhs_type != ctx.get_i32_type())
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got shift expression of type '{}' {} '{}', expected 'i32' {} 'i32' or 'i64' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                op.s,
+                ctx.to_string(rhs_type.value()),
+                op.s,
+                op.s));
+        }
+
+        // disallow negative literals.
+        if(rhs->is_literal())
+        {
+            const std::optional<const_value>& v = rhs->as_literal()->get_token().value;
+            if(!v.has_value())
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "R.h.s. does not have a value, but is typed as 'i32' literal."));
+            }
+
+            if(std::get<std::int64_t>(v.value()) < 0)
+            {
+                throw ty::type_error(
+                  loc,
+                  std::format(
+                    "Negative shift counts are not allowed."));
+            }
+        }
+
+        // set the restricted type.
+        expr_type = lhs_type;
+        ctx.set_expression_type(*this, expr_type);
+        return expr_type;
+    }
+
+    if(op.s == "&&" || op.s == "||")
+    {
+        if((lhs_type != rhs_type
+            || (lhs_type != ctx.get_i32_type() && lhs_type != ctx.get_i64_type())))
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Got logical expression of type '{}' {} '{}', expected 'i32' {} 'i32'.",
+                ctx.to_string(lhs_type.value()),
+                op.s,
+                ctx.to_string(rhs_type.value()),
+                op.s));
         }
 
         // set the restricted type.
@@ -2931,7 +4207,8 @@ std::optional<ty::type_id> binary_expression::type_check(
     }
 
     // assignments and comparisons.
-    if(op.s == "=" || op.s == "==" || op.s == "!=")
+    if(op.s == "=="
+       || op.s == "!=")
     {
         // Either the types match, or the type is a reference types which is set to 'null'.
         if(!ctx.are_types_compatible(lhs_type.value(), rhs_type.value()))
@@ -2941,16 +4218,8 @@ std::optional<ty::type_id> binary_expression::type_check(
               std::format(
                 "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
                 ctx.to_string(lhs_type.value()),
-                reduced_op,
+                op.s,
                 ctx.to_string(rhs_type.value())));
-        }
-
-        if(op.s == "=")
-        {
-            // assignments return the type of the l.h.s.
-            expr_type = lhs_type;
-            ctx.set_expression_type(*this, expr_type);
-            return expr_type;
         }
 
         // comparisons return i32.
@@ -2959,25 +4228,34 @@ std::optional<ty::type_id> binary_expression::type_check(
         return expr_type;
     }
 
-    // check lhs and rhs have supported types (i32 and f32 at the moment).
-    if(lhs_type.value() != ctx.get_i32_type()
-       && lhs_type != ctx.get_f32_type())
+    // check lhs and rhs have supported types (i32, i64, f32 and f64).
+    if(lhs_type.value() != ctx.get_i8_type()
+       && lhs_type.value() != ctx.get_i16_type()
+       && lhs_type.value() != ctx.get_i32_type()
+       && lhs_type.value() != ctx.get_i64_type()
+       && lhs_type.value() != ctx.get_f32_type()
+       && lhs_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
           loc,
           std::format(
-            "Expected 'i32' or 'f32' for l.h.s. of binary operation of type '{}', got '{}'.",
-            reduced_op,
+            "Expected 'i32', 'i64', 'f32' or 'f64' for l.h.s. of binary operation of type '{}', got '{}'.",
+            op.s,
             ctx.to_string(lhs_type.value())));
     }
-    if(rhs_type.value() != ctx.get_i32_type()
-       && rhs_type.value() != ctx.get_f32_type())
+
+    if(rhs_type.value() != ctx.get_i8_type()
+       && rhs_type.value() != ctx.get_i16_type()
+       && rhs_type.value() != ctx.get_i32_type()
+       && rhs_type.value() != ctx.get_i64_type()
+       && rhs_type.value() != ctx.get_f32_type()
+       && rhs_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
           loc,
           std::format(
-            "Expected 'i32' or 'f32' for r.h.s. of binary operation of type '{}', got '{}'.",
-            reduced_op,
+            "Expected 'i32', 'i64', 'f32' or 'f64' for r.h.s. of binary operation of type '{}', got '{}'.",
+            op.s,
             ctx.to_string(rhs_type.value())));
     }
 
@@ -2988,18 +4266,18 @@ std::optional<ty::type_id> binary_expression::type_check(
           std::format(
             "Types don't match in binary expression. Got expression of type '{}' {} '{}'.",
             ctx.to_string(lhs_type.value()),
-            reduced_op,
+            op.s,
             ctx.to_string(rhs_type.value())));
     }
 
-    if(is_comparison)
+    if(is_comparison(op.s))
     {
         // comparisons return i32.
         expr_type = ctx.get_i32_type();
     }
     else
     {
-        // set the type of the binary expression.
+        // set the type of the binary expression,
         expr_type = lhs_type;
     }
 
@@ -3036,76 +4314,79 @@ bool unary_expression::is_pure(cg::context& ctx) const
     return operand->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> unary_expression::generate_code(
+std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into unary expression.");
-    }
-
     if(op.s == "++")
     {
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
-           && v->get_type().get_type_kind() != cg::type_kind::f32)
+           && v->get_type().get_type_kind() != cg::type_kind::i64
+           && v->get_type().get_type_kind() != cg::type_kind::f32
+           && v->get_type().get_type_kind() != cg::type_kind::f64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32' or 'f32'.",
+                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32
+           || v->get_type().get_type_kind() == cg::type_kind::i64)
         {
             ctx.generate_const(v->get_type(), 1);
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32
+                || v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            ctx.generate_const(v->get_type(), 1.f);
+            ctx.generate_const(v->get_type(), 1.0);
         }
         ctx.generate_binary_op(cg::binary_op::op_add, v->get_type());
 
         ctx.generate_dup(v->get_type());
         ctx.generate_store(
-          cg::variable_argument{std::make_unique<cg::value>(*v)});
+          cg::variable_argument{std::make_unique<cg::rvalue>(*v)});
         return v;
     }
 
     if(op.s == "--")
     {
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
         if(v->get_type().get_type_kind() != cg::type_kind::i32
-           && v->get_type().get_type_kind() != cg::type_kind::f32)
+           && v->get_type().get_type_kind() != cg::type_kind::i64
+           && v->get_type().get_type_kind() != cg::type_kind::f32
+           && v->get_type().get_type_kind() != cg::type_kind::f64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Wrong expression type '{}' for prefix operator '--'. Expected 'i32' or 'f32'.",
+                "Wrong expression type '{}' for prefix operator '--'. Expected 'i32', 'i64', 'f32' or 'f64'.",
                 v->get_type().to_string()));
         }
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i32
+           || v->get_type().get_type_kind() == cg::type_kind::i64)
         {
             ctx.generate_const(v->get_type(), 1);
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
+        else if(v->get_type().get_type_kind() == cg::type_kind::f32
+                || v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            ctx.generate_const(v->get_type(), 1.f);
+            ctx.generate_const(v->get_type(), 1.0);
         }
         ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
 
         ctx.generate_dup(v->get_type());
         ctx.generate_store(
-          cg::variable_argument{std::make_unique<cg::value>(*v)});
+          cg::variable_argument{std::make_unique<cg::rvalue>(*v)});
         return v;
     }
 
     // Evaluate constant subexpressions.
     auto it = ctx.get_const_env().const_eval_expr_values.find(this);
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval_)
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
        && it != ctx.get_const_env().const_eval_expr_values.cend())
     {
         const auto& info = it->second;
@@ -3116,9 +4397,20 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
             ctx.generate_const(
               back_end_type,
-              std::get<int>(info.value));
+              std::get<std::int64_t>(info.value));
 
-            return std::make_unique<cg::value>(back_end_type);
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::i64)
+        {
+            const auto back_end_type = cg::type{cg::type_kind::i64};
+
+            ctx.generate_const(
+              back_end_type,
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
         }
 
         if(info.type == const_::constant_type::f32)
@@ -3127,9 +4419,20 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
             ctx.generate_const(
               back_end_type,
-              std::get<float>(info.value));
+              std::get<double>(info.value));
 
-            return std::make_unique<cg::value>(back_end_type);
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f64)
+        {
+            const auto back_end_type = cg::type{cg::type_kind::f64};
+
+            ctx.generate_const(
+              back_end_type,
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
         }
 
         std::println(
@@ -3140,33 +4443,61 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     if(op.s == "+")
     {
-        return operand->generate_code(ctx, mc);
+        return operand->emit_rvalue(ctx);
     }
 
     if(op.s == "-")
     {
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
-        auto v = operand->generate_code(ctx, mc);
+        auto v = operand->emit_rvalue(ctx);
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        if(v->get_type().get_type_kind() == cg::type_kind::i32)
+        if(v->get_type().get_type_kind() == cg::type_kind::i8
+           || v->get_type().get_type_kind() == cg::type_kind::i16
+           || v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0, std::nullopt));
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::i32,
+                static_cast<std::int64_t>(0),
+                std::nullopt));
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        {
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::i64,
+                static_cast<std::int64_t>(0),
+                std::nullopt));
         }
         else if(v->get_type().get_type_kind() == cg::type_kind::f32)
         {
-            args.emplace_back(std::make_unique<cg::const_argument>(0.f, std::nullopt));
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::f32,
+                0.0,
+                std::nullopt));
+        }
+        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
+        {
+            args.emplace_back(
+              std::make_unique<cg::const_argument>(
+                cg::type_kind::f64,
+                0.0,
+                std::nullopt));
         }
         else
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '-': Expected 'i32' or 'f32', got '{}'.",
+                "Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
                 v->get_type().to_string()));
         }
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        instrs.insert(
+          instrs.begin() + pos,    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+          std::make_unique<cg::instruction>("const", std::move(args)));
 
         ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
         return v;
@@ -3174,20 +4505,21 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
 
     if(op.s == "!")
     {
-        auto v = operand->generate_code(ctx, memory_context::load);
-        if(v->get_type().get_type_kind() != cg::type_kind::i32)
+        auto v = operand->emit_rvalue(ctx);
+        if(v->get_type().get_type_kind() != cg::type_kind::i32
+           && v->get_type().get_type_kind() != cg::type_kind::i64)
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '!': Expected 'i32', got '{}'.",
+                "Type error for unary operator '!': Expected 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string()));
         }
 
-        ctx.generate_const({cg::type_kind::i32}, 0);
+        ctx.generate_const({v->get_type().get_type_kind()}, 0);
         ctx.generate_binary_op(cg::binary_op::op_equal, v->get_type());
 
-        return std::make_unique<cg::value>(cg::type{cg::type_kind::i32});
+        return std::make_unique<cg::rvalue>(v->get_type());
     }
 
     if(op.s == "~")
@@ -3195,23 +4527,43 @@ std::unique_ptr<cg::value> unary_expression::generate_code(
         auto& instrs = ctx.get_insertion_point()->get_instructions();
         std::size_t pos = instrs.size();
 
-        auto v = operand->generate_code(ctx, mc);
-        if(v->get_type().get_type_kind() != cg::type_kind::i32)
+        auto v = operand->emit_rvalue(ctx);
+        auto constant_type = [this, &v]() -> cg::type_kind
         {
+            if(v->get_type().get_type_kind() == cg::type_kind::i8
+               || v->get_type().get_type_kind() == cg::type_kind::i16
+               || v->get_type().get_type_kind() == cg::type_kind::i32)
+            {
+                return cg::type_kind::i32;
+            }
+
+            if(v->get_type().get_type_kind() == cg::type_kind::i64)
+            {
+                return cg::type_kind::i64;
+            }
+
             throw cg::codegen_error(
               loc,
               std::format(
-                "Type error for unary operator '~': Expected 'i32', got '{}'.",
+                "Type error for unary operator '~': Expected 'i8', 'i16', 'i32' or 'i64', got '{}'.",
                 v->get_type().to_string()));
-        }
+        }();
 
         std::vector<std::unique_ptr<cg::argument>> args;
-        args.emplace_back(std::make_unique<cg::const_argument>(~0, std::nullopt));
+        args.emplace_back(
+          std::make_unique<cg::const_argument>(
+            constant_type,
+            static_cast<std::int64_t>(~0),
+            std::nullopt));
 
-        instrs.insert(instrs.begin() + pos, std::make_unique<cg::instruction>("const", std::move(args)));    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+        instrs.insert(
+          instrs.begin() + pos,    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
+          std::make_unique<cg::instruction>(
+            "const",
+            std::move(args)));
 
-        ctx.generate_binary_op(cg::binary_op::op_xor, v->get_type());
-        return v;
+        ctx.generate_binary_op(cg::binary_op::op_xor, constant_type);
+        return std::make_unique<cg::rvalue>(constant_type);
     }
 
     throw std::runtime_error(
@@ -3247,12 +4599,12 @@ std::optional<ty::type_id> unary_expression::type_check(
     }
 
     const std::unordered_map<std::string, std::set<ty::type_id>> valid_operand_types = {
-      {"++", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"--", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"+", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"-", {ctx.get_i32_type(), ctx.get_f32_type()}},
-      {"!", {ctx.get_i32_type()}},
-      {"~", {ctx.get_i32_type()}}};
+      {"++", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"--", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"+", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"-", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type(), ctx.get_f32_type(), ctx.get_f64_type()}},
+      {"!", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type()}},
+      {"~", {ctx.get_i8_type(), ctx.get_i16_type(), ctx.get_i32_type(), ctx.get_i64_type()}}};
 
     auto op_it = valid_operand_types.find(op.s);
     if(op_it == valid_operand_types.end())
@@ -3318,15 +4670,10 @@ bool new_expression::is_pure(cg::context& ctx) const
     return array_length_expr->is_pure(ctx);
 }
 
-std::unique_ptr<cg::value> new_expression::generate_code(
+std::unique_ptr<cg::rvalue> new_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into new expression.");
-    }
-
     cg::type element_type = ctx.lower(type_expr->get_type());
     if(element_type.get_type_kind() == cg::type_kind::void_)
     {
@@ -3336,7 +4683,7 @@ std::unique_ptr<cg::value> new_expression::generate_code(
     }
 
     // generate array size.
-    std::unique_ptr<cg::value> v = array_length_expr->generate_code(ctx, memory_context::load);
+    std::unique_ptr<cg::rvalue> v = array_length_expr->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -3346,17 +4693,21 @@ std::unique_ptr<cg::value> new_expression::generate_code(
             v->get_type().to_string()));
     }
 
-    if(element_type.get_type_kind() == cg::type_kind::i32
+    if(element_type.get_type_kind() == cg::type_kind::i8
+       || element_type.get_type_kind() == cg::type_kind::i16
+       || element_type.get_type_kind() == cg::type_kind::i32
+       || element_type.get_type_kind() == cg::type_kind::i64
        || element_type.get_type_kind() == cg::type_kind::f32
+       || element_type.get_type_kind() == cg::type_kind::f64
        || element_type.get_type_kind() == cg::type_kind::str)
     {
         ctx.generate_newarray(element_type);
-        return std::make_unique<cg::value>(cg::type{cg::type_kind::ref});
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::ref});
     }
 
     // custom type.
     ctx.generate_anewarray(element_type);
-    return std::make_unique<cg::value>(cg::type_kind::ref);
+    return std::make_unique<cg::rvalue>(cg::type_kind::ref);
 }
 
 void new_expression::collect_names(co::context& ctx)
@@ -3424,18 +4775,13 @@ std::unique_ptr<expression> null_expression::clone() const
     return std::make_unique<null_expression>(*this);
 }
 
-std::unique_ptr<cg::value> null_expression::generate_code(
+std::unique_ptr<cg::rvalue> null_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into null expression.");
-    }
-
     ctx.generate_const_null();
 
-    return std::make_unique<cg::value>(cg::type{cg::type_kind::null});
+    return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::null});
 }
 
 std::optional<ty::type_id> null_expression::type_check(
@@ -3469,16 +4815,11 @@ void postfix_expression::serialize(archive& ar)
     ar & op;
 }
 
-std::unique_ptr<cg::value> postfix_expression::generate_code(
+std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into postfix operator expression.");
-    }
-
-    auto v = identifier->generate_code(ctx, memory_context::load);
+    auto v = identifier->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32
        && v->get_type().get_type_kind() != cg::type_kind::f32)
     {
@@ -3513,7 +4854,7 @@ std::unique_ptr<cg::value> postfix_expression::generate_code(
 
         ctx.generate_store(
           cg::variable_argument{
-            std::make_unique<cg::value>(*v)});
+            std::make_unique<cg::rvalue>(*v)});
     }
     else
     {
@@ -3690,94 +5031,114 @@ bool block::is_pure(cg::context& ctx) const
       });
 }
 
-std::unique_ptr<cg::value> block::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void block::generate_code(
+  cg::context& ctx) const
 {
-    if(mc == memory_context::none)
+    bool was_terminated = false;
+
+    for(const auto& expr: exprs)
     {
-        bool was_terminated = false;
-
-        for(const auto& expr: exprs)
+        if(was_terminated)
         {
-            if(was_terminated)
+            auto* fn = ctx.get_current_function();
+            if(fn != nullptr)
             {
-                auto* fn = ctx.get_current_function();
-                if(fn != nullptr)
-                {
-                    cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-                    fn->append_basic_block(bb);
-                    ctx.set_insertion_point(bb);
-                }
-            }
-
-            if(expr->is_pure(ctx))
-            {
-                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-                // don't generate code.
-                continue;
-            }
-
-            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
-
-            // non-assigning expressions need cleanup.
-            if(expr->needs_pop())
-            {
-                if(!v)
-                {
-                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-                }
-
-                ctx.generate_pop(v->get_type());
-            }
-
-            auto* bb = ctx.get_insertion_point();
-            if(ctx.get_current_function() != nullptr
-               && bb != nullptr)
-            {
-                was_terminated = bb->is_terminated();
-            }
-            else
-            {
-                was_terminated = false;
+                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+                fn->append_basic_block(bb);
+                ctx.set_insertion_point(bb);
             }
         }
 
+        if(expr->is_pure(ctx))
+        {
+            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+            // don't generate code.
+            continue;
+        }
+
+        expr->generate_code(ctx);
+
+        auto* bb = ctx.get_insertion_point();
+        if(ctx.get_current_function() != nullptr
+           && bb != nullptr)
+        {
+            was_terminated = bb->is_terminated();
+        }
+        else
+        {
+            was_terminated = false;
+        }
+    }
+}
+
+std::unique_ptr<cg::rvalue> block::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    if(exprs.size() == 0)
+    {
         return nullptr;
     }
 
-    if(mc == memory_context::load)
+    bool was_terminated = false;
+    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
     {
-        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        const auto& expr = exprs[i];
+        if(was_terminated)
         {
-            const auto& expr = exprs[i];
-            if(expr->is_pure(ctx))
+            auto* fn = ctx.get_current_function();
+            if(fn != nullptr)
             {
-                std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-                // don't generate code.
-                continue;
-            }
-            std::unique_ptr<cg::value> v = expr->generate_code(ctx, memory_context::none);
-
-            // non-assigning expressions need cleanup.
-            if(expr->needs_pop())
-            {
-                if(!v)
-                {
-                    throw cg::codegen_error(loc, "Expression requires popping the stack, but didn't produce a value.");
-                }
-
-                ctx.generate_pop(v->get_type());
+                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+                fn->append_basic_block(bb);
+                ctx.set_insertion_point(bb);
             }
         }
 
-        // the last expression is loaded.
-        return exprs.back()->generate_code(ctx, memory_context::load);
+        if(expr->is_pure(ctx))
+        {
+            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
+
+            // don't generate code.
+            continue;
+        }
+
+        expr->generate_code(ctx);
+
+        auto* bb = ctx.get_insertion_point();
+        if(ctx.get_current_function() != nullptr
+           && bb != nullptr)
+        {
+            was_terminated = bb->is_terminated();
+        }
+        else
+        {
+            was_terminated = false;
+        }
     }
 
-    throw cg::codegen_error(loc, "Invalid memory context for code block.");
+    // the last expression is loaded if it is an expression.
+
+    if(was_terminated)
+    {
+        auto* fn = ctx.get_current_function();
+        if(fn != nullptr)
+        {
+            cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
+            fn->append_basic_block(bb);
+            ctx.set_insertion_point(bb);
+        }
+    }
+
+    const auto& last_expr = exprs.back();
+    if(last_expr->is_expression_statement())
+    {
+        return last_expr->emit_rvalue(ctx);
+    }
+
+    last_expr->generate_code(ctx);
+    return nullptr;
 }
 
 void block::collect_names(co::context& ctx)
@@ -3813,9 +5174,11 @@ std::optional<ty::type_id> block::type_check(
     {
         expr->type_check(ctx, env);
     }
-    auto ret = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
 
-    return ret;
+    expr_type = exprs.empty() ? std::nullopt : exprs.back()->type_check(ctx, env);
+    ctx.set_expression_type(*this, expr_type);
+
+    return expr_type;
 }
 
 std::string block::to_string() const
@@ -3845,11 +5208,11 @@ std::unique_ptr<expression> function_expression::clone() const
 void function_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    bool has_prototype = static_cast<bool>(prototype);
+    bool has_prototype = prototype != nullptr;
     ar & has_prototype;
     if(has_prototype)
     {
-        if(!static_cast<bool>(prototype))
+        if(prototype == nullptr)
         {
             prototype = std::make_unique<prototype_ast>();
         }
@@ -3862,15 +5225,9 @@ void function_expression::serialize(archive& ar)
     ar& expression_serializer{body};
 }
 
-std::unique_ptr<cg::value> function_expression::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void function_expression::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for function_expression.");
-    }
-
     if(!symbol_id.has_value())
     {
         throw ty::type_error(
@@ -3923,7 +5280,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                 prototype->get_name()));
         }
 
-        auto v = body->generate_code(ctx);
+        auto v = body->emit_rvalue(ctx);
 
         // verify that the break-continue-stack is empty.
         if(ctx.get_break_continue_stack_size() != 0)
@@ -3939,7 +5296,16 @@ std::unique_ptr<cg::value> function_expression::generate_code(
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
             auto ret_type = std::get<0>(fn->get_signature());
-            if(ret_type.get_type_kind() != cg::type_kind::void_)
+            if(ret_type.get_type_kind() == cg::type_kind::void_)
+            {
+                // pop the stack if needed.
+                if(v != nullptr
+                   && v->get_type().get_type_kind() != cg::type_kind::void_)
+                {
+                    ctx.generate_pop(v->get_type());
+                }
+            }
+            else
             {
                 throw cg::codegen_error(
                   loc,
@@ -3948,7 +5314,7 @@ std::unique_ptr<cg::value> function_expression::generate_code(
                     fn->get_name()));
             }
 
-            ctx.generate_ret(v ? std::make_optional(v->get_type()) : std::nullopt);
+            ctx.generate_ret();
         }
     }
     else
@@ -4027,8 +5393,6 @@ std::unique_ptr<cg::value> function_expression::generate_code(
           ret_type,
           std::move(args));
     }
-
-    return nullptr;
 }
 
 void function_expression::collect_names(co::context& ctx)
@@ -4116,9 +5480,9 @@ bool call_expression::is_pure([[maybe_unused]] cg::context& ctx) const
     return false;
 }
 
-std::unique_ptr<cg::value> call_expression::generate_code(
+std::unique_ptr<cg::rvalue> call_expression::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  [[maybe_unused]] bool result_used) const
 {
     if(!symbol_id.has_value())
     {
@@ -4129,15 +5493,9 @@ std::unique_ptr<cg::value> call_expression::generate_code(
             callee.s));
     }
 
-    // Code generation for function calls.
-    if(mc == memory_context::store)
-    {
-        throw cg::codegen_error(loc, "Cannot store into call expression.");
-    }
-
     for(const auto& arg: args)
     {
-        arg->generate_code(ctx, memory_context::load);
+        arg->emit_rvalue(ctx);
     }
     ctx.generate_invoke(
       cg::function_argument{
@@ -4148,14 +5506,14 @@ std::unique_ptr<cg::value> call_expression::generate_code(
     if(index_expr)
     {
         // evaluate the index expression.
-        index_expr->generate_code(ctx, memory_context::load);
+        index_expr->emit_rvalue(ctx);
         ctx.generate_load_element(
           cg::type_argument{ctx.deref(lowered_return_type)});
-        return std::make_unique<cg::value>(
+        return std::make_unique<cg::rvalue>(
           ctx.deref(lowered_return_type));
     }
 
-    return std::make_unique<cg::value>(lowered_return_type);
+    return std::make_unique<cg::rvalue>(lowered_return_type);
 }
 
 void call_expression::collect_names(co::context& ctx)
@@ -4432,30 +5790,79 @@ void return_statement::serialize(archive& ar)
     ar& expression_serializer{expr};
 }
 
-std::unique_ptr<cg::value> return_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void return_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for return_statement.");
-    }
-
     if(expr)
     {
-        auto v = expr->generate_code(ctx, memory_context::load);
-        if(!v)
+        // Evaluate constant subexpressions.
+        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(expr.get());
+        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
         {
-            throw cg::codegen_error(loc, "Expression did not yield a type.");
+            auto info = const_eval_it->second;
+
+            if(info.type == const_::constant_type::i32)
+            {
+                const auto back_end_type = cg::type_kind::i32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return;
+            }
+
+            if(info.type == const_::constant_type::i64)
+            {
+                const auto back_end_type = cg::type_kind::i64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<std::int64_t>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return;
+            }
+
+            if(info.type == const_::constant_type::f32)
+            {
+                const auto back_end_type = cg::type_kind::f32;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return;
+            }
+
+            if(info.type == const_::constant_type::f64)
+            {
+                const auto back_end_type = cg::type_kind::f64;
+
+                ctx.generate_const(
+                  {back_end_type},
+                  std::get<double>(info.value));
+
+                ctx.generate_ret({back_end_type});
+                return;
+            }
+
+            std::println(
+              "{}: Warning: Attempted constant expression computation failed.",
+              ::slang::to_string(loc));
+            // fall-through
         }
+
+        auto v = expr->emit_rvalue(ctx);
         ctx.generate_ret(v->get_type());
     }
     else
     {
         ctx.generate_ret();
     }
-
-    return nullptr;
 }
 
 void return_statement::collect_names(co::context& ctx)
@@ -4551,20 +5958,10 @@ void if_statement::serialize(archive& ar)
     ar& expression_serializer{else_block};
 }
 
-std::unique_ptr<cg::value> if_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void if_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for if_statement.");
-    }
-
-    auto v = condition->generate_code(ctx, memory_context::load);
-    if(!v)
-    {
-        throw cg::codegen_error(loc, "Condition did not yield a type.");
-    }
+    auto v = condition->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -4588,7 +5985,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(
     // code generation for if block.
     ctx.get_current_function(true)->append_basic_block(if_basic_block);
     ctx.set_insertion_point(if_basic_block);
-    if_block->generate_code(ctx, memory_context::none);
+    if_block->generate_code(ctx);
     if_ends_with_return = if_basic_block->ends_with_return();
     if(!if_ends_with_return)
     {
@@ -4606,7 +6003,7 @@ std::unique_ptr<cg::value> if_statement::generate_code(
         else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
         ctx.get_current_function(true)->append_basic_block(else_basic_block);
         ctx.set_insertion_point(else_basic_block);
-        else_block->generate_code(ctx, memory_context::none);
+        else_block->generate_code(ctx);
         else_ends_with_return = else_basic_block->ends_with_return();
         if(!else_ends_with_return)
         {
@@ -4635,8 +6032,6 @@ std::unique_ptr<cg::value> if_statement::generate_code(
             ctx.set_insertion_point(if_basic_block);
         }
     }
-
-    return nullptr;
 }
 
 void if_statement::collect_names(co::context& ctx)
@@ -4704,15 +6099,9 @@ void while_statement::serialize(archive& ar)
     ar& expression_serializer{while_block};
 }
 
-std::unique_ptr<cg::value> while_statement::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void while_statement::generate_code(
+  cg::context& ctx) const
 {
-    if(mc != memory_context::none)
-    {
-        throw cg::codegen_error(loc, "Invalid memory context for while_statement.");
-    }
-
     // set up basic blocks.
     auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
@@ -4724,11 +6113,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(
 
     ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
 
-    auto v = condition->generate_code(ctx, memory_context::load);
-    if(!v)
-    {
-        throw cg::codegen_error(loc, "Condition did not yield a type.");
-    }
+    auto v = condition->emit_rvalue(ctx);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -4743,7 +6128,7 @@ std::unique_ptr<cg::value> while_statement::generate_code(
     // while loop body.
     ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
     ctx.set_insertion_point(while_loop_basic_block);
-    while_block->generate_code(ctx, memory_context::none);
+    while_block->generate_code(ctx);
 
     ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
     ctx.generate_branch(while_loop_header_basic_block);
@@ -4753,8 +6138,6 @@ std::unique_ptr<cg::value> while_statement::generate_code(
     // emit merge block.
     ctx.get_current_function(true)->append_basic_block(merge_basic_block);
     ctx.set_insertion_point(merge_basic_block);
-
-    return nullptr;
 }
 
 void while_statement::collect_names(co::context& ctx)
@@ -4804,13 +6187,11 @@ std::unique_ptr<expression> break_statement::clone() const
     return std::make_unique<break_statement>(*this);
 }
 
-std::unique_ptr<cg::value> break_statement::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void break_statement::generate_code(
+  cg::context& ctx) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
-    return nullptr;
 }
 
 /*
@@ -4822,13 +6203,11 @@ std::unique_ptr<expression> continue_statement::clone() const
     return std::make_unique<continue_statement>(*this);
 }
 
-std::unique_ptr<cg::value> continue_statement::generate_code(
-  cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void continue_statement::generate_code(
+  cg::context& ctx) const
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
-    return nullptr;
 }
 
 }    // namespace slang::ast

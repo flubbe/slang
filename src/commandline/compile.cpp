@@ -219,7 +219,7 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!evaluate_constant_subexpressions)
     {
-        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval_);
+        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval);
     }
 
     ast->collect_names(co_ctx);
@@ -248,6 +248,7 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->declare_functions(type_ctx, sema_env);
     ast->bind_constant_declarations(sema_env, const_env);
     ast->type_check(type_ctx, sema_env);
+    ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
     ast->expand_late_macros(co_ctx, resolver_ctx, type_ctx, sema_env);
     ast->evaluate_constant_expressions(type_ctx, const_env);
     ast->generate_code(codegen_ctx);
