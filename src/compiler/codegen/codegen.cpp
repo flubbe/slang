@@ -159,10 +159,10 @@ std::string type::to_string([[maybe_unused]] const name_resolver* resolver) cons
 }
 
 /*
- * value.
+ * rvalue.
  */
 
-std::string value::to_string([[maybe_unused]] const name_resolver* resolver) const
+std::string rvalue::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
     // named values.
     if(symbol_id.has_value())

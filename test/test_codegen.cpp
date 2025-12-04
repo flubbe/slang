@@ -351,7 +351,7 @@ TEST(codegen, generate_function)
         EXPECT_EQ(codegen_ctx.get_insertion_point(), block);
 
         codegen_ctx.generate_load(
-          cg::variable_argument{std::make_unique<cg::value>(
+          cg::variable_argument{std::make_unique<cg::rvalue>(
             cg::type{
               mock_i32_type, cg::type_kind::i32},
             args[0].first)});
@@ -419,7 +419,7 @@ TEST(codegen, operators)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type, cg::type_kind::i32},
               args[0].first)});
@@ -509,7 +509,7 @@ TEST(codegen, conditional_branch)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{mock_i32_type, cg::type_kind::i32},
               args[0].first)});
         codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 1);
@@ -634,12 +634,12 @@ TEST(codegen, locals_store)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{mock_i32_type, cg::type_kind::i32},
               args[0].first)});
         codegen_ctx.generate_store(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{mock_i32_type, cg::type_kind::i32},
               local_id)});
 
@@ -800,7 +800,7 @@ TEST(codegen, invoke)
           -1);
         codegen_ctx.generate_store(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
@@ -808,14 +808,14 @@ TEST(codegen, invoke)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
               local_id)});
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
@@ -884,14 +884,14 @@ TEST(codegen, invoke)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
               args_g[0].first)});
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
@@ -995,7 +995,7 @@ TEST(codegen, invoke)
           -1);
         codegen_ctx.generate_store(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
@@ -1003,14 +1003,14 @@ TEST(codegen, invoke)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
               local_id)});
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
@@ -1081,14 +1081,14 @@ TEST(codegen, invoke)
 
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},
               args_g[0].first)});
         codegen_ctx.generate_load(
           cg::variable_argument{
-            std::make_unique<cg::value>(
+            std::make_unique<cg::rvalue>(
               cg::type{
                 mock_i32_type,
                 cg::type_kind::i32},

@@ -286,7 +286,7 @@ void macro_invocation::serialize(archive& ar)
     ar& expression_serializer{expansion};
 }
 
-std::unique_ptr<cg::value> macro_invocation::emit_rvalue(
+std::unique_ptr<cg::rvalue> macro_invocation::emit_rvalue(
   cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {
@@ -305,7 +305,7 @@ std::unique_ptr<cg::value> macro_invocation::emit_rvalue(
         auto type = ctx.deref(return_type->get_type());
         ctx.generate_load_element(
           cg::type_argument{type});
-        return std::make_unique<cg::value>(type);
+        return std::make_unique<cg::rvalue>(type);
     }
 
     return return_type;
@@ -441,7 +441,7 @@ void macro_branch::generate_code(
     body->generate_code(ctx);
 }
 
-std::unique_ptr<cg::value> macro_branch::emit_rvalue(
+std::unique_ptr<cg::rvalue> macro_branch::emit_rvalue(
   cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {

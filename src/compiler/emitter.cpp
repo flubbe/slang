@@ -1003,7 +1003,7 @@ void instruction_emitter::emit_instruction(
         opcode ref_opcode)
     {
         const auto* arg = static_cast<const cg::variable_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        const cg::value* v = arg->get_value();
+        const cg::rvalue* v = arg->get_value();
 
         if(!v->has_symbol_id())
         {

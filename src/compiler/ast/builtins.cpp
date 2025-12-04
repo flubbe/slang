@@ -370,7 +370,7 @@ void format_macro_expression::expand_late_macros(
     }
 }
 
-std::unique_ptr<cg::value> format_macro_expression::emit_rvalue(
+std::unique_ptr<cg::rvalue> format_macro_expression::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {

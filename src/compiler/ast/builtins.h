@@ -172,7 +172,7 @@ public:
         return node_identifier::format_macro_expression;
     }
 
-    std::unique_ptr<cg::value> emit_rvalue(
+    std::unique_ptr<cg::rvalue> emit_rvalue(
       cg::context& ctx,
       bool result_used = false) const override;
     void collect_names(co::context& ctx) override;
