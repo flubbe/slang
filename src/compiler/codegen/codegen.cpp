@@ -730,6 +730,22 @@ void context::generate_dup_x2(type vt, type skip_type1, type skip_type2)
         std::move(args)));
 }
 
+void context::generate_dup2_x0(type t0, type t1)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(t0)));
+    args.emplace_back(
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(t1)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "dup2_x0",
+        std::move(args)));
+}
+
 void context::generate_get_field(std::unique_ptr<field_access_argument> arg)
 {
     validate_insertion_point();
@@ -764,28 +780,53 @@ void context::generate_invoke_dynamic()
         "invoke_dynamic"));
 }
 
-void context::generate_load(variable_argument v)
+void context::generate_load(const lvalue& v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<variable_argument>(
-        std::move(v)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "load",
-        std::move(args)));
-}
 
-void context::generate_load_element(type_argument t)
-{
-    validate_insertion_point();
-    std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(std::move(t)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "load_element",
-        std::move(args)));
+    std::visit(
+      [&v, &args, this](auto const& l) -> void
+      {
+          using T = std::decay_t<decltype(l)>;
+
+          if constexpr(std::is_same_v<T, variable_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<variable_argument>(
+                  v.get_base()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "load",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, array_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_argument>(
+                  v.get_type()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "load_element",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, field_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<field_access_argument>(
+                  std::get<field_location_info>(v.get_location()).struct_type,
+                  std::get<field_location_info>(v.get_location()).field_index));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "get_field",
+                  std::move(args)));
+          }
+          else
+          {
+              // FIXME static_assert here
+          }
+      },
+      v.get_location());
 }
 
 void context::generate_new(const type& t)
@@ -793,7 +834,10 @@ void context::generate_new(const type& t)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(t));
-    insertion_point->add_instruction(std::make_unique<instruction>("new", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "new",
+        std::move(args)));
 }
 
 void context::generate_newarray(const type& t)
@@ -846,30 +890,53 @@ void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
     insertion_point->add_instruction(std::make_unique<instruction>("set_field", std::move(args)));
 }
 
-void context::generate_store(variable_argument v)
+void context::generate_store(const lvalue& v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<variable_argument>(
-        std::move(v)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "store",
-        std::move(args)));
-}
 
-void context::generate_store_element(type_argument t)
-{
-    validate_insertion_point();
-    std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<type_argument>(
-        std::move(t)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "store_element",
-        std::move(args)));
+    std::visit(
+      [&v, &args, this](auto const& l) -> void
+      {
+          using T = std::decay_t<decltype(l)>;
+
+          if constexpr(std::is_same_v<T, variable_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<variable_argument>(
+                  v.get_base()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "store",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, array_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_argument>(
+                  v.get_type()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "store_element",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, field_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<field_access_argument>(
+                  std::get<field_location_info>(v.get_location()).struct_type,
+                  std::get<field_location_info>(v.get_location()).field_index));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "set_field",
+                  std::move(args)));
+          }
+          else
+          {
+              // FIXME static_assert here
+          }
+      },
+      v.get_location());
 }
 
 std::string context::generate_label()

@@ -3187,11 +3187,9 @@ TEST(compile_ir, postfix_operators)
               " const i32 0\n"
               " store i32 %1\n"
               " load i32 %1\n"
-              " dup cat1\n"
               " const i32 1\n"
               " add i32\n"
               " store i32 %1\n"
-              " pop i32\n"
               " ret void\n"
               "}");
 }

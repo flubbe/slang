@@ -430,6 +430,21 @@ void context::exec(
                 }
                 break;
             } /* opcode::dup_x2 */
+            case opcode::dup2_x0:
+            {
+                auto size1 = read_unchecked<std::size_t>(binary, offset);
+                auto size2 = read_unchecked<std::size_t>(binary, offset);
+                auto needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+                frame.stack.dup2_x0(size1, size2);
+
+                if(needs_gc != 0)
+                {
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2), size1);
+                    gc.add_temporary(addr);
+                }
+                break;
+            } /* opcode::dup2_x0 */
             case opcode::pop:
             {
                 frame.stack.pop_cat1<std::int32_t>();

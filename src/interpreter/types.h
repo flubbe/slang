@@ -189,6 +189,26 @@ public:
           stack.end());
     }
 
+    /** Duplicate the top memory block of size `size1 + size2`. */
+    // FIXME Should be replaced by dup2.
+    void dup2_x0(std::size_t size1, std::size_t size2)
+    {
+        if(stack.size() < size1 + size2)
+        {
+            throw interpreter_error("Stack underflow.");
+        }
+
+        if(stack.size() + size1 + size2 > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
+
+        stack.insert(
+          stack.end(),
+          stack.end() - size1 - size2,
+          stack.end());
+    }
+
     /** Duplicate the top address on the stack. */
     void dup_addr()
     {

@@ -195,11 +195,43 @@ public:
     }
 };
 
+/** Location info for a variable. */
+struct variable_location_info
+{
+    /** Index. */
+    std::size_t index{0};
+};
+
+/** Array location info. */
+struct array_location_info
+{
+    /** empty. */
+};
+
+/** Location info for struct fields. */
+struct field_location_info
+{
+    /** Struct type. */
+    type struct_type;
+
+    /** Field index. */
+    std::size_t field_index{0};
+};
+
+/** l-value location info. */
+using location_info = std::variant<
+  variable_location_info,
+  array_location_info,
+  field_location_info>;
+
 /** An l-value. */
 class lvalue
 {
     /** Base information. */
     rvalue base;
+
+    /** Location info. */
+    location_info location;
 
 public:
     /** Default constructors. */
@@ -222,6 +254,16 @@ public:
      */
     lvalue(
       type ty,
+      location_info location,
+      std::optional<sema::symbol_id> symbol_id = std::nullopt)
+    : base{ty, symbol_id}
+    , location{location}
+    {
+    }
+
+    // FIXME remove
+    lvalue(
+      type ty,
       std::optional<sema::symbol_id> symbol_id = std::nullopt)
     : base{ty, symbol_id}
     {
@@ -239,6 +281,13 @@ public:
     type get_type() const
     {
         return base.get_type();
+    }
+
+    /** Get location. */
+    [[nodiscard]]
+    const location_info& get_location() const
+    {
+        return location;
     }
 };
 
@@ -618,11 +667,11 @@ public:
 class variable_argument : public argument
 {
     /** The variable. */
-    std::unique_ptr<rvalue> var;
+    rvalue var;
 
 public:
     /** Defaulted and deleted constructors. */
-    variable_argument() = delete;
+    variable_argument() = default;
     variable_argument(const variable_argument&) = delete;
     variable_argument(variable_argument&&) = default;
 
@@ -638,7 +687,7 @@ public:
      *
      * @param v The variable.
      */
-    explicit variable_argument(std::unique_ptr<rvalue> v)
+    explicit variable_argument(rvalue v)
     : var{std::move(v)}
     {
     }
@@ -646,13 +695,13 @@ public:
     [[nodiscard]]
     std::string to_string(const name_resolver* resolver = nullptr) const override
     {
-        return var->to_string(resolver);
+        return var.to_string(resolver);
     }
 
     [[nodiscard]]
     const rvalue* get_value() const
     {
-        return var.get();
+        return &var;
     }
 };
 
@@ -2026,6 +2075,14 @@ public:
     void generate_dup_x2(type vt, type skip_type1, type skip_type2);
 
     /**
+     * Duplicate the top two stack value.
+     *
+     * @param t0 The first value.
+     * @param t1 The second value.
+     */
+    void generate_dup2_x0(type t0, type t1);
+
+    /**
      * Load a field of a struct instance onto the stack.
      *
      * @param arg The field access details.
@@ -2047,14 +2104,7 @@ public:
      *
      * @param v The variable to load.
      */
-    void generate_load(variable_argument v);
-
-    /**
-     * Load an array element onto the stack.
-     *
-     * @param t The variable type of the array.
-     */
-    void generate_load_element(type_argument t);
+    void generate_load(const lvalue& v);
 
     /**
      * Create a new instance of a type.
@@ -2101,16 +2151,9 @@ public:
     /**
      * Store the top of the stack into a variable.
      *
-     * @param arg The variable to store into.
+     * @param v The lvalue to store into.
      */
-    void generate_store(variable_argument v);
-
-    /**
-     * Store the top of the stack into an array element.
-     *
-     * @param t The variable type of the array.
-     */
-    void generate_store_element(type_argument t);
+    void generate_store(const lvalue& v);
 
     /**
      * Generate a label to be used by branches and jump instructions.

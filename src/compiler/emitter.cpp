@@ -878,6 +878,7 @@ static const std::unordered_map<
     {"dup", 1},
     {"dup_x1", 2},
     {"dup_x2", 3},
+    {"dup2_x0", 2},
     {"pop", 1},
     {"cast", 1},
     {"invoke", 1},
@@ -1312,6 +1313,20 @@ void instruction_emitter::emit_instruction(
 
         // emit instruction.
         emit(instruction_buffer, opcode::dup_x1);
+        instruction_buffer & v & s;
+    }
+    else if(name == "dup2_x0")
+    {
+        // get the duplicated value.
+        const auto* v_arg = static_cast<const cg::type_class_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto v = v_arg->get_class();
+
+        // get the stack argument.
+        const auto* stack_arg = static_cast<const cg::type_class_argument*>(args[1].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+        auto s = stack_arg->get_class();
+
+        // emit instruction.
+        emit(instruction_buffer, opcode::dup2_x0);
         instruction_buffer & v & s;
     }
     else if(name == "dup_x2")

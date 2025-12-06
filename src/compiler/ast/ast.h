@@ -210,13 +210,6 @@ public:
      */
     virtual class call_expression* as_call_expression();
 
-    /** Whether the expression is a expression statement list. */
-    [[nodiscard]]
-    virtual bool is_expression_statement() const
-    {
-        return get_id() == node_identifier::expression_statement;
-    }
-
     /** Whether this expression is a macro expression. */
     [[nodiscard]]
     virtual bool is_macro_expression() const

@@ -288,7 +288,7 @@ void macro_invocation::serialize(archive& ar)
 
 std::unique_ptr<cg::rvalue> macro_invocation::emit_rvalue(
   cg::context& ctx,
-  [[maybe_unused]] bool result_used) const
+  bool result_used) const
 {
     // Code generation for macros.
     if(!expansion)
@@ -296,15 +296,17 @@ std::unique_ptr<cg::rvalue> macro_invocation::emit_rvalue(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    auto return_type = expansion->emit_rvalue(ctx);
+    auto return_type = expansion->emit_rvalue(ctx, result_used);
     if(index_expr)
     {
         // evaluate the index expression.
         index_expr->emit_rvalue(ctx);
 
         auto type = ctx.deref(return_type->get_type());
-        ctx.generate_load_element(
-          cg::type_argument{type});
+        ctx.generate_load(
+          cg::lvalue{
+            type,
+            cg::array_location_info{}});
         return std::make_unique<cg::rvalue>(type);
     }
 
@@ -443,9 +445,9 @@ void macro_branch::generate_code(
 
 std::unique_ptr<cg::rvalue> macro_branch::emit_rvalue(
   cg::context& ctx,
-  [[maybe_unused]] bool result_used) const
+  bool result_used) const
 {
-    return body->emit_rvalue(ctx);
+    return body->emit_rvalue(ctx, result_used);
 }
 
 void macro_branch::collect_names(co::context& ctx)

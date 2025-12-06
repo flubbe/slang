@@ -900,8 +900,9 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), i1.i, i2.i);
         return static_cast<std::int32_t>(-sizeof(std::int32_t));
     }
-    /* dup_x1. */
-    case opcode::dup_x1:
+    /* dup_x1, dup2_x0. */
+    case opcode::dup_x1: [[fallthrough]];
+    case opcode::dup2_x0:
     {
         // type arguments.
         type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
@@ -976,7 +977,7 @@ std::int32_t module_loader::decode_instruction(
 
         recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2), to_string(v3));
         return static_cast<std::int32_t>(size1);
-    } /* invoke. */
+    } /* dup_x2. */
     case opcode::invoke:
     {
         vle_int i;
