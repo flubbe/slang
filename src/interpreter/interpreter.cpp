@@ -9,7 +9,6 @@
  */
 
 #include <format>
-#include <print>
 #include <utility>
 
 #include "archives/memory.h"
@@ -21,6 +20,7 @@
 #include "vector.h"
 
 #ifdef INTERPRETER_DEBUG
+#    include <print>
 #    define DEBUG_LOG(...) std::println("INT: {}", std::format(__VA_ARGS__))
 #else
 #    define DEBUG_LOG(...)
@@ -434,13 +434,20 @@ void context::exec(
             {
                 auto size1 = read_unchecked<std::size_t>(binary, offset);
                 auto size2 = read_unchecked<std::size_t>(binary, offset);
-                auto needs_gc = read_unchecked<std::uint8_t>(binary, offset);
+                auto needs_gc1 = read_unchecked<std::uint8_t>(binary, offset);
+                auto needs_gc2 = read_unchecked<std::uint8_t>(binary, offset);
                 frame.stack.dup2_x0(size1, size2);
 
-                if(needs_gc != 0)
+                if(needs_gc1 != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2), size1);
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size1 + size2), size1);
+                    gc.add_temporary(addr);
+                }
+                if(needs_gc2 != 0)
+                {
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size2), size2);
                     gc.add_temporary(addr);
                 }
                 break;

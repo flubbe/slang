@@ -900,8 +900,42 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), i1.i, i2.i);
         return static_cast<std::int32_t>(-sizeof(std::int32_t));
     }
-    /* dup_x1, dup2_x0. */
-    case opcode::dup_x1: [[fallthrough]];
+    /* dup_x1. */
+    case opcode::dup_x1:;
+        {
+            // type arguments.
+            type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+            type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+            ar & v1 & v2;
+
+            // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
+            auto layout1 = target_type_layout::for_class(v1);
+            auto layout2 = target_type_layout::for_class(v2);
+
+            // convert to std::size_t to align with interpreter.
+            std::size_t size1 = layout1.size;
+            std::size_t size2 = layout2.size;
+
+            // check if the type needs garbage collection.
+            std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
+
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&size1),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&size1) + sizeof(size1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&size2),                     // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            code.insert(
+              code.end(),
+              reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+            recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2));
+            return static_cast<std::int32_t>(size1);
+        }
+    /* dup2_x0. */
     case opcode::dup2_x0:
     {
         // type arguments.
@@ -917,8 +951,9 @@ std::int32_t module_loader::decode_instruction(
         std::size_t size1 = layout1.size;
         std::size_t size2 = layout2.size;
 
-        // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
+        // check if the types needs garbage collection.
+        std::uint8_t needs_gc1 = is_garbage_collected(v1) ? 1 : 0;
+        std::uint8_t needs_gc2 = is_garbage_collected(v2) ? 1 : 0;
 
         code.insert(
           code.end(),
@@ -930,11 +965,15 @@ std::int32_t module_loader::decode_instruction(
           reinterpret_cast<std::byte*>(&size2) + sizeof(size2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
         code.insert(
           code.end(),
-          reinterpret_cast<std::byte*>(&needs_gc),                        // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          reinterpret_cast<std::byte*>(&needs_gc) + sizeof(needs_gc));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          reinterpret_cast<std::byte*>(&needs_gc1),                         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&needs_gc1) + sizeof(needs_gc1));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        code.insert(
+          code.end(),
+          reinterpret_cast<std::byte*>(&needs_gc2),                         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<std::byte*>(&needs_gc2) + sizeof(needs_gc2));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         recorder->record(static_cast<opcode>(instr), to_string(v1), to_string(v2));
-        return static_cast<std::int32_t>(size1);
+        return static_cast<std::int32_t>(size1 + size2);
     }
     /* dup_x2. */
     case opcode::dup_x2:

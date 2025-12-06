@@ -228,7 +228,7 @@ fn main(args: [str]) -> i32 {
     test_f32_unary_operators();
 
     test_logical_operators();
-//    test_compound_assignments();
+    test_compound_assignments();
 
     return 0;
 }
