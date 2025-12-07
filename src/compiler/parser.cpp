@@ -1252,35 +1252,6 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
         }
         get_next_token();    // skip ")"
 
-        if(current_token->s == "[")    // array access.
-        {
-            get_next_token();    // skip '['
-            auto index_expression = parse_expression();
-            if(current_token->s != "]")
-            {
-                throw syntax_error(
-                  *current_token,
-                  std::format(
-                    "Expected ']', got '{}'.",
-                    current_token->s));
-            }
-
-            get_next_token();    // skip ']'
-
-            if(identifier.type == token_type::macro_name)
-            {
-                return std::make_unique<ast::macro_invocation>(
-                  std::move(identifier),
-                  std::move(args),
-                  std::move(index_expression));
-            }
-
-            return std::make_unique<ast::call_expression>(
-              std::move(identifier),
-              std::move(args),
-              std::move(index_expression));
-        }
-
         if(identifier.type == token_type::macro_name)
         {
             return std::make_unique<ast::macro_invocation>(
@@ -1447,29 +1418,6 @@ std::unique_ptr<ast::expression> parser::parse_access_expression(
 
         get_next_token();
     }
-
-    // TODO array access: usually represented by variable reference; does not work here?
-#if 0
-    if(current_token->s == "[")    // array access.
-    {
-        get_next_token();    // skip '['
-        auto index_expression = parse_expression();
-        if(current_token->s != "]")
-        {
-            throw syntax_error(*current_token, std::format("Expected ']', got '{}'.", current_token->s));
-        }
-
-        get_next_token();    // skip ']'
-
-        if(identifier.type == token_type::macro_name)
-        {
-            return std::make_unique<ast::macro_invocation>(
-              std::move(identifier), std::move(args), std::move(index_expression));
-        }
-
-        return std::make_unique<ast::call_expression>(std::move(identifier), std::move(args), std::move(index_expression));
-    }
-#endif
 
     return lhs;
 }

@@ -287,6 +287,49 @@ fn test_nested_evaluation() -> void {
     std::assert(i == 2, "i == 2");
 }
 
+fn return_modified_input_i32(a: [i32]) -> [i32]
+{
+    a[1] += -1;
+    return a;
+}
+
+fn return_modified_input_i8(a: [i8]) -> [i8]
+{
+    a[1] += -1i8;
+    return a;
+}
+
+fn test_modify_returned_array() -> void
+{
+    std::println("modify returned array: i8");
+
+    let a: [i8] = [1i8, 2i8, 3i8];
+    return_modified_input_i8(a)[0] -= 1i8;
+
+    std::println(
+        std::format!(
+            "{} {} {}",
+            a[0], a[1], a[2]));
+
+    std::assert(a[0] == 0i8, "a[0] == 0");
+    std::assert(a[1] == 1i8, "a[1] == 1");
+    std::assert(a[2] == 3i8, "a[2] == 3");
+
+    std::println("modify returned array: i32");
+
+    let b: [i32] = [1, 2, 3];
+    return_modified_input_i32(b)[0] += 1;
+
+    std::println(
+        std::format!(
+            "{} {} {}",
+            b[0], b[1], b[2]));
+
+    std::assert(b[0] == 2, "b[0] == 2");
+    std::assert(b[1] == 1, "b[1] == 1");
+    std::assert(b[2] == 3, "b[2] == 3");
+}
+
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
     test_i32_unary_operators();
@@ -298,6 +341,7 @@ fn main(args: [str]) -> i32 {
     test_compound_assignments();
 
     test_nested_evaluation();
+    test_modify_returned_array();
 
     return 0;
 }
