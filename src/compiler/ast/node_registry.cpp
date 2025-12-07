@@ -29,6 +29,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::access_expression: return std::make_unique<access_expression>();
     case node_identifier::directive_expression: return std::make_unique<directive_expression>();
     case node_identifier::variable_reference_expression: return std::make_unique<variable_reference_expression>();
+    case node_identifier::array_subscript_expression: return std::make_unique<array_subscript_expression>();
     case node_identifier::variable_declaration_expression: return std::make_unique<variable_declaration_expression>();
     case node_identifier::constant_declaration_expression: return std::make_unique<constant_declaration_expression>();
     case node_identifier::array_initializer_expression: return std::make_unique<array_initializer_expression>();

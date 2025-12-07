@@ -91,11 +91,6 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
           "No scope information available.");
     }
 
-    if(element_expr)
-    {
-        element_expr->resolve_names(ctx);
-    }
-
     if(expansion)
     {
         expansion->resolve_names(ctx);
@@ -137,6 +132,16 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
             "Could not resolve identifier '{}'.",
             get_qualified_name()));
     }
+}
+
+/*
+ * array_subscript_expression.
+ */
+
+void array_subscript_expression::resolve_names(rs::context& ctx)
+{
+    lhs->resolve_names(ctx);
+    subscript_expr->resolve_names(ctx);
 }
 
 /*

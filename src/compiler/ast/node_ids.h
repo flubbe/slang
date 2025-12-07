@@ -31,6 +31,7 @@ enum class node_identifier : std::uint8_t
     access_expression,
     directive_expression,
     variable_reference_expression,
+    array_subscript_expression,
     variable_declaration_expression,
     constant_declaration_expression,
     array_initializer_expression,

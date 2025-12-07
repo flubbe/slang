@@ -1423,15 +1423,7 @@ std::unique_ptr<cg::rvalue> access_expression::emit_rvalue(
 void access_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
-
     lhs->collect_names(ctx);
-
-    // Collect non-selector parts of the r.h.s.
-    if(rhs->get_id() == node_identifier::variable_reference_expression
-       && rhs->as_variable_reference()->is_array_element_access())
-    {
-        rhs->as_variable_reference()->get_element_expression()->collect_names(ctx);
-    }
 }
 
 std::optional<ty::type_id> access_expression::type_check(
@@ -1792,7 +1784,6 @@ std::unique_ptr<expression> variable_reference_expression::clone() const
 void variable_reference_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    ar& expression_serializer{element_expr};
     ar& expression_serializer{expansion};
 }
 
@@ -1851,29 +1842,6 @@ std::unique_ptr<cg::lvalue> variable_reference_expression::emit_lvalue(
     case sema::symbol_type::variable:
     {
         auto type = ctx.lower(expr_type.value());
-
-        if(element_expr != nullptr)
-        {
-            // load array reference and index
-
-            ctx.generate_load(
-              cg::lvalue{
-                ctx.lower(array_type.value()),
-                cg::variable_location_info{
-                  .index = ctx.get_current_function()->get_index(
-                    symbol_id.value())},
-                symbol_id});
-
-            element_expr->emit_rvalue(ctx, true);
-
-            return std::make_unique<cg::lvalue>(
-              cg::lvalue{
-                type,
-                cg::array_location_info{},
-                symbol_id}    // NOLINT(bugprone-unchecked-optional-access)
-            );
-        }
-
         return std::make_unique<cg::lvalue>(
           cg::lvalue{
             type,
@@ -2012,34 +1980,13 @@ std::unique_ptr<cg::rvalue> variable_reference_expression::emit_rvalue(
     case sema::symbol_type::variable:
     {
         auto type = ctx.lower(expr_type.value());
-
-        if(element_expr == nullptr)
-        {
-            ctx.generate_load(
-              cg::lvalue{
-                type,
-                cg::variable_location_info{
-                  .index = ctx.get_current_function()->get_index(
-                    symbol_id.value())},
-                symbol_id});
-        }
-        else
-        {
-            ctx.generate_load(
-              cg::lvalue{
-                ctx.lower(array_type.value()),
-                cg::variable_location_info{
-                  .index = ctx.get_current_function()->get_index(
-                    symbol_id.value())},
-                symbol_id});
-
-            element_expr->emit_rvalue(ctx, true);
-            ctx.generate_load(
-              cg::lvalue{
-                type,
-                cg::array_location_info{},
-                symbol_id});
-        }
+        ctx.generate_load(
+          cg::lvalue{
+            type,
+            cg::variable_location_info{
+              .index = ctx.get_current_function()->get_index(
+                symbol_id.value())},
+            symbol_id});
 
         return std::make_unique<cg::rvalue>(type, symbol_id);
     }
@@ -2058,11 +2005,6 @@ void variable_reference_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    if(element_expr)
-    {
-        element_expr->collect_names(ctx);
-    }
-
     if(expansion)
     {
         expansion->collect_names(ctx);
@@ -2073,8 +2015,6 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
   ty::context& ctx,
   sema::env& env)
 {
-    array_type = std::nullopt;
-
     ty::type_id type = [this, &ctx, &env]() -> ty::type_id
     {
         if(expansion)
@@ -2111,41 +2051,7 @@ std::optional<ty::type_id> variable_reference_expression::type_check(
         return env.type_map[symbol_id.value()];
     }();
 
-    if(element_expr)
-    {
-        auto v = element_expr->type_check(ctx, env);
-        if(!v.has_value())
-        {
-            throw ty::type_error(
-              element_expr->get_location(),
-              "Index expression has no type.");
-        }
-        if(!ctx.are_types_compatible(ctx.get_i32_type(), v.value()))
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "Expected <integer> for array element access, got '{}'.",
-                ctx.to_string(v.value())));
-        }
-
-        if(!ctx.is_array(type))
-        {
-            throw ty::type_error(
-              loc,
-              std::format(
-                "Cannot use subscript on non-array type '{}'.",
-                ctx.to_string(type)));
-        }
-
-        array_type = type;
-        expr_type = ctx.array_element_type(type);
-    }
-    else
-    {
-        expr_type = type;
-    }
-
+    expr_type = type;
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -2155,12 +2061,6 @@ std::string variable_reference_expression::to_string() const
 {
     std::string ret = std::format("VariableReference(name={}", name.s);
 
-    if(element_expr)
-    {
-        ret += std::format(
-          ", element_expr={}",
-          element_expr->to_string());
-    }
     if(expansion)
     {
         ret += std::format(
@@ -2170,6 +2070,116 @@ std::string variable_reference_expression::to_string() const
     ret += ")";
 
     return ret;
+}
+
+/*
+ * array_subscript_expression.
+ */
+
+std::unique_ptr<expression> array_subscript_expression::clone() const
+{
+    return std::make_unique<array_subscript_expression>(*this);
+}
+
+void array_subscript_expression::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_serializer{lhs};
+    ar& expression_serializer{subscript_expr};
+}
+
+std::unique_ptr<cg::lvalue> array_subscript_expression::emit_lvalue(
+  cg::context& ctx) const
+{
+    // load array reference and index
+    auto lhs_value = lhs->emit_rvalue(ctx, true);
+    subscript_expr->emit_rvalue(ctx, true);
+
+    return std::make_unique<cg::lvalue>(
+      cg::lvalue{
+        ctx.lower(expr_type.value()),
+        cg::array_location_info{},
+        symbol_id}    // NOLINT(bugprone-unchecked-optional-access)
+    );
+}
+
+std::unique_ptr<cg::rvalue> array_subscript_expression::emit_rvalue(
+  cg::context& ctx,
+  [[maybe_unused]] bool result_used) const
+{
+    // load array reference and index
+    auto lhs_value = lhs->emit_rvalue(ctx, true);
+    subscript_expr->emit_rvalue(ctx, true);
+
+    auto type = ctx.lower(expr_type.value());
+    ctx.generate_load(
+      cg::lvalue{
+        type,
+        cg::array_location_info{},
+        symbol_id});
+
+    return std::make_unique<cg::rvalue>(type, symbol_id);
+}
+
+void array_subscript_expression::collect_names(
+  co::context& ctx)
+{
+    super::collect_names(ctx);
+    lhs->collect_names(ctx);
+    subscript_expr->collect_names(ctx);
+}
+
+std::optional<ty::type_id> array_subscript_expression::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    auto lhs_type = lhs->type_check(ctx, env);
+    if(!lhs_type.has_value())
+    {
+        throw ty::type_error(
+          lhs->get_location(),
+          "Eexpression has no type.");
+    }
+
+    if(!ctx.is_array(lhs_type.value()))
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Cannot use subscript on non-array type '{}'.",
+            ctx.to_string(lhs_type.value())));
+    }
+
+    auto subscript_type = subscript_expr->type_check(ctx, env);
+    if(!subscript_type.has_value())
+    {
+        throw ty::type_error(
+          subscript_expr->get_location(),
+          "Subscript expression has no type.");
+    }
+    if(!ctx.are_types_compatible(
+         ctx.get_i32_type(),
+         subscript_type.value()))
+    {
+        throw ty::type_error(
+          subscript_expr->get_location(),
+          std::format(
+            "Expected <integer> for array element access, got '{}'.",
+            ctx.to_string(subscript_type.value())));
+    }
+
+    expr_type = ctx.array_element_type(lhs_type.value());
+    ctx.set_expression_type(*this, expr_type);
+
+    return expr_type;
+}
+
+std::string array_subscript_expression::to_string() const
+{
+    return std::format(
+      "ArraySubscript(lhs={}, subscript_expr={})",
+      lhs->to_string(),
+      subscript_expr->to_string());
 }
 
 /*
@@ -3716,11 +3726,6 @@ void binary_expression::serialize(archive& ar)
 static bool is_comparison(const std::string& s)
 {
     return (s == "==" || s == "!=" || s == ">" || s == ">=" || s == "<" || s == "<=");
-}
-
-bool binary_expression::needs_pop() const
-{
-    return true;
 }
 
 bool binary_expression::is_pure(cg::context& ctx) const

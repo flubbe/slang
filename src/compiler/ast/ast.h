@@ -122,13 +122,6 @@ public:
      */
     virtual void serialize(archive& ar);
 
-    /** Whether this expression needs stack cleanup. */
-    [[nodiscard]]
-    virtual bool needs_pop() const
-    {
-        return false;
-    }
-
     /** Whether this expression is a variable declaration. */
     [[nodiscard]]
     bool is_variable_declaration() const
@@ -738,11 +731,6 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    [[nodiscard]] bool needs_pop() const override
-    {
-        return true;
-    }
-
     [[nodiscard]]
     bool is_const_eval(const_::env&) const override
     {
@@ -1068,12 +1056,6 @@ public:
     void serialize(archive& ar) override;
 
     [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return expr->needs_pop();
-    }
-
-    [[nodiscard]]
     bool is_call_expression() const override
     {
         return expr->is_call_expression();
@@ -1347,12 +1329,6 @@ public:
     void serialize(archive& ar) override;
 
     [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return expr->needs_pop();
-    }
-
-    [[nodiscard]]
     bool is_macro_expression() const override
     {
         return expr->is_macro_expression();
@@ -1400,9 +1376,6 @@ class variable_reference_expression : public named_expression
 {
     friend class macro_expression;
 
-    /** An optional expression for element access. */
-    std::unique_ptr<expression> element_expr;
-
     /** The array type. Only valid for arrays. */
     std::optional<ty::type_id> array_type;
 
@@ -1417,7 +1390,6 @@ public:
     variable_reference_expression() = default;
     variable_reference_expression(const variable_reference_expression& other)
     : super{other}
-    , element_expr{other.element_expr ? other.element_expr->clone() : nullptr}
     , expansion{other.expansion ? other.expansion->clone() : nullptr}
     {
     }
@@ -1431,15 +1403,12 @@ public:
      * Construct a variable reference expression.
      *
      * @param name The variable's name.
-     * @param element_expr An optional expression for array element access.
      * @param expansion A macro expansion.
      */
     variable_reference_expression(
       token name,
-      std::unique_ptr<expression> element_expr = nullptr,
       std::unique_ptr<expression> expansion = nullptr)
     : named_expression{name.location, std::move(name)}
-    , element_expr{std::move(element_expr)}
     , expansion{std::move(expansion)}
     {
     }
@@ -1453,27 +1422,10 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    [[nodiscard]] bool needs_pop() const override
-    {
-        return true;
-    }
-
     [[nodiscard]]
     variable_reference_expression* as_variable_reference() override
     {
         return this;
-    }
-
-    [[nodiscard]]
-    bool is_array_element_access() const override
-    {
-        return element_expr != nullptr;
-    }
-
-    [[nodiscard]]
-    expression* get_element_expression()
-    {
-        return element_expr.get();
     }
 
     [[nodiscard]] bool is_const_eval(const_::env& env) const override;
@@ -1502,15 +1454,7 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        if(element_expr && expansion)
-        {
-            return {element_expr.get(), expansion.get()};
-        }
-        else if(element_expr)
-        {
-            return {element_expr.get()};
-        }
-        else if(expansion)
+        if(expansion)
         {
             return {expansion.get()};
         }
@@ -1519,15 +1463,7 @@ public:
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        if(element_expr && expansion)
-        {
-            return {element_expr.get(), expansion.get()};
-        }
-        else if(element_expr)
-        {
-            return {element_expr.get()};
-        }
-        else if(expansion)
+        if(expansion)
         {
             return {expansion.get()};
         }
@@ -1562,6 +1498,95 @@ public:
     std::optional<ty::type_id> get_array_type() const
     {
         return array_type;
+    }
+};
+
+/** Array element access. */
+class array_subscript_expression : public expression
+{
+    /** Left-hand side expression. */
+    std::unique_ptr<expression> lhs;
+
+    /** Subscript / index. */
+    std::unique_ptr<expression> subscript_expr;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Defaulted and deleted constructors. */
+    array_subscript_expression() = default;
+    array_subscript_expression(const array_subscript_expression& other)
+    : super{other}
+    , lhs{other.lhs->clone()}
+    , subscript_expr{other.subscript_expr->clone()}
+    {
+    }
+    array_subscript_expression(array_subscript_expression&&) = default;
+
+    /** Assignment operators. */
+    array_subscript_expression& operator=(const array_subscript_expression&) = delete;
+    array_subscript_expression& operator=(array_subscript_expression&&) = default;
+
+    /**
+     * Construct an array subscript expression.
+     *
+     * @param loc The location.
+     * @param lhs The left-hand side of the expression.
+     * @param subscript_expr The subscript expression.
+     */
+    array_subscript_expression(
+      source_location loc,
+      std::unique_ptr<expression> lhs,
+      std::unique_ptr<expression> subscript_expr)
+    : super{loc}
+    , lhs{std::move(lhs)}
+    , subscript_expr{std::move(subscript_expr)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::array_subscript_expression;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    [[nodiscard]]
+    bool is_array_element_access() const override
+    {
+        return subscript_expr != nullptr;
+    }
+
+    [[nodiscard]]
+    expression* get_subscript_expression()
+    {
+        return subscript_expr.get();
+    }
+
+    std::unique_ptr<cg::lvalue> emit_lvalue(
+      cg::context& ctx) const override;
+    std::unique_ptr<cg::rvalue> emit_rvalue(
+      cg::context& ctx,
+      bool result_used = false) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        return {lhs.get(), subscript_expr.get()};
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        return {lhs.get(), subscript_expr.get()};
     }
 };
 
@@ -2413,8 +2438,6 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    [[nodiscard]] bool needs_pop() const override;
-
     [[nodiscard]] bool is_const_eval(const_::env& env) const override;
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
     virtual std::optional<const_::const_info> evaluate(
@@ -2497,11 +2520,6 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
-
-    [[nodiscard]] bool needs_pop() const override
-    {
-        return true;
-    }
 
     [[nodiscard]] bool is_const_eval(const_::env& env) const override;
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
@@ -2586,11 +2604,6 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    [[nodiscard]] bool needs_pop() const override
-    {
-        return true;
-    }
-
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::rvalue> emit_rvalue(
@@ -2651,11 +2664,6 @@ public:
     }
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
-
-    [[nodiscard]] bool needs_pop() const override
-    {
-        return true;
-    }
 
     [[nodiscard]] bool is_pure(cg::context&) const override
     {
@@ -2719,12 +2727,6 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
-
-    [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return true;
-    }
 
     std::unique_ptr<cg::rvalue> emit_rvalue(
       cg::context& ctx,
@@ -3170,12 +3172,6 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
-    [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return !is_void_return_type;
-    }
-
     [[nodiscard]] bool is_pure(cg::context& ctx) const override;
 
     std::unique_ptr<cg::rvalue> emit_rvalue(
@@ -3325,12 +3321,6 @@ public:
     macro_invocation* as_macro_invocation() override
     {
         return this;
-    }
-
-    [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return expansion->needs_pop();
     }
 
     [[nodiscard]] bool is_pure(cg::context& ctx) const override
@@ -3484,12 +3474,6 @@ public:
 
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
-
-    [[nodiscard]]
-    bool needs_pop() const override
-    {
-        return expr->needs_pop();
-    }
 
     [[nodiscard]]
     bool is_const_eval(const_::env& env) const override
