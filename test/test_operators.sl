@@ -260,12 +260,16 @@ struct S {
     arr: [i32]
 };
 
+struct T {
+    s: S
+};
+
 fn foo() -> i32 {
     return -1;
 }
 
 fn test_nested_evaluation() -> void {
-    std::println("nested evaluations:");
+    std::println("nested evaluations: S");
 
     let obj: S = S{
         arr: [1, 2, 3]
@@ -285,6 +289,27 @@ fn test_nested_evaluation() -> void {
     std::assert(obj.arr[1] == 1, "obj.arr[1] == 1");
     std::assert(obj.arr[2] == 3, "obj.arr[2] == 3");
     std::assert(i == 2, "i == 2");
+
+    std::println("nested evaluations: T");
+    let obj2: T = T{
+        s: S{
+            arr: [1, 2, 3]
+        }
+    };
+
+    obj2.s.arr[i++] += foo();
+    
+    std::println(
+        std::format!(
+            "i = {} / obj2.s.arr=[{}, {}, {}] / obj2.s.arr.length = {},",
+            i,
+            obj2.s.arr[0], obj2.s.arr[1], obj2.s.arr[2],
+            obj2.s.arr.length));
+
+    std::assert(obj2.s.arr[0] == 1, "obj2.s.arr[0] == 1");
+    std::assert(obj2.s.arr[1] == 2, "obj2.s.arr[1] == 2");
+    std::assert(obj2.s.arr[2] == 2, "obj2.s.arr[2] == 2");
+    std::assert(i == 3, "i == 3");
 }
 
 fn return_modified_input_i32(a: [i32]) -> [i32]
