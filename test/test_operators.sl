@@ -299,6 +299,11 @@ fn return_modified_input_i8(a: [i8]) -> [i8]
     return a;
 }
 
+fn generate_array_i32() -> [i32]
+{
+    return new i32[3];
+}
+
 fn test_modify_returned_array() -> void
 {
     std::println("modify returned array: i8");
@@ -328,6 +333,9 @@ fn test_modify_returned_array() -> void
     std::assert(b[0] == 2, "b[0] == 2");
     std::assert(b[1] == 1, "b[1] == 1");
     std::assert(b[2] == 3, "b[2] == 3");
+
+    // GC test for return values.
+    generate_array_i32()[0] = 13;
 }
 
 fn main(args: [str]) -> i32 {
