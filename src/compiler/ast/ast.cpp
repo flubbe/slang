@@ -2294,6 +2294,7 @@ void variable_declaration_expression::generate_code(
     }
 
     auto lowered_type = ctx.lower(type->get_type());
+    ctx.push_declaration_type(lowered_type);
 
     auto* fn = ctx.get_current_function();
     if(fn != nullptr)
@@ -2301,11 +2302,6 @@ void variable_declaration_expression::generate_code(
         fn->add_local(
           symbol_id.value(),
           lowered_type);
-    }
-
-    if(is_array())
-    {
-        ctx.set_array_type(lowered_type);
     }
 
     if(expr)
@@ -2319,10 +2315,7 @@ void variable_declaration_expression::generate_code(
             symbol_id});
     }
 
-    if(is_array())
-    {
-        ctx.clear_array_type();
-    }
+    ctx.pop_declaration_type();
 }
 
 std::optional<ty::type_id> variable_declaration_expression::type_check(
@@ -2563,7 +2556,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
   [[maybe_unused]] bool result_used) const
 {
     std::unique_ptr<cg::rvalue> v;
-    auto array_type = ctx.get_array_type();
+    auto array_type = ctx.get_declaration_type();
     auto element_type = ctx.deref(array_type);
 
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
@@ -2766,10 +2759,17 @@ void struct_definition_expression::define_type(ty::context& ctx) const
 {
     for(const auto& m: members)
     {
+        auto field_type = ctx.get_type(
+          m->get_type()->get_qualified_name());
+        if(m->is_array())
+        {
+            field_type = ctx.get_array(field_type, 1);
+        }
+
         ctx.add_field(
           struct_type_id,
           m->get_name(),
-          ctx.get_type(m->get_type()->get_qualified_name()));
+          field_type);
     }
     ctx.seal_struct(struct_type_id);
 }
@@ -3059,7 +3059,10 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
         const auto& initializer = initializers[i];
 
         auto member_type = ctx.lower(field_info.field_type_id);
+
+        ctx.push_declaration_type(member_type);
         auto initializer_value = initializer->emit_rvalue(ctx, true);
+        ctx.pop_declaration_type();
 
         if(!initializer_value)
         {

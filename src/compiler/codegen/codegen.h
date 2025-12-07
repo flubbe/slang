@@ -1615,8 +1615,8 @@ class context
     /** Current instruction insertion point. */
     basic_block* insertion_point{nullptr};
 
-    /** Holds the array type when declaring an array. */
-    std::optional<type> array_type = std::nullopt;
+    /** Holds the declaration types when declaring a variable. */
+    std::vector<type> declaration_type_stack;
 
     /** Codegen flags. */
     codegen_flag_type flags{
@@ -1845,48 +1845,43 @@ public:
     }
 
     /**
-     * Set the array type when an array is declared.
+     * Push the type of the variable that is being declared.
      *
-     * @param t The array type.
-     * @throws Throws a `codegen_error` if the array type was already set.
+     * @param t The type.
      */
-    void set_array_type(type t)
+    void push_declaration_type(type t)
     {
-        if(array_type.has_value())
-        {
-            throw codegen_error("Cannot set array type since it is already set.");
-        }
-        array_type = t;
+        declaration_type_stack.emplace_back(t);
     }
 
     /**
-     * Return the array type.
+     * Pop the current declaration type. Needs to be called when a declaration is completed.
      *
-     * @return The array type.
-     * @throws Throws a `codegen_error` if no array was declared.
+     * @throws Throws a `codegen_error` if not processing a variable declaration.
+     */
+    void pop_declaration_type()
+    {
+        if(declaration_type_stack.empty())
+        {
+            throw codegen_error("Cannot clear declaration type since no variable is being declared.");
+        }
+        declaration_type_stack.pop_back();
+    }
+
+    /**
+     * Return the current declaration type.
+     *
+     * @return The declaration type.
+     * @throws Throws a `codegen_error` if codegen is not processing a variable declaration.
      */
     [[nodiscard]]
-    type get_array_type() const
+    type get_declaration_type() const
     {
-        if(!array_type.has_value())
+        if(declaration_type_stack.empty())
         {
-            throw codegen_error("Cannot get array type since no array was declared.");
+            throw codegen_error("Cannot get declaration type: Not processing declaration.");
         }
-        return array_type.value();
-    }
-
-    /**
-     * Clear the array type. Needs to be called when array declaration is completed.
-     *
-     * @throws Throws a `codegen_error` if no array was declared.
-     */
-    void clear_array_type()
-    {
-        if(!array_type.has_value())
-        {
-            throw codegen_error("Cannot clear array type since no array was declared.");
-        }
-        array_type.reset();
+        return declaration_type_stack.back();
     }
 
     /**

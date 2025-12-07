@@ -256,6 +256,37 @@ fn test_compound_assignments() -> void {
     std::assert(i == 1, "i == 1");
 }
 
+struct S {
+    arr: [i32]
+};
+
+fn foo() -> i32 {
+    return -1;
+}
+
+fn test_nested_evaluation() -> void {
+    std::println("nested evaluations:");
+
+    let obj: S = S{
+        arr: [1, 2, 3]
+    };
+    let i: i32 = 1;
+
+    obj.arr[i++] += foo();
+
+    std::println(
+        std::format!(
+            "i = {} / obj.arr=[{}, {}, {}] / obj.arr.length = {},",
+            i,
+            obj.arr[0], obj.arr[1], obj.arr[2],
+            obj.arr.length));
+
+    std::assert(obj.arr[0] == 1, "obj.arr[0] == 1");
+    std::assert(obj.arr[1] == 1, "obj.arr[1] == 1");
+    std::assert(obj.arr[2] == 3, "obj.arr[2] == 3");
+    std::assert(i == 2, "i == 2");
+}
+
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
     test_i32_unary_operators();
@@ -265,6 +296,8 @@ fn main(args: [str]) -> i32 {
 
     test_logical_operators();
     test_compound_assignments();
+
+    test_nested_evaluation();
 
     return 0;
 }
