@@ -2554,6 +2554,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
 {
     std::unique_ptr<cg::rvalue> v;
     auto array_type = ctx.get_array_type();
+    auto element_type = ctx.deref(array_type);
 
     if(exprs.size() >= std::numeric_limits<std::int32_t>::max())
     {
@@ -2568,7 +2569,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
       {cg::type_kind::i32},
       static_cast<int>(exprs.size()));
     ctx.generate_newarray(
-      ctx.deref(array_type));
+      element_type);
 
     for(std::size_t i = 0; i < exprs.size(); ++i)
     {
@@ -2592,7 +2593,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
 
         ctx.generate_store(
           cg::lvalue{
-            expr_value->get_type(),
+            element_type,
             cg::array_location_info{}});
 
         if(!v)

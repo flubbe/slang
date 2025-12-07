@@ -202,7 +202,7 @@ fn test_f32_binary_operators() -> void
 }
 
 fn test_compound_assignments() -> void {
-    std::println("compound assignments");
+    std::println("compound assignments: [i32]/i32");
 
     let x: [i32] = [0, 0, 0];
     let i: i32 = 0;
@@ -217,6 +217,42 @@ fn test_compound_assignments() -> void {
     std::assert(x[0] == 0, "x[0] == 0");
     std::assert(x[1] == 2, "x[1] == 2");
     std::assert(x[2] == 0, "x[2] == 0");
+    std::assert(i == 1, "i == 1");
+
+    std::println("compound assignments: [i32]/i8");
+
+    x[0] = 0;
+    x[1] = 0;
+    x[2] = 0;
+    let j: i8 = 0i8;
+
+    x[(j += 1i8) as i32] += 2;
+
+    std::println(
+        std::format!(
+            "i = {} / x = [{}, {}, {}]", 
+            i, x[0], x[1], x[2]));
+
+    std::assert(x[0] == 0, "x[0] == 0");
+    std::assert(x[1] == 2, "x[1] == 2");
+    std::assert(x[2] == 0, "x[2] == 0");
+    std::assert(j == 1i8, "j == 1");
+
+    std::println("compound assignments: [i16]/i32");
+
+    let y: [i16] = [1i16, 2i16, 3i16];
+    i = 0;
+
+    y[(i += 1) + 1] += 2i16;
+
+    std::println(
+        std::format!(
+            "i = {} / y = [{}, {}, {}]", 
+            i, y[0], y[1], y[2]));
+
+    std::assert(y[0] == 1i16, "y[0] == 1");
+    std::assert(y[1] == 2i16, "y[1] == 2");
+    std::assert(y[2] == 5i16, "y[2] == 5");
     std::assert(i == 1, "i == 1");
 }
 

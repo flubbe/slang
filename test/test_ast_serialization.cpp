@@ -238,7 +238,7 @@ AST_SERIALIZATION_TEST(
   "fn string_concat(s1: str, s2: str) -> str;\n"
   "fn main() -> i32\n"
   "{\n"
-  "\tlet s: str = string_concat(\"a\", \"b\")\n"
+  "\tlet s: str = string_concat(\"a\", \"b\");\n"
   "\tif(string_equals(s, \"ab\"))\n"
   "\t{\n"
   "\t\treturn 10;\n"

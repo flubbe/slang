@@ -408,13 +408,9 @@ std::unique_ptr<ast::type_expression> parser::parse_type()
         get_next_token();
     }
 
-    if(current_token->s == "]")
+    if(current_token->s == "]"
+       && is_array_type)
     {
-        if(!is_array_type)
-        {
-            throw syntax_error(*current_token, std::format("Expected ']', got '{}'.", current_token->s));
-        }
-
         get_next_token();
     }
 
@@ -448,7 +444,7 @@ std::unique_ptr<ast::array_initializer_expression> parser::parse_array_initializ
 
         if(current_token->s == ",")
         {
-            get_next_token();    // skip ';'.
+            get_next_token();    // skip ','.
         }
         else
         {
@@ -659,11 +655,6 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
         return {};
     }
 
-    if(current_token->s == "let")
-    {
-        return parse_variable();
-    }
-
     if(current_token->s == "if")
     {
         return parse_if();
@@ -674,27 +665,33 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
         return parse_while();
     }
 
-    if(current_token->s == "break")
-    {
-        return parse_break();
-    }
+    std::unique_ptr<ast::expression> stmt;
 
-    if(current_token->s == "continue")
+    if(current_token->s == "let")
     {
-        return parse_continue();
+        stmt = parse_variable();
     }
-
-    if(current_token->s == "return")
+    else if(current_token->s == "break")
     {
-        return parse_return();
+        stmt = parse_break();
     }
-
-    if(is_keyword(current_token->s))
+    else if(current_token->s == "continue")
     {
-        throw syntax_error(*current_token, std::format("Unexpected keyword '{}'.", current_token->s));
+        stmt = parse_continue();
     }
+    else if(current_token->s == "return")
+    {
+        stmt = parse_return();
+    }
+    else
+    {
+        if(is_keyword(current_token->s))
+        {
+            throw syntax_error(*current_token, std::format("Unexpected keyword '{}'.", current_token->s));
+        }
 
-    auto expr = std::make_unique<ast::expression_statement>(parse_expression());
+        stmt = std::make_unique<ast::expression_statement>(parse_expression());
+    }
 
     if(current_token->s != ";")
     {
@@ -702,7 +699,7 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
     }
     get_next_token();
 
-    return expr;
+    return stmt;
 }
 
 // primary_expr ::= identifier_expr | literal_expr | paren_expr
