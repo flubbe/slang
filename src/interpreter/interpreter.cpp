@@ -9,7 +9,7 @@
  */
 
 #include <format>
-#include <print>
+#include <utility>
 
 #include "archives/memory.h"
 #include "shared/module.h"
@@ -20,6 +20,7 @@
 #include "vector.h"
 
 #ifdef INTERPRETER_DEBUG
+#    include <print>
 #    define DEBUG_LOG(...) std::println("INT: {}", std::format(__VA_ARGS__))
 #else
 #    define DEBUG_LOG(...)
@@ -41,7 +42,8 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * Helpers.
  */
 
-abi_type_class get_abi_type_class(const module_::variable_type& ty)
+abi_type_class get_abi_type_class(
+  const module_::variable_type& ty)
 {
     if(ty.is_array())
     {
@@ -53,14 +55,34 @@ abi_type_class get_abi_type_class(const module_::variable_type& ty)
         return abi_type_class::void_;
     }
 
+    if(ty.base_type() == "i8")
+    {
+        return abi_type_class::i8;
+    }
+
+    if(ty.base_type() == "i16")
+    {
+        return abi_type_class::i16;
+    }
+
     if(ty.base_type() == "i32")
     {
         return abi_type_class::i32;
     }
 
+    if(ty.base_type() == "i64")
+    {
+        return abi_type_class::i64;
+    }
+
     if(ty.base_type() == "f32")
     {
         return abi_type_class::f32;
+    }
+
+    if(ty.base_type() == "f64")
+    {
+        return abi_type_class::f64;
     }
 
     if(ty.base_type() == "str")
@@ -72,13 +94,18 @@ abi_type_class get_abi_type_class(const module_::variable_type& ty)
     return abi_type_class::ref;
 }
 
-std::string to_string(abi_type_class cls)
+std::string to_string(
+  abi_type_class cls)
 {
     switch(cls)
     {
     case abi_type_class::void_: return "void";
+    case abi_type_class::i8: return "i8";
+    case abi_type_class::i16: return "i16";
     case abi_type_class::i32: return "i32";
+    case abi_type_class::i64: return "i64";
     case abi_type_class::f32: return "f32";
+    case abi_type_class::f64: return "f64";
     case abi_type_class::str: return "str";
     case abi_type_class::ref: return "ref";
     default:;
@@ -128,7 +155,8 @@ function::function(
 {
 }
 
-value function::invoke(const std::vector<value>& args)
+value function::invoke(
+  const std::vector<value>& args)
 {
     return ctx.invoke(
       loader,
@@ -190,7 +218,10 @@ public:
      * @param locals The locals.
      * @param frame The stack frame.
      */
-    locals_scope(context& ctx, const std::vector<module_::variable_descriptor>& locals, stack_frame& frame)
+    locals_scope(
+      context& ctx,
+      const std::vector<module_::variable_descriptor>& locals,
+      stack_frame& frame)
     : ctx{ctx}
     , locals{locals}
     , frame{frame}
@@ -269,7 +300,9 @@ public:
  * @returns Returns the read value.
  */
 template<typename T>
-static T read_unchecked(const std::vector<std::byte>& binary, std::size_t& offset)
+static T read_unchecked(
+  const std::vector<std::byte>& binary,
+  std::size_t& offset)
 {
     T v;
     std::memcpy(&v, &binary[offset], sizeof(T));
@@ -316,7 +349,7 @@ void context::exec(
             ++offset;
 
             // validate opcode.
-            if(instr >= static_cast<opcode_base>(opcode::opcode_count))
+            if(instr >= std::to_underlying(opcode::opcode_count))
             {
                 throw interpreter_error(
                   std::format(
@@ -326,7 +359,8 @@ void context::exec(
             auto instr_opcode = static_cast<opcode>(instr);
 
             // return.
-            if(instr >= static_cast<opcode_base>(opcode::ret) && instr <= static_cast<opcode_base>(opcode::aret))
+            if(instr >= std::to_underlying(opcode::ret)
+               && instr <= std::to_underlying(opcode::aret))
             {
                 // NOTE The stack size is validated by the caller.
 
@@ -396,11 +430,38 @@ void context::exec(
                 }
                 break;
             } /* opcode::dup_x2 */
+            case opcode::dup2_x0:
+            {
+                auto size1 = read_unchecked<std::size_t>(binary, offset);
+                auto size2 = read_unchecked<std::size_t>(binary, offset);
+                auto needs_gc1 = read_unchecked<std::uint8_t>(binary, offset);
+                auto needs_gc2 = read_unchecked<std::uint8_t>(binary, offset);
+                frame.stack.dup2_x0(size1, size2);
+
+                if(needs_gc1 != 0)
+                {
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size1 + size2), size1);
+                    gc.add_temporary(addr);
+                }
+                if(needs_gc2 != 0)
+                {
+                    void* addr;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size2), size2);
+                    gc.add_temporary(addr);
+                }
+                break;
+            } /* opcode::dup2_x0 */
             case opcode::pop:
             {
-                frame.stack.pop_i32();
+                frame.stack.pop_cat1<std::int32_t>();
                 break;
             } /* opcode::pop */
+            case opcode::pop2:
+            {
+                frame.stack.pop_cat2<std::int64_t>();
+                break;
+            } /* opcode::pop2 */
             case opcode::apop:
             {
                 gc.remove_temporary(frame.stack.pop_addr<void>());
@@ -408,7 +469,7 @@ void context::exec(
             } /* opcode::apop */
             case opcode::iadd:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i + v; });
@@ -416,7 +477,7 @@ void context::exec(
             } /* opcode::iadd */
             case opcode::isub:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i - v; });
@@ -424,7 +485,7 @@ void context::exec(
             } /* opcode::isub */
             case opcode::imul:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i * v; });
@@ -432,7 +493,7 @@ void context::exec(
             } /* opcode::imul */
             case opcode::idiv:
             {
-                std::int32_t divisor = frame.stack.pop_i32();
+                auto divisor = frame.stack.pop_cat1<std::int32_t>();
                 if(divisor == 0)
                 {
                     throw interpreter_error("Division by zero.");
@@ -444,7 +505,7 @@ void context::exec(
             } /* opcode::idiv */
             case opcode::imod:
             {
-                std::int32_t divisor = frame.stack.pop_i32();
+                auto divisor = frame.stack.pop_cat1<std::int32_t>();
                 if(divisor == 0)
                 {
                     throw interpreter_error("Division by zero.");
@@ -454,9 +515,57 @@ void context::exec(
                   { return dividend % divisor; });
                 break;
             } /* opcode::imod */
+            case opcode::ladd:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [v](std::int64_t i) -> std::int64_t
+                  { return i + v; });
+                break;
+            } /* opcode::ladd */
+            case opcode::lsub:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [v](std::int64_t i) -> std::int64_t
+                  { return i - v; });
+                break;
+            } /* opcode::lsub */
+            case opcode::lmul:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [v](std::int64_t i) -> std::int64_t
+                  { return i * v; });
+                break;
+            } /* opcode::lmul */
+            case opcode::ldiv:
+            {
+                auto divisor = frame.stack.pop_cat2<std::int64_t>();
+                if(divisor == 0)
+                {
+                    throw interpreter_error("Division by zero.");
+                }
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [divisor](std::int64_t dividend) -> std::int64_t
+                  { return dividend / divisor; });
+                break;
+            } /* opcode::ldiv */
+            case opcode::lmod:
+            {
+                auto divisor = frame.stack.pop_cat2<std::int64_t>();
+                if(divisor == 0)
+                {
+                    throw interpreter_error("Division by zero.");
+                }
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [divisor](std::int64_t dividend) -> std::int64_t
+                  { return dividend % divisor; });
+                break;
+            } /* opcode::lmod */
             case opcode::fadd:
             {
-                float v = frame.stack.pop_f32();
+                auto v = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, float>(
                   [v](float i) -> float
                   { return i + v; });
@@ -464,7 +573,7 @@ void context::exec(
             } /* opcode::fadd */
             case opcode::fsub:
             {
-                float v = frame.stack.pop_f32();
+                auto v = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, float>(
                   [v](float i) -> float
                   { return i - v; });
@@ -472,7 +581,7 @@ void context::exec(
             } /* opcode::fsub */
             case opcode::fmul:
             {
-                float v = frame.stack.pop_f32();
+                auto v = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, float>(
                   [v](float i) -> float
                   { return i * v; });
@@ -480,7 +589,7 @@ void context::exec(
             } /* opcode::fmul */
             case opcode::fdiv:
             {
-                float divisor = frame.stack.pop_f32();
+                auto divisor = frame.stack.pop_cat1<float>();
                 if(divisor == 0)
                 {
                     throw interpreter_error("Division by zero.");
@@ -490,20 +599,130 @@ void context::exec(
                   { return dividend / divisor; });
                 break;
             } /* opcode::fdiv */
+            case opcode::dadd:
+            {
+                auto v = frame.stack.pop_cat2<double>();
+                frame.stack.modify_top<double, double>(
+                  [v](double i) -> double
+                  { return i + v; });
+                break;
+            } /* opcode::dadd */
+            case opcode::dsub:
+            {
+                auto v = frame.stack.pop_cat2<double>();
+                frame.stack.modify_top<double, double>(
+                  [v](double i) -> double
+                  { return i - v; });
+                break;
+            } /* opcode::dsub */
+            case opcode::dmul:
+            {
+                auto v = frame.stack.pop_cat2<double>();
+                frame.stack.modify_top<double, double>(
+                  [v](double i) -> double
+                  { return i * v; });
+                break;
+            } /* opcode::dmul */
+            case opcode::ddiv:
+            {
+                auto divisor = frame.stack.pop_cat2<double>();
+                if(divisor == 0)
+                {
+                    throw interpreter_error("Division by zero.");
+                }
+                frame.stack.modify_top<double, double>(
+                  [divisor](double dividend) -> double
+                  { return dividend / divisor; });
+                break;
+            } /* opcode::ddiv */
+            case opcode::i2c:
+            {
+                frame.stack.modify_top<std::int32_t, std::int32_t>(
+                  [](std::int32_t i) -> std::int32_t
+                  { return static_cast<std::int32_t>(static_cast<std::int8_t>(i)); });
+                break;
+            } /* opcode::i2c */
+            case opcode::i2s:
+            {
+                frame.stack.modify_top<std::int32_t, std::int32_t>(
+                  [](std::int32_t i) -> std::int32_t
+                  { return static_cast<std::int32_t>(static_cast<std::int16_t>(i)); });
+                break;
+            } /* opcode::i2s */
+            case opcode::i2l:
+            {
+                frame.stack.push_cat2<std::int64_t>(
+                  frame.stack.pop_cat1<std::int32_t>());
+                break;
+            } /* opcode::i2l */
             case opcode::i2f:
             {
                 frame.stack.modify_top<std::int32_t, float>(
-                  [](const std::int32_t i) -> float
+                  [](std::int32_t i) -> float
                   { return static_cast<float>(i); });
                 break;
             } /* opcode::i2f */
+            case opcode::i2d:
+            {
+                auto i = frame.stack.pop_cat1<std::int32_t>();
+                frame.stack.push_cat2(static_cast<double>(i));
+                break;
+            } /* opcode::i2d */
+            case opcode::l2i:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1(static_cast<std::int32_t>(i));
+                break;
+            } /* opcode::l2i */
+            case opcode::l2f:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1(static_cast<float>(i));
+                break;
+            } /* opcode::l2f */
+            case opcode::l2d:
+            {
+                auto i = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat2<double>(static_cast<double>(i));
+                break;
+            } /* opcode::l2d */
             case opcode::f2i:
             {
                 frame.stack.modify_top<float, std::int32_t>(
-                  [](const float f) -> std::int32_t
+                  [](float f) -> std::int32_t
                   { return static_cast<std::int32_t>(f); });
                 break;
             } /* opcode::f2i */
+            case opcode::f2l:
+            {
+                auto f = frame.stack.pop_cat1<float>();
+                frame.stack.push_cat2<std::int64_t>(static_cast<std::int64_t>(f));
+                break;
+            } /* opcode::f2l */
+            case opcode::f2d:
+            {
+                auto f = frame.stack.pop_cat1<float>();
+                frame.stack.push_cat2<double>(static_cast<double>(f));
+                break;
+            } /* opcode::f2d */
+            case opcode::d2i:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(d));
+                break;
+            } /* opcode::d2i */
+            case opcode::d2l:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat2<std::int64_t>(static_cast<std::int64_t>(d));
+                break;
+            } /* opcode::d2l */
+            case opcode::d2f:
+            {
+                auto d = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<float>(static_cast<float>(d));
+                break;
+            } /* opcode::d2f */
             case opcode::aconst_null:
             {
                 frame.stack.push_addr<void>(nullptr);
@@ -513,16 +732,30 @@ void context::exec(
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int32_t>(binary, offset);
-                frame.stack.push_i32(i);
+                frame.stack.push_cat1(i);
                 break;
             } /* opcode::iconst */
+            case opcode::lconst:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto i = read_unchecked<std::int64_t>(binary, offset);
+                frame.stack.push_cat2(i);
+                break;
+            } /* opcode::lconst */
             case opcode::fconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto f = read_unchecked<float>(binary, offset);
-                frame.stack.push_f32(f);
+                frame.stack.push_cat1(f);
                 break;
             } /* opcode::fconst */
+            case opcode::dconst:
+            {
+                /* no out-of-bounds read possible, since this is checked during decode. */
+                auto f = read_unchecked<double>(binary, offset);
+                frame.stack.push_cat2(f);
+                break;
+            } /* opcode::dconst */
             case opcode::sconst:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -543,9 +776,49 @@ void context::exec(
                 frame.stack.push_addr(str);
                 break;
             } /* opcode::sconst */
+            case opcode::caload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int8_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during caload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat1(static_cast<std::int32_t>((*arr)[array_index]));
+                break;
+            } /* opcode::caload */
+            case opcode::saload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int16_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during saload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat1(static_cast<std::int32_t>((*arr)[array_index]));
+                break;
+            } /* opcode::saload */
             case opcode::iaload:
             {
-                std::int32_t array_index = frame.stack.pop_i32();
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
                 if(arr == nullptr)
@@ -560,12 +833,32 @@ void context::exec(
                     throw interpreter_error("Out of bounds array access.");
                 }
 
-                frame.stack.push_i32((*arr)[array_index]);
+                frame.stack.push_cat1((*arr)[array_index]);
                 break;
             } /* opcode::iaload */
+            case opcode::laload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int64_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during laload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat2(static_cast<std::int64_t>((*arr)[array_index]));
+                break;
+            } /* opcode::laload */
             case opcode::faload:
             {
-                std::int32_t array_index = frame.stack.pop_i32();
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
                 if(arr == nullptr)
@@ -580,12 +873,32 @@ void context::exec(
                     throw interpreter_error("Out of bounds array access.");
                 }
 
-                frame.stack.push_f32((*arr)[array_index]);
+                frame.stack.push_cat1((*arr)[array_index]);
                 break;
             } /* opcode::faload */
+            case opcode::daload:
+            {
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<double>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during daload.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(array_index < 0 || static_cast<std::size_t>(array_index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                frame.stack.push_cat2((*arr)[array_index]);
+                break;
+            } /* opcode::daload */
             case opcode::aaload:
             {
-                std::int32_t array_index = frame.stack.pop_i32();
+                auto array_index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 if(arr == nullptr)
@@ -606,10 +919,52 @@ void context::exec(
                 frame.stack.push_addr(obj);
                 break;
             } /* opcode::aaload */
+            case opcode::castore:
+            {
+                auto v = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int8_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during castore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = static_cast<std::int8_t>(v);
+                break;
+            } /* opcode::castore */
+            case opcode::sastore:
+            {
+                auto v = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int16_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during sastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = static_cast<std::int16_t>(v);
+                break;
+            } /* opcode::sastore */
             case opcode::iastore:
             {
-                std::int32_t v = frame.stack.pop_i32();
-                std::int32_t index = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<std::int32_t>>();
 
                 if(arr == nullptr)
@@ -627,10 +982,31 @@ void context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::iastore */
+            case opcode::lastore:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<std::int64_t>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during lastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = v;
+                break;
+            } /* opcode::lastore */
             case opcode::fastore:
             {
-                float v = frame.stack.pop_f32();
-                std::int32_t index = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<float>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<float>>();
 
                 if(arr == nullptr)
@@ -648,10 +1024,31 @@ void context::exec(
                 (*arr)[index] = v;
                 break;
             } /* opcode::fastore */
+            case opcode::dastore:
+            {
+                auto v = frame.stack.pop_cat2<double>();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
+                auto* arr = frame.stack.pop_addr<fixed_vector<double>>();
+
+                if(arr == nullptr)
+                {
+                    throw interpreter_error("Null pointer access during dastore.");
+                }
+
+                gc.remove_temporary(arr);
+
+                if(index < 0 || static_cast<std::size_t>(index) >= arr->size())
+                {
+                    throw interpreter_error("Out of bounds array access.");
+                }
+
+                (*arr)[index] = v;
+                break;
+            } /* opcode::dastore */
             case opcode::aastore:
             {
                 void* obj = frame.stack.pop_addr<void>();
-                std::int32_t index = frame.stack.pop_i32();
+                auto index = frame.stack.pop_cat1<std::int32_t>();
                 auto* arr = frame.stack.pop_addr<fixed_vector<void*>>();
 
                 if(arr == nullptr)
@@ -668,10 +1065,10 @@ void context::exec(
                 }
 
                 (*arr)[index] = obj;
-
                 break;
             } /* opcode::aastore */
             case opcode::iload:
+            case opcode::fload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -692,10 +1089,11 @@ void context::exec(
 
                 std::int32_t v;    // NOLINT(cppcoreguidelines-init-variables)
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
-                frame.stack.push_i32(v);
+                frame.stack.push_cat1(v);
                 break;
-            } /* opcode::iload */
-            case opcode::fload:
+            } /* opcode::iload, opcode::fload */
+            case opcode::lload:
+            case opcode::dload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -709,16 +1107,16 @@ void context::exec(
                         i));
                 }
 
-                if(i + sizeof(float) > frame.locals.size())
+                if(i + sizeof(std::int64_t) > frame.locals.size())
                 {
                     throw interpreter_error("Invalid memory access.");
                 }
 
-                float v;    // NOLINT(cppcoreguidelines-init-variables)
+                std::int64_t v;    // NOLINT(cppcoreguidelines-init-variables)
                 std::memcpy(&v, &frame.locals[i], sizeof(v));
-                frame.stack.push_f32(v);
+                frame.stack.push_cat2(v);
                 break;
-            } /* opcode::fload */
+            } /* opcode::lload, opcode::dload */
             case opcode::aload:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -745,6 +1143,7 @@ void context::exec(
                 break;
             } /* opcode::aload */
             case opcode::istore:
+            case opcode::fstore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -763,11 +1162,12 @@ void context::exec(
                     throw interpreter_error("Stack overflow.");
                 }
 
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::istore */
-            case opcode::fstore:
+            } /* opcode::istore, opcode::fstore */
+            case opcode::lstore:
+            case opcode::dstore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto i = read_unchecked<std::int64_t>(binary, offset);
@@ -781,15 +1181,15 @@ void context::exec(
                         i));
                 }
 
-                if(i + sizeof(float) > frame.locals.size())
+                if(i + sizeof(std::int64_t) > frame.locals.size())
                 {
                     throw interpreter_error("Stack overflow.");
                 }
 
-                float v = frame.stack.pop_f32();
+                auto v = frame.stack.pop_cat2<std::int64_t>();
                 std::memcpy(&frame.locals[i], &v, sizeof(v));
                 break;
-            } /* opcode::fstore */
+            } /* opcode::istore, opcode::fstore */
             case opcode::astore:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
@@ -915,21 +1315,37 @@ void context::exec(
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto type = read_unchecked<std::uint8_t>(binary, offset);
 
-                std::int32_t size = frame.stack.pop_i32();
+                auto size = frame.stack.pop_cat1<std::int32_t>();
                 if(size < 0)
                 {
                     throw interpreter_error(std::format("Invalid array size '{}'.", size));
                 }
 
-                if(type == static_cast<std::uint8_t>(module_::array_type::i32))
+                if(type == std::to_underlying(module_::array_type::i8))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int8_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::i16))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int16_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::i32))
                 {
                     frame.stack.push_addr(gc.gc_new_array<std::int32_t>(size, gc::gc_object::of_temporary));
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::f32))
+                else if(type == std::to_underlying(module_::array_type::i64))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<std::int64_t>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::f32))
                 {
                     frame.stack.push_addr(gc.gc_new_array<float>(size, gc::gc_object::of_temporary));
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::str))
+                else if(type == std::to_underlying(module_::array_type::f64))
+                {
+                    frame.stack.push_addr(gc.gc_new_array<double>(size, gc::gc_object::of_temporary));
+                }
+                else if(type == std::to_underlying(module_::array_type::str))
                 {
                     auto* array = gc.gc_new_array<std::string*>(size, gc::gc_object::of_temporary);
                     for(std::string*& s: *array)
@@ -938,7 +1354,7 @@ void context::exec(
                     }
                     frame.stack.push_addr(array);
                 }
-                else if(type == static_cast<std::uint8_t>(module_::array_type::ref))
+                else if(type == std::to_underlying(module_::array_type::ref))
                 {
                     frame.stack.push_addr(gc.gc_new_array<void*>(size, gc::gc_object::of_temporary));
                 }
@@ -954,7 +1370,7 @@ void context::exec(
                 /* no out-of-bounds read possible, since this is checked during decode. */
                 auto layout_id = read_unchecked<std::size_t>(binary, offset);
 
-                std::int32_t length = frame.stack.pop_i32();
+                auto length = frame.stack.pop_cat1<std::int32_t>();
                 if(length < 0)
                 {
                     throw interpreter_error(std::format("Invalid array length '{}'.", length));
@@ -973,7 +1389,7 @@ void context::exec(
                     throw interpreter_error("Null pointer access during arraylength.");
                 }
                 gc.remove_temporary(v);
-                frame.stack.push_i32(utils::numeric_cast<std::int32_t>(v->size()));
+                frame.stack.push_cat1(utils::numeric_cast<std::int32_t>(v->size()));
                 break;
             } /* opcode::arraylength */
             case opcode::setfield:
@@ -1007,7 +1423,7 @@ void context::exec(
                 }
                 else if(field_size == sizeof(std::int32_t))
                 {
-                    std::int32_t v = frame.stack.pop_i32();
+                    auto v = frame.stack.pop_cat1<std::int32_t>();
                     void* type_ref = frame.stack.pop_addr<void>();
                     if(type_ref == nullptr)
                     {
@@ -1064,7 +1480,7 @@ void context::exec(
                       static_cast<void*>(&v),
                       reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
                       sizeof(v));
-                    frame.stack.push_i32(v);
+                    frame.stack.push_cat1(v);
                 }
                 else
                 {
@@ -1078,7 +1494,7 @@ void context::exec(
                 auto target_layout_id = read_unchecked<std::size_t>(binary, offset);
                 auto flags = read_unchecked<std::size_t>(binary, offset);
 
-                if((flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) == 0)
+                if((flags & std::to_underlying(module_::struct_flags::allow_cast)) == 0)
                 {
                     void* obj = frame.stack.pop_addr<void>();
                     if(obj == nullptr)
@@ -1101,7 +1517,7 @@ void context::exec(
             } /* opcode::checkcast */
             case opcode::iand:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i & v; });
@@ -1109,7 +1525,7 @@ void context::exec(
             } /* opcode::iand */
             case opcode::land:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return (i != 0) && (v != 0); });
@@ -1117,7 +1533,7 @@ void context::exec(
             } /* opcode::land */
             case opcode::ior:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i | v; });
@@ -1125,7 +1541,7 @@ void context::exec(
             } /* opcode::ior */
             case opcode::lor:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return (i != 0) || (v != 0); });
@@ -1133,15 +1549,28 @@ void context::exec(
             } /* opcode::lor */
             case opcode::ixor:
             {
-                std::int32_t v = frame.stack.pop_i32();
+                auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
                   { return i ^ v; });
                 break;
             } /* opcode::ixor */
+            case opcode::lxor:
+            {
+                auto v = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [v](std::int64_t i) -> std::int64_t
+                  { return i ^ v; });
+                break;
+            } /* opcode::lxor */
             case opcode::ishl:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
+                if(a < 0)
+                {
+                    throw interpreter_error("Negative shift.");
+                }
+
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
@@ -1151,9 +1580,31 @@ void context::exec(
                     return static_cast<std::int32_t>(s_u32 << a_u32); });
                 break;
             } /* opcode::ishl */
+            case opcode::lshl:
+            {
+                auto a = frame.stack.pop_cat1<std::int32_t>();
+                if(a < 0)
+                {
+                    throw interpreter_error("Negative shift.");
+                }
+
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
+                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x3f;    // mask because of 64-bit int.
+
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [a_u32](std::int64_t s) -> std::int64_t
+                  { std::uint64_t s_u64 = *reinterpret_cast<std::uint64_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                    return static_cast<std::int64_t>(s_u64 << a_u32); });
+                break;
+            } /* opcode::lshl */
             case opcode::ishr:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
+                if(a < 0)
+                {
+                    throw interpreter_error("Negative shift.");
+                }
+
                 // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
                 std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
 
@@ -1163,109 +1614,210 @@ void context::exec(
                     return static_cast<std::int32_t>(s_u32 >> a_u32); });
                 break;
             } /* opcode::ishr */
+            case opcode::lshr:
+            {
+                auto a = frame.stack.pop_cat1<std::int32_t>();
+                if(a < 0)
+                {
+                    throw interpreter_error("Negative shift.");
+                }
+
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
+                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x3f;    // mask because of 64-bit int.
+
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [a_u32](std::int64_t s) -> std::int64_t
+                  { std::uint64_t s_u64 = *reinterpret_cast<std::uint64_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                    return static_cast<std::int64_t>(s_u64 >> a_u32); });
+                break;
+            } /* opcode::lshr */
             case opcode::icmpl:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b < a; });
                 break;
             } /* opcode::icmpl */
+            case opcode::lcmpl:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b < a));
+                break;
+            } /* opcode::lcmpl */
             case opcode::fcmpl:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b < a; });
                 break;
             } /* opcode::fcmpl */
+            case opcode::dcmpl:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b < a));
+                break;
+            } /* opcode::dcmpl */
             case opcode::icmple:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b <= a; });
                 break;
             } /* opcode::icmple */
+            case opcode::lcmple:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b <= a));
+                break;
+            } /* opcode::lcmple */
             case opcode::fcmple:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b <= a; });
                 break;
             } /* opcode::fcmple */
+            case opcode::dcmple:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b <= a));
+                break;
+            } /* opcode::dcmple */
             case opcode::icmpg:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b > a; });
                 break;
             } /* opcode::icmpg */
+            case opcode::lcmpg:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b > a));
+                break;
+            } /* opcode::lcmpg */
             case opcode::fcmpg:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b > a; });
                 break;
             } /* opcode::fcmpg */
+            case opcode::dcmpg:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b > a));
+                break;
+            } /* opcode::dcmpg */
             case opcode::icmpge:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b >= a; });
                 break;
             } /* opcode::icmpge */
+            case opcode::lcmpge:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b >= a));
+                break;
+            } /* opcode::lcmpge */
             case opcode::fcmpge:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b >= a; });
                 break;
             } /* opcode::fcmpge */
+            case opcode::dcmpge:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b >= a));
+                break;
+            } /* opcode::dcmpge */
             case opcode::icmpeq:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b == a; });
                 break;
             } /* opcode::icmpeq */
+            case opcode::lcmpeq:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b == a));
+                break;
+            } /* opcode::lcmpeq */
             case opcode::fcmpeq:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b == a; });
                 break;
             } /* opcode::fcmpeq */
+            case opcode::dcmpeq:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b == a));
+                break;
+            } /* opcode::dcmpeq */
             case opcode::icmpne:
             {
-                std::int32_t a = frame.stack.pop_i32();
+                auto a = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a](std::int32_t b) -> std::int32_t
                   { return b != a; });
                 break;
             } /* opcode::icmpne */
+            case opcode::lcmpne:
+            {
+                auto a = frame.stack.pop_cat2<std::int64_t>();
+                auto b = frame.stack.pop_cat2<std::int64_t>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b != a));
+                break;
+            } /* opcode::lcmpne */
             case opcode::fcmpne:
             {
-                float a = frame.stack.pop_f32();
+                auto a = frame.stack.pop_cat1<float>();
                 frame.stack.modify_top<float, std::int32_t>(
                   [a](float b) -> std::int32_t
                   { return b != a; });
                 break;
             } /* opcode::fcmpne */
+            case opcode::dcmpne:
+            {
+                auto a = frame.stack.pop_cat2<double>();
+                auto b = frame.stack.pop_cat2<double>();
+                frame.stack.push_cat1<std::int32_t>(static_cast<std::int32_t>(b != a));
+                break;
+            } /* opcode::dcmpne */
             case opcode::acmpeq:
             {
                 void* a = frame.stack.pop_addr<void>();
                 void* b = frame.stack.pop_addr<void>();
                 gc.remove_temporary(a);
                 gc.remove_temporary(b);
-                frame.stack.push_i32((b == a) ? 1 : 0);
+                frame.stack.push_cat1((b == a) ? 1 : 0);
                 break;
             } /* opcode::acmpeq */
             case opcode::acmpne:
@@ -1274,7 +1826,7 @@ void context::exec(
                 void* b = frame.stack.pop_addr<void>();
                 gc.remove_temporary(a);
                 gc.remove_temporary(b);
-                frame.stack.push_i32((b != a) ? 1 : 0);
+                frame.stack.push_cat1((b != a) ? 1 : 0);
                 break;
             } /* opcode::acmpne */
             case opcode::jnz:
@@ -1283,7 +1835,7 @@ void context::exec(
                 auto then_offset = read_unchecked<std::size_t>(binary, offset);
                 auto else_offset = read_unchecked<std::size_t>(binary, offset);
 
-                std::int32_t cond = frame.stack.pop_i32();
+                auto cond = frame.stack.pop_cat1<std::int32_t>();
                 if(cond != 0)
                 {
                     offset = then_offset;
@@ -1305,7 +1857,7 @@ void context::exec(
                   std::format(
                     "Opcode '{}' ({}) not implemented.",
                     to_string(instr_opcode),
-                    static_cast<std::uint8_t>(instr)));
+                    instr));
             }
         }
 
@@ -1343,7 +1895,8 @@ void context::stack_trace_handler(
     err.add_stack_trace_entry("<unknown>", entry_point, offset);
 }
 
-std::string context::stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace)
+std::string context::stack_trace_to_string(
+  const std::vector<stack_trace_entry>& stack_trace)
 {
     std::string buf;
     for(const auto& entry: stack_trace)
@@ -1581,11 +2134,11 @@ value context::exec(
     }
     else if(return_type_class == abi_type_class::i32)
     {
-        ret = value{frame.stack.pop_i32()};
+        ret = value{frame.stack.pop_cat1<std::int32_t>()};
     }
     else if(return_type_class == abi_type_class::f32)
     {
-        ret = value{frame.stack.pop_f32()};
+        ret = value{frame.stack.pop_cat1<float>()};
     }
     else if(return_type_class == abi_type_class::str)
     {
@@ -1665,7 +2218,9 @@ void context::register_native_function(
     }
 }
 
-module_loader& context::resolve_module(const std::string& import_name, std::shared_ptr<instruction_recorder> recorder)
+module_loader& context::resolve_module(
+  const std::string& import_name,
+  std::shared_ptr<instruction_recorder> recorder)
 {
     auto it = loaders.find(import_name);
     if(it != loaders.end())
@@ -1687,7 +2242,8 @@ module_loader& context::resolve_module(const std::string& import_name, std::shar
     return *loaders[import_name].get();
 }
 
-std::string context::get_import_name(const module_loader& loader) const
+std::string context::get_import_name(
+  const module_loader& loader) const
 {
     auto it = std::ranges::find_if(
       std::as_const(loaders),
@@ -1703,7 +2259,10 @@ std::string context::get_import_name(const module_loader& loader) const
     return it->first;
 }
 
-value context::invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args)
+value context::invoke(
+  const std::string& module_name,
+  const std::string& function_name,
+  const std::vector<value>& args)
 {
     try
     {
@@ -1737,7 +2296,10 @@ value context::invoke(const std::string& module_name, const std::string& functio
     }
 }
 
-value context::invoke(const module_loader& loader, const function& fn, const std::vector<value>& args)
+value context::invoke(
+  const module_loader& loader,
+  const function& fn,
+  const std::vector<value>& args)
 {
     try
     {

@@ -286,9 +286,9 @@ void macro_invocation::serialize(archive& ar)
     ar& expression_serializer{expansion};
 }
 
-std::unique_ptr<cg::value> macro_invocation::generate_code(
+std::unique_ptr<cg::rvalue> macro_invocation::emit_rvalue(
   cg::context& ctx,
-  memory_context mc) const
+  bool result_used) const
 {
     // Code generation for macros.
     if(!expansion)
@@ -296,16 +296,18 @@ std::unique_ptr<cg::value> macro_invocation::generate_code(
         throw cg::codegen_error(loc, "Macro was not expanded.");
     }
 
-    auto return_type = expansion->generate_code(ctx, mc);
+    auto return_type = expansion->emit_rvalue(ctx, result_used);
     if(index_expr)
     {
         // evaluate the index expression.
-        index_expr->generate_code(ctx, memory_context::load);
+        index_expr->emit_rvalue(ctx);
 
         auto type = ctx.deref(return_type->get_type());
-        ctx.generate_load_element(
-          cg::type_argument{type});
-        return std::make_unique<cg::value>(type);
+        ctx.generate_load(
+          cg::lvalue{
+            type,
+            cg::array_location_info{}});
+        return std::make_unique<cg::rvalue>(type);
     }
 
     return return_type;
@@ -435,11 +437,17 @@ void macro_branch::serialize(archive& ar)
     ar & body;
 }
 
-std::unique_ptr<cg::value> macro_branch::generate_code(
-  cg::context& ctx,
-  memory_context mc) const
+void macro_branch::generate_code(
+  cg::context& ctx) const
 {
-    return body->generate_code(ctx, mc);
+    body->generate_code(ctx);
+}
+
+std::unique_ptr<cg::rvalue> macro_branch::emit_rvalue(
+  cg::context& ctx,
+  bool result_used) const
+{
+    return body->emit_rvalue(ctx, result_used);
 }
 
 void macro_branch::collect_names(co::context& ctx)
@@ -517,9 +525,8 @@ void macro_expression_list::collect_names(
     // no-op.
 }
 
-std::unique_ptr<cg::value> macro_expression_list::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void macro_expression_list::generate_code(
+  [[maybe_unused]] cg::context& ctx) const
 {
     throw cg::codegen_error(loc, "Non-expanded macro expression list.");
 }
@@ -589,12 +596,10 @@ void macro_expression::collect_names(
     ctx.pop_scope();
 }
 
-std::unique_ptr<cg::value> macro_expression::generate_code(
-  [[maybe_unused]] cg::context& ctx,
-  [[maybe_unused]] memory_context mc) const
+void macro_expression::generate_code(
+  [[maybe_unused]] cg::context& ctx) const
 {
     // empty, as macros don't generate code.
-    return nullptr;
 }
 
 std::optional<ty::type_id> macro_expression::type_check(

@@ -51,13 +51,25 @@ std::tuple<gc_object<std::string>> get_args(si::context& ctx, si::operand_stack&
 template<>
 std::tuple<std::int32_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
-    return stack.pop_i32();
+    return stack.pop_cat1<std::int32_t>();
+}
+
+template<>
+std::tuple<std::int64_t> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_cat2<std::int64_t>();
 }
 
 template<>
 std::tuple<float> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
-    return stack.pop_f32();
+    return stack.pop_cat1<float>();
+}
+
+template<>
+std::tuple<double> get_args([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    return stack.pop_cat2<double>();
 }
 
 }    // namespace slang::runtime

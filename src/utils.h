@@ -179,4 +179,19 @@ constexpr T numeric_cast(S value)
     return static_cast<T>(value);
 }
 
+/**
+ * Check if a `std::int64_t` value fits into the range of another signed integral type.
+ *
+ * @tparam T The type to check against.
+ * @param v The value to check.
+ * @returns Returns whether the value fits into the type.
+ */
+template<typename T>
+    requires(std::is_integral_v<T> && std::is_signed_v<T>)
+constexpr bool fits_in(std::int64_t v)
+{
+    return v >= std::numeric_limits<T>::min()
+           && v <= std::numeric_limits<T>::max();
+}
+
 }    // namespace slang::utils

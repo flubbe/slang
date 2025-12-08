@@ -11,6 +11,7 @@
 #include <format>
 #include <queue>
 #include <ranges>
+#include <utility>
 
 #include "shared/type_utils.h"
 #include "collect.h"
@@ -66,9 +67,21 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::i32,
-                .value = std::get<int>(const_entry.data)});
+                .value = std::get<std::int32_t>(const_entry.data)});
 
             return type_ctx.get_i32_type();
+        }
+
+        if(const_entry.type == module_::constant_type::i64)
+        {
+            const_env.set_const_info(
+              symbol_id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::i64,
+                .value = std::get<std::int64_t>(const_entry.data)});
+
+            return type_ctx.get_i64_type();
         }
 
         if(const_entry.type == module_::constant_type::f32)
@@ -81,6 +94,18 @@ void context::import_constant(
                 .value = std::get<float>(const_entry.data)});
 
             return type_ctx.get_f32_type();
+        }
+
+        if(const_entry.type == module_::constant_type::f64)
+        {
+            const_env.set_const_info(
+              symbol_id,
+              const_::const_info{
+                .origin_module_id = symbol_info_it->second.declaring_module,
+                .type = const_::constant_type::f64,
+                .value = std::get<double>(const_entry.data)});
+
+            return type_ctx.get_f64_type();
         }
 
         if(const_entry.type == module_::constant_type::str)
@@ -99,7 +124,7 @@ void context::import_constant(
           std::format(
             "External symbol '{}': Unknown constant type {}.",
             symbol_info_it->second.qualified_name,
-            static_cast<int>(const_entry.type)));
+            std::to_underlying(const_entry.type)));
     }();
 
     auto [entry, success] = sema_env.type_map.insert(
@@ -215,8 +240,8 @@ void context::import_type(
 
     type_ctx.set_type_flags(
       struct_type_id,
-      (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::native)) != 0,
-      (desc.flags & static_cast<std::uint8_t>(module_::struct_flags::allow_cast)) != 0);
+      (desc.flags & std::to_underlying(module_::struct_flags::native)) != 0,
+      (desc.flags & std::to_underlying(module_::struct_flags::allow_cast)) != 0);
 
     for(const auto& m: desc.member_types)
     {
@@ -531,7 +556,7 @@ sema::symbol_type to_sema_symbol_type(module_::symbol_type s)
         throw std::runtime_error(
           std::format(
             "Unable to get semantic symbol type from module symbol type '{}'.",
-            static_cast<int>(s)));
+            std::to_underlying(s)));
     }
 }
 
@@ -619,7 +644,7 @@ std::unordered_map<std::string, import_module_spec> context::collect_unresolved_
             continue;
         }
 
-        auto [it, success] = import_specs.insert(
+        auto [entry, success] = import_specs.insert(
           {symbol_info.qualified_name,
            import_module_spec{
              .origin = symbol_info.declaring_module,
@@ -628,7 +653,7 @@ std::unordered_map<std::string, import_module_spec> context::collect_unresolved_
         {
             if(symbol_info.declaring_module == sema::symbol_info::current_module_id)
             {
-                it->second.origin = sema::symbol_info::current_module_id;
+                entry->second.origin = sema::symbol_info::current_module_id;
             }
         }
     }

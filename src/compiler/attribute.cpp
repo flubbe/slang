@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <format>
 #include <unordered_map>
+#include <utility>
 
 #include "compiler/attribute.h"
 
@@ -50,7 +51,7 @@ std::string to_string(attribute_kind kind)
         throw std::runtime_error(
           std::format(
             "Missing string in value-string conversion for attribute with value '{}'.",
-            static_cast<int>(kind)));
+            std::to_underlying(kind)));
     }
 
     return it->first;

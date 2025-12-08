@@ -51,6 +51,34 @@ std::string to_string(token_type ty);
  */
 archive& operator&(archive& ar, token_type& ty);
 
+/** Numeric suffix type. */
+enum class suffix_type
+{
+    integer,        /** integers literals */
+    floating_point, /** floating-point literals */
+};
+
+/**
+ * Convert a suffix type into a readable string.
+ *
+ * @param ty The suffix type.
+ * @returns Returns a readable string.
+ */
+std::string to_string(suffix_type ty);
+
+/** A numeric suffix. */
+struct numeric_suffix
+{
+    /** Suffix type. */
+    suffix_type ty;
+
+    /** Bit width. */
+    std::uint32_t width;
+};
+
+/** An evaluated constant. */
+using const_value = std::variant<std::int64_t, double, std::string>;
+
 /** An evaluated token. */
 struct token
 {
@@ -64,10 +92,16 @@ struct token
     token_type type;
 
     /**
-     * Evaluated token, for `token_type::int_literal`,
-     * `token_type::fp_literal` and `token_type::string_literal.`
+     * Literal suffix, for `token_type::int_literal`,
+     * `token_type::fp_literal` and `token_type::str_literal.
      */
-    std::optional<std::variant<int, float, std::string>> value;
+    std::optional<numeric_suffix> suffix;
+
+    /**
+     * Evaluated token, for `token_type::int_literal`,
+     * `token_type::fp_literal` and `token_type::str_literal.`
+     */
+    std::optional<const_value> value;
 
     /** Default constructors. */
     token() = default;
@@ -83,17 +117,20 @@ struct token
      *
      * @param s The token's string.
      * @param location The token's location.
-     * @param type The token's type. Defaults to token_type::unknown.
-     * @param value The token's value. Defaults to std::nullopt.
+     * @param type The token's type. Defaults to `token_type::unknown`.
+     * @param suffix Optional suffix for numeric tokens.
+     * @param value The token's value. Defaults to `std::nullopt`.
      */
     token(
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
-      std::optional<std::variant<int, float, std::string>> value = std::nullopt)
+      std::optional<numeric_suffix> suffix = std::nullopt,
+      std::optional<const_value> value = std::nullopt)
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}
+    , suffix{suffix}
     , value{std::move(value)}
     {
     }

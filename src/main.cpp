@@ -37,7 +37,10 @@ void add_unique_command(
          })
        != cmds.end())
     {
-        throw std::runtime_error(std::format("add_unique_command: Command '{}' already registered.", new_cmd->get_name()));
+        throw std::runtime_error(
+          std::format(
+            "add_unique_command: Command '{}' already registered.",
+            new_cmd->get_name()));
     }
 
     cmds.emplace_back(std::move(new_cmd));

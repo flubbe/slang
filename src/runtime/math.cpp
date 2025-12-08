@@ -130,9 +130,9 @@ void atan([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 
 void atan2([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
-    float y = stack.pop_f32();
-    float x = stack.pop_f32();
-    stack.push_f32(builtin_atan2f(x, y));
+    float y = stack.pop_cat1<float>();
+    float x = stack.pop_cat1<float>();
+    stack.push_cat1(builtin_atan2f(x, y));
 }
 
 }    // namespace slang::runtime

@@ -194,19 +194,19 @@ TEST(output, emitter)
           "}\n"
           /* f32 */
           "fn ftest() -> f32 {\n"
-          " return 1.1;\n"
+          " return 1.1 as f32;\n"
           "}\n"
           "fn fadd() -> f32 {\n"
-          " return 1.1+2.1;\n"
+          " return (1.1+2.1) as f32;\n"
           "}\n"
           "fn fsub() -> f32 {\n"
-          " return 3.1-2.1;\n"
+          " return (3.1-2.1) as f32;\n"
           "}\n"
           "fn fmul() -> f32 {\n"
-          " return 2.1*3.1;\n"
+          " return (2.1*3.1) as f32;\n"
           "}\n"
           "fn fdiv() -> f32 {\n"
-          " return 6.4 / 2.0;\n"
+          " return (6.4 / 2.0) as f32;\n"
           "}\n"
           /* str */
           "fn stest() -> str {\n"
@@ -217,14 +217,14 @@ TEST(output, emitter)
           " return 1 + a;\n"
           "}\n"
           "fn arg2(a: f32) -> f32 {\n"
-          " return 2.0*a+1.0;\n"
+          " return (2.0 as f32)*a+(1.0 as f32);\n"
           "}\n"
           "fn sid(a: str) -> str {\n"
           " return a;\n"
           "}\n"
           "fn arg3(a: f32, s: str) -> f32 {\n"
           " s = \"Test\";\n"
-          " return 2.0 + a;\n"
+          " return 2.0 as f32 + a;\n"
           "}\n"
           /* function calls */
           "fn call(a: i32) -> i32 {\n"
@@ -418,10 +418,10 @@ TEST(output, operators)
           "\ta *= -3;\n"
           "\ta /= -2;\n"
           "\ta %= 1;\n"
-          "\tlet b: f32 = 1.0 + 2.0;\n"
-          "\tb = 1.0 - 2.0;\n"
-          "\tb = 1.0 * 2.0;\n"
-          "\tb = 1.0 / 2.0;\n"
+          "\tlet b: f32 = (1.0 + 2.0) as f32;\n"
+          "\tb = (1.0 - 2.0) as f32;\n"
+          "\tb = (1.0 * 2.0) as f32;\n"
+          "\tb = (1.0 / 2.0) as f32;\n"
           "\tlet c: i32 = 1 & 2;\n"
           "\tc = 1 | 2;\n"
           "\tc = 1 ^ 2;\n"
@@ -741,7 +741,7 @@ TEST(output, control_flow)
       "}\n"
       "fn conditional_hello_world(a: f32) -> void\n"
       "{\n"
-      " if(a > 2.5)\n"
+      " if(a > 2.5 as f32)\n"
       " {\n"
       "  std::println(\"Hello, World!\");\n"
       " }\n"
@@ -1938,7 +1938,7 @@ TEST(output, structs)
           "};\n"
           "fn return_struct() -> S\n"
           "{\n"
-          " return S{i:1, j:2.3, s: \"test\"};"
+          " return S{i:1, j:2.3 as f32, s: \"test\"};"
           "}\n";
 
         slang::lexer lexer;
@@ -1994,7 +1994,7 @@ TEST(output, structs)
           "fn struct_arg(s: S) -> void\n"
           "{\n"
           " s.i = 1;\n"
-          " s.j = 2.3;\n"
+          " s.j = 2.3 as f32;\n"
           " s.s = \"test\";\n"
           "}\n";
 
@@ -2115,7 +2115,7 @@ TEST(output, nested_structs)
           "fn test() -> i32\n"
           "{\n"
           " let c: Container = Container{\n"
-          "  data: Data{i: -1, f: 3.14, s: \"Test\", next: null},\n"
+          "  data: Data{i: -1, f: 3.14 as f32, s: \"Test\", next: null},\n"
           "  flags: 4096\n"
           " };\n"
           " return c.data.i + (c.data.f as i32);\n"
@@ -2174,7 +2174,7 @@ TEST(output, type_imports)
           "fn test() -> i32\n"
           "{\n"
           " let c: nested_structs2::Container = nested_structs2::Container{\n"
-          "  data: nested_structs2::Data{i: -1, f: 3.14, s: \"Test\", next: null},\n"
+          "  data: nested_structs2::Data{i: -1, f: 3.14 as f32, s: \"Test\", next: null},\n"
           "  flags: 4096\n"
           " };\n"
           " return c.data.i + (c.data.f as i32);\n"
@@ -2342,7 +2342,7 @@ TEST(output, multiple_modules)
            "fn f(x: i32) -> f32 { return (mod1::f() * x) as f32; }\n"},
           {"mod3",
            "import mod2;\n"
-           "fn f(x: f32) -> i32 { return (mod2::f(x as i32) * 2.0) as i32; }\n"}};
+           "fn f(x: f32) -> i32 { return (mod2::f(x as i32) * (2.0 as f32)) as i32; }\n"}};
 
         for(const auto& s: module_inputs)
         {

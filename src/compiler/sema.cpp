@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <format>
+#include <utility>
 
 #include "sema.h"
 
@@ -60,7 +61,7 @@ std::string to_string(symbol_type t)
     throw std::runtime_error(
       std::format(
         "Unknown symbol type '{}'.",
-        static_cast<int>(t)));
+        std::to_underlying(t)));
 }
 
 /*
@@ -201,7 +202,7 @@ std::string to_string(const env& env)
     std::string res = std::format(
       "--- Semantic Environment ---\n"
       "    Global scope id: {}\n",
-      static_cast<int>(env.global_scope_id));
+      env.global_scope_id);
 
     if(!env.scope_map.empty())
     {
@@ -222,7 +223,7 @@ std::string to_string(const env& env)
             res += std::format(
               "    {:>8}    {:>9}    {}\n",
               id,
-              static_cast<int>(s.parent),
+              static_cast<std::int64_t>(s.parent),
               name);
         }
 
@@ -261,10 +262,10 @@ std::string to_string(const env& env)
         {
             res += std::format(
               "    {:>9}    {:>20}    {:>8}    {:>10}    {:>8}    {} ({})\n",
-              static_cast<int>(id.value),
+              id.value,
               to_string(info.type),
               info.scope,
-              static_cast<int>(info.declaring_module.value),
+              static_cast<std::int64_t>(info.declaring_module.value),
               to_string(info.loc),
               info.name,
               info.qualified_name);
@@ -283,7 +284,7 @@ std::string to_string(const env& env)
         {
             res += std::format(
               "    {:>9}\n",
-              static_cast<int>(it.value));
+              it.value);
         }
     }
 
@@ -299,7 +300,7 @@ std::string to_string(const env& env)
         {
             res += std::format(
               "    {:>9}    {:>7}\n",
-              static_cast<int>(symbol_id.value),
+              symbol_id.value,
               type_id);
         }
     }

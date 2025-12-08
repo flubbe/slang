@@ -44,8 +44,12 @@ std::string to_string(type_kind kind)
     {
     case type_kind::void_: return "void";
     case type_kind::null: return "null";
+    case type_kind::i8: return "i8";
+    case type_kind::i16: return "i16";
     case type_kind::i32: return "i32";
+    case type_kind::i64: return "i64";
     case type_kind::f32: return "f32";
+    case type_kind::f64: return "f64";
     case type_kind::str: return "str";
     case type_kind::ref: return "ref";
     default:
@@ -79,7 +83,7 @@ std::string to_string(binary_op op)
       "land",
       "lor"};
 
-    auto idx = static_cast<std::size_t>(op);
+    auto idx = static_cast<std::size_t>(std::to_underlying(op));
     if(idx >= strs.size())
     {
         throw codegen_error("Invalid operator index in to_string(binary_op).");
@@ -94,15 +98,28 @@ std::string to_string(binary_op op)
 
 std::string to_string(type_cast tc)
 {
-    static const std::array<std::string, 2> strs = {"i32_to_f32", "f32_to_i32"};
-
-    auto idx = static_cast<std::size_t>(tc);
-    if(idx >= strs.size())
+    switch(tc)
     {
-        throw codegen_error("Invalid type cast index in to_string(type_cast).");
+    case type_cast::i32_to_i8: return "i32_to_i8";
+    case type_cast::i32_to_i16: return "i32_to_i16";
+    case type_cast::i32_to_i64: return "i32_to_i64";
+    case type_cast::i32_to_f32: return "i32_to_f32";
+    case type_cast::i32_to_f64: return "i32_to_f64";
+    case type_cast::i64_to_i32: return "i64_to_i32";
+    case type_cast::i64_to_f32: return "i64_to_f32";
+    case type_cast::i64_to_f64: return "i64_to_f64";
+    case type_cast::f32_to_i32: return "f32_to_i32";
+    case type_cast::f32_to_i64: return "f32_to_i64";
+    case type_cast::f32_to_f64: return "f32_to_f64";
+    case type_cast::f64_to_i32: return "f64_to_i32";
+    case type_cast::f64_to_i64: return "f64_to_i64";
+    case type_cast::f64_to_f32: return "f64_to_f32";
     }
 
-    return strs[idx];    // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    throw codegen_error(
+      std::format(
+        "Invalid type cast index {} in to_string(type_cast).",
+        std::to_underlying(tc)));
 }
 
 /*
@@ -114,8 +131,12 @@ std::string type::to_string([[maybe_unused]] const name_resolver* resolver) cons
     static const std::unordered_map<type_kind, std::string> map = {
       {type_kind::void_, "void"},
       {type_kind::null, "null"},
+      {type_kind::i8, "i8"},
+      {type_kind::i16, "i16"},
       {type_kind::i32, "i32"},
+      {type_kind::i64, "i64"},
       {type_kind::f32, "f32"},
+      {type_kind::f64, "f64"},
       {type_kind::str, "str"},
       {type_kind::ref, "ref"}};
 
@@ -138,10 +159,10 @@ std::string type::to_string([[maybe_unused]] const name_resolver* resolver) cons
 }
 
 /*
- * value.
+ * rvalue.
  */
 
-std::string value::to_string([[maybe_unused]] const name_resolver* resolver) const
+std::string rvalue::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
     // named values.
     if(symbol_id.has_value())
@@ -179,23 +200,37 @@ std::string value::to_string([[maybe_unused]] const name_resolver* resolver) con
 
 std::string const_argument::to_string([[maybe_unused]] const name_resolver* resolver) const
 {
-    auto kind = v->get_type().get_type_kind();
-
-    if(kind == type_kind::i32)
+    if(type == type_kind::i32)
     {
         return std::format(
           "i32 {}",
-          static_cast<constant_i32*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<float>(
+            static_cast<constant_i64*>(v.get())->get_int()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(kind == type_kind::f32)
+    if(type == type_kind::i64)
+    {
+        return std::format(
+          "i64 {}",
+          static_cast<constant_i64*>(v.get())->get_int());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    }
+
+    if(type == type_kind::f32)
     {
         return std::format(
           "f32 {}",
-          static_cast<constant_f32*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+          static_cast<float>(
+            static_cast<constant_f64*>(v.get())->get_float()));    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
     }
 
-    if(kind == type_kind::str)
+    if(type == type_kind::f64)
+    {
+        return std::format(
+          "f64 {}",
+          static_cast<constant_f64*>(v.get())->get_float());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    }
+
+    if(type == type_kind::str)
     {
         const auto* v_ptr = static_cast<const constant_str*>(v.get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
         std::string s = v_ptr->to_string();
@@ -598,21 +633,25 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
 
 void context::generate_const(
   const type& vt,
-  std::variant<int, float, const_::constant_id> v)
+  std::variant<std::int64_t, double, const_::constant_id> v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    if(vt.get_type_kind() == type_kind::i32)
+    if(vt.get_type_kind() == type_kind::i32
+       || vt.get_type_kind() == type_kind::i64)
     {
         auto arg = std::make_unique<const_argument>(
-          std::get<int>(v),
+          vt.get_type_kind(),
+          std::get<std::int64_t>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
-    else if(vt.get_type_kind() == type_kind::f32)
+    else if(vt.get_type_kind() == type_kind::f32
+            || vt.get_type_kind() == type_kind::f64)
     {
         auto arg = std::make_unique<const_argument>(
-          std::get<float>(v),
+          vt.get_type_kind(),
+          std::get<double>(v),
           std::nullopt);
         args.emplace_back(std::move(arg));
     }
@@ -648,8 +687,8 @@ void context::generate_dup(type vt)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(vt)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(vt)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup",
@@ -661,11 +700,11 @@ void context::generate_dup_x1(type vt, type skip_type)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(vt)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(vt)));
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(skip_type)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(skip_type)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup_x1",
@@ -677,17 +716,33 @@ void context::generate_dup_x2(type vt, type skip_type1, type skip_type2)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(vt)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(vt)));
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(skip_type1)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(skip_type1)));
     args.emplace_back(
-      std::make_unique<stack_value_argument>(
-        lowering_ctx.get_stack_value(skip_type2)));
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(skip_type2)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup_x2",
+        std::move(args)));
+}
+
+void context::generate_dup2_x0(type t0, type t1)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(t0)));
+    args.emplace_back(
+      std::make_unique<type_class_argument>(
+        lowering_ctx.get_type_class(t1)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "dup2_x0",
         std::move(args)));
 }
 
@@ -725,28 +780,53 @@ void context::generate_invoke_dynamic()
         "invoke_dynamic"));
 }
 
-void context::generate_load(variable_argument v)
+void context::generate_load(const lvalue& v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<variable_argument>(
-        std::move(v)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "load",
-        std::move(args)));
-}
 
-void context::generate_load_element(type_argument t)
-{
-    validate_insertion_point();
-    std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(std::move(t)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "load_element",
-        std::move(args)));
+    std::visit(
+      [&v, &args, this](auto const& l) -> void
+      {
+          using T = std::decay_t<decltype(l)>;
+
+          if constexpr(std::is_same_v<T, variable_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<variable_argument>(
+                  v.get_base()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "load",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, array_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_argument>(
+                  v.get_type()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "load_element",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, field_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<field_access_argument>(
+                  std::get<field_location_info>(v.get_location()).struct_type,
+                  std::get<field_location_info>(v.get_location()).field_index));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "get_field",
+                  std::move(args)));
+          }
+          else
+          {
+              // FIXME static_assert here
+          }
+      },
+      v.get_location());
 }
 
 void context::generate_new(const type& t)
@@ -754,7 +834,10 @@ void context::generate_new(const type& t)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(t));
-    insertion_point->add_instruction(std::make_unique<instruction>("new", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "new",
+        std::move(args)));
 }
 
 void context::generate_newarray(const type& t)
@@ -807,30 +890,53 @@ void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
     insertion_point->add_instruction(std::make_unique<instruction>("set_field", std::move(args)));
 }
 
-void context::generate_store(variable_argument v)
+void context::generate_store(const lvalue& v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<variable_argument>(
-        std::move(v)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "store",
-        std::move(args)));
-}
 
-void context::generate_store_element(type_argument t)
-{
-    validate_insertion_point();
-    std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(
-      std::make_unique<type_argument>(
-        std::move(t)));
-    insertion_point->add_instruction(
-      std::make_unique<instruction>(
-        "store_element",
-        std::move(args)));
+    std::visit(
+      [&v, &args, this](auto const& l) -> void
+      {
+          using T = std::decay_t<decltype(l)>;
+
+          if constexpr(std::is_same_v<T, variable_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<variable_argument>(
+                  v.get_base()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "store",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, array_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_argument>(
+                  v.get_type()));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "store_element",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, field_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<field_access_argument>(
+                  std::get<field_location_info>(v.get_location()).struct_type,
+                  std::get<field_location_info>(v.get_location()).field_index));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "set_field",
+                  std::move(args)));
+          }
+          else
+          {
+              // FIXME static_assert here
+          }
+      },
+      v.get_location());
 }
 
 std::string context::generate_label()
@@ -881,15 +987,41 @@ static std::string print_constant(
 
     if(info.type == const_::constant_type::i32)
     {
-        buf += std::format(".i32 @{} {}", id, std::get<int>(info.value));
+        buf += std::format(
+          ".i32 @{} {}",
+          id,
+          static_cast<std::int32_t>(
+            std::get<std::int64_t>(info.value)));
+    }
+    else if(info.type == const_::constant_type::i64)
+    {
+        buf += std::format(
+          ".i64 @{} {}",
+          id,
+          std::get<std::int64_t>(info.value));
     }
     else if(info.type == const_::constant_type::f32)
     {
-        buf += std::format(".f32 @{} {}", id, std::get<float>(info.value));
+        buf += std::format(
+          ".f32 @{} {}",
+          id,
+          static_cast<float>(
+            std::get<double>(info.value)));
+    }
+    else if(info.type == const_::constant_type::f64)
+    {
+        buf += std::format(
+          ".f64 @{} {}",
+          id,
+          std::get<double>(info.value));
     }
     else if(info.type == const_::constant_type::str)
     {
-        buf += std::format(".string @{} \"{}\"", id, make_printable(std::get<std::string>(info.value)));
+        buf += std::format(
+          ".string @{} \"{}\"",
+          id,
+          make_printable(
+            std::get<std::string>(info.value)));
     }
     else
     {

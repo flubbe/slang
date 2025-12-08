@@ -13,7 +13,7 @@
 #include <unordered_map>
 
 #include "compiler/codegen/type.h"
-#include "shared/stack_value.h"
+#include "shared/type_class.h"
 #include "type.h"
 
 /*
@@ -56,8 +56,12 @@ class context
     /** Built-in types. */
     cg::type null_type;
     cg::type void_type;
+    cg::type i8_type;
+    cg::type i16_type;
     cg::type i32_type;
+    cg::type i64_type;
     cg::type f32_type;
+    cg::type f64_type;
     cg::type str_type;
 
     /** Initialize the built-in types. */
@@ -114,12 +118,12 @@ public:
     cg::type deref(const cg::type& type);
 
     /**
-     * Get stack type size.
+     * Get the type class.
      *
      * @param type The type.
-     * @returns Returns the stack type size as a `stack_value`.
+     * @returns Returns the the type class of `type`.
      */
-    stack_value get_stack_value(const cg::type& type) const;
+    type_class get_type_class(const cg::type& type) const;
 
     /** Print the contents as a readable string. */
     [[nodiscard]]
