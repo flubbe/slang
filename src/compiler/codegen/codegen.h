@@ -261,14 +261,6 @@ public:
     {
     }
 
-    // FIXME remove
-    lvalue(
-      type ty,
-      std::optional<sema::symbol_id> symbol_id = std::nullopt)
-    : base{ty, symbol_id}
-    {
-    }
-
     /** Get base information. */
     [[nodiscard]]
     const rvalue& get_base() const
@@ -2048,9 +2040,16 @@ public:
     /**
      * Duplicate the top stack value.
      *
-     * @param vt The value's type.
+     * @param v The value to duplicate.
      */
-    void generate_dup(type vt);
+    void generate_dup(const rvalue& v);
+
+    /**
+     * Duplicate an address at the top of the stack.
+     *
+     * @param v The value to duplicate.
+     */
+    void generate_dup(const lvalue& v);
 
     /**
      * Duplicate the top stack value and insert it two values down.
@@ -2070,7 +2069,7 @@ public:
     void generate_dup_x2(type vt, type skip_type1, type skip_type2);
 
     /**
-     * Duplicate the top two stack value.
+     * Duplicate the top two stack values.
      *
      * @param t0 The first value.
      * @param t1 The second value.

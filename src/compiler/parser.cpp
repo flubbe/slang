@@ -1160,6 +1160,16 @@ std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
           std::move(expr));
     }
 
+    if(current_token->s == "++"
+       || current_token->s == "--")    // postfix operators.
+    {
+        expr = std::make_unique<ast::postfix_expression>(
+          std::move(expr),
+          *current_token);
+
+        get_next_token();    // skip operator.
+    }
+
     return expr;
 }
 
@@ -1212,18 +1222,6 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 {
     token identifier = *current_token;
     get_next_token();    // skip identifier
-
-    if(current_token->s == "++"
-       || current_token->s == "--")    // postfix operators.
-    {
-        token postfix_op = *current_token;
-        get_next_token();
-
-        return std::make_unique<ast::postfix_expression>(
-          std::make_unique<ast::variable_reference_expression>(
-            std::move(identifier)),
-          std::move(postfix_op));
-    }
 
     if(current_token->s == "(")    // function call or macro invocation.
     {

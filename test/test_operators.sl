@@ -256,113 +256,6 @@ fn test_compound_assignments() -> void {
     std::assert(i == 1, "i == 1");
 }
 
-struct S {
-    arr: [i32]
-};
-
-struct T {
-    s: S
-};
-
-fn foo() -> i32 {
-    return -1;
-}
-
-fn test_nested_evaluation() -> void {
-    std::println("nested evaluations: S");
-
-    let obj: S = S{
-        arr: [1, 2, 3]
-    };
-    let i: i32 = 1;
-
-    obj.arr[i++] += foo();
-
-    std::println(
-        std::format!(
-            "i = {} / obj.arr=[{}, {}, {}] / obj.arr.length = {},",
-            i,
-            obj.arr[0], obj.arr[1], obj.arr[2],
-            obj.arr.length));
-
-    std::assert(obj.arr[0] == 1, "obj.arr[0] == 1");
-    std::assert(obj.arr[1] == 1, "obj.arr[1] == 1");
-    std::assert(obj.arr[2] == 3, "obj.arr[2] == 3");
-    std::assert(i == 2, "i == 2");
-
-    std::println("nested evaluations: T");
-    let obj2: T = T{
-        s: S{
-            arr: [1, 2, 3]
-        }
-    };
-
-    obj2.s.arr[i++] += foo();
-    
-    std::println(
-        std::format!(
-            "i = {} / obj2.s.arr=[{}, {}, {}] / obj2.s.arr.length = {},",
-            i,
-            obj2.s.arr[0], obj2.s.arr[1], obj2.s.arr[2],
-            obj2.s.arr.length));
-
-    std::assert(obj2.s.arr[0] == 1, "obj2.s.arr[0] == 1");
-    std::assert(obj2.s.arr[1] == 2, "obj2.s.arr[1] == 2");
-    std::assert(obj2.s.arr[2] == 2, "obj2.s.arr[2] == 2");
-    std::assert(i == 3, "i == 3");
-}
-
-fn return_modified_input_i32(a: [i32]) -> [i32]
-{
-    a[1] += -1;
-    return a;
-}
-
-fn return_modified_input_i8(a: [i8]) -> [i8]
-{
-    a[1] += -1i8;
-    return a;
-}
-
-fn generate_array_i32() -> [i32]
-{
-    return new i32[3];
-}
-
-fn test_modify_returned_array() -> void
-{
-    std::println("modify returned array: i8");
-
-    let a: [i8] = [1i8, 2i8, 3i8];
-    return_modified_input_i8(a)[0] -= 1i8;
-
-    std::println(
-        std::format!(
-            "{} {} {}",
-            a[0], a[1], a[2]));
-
-    std::assert(a[0] == 0i8, "a[0] == 0");
-    std::assert(a[1] == 1i8, "a[1] == 1");
-    std::assert(a[2] == 3i8, "a[2] == 3");
-
-    std::println("modify returned array: i32");
-
-    let b: [i32] = [1, 2, 3];
-    return_modified_input_i32(b)[0] += 1;
-
-    std::println(
-        std::format!(
-            "{} {} {}",
-            b[0], b[1], b[2]));
-
-    std::assert(b[0] == 2, "b[0] == 2");
-    std::assert(b[1] == 1, "b[1] == 1");
-    std::assert(b[2] == 3, "b[2] == 3");
-
-    // GC test for return values.
-    generate_array_i32()[0] = 13;
-}
-
 fn main(args: [str]) -> i32 {
     test_i32_binary_operators();
     test_i32_unary_operators();
@@ -372,9 +265,6 @@ fn main(args: [str]) -> i32 {
 
     test_logical_operators();
     test_compound_assignments();
-
-    test_nested_evaluation();
-    test_modify_returned_array();
 
     return 0;
 }

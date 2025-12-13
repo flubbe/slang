@@ -96,6 +96,12 @@ inline void replace_all(
     }
 }
 
+/** Same as `std::false_type`, but taking a parameter argument. */
+template<typename T>
+struct false_type : public std::false_type
+{
+};
+
 /**
  * Align a parameter according to the specified alignment.
  *

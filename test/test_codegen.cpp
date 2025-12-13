@@ -420,8 +420,9 @@ TEST(codegen, operators)
 
         codegen_ctx.generate_load(
           cg::lvalue{
-            cg::type{
-              mock_i32_type, cg::type_kind::i32},
+            {mock_i32_type, cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args[0].first});
         codegen_ctx.generate_const(
           {mock_i32_type, cg::type_kind::i32},
@@ -509,7 +510,9 @@ TEST(codegen, conditional_branch)
 
         codegen_ctx.generate_load(
           cg::lvalue{
-            cg::type{mock_i32_type, cg::type_kind::i32},
+            {mock_i32_type, cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args[0].first});
         codegen_ctx.generate_const({mock_i32_type, cg::type_kind::i32}, 1);
         codegen_ctx.generate_binary_op(cg::binary_op::op_equal, {mock_i32_type, cg::type_kind::i32});
@@ -634,10 +637,14 @@ TEST(codegen, locals_store)
         codegen_ctx.generate_load(
           cg::lvalue{
             cg::type{mock_i32_type, cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args[0].first});
         codegen_ctx.generate_store(
           cg::lvalue{
             cg::type{mock_i32_type, cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             local_id});
 
         codegen_ctx.generate_ret();
@@ -800,6 +807,8 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             local_id});
 
         codegen_ctx.generate_load(
@@ -807,12 +816,16 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             local_id});
         codegen_ctx.generate_load(
           cg::lvalue{
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args_f[0].first});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
@@ -881,12 +894,16 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args_g[0].first});
         codegen_ctx.generate_load(
           cg::lvalue{
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             args_g[1].first});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,
@@ -990,6 +1007,8 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             local_id});
 
         codegen_ctx.generate_load(
@@ -997,12 +1016,16 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             local_id});
         codegen_ctx.generate_load(
           cg::lvalue{
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args_f[0].first});
 
         const sema::scope_id mock_scope_id = co_ctx.push_scope(
@@ -1073,12 +1096,16 @@ TEST(codegen, invoke)
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 0},
             args_g[0].first});
         codegen_ctx.generate_load(
           cg::lvalue{
             cg::type{
               mock_i32_type,
               cg::type_kind::i32},
+            cg::variable_location_info{
+              .index = 1},
             args_g[1].first});
         codegen_ctx.generate_binary_op(
           cg::binary_op::op_mul,

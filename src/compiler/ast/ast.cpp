@@ -2579,7 +2579,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
         const auto& expr = exprs[i];
 
         // the top of the stack contains the array address.
-        ctx.generate_dup(array_type);
+        ctx.generate_dup(cg::rvalue{array_type});
         ctx.generate_const(
           {cg::type_kind::i32},
           static_cast<int>(i));
@@ -2842,7 +2842,7 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
-        ctx.generate_dup(struct_type);
+        ctx.generate_dup(cg::rvalue{struct_type});
 
         const auto& field_info = fields[i];
         const auto& initializer = initializers[i];
@@ -3053,7 +3053,7 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
-        ctx.generate_dup(struct_type);
+        ctx.generate_dup(cg::rvalue{struct_type});
 
         const auto& field_info = fields[i];
         const auto& initializer = initializers[i];
@@ -3353,9 +3353,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
         if(lhs->is_array_element_access())
         {
             // duplicate array address and index.
-            ctx.generate_dup2_x0(
-              {cg::type_kind::ref},
-              {cg::type_kind::i32});
+            ctx.generate_dup(*lhs_value);
         }
 
         ctx.generate_load(*lhs_value);
@@ -3433,7 +3431,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
     // we might need to duplicate the value for chained assignments.
     if(result_used)
     {
-        ctx.generate_dup(rhs_value->get_type());
+        ctx.generate_dup(*rhs_value);
     }
 
     ctx.generate_store(*lhs_value);
@@ -4331,7 +4329,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
         if(result_used)
         {
-            ctx.generate_dup(v->get_type());
+            ctx.generate_dup(*v);
         }
 
         ctx.generate_store(*v);
@@ -4384,7 +4382,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
         if(result_used)
         {
-            ctx.generate_dup(v->get_type());
+            ctx.generate_dup(*v);
         }
 
         ctx.generate_store(*v);
@@ -4820,7 +4818,7 @@ std::unique_ptr<expression> postfix_expression::clone() const
 void postfix_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    ar& expression_serializer{identifier};
+    ar& expression_serializer{expr};
     ar & op;
 }
 
@@ -4828,17 +4826,56 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    auto v = identifier->emit_lvalue(ctx);
-    ctx.generate_load(*v);
+    auto v = expr->emit_lvalue(ctx);
+    if(result_used)
+    {
+        std::visit(
+          [&v, &ctx](auto const& l) -> void
+          {
+              using T = std::decay_t<decltype(l)>;
+
+              if constexpr(std::is_same_v<T, cg::variable_location_info>)
+              {
+                  ctx.generate_load(*v);
+                  ctx.generate_dup(*v);
+              }
+              else if constexpr(std::is_same_v<T, cg::array_location_info>)
+              {
+                  // stack: [..., array_ref, array_index]
+                  ctx.generate_dup2_x0(
+                    {cg::type_kind::ref},
+                    {cg::type_kind::i32});    // stack: [..., array_ref, array_index, array_ref, array_index]
+                  ctx.generate_load(*v);      // stack: [..., array_ref, array_index, value]
+                  ctx.generate_dup_x2(
+                    v->get_type(),
+                    {cg::type_kind::ref},
+                    {cg::type_kind::i32});    // stack: [..., value, array_ref, array_index, value]
+              }
+              else if constexpr(std::is_same_v<T, cg::field_location_info>)
+              {
+                  // stack: [..., struct_ref]
+                  ctx.generate_dup(
+                    {cg::type_kind::ref});    // stack: [..., struct_ref, struct_ref]
+                  ctx.generate_load(*v);      // stack: [..., struct_ref, value]
+                  ctx.generate_dup_x1(
+                    v->get_type(),
+                    {cg::type_kind::ref});    // stack: [..., value, struct_ref, value]
+              }
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
+              }
+          },
+          v->get_location());
+    }
+    else
+    {
+        ctx.generate_load(*v);
+    }
 
     if(op.s == "++"
        || op.s == "--")
     {
-        if(result_used)
-        {
-            ctx.generate_dup(v->get_base().get_type());    // keep the value on the stack.
-        }
-
         auto type_kind = v->get_type().get_type_kind();
         if(type_kind == cg::type_kind::i8
            || type_kind == cg::type_kind::i16
@@ -4893,18 +4930,18 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
 void postfix_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
-    identifier->collect_names(ctx);
+    expr->collect_names(ctx);
 }
 
 std::optional<ty::type_id> postfix_expression::type_check(
   ty::context& ctx,
   sema::env& env)
 {
-    auto identifier_type = identifier->type_check(ctx, env);
+    auto identifier_type = expr->type_check(ctx, env);
     if(!identifier_type.has_value())
     {
         throw ty::type_error(
-          identifier->get_location(),
+          expr->get_location(),
           "Identifier has no type.");
     }
 
@@ -4916,7 +4953,7 @@ std::optional<ty::type_id> postfix_expression::type_check(
        && identifier_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
-          identifier->get_location(),
+          expr->get_location(),
           std::format(
             "Postfix operator '{}' can only operate on 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64' (found '{}').",
             op.s,
@@ -4931,7 +4968,7 @@ std::optional<ty::type_id> postfix_expression::type_check(
 
 std::string postfix_expression::to_string() const
 {
-    return std::format("Postfix(identifier={}, op=\"{}\")", identifier->to_string(), op.s);
+    return std::format("Postfix(expr={}, op=\"{}\")", expr->to_string(), op.s);
 }
 
 /*
