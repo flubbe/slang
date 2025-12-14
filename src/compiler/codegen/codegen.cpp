@@ -770,12 +770,10 @@ void context::generate_dup(const lvalue& v)
           }
           else
           {
-              // FIXME static_assert here
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
           }
       },
       v.get_location());
-
-    //    throw std::runtime_error("context::generate_dup");
 }
 
 void context::generate_dup_x1(type vt, type skip_type)
@@ -908,7 +906,7 @@ void context::generate_load(const lvalue& v)
           }
           else
           {
-              // FIXME static_assert here
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
           }
       },
       v.get_location());
@@ -1033,7 +1031,7 @@ void context::generate_store(const lvalue& v)
           }
           else
           {
-              // FIXME static_assert here
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
           }
       },
       v.get_location());

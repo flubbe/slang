@@ -357,15 +357,6 @@ public:
     std::size_t get_array_rank(type_id id) const;
 
     /**
-     * Resolve a type.
-     *
-     * @param name The name to be resolved.
-     * @returns Returns the type id.
-     * @throws Throws a `type_error` if the type could not be resolved.
-     */
-    type_id resolve_type(const std::string& name);
-
-    /**
      * Check whether an expression type is known, or it is known to have no type.
      *
      * @param expr The expression.

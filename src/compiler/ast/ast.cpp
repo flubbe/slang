@@ -1173,7 +1173,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(
     }
 
     // casts for struct types. this is checked at run-time.
-    expr_type = ctx.resolve_type(target_type->get_qualified_name());    // no array casts.
+    expr_type = ctx.get_type(target_type->get_qualified_name());    // no array casts.
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -4729,7 +4729,7 @@ std::optional<ty::type_id> new_expression::type_check(
 {
     type_expr->type_check(ctx, env);
 
-    type_expr_id = ctx.resolve_type(type_expr->get_qualified_name());
+    type_expr_id = ctx.get_type(type_expr->get_qualified_name());
     if(!type_expr_id.has_value())
     {
         throw ty::type_error(
@@ -5033,7 +5033,7 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
 
     for(const auto& arg: args)
     {
-        auto type = ctx.resolve_type(
+        auto type = ctx.get_type(
           std::get<2>(arg)->get_qualified_name());
         if(std::get<2>(arg)->is_array())
         {
@@ -5044,7 +5044,7 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
         env.type_map.insert({std::get<1>(arg), type});
     }
 
-    return_type_id = ctx.resolve_type(return_type->get_qualified_name());
+    return_type_id = ctx.get_type(return_type->get_qualified_name());
     if(return_type->is_array())
     {
         return_type_id = ctx.get_array(return_type_id, 1);
@@ -5725,7 +5725,7 @@ std::optional<ty::type_id> call_expression::type_check(
             }
         }
 
-        return_type = ctx.resolve_type(type_str);
+        return_type = ctx.get_type(type_str);
         if(desc.signature.return_type.is_array())
         {
             return_type = ctx.get_array(return_type, 1);
@@ -5756,7 +5756,7 @@ std::optional<ty::type_id> call_expression::type_check(
                 }
             }
 
-            auto expected_arg_type = ctx.resolve_type(type_str);
+            auto expected_arg_type = ctx.get_type(type_str);
             if(desc.signature.arg_types[i].is_array())
             {
                 expected_arg_type = ctx.get_array(expected_arg_type, 1);

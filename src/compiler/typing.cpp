@@ -533,12 +533,6 @@ std::size_t context::get_array_rank(type_id id) const
     return std::get<array_info>(it->second.data).rank;
 }
 
-// FIXME is this needed?
-type_id context::resolve_type(const std::string& name)
-{
-    return get_type(name);
-}
-
 bool context::has_expression_type(const ast::expression& expr) const
 {
     return expression_types.contains(&expr);
