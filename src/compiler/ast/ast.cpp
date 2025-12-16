@@ -4281,109 +4281,120 @@ bool unary_expression::is_pure(cg::context& ctx) const
     return operand->is_pure(ctx);
 }
 
+/**
+ * Add or subtract one to a value on the stack of a given type.
+ *
+ * @param ctx The codegen context.
+ * @param loc Source location of the add.
+ * @param ty Type to emit an add for.
+ * @param add Whether to add.
+ * @throws Throws a `cg::codegen_error` if the type is not one of `i8`, `i16`, `i32`, `i64`, `f32` or `f64`.
+ */
+static void emit_addsub_one(
+  cg::context& ctx,
+  source_location loc,
+  bool add,
+  cg::type ty)
+{
+    auto kind = ty.get_type_kind();
+
+    if(kind == cg::type_kind::i8
+       || kind == cg::type_kind::i16
+       || kind == cg::type_kind::i32)
+    {
+        ctx.generate_const(
+          {cg::type_kind::i32},
+          add
+            ? static_cast<std::int64_t>(1)
+            : static_cast<std::int64_t>(-1));
+    }
+    else if(kind == cg::type_kind::i64)
+    {
+        ctx.generate_const(
+          {cg::type_kind::i64},
+          add
+            ? static_cast<std::int64_t>(1)
+            : static_cast<std::int64_t>(-1));
+    }
+    else if(kind == cg::type_kind::f32
+            || kind == cg::type_kind::f64)
+    {
+        ctx.generate_const(ty, add ? 1.0 : -1.0);
+    }
+    else
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
+            ty.to_string()));
+    }
+
+    ctx.generate_binary_op(cg::binary_op::op_add, ty);
+}
+
 std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    if(op.s == "++")
+    if(op.s == "++" || op.s == "--")
     {
+        bool increment = op.s == "++";
+
         auto v = operand->emit_lvalue(ctx);
-        ctx.generate_load(*v);
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i8
-           || v->get_type().get_type_kind() == cg::type_kind::i16
-           || v->get_type().get_type_kind() == cg::type_kind::i32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i32},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i64},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f32},
-              1.0);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f64},
-              1.0);
-        }
-        else
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-                v->get_type().to_string()));
-        }
+        std::visit(
+          [&v, &ctx, result_used, increment, this](auto const& l) -> void
+          {
+              using T = std::decay_t<decltype(l)>;
 
-        ctx.generate_binary_op(cg::binary_op::op_add, v->get_type());
+              if constexpr(std::is_same_v<T, cg::variable_location_info>)
+              {
+                  ctx.generate_load(*v);
+                  emit_addsub_one(ctx, loc, increment, v->get_type());
+                  if(result_used)
+                  {
+                      ctx.generate_dup(*v);
+                  }
+              }
+              else if constexpr(std::is_same_v<T, cg::array_location_info>)
+              {
+                  // stack: [..., array_ref, array_index]
+                  ctx.generate_dup2_x0({cg::type_kind::ref}, {cg::type_kind::i32});    // stack: [..., array_ref, array_index, array_ref, array_index]
+                  ctx.generate_load(*v);                                               // stack: [..., array_ref, array_index, old_value]
+                  emit_addsub_one(ctx, loc, increment, v->get_type());                 // stack: [..., array_ref, array_index, new_value]
 
-        if(result_used)
-        {
-            ctx.generate_dup(*v);
-        }
+                  if(result_used)
+                  {
+                      ctx.generate_dup_x2(
+                        v->get_type(),
+                        {cg::type_kind::ref},
+                        {cg::type_kind::i32});
+                      // stack: [..., new_value, array_ref, array_index, new_value]
+                  }
+              }
+              else if constexpr(std::is_same_v<T, cg::field_location_info>)
+              {
+                  // stack: [..., struct_ref]
+                  ctx.generate_dup({cg::type_kind::ref});    // stack: [..., struct_ref, struct_ref]
+                  ctx.generate_load(*v);                     // stack: [..., struct_ref, old_value]
 
-        ctx.generate_store(*v);
+                  emit_addsub_one(ctx, loc, increment, v->get_type());    // stack: [..., struct_ref, new_value]
 
-        return std::make_unique<cg::rvalue>(
-          v->get_base());
-    }
-
-    if(op.s == "--")
-    {
-        auto v = operand->emit_lvalue(ctx);
-        ctx.generate_load(*v);
-
-        if(v->get_type().get_type_kind() == cg::type_kind::i8
-           || v->get_type().get_type_kind() == cg::type_kind::i16
-           || v->get_type().get_type_kind() == cg::type_kind::i32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i32},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i64},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f32},
-              1.0);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f64},
-              1.0);
-        }
-        else
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-                v->get_type().to_string()));
-        }
-
-        ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
-
-        if(result_used)
-        {
-            ctx.generate_dup(*v);
-        }
+                  if(result_used)
+                  {
+                      ctx.generate_dup_x1(
+                        v->get_type(),
+                        {cg::type_kind::ref});
+                      // stack: [..., new_value, struct_ref, new_value]
+                  }
+              }
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
+              }
+          },
+          v->get_location());
 
         ctx.generate_store(*v);
 
@@ -4879,10 +4890,17 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
         auto type_kind = v->get_type().get_type_kind();
         if(type_kind == cg::type_kind::i8
            || type_kind == cg::type_kind::i16
-           || type_kind == cg::type_kind::i32
-           || type_kind == cg::type_kind::i64)
+           || type_kind == cg::type_kind::i32)
         {
-            ctx.generate_const(v->get_type(), 1);
+            ctx.generate_const(
+              {cg::type_kind::i32},
+              static_cast<std::int64_t>(1));
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::i64},
+              static_cast<std::int64_t>(1));
         }
         else if(type_kind == cg::type_kind::f32
                 || type_kind == cg::type_kind::f64)
