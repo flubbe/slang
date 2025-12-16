@@ -224,6 +224,39 @@ fn test_nested_evaluation3() -> void {
     }
 }
 
+fn test_chained_assignments() -> void
+{
+    let x: i32;
+    let y: i32;
+    let z: i32;
+
+    x = y = 3;
+    std::assert(x == 3, "x == 3");
+    std::assert(y == 3, "y == 3");
+
+    z = x = y = 4;
+    std::assert(x == 4, "x == 4");
+    std::assert(y == 4, "y == 4");
+    std::assert(z == 4, "z == 4");
+}
+
+fn test_compound_assignments() -> void
+{
+    let x: i32 = 1;
+    x += 2;
+
+    std::assert(x == 3, "x == 3");
+
+    let a: [i32] = [0];
+    let y: i32;
+    
+    a[0] = 1; 
+    y = a[0] += 2; 
+
+    std::assert(a[0] == 3, "a[0] == 3");
+    std::assert(y == 3, "y == 3");
+}
+
 fn return_modified_input_i32(a: [i32]) -> [i32]
 {
     a[1] += -1;
@@ -280,6 +313,10 @@ fn main(args: [str]) -> i32 {
     test_nested_evaluation1();
     test_nested_evaluation2();
     test_nested_evaluation3();
+
+    test_chained_assignments();
+    test_compound_assignments();
+
     test_modify_returned_array();
 
     return 0;
