@@ -2683,7 +2683,7 @@ public:
 class postfix_expression : public expression
 {
     /** The operand. */
-    std::unique_ptr<expression> identifier;
+    std::unique_ptr<expression> expr;
 
     /** The operator. */
     token op;
@@ -2696,7 +2696,7 @@ public:
     postfix_expression() = default;
     postfix_expression(const postfix_expression& other)
     : super{other}
-    , identifier{other.identifier->clone()}
+    , expr{other.expr->clone()}
     , op{other.op}
     {
     }
@@ -2709,12 +2709,12 @@ public:
     /**
      * Construct a unary expression.
      *
-     * @param identifier The operand.
+     * @param expr The operand.
      * @param op The operator.
      */
-    postfix_expression(std::unique_ptr<expression> identifier, token op)
-    : expression{identifier->get_location()}
-    , identifier{std::move(identifier)}
+    postfix_expression(std::unique_ptr<expression> expr, token op)
+    : expression{expr->get_location()}
+    , expr{std::move(expr)}
     , op{std::move(op)}
     {
     }
@@ -2741,12 +2741,12 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return {identifier.get()};
+        return {expr.get()};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        return {identifier.get()};
+        return {expr.get()};
     }
 };
 

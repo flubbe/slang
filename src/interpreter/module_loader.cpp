@@ -596,7 +596,10 @@ void module_loader::decode()
             stack_size += decode_instruction(ar, instr, details, code);
             if(stack_size < 0)
             {
-                throw interpreter_error("Error during decode: Got negative stack size.");
+                throw interpreter_error(
+                  std::format(
+                    "Got negative stack size while decoding instruction '{}'.",
+                    to_string(static_cast<opcode>(instr))));
             }
 
             if(utils::numeric_cast<std::size_t>(stack_size) > max_stack_size)

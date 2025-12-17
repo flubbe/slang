@@ -302,7 +302,7 @@ void new_expression::resolve_names(rs::context& ctx)
 
 void postfix_expression::resolve_names(rs::context& ctx)
 {
-    identifier->resolve_names(ctx);
+    expr->resolve_names(ctx);
 }
 
 /*

@@ -29,8 +29,14 @@ namespace ld = slang::loader;
  * Exceptions.
  */
 
-codegen_error::codegen_error(const source_location& loc, const std::string& message)
-: std::runtime_error{std::format("{}: {}", to_string(loc), message)}
+codegen_error::codegen_error(
+  const source_location& loc,
+  const std::string& message)
+: std::runtime_error{
+    std::format(
+      "{}: {}",
+      to_string(loc),
+      message)}
 {
 }
 
@@ -240,7 +246,7 @@ std::string const_argument::to_string([[maybe_unused]] const name_resolver* reso
           s);
     }
 
-    throw codegen_error(std::format("Unrecognized const_argument type."));
+    throw codegen_error("Unrecognized const_argument type.");
 }
 
 /*
@@ -276,9 +282,13 @@ std::string basic_block::to_string(const name_resolver* resolver) const
     std::string buf = std::format("{}:\n", label);
     for(std::size_t i = 0; i < instrs.size() - 1; ++i)
     {
-        buf += std::format(" {}\n", instrs[i]->to_string(resolver));
+        buf += std::format(
+          " {}\n",
+          instrs[i]->to_string(resolver));
     }
-    buf += std::format(" {}", instrs.back()->to_string(resolver));
+    buf += std::format(
+      " {}",
+      instrs.back()->to_string(resolver));
     return buf;
 }
 
@@ -453,12 +463,6 @@ std::string function::to_string(const name_resolver* resolver) const
  * context.
  */
 
-/** Same as `std::false_type`, but taking a parameter argument. */
-template<typename T>
-struct false_type : public std::false_type
-{
-};
-
 /**
  * Maps `std::int32_t`, `float` and `std::string` to the corresponding
  * values in `module_::constant_type`.
@@ -482,7 +486,7 @@ constexpr module_::constant_type map_constant_type()
     }
     else
     {
-        static_assert(false_type<T>::value, "Unsupported constant type.");
+        static_assert(utils::false_type<T>::value, "Unsupported constant type.");
     }
 }
 
@@ -558,7 +562,8 @@ void context::set_insertion_point(basic_block* ip)
     }
 
     insertion_point = ip;
-    if(insertion_point != nullptr && insertion_point->get_inserting_context() != this)
+    if(insertion_point != nullptr
+       && insertion_point->get_inserting_context() != this)
     {
         insertion_point->set_inserting_context(this);
     }
@@ -571,15 +576,20 @@ void context::set_insertion_point(basic_block* ip)
 void context::generate_arraylength()
 {
     validate_insertion_point();
-    insertion_point->add_instruction(std::make_unique<instruction>("arraylength"));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>("arraylength"));
 }
 
 void context::generate_binary_op(binary_op op, const type& op_type)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<type_argument>(op_type));
-    insertion_point->add_instruction(std::make_unique<instruction>(codegen::to_string(op), std::move(args)));
+    args.emplace_back(
+      std::make_unique<type_argument>(op_type));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        codegen::to_string(op),
+        std::move(args)));
 }
 
 void context::generate_branch(basic_block* block)
@@ -593,7 +603,10 @@ void context::generate_branch(basic_block* block)
     auto arg = std::make_unique<label_argument>(block->get_label());
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
-    insertion_point->add_instruction(std::make_unique<instruction>("jmp", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "jmp",
+        std::move(args)));
 }
 
 void context::generate_cast(type_cast tc)
@@ -602,7 +615,10 @@ void context::generate_cast(type_cast tc)
     auto arg0 = std::make_unique<cast_argument>(tc);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
-    insertion_point->add_instruction(std::make_unique<instruction>("cast", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "cast",
+        std::move(args)));
 }
 
 void context::generate_checkcast(type target_type)
@@ -611,7 +627,10 @@ void context::generate_checkcast(type target_type)
     auto arg0 = std::make_unique<type_argument>(target_type);
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
-    insertion_point->add_instruction(std::make_unique<instruction>("checkcast", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "checkcast",
+        std::move(args)));
 }
 
 void context::generate_cond_branch(basic_block* then_block, basic_block* else_block)
@@ -628,7 +647,10 @@ void context::generate_cond_branch(basic_block* then_block, basic_block* else_bl
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg0));
     args.emplace_back(std::move(arg1));
-    insertion_point->add_instruction(std::make_unique<instruction>("jnz", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "jnz",
+        std::move(args)));
 }
 
 void context::generate_const(
@@ -679,20 +701,79 @@ void context::generate_const(
 void context::generate_const_null()
 {
     validate_insertion_point();
-    insertion_point->add_instruction(std::make_unique<instruction>("const_null", std::vector<std::unique_ptr<argument>>{}));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "const_null",
+        std::vector<std::unique_ptr<argument>>{}));
 }
 
-void context::generate_dup(type vt)
+void context::generate_dup(const rvalue& v)
 {
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(
       std::make_unique<type_class_argument>(
-        lowering_ctx.get_type_class(vt)));
+        lowering_ctx.get_type_class(v.get_type())));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "dup",
         std::move(args)));
+}
+
+void context::generate_dup(const lvalue& v)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+
+    std::visit(
+      [&v, &args, this](auto const& l) -> void
+      {
+          using T = std::decay_t<decltype(l)>;
+
+          if constexpr(std::is_same_v<T, variable_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_class_argument>(
+                  lowering_ctx.get_type_class(
+                    v.get_base().get_type())));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "dup",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, array_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_class_argument>(
+                  type_class::ref));
+              args.emplace_back(
+                std::make_unique<type_class_argument>(
+                  type_class::cat1));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "dup2_x0",
+                  std::move(args)));
+          }
+          else if constexpr(std::is_same_v<T, field_location_info>)
+          {
+              args.emplace_back(
+                std::make_unique<type_class_argument>(
+                  lowering_ctx.get_type_class(
+                    std::get<field_location_info>(v.get_location()).struct_type)));
+              args.emplace_back(
+                std::make_unique<type_class_argument>(
+                  type_class::cat1));
+              insertion_point->add_instruction(
+                std::make_unique<instruction>(
+                  "dup2_x0",
+                  std::move(args)));
+          }
+          else
+          {
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
+          }
+      },
+      v.get_location());
 }
 
 void context::generate_dup_x1(type vt, type skip_type)
@@ -764,7 +845,9 @@ void context::generate_invoke(function_argument f)
     validate_insertion_point();
 
     std::vector<std::unique_ptr<argument>> args;
-    args.emplace_back(std::make_unique<function_argument>(std::move(f)));
+    args.emplace_back(
+      std::make_unique<function_argument>(
+        std::move(f)));
     insertion_point->add_instruction(
       std::make_unique<instruction>(
         "invoke",
@@ -823,7 +906,7 @@ void context::generate_load(const lvalue& v)
           }
           else
           {
-              // FIXME static_assert here
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
           }
       },
       v.get_location());
@@ -845,7 +928,10 @@ void context::generate_newarray(const type& t)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(t));
-    insertion_point->add_instruction(std::make_unique<instruction>("newarray", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "newarray",
+        std::move(args)));
 }
 
 void context::generate_anewarray(const type& t)
@@ -853,7 +939,10 @@ void context::generate_anewarray(const type& t)
     validate_insertion_point();
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::make_unique<type_argument>(t));
-    insertion_point->add_instruction(std::make_unique<instruction>("anewarray", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "anewarray",
+        std::move(args)));
 }
 
 void context::generate_pop(const type& t)
@@ -862,7 +951,10 @@ void context::generate_pop(const type& t)
     std::vector<std::unique_ptr<argument>> args;
 
     args.emplace_back(std::make_unique<type_argument>(t));
-    insertion_point->add_instruction(std::make_unique<instruction>("pop", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "pop",
+        std::move(args)));
 }
 
 void context::generate_ret(std::optional<type> arg)
@@ -877,7 +969,10 @@ void context::generate_ret(std::optional<type> arg)
     {
         args.emplace_back(std::make_unique<type_argument>(*arg));
     }
-    insertion_point->add_instruction(std::make_unique<instruction>("ret", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "ret",
+        std::move(args)));
 }
 
 void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
@@ -887,7 +982,10 @@ void context::generate_set_field(std::unique_ptr<field_access_argument> arg)
     std::vector<std::unique_ptr<argument>> args;
     args.emplace_back(std::move(arg));
 
-    insertion_point->add_instruction(std::make_unique<instruction>("set_field", std::move(args)));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "set_field",
+        std::move(args)));
 }
 
 void context::generate_store(const lvalue& v)
@@ -933,7 +1031,7 @@ void context::generate_store(const lvalue& v)
           }
           else
           {
-              // FIXME static_assert here
+              static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
           }
       },
       v.get_location());
@@ -1040,7 +1138,9 @@ std::string context::to_string(const name_resolver* resolver) const
     {
         for(const auto& [id, info]: const_env.const_literal_map)
         {
-            buf += std::format("{}\n", print_constant(id, info));
+            buf += std::format(
+              "{}\n",
+              print_constant(id, info));
         }
 
         // don't append a newline if the constant table is the only non-empty buffer.
@@ -1061,9 +1161,13 @@ std::string context::to_string(const name_resolver* resolver) const
     {
         for(std::size_t i = 0; i < funcs.size() - 1; ++i)
         {
-            buf += std::format("{}\n", funcs[i]->to_string(resolver));
+            buf += std::format(
+              "{}\n",
+              funcs[i]->to_string(resolver));
         }
-        buf += std::format("{}", funcs.back()->to_string(resolver));
+        buf += std::format(
+          "{}",
+          funcs.back()->to_string(resolver));
     }
 
     return buf;

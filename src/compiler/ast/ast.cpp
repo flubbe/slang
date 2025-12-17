@@ -1173,7 +1173,7 @@ std::optional<ty::type_id> type_cast_expression::type_check(
     }
 
     // casts for struct types. this is checked at run-time.
-    expr_type = ctx.resolve_type(target_type->get_qualified_name());    // no array casts.
+    expr_type = ctx.get_type(target_type->get_qualified_name());    // no array casts.
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -2579,7 +2579,7 @@ std::unique_ptr<cg::rvalue> array_initializer_expression::emit_rvalue(
         const auto& expr = exprs[i];
 
         // the top of the stack contains the array address.
-        ctx.generate_dup(array_type);
+        ctx.generate_dup(cg::rvalue{array_type});
         ctx.generate_const(
           {cg::type_kind::i32},
           static_cast<int>(i));
@@ -2842,7 +2842,7 @@ std::unique_ptr<cg::rvalue> struct_anonymous_initializer_expression::emit_rvalue
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
-        ctx.generate_dup(struct_type);
+        ctx.generate_dup(cg::rvalue{struct_type});
 
         const auto& field_info = fields[i];
         const auto& initializer = initializers[i];
@@ -3053,7 +3053,7 @@ std::unique_ptr<cg::rvalue> struct_named_initializer_expression::emit_rvalue(
 
     for(std::size_t i = 0; i < initializers.size(); ++i)
     {
-        ctx.generate_dup(struct_type);
+        ctx.generate_dup(cg::rvalue{struct_type});
 
         const auto& field_info = fields[i];
         const auto& initializer = initializers[i];
@@ -3353,9 +3353,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
         if(lhs->is_array_element_access())
         {
             // duplicate array address and index.
-            ctx.generate_dup2_x0(
-              {cg::type_kind::ref},
-              {cg::type_kind::i32});
+            ctx.generate_dup(*lhs_value);
         }
 
         ctx.generate_load(*lhs_value);
@@ -3433,7 +3431,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
     // we might need to duplicate the value for chained assignments.
     if(result_used)
     {
-        ctx.generate_dup(rhs_value->get_type());
+        ctx.generate_dup(*rhs_value);
     }
 
     ctx.generate_store(*lhs_value);
@@ -4283,109 +4281,120 @@ bool unary_expression::is_pure(cg::context& ctx) const
     return operand->is_pure(ctx);
 }
 
+/**
+ * Add or subtract one to a value on the stack of a given type.
+ *
+ * @param ctx The codegen context.
+ * @param loc Source location of the add.
+ * @param ty Type to emit an add for.
+ * @param add Whether to add.
+ * @throws Throws a `cg::codegen_error` if the type is not one of `i8`, `i16`, `i32`, `i64`, `f32` or `f64`.
+ */
+static void emit_addsub_one(
+  cg::context& ctx,
+  source_location loc,
+  bool add,
+  cg::type ty)
+{
+    auto kind = ty.get_type_kind();
+
+    if(kind == cg::type_kind::i8
+       || kind == cg::type_kind::i16
+       || kind == cg::type_kind::i32)
+    {
+        ctx.generate_const(
+          {cg::type_kind::i32},
+          add
+            ? static_cast<std::int64_t>(1)
+            : static_cast<std::int64_t>(-1));
+    }
+    else if(kind == cg::type_kind::i64)
+    {
+        ctx.generate_const(
+          {cg::type_kind::i64},
+          add
+            ? static_cast<std::int64_t>(1)
+            : static_cast<std::int64_t>(-1));
+    }
+    else if(kind == cg::type_kind::f32
+            || kind == cg::type_kind::f64)
+    {
+        ctx.generate_const(ty, add ? 1.0 : -1.0);
+    }
+    else
+    {
+        throw cg::codegen_error(
+          loc,
+          std::format(
+            "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
+            ty.to_string()));
+    }
+
+    ctx.generate_binary_op(cg::binary_op::op_add, ty);
+}
+
 std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    if(op.s == "++")
+    if(op.s == "++" || op.s == "--")
     {
+        bool increment = op.s == "++";
+
         auto v = operand->emit_lvalue(ctx);
-        ctx.generate_load(*v);
 
-        if(v->get_type().get_type_kind() == cg::type_kind::i8
-           || v->get_type().get_type_kind() == cg::type_kind::i16
-           || v->get_type().get_type_kind() == cg::type_kind::i32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i32},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i64},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f32},
-              1.0);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f64},
-              1.0);
-        }
-        else
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-                v->get_type().to_string()));
-        }
+        std::visit(
+          [&v, &ctx, result_used, increment, this](auto const& l) -> void
+          {
+              using T = std::decay_t<decltype(l)>;
 
-        ctx.generate_binary_op(cg::binary_op::op_add, v->get_type());
+              if constexpr(std::is_same_v<T, cg::variable_location_info>)
+              {
+                  ctx.generate_load(*v);
+                  emit_addsub_one(ctx, loc, increment, v->get_type());
+                  if(result_used)
+                  {
+                      ctx.generate_dup(*v);
+                  }
+              }
+              else if constexpr(std::is_same_v<T, cg::array_location_info>)
+              {
+                  // stack: [..., array_ref, array_index]
+                  ctx.generate_dup2_x0({cg::type_kind::ref}, {cg::type_kind::i32});    // stack: [..., array_ref, array_index, array_ref, array_index]
+                  ctx.generate_load(*v);                                               // stack: [..., array_ref, array_index, old_value]
+                  emit_addsub_one(ctx, loc, increment, v->get_type());                 // stack: [..., array_ref, array_index, new_value]
 
-        if(result_used)
-        {
-            ctx.generate_dup(v->get_type());
-        }
+                  if(result_used)
+                  {
+                      ctx.generate_dup_x2(
+                        v->get_type(),
+                        {cg::type_kind::ref},
+                        {cg::type_kind::i32});
+                      // stack: [..., new_value, array_ref, array_index, new_value]
+                  }
+              }
+              else if constexpr(std::is_same_v<T, cg::field_location_info>)
+              {
+                  // stack: [..., struct_ref]
+                  ctx.generate_dup({cg::type_kind::ref});    // stack: [..., struct_ref, struct_ref]
+                  ctx.generate_load(*v);                     // stack: [..., struct_ref, old_value]
 
-        ctx.generate_store(*v);
+                  emit_addsub_one(ctx, loc, increment, v->get_type());    // stack: [..., struct_ref, new_value]
 
-        return std::make_unique<cg::rvalue>(
-          v->get_base());
-    }
-
-    if(op.s == "--")
-    {
-        auto v = operand->emit_lvalue(ctx);
-        ctx.generate_load(*v);
-
-        if(v->get_type().get_type_kind() == cg::type_kind::i8
-           || v->get_type().get_type_kind() == cg::type_kind::i16
-           || v->get_type().get_type_kind() == cg::type_kind::i32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i32},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::i64},
-              static_cast<std::int64_t>(1));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f32},
-              1.0);
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
-        {
-            ctx.generate_const(
-              {cg::type_kind::f64},
-              1.0);
-        }
-        else
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Wrong expression type '{}' for prefix operator '++'. Expected 'i32', 'i64', 'f32' or 'f64'.",
-                v->get_type().to_string()));
-        }
-
-        ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
-
-        if(result_used)
-        {
-            ctx.generate_dup(v->get_type());
-        }
+                  if(result_used)
+                  {
+                      ctx.generate_dup_x1(
+                        v->get_type(),
+                        {cg::type_kind::ref});
+                      // stack: [..., new_value, struct_ref, new_value]
+                  }
+              }
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
+              }
+          },
+          v->get_location());
 
         ctx.generate_store(*v);
 
@@ -4731,7 +4740,7 @@ std::optional<ty::type_id> new_expression::type_check(
 {
     type_expr->type_check(ctx, env);
 
-    type_expr_id = ctx.resolve_type(type_expr->get_qualified_name());
+    type_expr_id = ctx.get_type(type_expr->get_qualified_name());
     if(!type_expr_id.has_value())
     {
         throw ty::type_error(
@@ -4820,7 +4829,7 @@ std::unique_ptr<expression> postfix_expression::clone() const
 void postfix_expression::serialize(archive& ar)
 {
     super::serialize(ar);
-    ar& expression_serializer{identifier};
+    ar& expression_serializer{expr};
     ar & op;
 }
 
@@ -4828,24 +4837,70 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    auto v = identifier->emit_lvalue(ctx);
-    ctx.generate_load(*v);
+    auto v = expr->emit_lvalue(ctx);
+    if(result_used)
+    {
+        std::visit(
+          [&v, &ctx](auto const& l) -> void
+          {
+              using T = std::decay_t<decltype(l)>;
+
+              if constexpr(std::is_same_v<T, cg::variable_location_info>)
+              {
+                  ctx.generate_load(*v);
+                  ctx.generate_dup(*v);
+              }
+              else if constexpr(std::is_same_v<T, cg::array_location_info>)
+              {
+                  // stack: [..., array_ref, array_index]
+                  ctx.generate_dup2_x0(
+                    {cg::type_kind::ref},
+                    {cg::type_kind::i32});    // stack: [..., array_ref, array_index, array_ref, array_index]
+                  ctx.generate_load(*v);      // stack: [..., array_ref, array_index, value]
+                  ctx.generate_dup_x2(
+                    v->get_type(),
+                    {cg::type_kind::ref},
+                    {cg::type_kind::i32});    // stack: [..., value, array_ref, array_index, value]
+              }
+              else if constexpr(std::is_same_v<T, cg::field_location_info>)
+              {
+                  // stack: [..., struct_ref]
+                  ctx.generate_dup(
+                    {cg::type_kind::ref});    // stack: [..., struct_ref, struct_ref]
+                  ctx.generate_load(*v);      // stack: [..., struct_ref, value]
+                  ctx.generate_dup_x1(
+                    v->get_type(),
+                    {cg::type_kind::ref});    // stack: [..., value, struct_ref, value]
+              }
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported lvalue location type.");
+              }
+          },
+          v->get_location());
+    }
+    else
+    {
+        ctx.generate_load(*v);
+    }
 
     if(op.s == "++"
        || op.s == "--")
     {
-        if(result_used)
-        {
-            ctx.generate_dup(v->get_base().get_type());    // keep the value on the stack.
-        }
-
         auto type_kind = v->get_type().get_type_kind();
         if(type_kind == cg::type_kind::i8
            || type_kind == cg::type_kind::i16
-           || type_kind == cg::type_kind::i32
-           || type_kind == cg::type_kind::i64)
+           || type_kind == cg::type_kind::i32)
         {
-            ctx.generate_const(v->get_type(), 1);
+            ctx.generate_const(
+              {cg::type_kind::i32},
+              static_cast<std::int64_t>(1));
+        }
+        else if(type_kind == cg::type_kind::i64)
+        {
+            ctx.generate_const(
+              {cg::type_kind::i64},
+              static_cast<std::int64_t>(1));
         }
         else if(type_kind == cg::type_kind::f32
                 || type_kind == cg::type_kind::f64)
@@ -4893,18 +4948,18 @@ std::unique_ptr<cg::rvalue> postfix_expression::emit_rvalue(
 void postfix_expression::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
-    identifier->collect_names(ctx);
+    expr->collect_names(ctx);
 }
 
 std::optional<ty::type_id> postfix_expression::type_check(
   ty::context& ctx,
   sema::env& env)
 {
-    auto identifier_type = identifier->type_check(ctx, env);
+    auto identifier_type = expr->type_check(ctx, env);
     if(!identifier_type.has_value())
     {
         throw ty::type_error(
-          identifier->get_location(),
+          expr->get_location(),
           "Identifier has no type.");
     }
 
@@ -4916,7 +4971,7 @@ std::optional<ty::type_id> postfix_expression::type_check(
        && identifier_type.value() != ctx.get_f64_type())
     {
         throw ty::type_error(
-          identifier->get_location(),
+          expr->get_location(),
           std::format(
             "Postfix operator '{}' can only operate on 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64' (found '{}').",
             op.s,
@@ -4931,7 +4986,7 @@ std::optional<ty::type_id> postfix_expression::type_check(
 
 std::string postfix_expression::to_string() const
 {
-    return std::format("Postfix(identifier={}, op=\"{}\")", identifier->to_string(), op.s);
+    return std::format("Postfix(expr={}, op=\"{}\")", expr->to_string(), op.s);
 }
 
 /*
@@ -4996,7 +5051,7 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
 
     for(const auto& arg: args)
     {
-        auto type = ctx.resolve_type(
+        auto type = ctx.get_type(
           std::get<2>(arg)->get_qualified_name());
         if(std::get<2>(arg)->is_array())
         {
@@ -5007,7 +5062,7 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
         env.type_map.insert({std::get<1>(arg), type});
     }
 
-    return_type_id = ctx.resolve_type(return_type->get_qualified_name());
+    return_type_id = ctx.get_type(return_type->get_qualified_name());
     if(return_type->is_array())
     {
         return_type_id = ctx.get_array(return_type_id, 1);
@@ -5688,7 +5743,7 @@ std::optional<ty::type_id> call_expression::type_check(
             }
         }
 
-        return_type = ctx.resolve_type(type_str);
+        return_type = ctx.get_type(type_str);
         if(desc.signature.return_type.is_array())
         {
             return_type = ctx.get_array(return_type, 1);
@@ -5719,7 +5774,7 @@ std::optional<ty::type_id> call_expression::type_check(
                 }
             }
 
-            auto expected_arg_type = ctx.resolve_type(type_str);
+            auto expected_arg_type = ctx.get_type(type_str);
             if(desc.signature.arg_types[i].is_array())
             {
                 expected_arg_type = ctx.get_array(expected_arg_type, 1);

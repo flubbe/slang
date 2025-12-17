@@ -474,6 +474,11 @@ add_compile_exec_test(
     test/test_eval_subexpr
 )
 add_compile_exec_test(
+    "slang expressions"
+    TRUE
+    test/test_expressions
+)
+add_compile_exec_test(
     "slang integer wrap"
     TRUE
     test/test_integer_wrap

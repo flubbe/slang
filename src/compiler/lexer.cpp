@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "lexer.h"
+#include "utils.h"
 
 namespace slang
 {
@@ -58,9 +59,9 @@ static bool is_identifier(const std::optional<char>& c, bool first_char)
 
     if(first_char)
     {
-        return std::isalpha(*c) != 0 || *c == '_';
+        return utils::is_alpha(*c) || *c == '_';
     }
-    return std::isalnum(*c) != 0 || *c == '_';
+    return utils::is_alnum(*c) || *c == '_';
 }
 
 /**
@@ -388,7 +389,7 @@ std::optional<token> lexer::next()
                     current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
                 }
 
-                if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+                if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
                 {
                     throw lexical_error(
                       std::format(
@@ -445,7 +446,7 @@ std::optional<token> lexer::next()
 
             eval_token = current_token;
 
-            if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+            if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
             {
                 suffix_type type = [this, loc, &current_token]()
                 {
@@ -581,7 +582,7 @@ std::optional<token> lexer::next()
                 }
             }
 
-            if(peek().has_value() && std::isalpha(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+            if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
             {
                 throw lexical_error(
                   std::format(
