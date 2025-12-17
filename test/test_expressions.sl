@@ -8,6 +8,10 @@ struct S {
     arr: [i32]
 };
 
+struct Si16 {
+    arr: [i16]
+};
+
 struct T {
     s: S
 };
@@ -94,6 +98,51 @@ fn test_nested_evaluation1() -> void {
         std::assert(obj.arr[0] == 1, "obj.arr[0] == 1");
         std::assert(obj.arr[1] == 3, "obj.arr[1] == 3");
         std::assert(obj.arr[2] == 3, "obj.arr[2] == 3");
+        std::assert(i == 0, "i == 0");
+    }
+}
+
+fn test_nested_evaluation1_i16() -> void {
+    std::println("nested evaluations: objects / arrays 1 (i16)");
+
+    {
+        let obj: Si16 = Si16{
+            arr: [1i16, 2i16, 3i16]
+        };
+        let i: i32 = 1;
+
+        obj.arr[i++] += foo() as i16;
+
+        std::println(
+            std::format!(
+                "i = {} / obj.arr=[{}, {}, {}] / obj.arr.length = {},",
+                i,
+                obj.arr[0], obj.arr[1], obj.arr[2],
+                obj.arr.length));
+
+        std::assert(obj.arr[0] == 1i16, "obj.arr[0] == 1");
+        std::assert(obj.arr[1] == 1i16, "obj.arr[1] == 1");
+        std::assert(obj.arr[2] == 3i16, "obj.arr[2] == 3");
+        std::assert(i == 2, "i == 2");
+    }
+    {
+        let obj: Si16 = Si16{
+            arr: [1i16, 2i16, 3i16]
+        };
+        let i: i32 = 1;
+
+        obj.arr[i--] -= foo() as i16;
+
+        std::println(
+            std::format!(
+                "i = {} / obj.arr=[{}, {}, {}] / obj.arr.length = {},",
+                i,
+                obj.arr[0], obj.arr[1], obj.arr[2],
+                obj.arr.length));
+
+        std::assert(obj.arr[0] == 1i16, "obj.arr[0] == 1");
+        std::assert(obj.arr[1] == 3i16, "obj.arr[1] == 3");
+        std::assert(obj.arr[2] == 3i16, "obj.arr[2] == 3");
         std::assert(i == 0, "i == 0");
     }
 }
@@ -224,6 +273,83 @@ fn test_nested_evaluation3() -> void {
     }
 }
 
+fn test_nested_evaluation3_i8() -> void {
+    std::println("nested evaluations: arrays (i8)");
+
+    {
+        let y: i8;
+        let a: [i8] = [1i8, 2i8, 3i8];
+        let i: i32 = 0;
+
+        y = a[i]++;
+
+        std::println(
+            std::format!(
+                "i = {} / y = {} / a = [{}, {}, {}]",
+                i,
+                y,
+                a[0], a[1], a[2]));
+
+        std::assert(a[0] == 2i8, "a[0] == 2");
+        std::assert(a[1] == 2i8, "a[1] == 2");
+        std::assert(a[2] == 3i8, "a[2] == 3");
+        std::assert(y == 1i8, "y == 1");
+        std::assert(i == 0, "i == 0");
+
+        let z: i8;
+        z = ++a[i];
+
+        std::println(
+            std::format!(
+                "i = {} / z = {} / a = [{}, {}, {}]",
+                i,
+                z,
+                a[0], a[1], a[2]));
+
+        std::assert(a[0] == 3i8, "a[0] == 3");
+        std::assert(a[1] == 2i8, "a[1] == 2");
+        std::assert(a[2] == 3i8, "a[2] == 3");
+        std::assert(z == 3i8, "z == 3");
+        std::assert(i == 0, "i == 0");
+    }
+    {
+        let y: i8;
+        let a: [i8] = [1i8, 2i8, 3i8];
+        let i: i32 = 0;
+
+        y = a[i]--;
+
+        std::println(
+            std::format!(
+                "i = {} / y = {} / a = [{}, {}, {}]",
+                i,
+                y,
+                a[0], a[1], a[2]));
+
+        std::assert(a[0] == 0i8, "a[0] == 0");
+        std::assert(a[1] == 2i8, "a[1] == 2");
+        std::assert(a[2] == 3i8, "a[2] == 3");
+        std::assert(y == 1i8, "y == 1");
+        std::assert(i == 0, "i == 0");
+
+        let z: i8;
+        z = --a[i];
+
+        std::println(
+            std::format!(
+                "i = {} / z = {} / a = [{}, {}, {}]",
+                i,
+                z,
+                a[0], a[1], a[2]));
+
+        std::assert(a[0] == -1i8, "a[0] == -1");
+        std::assert(a[1] == 2i8, "a[1] == 2");
+        std::assert(a[2] == 3i8, "a[2] == 3");
+        std::assert(z == -1i8, "z == -1");
+        std::assert(i == 0, "i == 0");
+    }
+}
+
 fn test_chained_assignments() -> void
 {
     let x: i32;
@@ -313,6 +439,9 @@ fn main(args: [str]) -> i32 {
     test_nested_evaluation1();
     test_nested_evaluation2();
     test_nested_evaluation3();
+
+    test_nested_evaluation1_i16();
+    test_nested_evaluation3_i8();
 
     test_chained_assignments();
     test_compound_assignments();
