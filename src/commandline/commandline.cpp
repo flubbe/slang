@@ -11,6 +11,7 @@
 #include <format>
 
 #include "commandline.h"
+#include "strings.h"
 
 namespace slang::commandline
 {
@@ -40,7 +41,7 @@ void command::validate_name() const
 {
     for(const auto& c: name)
     {
-        if(c != '_' && (std::isalpha(c) == 0))
+        if(c != '_' && !is_alpha(c))
         {
             throw std::runtime_error(std::format("Invalid command name '{}'.", name));
         }
