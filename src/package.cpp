@@ -13,7 +13,7 @@
 #include <ranges>
 
 #include "package.h"
-#include "strings.h"
+#include "utils.h"
 
 namespace slang
 {
@@ -95,7 +95,7 @@ bool package::is_valid_name(const std::string& name)
 bool package::is_valid_name_component(const std::string& name)
 {
     char ch = name[0];
-    if(ch != '_' && !is_alpha(ch))
+    if(ch != '_' && !utils::is_alpha(ch))
     {
         return false;
     }
@@ -104,7 +104,7 @@ bool package::is_valid_name_component(const std::string& name)
       name | std::views::drop(1),
       [](char ch)
       {
-          return ch == '_' || is_alnum(ch);
+          return ch == '_' || utils::is_alnum(ch);
       });
 }
 
