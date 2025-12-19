@@ -367,9 +367,6 @@ void context::exec(
                 // destruct the locals here for the GC to clean them up.
                 ls.destruct();
 
-                // run garbage collector.
-                gc.run();
-
                 --call_stack_level;
                 return;
             }
@@ -2163,9 +2160,6 @@ value context::exec(
           "Invalid return opcode '{}' ({}).",
           to_string(return_type_class), static_cast<int>(return_type_class)));
     }
-
-    // invoke the garbage collector to clean up before returning.
-    gc.run();
 
     // verify that the stack is empty.
     if(!frame.stack.empty())

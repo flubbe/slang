@@ -25,6 +25,12 @@ namespace
 namespace si = slang::interpreter;
 namespace rt = slang::runtime;
 
+#define FINALIZE_GC(gc)               \
+    EXPECT_EQ(gc.root_set_size(), 0); \
+    gc.run();                         \
+    EXPECT_EQ(gc.object_count(), 0);  \
+    EXPECT_EQ(gc.byte_size(), 0);
+
 TEST(interpreter, module_and_functions)
 {
     slang::file_manager file_mgr;
@@ -74,9 +80,7 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg", {si::value{-100}}));
     EXPECT_EQ(*res.get<int>(), -99);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg2", {si::value{1.0f}}));
     EXPECT_NEAR(*res.get<float>(), 3.0, 1e-6);
@@ -85,9 +89,7 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "arg2", {si::value{0.f}}));
     EXPECT_NEAR(*res.get<float>(), 1.0, 1e-6);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "sid", {si::value{"Test"}}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
@@ -98,9 +100,7 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "call", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), 0);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "local", {si::value{0}}));
     EXPECT_EQ(*res.get<int>(), -1);
@@ -109,18 +109,14 @@ TEST(interpreter, module_and_functions)
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "local3", {}));
     EXPECT_EQ(*res.get<std::string>(), "Test");
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_i2f", {si::value{23}}));
     EXPECT_EQ(*res.get<float>(), 23.0);
     ASSERT_NO_THROW(res = ctx.invoke("test_output.bin", "cast_f2i", {si::value{92.3f}}));    // NOLINT(readability-magic-numbers)
     EXPECT_EQ(*res.get<int>(), 92);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 /**
@@ -299,9 +295,7 @@ TEST(interpreter, hello_world)
                                               []([[maybe_unused]] si::operand_stack& stack) {}),
                  si::interpreter_error);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, operators)
@@ -343,9 +337,7 @@ TEST(interpreter, operators)
     ASSERT_NO_THROW(res = ctx.invoke("operators", "mod", {si::value{127}, si::value{23}}));
     EXPECT_EQ(*res.get<int>(), 12);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, control_flow)
@@ -371,17 +363,13 @@ TEST(interpreter, control_flow)
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(ctx.invoke("control_flow", "conditional_hello_world", {si::value{2.2f}}));    // NOLINT(readability-magic-numbers)
     ASSERT_EQ(print_buf.size(), 2);
     EXPECT_EQ(print_buf.back(), "World, hello!\n");
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     print_buf.clear();
     ASSERT_NO_THROW(ctx.invoke("control_flow", "no_else", {si::value{1}}));
@@ -394,9 +382,7 @@ TEST(interpreter, control_flow)
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf[0], "Test\n");
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, loops)
@@ -420,9 +406,7 @@ TEST(interpreter, loops)
         EXPECT_EQ(it, "Hello, World!\n");
     }
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, loop_break_continue)
@@ -448,9 +432,7 @@ TEST(interpreter, loop_break_continue)
     ASSERT_EQ(print_buf.size(), 1);
     EXPECT_EQ(print_buf.back(), "Hello, World!\n");
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, infinite_recursion)
@@ -465,9 +447,7 @@ TEST(interpreter, infinite_recursion)
 
     ASSERT_THROW(res = ctx.invoke("inf_recursion", "inf", {}), si::interpreter_error);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, arrays)
@@ -483,16 +463,12 @@ TEST(interpreter, arrays)
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "f", {}));
     EXPECT_EQ(*res.get<int>(), 2);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_NO_THROW(res = ctx.invoke("arrays", "g", {}));
     EXPECT_EQ(*res.get<int>(), 3);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, return_arrays)
@@ -516,11 +492,7 @@ TEST(interpreter, return_arrays)
     EXPECT_EQ((*v)[1], 2);
 
     ASSERT_NO_THROW(ctx.get_gc().remove_temporary(v));
-    ASSERT_NO_THROW(ctx.get_gc().run());
-
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, pass_array)
@@ -539,9 +511,7 @@ TEST(interpreter, pass_array)
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "f", {si::value{std::vector<int>{1, 2}}}));
     EXPECT_EQ(*res.get<int>(), 2);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, invalid_index)
@@ -578,11 +548,7 @@ TEST(interpreter, return_str_array)
         EXPECT_EQ(*(*array)[2], "123");
 
         ASSERT_NO_THROW(ctx.get_gc().remove_temporary(array));
-        ASSERT_NO_THROW(ctx.get_gc().run());
-
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "ret_str", {}));
@@ -591,9 +557,7 @@ TEST(interpreter, return_str_array)
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "call_return", {}));
     EXPECT_EQ(*res.get<int>(), 1);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, array_length)
@@ -609,9 +573,7 @@ TEST(interpreter, array_length)
     ASSERT_NO_THROW(res = ctx.invoke("array_length", "len", {}));
     EXPECT_EQ(*res.get<int>(), 2);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_THROW(ctx.invoke("array_length", "len2", {}), si::interpreter_error);
 }
@@ -635,9 +597,7 @@ TEST(interpreter, array_copy)
     ASSERT_NO_THROW(res = ctx.invoke("array_copy", "test_copy_str", {}));
     ASSERT_EQ(*res.get<int>(), 1);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_none", {}), si::interpreter_error);
     ASSERT_THROW(ctx.invoke("array_copy", "test_copy_fail_type", {}), si::interpreter_error);
@@ -659,9 +619,7 @@ TEST(interpreter, string_operations)
     ASSERT_NO_THROW(res = ctx.invoke("string_operations", "main", {}));
     ASSERT_EQ(*res.get<int>(), 10);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, operator_new)
@@ -676,9 +634,7 @@ TEST(interpreter, operator_new)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_array", "new_array", {}));
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 
     ASSERT_THROW(ctx.invoke("return_array", "new_array_invalid_size", {}), si::interpreter_error);
 }
@@ -710,9 +666,7 @@ TEST(interpreter, prefix_postfix)
     ASSERT_NO_THROW(res = ctx.invoke("prefix_postfix", "postfix_sub_f32", {si::value{1.f}}));
     ASSERT_EQ(*res.get<float>(), 1.f);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, return_discard)
@@ -727,9 +681,7 @@ TEST(interpreter, return_discard)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard", "f", {}));
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, return_discard_array)
@@ -744,9 +696,7 @@ TEST(interpreter, return_discard_array)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_array", "f", {}));
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, return_discard_strings)
@@ -761,9 +711,7 @@ TEST(interpreter, return_discard_strings)
 
     ASSERT_NO_THROW(res = ctx.invoke("return_discard_strings", "f", {}));
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, structs)
@@ -812,9 +760,7 @@ TEST(interpreter, structs)
 
     ASSERT_NO_THROW(ctx.resolve_module("structs"));
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, structs_access)
@@ -831,9 +777,7 @@ TEST(interpreter, structs_access)
         ASSERT_NO_THROW(res = ctx.invoke("structs_access", "test", {}));
         EXPECT_EQ(*res.get<int>(), 4);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -847,9 +791,7 @@ TEST(interpreter, structs_access)
         ASSERT_NO_THROW(res = ctx.invoke("structs_access2", "test", {}));
         EXPECT_EQ(*res.get<int>(), 2);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -863,9 +805,7 @@ TEST(interpreter, structs_access)
         ASSERT_NO_THROW(res = ctx.invoke("structs_access2", "test_local", {}));
         EXPECT_EQ(*res.get<int>(), 4);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -876,9 +816,7 @@ TEST(interpreter, structs_access)
 
         ASSERT_NO_THROW(ctx.invoke("structs_references", "test", {}));
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -889,9 +827,7 @@ TEST(interpreter, structs_access)
 
         ASSERT_THROW(ctx.invoke("null_dereference", "test", {}), si::interpreter_error);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -925,11 +861,7 @@ TEST(interpreter, returned_struct)
         EXPECT_EQ(*s->s, "test");
 
         ctx.get_gc().remove_temporary(s);
-        ctx.get_gc().run();
-
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -970,11 +902,7 @@ TEST(interpreter, struct_argument)
 
         // collect `s.s`.
         ctx.get_gc().remove_root(s.s);
-        ctx.get_gc().run();
-
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -989,9 +917,7 @@ TEST(interpreter, nested_structs)
 
         ASSERT_NO_THROW(ctx.invoke("nested_structs", "test", {}));
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -1005,9 +931,7 @@ TEST(interpreter, nested_structs)
 
         EXPECT_EQ(*res.get<int>(), 2);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -1025,9 +949,7 @@ TEST(interpreter, type_imports)
 
         EXPECT_EQ(*res.get<int>(), 2);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -1043,9 +965,7 @@ TEST(interpreter, null_access)
         ASSERT_NO_THROW(ctx.resolve_module("null_access"));
         ASSERT_THROW(res = ctx.invoke("null_access", "main", {}), si::interpreter_error);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 
@@ -1063,9 +983,7 @@ TEST(interpreter, multiple_modules)
     ASSERT_NO_THROW(res = ctx.invoke("mod3", "f", {si::value{1.0f}}));
     EXPECT_EQ(*res.get<int>(), 4);
 
-    EXPECT_EQ(ctx.get_gc().object_count(), 0);
-    EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-    EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+    FINALIZE_GC(ctx.get_gc());
 }
 
 TEST(interpreter, invocation_api)
@@ -1083,9 +1001,7 @@ TEST(interpreter, invocation_api)
         ASSERT_NO_THROW(res = si::invoke(ctx, "mod3", "f", 1.0f));
         EXPECT_EQ(*res.get<int>(), 4);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
     {
         slang::file_manager file_mgr;
@@ -1101,9 +1017,7 @@ TEST(interpreter, invocation_api)
         ASSERT_NO_THROW(res = si::invoke(f, 1.0f));
         EXPECT_EQ(*res.get<int>(), 4);
 
-        EXPECT_EQ(ctx.get_gc().object_count(), 0);
-        EXPECT_EQ(ctx.get_gc().root_set_size(), 0);
-        EXPECT_EQ(ctx.get_gc().byte_size(), 0);
+        FINALIZE_GC(ctx.get_gc());
     }
 }
 

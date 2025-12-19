@@ -66,17 +66,19 @@ static void validate_main_signature(const si::function& main_function, bool verb
 }
 
 /**
- * Check if the garbage collector is finalized / cleaned up.
+ * Finalize garbage collection.
  *
  * @param gc The garbage collector.
  * @param verbose Whether to enable verbose logging.
  */
-static void check_finalized_gc(gc::garbage_collector& gc, bool verbose)
+static void finalize_gc(gc::garbage_collector& gc, bool verbose)
 {
     if(verbose)
     {
-        std::println("Info: Checking GC cleanup.");
+        std::println("Info: Finalizing GC.");
     }
+
+    gc.run();
 
     if(gc.object_count() != 0)
     {
@@ -216,7 +218,7 @@ void run::invoke(const std::vector<std::string>& args)
         std::println("Program exited with exit code {}.", *return_value);
     }
 
-    check_finalized_gc(ctx.get_gc(), verbose);
+    finalize_gc(ctx.get_gc(), verbose);
 }
 
 std::string run::get_description() const
