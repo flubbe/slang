@@ -4278,7 +4278,9 @@ void unary_expression::serialize(archive& ar)
 
 bool unary_expression::is_pure(cg::context& ctx) const
 {
-    return operand->is_pure(ctx);
+    return op.s != "++"
+           && op.s != "--"
+           && operand->is_pure(ctx);
 }
 
 /**
@@ -4398,8 +4400,13 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
         ctx.generate_store(*v);
 
-        return std::make_unique<cg::rvalue>(
-          v->get_base());
+        if(result_used)
+        {
+            return std::make_unique<cg::rvalue>(
+              v->get_base());
+        }
+
+        return nullptr;
     }
 
     // Evaluate constant subexpressions.
