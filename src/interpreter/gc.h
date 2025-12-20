@@ -354,8 +354,20 @@ class garbage_collector
     /** Reference-counted persistent objects. */
     std::unordered_map<void*, gc_persistent_object> persistent_objects;
 
-    /** Allocated bytes. */
+    /** Total allocated bytes. */
     std::size_t allocated_bytes{0};
+
+    /** Allocated bytes since last GC run. */
+    std::size_t allocated_bytes_since_gc{0};
+
+    /** Minimal threshold when to trigger GC run. */
+    std::size_t gc_run_min_thresold_bytes{1 * 1024 * 1024};
+
+    /** Threshold when to trigger GC run. */
+    std::size_t gc_run_threshold_bytes{1 * 1024 * 1024};
+
+    /** Growth factor for the live set that triggers a GC run. */
+    float gc_run_growth_factor = 2.0f;
 
     /** Type layouts. */
     std::unordered_map<std::size_t, std::pair<std::string, std::vector<std::size_t>>> type_layouts;
@@ -378,13 +390,29 @@ class garbage_collector
 
 public:
     /** Defaulted and deleted constructors. */
-    garbage_collector() = default;
     garbage_collector(const garbage_collector&) = delete;
     garbage_collector(garbage_collector&&) = default;
 
     /** Defaulted and deleted assignment operators. */
     garbage_collector& operator=(const garbage_collector&) = delete;
     garbage_collector& operator=(garbage_collector&&) = default;
+
+    /**
+     * Construct a garbage collector.
+     *
+     * @param min_threshold_bytes Minimal threshold when to trigger GC run.
+     * @param threshold_bytes Threshold when to trigger GC run.
+     * @param growth_factor Growth factor for the live set that triggers a GC run.
+     */
+    garbage_collector(
+      std::size_t min_thresold_bytes = 1 * 1024 * 1024,
+      std::size_t threshold_bytes = 1 * 1024 * 1024,
+      float growth_factor = 2.0f)
+    : gc_run_min_thresold_bytes{min_thresold_bytes}
+    , gc_run_threshold_bytes{threshold_bytes}
+    , gc_run_growth_factor{growth_factor}
+    {
+    }
 
     /** Destructor. */
     ~garbage_collector()
@@ -427,6 +455,12 @@ public:
       bool add = true)
     {
         allocated_bytes += sizeof(T);
+        allocated_bytes_since_gc += sizeof(T);
+
+        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
+        {
+            run();
+        }
 
         T* obj = new T;
         if(objects.find(obj) != objects.end())
@@ -466,6 +500,12 @@ public:
       bool add = true)
     {
         allocated_bytes += size;
+        allocated_bytes_since_gc += size;
+
+        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
+        {
+            run();
+        }
 
         void* obj = new(std::align_val_t{alignment}) std::byte[size]();    // This also performs zero-initialization.
         if(objects.find(obj) != objects.end())
@@ -508,6 +548,7 @@ public:
         objects.insert({array, gc_object::from(array, flags, nullptr)});
 
         allocated_bytes += sizeof(si::fixed_vector<T>);
+        allocated_bytes_since_gc += sizeof(si::fixed_vector<T>);
 
         if(flags & gc_object::of_temporary)
         {
@@ -542,6 +583,7 @@ public:
         objects.insert({array, gc_object::from(array, flags, &layout_it->second.second)});
 
         allocated_bytes += sizeof(si::fixed_vector<void*>);
+        allocated_bytes_since_gc += sizeof(si::fixed_vector<void*>);
 
         if(flags & gc_object::of_temporary)
         {
@@ -699,6 +741,30 @@ public:
     std::size_t byte_size() const
     {
         return allocated_bytes;
+    }
+
+    /** Allocated bytes since last GC run. */
+    std::size_t byte_size_since_gc() const
+    {
+        return allocated_bytes_since_gc;
+    }
+
+    /** Minimal allocated bytes that trigger a GC run. */
+    std::size_t min_threshold_bytes() const
+    {
+        return gc_run_min_thresold_bytes;
+    }
+
+    /** Threshold when to trigger GC run. */
+    std::size_t threshold_bytes() const
+    {
+        return gc_run_threshold_bytes;
+    }
+
+    /** Growth factor for the live set that triggers a GC run. */
+    float growth_factor() const
+    {
+        return gc_run_growth_factor;
     }
 };
 

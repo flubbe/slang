@@ -275,4 +275,37 @@ void atan(si::context& ctx, si::operand_stack& stack);
  */
 void atan2(si::context& ctx, si::operand_stack& stack);
 
+/*
+ * Garbage collector interface.
+ */
+
+namespace gci
+{
+
+/** Run the garbage collector. */
+void run(si::context& ctx, si::operand_stack& stack);
+
+/** Get the object count. */
+void object_count(si::context& ctx, si::operand_stack& stack);
+
+/** Get the root set size. */
+void root_set_size(si::context& ctx, si::operand_stack& stack);
+
+/** Get allocated bytes. */
+void allocated_bytes(si::context& ctx, si::operand_stack& stack);
+
+/** Get allocated bytes since last GC run. */
+void allocated_bytes_since_gc(si::context& ctx, si::operand_stack& stack);
+
+/** Minimal allocated bytes that trigger GC run. */
+void min_threshold_bytes(si::context& ctx, si::operand_stack& stack);
+
+/** Threshold when to trigger GC run. */
+void threshold_bytes(si::context& ctx, si::operand_stack& stack);
+
+/** Growth factor for the live set that triggers a GC run. */
+void growth_factor(si::context& ctx, si::operand_stack& stack);
+
+}    // namespace gci
+
 }    // namespace slang::runtime

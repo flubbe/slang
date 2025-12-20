@@ -304,6 +304,12 @@ void garbage_collector::run()
             objects.size()));
     }
 
+    // set threshold for next run
+    gc_run_threshold_bytes = std::max(
+      gc_run_min_thresold_bytes,
+      static_cast<std::size_t>(allocated_bytes * gc_run_growth_factor));
+    allocated_bytes_since_gc = 0;
+
 #ifdef GC_DEBUG
     GC_LOG("run: {} -> {}, {} bytes allocated", object_set_size, objects.size(), allocated_bytes);
     GC_LOG("----- objects -----");
@@ -341,6 +347,17 @@ void garbage_collector::reset()
     objects.clear();
 
     GC_LOG("reset {} -> 0", object_count);
+
+#ifdef GC_DEBUG
+    if(allocated_bytes > 0)
+    {
+        GC_LOG("allocated bytes after reset: {}", allocated_bytes);
+    }
+#endif
+
+    allocated_bytes = 0;
+    allocated_bytes_since_gc = 0;
+    gc_run_threshold_bytes = 0;
 }
 
 void* garbage_collector::add_persistent(

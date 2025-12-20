@@ -3464,6 +3464,7 @@ public:
       std::unique_ptr<expression> expr)
     : expr{std::move(expr)}
     {
+        loc = this->expr->get_location();
     }
 
     [[nodiscard]]
