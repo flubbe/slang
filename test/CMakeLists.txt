@@ -362,6 +362,7 @@ add_executable(test_interpreter
     ../src/archives/file.cpp
     ../src/runtime/arrays.cpp
     ../src/runtime/debug.cpp
+    ../src/runtime/gc.cpp
     ../src/runtime/math.cpp
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
@@ -411,6 +412,17 @@ set_tests_properties(
     "build std (default, compile)" 
     PROPERTIES FIXTURES_SETUP 
     needs_std
+)
+
+add_compile_test(
+    "build gc"
+    FALSE
+    src/lang/gc -o lang/gc
+)
+set_tests_properties(
+    "build gc (default, compile)" 
+    PROPERTIES FIXTURES_SETUP 
+    needs_gc
 )
 
 add_compile_exec_test(
@@ -698,6 +710,34 @@ set_tests_properties(
     "slang test_import (--no-eval-const-subexpr, run)" 
     PROPERTIES FIXTURES_REQUIRED 
     example_package_hello
+)
+
+#
+# GC interface test.
+#
+
+add_my_test("slang gc interface (default, compile)" ${CMAKE_BINARY_DIR}/slang compile test/test_gc_interface)
+set_tests_properties(
+    "slang gc interface (default, compile)"
+    PROPERTIES
+    FIXTURES_SETUP "slang gc interface (default, compile)"
+)
+add_my_test("slang gc interface (default, run)" ${CMAKE_BINARY_DIR}/slang run test/test_gc_interface)
+set_tests_properties(
+    "slang gc interface (default, run)"
+    PROPERTIES
+    FIXTURES_REQUIRED "slang gc interface (default, compile)"
+)
+
+set_tests_properties(
+    "slang gc interface (default, compile)"
+    PROPERTIES 
+    FIXTURES_REQUIRED needs_gc
+)
+set_tests_properties(
+    "slang gc interface (default, run)"
+    PROPERTIES 
+    FIXTURES_REQUIRED needs_gc
 )
 
 #
