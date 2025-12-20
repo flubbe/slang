@@ -1356,7 +1356,7 @@ void instruction_emitter::emit_instruction(
           opcode::pop,
           opcode::pop2,
           opcode::apop,
-          opcode::apop);    // same instruction for i32 and f32.
+          opcode::apop);
     }
     else if(name == "cast")
     {

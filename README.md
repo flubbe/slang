@@ -1,8 +1,8 @@
 # Scripting Language
 
 This repository is for learning how to build a scripting language, that is, a compiler
-and an interpreter. It is far from complete and I am working on aspects of it every once
-in a while.
+and an interpreter. The current iteration of the language should be fairly feature complete,
+though it is certainly rough around the edges.
 
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline)) 
 provides these commands:
