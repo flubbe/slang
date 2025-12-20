@@ -24,8 +24,12 @@ namespace ty = slang::typing;
  * Verify size assumptions for arrays.
  */
 
+static_assert(sizeof(fixed_vector<std::int8_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::int16_t>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::int32_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::int64_t>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<double>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
