@@ -129,6 +129,68 @@ const named_expression* expression::as_named_expression() const
     throw std::runtime_error("Expression is not a named expression.");
 }
 
+std::unique_ptr<cg::rvalue> expression::try_emit_const_eval_result(
+  cg::context& ctx) const
+{
+    // Evaluate constant subexpressions.
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        auto info = const_eval_it->second;
+
+        if(info.type == const_::constant_type::i32)
+        {
+            const auto back_end_type = cg::type_kind::i32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::i64)
+        {
+            const auto back_end_type = cg::type_kind::i64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<std::int64_t>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f32)
+        {
+            const auto back_end_type = cg::type_kind::f32;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        if(info.type == const_::constant_type::f64)
+        {
+            const auto back_end_type = cg::type_kind::f64;
+
+            ctx.generate_const(
+              {back_end_type},
+              std::get<double>(info.value));
+
+            return std::make_unique<cg::rvalue>(back_end_type);
+        }
+
+        std::println(
+          "{}: Warning: Attempted constant expression computation failed.",
+          ::slang::to_string(loc));
+    }
+
+    return {};
+}
+
 std::optional<const_::const_info> expression::evaluate(
   [[maybe_unused]] ty::context& ctx,
   [[maybe_unused]] const_::env& env) const
@@ -3285,60 +3347,10 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
   bool result_used) const
 {
     // Evaluate constant subexpressions.
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    if(std::unique_ptr<cg::rvalue> v;
+       (v = try_emit_const_eval_result(ctx)) != nullptr)
     {
-        auto info = const_eval_it->second;
-
-        if(info.type == const_::constant_type::i32)
-        {
-            const auto back_end_type = cg::type_kind::i32;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::i64)
-        {
-            const auto back_end_type = cg::type_kind::i64;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f32)
-        {
-            const auto back_end_type = cg::type_kind::f32;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f64)
-        {
-            const auto back_end_type = cg::type_kind::f64;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        std::println(
-          "{}: Warning: Attempted constant expression computation failed.",
-          ::slang::to_string(loc));
-        // fall-through
+        return v;
     }
 
     std::unique_ptr<cg::rvalue> rhs_value;
@@ -3956,60 +3968,10 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
     }
 
     // Evaluate constant subexpressions.
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(this);
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    if(std::unique_ptr<cg::rvalue> v;
+       (v = try_emit_const_eval_result(ctx)) != nullptr)
     {
-        auto info = const_eval_it->second;
-
-        if(info.type == const_::constant_type::i32)
-        {
-            const auto back_end_type = cg::type_kind::i32;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::i64)
-        {
-            const auto back_end_type = cg::type_kind::i64;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f32)
-        {
-            const auto back_end_type = cg::type_kind::f32;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f64)
-        {
-            const auto back_end_type = cg::type_kind::f64;
-
-            ctx.generate_const(
-              {back_end_type},
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        std::println(
-          "{}: Warning: Attempted constant expression computation failed.",
-          ::slang::to_string(loc));
-        // fall-through
+        return v;
     }
 
     lhs_value = lhs->emit_rvalue(ctx, true);
@@ -4410,60 +4372,10 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
     }
 
     // Evaluate constant subexpressions.
-    auto it = ctx.get_const_env().const_eval_expr_values.find(this);
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && it != ctx.get_const_env().const_eval_expr_values.cend())
+    if(std::unique_ptr<cg::rvalue> v;
+       (v = try_emit_const_eval_result(ctx)) != nullptr)
     {
-        const auto& info = it->second;
-
-        if(info.type == const_::constant_type::i32)
-        {
-            const auto back_end_type = cg::type{cg::type_kind::i32};
-
-            ctx.generate_const(
-              back_end_type,
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::i64)
-        {
-            const auto back_end_type = cg::type{cg::type_kind::i64};
-
-            ctx.generate_const(
-              back_end_type,
-              std::get<std::int64_t>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f32)
-        {
-            const auto back_end_type = cg::type{cg::type_kind::f32};
-
-            ctx.generate_const(
-              back_end_type,
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        if(info.type == const_::constant_type::f64)
-        {
-            const auto back_end_type = cg::type{cg::type_kind::f64};
-
-            ctx.generate_const(
-              back_end_type,
-              std::get<double>(info.value));
-
-            return std::make_unique<cg::rvalue>(back_end_type);
-        }
-
-        std::println(
-          "{}: Warning: Attempted constant expression computation failed.",
-          ::slang::to_string(loc));
-        // fall-through
+        return v;
     }
 
     if(op.s == "+")
@@ -5891,64 +5803,10 @@ void return_statement::generate_code(
     if(expr)
     {
         // Evaluate constant subexpressions.
-        auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(expr.get());
-        if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-           && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+        if(std::unique_ptr<cg::rvalue> v;
+           (v = try_emit_const_eval_result(ctx)) != nullptr)
         {
-            auto info = const_eval_it->second;
-
-            if(info.type == const_::constant_type::i32)
-            {
-                const auto back_end_type = cg::type_kind::i32;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<std::int64_t>(info.value));
-
-                ctx.generate_ret({back_end_type});
-                return;
-            }
-
-            if(info.type == const_::constant_type::i64)
-            {
-                const auto back_end_type = cg::type_kind::i64;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<std::int64_t>(info.value));
-
-                ctx.generate_ret({back_end_type});
-                return;
-            }
-
-            if(info.type == const_::constant_type::f32)
-            {
-                const auto back_end_type = cg::type_kind::f32;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<double>(info.value));
-
-                ctx.generate_ret({back_end_type});
-                return;
-            }
-
-            if(info.type == const_::constant_type::f64)
-            {
-                const auto back_end_type = cg::type_kind::f64;
-
-                ctx.generate_const(
-                  {back_end_type},
-                  std::get<double>(info.value));
-
-                ctx.generate_ret({back_end_type});
-                return;
-            }
-
-            std::println(
-              "{}: Warning: Attempted constant expression computation failed.",
-              ::slang::to_string(loc));
-            // fall-through
+            ctx.generate_ret(v->get_type());
         }
 
         auto v = expr->emit_rvalue(ctx, true);
