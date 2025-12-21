@@ -27,7 +27,7 @@ macro q! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::println(std::format!("pi_2: {f}", pi_2!()));
     

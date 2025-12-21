@@ -488,17 +488,11 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
       parse_expression());
 }
 
-std::unique_ptr<ast::type_expression> parser::parse_type()
+std::unique_ptr<ast::type_expression> parser::parse_type(
+  bool parse_array_suffix)
 {
     bool is_array_type{false};
     auto location = current_token->location;
-
-    if(current_token->s == "[")
-    {
-        // parse array definition.
-        get_next_token();
-        is_array_type = true;
-    }
 
     if(current_token->type != token_type::identifier)
     {
@@ -532,10 +526,24 @@ std::unique_ptr<ast::type_expression> parser::parse_type()
         get_next_token();
     }
 
-    if(current_token->s == "]"
-       && is_array_type)
+    // parse array suffix.
+    if(parse_array_suffix)
     {
-        get_next_token();
+        if(current_token->s == "[")
+        {
+            get_next_token();
+            is_array_type = true;
+
+            if(current_token->s != "]")
+            {
+                throw syntax_error(
+                  *current_token,
+                  std::format(
+                    "Expected ']', got '{}'.",
+                    current_token->s));
+            }
+            get_next_token();
+        }
     }
 
     validate_base_type(components.back());
@@ -1180,7 +1188,7 @@ std::unique_ptr<ast::expression> parser::parse_new()
     auto location = current_token->location;
     get_next_token();
 
-    auto type_expr = parse_type();
+    auto type_expr = parse_type(false);
     if(current_token->s != "[")
     {
         throw syntax_error(

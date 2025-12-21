@@ -12,7 +12,7 @@ macro sum! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     let s: i32 = sum!(1);
     return 0;

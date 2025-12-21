@@ -1,6 +1,6 @@
 import std;
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     let r: std::result = std::result{
         ok: 1, 
         value: std::i32s{value: 123} as std::type

@@ -60,7 +60,7 @@ static void validate_main_signature(const si::function& main_function, bool verb
     if(sig.arg_types[0].base_type() != "str" || !sig.arg_types[0].is_array())
     {
         throw std::runtime_error(std::format(
-          "Invalid parameter type for 'main'. Expected parameter of type '[str]', got '{}'.",
+          "Invalid parameter type for 'main'. Expected parameter of type 'str[]', got '{}'.",
           slang::module_::to_string(sig.arg_types[0])));
     }
 }

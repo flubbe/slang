@@ -1,6 +1,6 @@
 import std;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     let s1: str = "Hello";
     let s2: str = "World";

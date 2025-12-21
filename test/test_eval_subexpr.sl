@@ -1,6 +1,6 @@
 import std;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     let s: i32 = 1*2 + 3;
 

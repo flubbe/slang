@@ -7,7 +7,7 @@ macro test! {
     };
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     let x: i32 = 1;
     x;
     1;

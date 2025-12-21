@@ -7,7 +7,7 @@ struct T {
     l: test_structs::L
 };
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     // Test imported types and functions.
     let s: test_structs::L = test_structs::create_node("Test");

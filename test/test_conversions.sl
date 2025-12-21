@@ -5,7 +5,7 @@ fn test(i: i32, f: f64) -> i32
     return i + f as i32;
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::assert(test(1, -1.234) == 0, "test(1, -1.234) == 0");
     std::assert(-0.23 as i32 + 4 == 4, "-0.23 as i32 + 4 == 4");

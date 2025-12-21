@@ -14,7 +14,7 @@ fn f() -> i32
     return 0;
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     std::assert(f() == 12, "f() == 12");
 
     return 0;

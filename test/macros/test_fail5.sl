@@ -10,7 +10,7 @@ macro var_use! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     var_decl!();
     var_use!();

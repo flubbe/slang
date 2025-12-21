@@ -5,11 +5,11 @@ struct R {
 };
 
 struct S {
-    arr: [i32]
+    arr: i32[]
 };
 
 struct Si16 {
-    arr: [i16]
+    arr: i16[]
 };
 
 struct T {
@@ -201,7 +201,7 @@ fn test_nested_evaluation3() -> void {
 
     {
         let y: i32;
-        let a: [i32] = [1, 2, 3];
+        let a: i32[] = [1, 2, 3];
         let i: i32 = 0;
 
         y = a[i]++;
@@ -237,7 +237,7 @@ fn test_nested_evaluation3() -> void {
     }
     {
         let y: i32;
-        let a: [i32] = [1, 2, 3];
+        let a: i32[] = [1, 2, 3];
         let i: i32 = 0;
 
         y = a[i]--;
@@ -278,7 +278,7 @@ fn test_nested_evaluation3_i8() -> void {
 
     {
         let y: i8;
-        let a: [i8] = [1i8, 2i8, 3i8];
+        let a: i8[] = [1i8, 2i8, 3i8];
         let i: i32 = 0;
 
         y = a[i]++;
@@ -314,7 +314,7 @@ fn test_nested_evaluation3_i8() -> void {
     }
     {
         let y: i8;
-        let a: [i8] = [1i8, 2i8, 3i8];
+        let a: i8[] = [1i8, 2i8, 3i8];
         let i: i32 = 0;
 
         y = a[i]--;
@@ -373,7 +373,7 @@ fn test_compound_assignments() -> void
 
     std::assert(x == 3, "x == 3");
 
-    let a: [i32] = [0];
+    let a: i32[] = [0];
     let y: i32;
     
     a[0] = 1; 
@@ -383,19 +383,19 @@ fn test_compound_assignments() -> void
     std::assert(y == 3, "y == 3");
 }
 
-fn return_modified_input_i32(a: [i32]) -> [i32]
+fn return_modified_input_i32(a: i32[]) -> i32[]
 {
     a[1] += -1;
     return a;
 }
 
-fn return_modified_input_i8(a: [i8]) -> [i8]
+fn return_modified_input_i8(a: i8[]) -> i8[]
 {
     a[1] += -1i8;
     return a;
 }
 
-fn generate_array_i32() -> [i32]
+fn generate_array_i32() -> i32[]
 {
     return new i32[3];
 }
@@ -404,7 +404,7 @@ fn test_modify_returned_array() -> void
 {
     std::println("modify returned array: i8");
 
-    let a: [i8] = [1i8, 2i8, 3i8];
+    let a: i8[] = [1i8, 2i8, 3i8];
     return_modified_input_i8(a)[0] -= 1i8;
 
     std::println(
@@ -418,7 +418,7 @@ fn test_modify_returned_array() -> void
 
     std::println("modify returned array: i32");
 
-    let b: [i32] = [1, 2, 3];
+    let b: i32[] = [1, 2, 3];
     return_modified_input_i32(b)[0] += 1;
 
     std::println(
@@ -434,7 +434,7 @@ fn test_modify_returned_array() -> void
     generate_array_i32()[0] = 13;
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     test_nested_evaluation0();
     test_nested_evaluation1();
     test_nested_evaluation2();

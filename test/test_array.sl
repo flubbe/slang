@@ -1,7 +1,7 @@
 import std;
 
 fn test_builtin() -> void {
-    let strs: [str] = [
+    let strs: str[] = [
         "This", "is", "a", "loop!"
     ];
 
@@ -17,7 +17,7 @@ fn test_builtin() -> void {
 }
 
 fn test_custom() -> void {
-    let arr: [std::i32s] = new std::i32s[2];
+    let arr: std::i32s[] = new std::i32s[2];
 
     std::assert(arr.length == 2, "arr.length == 2");
 
@@ -41,12 +41,12 @@ fn g(i: i32) -> i32 {
     return i + 1;
 }
 
-fn f(n: i32) -> [std::i32s] {
+fn f(n: i32) -> std::i32s[] {
     return new std::i32s[g(n) + 2];
 }
 
 fn test_custom2() -> void {
-    let arr: [std::i32s] = f(3);
+    let arr: std::i32s[] = f(3);
     std::assert(arr.length == 6, "arr.length == 6");
 
     let i: i32 = 0;
@@ -75,7 +75,7 @@ struct L{
 };
 
 fn test_local() -> void {
-    let arr: [L] = new L[3];
+    let arr: L[] = new L[3];
     arr[0] = L{1, 2.0 as f32};
     arr[1] = L{2, 3.0 as f32};
     arr[2] = L{3, 4.0 as f32};
@@ -90,12 +90,12 @@ fn test_local() -> void {
 }
 
 fn test_array_copy() -> void {
-    let arr1: [L] = new L[3];
+    let arr1: L[] = new L[3];
     arr1[0] = L{1, 2.0 as f32};
     arr1[1] = L{2, 3.0 as f32};
     arr1[2] = L{3, 4.0 as f32};
 
-    let arr2: [L] = new L[3];
+    let arr2: L[] = new L[3];
     std::array_copy(arr1, arr2);
 
     std::assert(arr1 != arr2, "arr1 != arr2");
@@ -108,7 +108,7 @@ fn test_array_copy() -> void {
     std::assert(arr1[2].f == arr2[2].f, "arr1[2].f == arr2[2].f");
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     test_builtin();
     test_custom();
     test_custom2();

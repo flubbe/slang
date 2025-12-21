@@ -44,7 +44,7 @@ fn test_overflow() -> void {
     }
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     test_underflow();
     test_overflow();
 

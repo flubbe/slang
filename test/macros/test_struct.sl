@@ -20,7 +20,7 @@ macro n! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     return m!() + n!();
 }

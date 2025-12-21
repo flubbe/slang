@@ -6,6 +6,6 @@ macro missing_import! {
     };
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     return 0;
 }

@@ -202,9 +202,9 @@ fn test_f32_binary_operators() -> void
 }
 
 fn test_compound_assignments() -> void {
-    std::println("compound assignments: [i32]/i32");
+    std::println("compound assignments: i32[]/i32");
 
-    let x: [i32] = [0, 0, 0];
+    let x: i32[] = [0, 0, 0];
     let i: i32 = 0;
 
     x[i += 1] += 2;
@@ -219,7 +219,7 @@ fn test_compound_assignments() -> void {
     std::assert(x[2] == 0, "x[2] == 0");
     std::assert(i == 1, "i == 1");
 
-    std::println("compound assignments: [i32]/i8");
+    std::println("compound assignments: i32[]/i8");
 
     x[0] = 0;
     x[1] = 0;
@@ -238,9 +238,9 @@ fn test_compound_assignments() -> void {
     std::assert(x[2] == 0, "x[2] == 0");
     std::assert(j == 1i8, "j == 1");
 
-    std::println("compound assignments: [i16]/i32");
+    std::println("compound assignments: i16[]/i32");
 
-    let y: [i16] = [1i16, 2i16, 3i16];
+    let y: i16[] = [1i16, 2i16, 3i16];
     i = 0;
 
     y[(i += 1) + 1] += 2i16;
@@ -256,7 +256,7 @@ fn test_compound_assignments() -> void {
     std::assert(i == 1, "i == 1");
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     test_i32_binary_operators();
     test_i32_unary_operators();
     test_i64_binary_operators();

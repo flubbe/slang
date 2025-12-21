@@ -4,7 +4,7 @@ macro var_use! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     let s: i32 = 0;
     var_use!();

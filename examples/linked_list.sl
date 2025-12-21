@@ -30,7 +30,7 @@ fn print(node: L) -> void
     }
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     let root: L = L{data: "root", next: null};
 
