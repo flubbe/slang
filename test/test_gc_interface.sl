@@ -1,7 +1,7 @@
 import std;
 import gc;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::println(
         std::format!(

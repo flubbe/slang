@@ -40,7 +40,7 @@ fn test_trigonometric_functions() -> void
     approx_eq(std::atan2(7.0 as f32, -0.0 as f32), (std::PI/2.0) as f32, "atan2(7, -0) == PI/2");
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     test_trigonometric_functions();
 

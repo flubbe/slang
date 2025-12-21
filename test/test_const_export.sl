@@ -12,7 +12,7 @@ const T_TEST: i32 = T == 7;
 const S: i32 = 1 << 2;
 const S_TEST: i32 = S == 4;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::assert(T_TEST == 1, "T_TEST == 1");
     std::assert(S_TEST == 1, "S_TEST == 1");

@@ -24,7 +24,7 @@ macro rec2! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::assert(rec!() == 1, "rec!() == 1");
     std::assert(rec!(1) == 2, "rec!(1) == 2");

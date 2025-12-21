@@ -12,7 +12,7 @@ fn second() -> void {
     third();
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     first();
     return 0;
 }

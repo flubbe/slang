@@ -341,6 +341,15 @@ public:
     }
 
     /**
+     * Emit the result of constant evaluation for this expression, if available.
+     *
+     * @param ctx The codegen context.
+     * @returns Returns the evaluation result r-value, or `nullptr` if no value was emitted.
+     */
+    std::unique_ptr<cg::rvalue> try_emit_const_eval_result(
+      cg::context& ctx) const;
+
+    /**
      * Return whether this expression is pure, i.e. if it has no side effects.
      *
      * @param ctx The context in which to check.

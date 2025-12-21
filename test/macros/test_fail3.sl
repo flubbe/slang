@@ -4,7 +4,7 @@ macro var_decl! {
     };
 }
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     var_decl!();
     s = 0; // s is not declared

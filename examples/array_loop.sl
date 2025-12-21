@@ -1,7 +1,7 @@
 import std;
 
-fn main(args: [str]) -> i32 {
-    let strs: [str] = [
+fn main(args: str[]) -> i32 {
+    let strs: str[] = [
         "This", "is", "a", "loop!"
     ];
 

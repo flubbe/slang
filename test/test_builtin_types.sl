@@ -80,7 +80,7 @@ fn test_literal_suffixes() -> void {
 }
 
 fn test_builtin_arrays() -> void {
-    let arr_i8: [i8] = new i8[2];
+    let arr_i8: i8[] = new i8[2];
     std::assert(arr_i8.length == 2, "arr_i8.length == 2");
 
     arr_i8[0] = 1i8;
@@ -88,7 +88,7 @@ fn test_builtin_arrays() -> void {
     std::assert(arr_i8[0] == 1i8, "arr_i8[0] == 1i8");
     std::assert(arr_i8[1] == 2i8, "arr_i8[1] == 2i8");
 
-    let arr_i16: [i16] = new i16[3];
+    let arr_i16: i16[] = new i16[3];
     std::assert(arr_i16.length == 3, "arr_i16.length == 3");
 
     arr_i16[0] = (-1) as i16;
@@ -98,13 +98,13 @@ fn test_builtin_arrays() -> void {
     std::assert(arr_i16[1] == 123 as i16, "arr_i16[0] == 123 as i16");
     std::assert(arr_i16[2] == 3 as i16, "arr_i16[0] == 3 as i16");
 
-    let arr_i32: [i32] = new i32[1];
+    let arr_i32: i32[] = new i32[1];
     std::assert(arr_i32.length == 1, "arr_i32.length == 1");
 
     arr_i32[0] = 761;
     std::assert(arr_i32[0] == 761, "arr_i32[0] == 761");
 
-    let arr_i64: [i64] = new i64[5];
+    let arr_i64: i64[] = new i64[5];
     std::assert(arr_i64.length == 5, "arr_i64.length == 1");
 
     arr_i64[0] = 762i64;
@@ -116,7 +116,7 @@ fn test_builtin_arrays() -> void {
     std::assert(arr_i64[2] == -764i64, "arr_i64[2] == -764i64");
     std::assert(arr_i64[3] == -762i64, "arr_i64[3] == -762i64");
 
-    let arr_f32: [f32] = new f32[2];
+    let arr_f32: f32[] = new f32[2];
     std::assert(arr_f32.length == 2, "arr_f32.length == 2");
 
     arr_f32[0] = 1.23f32;
@@ -124,7 +124,7 @@ fn test_builtin_arrays() -> void {
     std::assert(arr_f32[0] == 1.23f32, "arr_f32[0] == 1.23f32");
     std::assert(arr_f32[1] == -1 as f32, "arr_f32[1] == -1 as f32");
 
-    let arr_f64: [f64] = new f64[3];
+    let arr_f64: f64[] = new f64[3];
     std::assert(arr_f64.length == 3, "arr_f64.length == 3");
 
     arr_f64[0] = 3.23f64;
@@ -212,7 +212,7 @@ fn test_unary_operators() -> void {
     );
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     let a: i8 = 3 as i8;
 
     test_i8();

@@ -12,7 +12,7 @@ macro test_macro! {
     };
 }
 
-fn main(args: [str]) -> i32 {
+fn main(args: str[]) -> i32 {
     std::assert(test_import::two!() == 2, "test_import::two!() == 2");
 
     test_import::test!();

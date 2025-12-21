@@ -544,7 +544,7 @@ TEST(lexer, example_program)
         const std::string test_string =
           "import std;\n"
           "\n"
-          "fn main(args: [str]) -> i32\n"
+          "fn main(args: str[]) -> i32\n"
           "{\n"
           "\tstd::print(\"Hello, World!\\n\");\n"
           "}";

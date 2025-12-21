@@ -812,9 +812,9 @@ TEST(type_system, arrays)
 {
     {
         const std::string test_input =
-          "fn array_init() -> [i32]\n"
+          "fn array_init() -> i32[]\n"
           "{\n"
-          " let b: [i32] = [1, 2, 3];\n"
+          " let b: i32[] = [1, 2, 3];\n"
           " return b;\n"
           "}\n";
 
@@ -853,7 +853,7 @@ TEST(type_system, arrays)
         const std::string test_input =
           "fn array_init_wrong_type() -> i32\n"
           "{\n"
-          " let b: [i32] = [\"s\"];\n"    // wrong type
+          " let b: i32[] = [\"s\"];\n"    // wrong type
           " return b;\n"
           "}\n";
 
@@ -888,7 +888,7 @@ TEST(type_system, arrays)
         const std::string test_input =
           "fn array_init_wrong_type() -> i32\n"
           "{\n"
-          " let b: [i32] = [1, \"s\"];\n"    // inconsistent types
+          " let b: i32[] = [1, \"s\"];\n"    // inconsistent types
           " return b;\n"
           "}\n";
 
@@ -927,7 +927,7 @@ TEST(type_system, arrays)
         const std::string test_input =
           "fn array_init_wrong_type() -> i32\n"
           "{\n"
-          " let b: [i32] = new i32[2];\n"
+          " let b: i32[] = new i32[2];\n"
           " return b;\n"    // does not match return type
           "}\n";
 
@@ -960,9 +960,9 @@ TEST(type_system, arrays)
     }
     {
         const std::string test_input =
-          "fn array_init_wrong_type() -> [i32]\n"
+          "fn array_init_wrong_type() -> i32[]\n"
           "{\n"
-          " let b: [i32] = new T[2];\n"    // unknown type
+          " let b: i32[] = new T[2];\n"    // unknown type
           " return b;\n"
           "}\n";
 
@@ -995,9 +995,9 @@ TEST(type_system, arrays)
     }
     {
         const std::string test_input =
-          "fn array_init_wrong_type() -> [i32]\n"
+          "fn array_init_wrong_type() -> i32[]\n"
           "{\n"
-          " let b: [i32] = new i32[2.123];\n"    // invalid size type
+          " let b: i32[] = new i32[2.123];\n"    // invalid size type
           " return b;\n"
           "}\n";
 
@@ -1869,7 +1869,7 @@ TEST(type_system, examples)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(args: [str]) -> i32\n"
+          "fn main(args: str[]) -> i32\n"
           "{\n"
           "\tstd::println(\"Hello, World!\");\n"
           "\treturn 0;\n"

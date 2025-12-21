@@ -2464,7 +2464,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> void\n"
           "{\n"
-          " let b: [i32] = [1, 2];\n"
+          " let b: i32[] = [1, 2];\n"
           "}";
 
         slang::lexer lexer;
@@ -2517,9 +2517,9 @@ TEST(compile_ir, arrays)
     {
         // test: array definition and read access
         const std::string test_input =
-          "fn f() -> [i32]\n"
+          "fn f() -> i32[]\n"
           "{\n"
-          " let b: [i32] = [1, 2];\n"
+          " let b: i32[] = [1, 2];\n"
           " return b;\n"
           "}";
 
@@ -2574,7 +2574,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
+          " let b: i32[];\n"
           " b = new i32[2];\n"
           " b[1] = 2;\n"
           " return b[0];\n"
@@ -2629,7 +2629,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
+          " let b: i32[];\n"
           " b = new i32[2];\n"
           " b[0] = b[1] = 2;\n"
           " return b[0];\n"
@@ -2688,7 +2688,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
+          " let b: i32[];\n"
           " b = new i32;\n"    // missing size
           " b[1] = 2;\n"
           " return b[0];\n"
@@ -2705,7 +2705,7 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
+          " let b: i32[];\n"
           " b = new i32[];\n"    // missing size
           " b[1] = 2;\n"
           " return b[0];\n"
@@ -2722,8 +2722,8 @@ TEST(compile_ir, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
-          " b = new [i32];\n"    // invalid type
+          " let b: i32[];\n"
+          " b = new i32[];\n"    // invalid type
           " b[1] = 2;\n"
           " return b[0];\n"
           "}";

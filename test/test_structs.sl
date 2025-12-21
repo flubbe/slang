@@ -94,7 +94,7 @@ fn test_std_structs() -> void
  * test main.
  */
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     test_struct();
     test_linked_list();

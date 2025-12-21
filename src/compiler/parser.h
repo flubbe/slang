@@ -150,9 +150,10 @@ protected:
     /**
      * Parse a type.
      *
+     * @param parse_array_suffix Whether to parse the array suffix.
      * @return Returns a type expression.
      * */
-    std::unique_ptr<ast::type_expression> parse_type();
+    std::unique_ptr<ast::type_expression> parse_type(bool parse_array_suffix = true);
 
     /** Parse an array initializer expression. */
     std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();

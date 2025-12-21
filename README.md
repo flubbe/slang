@@ -71,7 +71,7 @@ A simple _Hello, World_ application looks like
 ```
 import std;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::println("Hello, World!");
     return 0;

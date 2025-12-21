@@ -12,7 +12,7 @@ algorithm, and the language is single-threaded.
 // Import the standard library.
 import std;
 
-fn main(args: [str]) -> i32
+fn main(args: str[]) -> i32
 {
     std::println("Hello, World!");
     return 0;
@@ -129,7 +129,11 @@ Ignoring comments, a program consists of:
 
             Unary `+` (identity), `-` (negation) and `!` (logical not, only for `i32`) apply to a single operand.
 
-        6. Assignments:
+        6. Pre-/postfix increments and decrements:
+
+            `++`, `--` can be applied as prefix and postfix operators to `i8, i16, i32, i64, f32, f64`.
+
+        7. Assignments:
             ```
             <target> = <expression>;
             ```
@@ -215,10 +219,10 @@ Built-in types are
 - `i8`, `i16`, `i32`, `i64`: Integers with bit widths of 8, 16, 32, and 64.
 - `f32`, `f64`: 32 and 64 bit wide floating-point numbers.
 - `str`: A string.
-- Arrays are declared as `let <name>: [<type>];`. They are of fixed length, and the length
+- Arrays are declared as `let <name>: <type>[];`. They are of fixed length, and the length
     can be accessed with `<name>.length`. A new array can be defined as
     ```
-    let <name>: [<type>] = new <type>[<size>];
+    let <name>: <type>[] = new <type>[<size>];
     ```
     **Note:** Arrays are one-dimensional.
 

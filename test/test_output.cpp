@@ -307,7 +307,7 @@ TEST(output, hello_world)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(args: [str]) -> i32\n"
+          "fn main(args: str[]) -> i32\n"
           "{\n"
           "\tstd::println(\"Hello, World!\");\n"
           "\treturn 0;\n"
@@ -362,7 +362,7 @@ TEST(output, hello_world)
         const std::string test_input =
           "import std;\n"
           "\n"
-          "fn main(args: [str]) -> i32\n"
+          "fn main(args: str[]) -> i32\n"
           "{\n"
           "\tlang::println(\"Hello, World!\");\n"    // wrong function path
           "\treturn 0;\n"
@@ -485,7 +485,7 @@ TEST(output, operators)
     }
     {
         const std::string test_input =
-          "fn main() -> [i32]\n"
+          "fn main() -> i32[]\n"
           "{\n"
           "\treturn 1 + 2;\n"
           "}";
@@ -999,12 +999,12 @@ TEST(output, arrays)
         const std::string test_input =
           "fn f() -> i32\n"
           "{\n"
-          " let b: [i32] = [1, 2];\n"
+          " let b: i32[] = [1, 2];\n"
           " return b[1];\n"
           "}\n"
           "fn g() -> i32\n"
           "{\n"
-          " let b: [i32] = [-1, 0, f()];\n"
+          " let b: i32[] = [-1, 0, f()];\n"
           " b[1] = 3;\n"
           " return b[1];\n"
           "}";
@@ -1054,33 +1054,33 @@ TEST(output, arrays)
     }
     {
         const std::string test_input =
-          "fn return_array() -> [i32]\n"
+          "fn return_array() -> i32[]\n"
           "{\n"
-          " let b: [i32] = [1, 2];\n"
+          " let b: i32[] = [1, 2];\n"
           " return b;\n"
           "}\n"
           "fn pass_array() -> i32\n"
           "{\n"
-          " let b: [i32] = [2, 3];\n"
+          " let b: i32[] = [2, 3];\n"
           " return f(b);\n"
           "}\n"
-          "fn f(a: [i32]) -> i32\n"
+          "fn f(a: i32[]) -> i32\n"
           "{\n"
           " return a[1];\n"
           "}\n"
           "fn invalid_index() -> i32\n"
           "{\n"
-          " let b: [i32] = [0, 1];\n"
+          " let b: i32[] = [0, 1];\n"
           " return b[3];\n"
           "}\n"
-          "fn str_array() -> [str]\n"
+          "fn str_array() -> str[]\n"
           "{\n"
-          " let s: [str] = [\"a\", \"test\", \"123\"];\n"
+          " let s: str[] = [\"a\", \"test\", \"123\"];\n"
           " return s;\n"
           "}\n"
           "fn ret_str() -> str\n"
           "{\n"
-          " let s: [str] = [\"a\", \"test\", \"123\"];\n"
+          " let s: str[] = [\"a\", \"test\", \"123\"];\n"
           " return s[2];\n"
           "}\n"
           "fn call_return() -> i32\n"
@@ -1089,13 +1089,13 @@ TEST(output, arrays)
           "}\n"
           "fn new_array() -> void\n"
           "{\n"
-          " let b: [i32] = new i32[2];\n"
+          " let b: i32[] = new i32[2];\n"
           " b[0] = 1;\n"
           " b[1] = 10;\n"
           "}\n"
           "fn new_array_invalid_size() -> void\n"
           "{\n"
-          " let b: [i32] = new i32[-1];\n"
+          " let b: i32[] = new i32[-1];\n"
           "}\n";
 
         slang::lexer lexer;
@@ -1143,9 +1143,9 @@ TEST(output, arrays)
     }
     {
         const std::string test_input =
-          "fn return_array() -> [i32]\n"
+          "fn return_array() -> i32[]\n"
           "{\n"
-          " let b: [i32] = [1, 2];\n"
+          " let b: i32[] = [1, 2];\n"
           " return b[0];\n"    // wrong return type
           "}";
 
@@ -1277,12 +1277,12 @@ TEST(output, arrays)
         const std::string test_input =
           "fn len() -> i32\n"
           "{\n"
-          " let b: [i32] = [2, 3];\n"
+          " let b: i32[] = [2, 3];\n"
           " return b.length;\n"
           "}\n"
           "fn len2() -> i32\n"
           "{\n"
-          " let b: [i32];\n"
+          " let b: i32[];\n"
           " return b.length;\n"
           "}\n";
 
@@ -1339,28 +1339,28 @@ TEST(output, arrays)
           "fn string_equals(s1: str, s2: str) -> i32;\n"
           "fn test_copy() -> i32\n"
           "{\n"
-          " let a: [i32] = [2, 3];\n"
-          " let b: [i32] = new i32[2];\n"
+          " let a: i32[] = [2, 3];\n"
+          " let b: i32[] = new i32[2];\n"
           " array_copy(a, b);\n"
           " return a.length == b.length && a[0] == b[0] && a[1] == b[1];\n"
           "}\n"
           "fn test_copy_str() -> i32\n"
           "{\n"
-          " let a: [str] = [\"a\", \"123\"];\n"
-          " let b: [str] = new str[2];\n"
+          " let a: str[] = [\"a\", \"123\"];\n"
+          " let b: str[] = new str[2];\n"
           " array_copy(a, b);\n"
           " return a.length == b.length && string_equals(a[0], b[0]) && string_equals(a[1], b[1]);\n"
           "}\n"
           "fn test_copy_fail_none() -> void\n"
           "{\n"
-          " let a: [i32] = [2, 3];\n"
-          " let b: [i32];\n"
+          " let a: i32[] = [2, 3];\n"
+          " let b: i32[];\n"
           " array_copy(a, b);\n"
           "}\n"
           "fn test_copy_fail_type() -> void\n"
           "{\n"
-          " let a: [i32] = [2, 3];\n"
-          " let b: [f32] = new f32[2];\n"
+          " let a: i32[] = [2, 3];\n"
+          " let b: f32[] = new f32[2];\n"
           " array_copy(a, b);\n"
           "}\n";
 
@@ -1494,9 +1494,9 @@ TEST(output, return_discard)
           "{\n"
           " g();\n"
           "}\n"
-          "fn g() -> [i32]\n"
+          "fn g() -> i32[]\n"
           "{\n"
-          " let r: [i32] = [1, 2];\n"
+          " let r: i32[] = [1, 2];\n"
           " return r;\n"
           "}";
 
@@ -1549,9 +1549,9 @@ TEST(output, return_discard)
           "{\n"
           " g();\n"
           "}\n"
-          "fn g() -> [str]\n"
+          "fn g() -> str[]\n"
           "{\n"
-          " let r: [str] = [\"a\", \"test\"];\n"
+          " let r: str[] = [\"a\", \"test\"];\n"
           " return r;\n"
           "}";
 
@@ -2280,8 +2280,8 @@ TEST(output, null_access)
         const std::string test_input =
           "fn main() -> i32\n"
           "{\n"
-          " let i: [f32] = new f32[10];\n"
-          " let s: [i32] = null;\n"
+          " let i: f32[] = new f32[10];\n"
+          " let s: i32[] = null;\n"
           " s[0] = 1;\n"
           " return 0;\n"
           "}\n";

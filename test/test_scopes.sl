@@ -29,7 +29,7 @@ fn test_local_scopes() -> void
     std::assert(i == 1, "i == 1");
 }
 
-fn main(args: [str]) -> i32 
+fn main(args: str[]) -> i32 
 {
     std::assert(test() == 1, "test() == 1");
 
