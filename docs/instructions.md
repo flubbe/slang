@@ -4,7 +4,7 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 
 - `aconst_null`: Load a `null` reference onto the stack.
 - `iconst`: Load `i32` constant onto stack.
-- `lconst`: Load i64 constant onto stack.
+- `lconst`: Load `i64` constant onto stack.
 - `fconst`: Load `f32` constant onto stack.
 - `dconst`: Load `f64` constant onto stack.
 - `sconst`: Load `str` constant onto stack.
@@ -38,7 +38,6 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 - `dup_x1`: Duplicate top stack element and push it 2 elements down the stack.
 - `dup_x2`: Duplicate top stack element and push it 3 elements down the stack.
 - `dup2_x0`: Duplicate top 2 stack elements.
-elements down the stack.
 - `pop`: Pop-discard a 4-byte value from the stack.
 - `pop2`: Pop-discard a 8-byte value from the stack.
 - `apop`: Pop-discard a reference from the stack.
