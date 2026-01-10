@@ -30,6 +30,14 @@ namespace slang::gc
 void garbage_collector::mark_object(
   void* obj)
 {
+    if(obj == nullptr)
+    {
+        GC_LOG("mark_object: null object passed in");
+
+        // nothing to mark.
+        return;
+    }
+
     auto it = objects.find(obj);
     if(it == objects.end())
     {
@@ -55,12 +63,13 @@ void garbage_collector::mark_object(
         }
 
         GC_LOG("mark_object {}: object layout", obj);
-        void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        void* outer_obj = *reinterpret_cast<void**>(obj);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         for(auto offset: *it->second.layout)
         {
-            mark_object(
-              *reinterpret_cast<void**>(                         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                static_cast<std::byte*>(mark_obj) + offset));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            auto* inner_obj = *reinterpret_cast<void**>(       // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              static_cast<std::byte*>(outer_obj) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+            mark_object(inner_obj);
         }
 
         return;
@@ -69,7 +78,7 @@ void garbage_collector::mark_object(
     gc_object& obj_info = it->second;
     if((obj_info.flags & gc_object::of_reachable) != 0)
     {
-        GC_LOG("mark_object: object {} unreachable", obj);
+        GC_LOG("mark_object: object {} already marked", obj);
 
         return;
     }
@@ -88,13 +97,14 @@ void garbage_collector::mark_object(
     }
     else if(obj_info.type == gc_object_type::obj)
     {
-        if(obj_info.layout == nullptr)
+        if(!obj_info.layout_id.has_value())
         {
             throw gc_error("Cannot mark object: Missing layout information.");
         }
 
         GC_LOG("mark_object: object layout");
-        for(auto offset: *obj_info.layout)
+        const auto& layout = type_layouts[obj_info.layout_id.value()];
+        for(auto offset: layout.second)
         {
             auto* obj = *reinterpret_cast<void**>(                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
               static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -591,18 +601,15 @@ std::size_t garbage_collector::get_type_layout_id(
             obj));
     }
 
-    for(const auto& it: type_layouts)
+    if(!obj_it->second.layout_id.has_value())
     {
-        if(&it.second.second == obj_it->second.layout)
-        {
-            return it.first;
-        }
+        throw gc_error(
+          std::format(
+            "Object {} has no type layout.",
+            obj));
     }
 
-    throw gc_error(
-      std::format(
-        "No type layout for type '{}' registered.",
-        obj));
+    return obj_it->second.layout_id.value();
 }
 
 std::string garbage_collector::layout_to_string(

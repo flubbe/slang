@@ -2167,6 +2167,8 @@ value context::exec(
         throw interpreter_error("Non-empty stack on function exit.");
     }
 
+    gc.run();    // DEBUG
+
     return ret;
 }
 
