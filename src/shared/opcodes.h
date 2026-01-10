@@ -103,7 +103,6 @@ enum class opcode : opcode_base
     lret,        /** Return an i64 from a function. */
     fret,        /** Return an f32 from a function. */
     dret,        /** Return an f64 from a function. */
-    sret,        /** Return a str from a function. */
     aret,        /** Return an address. */
     setfield,    /** Set a field in a struct. */
     getfield,    /** Get a field from a struct. */
@@ -153,7 +152,7 @@ enum class opcode : opcode_base
 /** Get a string representation of the opcode. */
 std::string to_string(opcode op);
 
-/** A opcode error. */
+/** An opcode error. */
 class opcode_error : public std::runtime_error
 {
     using std::runtime_error::runtime_error;

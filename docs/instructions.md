@@ -84,7 +84,6 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 - `lret`: Return an `i64` from a function.
 - `fret`: Return an `f32` from a function.
 - `dret`: Return an `f64` from a function.
-- `sret`: Return a `str` from a function.
 - `aret`: Return an address.
 - `setfield`: Set a field in a struct.
 - `getfield`: Get a field from a struct.

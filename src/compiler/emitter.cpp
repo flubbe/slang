@@ -939,7 +939,6 @@ void instruction_emitter::emit_instruction(
         opcode cat2i_opcode,
         opcode cat1f_opcode,
         opcode cat2f_opcode,
-        std::optional<opcode> str_opcode = std::nullopt,
         std::optional<opcode> ref_opcode = std::nullopt)
     {
         const auto* arg = static_cast<const cg::type_argument*>(args[0].get());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -963,16 +962,8 @@ void instruction_emitter::emit_instruction(
         {
             emit(instruction_buffer, cat2f_opcode);
         }
-        else if(type_kind == cg::type_kind::str)
-        {
-            if(!str_opcode.has_value())
-            {
-                throw std::runtime_error(std::format("Invalid type 'str' for instruction '{}'.", name));
-            }
-
-            emit(instruction_buffer, *str_opcode);
-        }
-        else if(type_kind == cg::type_kind::ref
+        else if(type_kind == cg::type_kind::str
+                || type_kind == cg::type_kind::ref
                 || type_kind == cg::type_kind::null)
         {
             if(!ref_opcode.has_value())
@@ -1355,7 +1346,6 @@ void instruction_emitter::emit_instruction(
           opcode::pop2,
           opcode::pop,
           opcode::pop2,
-          opcode::apop,
           opcode::apop);
     }
     else if(name == "cast")
@@ -1463,7 +1453,6 @@ void instruction_emitter::emit_instruction(
               opcode::lret,
               opcode::fret,
               opcode::dret,
-              opcode::sret,
               opcode::aret);
         }
     }
@@ -1684,7 +1673,6 @@ void instruction_emitter::emit_instruction(
           opcode::lcmpeq,
           opcode::fcmpeq,
           opcode::dcmpeq,
-          opcode::acmpeq,
           opcode::acmpeq);
     }
     else if(name == "cmpne")
@@ -1694,7 +1682,6 @@ void instruction_emitter::emit_instruction(
           opcode::lcmpne,
           opcode::fcmpne,
           opcode::dcmpne,
-          opcode::acmpne,
           opcode::acmpne);
     }
     else if(name == "jnz")
