@@ -104,7 +104,6 @@ std::string to_string(opcode op)
     case opcode::lret: return "lret";
     case opcode::fret: return "fret";
     case opcode::dret: return "dret";
-    case opcode::sret: return "sret";
     case opcode::aret: return "aret";
     case opcode::setfield: return "setfield";
     case opcode::getfield: return "getfield";

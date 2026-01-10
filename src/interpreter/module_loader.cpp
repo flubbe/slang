@@ -761,7 +761,6 @@ std::int32_t module_loader::decode_instruction(
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
-    case opcode::sret: [[fallthrough]];
     case opcode::aret:
         recorder->record(static_cast<opcode>(instr));
         return 0;

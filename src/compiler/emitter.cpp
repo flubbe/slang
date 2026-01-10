@@ -1463,7 +1463,7 @@ void instruction_emitter::emit_instruction(
               opcode::lret,
               opcode::fret,
               opcode::dret,
-              opcode::sret,
+              opcode::aret,
               opcode::aret);
         }
     }
