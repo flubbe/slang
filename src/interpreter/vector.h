@@ -41,7 +41,7 @@ private:
     struct vector_data
     {
         /** Element count. */
-        size_t size;
+        size_type size;
 
         /** Beginning of allocated data. */
         value_type data[1];
@@ -72,14 +72,14 @@ private:
      * @returns Returns a `std::unique_ptr` to the allocated memory.
      * @throws Throws `std::bad_alloc` if allocation fails.
      */
-    static data_pointer allocate(size_t n, bool uninitialized = false)
+    static data_pointer allocate(size_type n, bool uninitialized = false)
     {
         if(n == 0)
         {
             return {nullptr};
         }
 
-        std::size_t byte_size = sizeof(data_pointer) + n * sizeof(value_type);
+        std::size_t byte_size = sizeof(data_pointer) + static_cast<std::size_t>(n * sizeof(value_type));
         auto ptr = std::malloc(byte_size);
         if(ptr == nullptr)
         {
@@ -143,7 +143,7 @@ public:
     }
 
     /** Construct a vector with `n` uninitialized elements. */
-    explicit fixed_vector(size_t n)
+    explicit fixed_vector(size_type n)
     : data_ptr{allocate(n)}
     {
     }
@@ -202,7 +202,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned size,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t size() const noexcept
+    size_type size() const noexcept
     {
         return data_ptr ? data_ptr->size : 0;
     }
@@ -213,7 +213,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned max size,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t max_size() const noexcept
+    size_type max_size() const noexcept
     {
         return size();
     }
@@ -224,7 +224,7 @@ public:
      * @note Casting to a different `fixed_vector<T>` does not affect the returned capacity,
      *       but the resulting vector is otherwise in an invalid state.
      */
-    std::size_t capacity() const noexcept
+    size_type capacity() const noexcept
     {
         return size();
     }
@@ -303,5 +303,24 @@ public:
         return data_ptr ? data_ptr->data : nullptr;
     }
 };
+
+/**
+ * Estimate the heap size of a heap-allocated container.
+ *
+ * @tparam Container Container type.
+ * @param c The container.
+ * @returns Estimated heap size of the container.
+ */
+template<typename Container>
+    requires requires(const Container& t) {
+        typename Container::size_type;
+        typename Container::value_type;
+        { t.capacity() } noexcept -> std::convertible_to<typename Container::size_type>;
+    }
+auto estimate_heap_size(const Container& c) -> typename Container::size_type
+{
+    return static_cast<typename Container::size_type>(
+      sizeof(Container) + c.capacity() * sizeof(typename Container::value_type));
+}
 
 }    // namespace slang::interpreter

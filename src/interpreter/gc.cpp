@@ -118,21 +118,27 @@ void garbage_collector::mark_object(
  *
  * @tparam T The object type.
  * @param obj The object to delete.
+ * @param size The object's size.
  * @param allocated_bytes The currently allocated bytes to by updated after the deletion.
  * @throws Throws a `gc_error` if the object size is larger than `allocated_bytes`.
  */
 template<typename T>
 void object_deleter(
   gsl::owner<void*> obj,
+  std::size_t obj_byte_size,
   std::size_t& allocated_bytes)
 {
     delete static_cast<T*>(obj);
 
-    if(sizeof(T) > allocated_bytes)
+    if(obj_byte_size > allocated_bytes)
     {
-        throw gc_error("Inconsistent allocation stats: sizeof(T) > allocated_bytes");
+        throw gc_error(
+          std::format(
+            "Inconsistent allocation stats: obj_byte_size ({}) > allocated_bytes({}).",
+            obj_byte_size,
+            allocated_bytes));
     }
-    allocated_bytes -= sizeof(T);
+    allocated_bytes -= obj_byte_size;
 }
 
 void garbage_collector::delete_object(
@@ -142,7 +148,10 @@ void garbage_collector::delete_object(
 
     if(obj_info.type == gc_object_type::str)
     {
-        object_deleter<std::string>(obj_info.addr, allocated_bytes);
+        object_deleter<std::string>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::obj)
     {
@@ -156,35 +165,59 @@ void garbage_collector::delete_object(
     }
     else if(obj_info.type == gc_object_type::array_i8)
     {
-        object_deleter<si::fixed_vector<std::int8_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int8_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i16)
     {
-        object_deleter<si::fixed_vector<std::int16_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int16_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i32)
     {
-        object_deleter<si::fixed_vector<std::int32_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int32_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i64)
     {
-        object_deleter<si::fixed_vector<std::int64_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int64_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f32)
     {
-        object_deleter<si::fixed_vector<float>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<float>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f64)
     {
-        object_deleter<si::fixed_vector<double>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<double>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_str)
     {
-        object_deleter<si::fixed_vector<std::string*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::string*>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_aref)
     {
-        object_deleter<si::fixed_vector<void*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<void*>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else
     {
