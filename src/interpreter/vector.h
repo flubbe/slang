@@ -305,11 +305,11 @@ public:
 };
 
 /**
- * Estimate the heap size of a heap-allocated container.
+ * Estimate the heap byte size of a heap-allocated container.
  *
  * @tparam Container Container type.
  * @param c The container.
- * @returns Estimated heap size of the container.
+ * @returns Estimated heap byte size of the container.
  */
 template<typename Container>
     requires requires(const Container& t) {
@@ -317,7 +317,7 @@ template<typename Container>
         typename Container::value_type;
         { t.capacity() } noexcept -> std::convertible_to<typename Container::size_type>;
     }
-auto estimate_heap_size(const Container& c) -> typename Container::size_type
+auto estimate_heap_byte_size(const Container& c) -> typename Container::size_type
 {
     return static_cast<typename Container::size_type>(
       sizeof(Container) + c.capacity() * sizeof(typename Container::value_type));

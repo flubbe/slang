@@ -286,6 +286,8 @@ void garbage_collector::run()
 {
     GC_LOG("------- run -------");
 
+    gc_run_requested = false;
+
     std::size_t object_set_size = objects.size();
 
     // collect roots.

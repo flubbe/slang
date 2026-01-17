@@ -168,7 +168,7 @@ inline gc_object gc_object::from<std::string>(
     return {
       gc_object_type::str,
       std::nullopt,
-      sizeof(std::string),    // FIXME track string size
+      sizeof(std::string),    // FIXME track string size. string allocations don't go through the GC right now.
       std::alignment_of_v<std::string>,
       flags, obj};
 }
@@ -192,7 +192,7 @@ inline gc_object gc_object::from<si::fixed_vector<std::int8_t>>(
     return {
       gc_object_type::array_i8,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int8_t>>,
       flags, obj};
 }
@@ -216,7 +216,7 @@ inline gc_object gc_object::from<si::fixed_vector<std::int16_t>>(
     return {
       gc_object_type::array_i16,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int16_t>>,
       flags, obj};
 }
@@ -240,7 +240,7 @@ inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
     return {
       gc_object_type::array_i32,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int32_t>>,
       flags, obj};
 }
@@ -264,7 +264,7 @@ inline gc_object gc_object::from<si::fixed_vector<std::int64_t>>(
     return {
       gc_object_type::array_i64,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int64_t>>,
       flags, obj};
 }
@@ -288,7 +288,7 @@ inline gc_object gc_object::from<si::fixed_vector<float>>(
     return {
       gc_object_type::array_f32,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<float>>,
       flags, obj};
 }
@@ -312,7 +312,7 @@ inline gc_object gc_object::from<si::fixed_vector<double>>(
     return {
       gc_object_type::array_f64,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<double>>,
       flags, obj};
 }
@@ -336,7 +336,7 @@ inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
     return {
       gc_object_type::array_str,
       std::nullopt,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::string*>>,
       flags, obj};
 }
@@ -360,7 +360,7 @@ inline gc_object gc_object::from<si::fixed_vector<void*>>(
     return {
       gc_object_type::array_aref,
       layout_id,
-      si::estimate_heap_size(*obj),
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<void*>>,
       flags, obj};
 }
@@ -408,7 +408,10 @@ class garbage_collector
     std::size_t gc_run_threshold_bytes{1 * 1024 * 1024};
 
     /** Growth factor for the live set that triggers a GC run. */
-    float gc_run_growth_factor = 2.0f;
+    float gc_run_growth_factor{2.0f};
+
+    /** Whether a GC run is requested. */
+    bool gc_run_requested{false};
 
     /** Type layouts. */
     std::unordered_map<std::size_t, std::pair<std::string, std::vector<std::size_t>>> type_layouts;
@@ -515,10 +518,7 @@ public:
         allocated_bytes += obj_it->second.size;
         allocated_bytes_since_gc += obj_it->second.size;
 
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(add)
         {
@@ -575,10 +575,7 @@ public:
         allocated_bytes += obj_it->second.size;
         allocated_bytes_since_gc += obj_it->second.size;
 
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(add)
         {
@@ -620,10 +617,7 @@ public:
         allocated_bytes += obj_it->second.size;
         allocated_bytes_since_gc += obj_it->second.size;
 
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(flags & gc_object::of_temporary)
         {
@@ -668,10 +662,7 @@ public:
         allocated_bytes += obj_it->second.size;
         allocated_bytes_since_gc += obj_it->second.size;
 
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(flags & gc_object::of_temporary)
         {
@@ -853,6 +844,12 @@ public:
     float growth_factor() const
     {
         return gc_run_growth_factor;
+    }
+
+    /** Whether a GC run was requested. */
+    bool is_run_requested() const
+    {
+        return gc_run_requested;
     }
 };
 
