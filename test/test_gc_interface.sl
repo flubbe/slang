@@ -51,5 +51,10 @@ fn main(args: str[]) -> i32
             "object count (after):     {}",
             gc::object_count()));
 
+    std::println(
+        std::format!(
+            "allocated bytes (after):  {}",
+            gc::allocated_bytes()));
+
     return 0;
 }

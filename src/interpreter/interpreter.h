@@ -130,6 +130,12 @@ class context
      */
     std::string stack_trace_to_string(const std::vector<stack_trace_entry>& stack_trace);
 
+    /**
+     * Safepoint handler. Executed when a safepoint is reached, i.e., the state
+     * of the VM is stable.
+     */
+    void safepoint_handler();
+
 public:
     /** Default constructors. */
     context() = delete;
