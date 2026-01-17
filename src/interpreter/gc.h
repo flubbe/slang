@@ -402,13 +402,13 @@ class garbage_collector
     std::size_t allocated_bytes_since_gc{0};
 
     /** Minimal threshold when to trigger GC run. */
-    std::size_t gc_run_min_thresold_bytes{1 * 1024 * 1024};
+    std::size_t gc_run_min_thresold_bytes;
 
     /** Threshold when to trigger GC run. */
-    std::size_t gc_run_threshold_bytes{1 * 1024 * 1024};
+    std::size_t gc_run_threshold_bytes;
 
     /** Growth factor for the live set that triggers a GC run. */
-    float gc_run_growth_factor{2.0f};
+    float gc_run_growth_factor;
 
     /** Whether a GC run is requested. */
     bool gc_run_requested{false};

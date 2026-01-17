@@ -2170,6 +2170,8 @@ value context::exec(
             ret = value{*s};    // copy string
             gc.remove_temporary(s);
         }
+
+        gc.run();
     }
     else if(return_type_class == abi_type_class::ref)
     {
@@ -2191,8 +2193,6 @@ value context::exec(
     {
         throw interpreter_error("Non-empty stack on function exit.");
     }
-
-    gc.run();    // DEBUG
 
     return ret;
 }
