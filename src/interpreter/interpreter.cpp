@@ -364,11 +364,11 @@ void context::exec(
             {
                 // NOTE The stack size is validated by the caller.
 
-                // run safepoint handler before frame destruction.
-                safepoint_handler();
-
                 // destruct the locals here for the GC to clean them up.
                 ls.destruct();
+
+                // run safepoint handler before frame destruction in the caller.
+                safepoint_handler();
 
                 --call_stack_level;
                 return;
