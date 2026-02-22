@@ -30,6 +30,14 @@ namespace slang::gc
 void garbage_collector::mark_object(
   void* obj)
 {
+    if(obj == nullptr)
+    {
+        GC_LOG("mark_object: null object passed in");
+
+        // nothing to mark.
+        return;
+    }
+
     auto it = objects.find(obj);
     if(it == objects.end())
     {
@@ -55,12 +63,13 @@ void garbage_collector::mark_object(
         }
 
         GC_LOG("mark_object {}: object layout", obj);
-        void* mark_obj = *reinterpret_cast<void**>(static_cast<std::byte*>(obj));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        void* outer_obj = *reinterpret_cast<void**>(obj);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
         for(auto offset: *it->second.layout)
         {
-            mark_object(
-              *reinterpret_cast<void**>(                         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                static_cast<std::byte*>(mark_obj) + offset));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            auto* inner_obj = *reinterpret_cast<void**>(       // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              static_cast<std::byte*>(outer_obj) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+            mark_object(inner_obj);
         }
 
         return;
@@ -69,7 +78,7 @@ void garbage_collector::mark_object(
     gc_object& obj_info = it->second;
     if((obj_info.flags & gc_object::of_reachable) != 0)
     {
-        GC_LOG("mark_object: object {} unreachable", obj);
+        GC_LOG("mark_object: object {} already marked", obj);
 
         return;
     }
@@ -88,13 +97,14 @@ void garbage_collector::mark_object(
     }
     else if(obj_info.type == gc_object_type::obj)
     {
-        if(obj_info.layout == nullptr)
+        if(!obj_info.layout_id.has_value())
         {
             throw gc_error("Cannot mark object: Missing layout information.");
         }
 
         GC_LOG("mark_object: object layout");
-        for(auto offset: *obj_info.layout)
+        const auto& layout = type_layouts[obj_info.layout_id.value()];
+        for(auto offset: layout.second)
         {
             auto* obj = *reinterpret_cast<void**>(                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
               static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -108,21 +118,27 @@ void garbage_collector::mark_object(
  *
  * @tparam T The object type.
  * @param obj The object to delete.
+ * @param size The object's size.
  * @param allocated_bytes The currently allocated bytes to by updated after the deletion.
  * @throws Throws a `gc_error` if the object size is larger than `allocated_bytes`.
  */
 template<typename T>
 void object_deleter(
   gsl::owner<void*> obj,
+  std::size_t obj_byte_size,
   std::size_t& allocated_bytes)
 {
     delete static_cast<T*>(obj);
 
-    if(sizeof(T) > allocated_bytes)
+    if(obj_byte_size > allocated_bytes)
     {
-        throw gc_error("Inconsistent allocation stats: sizeof(T) > allocated_bytes");
+        throw gc_error(
+          std::format(
+            "Inconsistent allocation stats: obj_byte_size ({}) > allocated_bytes({}).",
+            obj_byte_size,
+            allocated_bytes));
     }
-    allocated_bytes -= sizeof(T);
+    allocated_bytes -= obj_byte_size;
 }
 
 void garbage_collector::delete_object(
@@ -132,7 +148,10 @@ void garbage_collector::delete_object(
 
     if(obj_info.type == gc_object_type::str)
     {
-        object_deleter<std::string>(obj_info.addr, allocated_bytes);
+        object_deleter<std::string>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::obj)
     {
@@ -146,35 +165,59 @@ void garbage_collector::delete_object(
     }
     else if(obj_info.type == gc_object_type::array_i8)
     {
-        object_deleter<si::fixed_vector<std::int8_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int8_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i16)
     {
-        object_deleter<si::fixed_vector<std::int16_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int16_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i32)
     {
-        object_deleter<si::fixed_vector<std::int32_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int32_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_i64)
     {
-        object_deleter<si::fixed_vector<std::int64_t>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::int64_t>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f32)
     {
-        object_deleter<si::fixed_vector<float>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<float>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_f64)
     {
-        object_deleter<si::fixed_vector<double>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<double>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_str)
     {
-        object_deleter<si::fixed_vector<std::string*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<std::string*>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else if(obj_info.type == gc_object_type::array_aref)
     {
-        object_deleter<si::fixed_vector<void*>>(obj_info.addr, allocated_bytes);
+        object_deleter<si::fixed_vector<void*>>(
+          obj_info.addr,
+          obj_info.size,
+          allocated_bytes);
     }
     else
     {
@@ -242,6 +285,8 @@ void garbage_collector::remove_root(
 void garbage_collector::run()
 {
     GC_LOG("------- run -------");
+
+    gc_run_requested = false;
 
     std::size_t object_set_size = objects.size();
 
@@ -591,18 +636,15 @@ std::size_t garbage_collector::get_type_layout_id(
             obj));
     }
 
-    for(const auto& it: type_layouts)
+    if(!obj_it->second.layout_id.has_value())
     {
-        if(&it.second.second == obj_it->second.layout)
-        {
-            return it.first;
-        }
+        throw gc_error(
+          std::format(
+            "Object {} has no type layout.",
+            obj));
     }
 
-    throw gc_error(
-      std::format(
-        "No type layout for type '{}' registered.",
-        obj));
+    return obj_it->second.layout_id.value();
 }
 
 std::string garbage_collector::layout_to_string(

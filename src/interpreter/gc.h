@@ -101,12 +101,12 @@ struct gc_object
     gc_object_type type;
 
     /**
-     * Type layout (offsets of references inside this object).
+     * Type layout id (offsets of references inside this object).
      *
      * @note Not used for arrays, since we don't want to create a new
      * layout for arrays of a different sizes.
      */
-    std::vector<std::size_t>* layout = nullptr;
+    std::optional<std::size_t> layout_id{std::nullopt};
 
     /** Object size. */
     std::size_t size;
@@ -125,7 +125,7 @@ struct gc_object
     static gc_object from(
       [[maybe_unused]] T* obj,
       [[maybe_unused]] std::uint8_t flags = of_none,
-      [[maybe_unused]] std::vector<std::size_t>* layout = nullptr)
+      [[maybe_unused]] std::optional<std::size_t> layout_id = std::nullopt)
     {
         static_assert(
           std::is_same_v<T, std::string>
@@ -148,9 +148,9 @@ struct gc_object
       std::size_t size,
       std::size_t alignment,
       std::uint8_t flags = of_none,
-      std::vector<std::size_t>* layout = nullptr)
+      std::optional<std::size_t> layout_id = std::nullopt)
     {
-        return {gc_object_type::obj, layout, size, alignment, flags, obj};
+        return {gc_object_type::obj, layout_id, size, alignment, flags, obj};
     }
 };
 
@@ -158,35 +158,41 @@ template<>
 inline gc_object gc_object::from<std::string>(
   std::string* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create string with a type layout.");
     }
 
-    return {gc_object_type::str,
-            nullptr,
-            sizeof(std::string),
-            std::alignment_of_v<std::string>,
-            flags, obj};
+    return {
+      gc_object_type::str,
+      std::nullopt,
+      sizeof(std::string),    // FIXME track string size. string allocations don't go through the GC right now.
+      std::alignment_of_v<std::string>,
+      flags, obj};
 }
 
 template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int8_t>>(
   si::fixed_vector<std::int8_t>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create i8 array with null data.");
+    }
+
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
     }
 
     return {
       gc_object_type::array_i8,
-      nullptr,
-      sizeof(si::fixed_vector<std::int8_t>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int8_t>>,
       flags, obj};
 }
@@ -195,17 +201,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int16_t>>(
   si::fixed_vector<std::int16_t>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
     {
-        throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
+        throw gc_error("Invalid function call: Tried to create i16 array with null data.");
+    }
+
+    if(layout_id.has_value())
+    {
+        throw gc_error("Invalid function call: Tried to create i16 array with a type layout.");
     }
 
     return {
       gc_object_type::array_i16,
-      nullptr,
-      sizeof(si::fixed_vector<std::int16_t>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int16_t>>,
       flags, obj};
 }
@@ -214,17 +225,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int32_t>>(
   si::fixed_vector<std::int32_t>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create i32 array with null data.");
+    }
+
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create i32 array with a type layout.");
     }
 
     return {
       gc_object_type::array_i32,
-      nullptr,
-      sizeof(si::fixed_vector<std::int32_t>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int32_t>>,
       flags, obj};
 }
@@ -233,17 +249,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<std::int64_t>>(
   si::fixed_vector<std::int64_t>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
     {
-        throw gc_error("Invalid function call: Tried to create i8 array with a type layout.");
+        throw gc_error("Invalid function call: Tried to create i64 array with null data.");
+    }
+
+    if(layout_id.has_value())
+    {
+        throw gc_error("Invalid function call: Tried to create i64 array with a type layout.");
     }
 
     return {
       gc_object_type::array_i64,
-      nullptr,
-      sizeof(si::fixed_vector<std::int64_t>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::int64_t>>,
       flags, obj};
 }
@@ -252,17 +273,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<float>>(
   si::fixed_vector<float>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create f32 array with null data.");
+    }
+
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create f32 array with a type layout.");
     }
 
     return {
       gc_object_type::array_f32,
-      nullptr,
-      sizeof(si::fixed_vector<float>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<float>>,
       flags, obj};
 }
@@ -271,17 +297,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<double>>(
   si::fixed_vector<double>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create f64 array with null data.");
+    }
+
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create f64 array with a type layout.");
     }
 
     return {
       gc_object_type::array_f64,
-      nullptr,
-      sizeof(si::fixed_vector<double>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<double>>,
       flags, obj};
 }
@@ -290,17 +321,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<std::string*>>(
   si::fixed_vector<std::string*>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout != nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create string array with null data.");
+    }
+
+    if(layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create string array with a type layout.");
     }
 
     return {
       gc_object_type::array_str,
-      nullptr,
-      sizeof(si::fixed_vector<std::string*>),
+      std::nullopt,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<std::string*>>,
       flags, obj};
 }
@@ -309,17 +345,22 @@ template<>
 inline gc_object gc_object::from<si::fixed_vector<void*>>(
   si::fixed_vector<void*>* obj,
   std::uint8_t flags,
-  std::vector<std::size_t>* layout)
+  std::optional<std::size_t> layout_id)
 {
-    if(layout == nullptr)
+    if(obj == nullptr)
+    {
+        throw gc_error("Invalid function call: Tried to create object array with null data.");
+    }
+
+    if(!layout_id.has_value())
     {
         throw gc_error("Invalid function call: Tried to create object array without a type layout.");
     }
 
     return {
       gc_object_type::array_aref,
-      layout,
-      sizeof(si::fixed_vector<void*>),
+      layout_id,
+      si::estimate_heap_byte_size(*obj),
       std::alignment_of_v<si::fixed_vector<void*>>,
       flags, obj};
 }
@@ -361,13 +402,16 @@ class garbage_collector
     std::size_t allocated_bytes_since_gc{0};
 
     /** Minimal threshold when to trigger GC run. */
-    std::size_t gc_run_min_thresold_bytes{1 * 1024 * 1024};
+    std::size_t gc_run_min_thresold_bytes;
 
     /** Threshold when to trigger GC run. */
-    std::size_t gc_run_threshold_bytes{1 * 1024 * 1024};
+    std::size_t gc_run_threshold_bytes;
 
     /** Growth factor for the live set that triggers a GC run. */
-    float gc_run_growth_factor = 2.0f;
+    float gc_run_growth_factor;
+
+    /** Whether a GC run is requested. */
+    bool gc_run_requested{false};
 
     /** Type layouts. */
     std::unordered_map<std::size_t, std::pair<std::string, std::vector<std::size_t>>> type_layouts;
@@ -454,20 +498,27 @@ public:
       std::uint32_t flags = gc_object::of_none,
       bool add = true)
     {
-        allocated_bytes += sizeof(T);
-        allocated_bytes_since_gc += sizeof(T);
-
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
-
         T* obj = new T;
-        if(objects.find(obj) != objects.end())
+        if(objects.contains(obj))
         {
             throw gc_error("Allocated object already exists.");
         }
-        objects.insert({obj, gc_object::from(obj, flags, nullptr)});
+        auto gc_obj_container = gc_object::from(obj, flags, std::nullopt);
+        auto [obj_it, success] = objects.insert({obj, gc_obj_container});
+
+        if(!success)
+        {
+            throw gc_error(
+              std::format(
+                "Allocation of {} bytes failed.",
+                gc_obj_container.size));
+        }
+
+        // update GC stats.
+        allocated_bytes += obj_it->second.size;
+        allocated_bytes_since_gc += obj_it->second.size;
+
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(add)
         {
@@ -499,27 +550,32 @@ public:
       std::uint32_t flags = gc_object::of_none,
       bool add = true)
     {
-        allocated_bytes += size;
-        allocated_bytes_since_gc += size;
-
-        if(allocated_bytes_since_gc >= gc_run_threshold_bytes)
-        {
-            run();
-        }
-
         void* obj = new(std::align_val_t{alignment}) std::byte[size]();    // This also performs zero-initialization.
-        if(objects.find(obj) != objects.end())
+        if(objects.contains(obj))
         {
             throw gc_error("Allocated object already exists.");
         }
-        auto layout_it = type_layouts.find(layout_id);
-        if(layout_it == type_layouts.end())
+        if(!type_layouts.contains(layout_id))
         {
             throw gc_error("Tried to create object with unknown type layout index.");
         }
-        // note: references to elements remain valid after insert/emplace (but may invalidate iterators).
 
-        objects.insert({obj, gc_object::from(obj, size, alignment, flags, &layout_it->second.second)});
+        auto gc_obj_container = gc_object::from(obj, size, alignment, flags, std::make_optional(layout_id));
+        auto [obj_it, success] = objects.insert({obj, gc_obj_container});
+
+        if(!success)
+        {
+            throw gc_error(
+              std::format(
+                "Allocation of {} bytes failed.",
+                gc_obj_container.size));
+        }
+
+        // update GC stats.
+        allocated_bytes += obj_it->second.size;
+        allocated_bytes_since_gc += obj_it->second.size;
+
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(add)
         {
@@ -545,10 +601,23 @@ public:
     {
         auto array = new si::fixed_vector<T>(size);
         assert(array->size() == size);
-        objects.insert({array, gc_object::from(array, flags, nullptr)});
 
-        allocated_bytes += sizeof(si::fixed_vector<T>);
-        allocated_bytes_since_gc += sizeof(si::fixed_vector<T>);
+        auto gc_obj_container = gc_object::from(array, flags, std::nullopt);
+        auto [obj_it, success] = objects.insert({array, gc_obj_container});
+
+        if(!success)
+        {
+            throw gc_error(
+              std::format(
+                "Allocation of {} bytes failed.",
+                gc_obj_container.size));
+        }
+
+        // update GC stats.
+        allocated_bytes += obj_it->second.size;
+        allocated_bytes_since_gc += obj_it->second.size;
+
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(flags & gc_object::of_temporary)
         {
@@ -573,17 +642,27 @@ public:
         auto array = new si::fixed_vector<void*>(length);
         assert(array->size() == length);
 
-        auto layout_it = type_layouts.find(layout_id);
-        if(layout_it == type_layouts.end())
+        if(!type_layouts.contains(layout_id))
         {
             throw gc_error("Tried to create object with unknown type layout index.");
         }
-        // note: references to elements remain valid after insert/emplace (but may invalidate iterators).
 
-        objects.insert({array, gc_object::from(array, flags, &layout_it->second.second)});
+        auto gc_obj_container = gc_object::from(array, flags, std::make_optional(layout_id));
+        auto [obj_it, success] = objects.insert({array, gc_obj_container});
 
-        allocated_bytes += sizeof(si::fixed_vector<void*>);
-        allocated_bytes_since_gc += sizeof(si::fixed_vector<void*>);
+        if(!success)
+        {
+            throw gc_error(
+              std::format(
+                "Allocation of {} bytes failed.",
+                gc_obj_container.size));
+        }
+
+        // update GC stats.
+        allocated_bytes += obj_it->second.size;
+        allocated_bytes_since_gc += obj_it->second.size;
+
+        gc_run_requested = allocated_bytes_since_gc >= gc_run_threshold_bytes;
 
         if(flags & gc_object::of_temporary)
         {
@@ -765,6 +844,12 @@ public:
     float growth_factor() const
     {
         return gc_run_growth_factor;
+    }
+
+    /** Whether a GC run was requested. */
+    bool is_run_requested() const
+    {
+        return gc_run_requested;
     }
 };
 

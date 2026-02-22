@@ -367,6 +367,9 @@ void context::exec(
                 // destruct the locals here for the GC to clean them up.
                 ls.destruct();
 
+                // run safepoint handler before frame destruction in the caller.
+                safepoint_handler();
+
                 --call_stack_level;
                 return;
             }
@@ -1228,6 +1231,9 @@ void context::exec(
             } /* opcode::astore */
             case opcode::invoke:
             {
+                // call safepoint handler before running any of the logic below.
+                safepoint_handler();
+
                 /* no out-of-bounds read possible, since this is checked during decode.
                  * NOTE this does not use `read_unchecked`, since we do not de-reference the result. */
                 module_loader const* callee_loader;    // NOLINT(cppcoreguidelines-init-variables)
@@ -1833,20 +1839,31 @@ void context::exec(
                 auto else_offset = read_unchecked<std::size_t>(binary, offset);
 
                 auto cond = frame.stack.pop_cat1<std::int32_t>();
-                if(cond != 0)
+                auto target = (cond != 0)
+                                ? then_offset
+                                : else_offset;
+
+                // call safepoint handler if jumping to a previous instruction (loop back edge).
+                if(target < offset)
                 {
-                    offset = then_offset;
+                    safepoint_handler();
                 }
-                else
-                {
-                    offset = else_offset;
-                }
+
+                offset = target;
                 break;
             } /* opcode::jnz */
             case opcode::jmp:
             {
                 /* no out-of-bounds read possible, since this is checked during decode. */
-                offset = read_unchecked<std::int64_t>(binary, offset);
+                auto target = read_unchecked<std::size_t>(binary, offset);
+
+                // call safepoint handler if jumping to a previous instruction (loop back edge).
+                if(target < offset)
+                {
+                    safepoint_handler();
+                }
+
+                offset = target;
                 break;
             } /* opcode::jmp */
             default:
@@ -1911,6 +1928,14 @@ std::string context::stack_trace_to_string(
         buf += std::format("  in {}.{}\n", entry.mod_name, func_name);
     }
     return buf;
+}
+
+void context::safepoint_handler()
+{
+    if(gc.is_run_requested())
+    {
+        gc.run();
+    }
 }
 
 /** Function argument writing and destruction. */
@@ -2145,6 +2170,8 @@ value context::exec(
             ret = value{*s};    // copy string
             gc.remove_temporary(s);
         }
+
+        gc.run();
     }
     else if(return_type_class == abi_type_class::ref)
     {

@@ -18,7 +18,7 @@ namespace gc = slang::gc;
 namespace slang::runtime::gci
 {
 
-void run(si::context& ctx, si::operand_stack& stack)
+void run(si::context& ctx, [[maybe_unused]] si::operand_stack& stack)
 {
     ctx.get_gc().run();
 }
