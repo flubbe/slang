@@ -647,9 +647,10 @@ void write_value(std::vector<std::byte>& code, T v)
     const auto size = code.size();
 
     code.resize(size + sizeof(T));
-    std::memcpy(code.data() + size,
-                &v,
-                sizeof(T));
+    std::memcpy(
+      code.data() + size,
+      &v,
+      sizeof(T));
 }
 
 std::int32_t module_loader::decode_instruction(

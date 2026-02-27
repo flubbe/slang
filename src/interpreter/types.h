@@ -420,18 +420,18 @@ public:
     }
 
     /**
-     * Get a span starting to the end minus an offset.
+     * Get a span for the stack tail.
      *
-     * @param offset Offset to subtract from the end.
+     * @param n Tail length.
      * @throws Throws an `interpreter_error` if a stack underflow occurs.
      */
-    std::span<std::byte> end(std::size_t offset = 0)
+    std::span<std::byte> tail(std::size_t n)
     {
-        if(offset > stack.size())
+        if(n > stack.size())
         {
             throw interpreter_error("Stack underflow");
         }
-        return {&stack[stack.size() - offset], offset};
+        return {&stack[stack.size() - n], n};
     }
 
     /**

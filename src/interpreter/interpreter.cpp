@@ -396,7 +396,7 @@ void context::exec(
                 frame.stack.dup_addr();
 
                 void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                auto tail = frame.stack.end(sizeof(addr));
+                auto tail = frame.stack.tail(sizeof(addr));
                 std::memcpy(&addr, tail.data(), tail.size());
 
                 gc.add_temporary(addr);
@@ -412,7 +412,7 @@ void context::exec(
                 if(needs_gc != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    auto tail = frame.stack.end((2 * size1) + size2);
+                    auto tail = frame.stack.tail((2 * size1) + size2);
                     std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
@@ -429,7 +429,7 @@ void context::exec(
                 if(needs_gc != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    auto tail = frame.stack.end((2 * size1) + size2 + size3);
+                    auto tail = frame.stack.tail((2 * size1) + size2 + size3);
                     std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
@@ -446,14 +446,14 @@ void context::exec(
                 if(needs_gc1 != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    auto tail = frame.stack.end(size1 + size2);
+                    auto tail = frame.stack.tail(size1 + size2);
                     std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
                 if(needs_gc2 != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    auto tail = frame.stack.end(size2);
+                    auto tail = frame.stack.tail(size2);
                     std::memcpy(&addr, tail.data(), size2);
                     gc.add_temporary(addr);
                 }
@@ -1280,7 +1280,7 @@ void context::exec(
                       details.stack_size};
 
                     std::ranges::copy(
-                      frame.stack.end(details.args_size),
+                      frame.stack.tail(details.args_size),
                       callee_frame.locals.begin());
                     frame.stack.discard(details.args_size);
 
