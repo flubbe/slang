@@ -40,7 +40,7 @@ fn print_info() -> void
 
     std::println(
         std::format!(
-            "object count (before):    {}",
+            "object count:             {}",
             gc::object_count()));
 }
 
@@ -75,6 +75,8 @@ fn main(args: str[]) -> i32
     test_gc_run();
 
     let last_bytes: i32 = gc::allocated_bytes();
+    let last_object_count: i32 = gc::object_count();
+
     let i: i32 = 0;
     let t: T;
     while(i < 500000) 
@@ -83,15 +85,20 @@ fn main(args: str[]) -> i32
         ++i;
 
         let cur_bytes: i32 = gc::allocated_bytes();
+        let cur_object_count: i32 = gc::object_count();
         if(cur_bytes < last_bytes)
         {
             std::println(
                 std::format!(
-                    "GC: {} -> {}",
+                    "GC iteration {}: {} -> {} objs ({} -> {} bytes)",
+                    i,
+                    last_object_count,
+                    cur_object_count,
                     last_bytes,
                     cur_bytes));
         }
         last_bytes = cur_bytes;
+        last_object_count = cur_object_count;
     }
 
     print_info();
