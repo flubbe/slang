@@ -135,7 +135,7 @@ void parse_i32(si::context& ctx, si::operand_stack& stack)
     std::size_t result_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "result"));
     std::size_t i32s_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "i32s"));
 
-    auto* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* r = static_cast<result*>(ctx.get_gc().gc_new(
       result_layout_id, sizeof(result), std::alignment_of_v<result>,
       gc::gc_object::of_temporary));
     stack.push_addr(r);
@@ -178,7 +178,7 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
     std::size_t result_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "result"));
     std::size_t f32s_layout_id = ctx.get_gc().get_type_layout_id(si::make_type_name("std", "f32s"));
 
-    auto* r = reinterpret_cast<result*>(ctx.get_gc().gc_new(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* r = static_cast<result*>(ctx.get_gc().gc_new(
       result_layout_id, sizeof(result), std::alignment_of_v<result>,
       gc::gc_object::of_temporary));
     stack.push_addr(r);

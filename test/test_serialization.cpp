@@ -31,7 +31,7 @@ std::vector<std::uint8_t> to_little_endian(std::uint16_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int16_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint16_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_little_endian(static_cast<std::uint16_t>(i));
 }
 
 std::vector<std::uint8_t> to_little_endian(std::uint32_t i)
@@ -46,7 +46,7 @@ std::vector<std::uint8_t> to_little_endian(std::uint32_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int32_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint32_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_little_endian(static_cast<std::uint32_t>(i));
 }
 
 std::vector<std::uint8_t> to_little_endian(std::uint64_t i)
@@ -65,7 +65,7 @@ std::vector<std::uint8_t> to_little_endian(std::uint64_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_little_endian(std::int64_t i)
 {
-    return to_little_endian(*reinterpret_cast<std::uint64_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_little_endian(static_cast<std::uint64_t>(i));
 }
 
 std::vector<std::uint8_t> to_little_endian(float f)
@@ -94,7 +94,7 @@ std::vector<std::uint8_t> to_big_endian(std::uint16_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int16_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint16_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_big_endian(static_cast<std::uint16_t>(i));
 }
 
 std::vector<std::uint8_t> to_big_endian(std::uint32_t i)
@@ -109,7 +109,7 @@ std::vector<std::uint8_t> to_big_endian(std::uint32_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int32_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint32_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_big_endian(static_cast<std::uint32_t>(i));
 }
 
 std::vector<std::uint8_t> to_big_endian(std::uint64_t i)
@@ -128,7 +128,7 @@ std::vector<std::uint8_t> to_big_endian(std::uint64_t i)
 [[maybe_unused]]
 std::vector<std::uint8_t> to_big_endian(std::int64_t i)
 {
-    return to_big_endian(*reinterpret_cast<std::uint64_t*>(&i));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return to_big_endian(static_cast<std::uint64_t>(i));
 }
 
 std::vector<std::uint8_t> to_big_endian(float f)

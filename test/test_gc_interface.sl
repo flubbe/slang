@@ -1,7 +1,7 @@
 import std;
 import gc;
 
-fn main(args: str[]) -> i32
+fn print_info() -> void
 {
     std::println(
         std::format!(
@@ -42,7 +42,10 @@ fn main(args: str[]) -> i32
         std::format!(
             "object count (before):    {}",
             gc::object_count()));
+}
 
+fn test_gc_run() -> void
+{
     gc::run();
     std::assert(gc::object_count() == 0, "gc::object_count() == 0");
 
@@ -55,6 +58,43 @@ fn main(args: str[]) -> i32
         std::format!(
             "allocated bytes (after):  {}",
             gc::allocated_bytes()));
+}
+
+struct S{
+    s: str
+};
+
+struct T{
+    s: S
+};
+
+fn main(args: str[]) -> i32
+{
+    print_info();
+
+    test_gc_run();
+
+    let last_bytes: i32 = gc::allocated_bytes();
+    let i: i32 = 0;
+    let t: T;
+    while(i < 500000) 
+    {
+        t = T{s:S{"Test"}};
+        ++i;
+
+        let cur_bytes: i32 = gc::allocated_bytes();
+        if(cur_bytes < last_bytes)
+        {
+            std::println(
+                std::format!(
+                    "GC: {} -> {}",
+                    last_bytes,
+                    cur_bytes));
+        }
+        last_bytes = cur_bytes;
+    }
+
+    print_info();
 
     return 0;
 }
