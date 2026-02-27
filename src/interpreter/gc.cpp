@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <format>
+#include <cstring>
 #include <utility>
 
 #include "vector.h"
