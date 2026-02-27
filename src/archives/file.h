@@ -59,9 +59,9 @@ public:
 class file_write_archive : public file_archive
 {
 protected:
-    void serialize_bytes(std::byte* buffer, std::size_t c) override
+    void serialize_bytes(std::span<std::byte> bytes) override
     {
-        file.write(reinterpret_cast<const char*>(buffer), c);
+        file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     }
 
 public:
@@ -117,9 +117,9 @@ public:
 class file_read_archive : public file_archive
 {
 protected:
-    void serialize_bytes(std::byte* buffer, std::size_t c) override
+    void serialize_bytes(std::span<std::byte> bytes) override
     {
-        file.read(reinterpret_cast<char*>(buffer), c);
+        file.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
     }
 
 public:

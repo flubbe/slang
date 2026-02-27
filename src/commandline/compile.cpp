@@ -176,7 +176,7 @@ void compile::invoke(const std::vector<std::string>& args)
         }
 
         input_buffer.resize(input_size);
-        input_ar->serialize(reinterpret_cast<std::byte*>(input_buffer.data()), input_size);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        input_ar->serialize(std::as_writable_bytes(std::span(input_buffer)));
     }
 
     slang::lexer lexer;
