@@ -24,9 +24,9 @@ protected:
     /** The archive buffer. */
     std::vector<std::byte> memory_buffer;
 
-    void serialize_bytes(std::byte* buffer, std::size_t c) override
+    void serialize_bytes(std::span<std::byte> bytes) override
     {
-        memory_buffer.insert(memory_buffer.end(), buffer, buffer + c);
+        memory_buffer.insert(memory_buffer.end(), bytes.begin(), bytes.end());
     }
 
 public:
@@ -90,15 +90,15 @@ protected:
     /** Current buffer read offset. */
     std::size_t offset = 0;
 
-    void serialize_bytes(std::byte* buffer, std::size_t c) override
+    void serialize_bytes(std::span<std::byte> bytes) override
     {
-        if(offset + c > memory_buffer.size())
+        if(offset + bytes.size() > memory_buffer.size())
         {
             throw std::runtime_error("memory_read_archive: read out of bounds.");
         }
 
-        std::copy(memory_buffer.begin() + offset, memory_buffer.begin() + offset + c, buffer);
-        offset += c;
+        std::copy(memory_buffer.begin() + offset, memory_buffer.begin() + offset + bytes.size(), bytes.begin());
+        offset += bytes.size();
     }
 
 public:

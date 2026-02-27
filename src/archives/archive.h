@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,13 @@ static_assert(
 static_assert(
   sizeof(std::size_t) == 8, "Only 8-byte std::size_t's are supported.");    // NOLINT(readability-magic-numbers)
 
+/** A primitive scalar type. */
+template<class T>
+concept serializable_scalar =
+  std::is_same_v<T, std::remove_cv_t<T>>
+  && std::is_same_v<T, std::remove_reference_t<T>>
+  && (std::is_arithmetic_v<T> || std::is_same_v<T, std::byte>);
+
 /** A serialization error. */
 class serialization_error : public std::runtime_error
 {
@@ -72,10 +80,9 @@ protected:
     /**
      * Serialize raw bytes.
      *
-     * @param buffer The raw byte buffer.
-     * @param c The buffer size, in bytes.
+     * @param bytes Span containing the bytes.
      */
-    virtual void serialize_bytes(std::byte* buffer, std::size_t c) = 0;
+    virtual void serialize_bytes(std::span<std::byte> bytes) = 0;
 
 public:
     /** Defaulted and deleted constructors. */
@@ -157,133 +164,45 @@ public:
     }
 
     /**
-     * Serialize byte buffers to little endian. That is, if `c>1`,
+     * Serialize byte span to little endian. That is, if `bytes.size()>1`,
      * the buffer is reversed on big endian architectures.
      *
-     * @param buffer The raw byte buffer.
-     * @param c The buffer size, in bytes.
+     * @param bytes The bytes to serialize.
      */
-    virtual void serialize(std::byte* buffer, std::size_t c)
+    virtual void serialize(std::span<std::byte> bytes)
     {
         if(!is_persistent())
         {
             // in-memory archive.
-            serialize_bytes(buffer, c);
+            serialize_bytes(bytes);
         }
         else
         {
             // persistent archive.
             if(target_byte_order == std::endian::native)
             {
-                serialize_bytes(buffer, c);
+                serialize_bytes(bytes);
             }
             else
             {
-                for(std::size_t i = c; i > 0; --i)
+                for(std::size_t i = bytes.size(); i > 0; --i)
                 {
-                    serialize_bytes(&buffer[i - 1], 1);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                    serialize_bytes({&bytes[i - 1], 1});    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                 }
             }
         }
     }
 
-    /** Serializa a bool. */
-    archive& operator&(bool& b)
+    /**
+     * Serialize a scalar type.
+     *
+     * @tparam T The scalar type.
+     * @param s The scalar.
+     */
+    template<serializable_scalar T>
+    archive& operator&(T& s)
     {
-        serialize(reinterpret_cast<std::byte*>(&b), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a char. */
-    archive& operator&(char& c)
-    {
-        serialize(reinterpret_cast<std::byte*>(&c), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a byte. */
-    archive& operator&(std::byte& b)
-    {
-        serialize(&b, 1);
-        return *this;
-    }
-
-    /** Serialize a std::int8_t. */
-    archive& operator&(std::int8_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::uint8_t. */
-    archive& operator&(std::uint8_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 1);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::int16_t. */
-    archive& operator&(std::int16_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 2);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::uint16_t. */
-    archive& operator&(std::uint16_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 2);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::int32_t. */
-    archive& operator&(std::int32_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::uint32_t. */
-    archive& operator&(std::uint32_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a std::int64_t. */
-    archive& operator&(std::int64_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-        return *this;
-    }
-
-    /** Serialize a std::int64_t. */
-    archive& operator&(std::uint64_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-        return *this;
-    }
-
-#ifdef __clang__
-    /** Serialize a std::size_t. */
-    archive& operator&(std::size_t& i)
-    {
-        serialize(reinterpret_cast<std::byte*>(&i), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-        return *this;
-    }
-#endif
-
-    /** Serialize a float. */
-    archive& operator&(float& f)
-    {
-        serialize(reinterpret_cast<std::byte*>(&f), 4);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        return *this;
-    }
-
-    /** Serialize a double. */
-    archive& operator&(double& d)
-    {
-        serialize(reinterpret_cast<std::byte*>(&d), 8);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
+        serialize(std::as_writable_bytes(std::span<T>(&s, 1)));
         return *this;
     }
 };

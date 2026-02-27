@@ -394,8 +394,11 @@ void context::exec(
             case opcode::adup:
             {
                 frame.stack.dup_addr();
+
                 void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                std::memcpy(static_cast<void*>(&addr), frame.stack.end(sizeof(void*)), sizeof(void*));
+                auto tail = frame.stack.tail(sizeof(addr));
+                std::memcpy(&addr, tail.data(), tail.size());
+
                 gc.add_temporary(addr);
                 break;
             } /* opcode::adup */
@@ -409,7 +412,8 @@ void context::exec(
                 if(needs_gc != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2), size1);
+                    auto tail = frame.stack.tail((2 * size1) + size2);
+                    std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
                 break;
@@ -425,7 +429,8 @@ void context::exec(
                 if(needs_gc != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    std::memcpy(static_cast<void*>(&addr), frame.stack.end((2 * size1) + size2 + size3), size1);
+                    auto tail = frame.stack.tail((2 * size1) + size2 + size3);
+                    std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
                 break;
@@ -441,13 +446,15 @@ void context::exec(
                 if(needs_gc1 != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size1 + size2), size1);
+                    auto tail = frame.stack.tail(size1 + size2);
+                    std::memcpy(&addr, tail.data(), size1);
                     gc.add_temporary(addr);
                 }
                 if(needs_gc2 != 0)
                 {
                     void* addr;    // NOLINT(cppcoreguidelines-init-variables)
-                    std::memcpy(static_cast<void*>(&addr), frame.stack.end(size2), size2);
+                    auto tail = frame.stack.tail(size2);
+                    std::memcpy(&addr, tail.data(), size2);
                     gc.add_temporary(addr);
                 }
                 break;
@@ -1272,8 +1279,9 @@ void context::exec(
                       details.locals_size,
                       details.stack_size};
 
-                    auto* args_start = reinterpret_cast<std::byte*>(frame.stack.end(details.args_size));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                    std::copy(args_start, args_start + details.args_size, callee_frame.locals.data());      // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                    std::ranges::copy(
+                      frame.stack.tail(details.args_size),
+                      callee_frame.locals.begin());
                     frame.stack.discard(details.args_size);
 
                     // clean up arguments in GC
@@ -1420,7 +1428,7 @@ void context::exec(
                     }
 
                     std::memcpy(
-                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                       static_cast<void*>(&v),
                       sizeof(v));
                 }
@@ -1435,7 +1443,7 @@ void context::exec(
                     gc.remove_temporary(type_ref);
 
                     std::memcpy(
-                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                       static_cast<void*>(&v),
                       sizeof(v));
                 }
@@ -1467,7 +1475,7 @@ void context::exec(
                     void* v;    // NOLINT(cppcoreguidelines-init-variables)
                     std::memcpy(
                       static_cast<void*>(&v),
-                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                       sizeof(v));
                     frame.stack.push_addr(v);
 
@@ -1481,7 +1489,7 @@ void context::exec(
                     std::int32_t v;    // NOLINT(cppcoreguidelines-init-variables)
                     std::memcpy(
                       static_cast<void*>(&v),
-                      reinterpret_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
                       sizeof(v));
                     frame.stack.push_cat1(v);
                 }
@@ -1574,12 +1582,12 @@ void context::exec(
                     throw interpreter_error("Negative shift.");
                 }
 
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
+                // NOLINTNEXTLINE(readability-magic-numbers)
+                std::uint32_t a_u32 = static_cast<std::uint32_t>(a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
-                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                  { auto s_u32 = static_cast<std::uint32_t>(s);
                     return static_cast<std::int32_t>(s_u32 << a_u32); });
                 break;
             } /* opcode::ishl */
@@ -1591,12 +1599,12 @@ void context::exec(
                     throw interpreter_error("Negative shift.");
                 }
 
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x3f;    // mask because of 64-bit int.
+                // NOLINTNEXTLINE(readability-magic-numbers)
+                std::uint32_t a_u32 = static_cast<std::uint32_t>(a) & 0x3f;    // mask because of 64-bit int.
 
                 frame.stack.modify_top<std::int64_t, std::int64_t>(
                   [a_u32](std::int64_t s) -> std::int64_t
-                  { std::uint64_t s_u64 = *reinterpret_cast<std::uint64_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                  { auto s_u64 = static_cast<std::uint64_t>(s);
                     return static_cast<std::int64_t>(s_u64 << a_u32); });
                 break;
             } /* opcode::lshl */
@@ -1608,12 +1616,12 @@ void context::exec(
                     throw interpreter_error("Negative shift.");
                 }
 
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x1f;    // mask because of 32-bit int.
+                // NOLINTNEXTLINE(readability-magic-numbers)
+                std::uint32_t a_u32 = static_cast<std::uint32_t>(a) & 0x1f;    // mask because of 32-bit int.
 
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [a_u32](std::int32_t s) -> std::int32_t
-                  { std::uint32_t s_u32 = *reinterpret_cast<std::uint32_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                  { auto s_u32 = static_cast<std::uint32_t>(s);
                     return static_cast<std::int32_t>(s_u32 >> a_u32); });
                 break;
             } /* opcode::ishr */
@@ -1625,12 +1633,12 @@ void context::exec(
                     throw interpreter_error("Negative shift.");
                 }
 
-                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,readability-magic-numbers)
-                std::uint32_t a_u32 = *reinterpret_cast<std::uint32_t*>(&a) & 0x3f;    // mask because of 64-bit int.
+                // NOLINTNEXTLINE(readability-magic-numbers)
+                std::uint32_t a_u32 = static_cast<std::uint32_t>(a) & 0x3f;    // mask because of 64-bit int.
 
                 frame.stack.modify_top<std::int64_t, std::int64_t>(
                   [a_u32](std::int64_t s) -> std::int64_t
-                  { std::uint64_t s_u64 = *reinterpret_cast<std::uint64_t*>(&s);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                  { auto s_u64 = static_cast<std::uint64_t>(s);
                     return static_cast<std::int64_t>(s_u64 >> a_u32); });
                 break;
             } /* opcode::lshr */

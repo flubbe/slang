@@ -56,7 +56,7 @@ private:
             if(v != nullptr)
             {
                 std::destroy(v->data, v->data + v->size);
-                std::free(reinterpret_cast<pointer>(v));
+                std::free(v);
             }
         }
     };
@@ -86,7 +86,7 @@ private:
             throw std::bad_alloc();
         }
 
-        auto data_ptr = data_pointer{reinterpret_cast<vector_data*>(ptr)};
+        auto data_ptr = data_pointer{static_cast<vector_data*>(ptr)};
         data_ptr->size = n;
 
         if(!uninitialized)

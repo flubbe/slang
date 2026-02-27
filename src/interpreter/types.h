@@ -13,6 +13,7 @@
 #include <any>
 #include <cstring>
 #include <functional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -107,7 +108,7 @@ class operand_stack
 {
 protected:
     /** The stack. */
-    std::vector<std::uint8_t> stack;
+    std::vector<std::byte> stack;
 
     /** Maximal size. */
     std::size_t max_size;
@@ -236,7 +237,7 @@ public:
             throw interpreter_error("Invalid stack access.");
         }
 
-        std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
+        std::vector<std::byte> copy = {stack.end() - size1, stack.end()};
         stack.insert(
           stack.end() - size1 - size2,
           copy.begin(),
@@ -251,7 +252,7 @@ public:
             throw interpreter_error("Invalid stack access.");
         }
 
-        std::vector<std::uint8_t> copy = {stack.end() - size1, stack.end()};
+        std::vector<std::byte> copy = {stack.end() - size1, stack.end()};
         stack.insert(
           stack.end() - size1 - size2 - size3,
           copy.begin(),
@@ -265,17 +266,21 @@ public:
      */
     template<typename T>
         requires(sizeof(T) == 4
-                 && std::is_scalar_v<T>)
+                 && std::is_trivially_copyable_v<T>)
     void push_cat1(T i)
     {
-        if(stack.size() + 4 > max_size)
+        if(stack.size() + sizeof(T) > max_size)
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(
-          stack.end(),
-          reinterpret_cast<std::uint8_t*>(&i),
-          reinterpret_cast<std::uint8_t*>(&i) + 4);
+
+        auto src = std::as_bytes(std::span{&i, 1});
+        const auto old = stack.size();
+        stack.resize(old + src.size());
+        std::memcpy(
+          stack.data() + old,
+          src.data(),
+          src.size());
     }
 
     /**
@@ -285,17 +290,21 @@ public:
      */
     template<typename T>
         requires(sizeof(T) == 8
-                 && std::is_scalar_v<T>)
+                 && std::is_trivially_copyable_v<T>)
     void push_cat2(T i)
     {
-        if(stack.size() + 8 > max_size)
+        if(stack.size() + sizeof(T) > max_size)
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(
-          stack.end(),
-          reinterpret_cast<std::uint8_t*>(&i),
-          reinterpret_cast<std::uint8_t*>(&i) + 8);
+
+        auto src = std::as_bytes(std::span{&i, 1});
+        const auto old = stack.size();
+        stack.resize(old + src.size());
+        std::memcpy(
+          stack.data() + old,
+          src.data(),
+          src.size());
     }
 
     /**
@@ -310,10 +319,14 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(
-          stack.end(),
-          reinterpret_cast<std::uint8_t*>(&addr),
-          reinterpret_cast<std::uint8_t*>(&addr) + sizeof(const T*));
+
+        auto src = std::as_bytes(std::span{&addr, 1});
+        const auto old = stack.size();
+        stack.resize(old + src.size());
+        std::memcpy(
+          stack.data() + old,
+          src.data(),
+          src.size());
     }
 
     /**
@@ -327,26 +340,31 @@ public:
         {
             throw interpreter_error("Stack overflow.");
         }
-        stack.insert(
-          stack.end(),
-          other.stack.begin(),
-          other.stack.end());
+
+        const auto old = stack.size();
+        const auto n = other.stack.size();
+
+        stack.resize(old + n);
+        std::memcpy(
+          stack.data() + old,
+          other.stack.data(),
+          n);
     }
 
     /** Pop an category 1 type (32 bit) from the stack. */
     template<typename T>
         requires(sizeof(T) == 4
-                 && std::is_scalar_v<T>)
+                 && std::is_trivially_copyable_v<T>)
     T pop_cat1()
     {
-        if(stack.size() < 4)
+        if(stack.size() < sizeof(T))
         {
             throw interpreter_error("Stack underflow.");
         }
 
         T i;
-        std::memcpy(&i, &stack[stack.size() - 4], 4);
-        stack.resize(stack.size() - 4);
+        std::memcpy(&i, &stack[stack.size() - sizeof(T)], sizeof(T));
+        stack.resize(stack.size() - sizeof(T));
 
         return i;
     }
@@ -354,17 +372,17 @@ public:
     /** Pop an category 2 type (64 bit) from the stack. */
     template<typename T>
         requires(sizeof(T) == 8
-                 && std::is_scalar_v<T>)
+                 && std::is_trivially_copyable_v<T>)
     T pop_cat2()
     {
-        if(stack.size() < 8)
+        if(stack.size() < sizeof(T))
         {
             throw interpreter_error("Stack underflow.");
         }
 
         T i;
-        std::memcpy(&i, &stack[stack.size() - 8], 8);
-        stack.resize(stack.size() - 8);
+        std::memcpy(&i, &stack[stack.size() - sizeof(T)], sizeof(T));
+        stack.resize(stack.size() - sizeof(T));
 
         return i;
     }
@@ -372,7 +390,7 @@ public:
     /** Modify the top value on the stack in-place. */
     template<typename T, typename U>
         requires(sizeof(T) == sizeof(U)
-                 && std::is_scalar_v<T> && std::is_scalar_v<U>)
+                 && std::is_trivially_copyable_v<T> && std::is_trivially_copyable_v<U>)
     void modify_top(std::function<U(T)> func)
     {
         if(stack.size() < sizeof(T))
@@ -402,18 +420,18 @@ public:
     }
 
     /**
-     * Get a pointer to the end minus an offset.
+     * Get a span for the stack tail.
      *
-     * @param offset Offset to subtract from the end.
+     * @param n Tail length.
      * @throws Throws an `interpreter_error` if a stack underflow occurs.
      */
-    std::uint8_t* end(std::size_t offset = 0)
+    std::span<std::byte> tail(std::size_t n)
     {
-        if(offset > stack.size())
+        if(n > stack.size())
         {
             throw interpreter_error("Stack underflow");
         }
-        return &stack[stack.size() - offset];
+        return {&stack[stack.size() - n], n};
     }
 
     /**

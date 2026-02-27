@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <format>
+#include <cstring>
 #include <utility>
 
 #include "vector.h"
@@ -26,6 +27,27 @@ namespace si = slang::interpreter;
 
 namespace slang::gc
 {
+
+/**
+ * Load a pointer from an address, given by `base` and `offset`.
+ *
+ * @note There are no alignment requirements on the pointer.
+ *
+ * @param base The base address.
+ * @param offset Offset from the base.
+ * @returns Returns the loaded pointer.
+ */
+static inline void* load_pointer(
+  const void* base,
+  std::size_t offset) noexcept
+{
+    void* p;
+    std::memcpy(
+      static_cast<void*>(&p),
+      static_cast<const std::byte*>(base) + offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(void*));
+    return p;
+}
 
 void garbage_collector::mark_object(
   void* obj)
@@ -63,12 +85,10 @@ void garbage_collector::mark_object(
         }
 
         GC_LOG("mark_object {}: object layout", obj);
-        void* outer_obj = *reinterpret_cast<void**>(obj);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        void* outer_obj = load_pointer(obj, 0);
         for(auto offset: *it->second.layout)
         {
-            auto* inner_obj = *reinterpret_cast<void**>(       // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-              static_cast<std::byte*>(outer_obj) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
+            auto* inner_obj = load_pointer(outer_obj, offset);
             mark_object(inner_obj);
         }
 
@@ -106,9 +126,8 @@ void garbage_collector::mark_object(
         const auto& layout = type_layouts[obj_info.layout_id.value()];
         for(auto offset: layout.second)
         {
-            auto* obj = *reinterpret_cast<void**>(                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-              static_cast<std::byte*>(obj_info.addr) + offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            mark_object(obj);
+            auto* inner_obj = load_pointer(obj_info.addr, offset);
+            mark_object(inner_obj);
         }
     }
 }
