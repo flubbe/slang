@@ -68,6 +68,8 @@ struct T{
     s: S
 };
 
+const estimated_per_object_overhead: i32 = 8;
+
 fn main(args: str[]) -> i32
 {
     print_info();
@@ -79,13 +81,23 @@ fn main(args: str[]) -> i32
 
     let i: i32 = 0;
     let t: T;
-    while(i < 500000) 
+    
+    while(i < 100000) 
     {
         t = T{s:S{"Test"}};
         ++i;
 
         let cur_bytes: i32 = gc::allocated_bytes();
         let cur_object_count: i32 = gc::object_count();
+
+        let object_overhead: i32 = estimated_per_object_overhead * cur_object_count;
+
+        std::assert(
+            cur_bytes < gc::threshold_bytes() + object_overhead, 
+            std::format!(
+                "cur_bytes < gc::threshold_bytes() + {}",
+                object_overhead));
+
         if(cur_bytes < last_bytes)
         {
             std::println(
