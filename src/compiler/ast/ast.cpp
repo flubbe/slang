@@ -232,6 +232,13 @@ void expression::collect_attributes(sema::env& env) const
           if(expr.get_id() == node_identifier::directive_expression)
           {
               const auto* dir_expr = static_cast<const directive_expression*>(&expr);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              if(!dir_expr->get_target()->symbol_id.has_value())
+              {
+                  // The target is not a symbol, so we cannot attach an attribute.
+                  // For example: Disabling constant evaluation on an expression.
+                  return;
+              }
+
               const std::string& name = dir_expr->get_name();
 
               auto kind = attribs::get_attribute_kind(name);
@@ -246,27 +253,18 @@ void expression::collect_attributes(sema::env& env) const
 
               // TODO Formalize attribute specification and allow other argument types.
 
-              if(!dir_expr->get_target()->symbol_id.has_value())
-              {
-                  std::println(
-                    "{}: Warning: Currently directives can only be attached to symbols.",
-                    slang::to_string(expr.loc));
-              }
-              else
-              {
-                  env.attach_attribute(
-                    dir_expr->get_target()->symbol_id.value(),
-                    sema::attribute_info{
-                      .kind = kind.value(),
-                      .loc = expr.get_location(),
-                      .payload = dir_expr->get_args()
-                                 | std::views::transform(
-                                   [](const std::pair<token, token>& p) -> std::pair<std::string, std::string>
-                                   {
-                                       return std::make_pair(p.first.s, p.second.s);
-                                   })
-                                 | std::ranges::to<std::vector>()});
-              }
+              env.attach_attribute(
+                dir_expr->get_target()->symbol_id.value(),
+                sema::attribute_info{
+                  .kind = kind.value(),
+                  .loc = expr.get_location(),
+                  .payload = dir_expr->get_args()
+                             | std::views::transform(
+                               [](const std::pair<token, token>& p) -> std::pair<std::string, std::string>
+                               {
+                                   return std::make_pair(p.first.s, p.second.s);
+                               })
+                             | std::ranges::to<std::vector>()});
           }
       },
       false, /* don't visit this node */
