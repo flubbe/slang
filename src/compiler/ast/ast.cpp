@@ -780,7 +780,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                     throw ty::type_error(
                       loc,
                       std::format(
-                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}",
+                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}.",
                         tok.s,
                         std::numeric_limits<float>::min(),
                         std::numeric_limits<float>::max()));
@@ -5923,17 +5923,39 @@ void if_statement::generate_code(
   cg::context& ctx) const
 {
     // Evaluate constant subexpressions.
-    auto v = condition->try_emit_const_eval_result(ctx);
-    if(v == nullptr)
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(condition.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
     {
-        v = condition->emit_rvalue(ctx, true);
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        if(std::get<std::int64_t>(info.value) != 0)
+        {
+            if_block->generate_code(ctx);
+        }
+        else if(else_block != nullptr)
+        {
+            else_block->generate_code(ctx);
+        }
+
+        return;
     }
+
+    auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
+            "Expected if condition to be of type 'i32', got '{}.'",
             v->get_type().to_string()));
     }
 
@@ -6026,7 +6048,7 @@ std::optional<ty::type_id> if_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
+            "Expected if condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 
@@ -6133,7 +6155,7 @@ std::optional<ty::type_id> while_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected while condition to be of type 'i32', got '{}",
+            "Expected while condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 
