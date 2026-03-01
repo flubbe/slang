@@ -1674,7 +1674,7 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }
@@ -1683,7 +1683,7 @@ public:
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }
@@ -3497,6 +3497,18 @@ public:
         return expr->is_pure(ctx);
     }
 
+    std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override
+    {
+        auto v = expr->evaluate(ctx, env);
+        if(v.has_value())
+        {
+            env.set_expression_value(*expr, v.value());
+        }
+        return std::nullopt;
+    }
+
     void generate_code(
       cg::context& ctx) const override;
     std::unique_ptr<cg::rvalue> emit_rvalue(
@@ -3512,7 +3524,7 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }
@@ -3521,7 +3533,7 @@ public:
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }
@@ -3624,6 +3636,32 @@ public:
     [[nodiscard]] std::unique_ptr<expression> clone() const override;
     void serialize(archive& ar) override;
 
+    [[nodiscard]]
+    bool is_const_eval(const_::env& env) const override
+    {
+        if(expr != nullptr)
+        {
+            return expr->is_const_eval(env);
+        }
+
+        return true;
+    }
+
+    std::optional<const_::const_info> evaluate(
+      ty::context& ctx,
+      const_::env& env) const override
+    {
+        if(expr != nullptr)
+        {
+            auto v = expr->evaluate(ctx, env);
+            if(v.has_value())
+            {
+                env.set_expression_value(*expr, v.value());
+            }
+        }
+        return std::nullopt;
+    }
+
     void generate_code(
       cg::context& ctx) const override;
     void collect_names(co::context& ctx) override;
@@ -3636,7 +3674,7 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }
@@ -3645,7 +3683,7 @@ public:
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        if(expr)
+        if(expr != nullptr)
         {
             return {expr.get()};
         }

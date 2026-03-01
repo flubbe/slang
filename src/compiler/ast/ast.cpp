@@ -246,18 +246,27 @@ void expression::collect_attributes(sema::env& env) const
 
               // TODO Formalize attribute specification and allow other argument types.
 
-              env.attach_attribute(
-                dir_expr->get_target()->symbol_id.value(),
-                sema::attribute_info{
-                  .kind = kind.value(),
-                  .loc = expr.get_location(),
-                  .payload = dir_expr->get_args()
-                             | std::views::transform(
-                               [](const std::pair<token, token>& p) -> std::pair<std::string, std::string>
-                               {
-                                   return std::make_pair(p.first.s, p.second.s);
-                               })
-                             | std::ranges::to<std::vector>()});
+              if(!dir_expr->get_target()->symbol_id.has_value())
+              {
+                  std::println(
+                    "{}: Warning: Currently directives can only be attached to symbols.",
+                    slang::to_string(expr.loc));
+              }
+              else
+              {
+                  env.attach_attribute(
+                    dir_expr->get_target()->symbol_id.value(),
+                    sema::attribute_info{
+                      .kind = kind.value(),
+                      .loc = expr.get_location(),
+                      .payload = dir_expr->get_args()
+                                 | std::views::transform(
+                                   [](const std::pair<token, token>& p) -> std::pair<std::string, std::string>
+                                   {
+                                       return std::make_pair(p.first.s, p.second.s);
+                                   })
+                                 | std::ranges::to<std::vector>()});
+              }
           }
       },
       false, /* don't visit this node */
@@ -784,7 +793,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                    && std::isfinite(v))
                 {
                     std::println(
-                      "{} Warning: Floating point literal '{}' underflows to 0.0 in f32.",
+                      "{}: Warning: Floating point literal '{}' underflows to 0.0 in f32.",
                       slang::to_string(loc),
                       tok.s);
                 }
@@ -5804,9 +5813,10 @@ void return_statement::generate_code(
     {
         // Evaluate constant subexpressions.
         if(std::unique_ptr<cg::rvalue> v;
-           (v = try_emit_const_eval_result(ctx)) != nullptr)
+           (v = expr->try_emit_const_eval_result(ctx)) != nullptr)
         {
             ctx.generate_ret(v->get_type());
+            return;
         }
 
         auto v = expr->emit_rvalue(ctx, true);
