@@ -443,7 +443,7 @@ void expression::insert_implicit_casts(
           }
           else if(expr.get_id() == node_identifier::variable_declaration_expression)
           {
-              static_cast<variable_declaration_expression*>(&expr)->insert_implicit_casts(ctx, env);
+              expr.as_variable_declaration()->insert_implicit_casts(ctx, env);
           }
       },
       false,
@@ -3355,7 +3355,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
 {
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -3976,7 +3976,7 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
 
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -4380,7 +4380,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -5085,7 +5085,7 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    if(exprs.size() == 0)
+    if(exprs.empty())
     {
         return nullptr;
     }
@@ -5811,7 +5811,7 @@ void return_statement::generate_code(
     {
         // Evaluate constant subexpressions.
         if(std::unique_ptr<cg::rvalue> v;
-           (v = expr->try_emit_const_eval_result(ctx)) != nullptr)
+           (v = expr->try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
         {
             ctx.generate_ret(v->get_type());
             return;
@@ -5922,7 +5922,12 @@ void if_statement::serialize(archive& ar)
 void if_statement::generate_code(
   cg::context& ctx) const
 {
-    auto v = condition->emit_rvalue(ctx, true);
+    // Evaluate constant subexpressions.
+    auto v = condition->try_emit_const_eval_result(ctx);
+    if(v == nullptr)
+    {
+        v = condition->emit_rvalue(ctx, true);
+    }
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -6074,7 +6079,12 @@ void while_statement::generate_code(
 
     ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
 
-    auto v = condition->emit_rvalue(ctx, true);
+    // Evaluate constant subexpressions.
+    auto v = condition->try_emit_const_eval_result(ctx);
+    if(v == nullptr)
+    {
+        v = condition->emit_rvalue(ctx, true);
+    }
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
