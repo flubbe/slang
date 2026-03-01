@@ -127,6 +127,43 @@ target_compile_options(test_compile_ir PRIVATE
 )
 add_test(NAME compile_ir COMMAND test_compile_ir)
 
+add_executable(test_consteval
+    test_consteval.cpp
+    ../src/archives/file.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/builtins.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_consteval GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_consteval PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME consteval COMMAND test_consteval)
+
+
 add_executable(test_type_system
     test_type_system.cpp
     ../src/archives/file.cpp
@@ -162,7 +199,7 @@ target_compile_options(test_type_system PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME type_system COMMAND test_type_system)
-set_tests_properties(type_system PROPERTIES 
+set_tests_properties(type_system PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
 )
@@ -203,7 +240,7 @@ target_compile_options(test_resolve PRIVATE
 )
 add_test(NAME resolve COMMAND test_resolve)
 set_tests_properties(resolve PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
-set_tests_properties(type_system PROPERTIES 
+set_tests_properties(type_system PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
 )
@@ -246,7 +283,7 @@ target_compile_options(test_opt_cfg PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME opt_cfg COMMAND test_opt_cfg)
-set_tests_properties(opt_cfg PROPERTIES 
+set_tests_properties(opt_cfg PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
@@ -287,7 +324,7 @@ target_compile_options(test_output PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME output COMMAND test_output)
-set_tests_properties(output PROPERTIES 
+set_tests_properties(output PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
     FIXTURES_SETUP output
@@ -339,7 +376,7 @@ target_compile_options(test_ast_serialization PRIVATE
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
 add_test(NAME ast_serialization COMMAND test_ast_serialization)
-set_tests_properties(ast_serialization PROPERTIES 
+set_tests_properties(ast_serialization PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED needs_std
 )
@@ -382,7 +419,7 @@ target_compile_options(test_interpreter PRIVATE
 )
 add_test(NAME interpreter COMMAND test_interpreter)
 set_tests_properties(interpreter PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
-set_tests_properties(type_system PROPERTIES 
+set_tests_properties(type_system PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     FIXTURES_REQUIRED output
 )
@@ -409,8 +446,8 @@ add_compile_test(
     src/lang/std -o lang/std
 )
 set_tests_properties(
-    "build std (default, compile)" 
-    PROPERTIES FIXTURES_SETUP 
+    "build std (default, compile)"
+    PROPERTIES FIXTURES_SETUP
     needs_std
 )
 
@@ -420,8 +457,8 @@ add_compile_test(
     src/lang/gc -o lang/gc
 )
 set_tests_properties(
-    "build gc (default, compile)" 
-    PROPERTIES FIXTURES_SETUP 
+    "build gc (default, compile)"
+    PROPERTIES FIXTURES_SETUP
     needs_gc
 )
 
@@ -601,8 +638,8 @@ add_compile_exec_test(
     test/macros/test_import --search-path test/macros
 )
 set_tests_properties(
-    "slang macro import (default, compile)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang macro import (default, compile)"
+    PROPERTIES FIXTURES_REQUIRED
     test_macros
 )
 add_compile_exec_test(
@@ -611,8 +648,8 @@ add_compile_exec_test(
     test/macros/test_transitive_import1 --search-path test/macros
 )
 set_tests_properties(
-    "slang macro transitive import 1 (default, compile)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang macro transitive import 1 (default, compile)"
+    PROPERTIES FIXTURES_REQUIRED
     test_import
 )
 add_compile_exec_test(
@@ -621,8 +658,8 @@ add_compile_exec_test(
     test/macros/test_transitive_import2 --search-path test/macros
 )
 set_tests_properties(
-    "slang macro transitive import 2 (default, compile)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang macro transitive import 2 (default, compile)"
+    PROPERTIES FIXTURES_REQUIRED
     test_transitive_import1
 )
 add_compile_exec_test(
@@ -632,7 +669,7 @@ add_compile_exec_test(
 )
 set_tests_properties(
     "slang macro struct (default, compile)"
-    PROPERTIES 
+    PROPERTIES
     FIXTURES_REQUIRED needs_std
 )
 add_compile_exec_test(
@@ -681,8 +718,8 @@ add_compile_test(
     test/example_package/hello
 )
 set_tests_properties(
-    "slang example_package/hello (default, compile)" 
-    PROPERTIES FIXTURES_SETUP 
+    "slang example_package/hello (default, compile)"
+    PROPERTIES FIXTURES_SETUP
     example_package_hello
 )
 
@@ -692,23 +729,23 @@ add_compile_exec_test(
     test/test_import --search-path test
 )
 set_tests_properties(
-    "slang test_import (default, compile)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang test_import (default, compile)"
+    PROPERTIES FIXTURES_REQUIRED
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (--no-eval-const-subexpr, compile)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang test_import (--no-eval-const-subexpr, compile)"
+    PROPERTIES FIXTURES_REQUIRED
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (default, run)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang test_import (default, run)"
+    PROPERTIES FIXTURES_REQUIRED
     example_package_hello
 )
 set_tests_properties(
-    "slang test_import (--no-eval-const-subexpr, run)" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "slang test_import (--no-eval-const-subexpr, run)"
+    PROPERTIES FIXTURES_REQUIRED
     example_package_hello
 )
 
@@ -731,12 +768,12 @@ set_tests_properties(
 
 set_tests_properties(
     "slang gc interface (default, compile)"
-    PROPERTIES 
+    PROPERTIES
     FIXTURES_REQUIRED needs_gc
 )
 set_tests_properties(
     "slang gc interface (default, run)"
-    PROPERTIES 
+    PROPERTIES
     FIXTURES_REQUIRED needs_gc
 )
 
@@ -776,7 +813,7 @@ add_my_test(
 )
 set_tests_properties(
     "slang examples/print_args -- Hello World"
-    PROPERTIES 
+    PROPERTIES
     FIXTURES_REQUIRED needs_std
 )
 
@@ -792,7 +829,7 @@ add_my_test(
 )
 set_tests_properties(
     "slang examples/string_conversion -- 3.141 a -1"
-    PROPERTIES 
+    PROPERTIES
     FIXTURES_REQUIRED needs_std
 )
 
@@ -812,21 +849,20 @@ add_compile_test(
     examples/native_integration
 )
 set_tests_properties(
-    "slang native_integration (default, compile)" 
-    PROPERTIES FIXTURES_SETUP 
+    "slang native_integration (default, compile)"
+    PROPERTIES FIXTURES_SETUP
     native_integration
 )
 
-add_test(NAME "native_integration" 
+add_test(NAME "native_integration"
     COMMAND ${CMAKE_BINARY_DIR}/examples/native_integration
 )
-set_tests_properties("native_integration" 
-    PROPERTIES 
+set_tests_properties("native_integration"
+    PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 set_tests_properties(
-    "native_integration" 
-    PROPERTIES FIXTURES_REQUIRED 
+    "native_integration"
+    PROPERTIES FIXTURES_REQUIRED
     native_integration
 )
-    

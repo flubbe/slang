@@ -232,6 +232,13 @@ void expression::collect_attributes(sema::env& env) const
           if(expr.get_id() == node_identifier::directive_expression)
           {
               const auto* dir_expr = static_cast<const directive_expression*>(&expr);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              if(!dir_expr->get_target()->symbol_id.has_value())
+              {
+                  // The target is not a symbol, so we cannot attach an attribute.
+                  // For example: Disabling constant evaluation on an expression.
+                  return;
+              }
+
               const std::string& name = dir_expr->get_name();
 
               auto kind = attribs::get_attribute_kind(name);
@@ -436,7 +443,7 @@ void expression::insert_implicit_casts(
           }
           else if(expr.get_id() == node_identifier::variable_declaration_expression)
           {
-              static_cast<variable_declaration_expression*>(&expr)->insert_implicit_casts(ctx, env);
+              expr.as_variable_declaration()->insert_implicit_casts(ctx, env);
           }
       },
       false,
@@ -773,7 +780,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                     throw ty::type_error(
                       loc,
                       std::format(
-                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}",
+                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}.",
                         tok.s,
                         std::numeric_limits<float>::min(),
                         std::numeric_limits<float>::max()));
@@ -784,7 +791,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                    && std::isfinite(v))
                 {
                     std::println(
-                      "{} Warning: Floating point literal '{}' underflows to 0.0 in f32.",
+                      "{}: Warning: Floating point literal '{}' underflows to 0.0 in f32.",
                       slang::to_string(loc),
                       tok.s);
                 }
@@ -3348,7 +3355,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
 {
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -3969,7 +3976,7 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
 
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -4373,7 +4380,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -5078,7 +5085,7 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    if(exprs.size() == 0)
+    if(exprs.empty())
     {
         return nullptr;
     }
@@ -5804,9 +5811,10 @@ void return_statement::generate_code(
     {
         // Evaluate constant subexpressions.
         if(std::unique_ptr<cg::rvalue> v;
-           (v = try_emit_const_eval_result(ctx)) != nullptr)
+           (v = expr->try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
         {
             ctx.generate_ret(v->get_type());
+            return;
         }
 
         auto v = expr->emit_rvalue(ctx, true);
@@ -5914,13 +5922,40 @@ void if_statement::serialize(archive& ar)
 void if_statement::generate_code(
   cg::context& ctx) const
 {
+    // Evaluate constant subexpressions.
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(condition.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        if(std::get<std::int64_t>(info.value) != 0)
+        {
+            if_block->generate_code(ctx);
+        }
+        else if(else_block != nullptr)
+        {
+            else_block->generate_code(ctx);
+        }
+
+        return;
+    }
+
     auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
+            "Expected if condition to be of type 'i32', got '{}.'",
             v->get_type().to_string()));
     }
 
@@ -6013,7 +6048,7 @@ std::optional<ty::type_id> if_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
+            "Expected if condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 
@@ -6066,7 +6101,12 @@ void while_statement::generate_code(
 
     ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
 
-    auto v = condition->emit_rvalue(ctx, true);
+    // Evaluate constant subexpressions.
+    auto v = condition->try_emit_const_eval_result(ctx);
+    if(v == nullptr)
+    {
+        v = condition->emit_rvalue(ctx, true);
+    }
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -6115,7 +6155,7 @@ std::optional<ty::type_id> while_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected while condition to be of type 'i32', got '{}",
+            "Expected while condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 
