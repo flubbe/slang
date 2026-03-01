@@ -6090,6 +6090,52 @@ void while_statement::serialize(archive& ar)
 void while_statement::generate_code(
   cg::context& ctx) const
 {
+    // Evaluate constant subexpressions.
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(condition.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              loc,
+              std::format(
+                "Expected while condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        if(std::get<std::int64_t>(info.value) != 0)
+        {
+            // set up basic blocks.
+            auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+            auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+            ctx.push_break_continue({merge_basic_block, while_loop_basic_block});
+
+            // while loop body.
+            ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
+            ctx.set_insertion_point(while_loop_basic_block);
+            while_block->generate_code(ctx);
+
+            ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
+
+            // TODO check for fall-through from while loop body.
+            if(!ctx.get_current_function(true)->get_basic_blocks().back()->ends_with_return())
+            {
+                ctx.generate_branch(while_loop_basic_block);
+            }
+
+            ctx.pop_break_continue(loc);
+
+            // emit merge block.
+            ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+            ctx.set_insertion_point(merge_basic_block);
+        }
+
+        return;
+    }
+
     // set up basic blocks.
     auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
@@ -6101,12 +6147,7 @@ void while_statement::generate_code(
 
     ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
 
-    // Evaluate constant subexpressions.
-    auto v = condition->try_emit_const_eval_result(ctx);
-    if(v == nullptr)
-    {
-        v = condition->emit_rvalue(ctx, true);
-    }
+    auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
@@ -6124,7 +6165,12 @@ void while_statement::generate_code(
     while_block->generate_code(ctx);
 
     ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
-    ctx.generate_branch(while_loop_header_basic_block);
+
+    // TODO check for fall-through from while loop body.
+    if(!ctx.get_current_function(true)->get_basic_blocks().back()->ends_with_return())
+    {
+        ctx.generate_branch(while_loop_header_basic_block);
+    }
 
     ctx.pop_break_continue(loc);
 
