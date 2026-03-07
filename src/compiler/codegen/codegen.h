@@ -1596,7 +1596,7 @@ class context
     std::size_t macro_invocation_id{0};
 
     /** The basic blocks for `break` and `continue` statements. */
-    std::vector<std::pair<basic_block*, basic_block*>> basic_block_brk_cnt;
+    std::vector<std::pair<basic_block*, basic_block*>> loop_context_stack;
 
     /** List of basic blocks. */
     std::vector<std::unique_ptr<basic_block>> basic_blocks;
@@ -1877,13 +1877,13 @@ public:
     }
 
     /**
-     * Push a new `break`-`continue` `basic_block` pair.
+     * Push a new loop context, that is, a `break`-`continue` `basic_block` pair.
      *
-     * @param brk_cnt The `break`-`continue` pair.
+     * @param loop_ctx The loop context / `break`-`continue` pair.
      */
-    void push_break_continue(std::pair<basic_block*, basic_block*> brk_cnt)
+    void push_loop_context(std::pair<basic_block*, basic_block*> loop_ctx)
     {
-        basic_block_brk_cnt.push_back(std::move(brk_cnt));
+        loop_context_stack.push_back(std::move(loop_ctx));
     }
 
     /**
@@ -1892,9 +1892,9 @@ public:
      * @param loc An optional token location. If provided, this is used in error reporting.
      * @throws Throws a `codegen_error` if the stack is empty.
      */
-    void pop_break_continue(std::optional<source_location> loc = std::nullopt)
+    void pop_loop_context(std::optional<source_location> loc = std::nullopt)
     {
-        if(basic_block_brk_cnt.empty())
+        if(loop_context_stack.empty())
         {
             if(loc.has_value())
             {
@@ -1905,7 +1905,7 @@ public:
                 throw codegen_error("Encountered break or continue statement outside of loop.");
             }
         }
-        basic_block_brk_cnt.pop_back();
+        loop_context_stack.pop_back();
     }
 
     /**
@@ -1917,7 +1917,7 @@ public:
     [[nodiscard]]
     std::pair<basic_block*, basic_block*> top_break_continue(std::optional<source_location> loc = std::nullopt)
     {
-        if(basic_block_brk_cnt.empty())
+        if(loop_context_stack.empty())
         {
             if(loc.has_value())
             {
@@ -1928,14 +1928,14 @@ public:
                 throw codegen_error("Encountered break or continue statement outside of loop.");
             }
         }
-        return basic_block_brk_cnt.back();
+        return loop_context_stack.back();
     }
 
     /** Get `break`-`continue` stack size. */
     [[nodiscard]]
     std::size_t get_break_continue_stack_size() const
     {
-        return basic_block_brk_cnt.size();
+        return loop_context_stack.size();
     }
 
     /** Get codegen flags. */

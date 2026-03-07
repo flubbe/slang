@@ -3955,30 +3955,26 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
      *    <binary-op>
      */
 
+    // Evaluate constant subexpressions.
+    if(std::unique_ptr<cg::rvalue> v;
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
+    {
+        return v;
+    }
+
     std::unique_ptr<cg::rvalue> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
 
     /* Case 0 (logical and/logical or). */
     if(op.s == "&&")
     {
-        // TODO Evaluate constant subexpressions
-
         // Short-circuit evaluation of "lhs && rhs".
         return generate_logical_and(ctx, lhs, rhs);
     }
 
     if(op.s == "||")
     {
-        // TODO Evaluate constant subexpressions
-
         // Short-circuit evaluation of "lhs || rhs".
         return generate_logical_or(ctx, lhs, rhs);
-    }
-
-    // Evaluate constant subexpressions.
-    if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
-    {
-        return v;
     }
 
     lhs_value = lhs->emit_rvalue(ctx, true);
@@ -6108,25 +6104,22 @@ void while_statement::generate_code(
         if(std::get<std::int64_t>(info.value) != 0)
         {
             // set up basic blocks.
-            auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+            auto* body_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
             auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
-            ctx.push_break_continue({merge_basic_block, while_loop_basic_block});
-
             // while loop body.
-            ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
-            ctx.set_insertion_point(while_loop_basic_block);
+            ctx.get_current_function(true)->append_basic_block(body_basic_block);
+            ctx.set_insertion_point(body_basic_block);
+
+            ctx.push_loop_context({merge_basic_block, body_basic_block});
             while_block->generate_code(ctx);
+            ctx.pop_loop_context(loc);
 
-            ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
-
-            // TODO check for fall-through from while loop body.
-            if(!ctx.get_current_function(true)->get_basic_blocks().back()->ends_with_return())
+            if(auto* bb = ctx.get_insertion_point();
+               bb && !bb->is_terminated())
             {
-                ctx.generate_branch(while_loop_basic_block);
+                ctx.generate_branch(body_basic_block);
             }
-
-            ctx.pop_break_continue(loc);
 
             // emit merge block.
             ctx.get_current_function(true)->append_basic_block(merge_basic_block);
@@ -6137,15 +6130,13 @@ void while_statement::generate_code(
     }
 
     // set up basic blocks.
-    auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-    auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* condition_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* body_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
     // while loop header.
-    ctx.get_current_function(true)->append_basic_block(while_loop_header_basic_block);
-    ctx.set_insertion_point(while_loop_header_basic_block);
-
-    ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
+    ctx.get_current_function(true)->append_basic_block(condition_basic_block);
+    ctx.set_insertion_point(condition_basic_block);
 
     auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
@@ -6157,22 +6148,21 @@ void while_statement::generate_code(
             v->get_type().to_string()));
     }
 
-    ctx.generate_cond_branch(while_loop_basic_block, merge_basic_block);
+    ctx.generate_cond_branch(body_basic_block, merge_basic_block);
 
     // while loop body.
-    ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
-    ctx.set_insertion_point(while_loop_basic_block);
+    ctx.get_current_function(true)->append_basic_block(body_basic_block);
+    ctx.set_insertion_point(body_basic_block);
+
+    ctx.push_loop_context({merge_basic_block, condition_basic_block});
     while_block->generate_code(ctx);
+    ctx.pop_loop_context(loc);
 
-    ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
-
-    // TODO check for fall-through from while loop body.
-    if(!ctx.get_current_function(true)->get_basic_blocks().back()->ends_with_return())
+    if(auto* bb = ctx.get_insertion_point();
+       bb && !bb->is_terminated())
     {
-        ctx.generate_branch(while_loop_header_basic_block);
+        ctx.generate_branch(condition_basic_block);
     }
-
-    ctx.pop_break_continue(loc);
 
     // emit merge block.
     ctx.get_current_function(true)->append_basic_block(merge_basic_block);

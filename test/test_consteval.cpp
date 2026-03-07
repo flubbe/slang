@@ -556,7 +556,6 @@ TEST(const_eval, while_statement)
                   " jnz %1, %2\n"
                   "1:\n"
                   " jmp %2\n"
-                  " jmp %0\n"
                   "2:\n"
                   " const i32 0\n"
                   " ret i32\n"
