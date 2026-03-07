@@ -235,11 +235,12 @@ void disasm::invoke(const std::vector<std::string>& args)
     }
 
     auto module_name = module_path.filename().stem();
-    if(module_name.string().empty())
+    if(module_name.empty())
     {
-        throw std::runtime_error(std::format(
-          "Trying to get module name from path '{}' produced empty string.",
-          module_path.string()));
+        throw std::runtime_error(
+          std::format(
+            "Trying to get module name from path '{}' produced empty string.",
+            module_path.string()));
     }
 
     std::print("Module name: {}\n\n", module_name.string());

@@ -15,7 +15,8 @@
 namespace slang
 {
 
-bool file_manager::exists(const fs::path& p) const
+bool file_manager::exists(
+  const fs::path& p) const
 {
     if(p.is_absolute())
     {
@@ -30,7 +31,8 @@ bool file_manager::exists(const fs::path& p) const
       });
 }
 
-bool file_manager::is_file(const fs::path& p) const
+bool file_manager::is_file(
+  const fs::path& p) const
 {
     if(p.is_absolute())
     {
@@ -45,7 +47,8 @@ bool file_manager::is_file(const fs::path& p) const
       });
 }
 
-bool file_manager::is_directory(const fs::path& p) const
+bool file_manager::is_directory(
+  const fs::path& p) const
 {
     if(p.is_absolute())
     {
@@ -60,13 +63,17 @@ bool file_manager::is_directory(const fs::path& p) const
       });
 }
 
-fs::path file_manager::resolve(const fs::path& path) const
+fs::path file_manager::resolve(
+  const fs::path& path) const
 {
     if(path.is_absolute())
     {
         if(!fs::is_regular_file(path))
         {
-            throw file_error(std::format("Resolved path '{}' is not a file.", path.c_str()));
+            throw file_error(
+              std::format(
+                "Resolved path '{}' is not a file.",
+                path.string()));
         }
         return fs::canonical(path);
     }
@@ -79,10 +86,15 @@ fs::path file_manager::resolve(const fs::path& path) const
         }
     }
 
-    throw file_error(std::format("Unable to resolve path '{}'.", path.c_str()));
+    throw file_error(
+      std::format(
+        "Unable to resolve path '{}'.",
+        path.string()));
 }
 
-std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode mode) const
+std::unique_ptr<file_archive> file_manager::open(
+  const fs::path& path,
+  open_mode mode) const
 {
     fs::path resolved_path;
 
@@ -104,17 +116,24 @@ std::unique_ptr<file_archive> file_manager::open(const fs::path& path, open_mode
 
     if(resolved_path.empty())
     {
-        throw file_error(std::format("Unable to find file '{}' in search paths.", path.string()));
+        throw file_error(
+          std::format(
+            "Unable to find file '{}' in search paths.",
+            path.string()));
     }
 
     if(mode == open_mode::read)
     {
-        return std::make_unique<file_read_archive>(resolved_path, std::endian::little);
+        return std::make_unique<file_read_archive>(
+          resolved_path,
+          std::endian::little);
     }
 
     if(mode == open_mode::write)
     {
-        return std::make_unique<file_write_archive>(resolved_path, std::endian::little);
+        return std::make_unique<file_write_archive>(
+          resolved_path,
+          std::endian::little);
     }
 
     throw std::runtime_error("Invalid file open mode.");
