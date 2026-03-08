@@ -3770,6 +3770,110 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
     std::unique_ptr<cg::rvalue> lhs_value;
     std::unique_ptr<cg::rvalue> rhs_value;
 
+    /*
+     * At least one of the expressions is not evaluated.
+     */
+
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(lhs.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        // r.h.s. is not evaluated.
+
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        // Short circuit: don't generate code if expression is false-ish.
+        if(std::get<std::int64_t>(info.value) == 0)
+        {
+            ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+        }
+
+        // l.h.s. is true-ish: always generate r.h.s.
+
+        rhs_value = rhs->emit_rvalue(ctx, true);
+        if(!rhs_value)
+        {
+            throw cg::codegen_error(
+              rhs->get_location(),
+              "Expression didn't produce a value.");
+        }
+        if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+        {
+            throw cg::codegen_error(
+              rhs->get_location(),
+              std::format(
+                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                rhs_value->get_type().to_string()));
+        }
+
+        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+        ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: (rhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    const_eval_it = ctx.get_const_env().const_eval_expr_values.find(rhs.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        // l.h.s. is not evaluated.
+
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        // always evaluate l.h.s.
+
+        lhs_value = lhs->emit_rvalue(ctx, true);
+        if(!lhs_value)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              "Expression didn't produce a value.");
+        }
+        if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                lhs_value->get_type().to_string()));
+        }
+
+        // if the r.h.s. is false-ish, the expression will always evaluate to false.
+        if(std::get<std::int64_t>(info.value) == 0)
+        {
+            ctx.generate_pop(lhs_value->get_type());
+            ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+
+            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+        }
+
+        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+        ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    /*
+     * Both evaluations need to be generated.
+     */
+
     lhs_value = lhs->emit_rvalue(ctx, true);
     if(!lhs_value)
     {
@@ -3862,6 +3966,110 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
     std::unique_ptr<cg::rvalue> lhs_value;
     std::unique_ptr<cg::rvalue> rhs_value;
 
+    /*
+     * At least one of the expressions is not evaluated.
+     */
+
+    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(lhs.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        // r.h.s. is not evaluated.
+
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        // Short circuit: don't generate code if expression is true-ish.
+        if(std::get<std::int64_t>(info.value) != 0)
+        {
+            ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
+            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+        }
+
+        // l.h.s. is false-ish: always generate r.h.s.
+
+        rhs_value = rhs->emit_rvalue(ctx, true);
+        if(!rhs_value)
+        {
+            throw cg::codegen_error(
+              rhs->get_location(),
+              "Expression didn't produce a value.");
+        }
+        if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+        {
+            throw cg::codegen_error(
+              rhs->get_location(),
+              std::format(
+                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                rhs_value->get_type().to_string()));
+        }
+
+        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+        ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: (rhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    const_eval_it = ctx.get_const_env().const_eval_expr_values.find(rhs.get());
+    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
+       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        // l.h.s. is not evaluated.
+
+        auto info = const_eval_it->second;
+        if(info.type != const_::constant_type::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Expected if condition to be of type 'i32', got '{}',",
+                const_::to_string(info.type)));
+        }
+
+        // always evaluate l.h.s.
+
+        lhs_value = lhs->emit_rvalue(ctx, true);
+        if(!lhs_value)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              "Expression didn't produce a value.");
+        }
+        if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
+        {
+            throw cg::codegen_error(
+              lhs->get_location(),
+              std::format(
+                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                lhs_value->get_type().to_string()));
+        }
+
+        // if the r.h.s. is true-ish, the expression will always evaluate to true.
+        if(std::get<std::int64_t>(info.value) != 0)
+        {
+            ctx.generate_pop(lhs_value->get_type());
+            ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
+
+            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+        }
+
+        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+        ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    /*
+     * Both evaluations need to be generated.
+     */
+
     lhs_value = lhs->emit_rvalue(ctx, true);
     if(!lhs_value)
     {
@@ -3908,7 +4116,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
           rhs->get_location(),
           std::format(
             "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
+            rhs_value->get_type().to_string()));
     }
 
     ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
