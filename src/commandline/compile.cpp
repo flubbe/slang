@@ -160,7 +160,10 @@ void compile::invoke(const std::vector<std::string>& args)
 
     if(!file_mgr.is_file(module_path))
     {
-        throw std::runtime_error(std::format("Module '{}' does not exist.", module_path.string()));
+        throw std::runtime_error(
+          std::format(
+            "Module '{}' does not exist.",
+            module_path.string()));
     }
 
     std::println("Compiling '{}'...", module_path.string());
@@ -256,7 +259,7 @@ void compile::invoke(const std::vector<std::string>& args)
     emitter.run();
 
     slang::module_::language_module mod = emitter.to_module();
-    slang::file_write_archive write_ar(output_file.string());
+    slang::file_write_archive write_ar{output_file};
     write_ar & mod;
 
     std::println("Compilation finished. Output file: {}", output_file.string());

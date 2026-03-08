@@ -232,6 +232,13 @@ void expression::collect_attributes(sema::env& env) const
           if(expr.get_id() == node_identifier::directive_expression)
           {
               const auto* dir_expr = static_cast<const directive_expression*>(&expr);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+              if(!dir_expr->get_target()->symbol_id.has_value())
+              {
+                  // The target is not a symbol, so we cannot attach an attribute.
+                  // For example: Disabling constant evaluation on an expression.
+                  return;
+              }
+
               const std::string& name = dir_expr->get_name();
 
               auto kind = attribs::get_attribute_kind(name);
@@ -436,7 +443,7 @@ void expression::insert_implicit_casts(
           }
           else if(expr.get_id() == node_identifier::variable_declaration_expression)
           {
-              static_cast<variable_declaration_expression*>(&expr)->insert_implicit_casts(ctx, env);
+              expr.as_variable_declaration()->insert_implicit_casts(ctx, env);
           }
       },
       false,
@@ -773,7 +780,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                     throw ty::type_error(
                       loc,
                       std::format(
-                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}",
+                        "Floating point literal '{}' cannot be represented as f32 (overflow to infinity). Valid finite range: {} to {}.",
                         tok.s,
                         std::numeric_limits<float>::min(),
                         std::numeric_limits<float>::max()));
@@ -784,7 +791,7 @@ std::optional<ty::type_id> literal_expression::type_check(
                    && std::isfinite(v))
                 {
                     std::println(
-                      "{} Warning: Floating point literal '{}' underflows to 0.0 in f32.",
+                      "{}: Warning: Floating point literal '{}' underflows to 0.0 in f32.",
                       slang::to_string(loc),
                       tok.s);
                 }
@@ -3348,7 +3355,7 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
 {
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -3748,6 +3755,41 @@ bool binary_expression::is_pure(cg::context& ctx) const
 }
 
 /**
+ * Get a `i32` value from the constants environment.
+ * Respects codegen flags.
+ *
+ * @param ctx The code generation context.
+ * @param expr The expression to get the value for.
+ */
+static std::optional<std::int64_t> get_const_i32(
+  cg::context& ctx,
+  const expression& expr)
+{
+    if(!ctx.has_flag(cg::codegen_flags::enable_const_eval))
+    {
+        return std::nullopt;
+    }
+
+    auto it = ctx.get_const_env().const_eval_expr_values.find(&expr);
+    if(it == ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        return std::nullopt;
+    }
+
+    const auto& info = it->second;
+    if(info.type != const_::constant_type::i32)
+    {
+        throw cg::codegen_error(
+          expr.get_location(),
+          std::format(
+            "Expected constant expression to be of type 'i32', got '{}'.",
+            const_::to_string(info.type)));
+    }
+
+    return std::get<std::int64_t>(info.value);
+}
+
+/**
  * Generate the control logic / short-circuit evaluation for _logical and_ operations (&&).
  *
  * @param ctx The code generation context.
@@ -3763,24 +3805,55 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
     std::unique_ptr<cg::rvalue> lhs_value;
     std::unique_ptr<cg::rvalue> rhs_value;
 
-    lhs_value = lhs->emit_rvalue(ctx, true);
-    if(!lhs_value)
+    /*
+     * At least one of the expressions is not evaluated.
+     */
+
+    auto v = get_const_i32(ctx, *lhs.get());
+    if(v.has_value())
     {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
+        // r.h.s. is not evaluated.
+
+        // Short circuit: don't generate code if expression is false-ish.
+        if(v.value() == 0)
+        {
+            return cg::emit_bool_const(ctx, false);
+        }
+
+        // l.h.s. is true-ish: always generate r.h.s.
+        rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical and operator");
+        cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: (rhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0)
+    v = get_const_i32(ctx, *rhs.get());
+    if(v.has_value())
+    {
+        // l.h.s. is not evaluated.
+
+        // always evaluate l.h.s.
+        lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical and operator");
+
+        // if the r.h.s. is false-ish, the expression will always evaluate to false.
+        if(v.value() == 0)
+        {
+            ctx.generate_pop(lhs_value->get_type());
+            return cg::emit_bool_const(ctx, false);
+        }
+
+        cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    /*
+     * Both evaluations need to be generated.
+     */
+
+    lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical and operator");
+
+    cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0)
 
     // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
@@ -3796,24 +3869,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
     ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
     ctx.set_insertion_point(lhs_true_basic_block);
 
-    rhs_value = rhs->emit_rvalue(ctx, true);
-    if(!rhs_value)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
-    }
+    rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical and operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... && (rhs != 0).
+    cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: ... && (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3821,7 +3879,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
      */
     ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
     ctx.set_insertion_point(lhs_false_basic_block);
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    cg::emit_bool_const(ctx, false);
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3855,24 +3913,56 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
     std::unique_ptr<cg::rvalue> lhs_value;
     std::unique_ptr<cg::rvalue> rhs_value;
 
-    lhs_value = lhs->emit_rvalue(ctx, true);
-    if(!lhs_value)
+    /*
+     * At least one of the expressions is not evaluated.
+     */
+
+    auto v = get_const_i32(ctx, *lhs.get());
+    if(v.has_value())
     {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
+        // r.h.s. is not evaluated.
+
+        // Short circuit: don't generate code if expression is true-ish.
+        if(v.value() != 0)
+        {
+            return cg::emit_bool_const(ctx, true);
+        }
+
+        // l.h.s. is false-ish: always generate r.h.s.
+        rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical or operator");
+
+        cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: (rhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs != 0)
+    v = get_const_i32(ctx, *rhs.get());
+    if(v.has_value())
+    {
+        // l.h.s. is not evaluated.
+
+        // always evaluate l.h.s.
+        lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical or operator");
+
+        // if the r.h.s. is true-ish, the expression will always evaluate to true.
+        if(v.value() != 0)
+        {
+            ctx.generate_pop(lhs_value->get_type());
+            return cg::emit_bool_const(ctx, true);
+        }
+
+        cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0).
+
+        return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+    }
+
+    /*
+     * Both evaluations need to be generated.
+     */
+
+    lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical or operator");
+
+    cg::emit_i32_is_zero(ctx, lhs_value->get_type());    // stack: (lhs == 0)
 
     // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
@@ -3888,24 +3978,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
     ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
     ctx.set_insertion_point(lhs_false_basic_block);
 
-    rhs_value = rhs->emit_rvalue(ctx, true);
-    if(!rhs_value)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
-    }
+    rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical or operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... || (rhs != 0).
+    cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: ... || (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3948,30 +4023,26 @@ std::unique_ptr<cg::rvalue> binary_expression::emit_rvalue(
      *    <binary-op>
      */
 
+    // Evaluate constant subexpressions.
+    if(std::unique_ptr<cg::rvalue> v;
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
+    {
+        return v;
+    }
+
     std::unique_ptr<cg::rvalue> lhs_value, lhs_store_value, rhs_value;    // NOLINT(readability-isolate-declaration)
 
     /* Case 0 (logical and/logical or). */
     if(op.s == "&&")
     {
-        // TODO Evaluate constant subexpressions
-
         // Short-circuit evaluation of "lhs && rhs".
         return generate_logical_and(ctx, lhs, rhs);
     }
 
     if(op.s == "||")
     {
-        // TODO Evaluate constant subexpressions
-
         // Short-circuit evaluation of "lhs || rhs".
         return generate_logical_or(ctx, lhs, rhs);
-    }
-
-    // Evaluate constant subexpressions.
-    if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
-    {
-        return v;
     }
 
     lhs_value = lhs->emit_rvalue(ctx, true);
@@ -4373,7 +4444,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
     // Evaluate constant subexpressions.
     if(std::unique_ptr<cg::rvalue> v;
-       (v = try_emit_const_eval_result(ctx)) != nullptr)
+       (v = try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
     {
         return v;
     }
@@ -5078,7 +5149,7 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
   cg::context& ctx,
   bool result_used) const
 {
-    if(exprs.size() == 0)
+    if(exprs.empty())
     {
         return nullptr;
     }
@@ -5804,9 +5875,10 @@ void return_statement::generate_code(
     {
         // Evaluate constant subexpressions.
         if(std::unique_ptr<cg::rvalue> v;
-           (v = try_emit_const_eval_result(ctx)) != nullptr)
+           (v = expr->try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
         {
             ctx.generate_ret(v->get_type());
+            return;
         }
 
         auto v = expr->emit_rvalue(ctx, true);
@@ -5914,14 +5986,30 @@ void if_statement::serialize(archive& ar)
 void if_statement::generate_code(
   cg::context& ctx) const
 {
-    auto v = condition->emit_rvalue(ctx, true);
-    if(v->get_type().get_type_kind() != cg::type_kind::i32)
+    // Evaluate constant subexpressions.
+    auto const_eval_v = get_const_i32(ctx, *condition.get());
+    if(const_eval_v.has_value())
+    {
+        if(const_eval_v.value() != 0)
+        {
+            if_block->generate_code(ctx);
+        }
+        else if(else_block != nullptr)
+        {
+            else_block->generate_code(ctx);
+        }
+
+        return;
+    }
+
+    auto condition_v = condition->emit_rvalue(ctx, true);
+    if(condition_v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
-            v->get_type().to_string()));
+            "Expected if condition to be of type 'i32', got '{}.'",
+            condition_v->get_type().to_string()));
     }
 
     // store where to insert the branch.
@@ -6013,7 +6101,7 @@ std::optional<ty::type_id> if_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected if condition to be of type 'i32', got '{}",
+            "Expected if condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 
@@ -6055,16 +6143,46 @@ void while_statement::serialize(archive& ar)
 void while_statement::generate_code(
   cg::context& ctx) const
 {
+    // Evaluate constant subexpressions.
+    auto condition_v = get_const_i32(ctx, *condition.get());
+    if(condition_v.has_value())
+    {
+        if(condition_v.value() != 0)
+        {
+            // set up basic blocks.
+            auto* body_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+            auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+
+            // while loop body.
+            ctx.get_current_function(true)->append_basic_block(body_basic_block);
+            ctx.set_insertion_point(body_basic_block);
+
+            ctx.push_loop_context({merge_basic_block, body_basic_block});
+            while_block->generate_code(ctx);
+            ctx.pop_loop_context(loc);
+
+            if(auto* bb = ctx.get_insertion_point();
+               bb && !bb->is_terminated())
+            {
+                ctx.generate_branch(body_basic_block);
+            }
+
+            // emit merge block.
+            ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+            ctx.set_insertion_point(merge_basic_block);
+        }
+
+        return;
+    }
+
     // set up basic blocks.
-    auto* while_loop_header_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-    auto* while_loop_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* condition_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    auto* body_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
     // while loop header.
-    ctx.get_current_function(true)->append_basic_block(while_loop_header_basic_block);
-    ctx.set_insertion_point(while_loop_header_basic_block);
-
-    ctx.push_break_continue({merge_basic_block, while_loop_header_basic_block});
+    ctx.get_current_function(true)->append_basic_block(condition_basic_block);
+    ctx.set_insertion_point(condition_basic_block);
 
     auto v = condition->emit_rvalue(ctx, true);
     if(v->get_type().get_type_kind() != cg::type_kind::i32)
@@ -6076,17 +6194,21 @@ void while_statement::generate_code(
             v->get_type().to_string()));
     }
 
-    ctx.generate_cond_branch(while_loop_basic_block, merge_basic_block);
+    ctx.generate_cond_branch(body_basic_block, merge_basic_block);
 
     // while loop body.
-    ctx.get_current_function(true)->append_basic_block(while_loop_basic_block);
-    ctx.set_insertion_point(while_loop_basic_block);
+    ctx.get_current_function(true)->append_basic_block(body_basic_block);
+    ctx.set_insertion_point(body_basic_block);
+
+    ctx.push_loop_context({merge_basic_block, condition_basic_block});
     while_block->generate_code(ctx);
+    ctx.pop_loop_context(loc);
 
-    ctx.set_insertion_point(ctx.get_current_function(true)->get_basic_blocks().back());
-    ctx.generate_branch(while_loop_header_basic_block);
-
-    ctx.pop_break_continue(loc);
+    if(auto* bb = ctx.get_insertion_point();
+       bb && !bb->is_terminated())
+    {
+        ctx.generate_branch(condition_basic_block);
+    }
 
     // emit merge block.
     ctx.get_current_function(true)->append_basic_block(merge_basic_block);
@@ -6115,7 +6237,7 @@ std::optional<ty::type_id> while_statement::type_check(
         throw ty::type_error(
           loc,
           std::format(
-            "Expected while condition to be of type 'i32', got '{}",
+            "Expected while condition to be of type 'i32', got '{}'.",
             ctx.to_string(condition_type.value())));
     }
 

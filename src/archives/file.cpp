@@ -25,21 +25,31 @@ file_archive::file_archive(
 {
     if(read && write)
     {
-        throw serialization_error(std::format("Cannot open file '{}' for reading and writing simultaneously.", this->path.c_str()));
+        throw serialization_error(
+          std::format(
+            "Cannot open file '{}' for reading and writing simultaneously.",
+            this->path.string()));
     }
 
     if(write)
     {
-        file.open(this->path, std::fstream::out | std::fstream::binary);
+        file.open(
+          this->path,
+          std::fstream::out | std::fstream::binary);
     }
     else if(read)
     {
-        file.open(this->path, std::fstream::in | std::fstream::binary);
+        file.open(
+          this->path,
+          std::fstream::in | std::fstream::binary);
     }
 
     if(!file)
     {
-        throw serialization_error(std::format("Unable to open file '{}'.", this->path.c_str()));
+        throw serialization_error(
+          std::format(
+            "Unable to open file '{}'.",
+            this->path.string()));
     }
 }
 

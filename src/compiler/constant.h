@@ -206,7 +206,7 @@ struct env
      *      Returns `std::nullopt` if the expression was not checked.
      */
     std::optional<bool> is_expression_const_eval(
-      const ast::expression& expr)
+      const ast::expression& expr) const
     {
         auto it = const_eval_exprs.find(&expr);
         if(it == const_eval_exprs.end())
@@ -224,7 +224,7 @@ struct env
      * @returns Returns `true` if the expression was evaluated.
      */
     bool is_expression_evaluated(
-      const ast::expression& expr)
+      const ast::expression& expr) const
     {
         return const_eval_expr_values.contains(&expr);
     }

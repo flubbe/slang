@@ -197,7 +197,9 @@ std::string rvalue::to_string([[maybe_unused]] const name_resolver* resolver) co
           ty.to_string());
     }
 
-    return std::format("{}", ty.to_string());
+    return std::format(
+      "{}",
+      ty.to_string());
 }
 
 /*
@@ -265,7 +267,10 @@ std::string instruction::to_string(const name_resolver* resolver) const
         }
         buf += args.back()->to_string(resolver);
     }
-    return std::format("{}{}", name, buf);
+    return std::format(
+      "{}{}",
+      name,
+      buf);
 }
 
 /*
@@ -276,10 +281,14 @@ std::string basic_block::to_string(const name_resolver* resolver) const
 {
     if(instrs.empty())
     {
-        return std::format("{}:", label);
+        return std::format(
+          "{}:",
+          label);
     }
 
-    std::string buf = std::format("{}:\n", label);
+    std::string buf = std::format(
+      "{}:\n",
+      label);
     for(std::size_t i = 0; i < instrs.size() - 1; ++i)
     {
         buf += std::format(
@@ -410,10 +419,14 @@ std::string function::to_string(const name_resolver* resolver) const
     {
         if(resolver)
         {
-            return std::format("%{}", resolver->symbol_name(id));
+            return std::format(
+              "%{}",
+              resolver->symbol_name(id));
         }
 
-        return std::format("%{}", id.value);
+        return std::format(
+          "%{}",
+          id.value);
     };
 
     if(!args.empty())
@@ -507,7 +520,10 @@ function* context::create_function(
          })
        != funcs.end())
     {
-        throw codegen_error(std::format("Function '{}' already defined.", name));
+        throw codegen_error(
+          std::format(
+            "Function '{}' already defined.",
+            name));
     }
 
     return funcs.emplace_back(
@@ -536,7 +552,10 @@ void context::create_native_function(
          })
        != funcs.end())
     {
-        throw codegen_error(std::format("Function '{}' already defined.", name));
+        throw codegen_error(
+          std::format(
+            "Function '{}' already defined.",
+            name));
     }
 
     funcs.emplace_back(
@@ -1040,7 +1059,9 @@ void context::generate_store(const lvalue& v)
 std::string context::generate_label()
 {
     ++label_count;
-    return std::format("{}", label_count - 1);
+    return std::format(
+      "{}",
+      label_count - 1);
 }
 
 /**
@@ -1059,7 +1080,9 @@ static std::string make_printable(const std::string& s)
     {
         if(isalnum(c) == 0 && c != ' ')
         {
-            str += std::format("\\x{:02x}", c);
+            str += std::format(
+              "\\x{:02x}",
+              c);
         }
         else
         {
@@ -1123,7 +1146,9 @@ static std::string print_constant(
     }
     else
     {
-        buf += std::format(".<unknown> @{}", id);
+        buf += std::format(
+          ".<unknown> @{}",
+          id);
     }
 
     return buf;
@@ -1171,6 +1196,60 @@ std::string context::to_string(const name_resolver* resolver) const
     }
 
     return buf;
+}
+
+/*
+ * Emission helpers.
+ */
+
+std::unique_ptr<rvalue> push_i32_rvalue(
+  context& ctx,
+  const slang::ast::expression& expr,
+  std::string_view op_name)
+{
+    auto value = expr.emit_rvalue(ctx, true);
+    if(!value)
+    {
+        throw codegen_error(
+          expr.get_location(),
+          "Expression didn't produce a value.");
+    }
+
+    if(value->get_type().get_type_kind() != type_kind::i32)
+    {
+        throw codegen_error(
+          expr.get_location(),
+          std::format(
+            "Wrong expression type '{}' for {}. Expected 'i32'.",
+            value->get_type().to_string(),
+            op_name));
+    }
+
+    return value;
+}
+
+void emit_i32_is_nonzero(
+  context& ctx,
+  const type& ty)
+{
+    ctx.generate_const(ty, 0);
+    ctx.generate_binary_op(binary_op::op_not_equal, ty);
+}
+
+void emit_i32_is_zero(
+  context& ctx,
+  const type& ty)
+{
+    ctx.generate_const(ty, 0);
+    ctx.generate_binary_op(binary_op::op_equal, ty);
+}
+
+std::unique_ptr<rvalue> emit_bool_const(
+  context& ctx,
+  bool value)
+{
+    ctx.generate_const(type{type_kind::i32}, value ? 1 : 0);
+    return std::make_unique<rvalue>(type{type_kind::i32});
 }
 
 }    // namespace slang::codegen
