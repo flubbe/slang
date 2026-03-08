@@ -3786,7 +3786,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
-                "Expected if condition to be of type 'i32', got '{}',",
+                "Expected l.h.s. to be of type 'i32', got '{}',",
                 const_::to_string(info.type)));
         }
 
@@ -3833,7 +3833,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
-                "Expected if condition to be of type 'i32', got '{}',",
+                "Expected r.h.s. to be of type 'i32', got '{}',",
                 const_::to_string(info.type)));
         }
 
@@ -3924,7 +3924,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
     }
 
     ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... && (rhs != 0).
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: ... && (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3982,7 +3982,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
-                "Expected if condition to be of type 'i32', got '{}',",
+                "Expected l.h.s. to be of type 'i32', got '{}',",
                 const_::to_string(info.type)));
         }
 
@@ -4007,7 +4007,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
             throw cg::codegen_error(
               rhs->get_location(),
               std::format(
-                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
                 rhs_value->get_type().to_string()));
         }
 
@@ -4029,7 +4029,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
-                "Expected if condition to be of type 'i32', got '{}',",
+                "Expected r.h.s. to be of type 'i32', got '{}',",
                 const_::to_string(info.type)));
         }
 
@@ -4047,7 +4047,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
-                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+                "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
                 lhs_value->get_type().to_string()));
         }
 
@@ -4082,12 +4082,12 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         throw cg::codegen_error(
           lhs->get_location(),
           std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
             lhs_value->get_type().to_string()));
     }
 
     ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs != 0)
+    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs == 0)
 
     // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
@@ -4115,12 +4115,12 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         throw cg::codegen_error(
           rhs->get_location(),
           std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
+            "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
             rhs_value->get_type().to_string()));
     }
 
     ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: ... || (rhs != 0).
+    ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: ... || (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
