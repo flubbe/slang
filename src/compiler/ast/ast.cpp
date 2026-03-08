@@ -3755,6 +3755,41 @@ bool binary_expression::is_pure(cg::context& ctx) const
 }
 
 /**
+ * Get a `i32` value from the constants environment.
+ * Respects codegen flags.
+ *
+ * @param ctx The code generation context.
+ * @param expr The expression to get the value for.
+ */
+static std::optional<std::int64_t> get_const_i32(
+  cg::context& ctx,
+  const expression& expr)
+{
+    if(!ctx.has_flag(cg::codegen_flags::enable_const_eval))
+    {
+        return std::nullopt;
+    }
+
+    auto it = ctx.get_const_env().const_eval_expr_values.find(&expr);
+    if(it == ctx.get_const_env().const_eval_expr_values.cend())
+    {
+        return std::nullopt;
+    }
+
+    const auto& info = it->second;
+    if(info.type != const_::constant_type::i32)
+    {
+        throw cg::codegen_error(
+          expr.get_location(),
+          std::format(
+            "Expected constant expression to be of type 'i32', got '{}'.",
+            const_::to_string(info.type)));
+    }
+
+    return std::get<std::int64_t>(info.value);
+}
+
+/**
  * Generate the control logic / short-circuit evaluation for _logical and_ operations (&&).
  *
  * @param ctx The code generation context.
@@ -3774,24 +3809,13 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
      * At least one of the expressions is not evaluated.
      */
 
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(lhs.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    auto v = get_const_i32(ctx, *lhs.get());
+    if(v.has_value())
     {
         // r.h.s. is not evaluated.
 
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Expected l.h.s. to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
         // Short circuit: don't generate code if expression is false-ish.
-        if(std::get<std::int64_t>(info.value) == 0)
+        if(v.value() == 0)
         {
             ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
             return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
@@ -3821,24 +3845,12 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
 
-    const_eval_it = ctx.get_const_env().const_eval_expr_values.find(rhs.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    v = get_const_i32(ctx, *rhs.get());
+    if(v.has_value())
     {
         // l.h.s. is not evaluated.
 
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Expected r.h.s. to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
         // always evaluate l.h.s.
-
         lhs_value = lhs->emit_rvalue(ctx, true);
         if(!lhs_value)
         {
@@ -3856,7 +3868,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
         }
 
         // if the r.h.s. is false-ish, the expression will always evaluate to false.
-        if(std::get<std::int64_t>(info.value) == 0)
+        if(v.value() == 0)
         {
             ctx.generate_pop(lhs_value->get_type());
             ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
@@ -3970,24 +3982,13 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
      * At least one of the expressions is not evaluated.
      */
 
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(lhs.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    auto v = get_const_i32(ctx, *lhs.get());
+    if(v.has_value())
     {
         // r.h.s. is not evaluated.
 
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Expected l.h.s. to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
         // Short circuit: don't generate code if expression is true-ish.
-        if(std::get<std::int64_t>(info.value) != 0)
+        if(v.value() != 0)
         {
             ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
             return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
@@ -4017,24 +4018,12 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
 
-    const_eval_it = ctx.get_const_env().const_eval_expr_values.find(rhs.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    v = get_const_i32(ctx, *rhs.get());
+    if(v.has_value())
     {
         // l.h.s. is not evaluated.
 
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Expected r.h.s. to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
         // always evaluate l.h.s.
-
         lhs_value = lhs->emit_rvalue(ctx, true);
         if(!lhs_value)
         {
@@ -4052,7 +4041,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         }
 
         // if the r.h.s. is true-ish, the expression will always evaluate to true.
-        if(std::get<std::int64_t>(info.value) != 0)
+        if(v.value() != 0)
         {
             ctx.generate_pop(lhs_value->get_type());
             ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
@@ -6127,21 +6116,10 @@ void if_statement::generate_code(
   cg::context& ctx) const
 {
     // Evaluate constant subexpressions.
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(condition.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    auto const_eval_v = get_const_i32(ctx, *condition.get());
+    if(const_eval_v.has_value())
     {
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Expected if condition to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
-        if(std::get<std::int64_t>(info.value) != 0)
+        if(const_eval_v.value() != 0)
         {
             if_block->generate_code(ctx);
         }
@@ -6153,14 +6131,14 @@ void if_statement::generate_code(
         return;
     }
 
-    auto v = condition->emit_rvalue(ctx, true);
-    if(v->get_type().get_type_kind() != cg::type_kind::i32)
+    auto condition_v = condition->emit_rvalue(ctx, true);
+    if(condition_v->get_type().get_type_kind() != cg::type_kind::i32)
     {
         throw cg::codegen_error(
           loc,
           std::format(
             "Expected if condition to be of type 'i32', got '{}.'",
-            v->get_type().to_string()));
+            condition_v->get_type().to_string()));
     }
 
     // store where to insert the branch.
@@ -6295,21 +6273,10 @@ void while_statement::generate_code(
   cg::context& ctx) const
 {
     // Evaluate constant subexpressions.
-    auto const_eval_it = ctx.get_const_env().const_eval_expr_values.find(condition.get());
-    if(ctx.has_flag(cg::codegen_flags::enable_const_eval)
-       && const_eval_it != ctx.get_const_env().const_eval_expr_values.cend())
+    auto condition_v = get_const_i32(ctx, *condition.get());
+    if(condition_v.has_value())
     {
-        auto info = const_eval_it->second;
-        if(info.type != const_::constant_type::i32)
-        {
-            throw cg::codegen_error(
-              loc,
-              std::format(
-                "Expected while condition to be of type 'i32', got '{}',",
-                const_::to_string(info.type)));
-        }
-
-        if(std::get<std::int64_t>(info.value) != 0)
+        if(condition_v.value() != 0)
         {
             // set up basic blocks.
             auto* body_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
