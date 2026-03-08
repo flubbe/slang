@@ -77,7 +77,8 @@ struct name_resolver
      * @returns Returns the symbol name.
      */
     [[nodiscard]]
-    virtual std::string symbol_name(sema::symbol_id id) const = 0;
+    virtual std::string symbol_name(
+      sema::symbol_id id) const = 0;
 
     /**
      * Return the name of a type.
@@ -86,7 +87,8 @@ struct name_resolver
      * @returns Returns the type name.
      */
     [[nodiscard]]
-    virtual std::string type_name(ty::type_id id) const = 0;
+    virtual std::string type_name(
+      ty::type_id id) const = 0;
 
     /**
      * Return the name of a field.
@@ -125,7 +127,9 @@ public:
      * @param loc The error location in the source.
      * @param message The error message.
      */
-    codegen_error(const slang::source_location& loc, const std::string& message);
+    codegen_error(
+      const slang::source_location& loc,
+      const std::string& message);
 };
 
 /** An r-value. */
@@ -171,7 +175,8 @@ public:
      * @returns Returns a string representation of the value.
      */
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const;
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const;
 
     /** Get the value's type. */
     [[nodiscard]]
@@ -408,7 +413,9 @@ public:
     [[nodiscard]]
     std::string to_string() const
     {
-        return std::format("@{}", const_id);
+        return std::format(
+          "@{}",
+          const_id);
     }
 
     /** Return the string id. */
@@ -442,12 +449,11 @@ public:
      * @returns Returns a string representation fo the function.
      */
     [[nodiscard]]
-    virtual std::string to_string(const name_resolver* resolver = nullptr) const = 0;
+    virtual std::string to_string(
+      const name_resolver* resolver = nullptr) const = 0;
 };
 
-/**
- * A constant instruction argument.
- */
+/** A constant instruction argument. */
 class const_argument : public argument
 {
     /** The constant type. */
@@ -525,7 +531,8 @@ public:
     const_argument& operator=(const const_argument&) = delete;
     const_argument& operator=(const_argument&&) = default;
 
-    [[nodiscard]] std::string to_string(const name_resolver* resolver = nullptr) const override;
+    [[nodiscard]] std::string to_string(
+      const name_resolver* resolver = nullptr) const override;
 
     [[nodiscard]]
     const rvalue* get_value() const
@@ -540,9 +547,7 @@ public:
     }
 };
 
-/**
- * Function argument.
- */
+/** Function argument. */
 class function_argument : public argument
 {
     /** Entry in the symbol table. */
@@ -572,7 +577,8 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const override
     {
         if(resolver != nullptr)
         {
@@ -623,7 +629,8 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const override
     {
         // try to resolve type id.
         if(resolver
@@ -685,7 +692,8 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const override
     {
         return var.to_string(resolver);
     }
@@ -734,9 +742,12 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string([[maybe_unused]] const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      [[maybe_unused]] const name_resolver* resolver = nullptr) const override
     {
-        return std::format("%{}", label);
+        return std::format(
+          "%{}",
+          label);
     }
 };
 
@@ -872,9 +883,12 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string([[maybe_unused]] const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      [[maybe_unused]] const name_resolver* resolver = nullptr) const override
     {
-        return std::format("{}", ::slang::codegen::to_string(cast));
+        return std::format(
+          "{}",
+          ::slang::codegen::to_string(cast));
     }
 };
 
@@ -930,7 +944,8 @@ public:
     }
 
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const override
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const override
     {
         if(!struct_type.get_type_id().has_value())
         {
@@ -955,9 +970,7 @@ public:
     }
 };
 
-/**
- * Instruction base class.
- */
+/** Instruction base class. */
 class instruction
 {
     /** The instruction name. */
@@ -995,7 +1008,9 @@ public:
      * @param name The instruction's opcode name.
      * @param args The instruction's arguments.
      */
-    instruction(std::string name, std::vector<std::unique_ptr<argument>> args)
+    instruction(
+      std::string name,
+      std::vector<std::unique_ptr<argument>> args)
     : name{std::move(name)}
     , args{std::move(args)}
     {
@@ -1036,7 +1051,8 @@ public:
      * @returns Returns a string representation of the instruction.
      */
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const;
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const;
 };
 
 /**
@@ -1111,7 +1127,8 @@ public:
      * @returns Returns a string representation of the basic block.
      */
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const;
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const;
 
     /** Get the inserting context. May return nullptr. */
     [[nodiscard]]
@@ -1180,9 +1197,7 @@ public:
     static basic_block* create(class context& ctx, std::string name);
 };
 
-/**
- * A guard that signals function entry and exit.
- */
+/** A guard that signals function entry and exit. */
 class function_guard
 {
     /** The associated context. */
@@ -1508,7 +1523,10 @@ struct imported_symbol
      * @param name The symbol's name.
      * @param import_path Path of the module the symbol is imported from.
      */
-    imported_symbol(module_::symbol_type type, std::string name, std::string import_path)
+    imported_symbol(
+      module_::symbol_type type,
+      std::string name,
+      std::string import_path)
     : type{type}
     , name{std::move(name)}
     , import_path{std::move(import_path)}
@@ -1596,7 +1614,11 @@ class context
     std::size_t macro_invocation_id{0};
 
     /** The basic blocks for `break` and `continue` statements. */
-    std::vector<std::pair<basic_block*, basic_block*>> loop_context_stack;
+    std::vector<
+      std::pair<
+        basic_block*,
+        basic_block*>>
+      loop_context_stack;
 
     /** List of basic blocks. */
     std::vector<std::unique_ptr<basic_block>> basic_blocks;
@@ -1915,7 +1937,9 @@ public:
      * @throws Throws a `codegen_error` if the stack is empty.
      */
     [[nodiscard]]
-    std::pair<basic_block*, basic_block*> top_break_continue(std::optional<source_location> loc = std::nullopt)
+    std::pair<basic_block*, basic_block*>
+      top_break_continue(
+        std::optional<source_location> loc = std::nullopt)
     {
         if(loop_context_stack.empty())
         {
@@ -1981,7 +2005,9 @@ public:
      * @param op The binary operation to execute.
      * @param op_type The type specifier for the operation.
      */
-    void generate_binary_op(binary_op op, const type& op_type);
+    void generate_binary_op(
+      binary_op op,
+      const type& op_type);
 
     /**
      * Generate an unconditional branch instruction.
@@ -2018,7 +2044,9 @@ public:
      * @param else_block The block to jump to if the condition is false. Can be a `nullptr`.
      * @throws Throws a `codegen_error` if `then_block` is `nullptr`.
      */
-    void generate_cond_branch(basic_block* then_block, basic_block* else_block);
+    void generate_cond_branch(
+      basic_block* then_block,
+      basic_block* else_block);
 
     /**
      * Load a constant value onto the stack.
@@ -2057,7 +2085,9 @@ public:
      * @param vt The value's type.
      * @param skip_type The value to skip on the stack before insertion.
      */
-    void generate_dup_x1(type vt, type skip_type);
+    void generate_dup_x1(
+      type vt,
+      type skip_type);
 
     /**
      * Duplicate the top stack value and insert it three values down.
@@ -2066,7 +2096,10 @@ public:
      * @param skip_type1 The first value to skip on the stack before insertion.
      * @param skip_type2 The second value to skip on the stack before insertion.
      */
-    void generate_dup_x2(type vt, type skip_type1, type skip_type2);
+    void generate_dup_x2(
+      type vt,
+      type skip_type1,
+      type skip_type2);
 
     /**
      * Duplicate the top two stack values.
@@ -2074,14 +2107,17 @@ public:
      * @param t0 The first value.
      * @param t1 The second value.
      */
-    void generate_dup2_x0(type t0, type t1);
+    void generate_dup2_x0(
+      type t0,
+      type t1);
 
     /**
      * Load a field of a struct instance onto the stack.
      *
      * @param arg The field access details.
      */
-    void generate_get_field(std::unique_ptr<field_access_argument> arg);
+    void generate_get_field(
+      std::unique_ptr<field_access_argument> arg);
 
     /**
      * Statically invoke a function.
@@ -2140,7 +2176,8 @@ public:
      *
      * @param arg The field access details.
      */
-    void generate_set_field(std::unique_ptr<field_access_argument> arg);
+    void generate_set_field(
+      std::unique_ptr<field_access_argument> arg);
 
     /**
      * Store the top of the stack into a variable.
@@ -2168,7 +2205,8 @@ public:
      * @returns Returns a readable string representation of the context.
      */
     [[nodiscard]]
-    std::string to_string(const name_resolver* resolver = nullptr) const;
+    std::string to_string(
+      const name_resolver* resolver = nullptr) const;
 };
 
 /*
@@ -2181,19 +2219,23 @@ inline void basic_block::set_inserting_context(context* ctx)
     inserting_context = nullptr;
 
     // Clear the associated context's insertion point.
-    if(old_context != nullptr && old_context->get_insertion_point() == this)
+    if(old_context != nullptr
+       && old_context->get_insertion_point() == this)
     {
         old_context->set_insertion_point(nullptr);
     }
 
     inserting_context = ctx;
-    if(inserting_context != nullptr && inserting_context->get_insertion_point() != this)
+    if(inserting_context != nullptr
+       && inserting_context->get_insertion_point() != this)
     {
         inserting_context->set_insertion_point(this);
     }
 }
 
-inline basic_block* basic_block::create(context& ctx, std::string name)
+inline basic_block* basic_block::create(
+  context& ctx,
+  std::string name)
 {
     return ctx.basic_blocks.emplace_back(new basic_block(name)).get();
 }
@@ -2202,7 +2244,9 @@ inline basic_block* basic_block::create(context& ctx, std::string name)
  * function_guard implementation.
  */
 
-inline function_guard::function_guard(context& ctx, function* fn)
+inline function_guard::function_guard(
+  context& ctx,
+  function* fn)
 : ctx{ctx}
 {
     ctx.enter_function(fn);
@@ -2212,5 +2256,52 @@ inline function_guard::~function_guard()
 {
     ctx.exit_function();
 }
+
+/*
+ * Emission helpers.
+ */
+
+/**
+ * Push a `i32` value generated by an r-value onto the stack.
+ *
+ * @param ctx The code generation context.
+ * @param expr The expression to get the r-value for.
+ * @param op_name Operand name, for error reporting.
+ * @return Returns the emitted value.
+ */
+std::unique_ptr<rvalue> push_i32_rvalue(
+  context& ctx,
+  const slang::ast::expression& expr,
+  std::string_view op_name);
+
+/**
+ * Emit a non-equality comparison against zero.
+ *
+ * @param ctx The code generation context.
+ * @param type The operand type.
+ */
+void emit_i32_is_nonzero(
+  context& ctx,
+  const type& ty);
+
+/**
+ * Emit an equality comparison against zero.
+ *
+ * @param ctx The code generation context.
+ * @param type The operand type.
+ */
+void emit_i32_is_zero(
+  context& ctx,
+  const type& ty);
+
+/**
+ * Emit a boolean constant.
+ *
+ * @param ctx The code generation context.
+ * @param value The value to push.
+ */
+std::unique_ptr<rvalue> emit_bool_const(
+  context& ctx,
+  bool value);
 
 }    // namespace slang::codegen

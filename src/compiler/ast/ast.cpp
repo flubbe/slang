@@ -3817,30 +3817,12 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
         // Short circuit: don't generate code if expression is false-ish.
         if(v.value() == 0)
         {
-            ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+            return cg::emit_bool_const(ctx, false);
         }
 
         // l.h.s. is true-ish: always generate r.h.s.
-
-        rhs_value = rhs->emit_rvalue(ctx, true);
-        if(!rhs_value)
-        {
-            throw cg::codegen_error(
-              rhs->get_location(),
-              "Expression didn't produce a value.");
-        }
-        if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-        {
-            throw cg::codegen_error(
-              rhs->get_location(),
-              std::format(
-                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-                rhs_value->get_type().to_string()));
-        }
-
-        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-        ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: (rhs != 0).
+        rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical and operator");
+        cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: (rhs != 0).
 
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
@@ -3851,33 +3833,16 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
         // l.h.s. is not evaluated.
 
         // always evaluate l.h.s.
-        lhs_value = lhs->emit_rvalue(ctx, true);
-        if(!lhs_value)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              "Expression didn't produce a value.");
-        }
-        if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-                lhs_value->get_type().to_string()));
-        }
+        lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical and operator");
 
         // if the r.h.s. is false-ish, the expression will always evaluate to false.
         if(v.value() == 0)
         {
             ctx.generate_pop(lhs_value->get_type());
-            ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-
-            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+            return cg::emit_bool_const(ctx, false);
         }
 
-        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-        ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0).
+        cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0).
 
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
@@ -3886,24 +3851,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
      * Both evaluations need to be generated.
      */
 
-    lhs_value = lhs->emit_rvalue(ctx, true);
-    if(!lhs_value)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
-    }
+    lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical and operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0)
+    cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0)
 
     // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
@@ -3919,24 +3869,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
     ctx.get_current_function(true)->append_basic_block(lhs_true_basic_block);
     ctx.set_insertion_point(lhs_true_basic_block);
 
-    rhs_value = rhs->emit_rvalue(ctx, true);
-    if(!rhs_value)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical and operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
-    }
+    rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical and operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: ... && (rhs != 0).
+    cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: ... && (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3944,7 +3879,7 @@ static std::unique_ptr<cg::rvalue> generate_logical_and(
      */
     ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
     ctx.set_insertion_point(lhs_false_basic_block);
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
+    cg::emit_bool_const(ctx, false);
     ctx.generate_branch(merge_basic_block);
 
     /*
@@ -3990,30 +3925,13 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         // Short circuit: don't generate code if expression is true-ish.
         if(v.value() != 0)
         {
-            ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
-            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+            return cg::emit_bool_const(ctx, true);
         }
 
         // l.h.s. is false-ish: always generate r.h.s.
+        rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical or operator");
 
-        rhs_value = rhs->emit_rvalue(ctx, true);
-        if(!rhs_value)
-        {
-            throw cg::codegen_error(
-              rhs->get_location(),
-              "Expression didn't produce a value.");
-        }
-        if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-        {
-            throw cg::codegen_error(
-              rhs->get_location(),
-              std::format(
-                "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
-                rhs_value->get_type().to_string()));
-        }
-
-        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-        ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: (rhs != 0).
+        cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: (rhs != 0).
 
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
@@ -4024,33 +3942,16 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
         // l.h.s. is not evaluated.
 
         // always evaluate l.h.s.
-        lhs_value = lhs->emit_rvalue(ctx, true);
-        if(!lhs_value)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              "Expression didn't produce a value.");
-        }
-        if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-        {
-            throw cg::codegen_error(
-              lhs->get_location(),
-              std::format(
-                "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
-                lhs_value->get_type().to_string()));
-        }
+        lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical or operator");
 
         // if the r.h.s. is true-ish, the expression will always evaluate to true.
         if(v.value() != 0)
         {
             ctx.generate_pop(lhs_value->get_type());
-            ctx.generate_const(cg::type{cg::type_kind::i32}, 1);
-
-            return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
+            return cg::emit_bool_const(ctx, true);
         }
 
-        ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-        ctx.generate_binary_op(cg::binary_op::op_not_equal, lhs_value->get_type());    // stack: (lhs != 0).
+        cg::emit_i32_is_nonzero(ctx, lhs_value->get_type());    // stack: (lhs != 0).
 
         return std::make_unique<cg::rvalue>(cg::type{cg::type_kind::i32});
     }
@@ -4059,24 +3960,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
      * Both evaluations need to be generated.
      */
 
-    lhs_value = lhs->emit_rvalue(ctx, true);
-    if(!lhs_value)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(lhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          lhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
-            lhs_value->get_type().to_string()));
-    }
+    lhs_value = cg::push_i32_rvalue(ctx, *lhs.get(), "logical or operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_equal, lhs_value->get_type());    // stack: (lhs == 0)
+    cg::emit_i32_is_zero(ctx, lhs_value->get_type());    // stack: (lhs == 0)
 
     // store where to insert the branch.
     auto* function_insertion_point = ctx.get_insertion_point(true);
@@ -4092,24 +3978,9 @@ static std::unique_ptr<cg::rvalue> generate_logical_or(
     ctx.get_current_function(true)->append_basic_block(lhs_false_basic_block);
     ctx.set_insertion_point(lhs_false_basic_block);
 
-    rhs_value = rhs->emit_rvalue(ctx, true);
-    if(!rhs_value)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          "Expression didn't produce a value.");
-    }
-    if(rhs_value->get_type().get_type_kind() != cg::type_kind::i32)
-    {
-        throw cg::codegen_error(
-          rhs->get_location(),
-          std::format(
-            "Wrong expression type '{}' for logical or operator. Expected 'i32'.",
-            rhs_value->get_type().to_string()));
-    }
+    rhs_value = cg::push_i32_rvalue(ctx, *rhs.get(), "logical or operator");
 
-    ctx.generate_const(cg::type{cg::type_kind::i32}, 0);
-    ctx.generate_binary_op(cg::binary_op::op_not_equal, rhs_value->get_type());    // stack: ... || (rhs != 0).
+    cg::emit_i32_is_nonzero(ctx, rhs_value->get_type());    // stack: ... || (rhs != 0).
     ctx.generate_branch(merge_basic_block);
 
     /*
