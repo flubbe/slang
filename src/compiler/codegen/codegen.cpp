@@ -396,6 +396,27 @@ std::size_t function::get_index(sema::symbol_id id) const
         id.value));
 }
 
+basic_block* function::get_basic_block(std::string_view label)
+{
+    auto it = std::ranges::find_if(
+      instr_blocks,
+      [&label](const basic_block* bb) -> bool
+      {
+          return bb->get_label() == label;
+      });
+
+    if(it == instr_blocks.end())
+    {
+        throw codegen_error(
+          std::format(
+            "Function '{}': Cannot get basic block with label '{}': Label not found.",
+            get_name(),
+            label));
+    }
+
+    return *it;
+}
+
 std::string function::to_string(const name_resolver* resolver) const
 {
     std::string buf;

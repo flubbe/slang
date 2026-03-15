@@ -12,12 +12,12 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/cfg/simplify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
-#include "compiler/opt/cfg.h"
 
 namespace ast = slang::ast;
 namespace cg = slang::codegen;
@@ -78,7 +78,7 @@ TEST(opt_cfg, remove_unreachable_blocks)
     rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx = get_context(sema_env, const_env, lowering_ctx);
-    slang::opt::cfg::context cfg_context{codegen_ctx};
+    slang::cfg::simplify cfg_context{codegen_ctx};
 
     ASSERT_NO_THROW(ast->collect_names(co_ctx));
     ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -133,7 +133,62 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
         cg::context ctx{sema_env, const_env, lowering_ctx};
-        slang::opt::cfg::context cfg_context{ctx};
+        slang::cfg::simplify cfg_context{ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg_context.run());
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test() {\n"
+                  "0:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
+TEST(opt_cfg, if_while_empty_blocks)
+{
+    {
+        const std::string test_input =
+          "fn test() -> i32\n"
+          "{\n"
+          "    if(0) {\n"
+          "        return 2;\n"
+          "    }\n"
+          "    while(0) {\n"
+          "        return 1;\n"
+          "    }\n"
+          "    return 0;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx{sema_env, const_env, lowering_ctx};
+        slang::cfg::simplify cfg_context{ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -150,8 +205,7 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
-                  "0:\n"
-                  " const i32 1\n"
+                  " const i32 0\n"
                   " ret i32\n"
                   "}");
     }
