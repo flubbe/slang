@@ -87,15 +87,42 @@ TEST(opt_cfg, remove_unreachable_blocks)
     ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+
+    EXPECT_EQ(codegen_ctx.to_string(),
+              "define i32 @f() {\n"
+              "local i32 %1\n"
+              "entry:\n"
+              " const i32 12\n"
+              " ret i32\n"
+              "0:\n"
+              " const i32 13\n"
+              " ret i32\n"
+              "1:\n"
+              " const i32 123\n"
+              " store i32 %1\n"
+              " load i32 %1\n"
+              " const i32 123\n"
+              " cmpeq i32\n"
+              " jnz %2, %3\n"
+              "2:\n"
+              " const i32 0\n"
+              " const i32 1\n"
+              " sub i32\n"
+              " ret i32\n"
+              "3:\n"
+              " const i32 0\n"
+              " ret i32\n"
+              "}");
+
     ASSERT_NO_THROW(cfg_context.run());
 
     EXPECT_EQ(codegen_ctx.to_string(),
-              R"(define i32 @f() {
-local i32 %1
-entry:
- const i32 12
- ret i32
-})");
+              "define i32 @f() {\n"
+              "local i32 %1\n"
+              "entry:\n"
+              " const i32 12\n"
+              " ret i32\n"
+              "}");
 }
 
 TEST(opt_cfg, while_loop_unreachable_blocks)
@@ -145,6 +172,21 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test() {\n"
+                  "entry:\n"
+                  "0:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "2:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+
         ASSERT_NO_THROW(cfg_context.run());
 
         EXPECT_EQ(ctx.to_string(),
@@ -156,16 +198,14 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
     }
 }
 
-TEST(opt_cfg, if_while_empty_blocks)
+TEST(opt_cfg, while_empty_blocks)
 {
     {
         const std::string test_input =
           "fn test() -> i32\n"
           "{\n"
-          "    if(0) {\n"
-          "        return 2;\n"
-          "    }\n"
-          "    while(0) {\n"
+          "    while(1) {\n"
+          "        break;\n"
           "        return 1;\n"
           "    }\n"
           "    return 0;\n"
@@ -200,11 +240,25 @@ TEST(opt_cfg, if_while_empty_blocks)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
-        ASSERT_NO_THROW(cfg_context.run());
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  "0:\n"
+                  " jmp %1\n"
+                  "2:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+
+        ASSERT_NO_THROW(cfg_context.run());
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test() {\n"
+                  "0:\n"
                   " const i32 0\n"
                   " ret i32\n"
                   "}");
@@ -254,6 +308,24 @@ TEST(opt_cfg, while_merge_blocks)
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test() {\n"
+                  "local i32 %1\n"
+                  "entry:\n"
+                  " const i32 1\n"
+                  " store i32 %1\n"
+                  "0:\n"
+                  " load i32 %1\n"
+                  " const i32 1\n"
+                  " add i32\n"
+                  " store i32 %1\n"
+                  " jmp %1\n"
+                  "1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+
         ASSERT_NO_THROW(cfg_context.run());
 
         EXPECT_EQ(ctx.to_string(),
