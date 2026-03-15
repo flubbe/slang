@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * Control flow graph optimization tests.
+ * Control flow graph simplification tests.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
