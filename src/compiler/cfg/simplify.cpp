@@ -182,12 +182,16 @@ static void remove_unreachable_blocks(
  * Remove empty basic blocks.
  *
  * @param func The functions containing the blocks.
+ * @returns Returns `true` if any blocks were removed.
  */
-static void remove_empty_blocks(
+static bool remove_empty_blocks(
   cg::function& func)
 {
+    bool removed_blocks = false;
+    auto blocks = func.get_basic_blocks();
+
     std::set<std::string> empty;
-    for(const auto& it: func.get_basic_blocks())
+    for(const auto& it: blocks)
     {
         if(it->get_instructions().empty())
         {
@@ -224,7 +228,7 @@ static void remove_empty_blocks(
         if(preds == info.preds.end())
         {
             // first block has no predecessor.
-            if(label != func.get_basic_blocks().front()->get_label())
+            if(label != blocks.front()->get_label())
             {
                 throw cg::codegen_error(
                   std::format(
@@ -279,7 +283,127 @@ static void remove_empty_blocks(
 
         // remove block.
         func.remove_basic_block(label);
+        removed_blocks = true;
     }
+
+    return removed_blocks;
+}
+
+/**
+ * Merge consecutive blocks if possible.
+ *
+ * @param func The functions containing the blocks.
+ * @returns Returns `true` if any blocks were merged.
+ */
+static bool merge_blocks(
+  cg::function& func)
+{
+    auto info = build_cfg_info(func);
+    const auto& blocks = func.get_basic_blocks();
+
+    /*
+     * merge blocks that are only successor blocks to fall-through's.
+     */
+
+    for(const auto& block: blocks | std::views::drop(1))    // skip the entry block
+    {
+        auto preds = info.preds.find(block->get_label());
+        if(preds == info.preds.end())
+        {
+            // no predecessor blocks.
+            continue;
+        }
+        if(preds->second.size() != 1)
+        {
+            // not a fall-through-only block.
+            continue;
+        }
+
+        auto* pred = func.get_basic_block(*preds->second.begin());
+        if(pred->is_terminated())
+        {
+            // not a fall-through-only block.
+            continue;
+        }
+
+        // merge blocks.
+        for(auto& instr: block->get_instructions())
+        {
+            pred->add_instruction(std::move(instr));
+        }
+
+        // remove block and return.
+        func.remove_basic_block(block->get_label());
+        return true;
+    }
+
+    /*
+     * merge blocks that are only successor blocks to blocks ending with an unconditional jump.
+     */
+
+    for(const auto& block: blocks | std::views::drop(1))    // skip the entry block
+    {
+        auto preds = info.preds.find(block->get_label());
+        if(preds == info.preds.end())
+        {
+            // no predecessor blocks.
+            continue;
+        }
+        if(preds->second.size() != 1)
+        {
+            // not a single-predecessor block.
+            continue;
+        }
+
+        // avoid self-looping.
+        if(block->get_label() == *preds->second.begin())
+        {
+            continue;
+        }
+
+        auto* pred = func.get_basic_block(*preds->second.begin());
+        if(!pred->is_terminated())
+        {
+            // not a single-unconditional-jump block.
+            continue;
+        }
+
+        auto& pred_branch_instr = pred->get_instructions().back();
+        if(pred_branch_instr->get_name() != "jmp")
+        {
+            // not a single-unconditional-jump block.
+            continue;
+        }
+
+        const auto& pred_jump_label = static_cast<cg::label_argument*>(
+                                        pred_branch_instr->get_args().at(0).get())
+                                        ->get_label();
+        if(pred_jump_label != block->get_label())
+        {
+            throw cg::codegen_error(
+              std::format(
+                "'{}': Cannot merge block '{}' into predecessor '{}': Jump label '{}' does not match.",
+                func.get_name(),
+                block->get_label(),
+                pred->get_label(),
+                pred_jump_label));
+        }
+
+        // remove jump instruction.
+        pred->get_instructions().pop_back();
+
+        // merge blocks.
+        for(auto& instr: block->get_instructions())
+        {
+            pred->add_instruction(std::move(instr));
+        }
+
+        // remove block and return.
+        func.remove_basic_block(block->get_label());
+        return true;
+    }
+
+    return false;
 }
 
 /*
@@ -300,7 +424,13 @@ void simplify::run_on_function(cg::function& func)
       func,
       reachable);
 
-    remove_empty_blocks(func);
+    bool changed = true;
+    while(changed)
+    {
+        changed = false;
+        changed |= remove_empty_blocks(func);
+        changed |= merge_blocks(func);
+    }
 }
 
 void simplify::run()
