@@ -256,6 +256,7 @@ add_executable(test_cfg_simplify
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/cfg/simplify.cpp
+    ../src/compiler/cfg/verify.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
     ../src/compiler/collect.cpp

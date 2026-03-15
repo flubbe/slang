@@ -1866,6 +1866,20 @@ public:
     }
 
     /**
+     * Return the functions.
+     *
+     * @returns Returns the functions.
+     */
+    [[nodiscard]]
+    const std::vector<
+      std::unique_ptr<
+        function>>&
+      get_functions() const
+    {
+        return funcs;
+    }
+
+    /**
      * Return the current function, or nullptr.
      *
      * @param validate If set to `true`, the function will throw a `codegen_error` instead of returning `nullptr`.

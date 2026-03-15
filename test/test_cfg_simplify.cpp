@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "compiler/cfg/simplify.h"
+#include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -20,6 +21,7 @@
 #include "compiler/typing.h"
 
 namespace ast = slang::ast;
+namespace cfg = slang::cfg;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
@@ -88,6 +90,8 @@ TEST(opt_cfg, remove_unreachable_blocks)
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
+    ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
+
     EXPECT_EQ(codegen_ctx.to_string(),
               "define i32 @f() {\n"
               "local i32 %1\n"
@@ -115,6 +119,7 @@ TEST(opt_cfg, remove_unreachable_blocks)
               "}");
 
     ASSERT_NO_THROW(cfg_context.run());
+    ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
 
     EXPECT_EQ(codegen_ctx.to_string(),
               "define i32 @f() {\n"
@@ -159,8 +164,8 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
-        cg::context ctx{sema_env, const_env, lowering_ctx};
-        slang::cfg::simplify cfg_context{ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::cfg::simplify cfg_context{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -171,9 +176,11 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
-        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
                   "0:\n"
@@ -188,8 +195,9 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
                   "}");
 
         ASSERT_NO_THROW(cfg_context.run());
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "0:\n"
                   " const i32 1\n"
@@ -227,8 +235,8 @@ TEST(opt_cfg, while_empty_blocks)
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
-        cg::context ctx{sema_env, const_env, lowering_ctx};
-        slang::cfg::simplify cfg_context{ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::cfg::simplify cfg_context{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -239,9 +247,11 @@ TEST(opt_cfg, while_empty_blocks)
         ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
-        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
                   "0:\n"
@@ -255,8 +265,9 @@ TEST(opt_cfg, while_empty_blocks)
                   "}");
 
         ASSERT_NO_THROW(cfg_context.run());
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "0:\n"
                   " const i32 0\n"
@@ -295,8 +306,8 @@ TEST(opt_cfg, while_merge_blocks)
         tl::context lowering_ctx{type_ctx};
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
-        cg::context ctx{sema_env, const_env, lowering_ctx};
-        slang::cfg::simplify cfg_context{ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        slang::cfg::simplify cfg_context{codegen_ctx};
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
@@ -307,9 +318,11 @@ TEST(opt_cfg, while_merge_blocks)
         ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
-        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
 
-        EXPECT_EQ(ctx.to_string(),
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
+
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "local i32 %1\n"
                   "entry:\n"
@@ -327,8 +340,9 @@ TEST(opt_cfg, while_merge_blocks)
                   "}");
 
         ASSERT_NO_THROW(cfg_context.run());
+        ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
 
-        EXPECT_EQ(ctx.to_string(),
+        EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "local i32 %1\n"
                   "entry:\n"
