@@ -245,8 +245,8 @@ set_tests_properties(type_system PROPERTIES
     FIXTURES_REQUIRED needs_std
 )
 
-add_executable(test_opt_cfg
-    test_opt_cfg.cpp
+add_executable(test_cfg_simplify
+    test_cfg_simplify.cpp
     ../src/archives/file.cpp
     ../src/compiler/ast/ast.cpp
     ../src/compiler/ast/builtins.cpp
@@ -255,6 +255,7 @@ add_executable(test_opt_cfg
     ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/cfg/simplify.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
     ../src/compiler/collect.cpp
@@ -265,7 +266,6 @@ add_executable(test_opt_cfg
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
-    ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
@@ -277,13 +277,13 @@ add_executable(test_opt_cfg
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_opt_cfg GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
-target_compile_options(test_opt_cfg PRIVATE
+target_link_libraries(test_cfg_simplify GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_cfg_simplify PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
-add_test(NAME opt_cfg COMMAND test_opt_cfg)
-set_tests_properties(opt_cfg PROPERTIES
+add_test(NAME cfg_simplify COMMAND test_cfg_simplify)
+set_tests_properties(cfg_simplify PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 

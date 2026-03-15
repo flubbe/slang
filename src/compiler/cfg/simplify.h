@@ -19,13 +19,13 @@ class context;
 class function;
 }    // namespace slang::codegen
 
-namespace slang::opt::cfg
+namespace slang::cfg
 {
 
 namespace cg = slang::codegen;
 
-/** Control flow graph analysis context. */
-class context
+/** Control flow graph simplificaion context. */
+class simplify
 {
     /** The associated codegen context. */
     cg::context& ctx;
@@ -40,20 +40,20 @@ protected:
 
 public:
     /** Deleted constructors. */
-    context() = delete;
-    context(const context&) = delete;
-    context(context&&) = delete;
+    simplify() = delete;
+    simplify(const simplify&) = delete;
+    simplify(simplify&&) = delete;
 
     /** Deleted assignments. */
-    context& operator=(const context&) = delete;
-    context& operator=(context&&) = delete;
+    simplify& operator=(const simplify&) = delete;
+    simplify& operator=(simplify&&) = delete;
 
     /**
-     * Initialize the CFG context.
+     * Initialize the CFG simplification context.
      *
      * @param ctx The codegen context.
      */
-    explicit context(cg::context& ctx)
+    explicit simplify(cg::context& ctx)
     : ctx{ctx}
     {
     }
@@ -62,4 +62,4 @@ public:
     void run();
 };
 
-}    // namespace slang::opt::cfg
+}    // namespace slang::cfg

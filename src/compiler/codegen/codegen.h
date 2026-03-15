@@ -53,10 +53,10 @@ namespace slang::typing
 class context; /* compiler/typing.h */
 };    // namespace slang::typing
 
-namespace slang::opt::cfg
+namespace slang::cfg
 {
-class context; /* opt/cfg.h */
-}    // namespace slang::opt::cfg
+class simplify; /* cfg/simplify.h */
+}    // namespace slang::cfg
 
 namespace slang::codegen
 {
@@ -741,6 +741,12 @@ public:
         return label;
     }
 
+    /** Set the label. */
+    void set_label(std::string_view new_label)
+    {
+        label = new_label;
+    }
+
     [[nodiscard]]
     std::string to_string(
       [[maybe_unused]] const name_resolver* resolver = nullptr) const override
@@ -1040,6 +1046,13 @@ public:
     /** Get the instruction's arguments. */
     [[nodiscard]]
     const std::vector<std::unique_ptr<argument>>& get_args() const
+    {
+        return args;
+    }
+
+    /** Get the instruction's arguments. */
+    [[nodiscard]]
+    std::vector<std::unique_ptr<argument>>& get_args()
     {
         return args;
     }
@@ -1414,7 +1427,7 @@ public:
     const std::vector<
       std::pair<
         sema::symbol_id,
-        type>>
+        type>>&
       get_args() const
     {
         return args;
@@ -1425,7 +1438,7 @@ public:
     const std::vector<
       std::pair<
         sema::symbol_id,
-        type>>
+        type>>&
       get_locals() const
     {
         return locals;
@@ -1438,6 +1451,7 @@ public:
      * @returns Returns the index.
      * @throws Throws a `codegen_error` if the given symbol id was not found.
      */
+    [[nodiscard]]
     std::size_t get_index(sema::symbol_id id) const;
 
     /**
@@ -1450,6 +1464,16 @@ public:
     {
         return instr_blocks;
     }
+
+    /**
+     * Return a basic block.
+     *
+     * @param label The basic block label.
+     * @return Returns the basic block.
+     * @throws Throws a `codegen_error` if the label is not associated with a block.
+     */
+    [[nodiscard]]
+    basic_block* get_basic_block(std::string_view label);
 
     /**
      * String representation of the function.
@@ -1592,7 +1616,7 @@ class context
     // FIXME Too many friends.
     friend class slang::instruction_emitter;
     friend class slang::export_table_builder;
-    friend class slang::opt::cfg::context;
+    friend class slang::cfg::simplify;
     friend class basic_block;
 
     /** Semantic environment. */
