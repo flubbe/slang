@@ -11,11 +11,11 @@
 #include <format>
 #include <print>
 
+#include "compiler/cfg/simplify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
-#include "compiler/opt/cfg.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
@@ -212,7 +212,7 @@ void compile::invoke(const std::vector<std::string>& args)
     rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
     tl::context lowering_ctx{type_ctx};
     cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-    opt::cfg::context cfg_context{codegen_ctx};
+    cfg::simplify cfg_context{codegen_ctx};
     slang::instruction_emitter emitter{
       sema_env,
       const_env,

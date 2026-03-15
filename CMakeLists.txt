@@ -28,6 +28,7 @@ add_executable(slang
     src/compiler/ast/node_registry.cpp
     src/compiler/ast/resolve.cpp
     src/compiler/attribute.cpp
+    src/compiler/cfg/simplify.cpp
     src/compiler/codegen/codegen.cpp
     src/compiler/collect.cpp
     src/compiler/constant.cpp
@@ -37,7 +38,6 @@ add_executable(slang
     src/compiler/location.cpp
     src/compiler/lowering.cpp
     src/compiler/macro.cpp
-    src/compiler/opt/cfg.cpp
     src/compiler/parser.cpp
     src/compiler/resolve.cpp
     src/compiler/sema.cpp

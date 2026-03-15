@@ -255,6 +255,7 @@ add_executable(test_opt_cfg
     ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
+    ../src/compiler/cfg/simplify.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
     ../src/compiler/collect.cpp
@@ -265,7 +266,6 @@ add_executable(test_opt_cfg
     ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
-    ../src/compiler/opt/cfg.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
