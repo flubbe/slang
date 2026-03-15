@@ -183,6 +183,7 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
         EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
@@ -199,7 +200,7 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
 
         EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
-                  "0:\n"
+                  "entry:\n"
                   " const i32 1\n"
                   " ret i32\n"
                   "}");
@@ -254,6 +255,7 @@ TEST(opt_cfg, while_empty_blocks)
         EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " jmp %1\n"
                   "2:\n"
@@ -269,7 +271,7 @@ TEST(opt_cfg, while_empty_blocks)
 
         EXPECT_EQ(codegen_ctx.to_string(),
                   "define i32 @test() {\n"
-                  "0:\n"
+                  "entry:\n"
                   " const i32 0\n"
                   " ret i32\n"
                   "}");
@@ -328,6 +330,7 @@ TEST(opt_cfg, while_merge_blocks)
                   "entry:\n"
                   " const i32 1\n"
                   " store i32 %1\n"
+                  " jmp %0\n"
                   "0:\n"
                   " load i32 %1\n"
                   " const i32 1\n"

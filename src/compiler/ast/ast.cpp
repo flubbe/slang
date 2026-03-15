@@ -6154,6 +6154,11 @@ void while_statement::generate_code(
             auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
             // while loop body.
+            if(auto* bb = ctx.get_insertion_point();
+               bb && !bb->is_terminated())
+            {
+                ctx.generate_branch(body_basic_block);
+            }
             ctx.get_current_function(true)->append_basic_block(body_basic_block);
             ctx.set_insertion_point(body_basic_block);
 
@@ -6181,6 +6186,11 @@ void while_statement::generate_code(
     auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
     // while loop header.
+    if(auto* bb = ctx.get_insertion_point();
+       bb && !bb->is_terminated())
+    {
+        ctx.generate_branch(condition_basic_block);
+    }
     ctx.get_current_function(true)->append_basic_block(condition_basic_block);
     ctx.set_insertion_point(condition_basic_block);
 

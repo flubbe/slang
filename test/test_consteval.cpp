@@ -872,6 +872,7 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
@@ -928,6 +929,7 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
@@ -1031,6 +1033,7 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " const i32 2\n"
