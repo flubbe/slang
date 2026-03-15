@@ -18,11 +18,11 @@ void verify(const cg::function& func)
 {
     for(const auto& block: func.get_basic_blocks())
     {
-        if(!block->is_terminated())
+        if(!block->is_valid())
         {
             throw cg::codegen_error(
               std::format(
-                "CFG verification error: Block '{}' in function '{}' must end with a terminator.",
+                "CFG verification error: Invalid block '{}' in function '{}'.",
                 block->get_label(),
                 func.get_name()));
         }
