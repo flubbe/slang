@@ -2251,9 +2251,10 @@ void instruction_emitter::run()
          */
         std::size_t entry_point = instruction_buffer.tell();
 
-        for(const auto& it: f->get_basic_blocks())
+        const auto& blocks = f->get_basic_blocks();
+        for(auto it = blocks.begin(); it != blocks.end(); ++it)
         {
-            auto jump_it = jump_targets.find(it->get_label());
+            auto jump_it = jump_targets.find((*it)->get_label());
             if(jump_it != jump_targets.end())
             {
                 emit(instruction_buffer, opcode::label);
@@ -2262,8 +2263,19 @@ void instruction_emitter::run()
                 instruction_buffer & index;
             }
 
-            for(auto& instr: it->get_instructions())
+            for(auto& instr: (*it)->get_instructions())
             {
+                // only emit unconditional jumps if the target is not the next block.
+                if(instr->get_name() == "jmp"
+                   && std::next(it) != blocks.end()
+                   && static_cast<cg::label_argument*>(
+                        instr->get_args().at(0).get())
+                          ->get_label()
+                        == (*std::next(it))->get_label())
+                {
+                    continue;
+                }
+
                 emit_instruction(f, instr);
             }
         }
