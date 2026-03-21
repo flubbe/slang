@@ -5180,14 +5180,13 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
         expr->generate_code(ctx);
 
         auto* bb = ctx.get_insertion_point();
-        if(ctx.get_current_function() != nullptr
-           && bb != nullptr)
+        if(bb != nullptr)
         {
             was_terminated = bb->is_terminated();
         }
         else
         {
-            was_terminated = false;
+            was_terminated = true;
         }
     }
 
@@ -5363,8 +5362,8 @@ void function_expression::generate_code(
               "Internal error: Break-continue stack is not empty.");
         }
 
-        auto* ip = ctx.get_insertion_point(true);
-        if(!ip->ends_with_return())
+        auto* ip = ctx.get_insertion_point();
+        if(ip && !ip->is_terminated())
         {
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
@@ -6013,65 +6012,63 @@ void if_statement::generate_code(
     }
 
     // store where to insert the branch.
-    auto* function_insertion_point = ctx.get_insertion_point(true);
+    auto* cond_basic_block = ctx.get_insertion_point(true);
+    auto* fn = ctx.get_current_function(true);
 
     // set up basic blocks.
     auto* if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     cg::basic_block* else_basic_block = nullptr;
-    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-
-    bool if_ends_with_return = false;
-    bool else_ends_with_return = false;
 
     // code generation for if block.
-    ctx.get_current_function(true)->append_basic_block(if_basic_block);
+    fn->append_basic_block(if_basic_block);
     ctx.set_insertion_point(if_basic_block);
     if_block->generate_code(ctx);
-    if_ends_with_return = if_basic_block->ends_with_return();
-    if(!if_ends_with_return)
-    {
-        ctx.generate_branch(merge_basic_block);
-    }
 
     // code generation for optional else block.
-    if(!else_block)
-    {
-        ctx.set_insertion_point(function_insertion_point);
-        ctx.generate_cond_branch(if_basic_block, merge_basic_block);
-    }
-    else
+    if(else_block)
     {
         else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-        ctx.get_current_function(true)->append_basic_block(else_basic_block);
+        fn->append_basic_block(else_basic_block);
         ctx.set_insertion_point(else_basic_block);
         else_block->generate_code(ctx);
-        else_ends_with_return = else_basic_block->ends_with_return();
-        if(!else_ends_with_return)
+    }
+
+    bool has_else = else_basic_block != nullptr;
+    bool if_falls_through = !if_basic_block->is_terminated();
+    bool else_falls_through = has_else && !else_basic_block->is_terminated();
+    bool needs_merge = !has_else || if_falls_through || else_falls_through;
+
+    cg::basic_block* merge_basic_block = nullptr;
+    if(needs_merge)
+    {
+        merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    }
+
+    cg::basic_block* false_target = has_else ? else_basic_block : merge_basic_block;
+
+    ctx.set_insertion_point(cond_basic_block);
+    ctx.generate_cond_branch(if_basic_block, false_target);
+
+    if(merge_basic_block != nullptr)
+    {
+        if(if_falls_through)
         {
+            ctx.set_insertion_point(if_basic_block);
             ctx.generate_branch(merge_basic_block);
         }
 
-        ctx.set_insertion_point(function_insertion_point);
-        ctx.generate_cond_branch(if_basic_block, else_basic_block);
-    }
+        if(else_falls_through)
+        {
+            ctx.set_insertion_point(else_basic_block);
+            ctx.generate_branch(merge_basic_block);
+        }
 
-    // emit merge block.
-    if(!if_ends_with_return || !else_ends_with_return)
-    {
-        ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+        fn->append_basic_block(merge_basic_block);
         ctx.set_insertion_point(merge_basic_block);
     }
     else
     {
-        // pick the last of the if/else blocks.
-        if(else_block)
-        {
-            ctx.set_insertion_point(else_basic_block);
-        }
-        else
-        {
-            ctx.set_insertion_point(if_basic_block);
-        }
+        ctx.set_insertion_point(nullptr);
     }
 }
 

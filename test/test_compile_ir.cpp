@@ -3848,11 +3848,11 @@ TEST(compile_ir, if_statement)
                   " load i32 %1\n"
                   " const i32 0\n"
                   " cmpg i32\n"
-                  " jnz %0, %2\n"
+                  " jnz %0, %1\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
-                  "2:\n"
+                  "1:\n"
                   " const i32 0\n"
                   " ret i32\n"
                   "}");
