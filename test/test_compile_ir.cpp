@@ -3859,6 +3859,212 @@ TEST(compile_ir, if_statement)
     }
 }
 
+TEST(compile_ir, control_flow)
+{
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          " if(x)\n"
+          " {\n"
+          "  if(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          "  else\n"
+          "  {\n"
+          "   return 2;\n"
+          "  }\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 3;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %3\n"
+                  "0:\n"
+                  " load i32 %2\n"
+                  " jnz %1, %2\n"
+                  "1:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "2:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "3:\n"
+                  " const i32 3\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          " if(x)\n"
+          " {\n"
+          "  while(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          "  return 2;\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 3;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %4\n"
+                  "0:\n"
+                  " jmp %1\n"
+                  "1:\n"
+                  " load i32 %2\n"
+                  " jnz %2, %3\n"
+                  "2:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "3:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "4:\n"
+                  " const i32 3\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          "if(x)\n"
+          "{\n"
+          " if(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 2;\n"
+          " }\n"
+          " return 3;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %3\n"
+                  "0:\n"
+                  " load i32 %2\n"
+                  " jnz %1, %2\n"
+                  "1:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "2:\n"
+                  " jmp %4\n"
+                  "3:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "4:\n"
+                  " const i32 3\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
 TEST(compile_ir, break_fail)
 {
     {

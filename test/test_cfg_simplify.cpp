@@ -143,7 +143,7 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
           "        {\n"
           "            return 1;\n"
           "        }\n"
-          "        return 2;\n"
+          "        return 2;\n"    // unreachable after consteval (all blocks terminated)
           "    }\n"
           "    return 0;\n"
           "}\n";
@@ -187,9 +187,6 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
-                  "2:\n"
-                  " const i32 2\n"
-                  " ret i32\n"
                   "1:\n"
                   " const i32 0\n"
                   " ret i32\n"
@@ -215,7 +212,7 @@ TEST(opt_cfg, while_empty_blocks)
           "{\n"
           "    while(1) {\n"
           "        break;\n"
-          "        return 1;\n"
+          "        return 1;\n"    // unreachable (all blocks terminated)
           "    }\n"
           "    return 0;\n"
           "}\n";
@@ -258,9 +255,6 @@ TEST(opt_cfg, while_empty_blocks)
                   " jmp %0\n"
                   "0:\n"
                   " jmp %1\n"
-                  "2:\n"
-                  " const i32 1\n"
-                  " ret i32\n"
                   "1:\n"
                   " const i32 0\n"
                   " ret i32\n"
