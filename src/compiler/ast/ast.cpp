@@ -5293,7 +5293,7 @@ void function_expression::generate_code(
 
         cg::function_guard fg{ctx, fn};
 
-        cg::basic_block* bb = cg::basic_block::create(ctx, "entry");
+        cg::basic_block* bb = cg::basic_block::create(ctx, cg::function::entry_block_label);
         fn->append_basic_block(bb);
 
         ctx.set_insertion_point(bb);

@@ -365,6 +365,30 @@ basic_block* function::remove_basic_block(const std::string& label)
     return bb;
 }
 
+basic_block* function::get_entry_basic_block()
+{
+    if(instr_blocks.empty())
+    {
+        throw codegen_error(
+          std::format(
+            "Function '{}' contains no basic blocks.",
+            name));
+    }
+    return instr_blocks.front();
+}
+
+const basic_block* function::get_entry_basic_block() const
+{
+    if(instr_blocks.empty())
+    {
+        throw codegen_error(
+          std::format(
+            "Function '{}' contains no basic blocks.",
+            name));
+    }
+    return instr_blocks.front();
+}
+
 std::size_t function::get_index(sema::symbol_id id) const
 {
     auto it = std::ranges::find_if(

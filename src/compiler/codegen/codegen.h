@@ -1098,8 +1098,8 @@ class basic_block
      *
      * @param label The block's label.
      */
-    explicit basic_block(std::string label)
-    : label{std::move(label)}
+    explicit basic_block(std::string_view label)
+    : label{label}
     , instrs{}
     {
     }
@@ -1207,7 +1207,7 @@ public:
      * @param name The block name.
      * @return Returns a new `basic_block`.
      */
-    static basic_block* create(class context& ctx, std::string name);
+    static basic_block* create(class context& ctx, std::string_view name);
 };
 
 /** A guard that signals function entry and exit. */
@@ -1273,6 +1273,15 @@ class function
     std::list<basic_block*> instr_blocks;
 
 public:
+    /**
+     * Entry block label.
+     *
+     * @note Do _not_ rely on this label, as it is fragile, especially during passes that modify the CFG
+     *       (that is, basic block labels can change or be removed, e.g. due to merge operations). Use
+     *       `get_entry_basic_block` instead.
+     */
+    static constexpr std::string_view entry_block_label = "entry";
+
     /** Constructors. */
     function() = delete;
     function(const function&) = delete;
@@ -1371,6 +1380,24 @@ public:
      * @returns A pointer to the block.
      */
     basic_block* remove_basic_block(const std::string& label);
+
+    /**
+     * Return the function's entry basic block.
+     *
+     * @throws Throws a `codegen_error` if the function does not have any basic blocks.
+     *
+     * @returns Returns the entry basic block.
+     */
+    basic_block* get_entry_basic_block();
+
+    /**
+     * Return the function's entry basic block.
+     *
+     * @throws Throws a `codegen_error` if the function does not have any basic blocks.
+     *
+     * @returns Returns the entry basic block.
+     */
+    const basic_block* get_entry_basic_block() const;
 
     /** Return whether the function ends with a return statement. */
     [[nodiscard]]
@@ -2273,7 +2300,7 @@ inline void basic_block::set_inserting_context(context* ctx)
 
 inline basic_block* basic_block::create(
   context& ctx,
-  std::string name)
+  std::string_view name)
 {
     return ctx.basic_blocks.emplace_back(new basic_block(name)).get();
 }

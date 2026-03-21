@@ -58,25 +58,25 @@ static cfg_info build_cfg_info(const cg::function& func)
         }
     };
 
-    for(auto it = func.get_basic_blocks().begin(); it != func.get_basic_blocks().end(); ++it)
+    for(auto bb: func.get_basic_blocks())
     {
-        for(auto& instr: (*it)->get_instructions())
+        for(auto& instr: bb->get_instructions())
         {
             if(instr->get_name() == "jnz")
             {
                 const auto& args = instr->get_args();
                 insert_edge(
-                  (*it)->get_label(),
+                  bb->get_label(),
                   static_cast<cg::label_argument*>(args.at(0).get())->get_label());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
                 insert_edge(
-                  (*it)->get_label(),
+                  bb->get_label(),
                   static_cast<cg::label_argument*>(args.at(1).get())->get_label());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             }
             else if(instr->get_name() == "jmp")
             {
                 const auto& args = instr->get_args();
                 insert_edge(
-                  (*it)->get_label(),
+                  bb->get_label(),
                   static_cast<cg::label_argument*>(args.at(0).get())->get_label());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             }
         }
@@ -176,7 +176,9 @@ static bool remove_empty_blocks(
     std::set<std::string> empty;
     for(const auto& it: blocks)
     {
-        if(it->get_instructions().empty())
+        if(it->get_instructions().empty()
+           || (it->get_instructions().size() == 1
+               && it->get_instructions().back().get()->get_name() == "jmp"))
         {
             empty.emplace(it->get_label());
         }
@@ -210,8 +212,8 @@ static bool remove_empty_blocks(
         auto preds = info.preds.find(label);
         if(preds == info.preds.end())
         {
-            // first block has no predecessor.
-            if(label != blocks.front()->get_label())
+            // entry block has no predecessor.
+            if(label != func.get_entry_basic_block()->get_label())
             {
                 throw cg::codegen_error(
                   std::format(
@@ -219,43 +221,43 @@ static bool remove_empty_blocks(
                     func.get_name(),
                     label));
             }
+
+            continue;
         }
-        else
+
+        for(const auto& pred_block_label: preds->second)
         {
-            for(const auto& pred_block_label: preds->second)
+            auto* block = func.get_basic_block(pred_block_label);
+
+            auto& branch_instr = *block->get_instructions().back();
+            auto& args = branch_instr.get_args();
+
+            if(branch_instr.get_name() == "jmp")
             {
-                auto* block = func.get_basic_block(pred_block_label);
-
-                auto& branch_instr = *block->get_instructions().back();
-                auto& args = branch_instr.get_args();
-
-                if(branch_instr.get_name() == "jmp")
+                static_cast<cg::label_argument*>(args.at(0).get())->set_label(succ_label);
+            }
+            else if(branch_instr.get_name() == "jnz")
+            {
+                auto* arg0 = static_cast<cg::label_argument*>(args.at(0).get());
+                if(arg0->get_label() == label)
                 {
-                    static_cast<cg::label_argument*>(args.at(0).get())->set_label(succ_label);
+                    arg0->set_label(succ_label);
                 }
-                else if(branch_instr.get_name() == "jnz")
-                {
-                    auto arg0 = static_cast<cg::label_argument*>(args.at(0).get());
-                    if(arg0->get_label() == label)
-                    {
-                        arg0->set_label(succ_label);
-                    }
 
-                    auto arg1 = static_cast<cg::label_argument*>(args.at(1).get());
-                    if(arg1->get_label() == label)
-                    {
-                        arg1->set_label(succ_label);
-                    }
-                }
-                else
+                auto* arg1 = static_cast<cg::label_argument*>(args.at(1).get());
+                if(arg1->get_label() == label)
                 {
-                    throw cg::codegen_error(
-                      std::format(
-                        "'{}': Block '{}' has unknown terminating instruction '{}'.",
-                        func.get_name(),
-                        label,
-                        branch_instr.get_name()));
+                    arg1->set_label(succ_label);
                 }
+            }
+            else
+            {
+                throw cg::codegen_error(
+                  std::format(
+                    "'{}': Block '{}' has unknown terminating instruction '{}'.",
+                    func.get_name(),
+                    label,
+                    branch_instr.get_name()));
             }
         }
 
@@ -280,51 +282,15 @@ static bool merge_blocks(
     const auto& blocks = func.get_basic_blocks();
 
     /*
-     * merge blocks that are only successor blocks to fall-through's.
-     */
-
-    for(const auto& block: blocks | std::views::drop(1))    // skip the entry block
-    {
-        auto preds = info.preds.find(block->get_label());
-        if(preds == info.preds.end())
-        {
-            // no predecessor blocks.
-            continue;
-        }
-        if(preds->second.size() != 1)
-        {
-            // not a fall-through-only block.
-            continue;
-        }
-
-        auto* pred = func.get_basic_block(*preds->second.begin());
-        if(pred->is_terminated())
-        {
-            // not a fall-through-only block.
-            continue;
-        }
-
-        // merge blocks.
-        for(auto& instr: block->get_instructions())
-        {
-            pred->add_instruction(std::move(instr));
-        }
-
-        // remove block and return.
-        func.remove_basic_block(block->get_label());
-        return true;
-    }
-
-    /*
      * merge blocks that are only successor blocks to blocks ending with an unconditional jump.
      */
 
-    for(const auto& block: blocks | std::views::drop(1))    // skip the entry block
+    for(const auto& block: blocks)    // skip the entry block
     {
         auto preds = info.preds.find(block->get_label());
         if(preds == info.preds.end())
         {
-            // no predecessor blocks.
+            // no predecessor blocks (true for entry blocks).
             continue;
         }
         if(preds->second.size() != 1)
@@ -396,7 +362,7 @@ void simplify::run_on_function(cg::function& func)
     std::set<std::string> reachable =
       compute_reachable(
         info,
-        func.get_basic_blocks().front()->get_label());
+        func.get_entry_basic_block()->get_label());
 
     remove_unreachable_blocks(
       func,
