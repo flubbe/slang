@@ -80,23 +80,6 @@ static cfg_info build_cfg_info(const cg::function& func)
                   static_cast<cg::label_argument*>(args.at(0).get())->get_label());    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
             }
         }
-
-        if(!(*it)->is_terminated())
-        {
-            // fall-through case.
-            auto next_it = std::next(it);
-            if(next_it == func.get_basic_blocks().end())
-            {
-                throw cg::codegen_error(
-                  std::format(
-                    "'{}': Unexpected function end.",
-                    func.get_name()));
-            }
-
-            insert_edge(
-              (*it)->get_label(),
-              (*next_it)->get_label());
-        }
     }
 
     return info;
@@ -242,11 +225,6 @@ static bool remove_empty_blocks(
             for(const auto& pred_block_label: preds->second)
             {
                 auto* block = func.get_basic_block(pred_block_label);
-                if(!block->is_terminated())
-                {
-                    // Fall-through block. Does not need to be rewired.
-                    continue;
-                }
 
                 auto& branch_instr = *block->get_instructions().back();
                 auto& args = branch_instr.get_args();

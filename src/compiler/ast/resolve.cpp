@@ -481,4 +481,18 @@ void macro_expression::resolve_names(rs::context& ctx)
       });
 }
 
+/*
+ * translation_unit.
+ */
+
+void translation_unit::resolve_names(rs::context& ctx)
+{
+    std::ranges::for_each(
+      decls,
+      [&ctx](std::unique_ptr<expression>& d)
+      {
+          d->resolve_names(ctx);
+      });
+}
+
 }    // namespace slang::ast

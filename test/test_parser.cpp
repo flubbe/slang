@@ -327,8 +327,8 @@ TEST(parser, operators)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=a, "
                 "type=TypeExpression("
@@ -366,8 +366,8 @@ TEST(parser, operators)
 
         // clang-format off
         const std::string expected = 
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=a, "
                 "type=TypeExpression("
@@ -410,8 +410,8 @@ TEST(parser, operators)
 
         // clang-format off
         const std::string expected = 
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=a, "
                 "type=TypeExpression("
@@ -454,8 +454,8 @@ TEST(parser, operators)
 
         // clang-format off
         const std::string expected = 
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=a, "
                 "type=TypeExpression("
@@ -511,8 +511,8 @@ TEST(parser, operators)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=s, "
                 "type=TypeExpression("
@@ -840,8 +840,8 @@ TEST(parser, variable_declaration)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "Function("
                 "prototype=Prototype("
                   "name=f, "
@@ -928,8 +928,8 @@ TEST(parser, explicit_cast)
 
     // clang-format off
     const std::string expected =
-      "Block("
-        "exprs=("
+      "TranslationUnit("
+        "decls=("
           "VariableDeclaration("
             "name=k, "
             "type=TypeExpression("
@@ -1088,8 +1088,8 @@ TEST(parser, struct_member_access)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=s1, "
                 "type=TypeExpression("
@@ -1126,8 +1126,8 @@ TEST(parser, struct_member_access)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "VariableDeclaration("
                 "name=s1, "
                 "type=TypeExpression("
@@ -1198,8 +1198,8 @@ TEST(parser, struct_cast)
 
         // clang-format off
         const std::string expected =
-          "Block("
-            "exprs=("
+          "TranslationUnit("
+            "decls=("
               "Function("
                 "prototype=Prototype("
                   "name=test, "
@@ -1403,8 +1403,8 @@ TEST(parser, struct_array_access)
 
         // clang-format off
         const std::string expected =
-        "Block("
-          "exprs=("
+        "TranslationUnit("
+          "decls=("
             "Struct("
               "name=L, "
               "members=("
@@ -1526,8 +1526,8 @@ TEST(parser, macro_definition)
 
         // clang-format off
         const std::string expected =
-        "Block("
-          "exprs=("
+        "TranslationUnit("
+          "decls=("
             "Macro("
               "name=sum!, "
               "branches=("

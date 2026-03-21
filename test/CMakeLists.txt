@@ -102,6 +102,7 @@ add_executable(test_compile_ir
     ../src/compiler/ast/macros.cpp
     ../src/compiler/ast/node_ids.cpp
     ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/cfg/verify.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
     ../src/compiler/collect.cpp
@@ -256,6 +257,7 @@ add_executable(test_cfg_simplify
     ../src/compiler/ast/node_registry.cpp
     ../src/compiler/ast/resolve.cpp
     ../src/compiler/cfg/simplify.cpp
+    ../src/compiler/cfg/verify.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/attribute.cpp
     ../src/compiler/collect.cpp

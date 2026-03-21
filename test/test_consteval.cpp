@@ -756,7 +756,7 @@ TEST(const_eval, if_statement)
           "    {\n"
           "        return 0+1;\n"
           "    }\n"
-          "    return 2+3;\n"
+          "    return 2+3;\n"    // unreachable
           "}\n";
 
         slang::lexer lexer;
@@ -808,19 +808,16 @@ TEST(const_eval, if_statement)
                   " const i32 0\n"
                   " jmp %2\n"
                   "2:\n"
-                  " jnz %3, %5\n"
+                  " jnz %3, %4\n"
                   "3:\n"
                   " const i32 1\n"
                   " const i32 2\n"
                   " add i32\n"
                   " ret i32\n"
-                  "5:\n"
+                  "4:\n"
                   " const i32 0\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " ret i32\n"
-                  "6:\n"
-                  " const i32 5\n"
                   " ret i32\n"
                   "}");
     }
@@ -872,6 +869,7 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
@@ -888,6 +886,63 @@ TEST(const_eval, while_statement)
           "{\n"
           "    while(a > 0 && b == 2) {\n"
           "        if(a < 2)\n"
+          "        {\n"
+          "            return 1;\n"
+          "        }\n"
+          "        return 2;\n"    // unreachable after consteval (all blocks terminated)
+          "    }\n"
+          "    return 0;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx{sema_env, const_env, lowering_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test() {\n"
+                  "entry:\n"
+                  " jmp %0\n"
+                  "0:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "const a: i32 = 1;\n"
+          "const b: i32 = 2;\n"
+          "fn test() -> i32\n"
+          "{\n"
+          "    while(a > 0 && b == 2) {\n"
+          "        if(a > 2)\n"
           "        {\n"
           "            return 1;\n"
           "        }\n"
@@ -928,13 +983,82 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
-                  " const i32 1\n"
-                  " ret i32\n"
-                  "2:\n"
                   " const i32 2\n"
                   " ret i32\n"
                   "1:\n"
+                  " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "const b: i32 = 2;\n"
+          "fn test(a: i32) -> i32\n"
+          "{\n"
+          "    while(a > 0 && b == 2) {\n"    // b == 2 is compile-time evaluated
+          "        if(a < 2)\n"
+          "        {\n"
+          "            return 1;\n"
+          "        }\n"
+          "        return 2;\n"
+          "    }\n"
+          "    return 0;\n"
+          "}\n";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx{sema_env, const_env, lowering_ctx};
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->bind_constant_declarations(sema_env, const_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->evaluate_constant_expressions(type_ctx, const_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @test(i32 %2) {\n"
+                  "entry:\n"
+                  " jmp %0\n"
+                  "0:\n"
+                  " load i32 %2\n"
+                  " const i32 0\n"
+                  " cmpg i32\n"
+                  " const i32 0\n"
+                  " cmpne i32\n"
+                  " jnz %1, %2\n"
+                  "1:\n"
+                  " load i32 %2\n"
+                  " const i32 2\n"
+                  " cmpl i32\n"
+                  " jnz %3, %4\n"
+                  "3:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "4:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "2:\n"
                   " const i32 0\n"
                   " ret i32\n"
                   "}");
@@ -1031,6 +1155,7 @@ TEST(const_eval, while_statement)
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test() {\n"
                   "entry:\n"
+                  " jmp %0\n"
                   "0:\n"
                   " const i32 1\n"
                   " const i32 2\n"

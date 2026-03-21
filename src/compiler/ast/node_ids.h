@@ -59,6 +59,7 @@ enum class node_identifier : std::uint8_t
     macro_branch,
     macro_expression_list,
     macro_expression,
+    translation_unit,
 
     format_macro_expression,
 

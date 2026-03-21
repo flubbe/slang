@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -20,6 +21,7 @@
 #include "compiler/typing.h"
 
 namespace ast = slang::ast;
+namespace cfg = slang::cfg;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace const_ = slang::const_;
@@ -198,6 +200,7 @@ TEST(compile_ir, empty)
     ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
+    ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
     EXPECT_EQ(ctx.to_string(&resolver).length(), 0);
 }
@@ -326,6 +329,7 @@ TEST(compile_ir, builtin_types)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -378,6 +382,7 @@ TEST(compile_ir, convert_i32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -422,6 +427,7 @@ TEST(compile_ir, convert_i32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -466,6 +472,7 @@ TEST(compile_ir, convert_i32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -510,6 +517,7 @@ TEST(compile_ir, convert_i32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -554,6 +562,7 @@ TEST(compile_ir, convert_i32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -604,6 +613,7 @@ TEST(compile_ir, convert_i8)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -653,6 +663,7 @@ TEST(compile_ir, convert_i8)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -701,6 +712,7 @@ TEST(compile_ir, convert_i8)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -750,6 +762,7 @@ TEST(compile_ir, convert_i8)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -799,6 +812,7 @@ TEST(compile_ir, convert_i8)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -853,6 +867,7 @@ TEST(compile_ir, convert_i16)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -902,6 +917,7 @@ TEST(compile_ir, convert_i16)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -950,6 +966,7 @@ TEST(compile_ir, convert_i16)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -999,6 +1016,7 @@ TEST(compile_ir, convert_i16)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1048,6 +1066,7 @@ TEST(compile_ir, convert_i16)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1102,6 +1121,7 @@ TEST(compile_ir, convert_i64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1152,6 +1172,7 @@ TEST(compile_ir, convert_i64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1202,6 +1223,7 @@ TEST(compile_ir, convert_i64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1251,6 +1273,7 @@ TEST(compile_ir, convert_i64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1300,6 +1323,7 @@ TEST(compile_ir, convert_i64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1354,6 +1378,7 @@ TEST(compile_ir, convert_f32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1404,6 +1429,7 @@ TEST(compile_ir, convert_f32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1454,6 +1480,7 @@ TEST(compile_ir, convert_f32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1503,6 +1530,7 @@ TEST(compile_ir, convert_f32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1552,6 +1580,7 @@ TEST(compile_ir, convert_f32)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1606,6 +1635,7 @@ TEST(compile_ir, convert_f64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1656,6 +1686,7 @@ TEST(compile_ir, convert_f64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1706,6 +1737,7 @@ TEST(compile_ir, convert_f64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1755,6 +1787,7 @@ TEST(compile_ir, convert_f64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1804,6 +1837,7 @@ TEST(compile_ir, convert_f64)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -1858,6 +1892,7 @@ TEST(compile_ir, arithmetic_i8)
             ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
             ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
             ASSERT_NO_THROW(ast->generate_code(ctx));
+            ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
             EXPECT_EQ(ctx.to_string(),
                       "define void @f() {\n"
@@ -1914,6 +1949,7 @@ TEST(compile_ir, arithmetic_i16)
             ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
             ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
             ASSERT_NO_THROW(ast->generate_code(ctx));
+            ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
             EXPECT_EQ(ctx.to_string(),
                       "define void @f() {\n"
@@ -1968,6 +2004,7 @@ TEST(compile_ir, logical_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -2023,6 +2060,7 @@ TEST(compile_ir, logical_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -2081,6 +2119,7 @@ TEST(compile_ir, empty_function)
     ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
+    ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
@@ -2127,6 +2166,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   "define i32 @f() {\n"
@@ -2171,6 +2211,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   "define f32 @f() {\n"
@@ -2216,6 +2257,7 @@ TEST(compile_ir, builtin_return_values)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   ".string @0 \"test\"\n"
@@ -2262,6 +2304,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f(i32 %1, str %2, f32 %3) {\n"
@@ -2304,6 +2347,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %1, str %2, f32 %3) {\n"
@@ -2350,6 +2394,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
@@ -2396,6 +2441,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f(i32 %1, i32 %2, f32 %3) {\n"
@@ -2443,6 +2489,7 @@ TEST(compile_ir, function_arguments_and_locals)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   "define i32 @f(i32 %i, i32 %j, f32 %k) {\n"
@@ -2495,6 +2542,7 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(&resolver),
                   "define void @f() {\n"
@@ -2549,6 +2597,7 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define ref @f() {\n"
@@ -2606,6 +2655,7 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -2661,6 +2711,7 @@ TEST(compile_ir, arrays)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -2770,6 +2821,7 @@ TEST(compile_ir, unary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @local(i32 %1) {\n"
@@ -2817,6 +2869,7 @@ TEST(compile_ir, unary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @local(i32 %1) {\n"
@@ -2870,6 +2923,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -2919,6 +2973,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -2968,6 +3023,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3017,6 +3073,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3070,6 +3127,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3123,6 +3181,7 @@ TEST(compile_ir, binary_operators)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3179,6 +3238,7 @@ TEST(compile_ir, postfix_operators)
     ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
     ASSERT_NO_THROW(ast->generate_code(ctx));
+    ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
     EXPECT_EQ(ctx.to_string(),
               "define void @f() {\n"
@@ -3231,6 +3291,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3282,6 +3343,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3340,6 +3402,7 @@ TEST(compile_ir, compound_assignments)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @f() {\n"
@@ -3436,6 +3499,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -3486,6 +3550,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   ".string @0 \"Test\"\n"
@@ -3544,6 +3609,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -3598,6 +3664,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
     }
     {
         // popping of unused return values (i32 and f32)
@@ -3642,6 +3709,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define void @f() {\n"
@@ -3707,6 +3775,7 @@ TEST(compile_ir, function_calls)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -3771,6 +3840,7 @@ TEST(compile_ir, if_statement)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "define i32 @test_if_else(i32 %1) {\n"
@@ -3778,12 +3848,218 @@ TEST(compile_ir, if_statement)
                   " load i32 %1\n"
                   " const i32 0\n"
                   " cmpg i32\n"
-                  " jnz %0, %2\n"
+                  " jnz %0, %1\n"
                   "0:\n"
                   " const i32 1\n"
                   " ret i32\n"
-                  "2:\n"
+                  "1:\n"
                   " const i32 0\n"
+                  " ret i32\n"
+                  "}");
+    }
+}
+
+TEST(compile_ir, control_flow)
+{
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          " if(x)\n"
+          " {\n"
+          "  if(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          "  else\n"
+          "  {\n"
+          "   return 2;\n"
+          "  }\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 3;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %3\n"
+                  "0:\n"
+                  " load i32 %2\n"
+                  " jnz %1, %2\n"
+                  "1:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "2:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "3:\n"
+                  " const i32 3\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          " if(x)\n"
+          " {\n"
+          "  while(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          "  return 2;\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 3;\n"
+          " }\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %4\n"
+                  "0:\n"
+                  " jmp %1\n"
+                  "1:\n"
+                  " load i32 %2\n"
+                  " jnz %2, %3\n"
+                  "2:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "3:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "4:\n"
+                  " const i32 3\n"
+                  " ret i32\n"
+                  "}");
+    }
+    {
+        const std::string test_input =
+          "fn f(x: i32, y: i32) -> i32\n"
+          "{\n"
+          "if(x)\n"
+          "{\n"
+          " if(y)\n"
+          "  {\n"
+          "   return 1;\n"
+          "  }\n"
+          " }\n"
+          " else\n"
+          " {\n"
+          "  return 2;\n"
+          " }\n"
+          " return 3;\n"
+          "}";
+
+        slang::lexer lexer;
+        slang::parser parser;
+
+        lexer.set_input(test_input);
+        parser.parse(lexer);
+
+        EXPECT_TRUE(lexer.eof());
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        tl::context lowering_ctx{type_ctx};
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+        cg::context ctx = get_context(sema_env, const_env, lowering_ctx);
+
+        ASSERT_NO_THROW(ast->collect_names(co_ctx));
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->define_types(type_ctx));
+        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+        ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
+
+        EXPECT_EQ(ctx.to_string(),
+                  "define i32 @f(i32 %1, i32 %2) {\n"
+                  "entry:\n"
+                  " load i32 %1\n"
+                  " jnz %0, %3\n"
+                  "0:\n"
+                  " load i32 %2\n"
+                  " jnz %1, %2\n"
+                  "1:\n"
+                  " const i32 1\n"
+                  " ret i32\n"
+                  "2:\n"
+                  " jmp %4\n"
+                  "3:\n"
+                  " const i32 2\n"
+                  " ret i32\n"
+                  "4:\n"
+                  " const i32 3\n"
                   " ret i32\n"
                   "}");
     }
@@ -3905,6 +4181,7 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         test_name_resolver resolver{sema_env, const_env, type_ctx};
 
@@ -3966,6 +4243,7 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4025,6 +4303,7 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4086,6 +4365,7 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4156,6 +4436,7 @@ TEST(compile_ir, structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4228,6 +4509,7 @@ TEST(compile_ir, nested_structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4292,6 +4574,7 @@ TEST(compile_ir, nested_structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4361,6 +4644,7 @@ TEST(compile_ir, nested_structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%S = type {\n"
@@ -4440,6 +4724,7 @@ TEST(compile_ir, nested_structs)
         ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
         ASSERT_NO_THROW(ast->generate_code(ctx));
+        ASSERT_NO_THROW(cfg::verify(ctx.get_functions()));
 
         EXPECT_EQ(ctx.to_string(),
                   "%Link = type {\n"

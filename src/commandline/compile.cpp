@@ -12,6 +12,7 @@
 #include <print>
 
 #include "compiler/cfg/simplify.h"
+#include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
 #include "compiler/loader.h"
@@ -22,6 +23,7 @@
 #include "commandline.h"
 
 namespace ast = slang::ast;
+namespace cfg = slang::cfg;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
 namespace ty = slang::typing;
@@ -254,8 +256,15 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
     ast->expand_late_macros(co_ctx, resolver_ctx, type_ctx, sema_env);
     ast->evaluate_constant_expressions(type_ctx, const_env);
+
+    // code generation and verification.
     ast->generate_code(codegen_ctx);
+    cfg::verify(codegen_ctx.get_functions());
+
+    // CFG simplification and verification.
     cfg_context.run();
+    cfg::verify(codegen_ctx.get_functions());
+
     emitter.run();
 
     slang::module_::language_module mod = emitter.to_module();

@@ -29,6 +29,7 @@ add_executable(slang
     src/compiler/ast/resolve.cpp
     src/compiler/attribute.cpp
     src/compiler/cfg/simplify.cpp
+    src/compiler/cfg/verify.cpp
     src/compiler/codegen/codegen.cpp
     src/compiler/collect.cpp
     src/compiler/constant.cpp

@@ -57,6 +57,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::macro_branch: return std::make_unique<macro_branch>();
     case node_identifier::macro_expression_list: return std::make_unique<macro_expression_list>();
     case node_identifier::macro_expression: return std::make_unique<macro_expression>();
+    case node_identifier::translation_unit: return std::make_unique<translation_unit>();
     case node_identifier::format_macro_expression: return std::make_unique<format_macro_expression>();
     }
 

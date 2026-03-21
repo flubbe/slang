@@ -2891,10 +2891,10 @@ public:
     }
 };
 
-/** AST of a code block. This can refer to any block, e.g. the whole program, or a function body. */
+/** AST of a code block. */
 class block : public expression
 {
-    /** The program expressions. */
+    /** The block expressions. */
     std::vector<std::unique_ptr<expression>> exprs;
 
 public:
@@ -2921,10 +2921,10 @@ public:
     block& operator=(block&&) = default;
 
     /**
-     * Construct a program.
+     * Construct a block.
      *
      * @param loc The location.
-     * @param exprs The program expressions.
+     * @param exprs The block expressions.
      */
     block(
       source_location loc,
@@ -4311,6 +4311,92 @@ public:
     std::unique_ptr<expression> expand(
       cg::context& ctx,
       const macro_invocation& invocation) const;
+};
+
+/** AST of a translation unit. */
+class translation_unit : public expression
+{
+    /** The program declarations. */
+    std::vector<std::unique_ptr<expression>> decls;
+
+public:
+    /** Set the super class. */
+    using super = expression;
+
+    /** Defaulted and deleted constructor. */
+    translation_unit() = default;
+    translation_unit(const translation_unit& other)
+    : super{other}
+    , decls{other.decls
+            | std::views::transform(
+              [](const auto& ptr)
+              {
+                  return ptr->clone();
+              })
+            | std::ranges::to<std::vector>()}
+    {
+    }
+    translation_unit(translation_unit&&) = default;
+
+    /** Assignment operators. */
+    translation_unit& operator=(const translation_unit&) = delete;
+    translation_unit& operator=(translation_unit&&) = default;
+
+    /**
+     * Construct a translation unit.
+     *
+     * @param loc The location.
+     * @param decls The translation unit declarations.
+     */
+    translation_unit(
+      source_location loc,
+      std::vector<std::unique_ptr<expression>> decls)
+    : expression{loc}
+    , decls{std::move(decls)}
+    {
+    }
+
+    [[nodiscard]]
+    node_identifier get_id() const override
+    {
+        return node_identifier::translation_unit;
+    }
+
+    [[nodiscard]] std::unique_ptr<expression> clone() const override;
+    void serialize(archive& ar) override;
+
+    void generate_code(cg::context& ctx) const override;
+    void collect_names(co::context& ctx) override;
+    void resolve_names(rs::context& ctx) override;
+    std::optional<ty::type_id> type_check(
+      ty::context& ctx,
+      sema::env& env) override;
+    [[nodiscard]] std::string to_string() const override;
+
+    [[nodiscard]]
+    std::vector<expression*> get_children() override
+    {
+        std::vector<expression*> children;
+        children.reserve(decls.size());
+
+        for(auto& d: decls)
+        {
+            children.emplace_back(d.get());
+        }
+        return children;
+    }
+    [[nodiscard]]
+    std::vector<const expression*> get_children() const override
+    {
+        std::vector<const expression*> children;
+        children.reserve(decls.size());
+
+        for(auto& d: decls)
+        {
+            children.emplace_back(d.get());
+        }
+        return children;
+    }
 };
 
 }    // namespace slang::ast

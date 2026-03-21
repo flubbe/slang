@@ -1814,7 +1814,7 @@ void parser::parse(lexer& lexer)
         throw parser_error("Not all tokens parsed.");
     }
 
-    ast = std::make_unique<ast::block>(
+    ast = std::make_unique<ast::translation_unit>(
       start_location,
       std::move(exprs));
 }

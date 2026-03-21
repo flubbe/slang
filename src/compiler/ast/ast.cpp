@@ -5107,21 +5107,8 @@ bool block::is_pure(cg::context& ctx) const
 void block::generate_code(
   cg::context& ctx) const
 {
-    bool was_terminated = false;
-
     for(const auto& expr: exprs)
     {
-        if(was_terminated)
-        {
-            auto* fn = ctx.get_current_function();
-            if(fn != nullptr)
-            {
-                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-                fn->append_basic_block(bb);
-                ctx.set_insertion_point(bb);
-            }
-        }
-
         if(expr->is_pure(ctx))
         {
             std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
@@ -5132,15 +5119,9 @@ void block::generate_code(
 
         expr->generate_code(ctx);
 
-        auto* bb = ctx.get_insertion_point();
-        if(ctx.get_current_function() != nullptr
-           && bb != nullptr)
+        if(ctx.get_insertion_point() == nullptr)
         {
-            was_terminated = bb->is_terminated();
-        }
-        else
-        {
-            was_terminated = false;
+            break;
         }
     }
 }
@@ -5154,54 +5135,27 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
         return nullptr;
     }
 
-    bool was_terminated = false;
-    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+    for(const auto& expr: exprs | std::views::take(exprs.size() - 1))
     {
-        const auto& expr = exprs[i];
-        if(was_terminated)
+        if(ctx.get_insertion_point() == nullptr)
         {
-            auto* fn = ctx.get_current_function();
-            if(fn != nullptr)
-            {
-                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-                fn->append_basic_block(bb);
-                ctx.set_insertion_point(bb);
-            }
+            return nullptr;
         }
 
         if(expr->is_pure(ctx))
         {
-            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-            // don't generate code.
+            std::println(
+              "{}: Expression has no effect.",
+              ::slang::to_string(expr->get_location()));
             continue;
         }
 
         expr->generate_code(ctx);
-
-        auto* bb = ctx.get_insertion_point();
-        if(ctx.get_current_function() != nullptr
-           && bb != nullptr)
-        {
-            was_terminated = bb->is_terminated();
-        }
-        else
-        {
-            was_terminated = false;
-        }
     }
 
-    // the last expression is loaded if it is an expression.
-
-    if(was_terminated)
+    if(ctx.get_insertion_point() == nullptr)
     {
-        auto* fn = ctx.get_current_function();
-        if(fn != nullptr)
-        {
-            cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-            fn->append_basic_block(bb);
-            ctx.set_insertion_point(bb);
-        }
+        return nullptr;
     }
 
     const auto& last_expr = exprs.back();
@@ -5259,9 +5213,9 @@ std::string block::to_string() const
     std::string ret = "Block(exprs=(";
     if(!exprs.empty())
     {
-        for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+        for(auto& expr: exprs | std::views::take(exprs.size() - 1))
         {
-            ret += std::format("{}, ", exprs[i] ? exprs[i]->to_string() : std::string("<none>"));
+            ret += std::format("{}, ", expr ? expr->to_string() : std::string("<none>"));
         }
         ret += std::format("{}", exprs.back() ? exprs.back()->to_string() : std::string("<none>"));
     }
@@ -5363,8 +5317,8 @@ void function_expression::generate_code(
               "Internal error: Break-continue stack is not empty.");
         }
 
-        auto* ip = ctx.get_insertion_point(true);
-        if(!ip->ends_with_return())
+        auto* ip = ctx.get_insertion_point();
+        if(ip && !ip->is_terminated())
         {
             // for `void` return types, we insert a return instruction. otherwise, the
             // return statement is missing and we throw an error.
@@ -5878,6 +5832,7 @@ void return_statement::generate_code(
            (v = expr->try_emit_const_eval_result(ctx)) != nullptr)    // NOLINT(bugprone-assignment-in-if-condition)
         {
             ctx.generate_ret(v->get_type());
+            ctx.set_insertion_point(nullptr);
             return;
         }
 
@@ -5888,6 +5843,8 @@ void return_statement::generate_code(
     {
         ctx.generate_ret();
     }
+
+    ctx.set_insertion_point(nullptr);
 }
 
 void return_statement::collect_names(co::context& ctx)
@@ -6013,65 +5970,64 @@ void if_statement::generate_code(
     }
 
     // store where to insert the branch.
-    auto* function_insertion_point = ctx.get_insertion_point(true);
+    auto* cond_basic_block = ctx.get_insertion_point(true);
+    auto* fn = ctx.get_current_function(true);
 
     // set up basic blocks.
     auto* if_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
     cg::basic_block* else_basic_block = nullptr;
-    auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-
-    bool if_ends_with_return = false;
-    bool else_ends_with_return = false;
 
     // code generation for if block.
-    ctx.get_current_function(true)->append_basic_block(if_basic_block);
+    fn->append_basic_block(if_basic_block);
     ctx.set_insertion_point(if_basic_block);
     if_block->generate_code(ctx);
-    if_ends_with_return = if_basic_block->ends_with_return();
-    if(!if_ends_with_return)
-    {
-        ctx.generate_branch(merge_basic_block);
-    }
+    auto* if_exit_block = ctx.get_insertion_point();
 
     // code generation for optional else block.
-    if(!else_block)
-    {
-        ctx.set_insertion_point(function_insertion_point);
-        ctx.generate_cond_branch(if_basic_block, merge_basic_block);
-    }
-    else
+    if(else_block)
     {
         else_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
-        ctx.get_current_function(true)->append_basic_block(else_basic_block);
+        fn->append_basic_block(else_basic_block);
         ctx.set_insertion_point(else_basic_block);
         else_block->generate_code(ctx);
-        else_ends_with_return = else_basic_block->ends_with_return();
-        if(!else_ends_with_return)
+    }
+
+    bool has_else = else_basic_block != nullptr;
+    bool if_falls_through = if_exit_block != nullptr;
+    bool else_falls_through = has_else && !else_basic_block->is_terminated();
+    bool needs_merge = !has_else || if_falls_through || else_falls_through;
+
+    cg::basic_block* merge_basic_block = nullptr;
+    if(needs_merge)
+    {
+        merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
+    }
+
+    cg::basic_block* false_target = has_else ? else_basic_block : merge_basic_block;
+
+    ctx.set_insertion_point(cond_basic_block);
+    ctx.generate_cond_branch(if_basic_block, false_target);
+
+    if(merge_basic_block != nullptr)
+    {
+        if(if_falls_through)
         {
+            ctx.set_insertion_point(if_exit_block);
             ctx.generate_branch(merge_basic_block);
         }
 
-        ctx.set_insertion_point(function_insertion_point);
-        ctx.generate_cond_branch(if_basic_block, else_basic_block);
-    }
+        if(else_falls_through)
+        {
+            ctx.set_insertion_point(else_basic_block);
+            ctx.generate_branch(merge_basic_block);
+        }
 
-    // emit merge block.
-    if(!if_ends_with_return || !else_ends_with_return)
-    {
-        ctx.get_current_function(true)->append_basic_block(merge_basic_block);
+        fn->append_basic_block(merge_basic_block);
         ctx.set_insertion_point(merge_basic_block);
     }
     else
     {
-        // pick the last of the if/else blocks.
-        if(else_block)
-        {
-            ctx.set_insertion_point(else_basic_block);
-        }
-        else
-        {
-            ctx.set_insertion_point(if_basic_block);
-        }
+        ctx.set_insertion_point(nullptr);
     }
 }
 
@@ -6154,6 +6110,11 @@ void while_statement::generate_code(
             auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
             // while loop body.
+            if(auto* bb = ctx.get_insertion_point();
+               bb && !bb->is_terminated())
+            {
+                ctx.generate_branch(body_basic_block);
+            }
             ctx.get_current_function(true)->append_basic_block(body_basic_block);
             ctx.set_insertion_point(body_basic_block);
 
@@ -6181,6 +6142,11 @@ void while_statement::generate_code(
     auto* merge_basic_block = cg::basic_block::create(ctx, ctx.generate_label());
 
     // while loop header.
+    if(auto* bb = ctx.get_insertion_point();
+       bb && !bb->is_terminated())
+    {
+        ctx.generate_branch(condition_basic_block);
+    }
     ctx.get_current_function(true)->append_basic_block(condition_basic_block);
     ctx.set_insertion_point(condition_basic_block);
 
@@ -6267,6 +6233,7 @@ void break_statement::generate_code(
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(break_block);
+    ctx.set_insertion_point(nullptr);
 }
 
 /*
@@ -6283,6 +6250,74 @@ void continue_statement::generate_code(
 {
     auto [break_block, continue_block] = ctx.top_break_continue(loc);
     ctx.generate_branch(continue_block);
+    ctx.set_insertion_point(nullptr);
+}
+
+/*
+ * translation_unit.
+ */
+
+std::unique_ptr<expression> translation_unit::clone() const
+{
+    return std::make_unique<translation_unit>(*this);
+}
+
+void translation_unit::serialize(archive& ar)
+{
+    super::serialize(ar);
+    ar& expression_vector_serializer{decls};
+}
+
+void translation_unit::generate_code(
+  cg::context& ctx) const
+{
+    for(const auto& decl: decls)
+    {
+        decl->generate_code(ctx);
+    }
+}
+
+void translation_unit::collect_names(co::context& ctx)
+{
+    super::collect_names(ctx);
+
+    // push anonymous scope
+    ctx.push_scope(std::nullopt, loc);
+
+    for(const auto& decl: decls)
+    {
+        decl->collect_names(ctx);
+    }
+
+    // pop anonymous scope
+    ctx.pop_scope();
+}
+
+std::optional<ty::type_id> translation_unit::type_check(
+  ty::context& ctx,
+  sema::env& env)
+{
+    for(auto& decl: decls)
+    {
+        decl->type_check(ctx, env);
+    }
+
+    return std::nullopt;
+}
+
+std::string translation_unit::to_string() const
+{
+    std::string ret = "TranslationUnit(decls=(";
+    if(!decls.empty())
+    {
+        for(auto& decl: decls | std::views::take(decls.size() - 1))
+        {
+            ret += std::format("{}, ", decl ? decl->to_string() : std::string("<none>"));
+        }
+        ret += std::format("{}", decls.back() ? decls.back()->to_string() : std::string("<none>"));
+    }
+    ret += "))";
+    return ret;
 }
 
 }    // namespace slang::ast
