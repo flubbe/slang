@@ -756,7 +756,7 @@ TEST(const_eval, if_statement)
           "    {\n"
           "        return 0+1;\n"
           "    }\n"
-          "    return 2+3;\n"
+          "    return 2+3;\n"    // unreachable
           "}\n";
 
         slang::lexer lexer;
@@ -818,9 +818,6 @@ TEST(const_eval, if_statement)
                   " const i32 0\n"
                   " const i32 1\n"
                   " add i32\n"
-                  " ret i32\n"
-                  "5:\n"
-                  " const i32 5\n"
                   " ret i32\n"
                   "}");
     }

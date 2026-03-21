@@ -5135,53 +5135,27 @@ std::unique_ptr<cg::rvalue> block::emit_rvalue(
         return nullptr;
     }
 
-    bool was_terminated = false;
-    for(std::size_t i = 0; i < exprs.size() - 1; ++i)
+    for(const auto& expr: exprs | std::views::take(exprs.size() - 1))
     {
-        const auto& expr = exprs[i];
-        if(was_terminated)
+        if(ctx.get_insertion_point() == nullptr)
         {
-            auto* fn = ctx.get_current_function();
-            if(fn != nullptr)
-            {
-                cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-                fn->append_basic_block(bb);
-                ctx.set_insertion_point(bb);
-            }
+            return nullptr;
         }
 
         if(expr->is_pure(ctx))
         {
-            std::println("{}: Expression has no effect.", ::slang::to_string(expr->get_location()));
-
-            // don't generate code.
+            std::println(
+              "{}: Expression has no effect.",
+              ::slang::to_string(expr->get_location()));
             continue;
         }
 
         expr->generate_code(ctx);
-
-        auto* bb = ctx.get_insertion_point();
-        if(bb != nullptr)
-        {
-            was_terminated = bb->is_terminated();
-        }
-        else
-        {
-            was_terminated = true;
-        }
     }
 
-    // the last expression is loaded if it is an expression.
-
-    if(was_terminated)
+    if(ctx.get_insertion_point() == nullptr)
     {
-        auto* fn = ctx.get_current_function();
-        if(fn != nullptr)
-        {
-            cg::basic_block* bb = cg::basic_block::create(ctx, ctx.generate_label());
-            fn->append_basic_block(bb);
-            ctx.set_insertion_point(bb);
-        }
+        return nullptr;
     }
 
     const auto& last_expr = exprs.back();

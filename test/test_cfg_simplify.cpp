@@ -92,29 +92,11 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     ASSERT_NO_THROW(cfg::verify(codegen_ctx.get_functions()));
 
+    // unreachable code is not emitted
     EXPECT_EQ(codegen_ctx.to_string(),
               "define i32 @f() {\n"
-              "local i32 %1\n"
               "entry:\n"
               " const i32 12\n"
-              " ret i32\n"
-              "0:\n"
-              " const i32 13\n"
-              " ret i32\n"
-              "1:\n"
-              " const i32 123\n"
-              " store i32 %1\n"
-              " load i32 %1\n"
-              " const i32 123\n"
-              " cmpeq i32\n"
-              " jnz %2, %3\n"
-              "2:\n"
-              " const i32 0\n"
-              " const i32 1\n"
-              " sub i32\n"
-              " ret i32\n"
-              "3:\n"
-              " const i32 0\n"
               " ret i32\n"
               "}");
 
@@ -123,7 +105,6 @@ TEST(opt_cfg, remove_unreachable_blocks)
 
     EXPECT_EQ(codegen_ctx.to_string(),
               "define i32 @f() {\n"
-              "local i32 %1\n"
               "entry:\n"
               " const i32 12\n"
               " ret i32\n"
