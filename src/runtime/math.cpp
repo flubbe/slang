@@ -130,9 +130,25 @@ void atan([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 
 void atan2([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
 {
-    float y = stack.pop_cat1<float>();
-    float x = stack.pop_cat1<float>();
+    auto y = stack.pop_cat1<float>();
+    auto x = stack.pop_cat1<float>();
     stack.push_cat1(builtin_atan2f(x, y));
+}
+
+void is_sign_positive([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    auto x = stack.pop_cat1<float>();
+    stack.push_cat1(
+      static_cast<std::int32_t>(
+        !std::signbit(x)));
+}
+
+void is_sign_negative([[maybe_unused]] si::context& ctx, si::operand_stack& stack)
+{
+    auto x = stack.pop_cat1<float>();
+    stack.push_cat1(
+      static_cast<std::int32_t>(
+        std::signbit(x)));
 }
 
 }    // namespace slang::runtime

@@ -313,3 +313,21 @@ fn atan(x: f32) -> f32;
  */
 #[native(lib="slang")]
 fn atan2(x: f32, y: f32) -> f32;
+
+/**
+ * Determine if a given floating point number is positive.
+ *
+ * @param x `f32` value.
+ * @return Returns `1` if the sign bit of `x` is cleared, i.e., if `x` is positive. Otherwise, return `0`.
+ */
+#[native(lib="slang")]
+fn is_sign_positive(x: f32) -> i32;
+
+/**
+ * Determine if a given floating point number is negative.
+ *
+ * @param x `f32` value.
+ * @return Returns `1` if the sign bit of `x` is set, i.e., if `x` is negative. Otherwise, return `0`.
+ */
+#[native(lib="slang")]
+fn is_sign_negative(x: f32) -> i32;

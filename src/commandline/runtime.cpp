@@ -229,6 +229,20 @@ void runtime_setup(si::context& ctx, bool verbose)
       {
           rt::atan2(ctx, stack);
       });
+    ctx.register_native_function(
+      "slang",
+      "is_sign_positive",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::is_sign_positive(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "is_sign_negative",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::is_sign_negative(ctx, stack);
+      });
 
     /*
      * Garbage collector.
