@@ -642,6 +642,42 @@ void context::exec(
                   { return dividend / divisor; });
                 break;
             } /* opcode::ddiv */
+            case opcode::ineg:
+            {
+                frame.stack.modify_top<std::int32_t, std::int32_t>(
+                  [](std::int32_t i) -> std::int32_t
+                  {
+                      return -i;
+                  });
+                break;
+            } /* opcode::ineg */
+            case opcode::lneg:
+            {
+                frame.stack.modify_top<std::int64_t, std::int64_t>(
+                  [](std::int64_t i) -> std::int64_t
+                  {
+                      return -i;
+                  });
+                break;
+            } /* opcode::ineg */
+            case opcode::fneg:
+            {
+                frame.stack.modify_top<float, float>(
+                  [](float f) -> float
+                  {
+                      return -f;
+                  });
+                break;
+            } /* opcode::fneg */
+            case opcode::dneg:
+            {
+                frame.stack.modify_top<double, double>(
+                  [](double d) -> double
+                  {
+                      return -d;
+                  });
+                break;
+            } /* opcode::dneg */
             case opcode::i2c:
             {
                 frame.stack.modify_top<std::int32_t, std::int32_t>(

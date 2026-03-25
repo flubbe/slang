@@ -2827,9 +2827,8 @@ TEST(compile_ir, unary_operators)
                   "define i32 @local(i32 %1) {\n"
                   "local i32 %2\n"
                   "entry:\n"
-                  " const i32 0\n"
                   " const i32 1\n"
-                  " sub i32\n"
+                  " neg i32\n"
                   " store i32 %2\n"
                   " load i32 %1\n"
                   " load i32 %2\n"
@@ -3727,10 +3726,9 @@ TEST(compile_ir, function_calls)
                   "}\n"
                   "define f32 @h() {\n"
                   "entry:\n"
-                  " const f32 0\n"
                   " const f64 1\n"
                   " cast f64_to_f32\n"
-                  " sub f32\n"
+                  " neg f32\n"
                   " ret f32\n"
                   "}");
     }

@@ -2202,6 +2202,13 @@ public:
     void generate_load(const lvalue& v);
 
     /**
+     * Negate the top value on the stack.
+     *
+     * @param t The value's type.
+     */
+    void generate_neg(const type& t);
+
+    /**
      * Create a new instance of a type.
      *
      * @param t The type.
