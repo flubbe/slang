@@ -36,6 +36,9 @@ fn test_trigonometric_functions() -> void
     approx_eq(std::atan(-1.0 as f32), (-std::PI/4.0) as f32, "atan(-1) == -PI/4");
 
     approx_eq(std::atan2(0.0 as f32, 0.0 as f32), 0.0 as f32, "atan2(0, 0) == 0");
+    approx_eq(std::atan2(0.0 as f32, -0.0 as f32), std::PI as f32, "atan2(0, -0) == PI [0]");
+    approx_eq(std::atan2(0.0 as f32, -0.0f32), std::PI as f32, "atan2(0, -0) == PI [1]");
+    approx_eq(std::atan2(0.0 as f32, (-0.0) as f32), std::PI as f32, "atan2(0, -0) == PI [2]");
     approx_eq(std::atan2(7.0 as f32, 0.0 as f32), (std::PI/2.0) as f32, "atan2(7, 0) == PI/2");
     approx_eq(std::atan2(7.0 as f32, -0.0 as f32), (std::PI/2.0) as f32, "atan2(7, -0) == PI/2");
 }
@@ -70,6 +73,11 @@ fn main(args: str[]) -> i32
     approx_eq(std::round(-2.3 as f32), -2.0 as f32, "std::round(-2.3)==-2");
     approx_eq(std::round(-2.5 as f32), -3.0 as f32, "std::round(-2.5)==-3");
     approx_eq(std::round(-2.7 as f32), -3.0 as f32, "std::round(-2.7)==-3");
+
+    std::assert(std::is_sign_positive(0.0f32) == 1, "std::is_sign_positive(0.0) == 1");
+    std::assert(std::is_sign_positive(-0.0f32) == 0, "std::is_sign_positive(-0.0) == 0");
+    std::assert(std::is_sign_negative(0.0f32) == 0, "std::is_sign_negative(0.0) == 0");
+    std::assert(std::is_sign_negative(-0.0f32) == 1, "std::is_sign_negative(-0.0) == 1");
 
     return 0;
 }

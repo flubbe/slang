@@ -976,6 +976,18 @@ void context::generate_load(const lvalue& v)
       v.get_location());
 }
 
+void context::generate_neg(const type& t)
+{
+    validate_insertion_point();
+    std::vector<std::unique_ptr<argument>> args;
+    args.emplace_back(
+      std::make_unique<type_argument>(t));
+    insertion_point->add_instruction(
+      std::make_unique<instruction>(
+        "neg",
+        std::move(args)));
+}
+
 void context::generate_new(const type& t)
 {
     validate_insertion_point();

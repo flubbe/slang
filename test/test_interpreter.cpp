@@ -131,145 +131,211 @@ void register_std_lib(si::context& ctx, std::vector<std::string>& print_buf)
 {
     rt::register_builtin_type_layouts(ctx.get_gc());
 
-    ctx.register_native_function("slang", "print",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     auto* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(*s);
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "println",
-                                 [&ctx, &print_buf](si::operand_stack& stack)
-                                 {
-                                     auto* s = stack.pop_addr<std::string>();
-                                     print_buf.push_back(std::format("{}\n", *s));
-                                     ctx.get_gc().remove_temporary(s);
-                                 });
-    ctx.register_native_function("slang", "array_copy",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::array_copy(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_length",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_length(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_equals",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_equals(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "string_concat",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::string_concat(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "i32_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::i32_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "i64_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::i64_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "f32_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::f32_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "f64_to_string",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::f64_to_string(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "parse_i32",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::parse_i32(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "parse_f32",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::parse_f32(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "assert",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::assert_(ctx, stack);
-                                 });
+    ctx.register_native_function(
+      "slang",
+      "print",
+      [&ctx, &print_buf](si::operand_stack& stack)
+      {
+          auto* s = stack.pop_addr<std::string>();
+          print_buf.push_back(*s);
+          ctx.get_gc().remove_temporary(s);
+      });
+    ctx.register_native_function(
+      "slang",
+      "println",
+      [&ctx, &print_buf](si::operand_stack& stack)
+      {
+          auto* s = stack.pop_addr<std::string>();
+          print_buf.push_back(std::format("{}\n", *s));
+          ctx.get_gc().remove_temporary(s);
+      });
+    ctx.register_native_function(
+      "slang",
+      "array_copy",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::array_copy(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "string_length",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::string_length(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "string_equals",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::string_equals(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "string_concat",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::string_concat(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "i32_to_string",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::i32_to_string(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "i64_to_string",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::i64_to_string(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "f32_to_string",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::f32_to_string(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "f64_to_string",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::f64_to_string(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "parse_i32",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::parse_i32(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "parse_f32",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::parse_f32(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "assert",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::assert_(ctx, stack);
+      });
 
     /*
      * Math.
      */
 
-    ctx.register_native_function("slang", "abs",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::abs(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "sqrt",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::sqrt(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "ceil",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::ceil(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "floor",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::floor(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "trunc",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::trunc(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "round",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::round(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "sin",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::sin(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "cos",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::cos(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "tan",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::tan(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "asin",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::asin(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "acos",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::acos(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "atan",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::atan(ctx, stack);
-                                 });
-    ctx.register_native_function("slang", "atan2",
-                                 [&ctx](si::operand_stack& stack)
-                                 {
-                                     rt::atan2(ctx, stack);
-                                 });
+    ctx.register_native_function(
+      "slang",
+      "abs",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::abs(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "sqrt",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::sqrt(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "ceil",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::ceil(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "floor",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::floor(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "trunc",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::trunc(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "round",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::round(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "sin",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::sin(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "cos",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::cos(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "tan",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::tan(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "asin",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::asin(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "acos",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::acos(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "atan",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::atan(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "atan2",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::atan2(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "is_sign_positive",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::is_sign_positive(ctx, stack);
+      });
+    ctx.register_native_function(
+      "slang",
+      "is_sign_negative",
+      [&ctx](si::operand_stack& stack)
+      {
+          rt::is_sign_negative(ctx, stack);
+      });
 }
 
 TEST(interpreter, hello_world)

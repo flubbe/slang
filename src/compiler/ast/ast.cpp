@@ -4456,8 +4456,6 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
 
     if(op.s == "-")
     {
-        auto& instrs = ctx.get_insertion_point()->get_instructions();
-        std::size_t pos = instrs.size();
         auto v = operand->emit_rvalue(ctx, true);
 
         std::vector<std::unique_ptr<cg::argument>> args;
@@ -4465,35 +4463,13 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
            || v->get_type().get_type_kind() == cg::type_kind::i16
            || v->get_type().get_type_kind() == cg::type_kind::i32)
         {
-            args.emplace_back(
-              std::make_unique<cg::const_argument>(
-                cg::type_kind::i32,
-                static_cast<std::int64_t>(0),
-                std::nullopt));
+            ctx.generate_neg({cg::type_kind::i32});
         }
-        else if(v->get_type().get_type_kind() == cg::type_kind::i64)
+        else if(v->get_type().get_type_kind() == cg::type_kind::i64
+                || v->get_type().get_type_kind() == cg::type_kind::f32
+                || v->get_type().get_type_kind() == cg::type_kind::f64)
         {
-            args.emplace_back(
-              std::make_unique<cg::const_argument>(
-                cg::type_kind::i64,
-                static_cast<std::int64_t>(0),
-                std::nullopt));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f32)
-        {
-            args.emplace_back(
-              std::make_unique<cg::const_argument>(
-                cg::type_kind::f32,
-                0.0,
-                std::nullopt));
-        }
-        else if(v->get_type().get_type_kind() == cg::type_kind::f64)
-        {
-            args.emplace_back(
-              std::make_unique<cg::const_argument>(
-                cg::type_kind::f64,
-                0.0,
-                std::nullopt));
+            ctx.generate_neg(v->get_type());
         }
         else
         {
@@ -4503,11 +4479,7 @@ std::unique_ptr<cg::rvalue> unary_expression::emit_rvalue(
                 "Type error for unary operator '-': Expected 'i8', 'i16', 'i32', 'i64', 'f32' or 'f64', got '{}'.",
                 v->get_type().to_string()));
         }
-        instrs.insert(
-          instrs.begin() + pos,    // NOLINT(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
-          std::make_unique<cg::instruction>("const", std::move(args)));
 
-        ctx.generate_binary_op(cg::binary_op::op_sub, v->get_type());
         return v;
     }
 

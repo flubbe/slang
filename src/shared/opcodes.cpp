@@ -119,6 +119,10 @@ std::string to_string(opcode op)
     case opcode::lshr: return "lshr";
     case opcode::imod: return "imod";
     case opcode::lmod: return "lmod";
+    case opcode::ineg: return "ineg";
+    case opcode::lneg: return "lneg";
+    case opcode::fneg: return "fneg";
+    case opcode::dneg: return "dneg";
     case opcode::icmpl: return "icmpl";
     case opcode::lcmpl: return "lcmpl";
     case opcode::fcmpl: return "fcmpl";

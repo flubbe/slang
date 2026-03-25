@@ -434,7 +434,33 @@ fn test_modify_returned_array() -> void
     generate_array_i32()[0] = 13;
 }
 
-fn main(args: str[]) -> i32 {
+const ABS: f32 = 1e-6 as f32;
+
+fn approx_eq(value: f32, expected: f32, message: str) -> void
+{
+    std::assert(std::abs(value - expected) < ABS, message);
+}
+
+fn test_negation() -> void 
+{
+    let i0: i8 = -1i8;
+    let i1: i16 = -2i16;
+    let i2: i32 = -3i32;
+    let i3: i64 = -4i64;
+    let f: f32 = -5.0f32;
+    let d: f64 = -6.0f64;
+
+    std::assert(i0 + 1i8 == 0i8, "i0 + 1 == 0");
+    std::assert(i1 + 2i16 == 0i16, "i1 + 2 == 0");
+    std::assert(i2 + 3i32 == 0i32, "i2 + 3 == 0");
+    std::assert(i3 + 4i64 == 0i64, "i3 + 4 == 0");
+
+    approx_eq(f + 5.0f32, 0.0f32, "f + 5 == 0");
+    approx_eq((d + 6.0f64) as f32, 0.0f32, "d + 6 == 0");
+}
+
+fn main(args: str[]) -> i32 
+{
     test_nested_evaluation0();
     test_nested_evaluation1();
     test_nested_evaluation2();
@@ -447,6 +473,8 @@ fn main(args: str[]) -> i32 {
     test_compound_assignments();
 
     test_modify_returned_array();
+
+    test_negation();
 
     return 0;
 }

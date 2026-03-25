@@ -869,6 +869,7 @@ static const std::unordered_map<
     {"mul", 1},
     {"div", 1},
     {"mod", 1},
+    {"neg", 1},
     {"const_null", 0},
     {"const", 1},
     {"load", 1},
@@ -1084,6 +1085,10 @@ void instruction_emitter::emit_instruction(
                 "Invalid type '{}' for instruction 'mod'.",
                 cg::to_string(arg->get_lowered_type().get_type_kind())));
         }
+    }
+    else if(name == "neg")
+    {
+        emit_typed(opcode::ineg, opcode::lneg, opcode::fneg, opcode::dneg);
     }
     else if(name == "const_null")
     {

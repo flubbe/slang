@@ -275,6 +275,22 @@ void atan(si::context& ctx, si::operand_stack& stack);
  */
 void atan2(si::context& ctx, si::operand_stack& stack);
 
+/**
+ * Determine if a given floating point number is positive.
+ *
+ * @param x `f32` value.
+ * @return Returns `1` if the sign bit of `x` is cleared, i.e., if `x` is positive. Otherwise, return `0`.
+ */
+void is_sign_positive(si::context& ctx, si::operand_stack& stack);
+
+/**
+ * Determine if a given floating point number is negative.
+ *
+ * @param x `f32` value.
+ * @return Returns `1` if the sign bit of `x` is set, i.e., if `x` is negative. Otherwise, return `0`.
+ */
+void is_sign_negative(si::context& ctx, si::operand_stack& stack);
+
 /*
  * Garbage collector interface.
  */

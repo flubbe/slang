@@ -772,6 +772,10 @@ std::int32_t module_loader::decode_instruction(
     case opcode::acmpne:
         recorder->record(static_cast<opcode>(instr));
         return static_cast<std::int32_t>(-2 * sizeof(void*) + sizeof(std::int32_t));
+    case opcode::ineg: [[fallthrough]];
+    case opcode::lneg: [[fallthrough]];
+    case opcode::fneg: [[fallthrough]];
+    case opcode::dneg: [[fallthrough]];
     case opcode::i2c: [[fallthrough]];
     case opcode::i2s: [[fallthrough]];
     case opcode::i2f: [[fallthrough]];
