@@ -59,6 +59,10 @@ The instructions set for the stack based virtual machine, as defined in [opcodes
 - `ddiv`: Divide two `f64` from the stack.
 - `imod`: Modulus of the division of two `i32`.
 - `lmod`: Modulus of the division of two `i64`.
+- `ineg`: Negate `i32` from the stack.
+- `lneg`: Negate `i64` from the stack.
+- `fneg`: Negate `f32` from the stack.
+- `dneg`: Negate `f64` from the stack.
 - `i2c`: Convert a `i32` into an `i8`.
 - `i2s`: Convert a `i32` into an `i16`.
 - `i2l`: Convert a `i32` into an `i64`.
