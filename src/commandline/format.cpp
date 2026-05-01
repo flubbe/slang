@@ -2,11 +2,17 @@
  * slang - a simple scripting language.
  *
  * `fmt` command implementation.
+ *
+ * \author Felix Lubbe
+ * \copyright Copyright (c) 2025
+ * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include <fstream>
 #include <format>
 #include <print>
+#include <set>
+#include <string_view>
 
 #include "formatter/formatter.h"
 #include "commandline.h"
@@ -17,9 +23,12 @@ namespace slang::commandline
 namespace
 {
 
-static std::string read_file(const fs::path& path)
+static std::string read_file(
+  const fs::path& path)
 {
-    std::ifstream in{path, std::ios::in | std::ios::binary};
+    std::ifstream in{
+      path,
+      std::ios::in | std::ios::binary};
     if(!in)
     {
         throw std::runtime_error(std::format("Unable to open '{}' for reading.", path.string()));
@@ -42,6 +51,105 @@ static void write_file(const fs::path& path, const std::string& content)
     }
 
     out << content;
+}
+
+static bool is_supported_glob(const std::string& p)
+{
+    return p.find("**/*") != std::string::npos
+           || p.ends_with("/**")
+           || p.ends_with("\\**");
+}
+
+static std::vector<fs::path> collect_recursive_with_extension(
+  const fs::path& base_path,
+  const std::string& wanted_extension)
+{
+    if(!fs::exists(base_path) || !fs::is_directory(base_path))
+    {
+        throw std::runtime_error(
+          std::format(
+            "Glob base path '{}' does not exist or is not a directory.",
+            base_path.string()));
+    }
+
+    std::vector<fs::path> out;
+    for(const auto& entry: fs::recursive_directory_iterator(base_path))
+    {
+        if(!entry.is_regular_file())
+        {
+            continue;
+        }
+
+        if(entry.path().extension() == wanted_extension)
+        {
+            out.emplace_back(entry.path());
+        }
+    }
+
+    return out;
+}
+
+static std::string with_file_context(const fs::path& file, const std::string& message)
+{
+    // Parser/lexer diagnostics are usually "<line>:<col>: <message>".
+    // Rewrite to "<path>:<line>:<col>: <message>" for clickable editor output.
+    const auto first_colon = message.find(':');
+    if(first_colon != std::string::npos)
+    {
+        const auto second_colon = message.find(':', first_colon + 1);
+        if(second_colon != std::string::npos)
+        {
+            const auto line_part = message.substr(0, first_colon);
+            const auto col_part = message.substr(first_colon + 1, second_colon - first_colon - 1);
+
+            const bool line_is_num = !line_part.empty() && std::ranges::all_of(line_part, ::isdigit);
+            const bool col_is_num = !col_part.empty() && std::ranges::all_of(col_part, ::isdigit);
+            if(line_is_num && col_is_num)
+            {
+                return std::format("{}:{}", file.string(), message);
+            }
+        }
+    }
+
+    return std::format("{}: {}", file.string(), message);
+}
+
+static std::vector<fs::path> expand_glob(const std::string& pattern)
+{
+    if(pattern.ends_with("/**") || pattern.ends_with("\\**"))
+    {
+        const auto base = pattern.substr(0, pattern.size() - 3);
+        const fs::path base_path = base.empty() ? fs::path{"."} : fs::path{base};
+        return collect_recursive_with_extension(base_path, ".sl");
+    }
+
+    const auto wildcard_pos = pattern.find("**/*");
+    if(wildcard_pos == std::string::npos)
+    {
+        return {fs::path{pattern}};
+    }
+
+    const std::string base = pattern.substr(0, wildcard_pos);
+    const std::string suffix = pattern.substr(wildcard_pos + std::string("**/*").size());
+
+    std::string wanted_extension = ".sl";
+    if(!suffix.empty())
+    {
+        if(suffix.starts_with("."))
+        {
+            wanted_extension = suffix;
+        }
+        else
+        {
+            throw std::runtime_error(
+              std::format(
+                "Unsupported glob pattern '{}'. Use '**/*' or '**/*.ext'.",
+                pattern));
+        }
+    }
+
+    fs::path base_path = base.empty() ? fs::path{"."} : fs::path{base};
+    return collect_recursive_with_extension(base_path, wanted_extension);
 }
 
 }    // namespace
@@ -74,7 +182,51 @@ void fmt::invoke(const std::vector<std::string>& args)
 
     const bool check_only = result.count("check") > 0;
     const std::size_t line_length = result["line-length"].as<std::size_t>();
-    const auto files = result["files"].as<std::vector<std::string>>();
+    const auto file_args = result["files"].as<std::vector<std::string>>();
+    std::vector<fs::path> files;
+    std::set<fs::path> seen;
+    for(const auto& arg: file_args)
+    {
+        const bool explicit_extension_glob = arg.find("**/*.") != std::string::npos;
+        std::vector<fs::path> expanded;
+        if(is_supported_glob(arg))
+        {
+            expanded = expand_glob(arg);
+        }
+        else
+        {
+            fs::path p{arg};
+            if(fs::exists(p) && fs::is_directory(p))
+            {
+                expanded = collect_recursive_with_extension(p, ".sl");
+            }
+            else
+            {
+                expanded = {std::move(p)};
+            }
+        }
+
+        for(const auto& p: expanded)
+        {
+            if(fs::exists(p)
+               && fs::is_regular_file(p)
+               && p.extension() != ".sl"
+               && !explicit_extension_glob)
+            {
+                continue;    // skip non-source files by default
+            }
+
+            if(seen.insert(p).second)
+            {
+                files.emplace_back(p);
+            }
+        }
+    }
+
+    if(files.empty())
+    {
+        throw std::runtime_error("No files matched the provided input patterns.");
+    }
 
     formatter::source_formatter formatter{
       formatter::options{
@@ -84,11 +236,19 @@ void fmt::invoke(const std::vector<std::string>& args)
         .ensure_trailing_newline = true}};
 
     std::size_t changed_count = 0;
-    for(const auto& file_arg: files)
+    for(const auto& file: files)
     {
-        const fs::path file{file_arg};
-        const std::string original = read_file(file);
-        const std::string formatted = formatter.format_text(original);
+        std::string original;
+        std::string formatted;
+        try
+        {
+            original = read_file(file);
+            formatted = formatter.format_text(original);
+        }
+        catch(const std::exception& e)
+        {
+            throw std::runtime_error(with_file_context(file, e.what()));
+        }
 
         if(original == formatted)
         {

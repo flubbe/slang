@@ -261,6 +261,7 @@ std::optional<token> lexer::next()
     source_location loc;
     std::vector<comment_trivia> leading_comments;
     std::vector<comment_trivia> trailing_comments;
+    bool has_blank_line_before_token = false;
 
     auto parse_line_comment = [this]() -> comment_trivia
     {
@@ -309,9 +310,19 @@ std::optional<token> lexer::next()
     // Collect whitespace/comments preceding the next token.
     while(!eof())
     {
+        std::size_t newline_count = 0;
         while(is_whitespace(peek()))
         {
-            get();
+            auto ws = get();
+            if(ws == '\n' || ws == '\r' || ws == '\v')
+            {
+                ++newline_count;
+            }
+        }
+
+        if(newline_count > 1)
+        {
+            has_blank_line_before_token = true;
         }
 
         if(peek().has_value() && *peek() == '/')
@@ -320,12 +331,16 @@ std::optional<token> lexer::next()
             ++p2;
             if(p2 != input.end() && *p2 == '/')
             {
-                leading_comments.emplace_back(parse_line_comment());
+                auto trivia = parse_line_comment();
+                trivia.has_blank_line_before = newline_count > 1;
+                leading_comments.emplace_back(std::move(trivia));
                 continue;
             }
             if(p2 != input.end() && *p2 == '*')
             {
-                leading_comments.emplace_back(parse_block_comment());
+                auto trivia = parse_block_comment();
+                trivia.has_blank_line_before = newline_count > 1;
+                leading_comments.emplace_back(std::move(trivia));
                 continue;
             }
         }
@@ -719,6 +734,7 @@ std::optional<token> lexer::next()
       type,
       suffix,
       eval(loc, eval_token, type),
+      has_blank_line_before_token,
       std::move(leading_comments),
       std::move(trailing_comments)};
 }

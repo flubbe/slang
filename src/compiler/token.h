@@ -88,6 +88,9 @@ struct comment_trivia
 
     /** Whether this is a block comment. */
     bool is_block{false};
+
+    /** Whether there was at least one blank line before this comment. */
+    bool has_blank_line_before{false};
 };
 
 /** `comment_trivia` serializer. */
@@ -117,6 +120,9 @@ struct token
      */
     std::optional<const_value> value;
 
+    /** Whether there was at least one blank line before this token. */
+    bool has_blank_line_before{false};
+
     /** Leading comments attached to this token. */
     std::vector<comment_trivia> leading_comments;
 
@@ -143,12 +149,13 @@ struct token
      * @param leading_comments Leading comments. Defaults to empty.
      * @param trailing_comments Trailing comments. Defaults to empty.
      */
-    token(
+     token(
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
       std::optional<numeric_suffix> suffix = std::nullopt,
       std::optional<const_value> value = std::nullopt,
+      bool has_blank_line_before = false,
       std::vector<comment_trivia> leading_comments = {},
       std::vector<comment_trivia> trailing_comments = {})
     : s{std::move(s)}
@@ -156,6 +163,7 @@ struct token
     , type{type}
     , suffix{suffix}
     , value{std::move(value)}
+    , has_blank_line_before{has_blank_line_before}
     , leading_comments{std::move(leading_comments)}
     , trailing_comments{std::move(trailing_comments)}
     {

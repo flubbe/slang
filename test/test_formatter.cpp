@@ -40,8 +40,8 @@ TEST(formatter, format_text_canonical_layout)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1 + 2;\n"
-      "    let y : i32 = x * 3;\n"
+      "    let x: i32 = 1 + 2;\n"
+      "    let y: i32 = x * 3;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -52,7 +52,7 @@ TEST(formatter, format_text_is_idempotent)
 {
     const std::string input =
       "fn main() -> void {\n"
-      "    let x : i32 = 1 + 2;\n"
+      "    let x: i32 = 1 + 2;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -85,7 +85,7 @@ TEST(formatter, format_file_returns_formatted_text)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1 + 2;\n"
+      "    let x: i32 = 1 + 2;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -118,9 +118,9 @@ TEST(formatter, format_text_formats_nested_blocks)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    if (1 < 2) {\n"
-      "        while (3 > 2) {\n"
-      "            let x : i32 = 1;\n"
+      "    if(1 < 2) {\n"
+      "        while(3 > 2) {\n"
+      "            let x: i32 = 1;\n"
       "        }\n"
       "    }\n"
       "}\n";
@@ -153,7 +153,7 @@ TEST(formatter, format_text_formats_directives)
       "#[no_eval]\n"
       "fn main() -> void {\n"
       "    #[allow_cast]\n"
-      "    let x : i32 = 1;\n"
+      "    let x: i32 = 1;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -174,7 +174,7 @@ TEST(formatter, format_text_wraps_long_lines_when_configured)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let value : i32 = very_long_identifier_name + another_long_identifier_name +\n"
+      "    let value: i32 = very_long_identifier_name + another_long_identifier_name +\n"
       "    third_long_identifier_name;\n"
       "}\n";
 
@@ -195,7 +195,7 @@ TEST(formatter, format_text_does_not_wrap_when_line_length_disabled)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let value : i32 = very_long_identifier_name + another_long_identifier_name + third_long_identifier_name;\n"
+      "    let value: i32 = very_long_identifier_name + another_long_identifier_name + third_long_identifier_name;\n"
       "}\n";
 
     EXPECT_EQ(formatter.format_text(input), expected);
@@ -215,7 +215,7 @@ TEST(formatter, format_text_wraps_more_aggressively_with_tight_limit)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = abcde + fghij +\n"
+      "    let x: i32 = abcde + fghij +\n"
       "    klmno + pqrst + uvwxy;\n"
       "}\n";
 
@@ -239,10 +239,29 @@ TEST(formatter, format_text_preserves_comment_variations)
       "// file line\n"
       "fn main() -> void {\n"
       "    /* stmt lead block */\n"
-      "    let a : i32 = 1; // stmt trail line\n"
+      "    let a: i32 = 1; // stmt trail line\n"
       "    // stmt lead line\n"
-      "    let b : i32 = 2; /* stmt trail block */\n"
-      "    let c : i32 = 3; // c1 /* c2 */\n"
+      "    let b: i32 = 2; /* stmt trail block */\n"
+      "    let c: i32 = 3; // c1 /* c2 */\n"
+      "}\n";
+
+    slang::formatter::source_formatter formatter;
+    EXPECT_EQ(formatter.format_text(input), expected);
+}
+
+TEST(formatter, format_text_preserves_single_blank_line_between_leading_block_comments)
+{
+    const std::string input =
+      "/* first */\n"
+      "\n"
+      "/* second */\n"
+      "fn main()->void{}";
+
+    const std::string expected =
+      "/* first */\n"
+      "\n"
+      "/* second */\n"
+      "fn main() -> void {\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -258,8 +277,29 @@ TEST(formatter, format_text_preserves_comments_before_closing_brace)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1; // after stmt\n"
+      "    let x: i32 = 1; // after stmt\n"
       "    // before closing brace\n"
+      "}\n";
+
+    slang::formatter::source_formatter formatter;
+    EXPECT_EQ(formatter.format_text(input), expected);
+}
+
+TEST(formatter, format_text_preserves_single_blank_line_between_statements)
+{
+    const std::string input =
+      "fn main()->void{\n"
+      "let a:i32=1;\n"
+      "\n"
+      "\n"
+      "let b:i32=2;\n"
+      "}";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    let a: i32 = 1;\n"
+      "\n"
+      "    let b: i32 = 2;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -280,7 +320,7 @@ TEST(formatter, format_text_wraps_at_operator_boundaries)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let sum : i32 = aaa + bbb + ccc +\n"
+      "    let sum: i32 = aaa + bbb + ccc +\n"
       "    ddd + eee + fff;\n"
       "}\n";
 
@@ -294,7 +334,7 @@ TEST(formatter, format_text_preserves_trailing_line_comment_at_eof)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1;\n"
+      "    let x: i32 = 1;\n"
       "} // eof trailing line comment\n";
 
     slang::formatter::source_formatter formatter;
@@ -308,7 +348,7 @@ TEST(formatter, format_text_preserves_trailing_block_comment_at_eof)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1;\n"
+      "    let x: i32 = 1;\n"
       "} /* eof trailing block comment */\n";
 
     slang::formatter::source_formatter formatter;
@@ -320,7 +360,7 @@ TEST(formatter, format_text_ensures_trailing_newline_by_default)
     const std::string input = "fn main()->void{let x:i32=1;}";
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1;\n"
+      "    let x: i32 = 1;\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -332,7 +372,7 @@ TEST(formatter, format_text_can_disable_trailing_newline)
     const std::string input = "fn main()->void{let x:i32=1;}";
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = 1;\n"
+      "    let x: i32 = 1;\n"
       "}";
 
     slang::formatter::source_formatter formatter{
@@ -352,7 +392,7 @@ TEST(formatter, format_text_formats_macro_definition_layout)
 
     const std::string expected =
       "macro sum! {\n"
-      "    ($a : expr, $b : expr...) => {\n"
+      "    ($a: expr, $b: expr...) => {\n"
       "        $a + sum!($b);\n"
       "    };\n"
       "}\n";
@@ -368,7 +408,7 @@ TEST(formatter, format_text_formats_macro_invocation_spacing)
 
     const std::string expected =
       "fn main() -> void {\n"
-      "    let x : i32 = sum!(1, 2);\n"
+      "    let x: i32 = sum!(1, 2);\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -382,9 +422,23 @@ TEST(formatter, format_text_formats_macro_pattern_branch_tokens)
 
     const std::string expected =
       "macro copy! {\n"
-      "    ($a : expr, $b : expr...) => {\n"
+      "    ($a: expr, $b: expr...) => {\n"
       "        $a + copy!($b);\n"
       "    };\n"
+      "}\n";
+
+    slang::formatter::source_formatter formatter;
+    EXPECT_EQ(formatter.format_text(input), expected);
+}
+
+TEST(formatter, format_text_preserves_escaped_string_literals)
+{
+    const std::string input =
+      "fn main()->void{print(\"line1\\nline2\\t\\\\\\\"\");}";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    print(\"line1\\nline2\\t\\\\\\\"\");\n"
       "}\n";
 
     slang::formatter::source_formatter formatter;
@@ -402,32 +456,38 @@ TEST(formatter, golden_examples_exact_output_and_idempotence)
     const std::vector<golden_case> cases = {
       {"examples/hello_world.sl",
        "import std;\n"
-       "fn main(args : str[]) -> i32 {\n"
+       "\n"
+       "fn main(args: str[]) -> i32 {\n"
        "    std::println(\"Hello, World!\");\n"
        "    return 0;\n"
        "}\n"},
       {"examples/array_loop.sl",
        "import std;\n"
-       "fn main(args : str[]) -> i32 {\n"
-       "    let strs : str[] = [\"This\", \"is\", \"a\", \"loop!\"];\n"
-       "    let i : i32 = 0;\n"
-       "    while (i < strs.length) {\n"
+       "\n"
+       "fn main(args: str[]) -> i32 {\n"
+       "    let strs: str[] = [\"This\", \"is\", \"a\", \"loop!\"];\n"
+       "\n"
+       "    let i: i32 = 0;\n"
+       "    while(i < strs.length) {\n"
        "        std::println(strs[i]);\n"
        "        i++;\n"
        "    }\n"
+       "\n"
        "    return 0;\n"
        "}\n"},
       {"examples/structs.sl",
        "struct S {\n"
-       "    i : i32, j : f32\n"
+       "    i: i32, j: f32\n"
        "};\n"
-       "fn init(i : i32, j : f32) -> S {\n"
+       "\n"
+       "fn init(i: i32, j: f32) -> S {\n"
        "    return S {\n"
-       "        i : i, j : j\n"
+       "        i: i, j: j\n"
        "    };\n"
        "}\n"
-       "fn main(args : str[]) -> i32 {\n"
-       "    let s : S = init(2, 3.141 as f32);\n"
+       "\n"
+       "fn main(args: str[]) -> i32 {\n"
+       "    let s: S = init(2, 3.141 as f32);\n"
        "    return s.i + (s.j as i32);\n"
        "}\n"},
     };

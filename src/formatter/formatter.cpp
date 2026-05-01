@@ -8,14 +8,14 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fstream>
 #include <optional>
 #include <set>
-#include <sstream>
+#include <span>
 #include <stdexcept>
 
 #include "compiler/lexer.h"
 #include "compiler/parser.h"
+#include "filemanager.h"
 #include "formatter/formatter.h"
 
 namespace slang::formatter
@@ -34,6 +34,41 @@ static bool is_word_token(const slang::token& tok)
            || tok.type == token_type::str_literal;
 }
 
+static std::string escape_string_literal(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size() + 8);
+    out.push_back('"');
+
+    for(char c: s)
+    {
+        switch(c)
+        {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        case '\f': out += "\\f"; break;
+        case '\v': out += "\\v"; break;
+        default: out.push_back(c); break;
+        }
+    }
+
+    out.push_back('"');
+    return out;
+}
+
+static std::string render_token_text(const slang::token& tok)
+{
+    if(tok.type == token_type::str_literal && tok.value.has_value())
+    {
+        return escape_string_literal(std::get<std::string>(*tok.value));
+    }
+
+    return tok.s;
+}
+
 static bool is_tight_after(const std::string& s)
 {
     return s == "(" || s == "[" || s == "{" || s == "." || s == "::";
@@ -47,7 +82,7 @@ static bool is_tight_before(const std::string& s)
 static bool is_keyword_space_before_paren(const slang::token& prev)
 {
     static const std::set<std::string> keywords = {
-      "if", "while", "return", "fn", "macro"};
+      "return", "fn", "macro"};
     return prev.type == token_type::identifier && keywords.contains(prev.s);
 }
 
@@ -65,6 +100,11 @@ static bool is_wrap_operator(const std::string& s)
 static bool needs_space(const slang::token& prev, const slang::token& curr)
 {
     if(is_tight_after(prev.s) || is_tight_before(curr.s))
+    {
+        return false;
+    }
+
+    if(curr.s == ":")
     {
         return false;
     }
@@ -125,28 +165,50 @@ static bool needs_space(const slang::token& prev, const slang::token& curr)
     return true;
 }
 
-static std::string read_file(const std::filesystem::path& file)
+static std::string read_archive(slang::archive& ar)
 {
-    std::ifstream in{file, std::ios::in | std::ios::binary};
-    if(!in)
+    ar.seek(0);
+    const auto size = ar.size();
+    ar.seek(0);
+
+    std::string content(size, '\0');
+    if(size > 0)
     {
-        throw std::runtime_error("Failed to open file for reading: " + file.string());
+        ar.serialize(std::as_writable_bytes(std::span(content)));
     }
 
-    std::ostringstream ss;
-    ss << in.rdbuf();
-    return ss.str();
+    return content;
+}
+
+static void write_archive(slang::archive& ar, const std::string& text)
+{
+    ar.seek(0);
+
+    if(text.empty())
+    {
+        return;
+    }
+
+    std::string writable{text};
+    ar.serialize(std::as_writable_bytes(std::span(writable)));
+}
+
+static std::string read_file(const std::filesystem::path& file)
+{
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
+    auto ar = file_mgr.open(file, slang::file_manager::open_mode::read);
+    return read_archive(*ar);
 }
 
 static void write_file(const std::filesystem::path& file, const std::string& text)
 {
-    std::ofstream out{file, std::ios::out | std::ios::binary | std::ios::trunc};
-    if(!out)
-    {
-        throw std::runtime_error("Failed to open file for writing: " + file.string());
-    }
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
 
-    out << text;
+    auto ar = file_mgr.open(file, slang::file_manager::open_mode::write);
+    write_archive(*ar, text);
 }
 
 static std::size_t current_line_length(const std::string& out)
@@ -204,13 +266,45 @@ std::string source_formatter::format_text(const std::string& source) const
         line_start = true;
     };
 
+    auto append_blank_line = [&]() -> void
+    {
+        if(out.empty())
+        {
+            return;
+        }
+
+        if(out.size() >= 2 && out[out.size() - 1] == '\n' && out[out.size() - 2] == '\n')
+        {
+            line_start = true;
+            return;
+        }
+
+        if(out.back() != '\n')
+        {
+            out.push_back('\n');
+        }
+        out.push_back('\n');
+        line_start = true;
+    };
+
     for(std::size_t i = 0; i < tokens.size(); ++i)
     {
         const auto& tok = tokens[i];
         const token* next_tok = (i + 1 < tokens.size()) ? &tokens[i + 1] : nullptr;
+        bool ended_top_level_decl = false;
+
+        if(tok.has_blank_line_before)
+        {
+            append_blank_line();
+        }
 
         for(const auto& comment: tok.leading_comments)
         {
+            if(comment.has_blank_line_before)
+            {
+                append_blank_line();
+            }
+
             if(!line_start)
             {
                 append_newline();
@@ -258,10 +352,11 @@ std::string source_formatter::format_text(const std::string& source) const
         }
 
         bool insert_space = !token_starts_line && prev.has_value() && needs_space(*prev, tok);
+        const std::string token_text = render_token_text(tok);
         const std::size_t projected_len =
           current_line_length(out)
           + (insert_space ? 1 : 0)
-          + tok.s.size();
+          + token_text.size();
 
         bool break_after_token = false;
         if(opts.max_line_length > 0
@@ -298,7 +393,7 @@ std::string source_formatter::format_text(const std::string& source) const
             out.push_back(' ');
         }
 
-        out += tok.s;
+        out += token_text;
 
         for(const auto& comment: tok.trailing_comments)
         {
@@ -323,6 +418,10 @@ std::string source_formatter::format_text(const std::string& source) const
         else if(tok.s == ";")
         {
             append_newline();
+            if(indent_level == 0 && !in_directive)
+            {
+                ended_top_level_decl = true;
+            }
         }
         else if(in_directive && tok.s == "]")
         {
@@ -337,11 +436,22 @@ std::string source_formatter::format_text(const std::string& source) const
             {
                 append_newline();
             }
+
+            if(indent_level == 0 && !in_directive && (!next_tok || next_tok->s != ";"))
+            {
+                ended_top_level_decl = true;
+            }
         }
         else if(break_after_token)
         {
             append_newline();
         }
+
+        if(ended_top_level_decl && next_tok)
+        {
+            append_blank_line();
+        }
+
         prev = tok;
     }
 
