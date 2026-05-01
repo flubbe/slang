@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <optional>
 #include <variant>
+#include <vector>
 
 #include "archives/archive.h"
 #include "location.h"
@@ -79,6 +80,19 @@ struct numeric_suffix
 /** An evaluated constant. */
 using const_value = std::variant<std::int64_t, double, std::string>;
 
+/** Comment trivia attached to a token. */
+struct comment_trivia
+{
+    /** The raw comment text including delimiters. */
+    std::string text;
+
+    /** Whether this is a block comment. */
+    bool is_block{false};
+};
+
+/** `comment_trivia` serializer. */
+archive& operator&(archive& ar, comment_trivia& trivia);
+
 /** An evaluated token. */
 struct token
 {
@@ -103,6 +117,12 @@ struct token
      */
     std::optional<const_value> value;
 
+    /** Leading comments attached to this token. */
+    std::vector<comment_trivia> leading_comments;
+
+    /** Trailing comments attached to this token. */
+    std::vector<comment_trivia> trailing_comments;
+
     /** Default constructors. */
     token() = default;
     token(const token&) = default;
@@ -120,18 +140,24 @@ struct token
      * @param type The token's type. Defaults to `token_type::unknown`.
      * @param suffix Optional suffix for numeric tokens.
      * @param value The token's value. Defaults to `std::nullopt`.
+     * @param leading_comments Leading comments. Defaults to empty.
+     * @param trailing_comments Trailing comments. Defaults to empty.
      */
     token(
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
       std::optional<numeric_suffix> suffix = std::nullopt,
-      std::optional<const_value> value = std::nullopt)
+      std::optional<const_value> value = std::nullopt,
+      std::vector<comment_trivia> leading_comments = {},
+      std::vector<comment_trivia> trailing_comments = {})
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}
     , suffix{suffix}
     , value{std::move(value)}
+    , leading_comments{std::move(leading_comments)}
+    , trailing_comments{std::move(trailing_comments)}
     {
     }
 

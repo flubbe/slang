@@ -1,6 +1,8 @@
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.scm import Version
 
 
 class slangRecipe(ConanFile):
@@ -29,6 +31,13 @@ class slangRecipe(ConanFile):
 
     def validate(self):
         check_min_cppstd(self, 23)
+        compiler = str(self.settings.compiler)
+        compiler_version = Version(str(self.settings.compiler.version))
+
+        if compiler == "gcc" and compiler_version < "14":
+            raise ConanInvalidConfiguration(
+                "slang requires GCC >= 14 (found GCC {}). "
+                "Please use gcc-14/g++-14.".format(compiler_version))
 
     def layout(self):
         cmake_layout(self)

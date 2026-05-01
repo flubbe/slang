@@ -48,6 +48,7 @@ A preliminary (incomplete) documentation of the scripting language can be found 
     $ cmake --preset conan-debug
     $ cmake --build build --preset conan-debug
     ```
+    This project requires a recent C++23 toolchain (for example GCC 14+).
 2. Manually:
 
     The project depends on

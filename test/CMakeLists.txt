@@ -396,6 +396,44 @@ target_compile_options(test_filemanager PRIVATE
 add_test(NAME filemanager COMMAND test_filemanager)
 set_tests_properties(filemanager PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
+add_executable(test_formatter
+    test_formatter.cpp
+    ../src/archives/file.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/builtins.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/formatter/formatter.cpp
+    ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(test_formatter GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_formatter PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME formatter COMMAND test_formatter)
+set_tests_properties(formatter PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
 add_executable(test_interpreter
     test_interpreter.cpp
     ../src/archives/file.cpp
@@ -867,4 +905,20 @@ set_tests_properties(
     "native_integration"
     PROPERTIES FIXTURES_REQUIRED
     native_integration
+)
+
+#
+# Formatter CLI end-to-end test.
+#
+
+add_test(
+    NAME formatter_cli_e2e
+    COMMAND ${CMAKE_COMMAND}
+        -DSLANG_BIN=${CMAKE_BINARY_DIR}/slang
+        -DTEST_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/..
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FmtCliE2E.cmake
+)
+set_tests_properties(formatter_cli_e2e
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )

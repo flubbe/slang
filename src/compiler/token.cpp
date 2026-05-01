@@ -17,6 +17,13 @@
 namespace slang
 {
 
+archive& operator&(archive& ar, comment_trivia& trivia)
+{
+    ar & trivia.text;
+    ar & trivia.is_block;
+    return ar;
+}
+
 archive& operator&(archive& ar, token_type& ty)
 {
     auto i = static_cast<std::uint8_t>(ty);
@@ -150,6 +157,8 @@ archive& operator&(archive& ar, token& tok)
     ar & tok.type;
 
     serialize_token_value(ar, tok.type, tok.value);
+    ar & tok.leading_comments;
+    ar & tok.trailing_comments;
 
     return ar;
 }

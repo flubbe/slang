@@ -42,6 +42,12 @@ static bool is_whitespace(const std::optional<char>& c)
            );
 }
 
+/** Horizontal whitespace (without line breaks). */
+static bool is_horizontal_whitespace(const std::optional<char>& c)
+{
+    return c && (*c == ' ' || *c == '\t' || *c == '\f');
+}
+
 /**
  * Check if a character is valid in an identifier, i.e., if
  * it is a-z, A-Z or _, or 0-9 when not the first character.
@@ -253,29 +259,101 @@ std::optional<token> lexer::next()
     token_type type = token_type::unknown;
     std::optional<numeric_suffix> suffix;
     source_location loc;
+    std::vector<comment_trivia> leading_comments;
+    std::vector<comment_trivia> trailing_comments;
 
-    while(!eof())    // this loop is only here for catching comments
+    auto parse_line_comment = [this]() -> comment_trivia
     {
-        type = token_type::unknown;    // reset type on each iteration.
-        current_token.clear();         // clear token on each iteration.
-        eval_token.clear();            // clear evaluation token on each iteration.
-        suffix = std::nullopt;         // clear numeric suffix on each iteration.
+        comment_trivia trivia;
+        trivia.is_block = false;
 
+        trivia.text += *get();    // '/'
+        trivia.text += *get();    // '/'
+
+        while(auto c = peek())
+        {
+            if(*c == '\n')
+            {
+                break;
+            }
+            trivia.text += *get();    // consume comment body
+        }
+
+        return trivia;
+    };
+
+    auto parse_block_comment = [this]() -> comment_trivia
+    {
+        comment_trivia trivia;
+        trivia.is_block = true;
+
+        trivia.text += *get();    // '/'
+        trivia.text += *get();    // '*'
+
+        while(auto c = get())
+        {
+            trivia.text += *c;
+            if(*c == '*' && peek().has_value() && *peek() == '/')
+            {
+                trivia.text += *get();    // '/'
+                return trivia;
+            }
+        }
+
+        throw lexical_error(
+          std::format(
+            "{}: Missing terminating '*/' for block comment.",
+            to_string(get_location())));
+    };
+
+    // Collect whitespace/comments preceding the next token.
+    while(!eof())
+    {
         while(is_whitespace(peek()))
         {
             get();
         }
 
-        loc = get_location();
-
-        std::optional<char> c = get();
-        if(!c.has_value())
+        if(peek().has_value() && *peek() == '/')
         {
-            return std::nullopt;
+            auto p2 = position;
+            ++p2;
+            if(p2 != input.end() && *p2 == '/')
+            {
+                leading_comments.emplace_back(parse_line_comment());
+                continue;
+            }
+            if(p2 != input.end() && *p2 == '*')
+            {
+                leading_comments.emplace_back(parse_block_comment());
+                continue;
+            }
         }
 
-        current_token = {*c};
+        break;
+    }
 
+    if(eof())
+    {
+        return std::nullopt;
+    }
+
+    type = token_type::unknown;
+    current_token.clear();
+    eval_token.clear();
+    suffix = std::nullopt;
+
+    loc = get_location();
+
+    std::optional<char> c = get();
+    if(!c.has_value())
+    {
+        return std::nullopt;
+    }
+
+    current_token = {*c};
+    while(true)
+    {
         bool macro_identifier = false;
         if(*c == '$')    // macro identifiers.
         {
@@ -317,42 +395,6 @@ std::optional<token> lexer::next()
             }
 
             break;
-        }
-
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        if(*c == '/' && peek().has_value() && *peek() == '/')    // single-line comment
-        {
-            // skip single-line comment and retry.
-            while((c = get()))
-            {
-                if(*c == '\n')
-                {
-                    break;
-                }
-            }
-
-            // clear token here, since the outer loop condition might not be satisfied anymore.
-            current_token.clear();
-            continue;
-        }
-
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        if(*c == '/' && peek().has_value() && *peek() == '*')    // multi-line comment
-        {
-            // skip multi-line comment and retry.
-            get();
-            while((c = get()))
-            {
-                if(*c == '*' && peek().has_value() && peek() == '/')
-                {
-                    get();
-                    break;
-                }
-            }
-
-            // clear token here, since the outer loop condition might not be satisfied anymore.
-            current_token.clear();
-            continue;
         }
 
         if(is_operator(c))
@@ -631,12 +673,54 @@ std::optional<token> lexer::next()
 
     validate_suffix(loc, suffix);
 
+    // Collect trailing comments after the token, if present on the same line.
+    while(true)
+    {
+        while(is_horizontal_whitespace(peek()))
+        {
+            get();
+        }
+
+        if(!peek().has_value() || *peek() == '\n' || *peek() == '\r' || *peek() == '\v')
+        {
+            break;
+        }
+
+        if(*peek() != '/')
+        {
+            break;
+        }
+
+        auto p2 = position;
+        ++p2;
+        if(p2 == input.end())
+        {
+            break;
+        }
+
+        if(*p2 == '/')
+        {
+            trailing_comments.emplace_back(parse_line_comment());
+            continue;
+        }
+
+        if(*p2 == '*')
+        {
+            trailing_comments.emplace_back(parse_block_comment());
+            continue;
+        }
+
+        break;
+    }
+
     return slang::token{
       current_token,
       loc,
       type,
       suffix,
-      eval(loc, eval_token, type)};
+      eval(loc, eval_token, type),
+      std::move(leading_comments),
+      std::move(trailing_comments)};
 }
 
 }    // namespace slang

@@ -5,13 +5,49 @@ project(slang CXX)
 
 enable_testing()
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 include_directories(
     src
     src/include
 )
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(CheckCXXSourceCompiles)
+
+check_cxx_source_compiles(
+    "
+    #include <format>
+    #include <print>
+    #include <ranges>
+    #include <vector>
+
+    struct sample
+    {
+        int value{0};
+        int get(this sample& self) { return self.value; }
+    };
+
+    int main()
+    {
+        auto out = std::vector<int>{1, 2, 3}
+            | std::views::transform([](int v) { return v + 1; })
+            | std::ranges::to<std::vector>();
+
+        std::print(\"{}\", std::format(\"{}\", out[0]));
+
+        sample s{42};
+        return s.get() == 42 ? 0 : 1;
+    }"
+    SLANG_CXX23_FEATURES_AVAILABLE)
+
+if(NOT SLANG_CXX23_FEATURES_AVAILABLE)
+    message(FATAL_ERROR
+        "slang requires a C++23 toolchain with <format>, <print>, std::ranges::to "
+        "and explicit object parameter support. "
+        "Detected ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. "
+        "Please use a newer toolchain (for example GCC 14+).")
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -52,9 +88,11 @@ add_executable(slang
     src/commandline/commandline.cpp
     src/commandline/compile.cpp
     src/commandline/disassemble.cpp
+    src/commandline/format.cpp
     src/commandline/run.cpp
     src/commandline/runtime.cpp
     src/filemanager.cpp
+    src/formatter/formatter.cpp
     src/main.cpp
     src/module_resolver.cpp
     src/package.cpp
