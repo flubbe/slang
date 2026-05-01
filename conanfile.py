@@ -7,7 +7,7 @@ from conan.tools.scm import Version
 
 class slangRecipe(ConanFile):
     name = "slang"
-    version = "0.2"
+    version = "0.4"
 
     # Optional metadata
     license = "MIT"
