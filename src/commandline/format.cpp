@@ -15,6 +15,7 @@
 #include <string_view>
 
 #include "formatter/formatter.h"
+#include "filemanager.h"
 #include "commandline.h"
 
 namespace slang::commandline
@@ -31,7 +32,10 @@ static std::string read_file(
       std::ios::in | std::ios::binary};
     if(!in)
     {
-        throw std::runtime_error(std::format("Unable to open '{}' for reading.", path.string()));
+        throw std::runtime_error(
+          std::format(
+            "Unable to open '{}' for reading.",
+            path.string()));
     }
 
     std::string content;
@@ -228,7 +232,11 @@ void fmt::invoke(const std::vector<std::string>& args)
         throw std::runtime_error("No files matched the provided input patterns.");
     }
 
+    file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
     formatter::source_formatter formatter{
+      file_mgr,
       formatter::options{
         .indent_size = 4,
         .max_line_length = line_length,
@@ -238,21 +246,20 @@ void fmt::invoke(const std::vector<std::string>& args)
     std::size_t changed_count = 0;
     for(const auto& file: files)
     {
-        std::string original;
         std::string formatted;
         try
         {
-            original = read_file(file);
-            formatted = formatter.format_text(original);
+            auto [result, changed] = formatter.format_file(file);
+            if(!changed)
+            {
+                continue;
+            }
+
+            formatted = std::move(result);
         }
         catch(const std::exception& e)
         {
             throw std::runtime_error(with_file_context(file, e.what()));
-        }
-
-        if(original == formatted)
-        {
-            continue;
         }
 
         ++changed_count;

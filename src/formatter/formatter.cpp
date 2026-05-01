@@ -24,7 +24,12 @@ namespace slang::formatter
 namespace
 {
 
-static bool is_word_token(const slang::token& tok)
+/*
+ * token helpers.
+ */
+
+static bool is_word_token(
+  const slang::token& tok)
 {
     return tok.type == token_type::identifier
            || tok.type == token_type::macro_identifier
@@ -34,7 +39,8 @@ static bool is_word_token(const slang::token& tok)
            || tok.type == token_type::str_literal;
 }
 
-static std::string escape_string_literal(const std::string& s)
+static std::string escape_string_literal(
+  const std::string& s)
 {
     std::string out;
     out.reserve(s.size() + 8);
@@ -59,34 +65,45 @@ static std::string escape_string_literal(const std::string& s)
     return out;
 }
 
-static std::string render_token_text(const slang::token& tok)
+/*
+ * formatting / rule helpers.
+ */
+
+static std::string render_token_text(
+  const slang::token& tok)
 {
-    if(tok.type == token_type::str_literal && tok.value.has_value())
+    if(tok.type == token_type::str_literal
+       && tok.value.has_value())
     {
-        return escape_string_literal(std::get<std::string>(*tok.value));
+        return escape_string_literal(
+          std::get<std::string>(*tok.value));
     }
 
     return tok.s;
 }
 
-static bool is_tight_after(const std::string& s)
+static bool is_tight_after(
+  const std::string& s)
 {
     return s == "(" || s == "[" || s == "{" || s == "." || s == "::";
 }
 
-static bool is_tight_before(const std::string& s)
+static bool is_tight_before(
+  const std::string& s)
 {
     return s == ")" || s == "]" || s == "}" || s == "," || s == ";" || s == "." || s == "::" || s == "...";
 }
 
-static bool is_keyword_space_before_paren(const slang::token& prev)
+static bool is_keyword_space_before_paren(
+  const slang::token& prev)
 {
     static const std::set<std::string> keywords = {
       "return", "fn", "macro"};
     return prev.type == token_type::identifier && keywords.contains(prev.s);
 }
 
-static bool is_wrap_operator(const std::string& s)
+static bool is_wrap_operator(
+  const std::string& s)
 {
     static const std::set<std::string> ops = {
       "+", "-", "*", "/", "%", "&", "|", "^",
@@ -97,9 +114,12 @@ static bool is_wrap_operator(const std::string& s)
     return ops.contains(s);
 }
 
-static bool needs_space(const slang::token& prev, const slang::token& curr)
+static bool needs_space(
+  const slang::token& prev,
+  const slang::token& curr)
 {
-    if(is_tight_after(prev.s) || is_tight_before(curr.s))
+    if(is_tight_after(prev.s)
+       || is_tight_before(curr.s))
     {
         return false;
     }
@@ -165,9 +185,25 @@ static bool needs_space(const slang::token& prev, const slang::token& curr)
     return true;
 }
 
-static std::string read_archive(slang::archive& ar)
+/*
+ * archive helpers.
+ */
+
+/**
+ * Read a text archive/file via the serialization API.
+ *
+ * @param ar The archive to read from.
+ * @return The file contents.
+ */
+static std::string read_archive(
+  slang::archive& ar)
 {
-    ar.seek(0);
+    if(!ar.is_reading())
+    {
+        throw std::runtime_error{
+          "read_archive: Archive not readable."};
+    }
+
     const auto size = ar.size();
     ar.seek(0);
 
@@ -180,8 +216,22 @@ static std::string read_archive(slang::archive& ar)
     return content;
 }
 
-static void write_archive(slang::archive& ar, const std::string& text)
+/**
+ * Write a text archive/file via the serialization API.
+ *
+ * @param ar The archive to write the string to.
+ * @param text The text to write.
+ */
+static void write_archive(
+  slang::archive& ar,
+  const std::string& text)
 {
+    if(!ar.is_writing())
+    {
+        throw std::runtime_error{
+          "write_archive: Archive not writable."};
+    }
+
     ar.seek(0);
 
     if(text.empty())
@@ -193,25 +243,44 @@ static void write_archive(slang::archive& ar, const std::string& text)
     ar.serialize(std::as_writable_bytes(std::span(writable)));
 }
 
-static std::string read_file(const std::filesystem::path& file)
+/**
+ * Read a file using the file manager.
+ *
+ * @param file_mgr The file manager to use.
+ * @param path The file path.
+ * @return Returns the file contents.
+ */
+static std::string read_file(
+  slang::file_manager& file_mgr,
+  const std::filesystem::path& path)
 {
-    slang::file_manager file_mgr;
-    file_mgr.add_search_path(".");
-
-    auto ar = file_mgr.open(file, slang::file_manager::open_mode::read);
+    auto ar = file_mgr.open(
+      path,
+      slang::file_manager::open_mode::read);
     return read_archive(*ar);
 }
 
-static void write_file(const std::filesystem::path& file, const std::string& text)
+/**
+ * Write a file using the file manager.
+ *
+ * @param file_mgr The file manager to use.
+ * @param path Path of the file to write to.
+ * @param text The text to write.
+ */
+static void write_file(
+  slang::file_manager& file_mgr,
+  const std::filesystem::path& path,
+  const std::string& text)
 {
-    slang::file_manager file_mgr;
-    file_mgr.add_search_path(".");
-
-    auto ar = file_mgr.open(file, slang::file_manager::open_mode::write);
+    auto ar = file_mgr.open(
+      path,
+      slang::file_manager::open_mode::write);
     write_archive(*ar, text);
 }
 
-static std::size_t current_line_length(const std::string& out)
+/** Return the length of the current line. */
+static std::size_t current_line_length(
+  const std::string& out)
 {
     const auto pos = out.find_last_of('\n');
     if(pos == std::string::npos)
@@ -224,12 +293,17 @@ static std::size_t current_line_length(const std::string& out)
 
 }    // namespace
 
-source_formatter::source_formatter(options opts)
-: opts{opts}
+source_formatter::source_formatter(
+  file_manager& file_mgr,
+  options opts)
+: file_mgr{file_mgr}
+, opts{opts}
 {
 }
 
-std::string source_formatter::format_text(const std::string& source) const
+std::pair<std::string, bool>
+  source_formatter::format_text(
+    const std::string& source) const
 {
     if(opts.validate_syntax)
     {
@@ -466,25 +540,29 @@ std::string source_formatter::format_text(const std::string& source) const
         out.push_back('\n');
     }
 
-    return out;
+    return std::make_pair(
+      out,
+      out != source);
 }
 
-std::string source_formatter::format_file(const std::filesystem::path& file) const
+std::pair<std::string, bool>
+  source_formatter::format_file(
+    const std::filesystem::path& file) const
 {
-    return format_text(read_file(file));
+    return format_text(read_file(file_mgr, file));
 }
 
 bool source_formatter::format_file_in_place(const std::filesystem::path& file) const
 {
-    const auto original = read_file(file);
-    const auto formatted = format_text(original);
+    const auto original = read_file(file_mgr, file);
+    const auto [formatted, changed] = format_text(original);
 
-    if(original == formatted)
+    if(!changed)
     {
         return false;
     }
 
-    write_file(file, formatted);
+    write_file(file_mgr, file, formatted);
     return true;
 }
 

@@ -16,9 +16,12 @@
 #include <gtest/gtest.h>
 
 #include "formatter/formatter.h"
+#include "filemanager.h"
 
 namespace
 {
+
+using slang::file_manager;
 
 std::string read_text_file(const std::filesystem::path& path)
 {
@@ -44,8 +47,9 @@ TEST(formatter, format_text_canonical_layout)
       "    let y: i32 = x * 3;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_is_idempotent)
@@ -55,10 +59,13 @@ TEST(formatter, format_text_is_idempotent)
       "    let x: i32 = 1 + 2;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    const std::string once = formatter.format_text(input);
-    const std::string twice = formatter.format_text(once);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    const auto [once, once_changed] = formatter.format_text(input);
+    const auto [twice, twice_changed] = formatter.format_text(once);
 
+    EXPECT_FALSE(once_changed);
+    EXPECT_FALSE(twice_changed);
     EXPECT_EQ(once, twice);
 }
 
@@ -67,7 +74,8 @@ TEST(formatter, format_text_invalid_syntax_throws)
     const std::string invalid_input =
       "fn main( -> void { let x: i32 = 1; }";
 
-    slang::formatter::source_formatter formatter;
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
     EXPECT_THROW(
       static_cast<void>(formatter.format_text(invalid_input)),
       std::runtime_error);
@@ -88,8 +96,9 @@ TEST(formatter, format_file_returns_formatted_text)
       "    let x: i32 = 1 + 2;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_file(temp_file), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_file(temp_file).first, expected);
 
     std::filesystem::remove(temp_file);
 }
@@ -104,7 +113,8 @@ TEST(formatter, format_file_in_place_reports_changes)
         out << "fn main()->void{let x:i32=1+2;}";
     }
 
-    slang::formatter::source_formatter formatter;
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
     EXPECT_TRUE(formatter.format_file_in_place(temp_file));
     EXPECT_FALSE(formatter.format_file_in_place(temp_file));
 
@@ -125,8 +135,9 @@ TEST(formatter, format_text_formats_nested_blocks)
       "    }\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_formats_commas_and_calls)
@@ -140,8 +151,9 @@ TEST(formatter, format_text_formats_commas_and_calls)
       "    bar(a, b, c);\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_formats_directives)
@@ -156,8 +168,9 @@ TEST(formatter, format_text_formats_directives)
       "    let x: i32 = 1;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_wraps_long_lines_when_configured)
@@ -165,7 +178,9 @@ TEST(formatter, format_text_wraps_long_lines_when_configured)
     const std::string input =
       "fn main()->void{let value:i32=very_long_identifier_name+another_long_identifier_name+third_long_identifier_name;}";
 
+    file_manager file_mgr;
     slang::formatter::source_formatter formatter{
+      file_mgr,
       slang::formatter::options{
         .indent_size = 4,
         .max_line_length = 60,
@@ -178,7 +193,7 @@ TEST(formatter, format_text_wraps_long_lines_when_configured)
       "    third_long_identifier_name;\n"
       "}\n";
 
-    EXPECT_EQ(formatter.format_text(input), expected);
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_does_not_wrap_when_line_length_disabled)
@@ -186,7 +201,9 @@ TEST(formatter, format_text_does_not_wrap_when_line_length_disabled)
     const std::string input =
       "fn main()->void{let value:i32=very_long_identifier_name+another_long_identifier_name+third_long_identifier_name;}";
 
+    file_manager file_mgr;
     slang::formatter::source_formatter formatter{
+      file_mgr,
       slang::formatter::options{
         .indent_size = 4,
         .max_line_length = 0,
@@ -198,7 +215,7 @@ TEST(formatter, format_text_does_not_wrap_when_line_length_disabled)
       "    let value: i32 = very_long_identifier_name + another_long_identifier_name + third_long_identifier_name;\n"
       "}\n";
 
-    EXPECT_EQ(formatter.format_text(input), expected);
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_wraps_more_aggressively_with_tight_limit)
@@ -206,7 +223,9 @@ TEST(formatter, format_text_wraps_more_aggressively_with_tight_limit)
     const std::string input =
       "fn main()->void{let x:i32=abcde+fghij+klmno+pqrst+uvwxy;}";
 
+    file_manager file_mgr;
     slang::formatter::source_formatter formatter{
+      file_mgr,
       slang::formatter::options{
         .indent_size = 4,
         .max_line_length = 30,
@@ -219,7 +238,7 @@ TEST(formatter, format_text_wraps_more_aggressively_with_tight_limit)
       "    klmno + pqrst + uvwxy;\n"
       "}\n";
 
-    EXPECT_EQ(formatter.format_text(input), expected);
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_comment_variations)
@@ -245,8 +264,9 @@ TEST(formatter, format_text_preserves_comment_variations)
       "    let c: i32 = 3; // c1 /* c2 */\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_single_blank_line_between_leading_block_comments)
@@ -264,8 +284,9 @@ TEST(formatter, format_text_preserves_single_blank_line_between_leading_block_co
       "fn main() -> void {\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_comments_before_closing_brace)
@@ -281,8 +302,9 @@ TEST(formatter, format_text_preserves_comments_before_closing_brace)
       "    // before closing brace\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_single_blank_line_between_statements)
@@ -302,8 +324,9 @@ TEST(formatter, format_text_preserves_single_blank_line_between_statements)
       "    let b: i32 = 2;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_wraps_at_operator_boundaries)
@@ -311,7 +334,9 @@ TEST(formatter, format_text_wraps_at_operator_boundaries)
     const std::string input =
       "fn main()->void{let sum:i32=aaa+bbb+ccc+ddd+eee+fff;}";
 
+    file_manager file_mgr;
     slang::formatter::source_formatter formatter{
+      file_mgr,
       slang::formatter::options{
         .indent_size = 4,
         .max_line_length = 34,
@@ -324,7 +349,7 @@ TEST(formatter, format_text_wraps_at_operator_boundaries)
       "    ddd + eee + fff;\n"
       "}\n";
 
-    EXPECT_EQ(formatter.format_text(input), expected);
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_trailing_line_comment_at_eof)
@@ -337,8 +362,9 @@ TEST(formatter, format_text_preserves_trailing_line_comment_at_eof)
       "    let x: i32 = 1;\n"
       "} // eof trailing line comment\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_trailing_block_comment_at_eof)
@@ -351,8 +377,9 @@ TEST(formatter, format_text_preserves_trailing_block_comment_at_eof)
       "    let x: i32 = 1;\n"
       "} /* eof trailing block comment */\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_ensures_trailing_newline_by_default)
@@ -363,8 +390,9 @@ TEST(formatter, format_text_ensures_trailing_newline_by_default)
       "    let x: i32 = 1;\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_can_disable_trailing_newline)
@@ -375,14 +403,16 @@ TEST(formatter, format_text_can_disable_trailing_newline)
       "    let x: i32 = 1;\n"
       "}";
 
+    file_manager file_mgr;
     slang::formatter::source_formatter formatter{
+      file_mgr,
       slang::formatter::options{
         .indent_size = 4,
         .max_line_length = 0,
         .validate_syntax = true,
         .ensure_trailing_newline = false}};
 
-    EXPECT_EQ(formatter.format_text(input), expected);
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_formats_macro_definition_layout)
@@ -397,8 +427,9 @@ TEST(formatter, format_text_formats_macro_definition_layout)
       "    };\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_formats_macro_invocation_spacing)
@@ -411,8 +442,9 @@ TEST(formatter, format_text_formats_macro_invocation_spacing)
       "    let x: i32 = sum!(1, 2);\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_formats_macro_pattern_branch_tokens)
@@ -427,8 +459,9 @@ TEST(formatter, format_text_formats_macro_pattern_branch_tokens)
       "    };\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, format_text_preserves_escaped_string_literals)
@@ -441,8 +474,9 @@ TEST(formatter, format_text_preserves_escaped_string_literals)
       "    print(\"line1\\nline2\\t\\\\\\\"\");\n"
       "}\n";
 
-    slang::formatter::source_formatter formatter;
-    EXPECT_EQ(formatter.format_text(input), expected);
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
 TEST(formatter, golden_examples_exact_output_and_idempotence)
@@ -492,15 +526,16 @@ TEST(formatter, golden_examples_exact_output_and_idempotence)
        "}\n"},
     };
 
-    slang::formatter::source_formatter formatter;
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
 
     for(const auto& test_case: cases)
     {
         SCOPED_TRACE(test_case.path.string());
         const std::string source = read_text_file(test_case.path);
-        const std::string formatted = formatter.format_text(source);
+        const auto [formatted, _] = formatter.format_text(source);
         EXPECT_EQ(formatted, test_case.expected);
-        EXPECT_EQ(formatter.format_text(formatted), formatted);
+        EXPECT_EQ(formatter.format_text(formatted).first, formatted);
     }
 }
 
