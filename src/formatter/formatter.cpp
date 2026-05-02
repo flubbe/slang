@@ -114,10 +114,48 @@ static bool is_wrap_operator(
     return ops.contains(s);
 }
 
+static bool is_unary_prefix_operator(
+  const std::string& s)
+{
+    static const std::set<std::string> ops = {
+      "+", "-", "!", "~", "++", "--"};
+    return ops.contains(s);
+}
+
+static bool starts_expression(
+  const std::optional<slang::token>& tok)
+{
+    if(!tok.has_value())
+    {
+        return true;
+    }
+
+    const auto& s = tok->s;
+    if(s == "(" || s == "[" || s == "{" || s == "," || s == ";" || s == ":")
+    {
+        return true;
+    }
+
+    if(is_wrap_operator(s))
+    {
+        return true;
+    }
+
+    return tok->type == token_type::identifier && s == "return";
+}
+
 static bool needs_space(
+  const std::optional<slang::token>& prev_prev,
   const slang::token& prev,
   const slang::token& curr)
 {
+    // Keep unary prefix operators attached to their operand: `-120`, `!flag`, `++i`.
+    if(is_unary_prefix_operator(prev.s)
+       && starts_expression(prev_prev))
+    {
+        return false;
+    }
+
     if(is_tight_after(prev.s)
        || is_tight_before(curr.s))
     {
@@ -320,6 +358,7 @@ std::pair<std::string, bool>
     }
 
     std::string out;
+    std::optional<token> prev_prev;
     std::optional<token> prev;
 
     std::size_t indent_level = 0;
@@ -425,7 +464,9 @@ std::pair<std::string, bool>
             line_start = false;
         }
 
-        bool insert_space = !token_starts_line && prev.has_value() && needs_space(*prev, tok);
+        bool insert_space = !token_starts_line
+                            && prev.has_value()
+                            && needs_space(prev_prev, *prev, tok);
         const std::string token_text = render_token_text(tok);
         const std::size_t projected_len =
           current_line_length(out)
@@ -526,6 +567,7 @@ std::pair<std::string, bool>
             append_blank_line();
         }
 
+        prev_prev = prev;
         prev = tok;
     }
 

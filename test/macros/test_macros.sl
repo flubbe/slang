@@ -21,7 +21,7 @@ macro identity! {
 }
 
 fn ret_i32() -> i32 {
-    return - 123;
+    return -123;
 }
 
 fn test_format() -> void {

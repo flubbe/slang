@@ -156,6 +156,25 @@ TEST(formatter, format_text_formats_commas_and_calls)
     EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
+TEST(formatter, format_text_attaches_unary_prefix_operators)
+{
+    const std::string input =
+      "fn main()->void{let a:i32=- 120;let b:i32=! 0;let c:i32=~ 1;let d:i32=++ a;let e:i32=-- a;}";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    let a: i32 = -120;\n"
+      "    let b: i32 = !0;\n"
+      "    let c: i32 = ~1;\n"
+      "    let d: i32 = ++a;\n"
+      "    let e: i32 = --a;\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
+}
+
 TEST(formatter, format_text_formats_directives)
 {
     const std::string input =

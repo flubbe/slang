@@ -56,7 +56,7 @@ fn main(args: str[]) -> i32 {
                 "Test"
             }
         };
-        ++ i;
+        ++i;
 
         let cur_bytes: i32 = gc::allocated_bytes();
         let cur_object_count: i32 = gc::object_count();

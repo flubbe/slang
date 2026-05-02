@@ -9,3 +9,7 @@
 /.VSCodeCounter
 
 /**/.DS_Store
+
+.env
+/out
+.codex

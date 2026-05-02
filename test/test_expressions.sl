@@ -17,7 +17,7 @@ struct T {
 };
 
 fn foo() -> i32 {
-    return - 1;
+    return -1;
 }
 
 fn test_nested_evaluation0() -> void {
@@ -177,7 +177,7 @@ fn test_nested_evaluation3() -> void {
         std::assert(i == 0, "i == 0");
 
         let z: i32;
-        z = ++ a[i];
+        z = ++a[i];
 
         std::println(std::format!("i = {} / z = {} / a = [{}, {}, {}]", i, z, a[0], a[1], a[2]));
 
@@ -203,14 +203,14 @@ fn test_nested_evaluation3() -> void {
         std::assert(i == 0, "i == 0");
 
         let z: i32;
-        z = -- a[i];
+        z = --a[i];
 
         std::println(std::format!("i = {} / z = {} / a = [{}, {}, {}]", i, z, a[0], a[1], a[2]));
 
-        std::assert(a[0] == - 1, "a[0] == -1");
+        std::assert(a[0] == -1, "a[0] == -1");
         std::assert(a[1] == 2, "a[1] == 2");
         std::assert(a[2] == 3, "a[2] == 3");
-        std::assert(z == - 1, "z == -1");
+        std::assert(z == -1, "z == -1");
         std::assert(i == 0, "i == 0");
     }
 }
@@ -234,7 +234,7 @@ fn test_nested_evaluation3_i8() -> void {
         std::assert(i == 0, "i == 0");
 
         let z: i8;
-        z = ++ a[i];
+        z = ++a[i];
 
         std::println(std::format!("i = {} / z = {} / a = [{}, {}, {}]", i, z, a[0], a[1], a[2]));
 
@@ -260,14 +260,14 @@ fn test_nested_evaluation3_i8() -> void {
         std::assert(i == 0, "i == 0");
 
         let z: i8;
-        z = -- a[i];
+        z = --a[i];
 
         std::println(std::format!("i = {} / z = {} / a = [{}, {}, {}]", i, z, a[0], a[1], a[2]));
 
-        std::assert(a[0] == - 1i8, "a[0] == -1");
+        std::assert(a[0] == -1i8, "a[0] == -1");
         std::assert(a[1] == 2i8, "a[1] == 2");
         std::assert(a[2] == 3i8, "a[2] == 3");
-        std::assert(z == - 1i8, "z == -1");
+        std::assert(z == -1i8, "z == -1");
         std::assert(i == 0, "i == 0");
     }
 }
@@ -304,12 +304,12 @@ fn test_compound_assignments() -> void {
 }
 
 fn return_modified_input_i32(a: i32[]) -> i32[] {
-    a[1] += - 1;
+    a[1] += -1;
     return a;
 }
 
 fn return_modified_input_i8(a: i8[]) -> i8[] {
-    a[1] += - 1i8;
+    a[1] += -1i8;
     return a;
 }
 
@@ -351,12 +351,12 @@ fn approx_eq(value: f32, expected: f32, message: str) -> void {
 }
 
 fn test_negation() -> void {
-    let i0: i8 = - 1i8;
-    let i1: i16 = - 2i16;
-    let i2: i32 = - 3i32;
-    let i3: i64 = - 4i64;
-    let f: f32 = - 5.0f32;
-    let d: f64 = - 6.0f64;
+    let i0: i8 = -1i8;
+    let i1: i16 = -2i16;
+    let i2: i32 = -3i32;
+    let i3: i64 = -4i64;
+    let f: f32 = -5.0f32;
+    let d: f64 = -6.0f64;
 
     std::assert(i0 + 1i8 == 0i8, "i0 + 1 == 0");
     std::assert(i1 + 2i16 == 0i16, "i1 + 2 == 0");

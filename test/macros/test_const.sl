@@ -16,7 +16,7 @@ macro o! {
 
 macro p! {
     () => {
-        - CONST;
+        -CONST;
     };
 }
 

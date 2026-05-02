@@ -16,7 +16,7 @@ fn main(args: str[]) -> i32 {
     std::assert(std::string_equals(s.data, "Test"), "s.data == \"Test\"");
 
     // Test imported constants.
-    std::assert((test_const_export::NEGATIVE_PI as i32) == - 3, "(test_const_export::NEGATIVE_PI as i32) == -3");
+    std::assert((test_const_export::NEGATIVE_PI as i32) == -3, "(test_const_export::NEGATIVE_PI as i32) == -3");
 
     // Function call.
     std::assert(std::string_equals(example_package::hello::return_hello(), "Hello"), "example_package::hello::return_hello() == \"Hello\"");
