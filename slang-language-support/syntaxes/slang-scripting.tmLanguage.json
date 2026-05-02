@@ -133,11 +133,11 @@
         },
         {
           "name": "storage.type.user.slang",
-          "match": "(?<=:\\s*)\\b[A-Z][A-Za-z0-9_]*\\b"
+          "match": "(?<=: )\\b[A-Z][A-Za-z0-9_]*\\b|(?<=:)\\b[A-Z][A-Za-z0-9_]*\\b"
         },
         {
           "name": "storage.type.user.slang",
-          "match": "(?<=->\\s*)\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+          "match": "(?<=-> )\\b[A-Za-z_][A-Za-z0-9_]*\\b|(?<=->)\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]
     },
@@ -157,7 +157,7 @@
       "patterns": [
         {
           "name": "entity.name.function.macro.slang",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*!\\b"
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*!(?=\\s*\\()|\\b[A-Za-z_][A-Za-z0-9_]*!(?=\\s*\\{)|\\b[A-Za-z_][A-Za-z0-9_]*!(?=\\s*$)|\\b[A-Za-z_][A-Za-z0-9_]*!(?=\\s*,)|\\b[A-Za-z_][A-Za-z0-9_]*!(?=\\s*;)"
         },
         {
           "name": "variable.parameter.macro.slang",
