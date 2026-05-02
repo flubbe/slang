@@ -117,7 +117,7 @@
         },
         {
           "name": "keyword.declaration.slang",
-          "match": "\\b(?:import|let|struct|fn|macro)\\b"
+          "match": "\\b(?:import|const|let|struct|fn|macro|new)\\b"
         },
         {
           "name": "keyword.operator.word.slang",
