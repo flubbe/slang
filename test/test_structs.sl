@@ -4,12 +4,14 @@ import std;
  * struct creation and member access.
  */
 struct S {
-    i: i32, j: f32
+    i: i32,
+    j: f32
 };
 
 fn init_struct(i: i32, j: f32) -> S {
     return S {
-        i: i, j: j
+        i: i,
+        j: j
     };
 }
 
@@ -22,12 +24,14 @@ fn test_struct() -> void {
  * linked lists.
  */
 struct L {
-    data: str, next: L
+    data: str,
+    next: L
 };
 
 fn create_node(data: str) -> L {
     return L {
-        data: data, next: null
+        data: data,
+        next: null
     };
 }
 

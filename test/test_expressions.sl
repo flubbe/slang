@@ -54,7 +54,7 @@ fn test_nested_evaluation1() -> void {
 
     {
         let obj: S = S {
-            arr:[1, 2, 3]
+            arr: [1, 2, 3]
         };
         let i: i32 = 1;
 
@@ -69,7 +69,7 @@ fn test_nested_evaluation1() -> void {
     }
     {
         let obj: S = S {
-            arr:[1, 2, 3]
+            arr: [1, 2, 3]
         };
         let i: i32 = 1;
 
@@ -89,7 +89,7 @@ fn test_nested_evaluation1_i16() -> void {
 
     {
         let obj: Si16 = Si16 {
-            arr:[1i16, 2i16, 3i16]
+            arr: [1i16, 2i16, 3i16]
         };
         let i: i32 = 1;
 
@@ -104,7 +104,7 @@ fn test_nested_evaluation1_i16() -> void {
     }
     {
         let obj: Si16 = Si16 {
-            arr:[1i16, 2i16, 3i16]
+            arr: [1i16, 2i16, 3i16]
         };
         let i: i32 = 1;
 
@@ -125,7 +125,7 @@ fn test_nested_evaluation2() -> void {
     {
         let obj2: T = T {
             s: S {
-                arr:[1, 2, 3]
+                arr: [1, 2, 3]
             }
         };
         let i: i32 = 2;
@@ -142,7 +142,7 @@ fn test_nested_evaluation2() -> void {
     {
         let obj2: T = T {
             s: S {
-                arr:[1, 2, 3]
+                arr: [1, 2, 3]
             }
         };
         let i: i32 = 2;

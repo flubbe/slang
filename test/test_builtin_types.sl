@@ -132,12 +132,22 @@ fn test_builtin_arrays() -> void {
 }
 
 struct S {
-    c: i8, s: i16, i: i32, l: i64, f: f32, d: f64
+    c: i8,
+    s: i16,
+    i: i32,
+    l: i64,
+    f: f32,
+    d: f64
 };
 
 fn test_struct() -> void {
     let s: S = S {
-        c: 1i8, s: 2i16, i: 3i32, l: 4i64, f: 5.1f32, d: 6.2f64
+        c: 1i8,
+        s: 2i16,
+        i: 3i32,
+        l: 4i64,
+        f: 5.1f32,
+        d: 6.2f64
     };
 
     std::print(std::format!("{} {} {} {} {} {}\n", s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));

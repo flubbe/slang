@@ -1,7 +1,8 @@
 import std;
 
 struct L {
-    data: str, next: L
+    data: str,
+    next: L
 };
 
 fn append(node: L, data: str) -> L {
@@ -13,7 +14,8 @@ fn append(node: L, data: str) -> L {
     }
 
     node.next = L {
-        data: data, next: null
+        data: data,
+        next: null
     };
 
     return node.next;
@@ -28,7 +30,8 @@ fn print(node: L) -> void {
 
 fn main(args: str[]) -> i32 {
     let root: L = L {
-        data: "root", next: null
+        data: "root",
+        next: null
     };
 
     append(root, "1");

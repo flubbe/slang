@@ -192,6 +192,46 @@ TEST(formatter, format_text_formats_directives)
     EXPECT_EQ(formatter.format_text(input).first, expected);
 }
 
+TEST(formatter, format_text_formats_struct_members_one_per_line)
+{
+    const std::string input =
+      "struct L{data:str,next:L};fn main()->void{let root:L=L{data:\"root\",next:null};}";
+
+    const std::string expected =
+      "struct L {\n"
+      "    data: str,\n"
+      "    next: L\n"
+      "};\n"
+      "\n"
+      "fn main() -> void {\n"
+      "    let root: L = L {\n"
+      "        data: \"root\",\n"
+      "        next: null\n"
+      "    };\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
+}
+
+TEST(formatter, format_text_keeps_short_array_inline_in_struct_member)
+{
+    const std::string input =
+      "fn main()->void{let obj:S=S{arr:[1,2,3]};}";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    let obj: S = S {\n"
+      "        arr: [1, 2, 3]\n"
+      "    };\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+    EXPECT_EQ(formatter.format_text(input).first, expected);
+}
+
 TEST(formatter, format_text_wraps_long_lines_when_configured)
 {
     const std::string input =
@@ -255,6 +295,55 @@ TEST(formatter, format_text_wraps_more_aggressively_with_tight_limit)
       "fn main() -> void {\n"
       "    let x: i32 = abcde + fghij +\n"
       "    klmno + pqrst + uvwxy;\n"
+      "}\n";
+
+    EXPECT_EQ(formatter.format_text(input).first, expected);
+}
+
+TEST(formatter, format_text_wraps_array_elements_one_per_line_when_too_long)
+{
+    const std::string input =
+      "fn main()->void{let strs:str[]=[\"This\",\"is\",\"a\",\"loop!\"];}";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{
+      file_mgr,
+      slang::formatter::options{
+        .indent_size = 4,
+        .max_line_length = 40,
+        .validate_syntax = true,
+        .ensure_trailing_newline = true}};
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    let strs: str[] = [\n"
+      "        \"This\",\n"
+      "        \"is\",\n"
+      "        \"a\",\n"
+      "        \"loop!\"\n"
+      "    ];\n"
+      "}\n";
+
+    EXPECT_EQ(formatter.format_text(input).first, expected);
+}
+
+TEST(formatter, format_text_keeps_short_array_inline)
+{
+    const std::string input =
+      "fn main()->void{let nums:i32[]=[1,2,3];}";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{
+      file_mgr,
+      slang::formatter::options{
+        .indent_size = 4,
+        .max_line_length = 120,
+        .validate_syntax = true,
+        .ensure_trailing_newline = true}};
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    let nums: i32[] = [1, 2, 3];\n"
       "}\n";
 
     EXPECT_EQ(formatter.format_text(input).first, expected);
@@ -530,12 +619,14 @@ TEST(formatter, golden_examples_exact_output_and_idempotence)
        "}\n"},
       {"examples/structs.sl",
        "struct S {\n"
-       "    i: i32, j: f32\n"
+       "    i: i32,\n"
+       "    j: f32\n"
        "};\n"
        "\n"
        "fn init(i: i32, j: f32) -> S {\n"
        "    return S {\n"
-       "        i: i, j: j\n"
+       "        i: i,\n"
+       "        j: j\n"
        "    };\n"
        "}\n"
        "\n"

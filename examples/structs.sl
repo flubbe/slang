@@ -1,10 +1,12 @@
 struct S {
-    i: i32, j: f32
+    i: i32,
+    j: f32
 };
 
 fn init(i: i32, j: f32) -> S {
     return S {
-        i: i, j: j
+        i: i,
+        j: j
     };
 }
 

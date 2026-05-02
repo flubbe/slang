@@ -76,19 +76,23 @@ fn test_custom2() -> void {
 }
 
 struct L {
-    i: i32, f: f32
+    i: i32,
+    f: f32
 };
 
 fn test_local() -> void {
     let arr: L[] = new L[3];
     arr[0] = L {
-        1, 2.0 as f32
+        1,
+        2.0 as f32
     };
     arr[1] = L {
-        2, 3.0 as f32
+        2,
+        3.0 as f32
     };
     arr[2] = L {
-        3, 4.0 as f32
+        3,
+        4.0 as f32
     };
 
     let t: std::type = arr[1] as std::type;
@@ -101,13 +105,16 @@ fn test_local() -> void {
 fn test_array_copy() -> void {
     let arr1: L[] = new L[3];
     arr1[0] = L {
-        1, 2.0 as f32
+        1,
+        2.0 as f32
     };
     arr1[1] = L {
-        2, 3.0 as f32
+        2,
+        3.0 as f32
     };
     arr1[2] = L {
-        3, 4.0 as f32
+        3,
+        4.0 as f32
     };
 
     let arr2: L[] = new L[3];

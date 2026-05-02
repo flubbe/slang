@@ -144,6 +144,72 @@ static bool starts_expression(
     return tok->type == token_type::identifier && s == "return";
 }
 
+enum class brace_context
+{
+    other,
+    struct_members
+};
+
+enum class bracket_context
+{
+    other,
+    array_multiline
+};
+
+static bool is_struct_member_block_open(
+  const std::optional<slang::token>& prev_prev,
+  const std::optional<slang::token>& prev)
+{
+    if(!prev.has_value()
+       || prev->type != token_type::identifier)
+    {
+        return false;
+    }
+
+    if(!prev_prev.has_value())
+    {
+        return false;
+    }
+
+    const auto& s = prev_prev->s;
+    return s == "struct"
+           || s == "="
+           || s == "return"
+           || s == ","
+           || s == "("
+           || s == "["
+           || s == "{"
+           || s == ":"
+           || s == "::";
+}
+
+static bool is_array_literal_open(
+  const std::optional<slang::token>& prev_prev,
+  const std::optional<slang::token>& prev)
+{
+    if(!prev.has_value())
+    {
+        return false;
+    }
+
+    if(prev->s == "#")
+    {
+        return false;
+    }
+
+    if(prev->s == "="
+       || prev->s == ","
+       || prev->s == "("
+       || prev->s == "["
+       || prev->s == "{"
+       || prev->s == "return")
+    {
+        return true;
+    }
+
+    return is_wrap_operator(prev->s) && starts_expression(prev_prev);
+}
+
 static bool needs_space(
   const std::optional<slang::token>& prev_prev,
   const slang::token& prev,
@@ -170,12 +236,13 @@ static bool needs_space(
     if(curr.s == "[")
     {
         // Keep attachment for `type[]`, `arr[i]`, and `#[...]`,
-        // but preserve spacing in assignments like `= [ ... ]`.
+        // but preserve spacing in assignments like `= [ ... ]`
+        // and member initializers like `name: [ ... ]`.
         if(prev.s == "#")
         {
             return false;
         }
-        return prev.s == "=";
+        return prev.s == "=" || prev.s == ":";
     }
 
     if(curr.s == "(")
@@ -360,6 +427,10 @@ std::pair<std::string, bool>
     std::string out;
     std::optional<token> prev_prev;
     std::optional<token> prev;
+    std::vector<brace_context> brace_stack;
+    std::vector<bracket_context> bracket_stack;
+    std::size_t paren_depth = 0;
+    std::size_t extra_indent_level = 0;
 
     std::size_t indent_level = 0;
     bool line_start = true;
@@ -367,7 +438,7 @@ std::pair<std::string, bool>
 
     auto append_indent = [&]() -> void
     {
-        out.append(indent_level * opts.indent_size, ' ');
+        out.append((indent_level + extra_indent_level) * opts.indent_size, ' ');
     };
 
     auto append_newline = [&]() -> void
@@ -400,11 +471,66 @@ std::pair<std::string, bool>
         line_start = true;
     };
 
+    auto inline_array_length_from =
+      [&](std::size_t start_index) -> std::optional<std::pair<std::size_t, std::size_t>>
+    {
+        if(start_index >= tokens.size() || tokens[start_index].s != "[")
+        {
+            return std::nullopt;
+        }
+
+        std::size_t depth = 0;
+        std::size_t length = 0;
+        std::optional<token> local_prev_prev;
+        std::optional<token> local_prev;
+
+        for(std::size_t j = start_index; j < tokens.size(); ++j)
+        {
+            const auto& t = tokens[j];
+
+            if(j > start_index
+               && local_prev.has_value()
+               && needs_space(local_prev_prev, *local_prev, t))
+            {
+                ++length;
+            }
+
+            length += render_token_text(t).size();
+
+            if(t.s == "[")
+            {
+                ++depth;
+            }
+            else if(t.s == "]")
+            {
+                if(depth == 0)
+                {
+                    return std::nullopt;
+                }
+
+                --depth;
+                if(depth == 0)
+                {
+                    return std::make_pair(length, j);
+                }
+            }
+
+            local_prev_prev = local_prev;
+            local_prev = t;
+        }
+
+        return std::nullopt;
+    };
+
     for(std::size_t i = 0; i < tokens.size(); ++i)
     {
         const auto& tok = tokens[i];
         const token* next_tok = (i + 1 < tokens.size()) ? &tokens[i + 1] : nullptr;
         bool ended_top_level_decl = false;
+        const bool closing_multiline_array =
+          tok.s == "]"
+          && !bracket_stack.empty()
+          && bracket_stack.back() == bracket_context::array_multiline;
 
         if(tok.has_blank_line_before)
         {
@@ -447,6 +573,18 @@ std::pair<std::string, bool>
                 append_newline();
             }
         }
+        else if(closing_multiline_array)
+        {
+            if(extra_indent_level > 0)
+            {
+                --extra_indent_level;
+            }
+
+            if(!line_start)
+            {
+                append_newline();
+            }
+        }
 
         // Always render directives (`#[...]`) as standalone lines.
         if(tok.s == "#" && next_tok && next_tok->s == "[")
@@ -474,6 +612,45 @@ std::pair<std::string, bool>
           + token_text.size();
 
         bool break_after_token = false;
+        bool expand_array_multiline = false;
+
+        if(opts.max_line_length > 0
+           && tok.s == "["
+           && is_array_literal_open(prev_prev, prev))
+        {
+            const auto inline_array_length = inline_array_length_from(i);
+            if(inline_array_length.has_value())
+            {
+                const auto [array_len, end_index] = *inline_array_length;
+                const std::size_t projected_array_len =
+                  current_line_length(out)
+                  + (insert_space ? 1 : 0)
+                  + array_len;
+
+                std::size_t projected_total_len = projected_array_len;
+                if(end_index + 1 < tokens.size())
+                {
+                    const auto& end_tok = tokens[end_index];
+                    const auto& next_after_array = tokens[end_index + 1];
+
+                    std::optional<token> array_prev;
+                    if(end_index > i)
+                    {
+                        array_prev = tokens[end_index - 1];
+                    }
+
+                    if(needs_space(array_prev, end_tok, next_after_array))
+                    {
+                        ++projected_total_len;
+                    }
+
+                    projected_total_len += render_token_text(next_after_array).size();
+                }
+
+                expand_array_multiline = projected_total_len > opts.max_line_length;
+            }
+        }
+
         if(opts.max_line_length > 0
            && !token_starts_line
            && projected_len > opts.max_line_length)
@@ -494,7 +671,8 @@ std::pair<std::string, bool>
             {
                 break_after_token = true;
             }
-            else if(!can_defer_break_to_operator)
+            else if(!can_defer_break_to_operator
+                    && !expand_array_multiline)
             {
                 append_newline();
                 append_indent();
@@ -530,6 +708,25 @@ std::pair<std::string, bool>
             ++indent_level;
             append_newline();
         }
+        else if(tok.s == "(")
+        {
+            ++paren_depth;
+        }
+        else if(tok.s == "[")
+        {
+            if(expand_array_multiline
+               && next_tok
+               && next_tok->s != "]")
+            {
+                bracket_stack.emplace_back(bracket_context::array_multiline);
+                ++extra_indent_level;
+                append_newline();
+            }
+            else
+            {
+                bracket_stack.emplace_back(bracket_context::other);
+            }
+        }
         else if(tok.s == ";")
         {
             append_newline();
@@ -545,6 +742,11 @@ std::pair<std::string, bool>
         }
         else if(tok.s == "}")
         {
+            if(!brace_stack.empty())
+            {
+                brace_stack.pop_back();
+            }
+
             if(next_tok
                && next_tok->s != ";"
                && next_tok->s != "else")
@@ -557,7 +759,36 @@ std::pair<std::string, bool>
                 ended_top_level_decl = true;
             }
         }
+        else if(tok.s == ")")
+        {
+            if(paren_depth > 0)
+            {
+                --paren_depth;
+            }
+        }
+        else if(tok.s == "]")
+        {
+            if(!bracket_stack.empty())
+            {
+                bracket_stack.pop_back();
+            }
+        }
         else if(break_after_token)
+        {
+            append_newline();
+        }
+        else if(tok.s == ","
+                && !brace_stack.empty()
+                && brace_stack.back() == brace_context::struct_members)
+        {
+            if(bracket_stack.empty() && paren_depth == 0)
+            {
+                append_newline();
+            }
+        }
+        else if(tok.s == ","
+                && !bracket_stack.empty()
+                && bracket_stack.back() == bracket_context::array_multiline)
         {
             append_newline();
         }
@@ -565,6 +796,14 @@ std::pair<std::string, bool>
         if(ended_top_level_decl && next_tok)
         {
             append_blank_line();
+        }
+
+        if(tok.s == "{")
+        {
+            brace_stack.emplace_back(
+              is_struct_member_block_open(prev_prev, prev)
+                ? brace_context::struct_members
+                : brace_context::other);
         }
 
         prev_prev = prev;
