@@ -8,63 +8,46 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <fstream>
 #include <format>
 #include <print>
 #include <set>
+#include <span>
 #include <string_view>
 
 #include "formatter/formatter.h"
-#include "filemanager.h"
 #include "commandline.h"
-
-namespace slang::commandline
-{
+#include "filemanager.h"
 
 namespace
 {
 
-static std::string read_file(
-  const fs::path& path)
+void write_file(
+  slang::file_manager& file_mgr,
+  const fs::path& path,
+  const std::string& content)
 {
-    std::ifstream in{
+    auto ar = file_mgr.open(
       path,
-      std::ios::in | std::ios::binary};
-    if(!in)
+      slang::file_manager::open_mode::write);
+
+    if(content.empty())
     {
-        throw std::runtime_error(
-          std::format(
-            "Unable to open '{}' for reading.",
-            path.string()));
+        return;
     }
 
-    std::string content;
-    in.seekg(0, std::ios::end);
-    content.resize(static_cast<std::size_t>(in.tellg()));
-    in.seekg(0, std::ios::beg);
-    in.read(content.data(), static_cast<std::streamsize>(content.size()));
-    return content;
+    std::string writable{content};
+    ar->serialize(std::as_writable_bytes(std::span(writable)));
 }
 
-static void write_file(const fs::path& path, const std::string& content)
-{
-    std::ofstream out{path, std::ios::out | std::ios::binary | std::ios::trunc};
-    if(!out)
-    {
-        throw std::runtime_error(std::format("Unable to open '{}' for writing.", path.string()));
-    }
-
-    out << content;
-}
-
-static bool is_supported_glob(const std::string& p)
+bool is_supported_glob(
+  const std::string& p)
 {
     return p.find("**/*") != std::string::npos
            || p.ends_with("/**")
            || p.ends_with("\\**");
 }
 
-static std::vector<fs::path> collect_recursive_with_extension(
+std::vector<fs::path> collect_recursive_with_extension(
   const fs::path& base_path,
   const std::string& wanted_extension)
 {
@@ -93,7 +76,9 @@ static std::vector<fs::path> collect_recursive_with_extension(
     return out;
 }
 
-static std::string with_file_context(const fs::path& file, const std::string& message)
+std::string with_file_context(
+  const fs::path& file,
+  const std::string& message)
 {
     // Parser/lexer diagnostics are usually "<line>:<col>: <message>".
     // Rewrite to "<path>:<line>:<col>: <message>" for clickable editor output.
@@ -104,27 +89,44 @@ static std::string with_file_context(const fs::path& file, const std::string& me
         if(second_colon != std::string::npos)
         {
             const auto line_part = message.substr(0, first_colon);
-            const auto col_part = message.substr(first_colon + 1, second_colon - first_colon - 1);
+            const auto col_part = message.substr(
+              first_colon + 1,
+              second_colon - first_colon - 1);
 
-            const bool line_is_num = !line_part.empty() && std::ranges::all_of(line_part, ::isdigit);
-            const bool col_is_num = !col_part.empty() && std::ranges::all_of(col_part, ::isdigit);
-            if(line_is_num && col_is_num)
+            const bool line_is_num = !line_part.empty()
+                                     && std::ranges::all_of(line_part, ::isdigit);
+            const bool col_is_num = !col_part.empty()
+                                    && std::ranges::all_of(col_part, ::isdigit);
+            if(line_is_num
+               && col_is_num)
             {
-                return std::format("{}:{}", file.string(), message);
+                return std::format(
+                  "{}:{}",
+                  file.string(),
+                  message);
             }
         }
     }
 
-    return std::format("{}: {}", file.string(), message);
+    return std::format(
+      "{}: {}",
+      file.string(),
+      message);
 }
 
-static std::vector<fs::path> expand_glob(const std::string& pattern)
+std::vector<fs::path> expand_glob(
+  const std::string& pattern)
 {
-    if(pattern.ends_with("/**") || pattern.ends_with("\\**"))
+    if(pattern.ends_with("/**")
+       || pattern.ends_with("\\**"))
     {
         const auto base = pattern.substr(0, pattern.size() - 3);
-        const fs::path base_path = base.empty() ? fs::path{"."} : fs::path{base};
-        return collect_recursive_with_extension(base_path, ".sl");
+        const fs::path base_path = base.empty()
+                                     ? fs::path{"."}
+                                     : fs::path{base};
+        return collect_recursive_with_extension(
+          base_path,
+          ".sl");
     }
 
     const auto wildcard_pos = pattern.find("**/*");
@@ -134,7 +136,8 @@ static std::vector<fs::path> expand_glob(const std::string& pattern)
     }
 
     const std::string base = pattern.substr(0, wildcard_pos);
-    const std::string suffix = pattern.substr(wildcard_pos + std::string("**/*").size());
+    const std::string suffix = pattern.substr(
+      wildcard_pos + std::string("**/*").size());
 
     std::string wanted_extension = ".sl";
     if(!suffix.empty())
@@ -152,18 +155,26 @@ static std::vector<fs::path> expand_glob(const std::string& pattern)
         }
     }
 
-    fs::path base_path = base.empty() ? fs::path{"."} : fs::path{base};
-    return collect_recursive_with_extension(base_path, wanted_extension);
+    fs::path base_path = base.empty()
+                           ? fs::path{"."}
+                           : fs::path{base};
+    return collect_recursive_with_extension(
+      base_path,
+      wanted_extension);
 }
 
 }    // namespace
+
+namespace slang::commandline
+{
 
 fmt::fmt()
 : command{"fmt"}
 {
 }
 
-void fmt::invoke(const std::vector<std::string>& args)
+void fmt::invoke(
+  const std::vector<std::string>& args)
 {
     cxxopts::Options options = make_cxxopts_options();
 
@@ -229,7 +240,7 @@ void fmt::invoke(const std::vector<std::string>& args)
 
     if(files.empty())
     {
-        throw std::runtime_error("No files matched the provided input patterns.");
+        throw std::runtime_error{"No files matched the provided input patterns."};
     }
 
     file_manager file_mgr;
@@ -270,7 +281,7 @@ void fmt::invoke(const std::vector<std::string>& args)
             continue;
         }
 
-        write_file(file, formatted);
+        write_file(file_mgr, file, formatted);
         std::println("Reformatted: {}", file.string());
     }
 
