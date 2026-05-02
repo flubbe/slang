@@ -726,10 +726,28 @@ set_tests_properties(formatter_cli_e2e
 #
 
 add_test(
-    NAME "check formatting"
-    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check .
+    NAME "check formatting (examples)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check examples
 )
-set_tests_properties("check formatting"
+set_tests_properties("check formatting (examples)"
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+add_test(
+    NAME "check formatting (src)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check src
+)
+set_tests_properties("check formatting (src)"
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+add_test(
+    NAME "check formatting (test)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check test
+)
+set_tests_properties("check formatting (test)"
     PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
