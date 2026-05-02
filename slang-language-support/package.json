@@ -1,0 +1,25 @@
+{
+  "name": "slang-language-support",
+  "displayName": "Slang Language Support",
+  "description": "Support for the scripting language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.118.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "slang-scripting",
+      "aliases": ["Slang", "slang-scripting"],
+      "extensions": [".sl"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "slang-scripting",
+      "scopeName": "source.slang",
+      "path": "./syntaxes/slang-scripting.tmLanguage.json"
+    }]
+  }
+}
