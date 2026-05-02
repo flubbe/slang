@@ -3,20 +3,17 @@ import std;
 /*
  * struct creation and member access.
  */
-
-struct S 
-{
-    i: i32,
-    j: f32
+struct S {
+    i: i32, j: f32
 };
 
-fn init_struct(i: i32, j: f32) -> S 
-{
-    return S{i: i, j: j};
+fn init_struct(i: i32, j: f32) -> S {
+    return S {
+        i: i, j: j
+    };
 }
 
-fn test_struct() -> void
-{
+fn test_struct() -> void {
     let s: S = init_struct(2, 3.141 as f32);
     std::assert(s.i + (s.j as i32) == 5, "s.i + (s.j as i32) == 5");
 }
@@ -24,22 +21,18 @@ fn test_struct() -> void
 /*
  * linked lists.
  */
-
-struct L
-{
-    data: str,
-    next: L
+struct L {
+    data: str, next: L
 };
 
-fn create_node(data: str) -> L
-{
-    return L{data: data, next: null};
+fn create_node(data: str) -> L {
+    return L {
+        data: data, next: null
+    };
 }
 
-fn append(node: L, data: str) -> L
-{
-    while(node.next != null)
-    {
+fn append(node: L, data: str) -> L {
+    while(node.next != null) {
         node = node.next;
     }
 
@@ -48,8 +41,7 @@ fn append(node: L, data: str) -> L
     return node.next;
 }
 
-fn test_linked_list() -> void
-{
+fn test_linked_list() -> void {
     let root: L = create_node("root");
 
     std::assert(std::string_equals(root.data, "root"), "root.data == \"root\"");
@@ -76,14 +68,12 @@ fn test_linked_list() -> void
 /*
  * std structs.
  */
-
 struct T {
     s: std::i32s
 };
 
-fn test_std_structs() -> void
-{
-    let s: std::i32s = std::i32s{
+fn test_std_structs() -> void {
+    let s: std::i32s = std::i32s {
         value: 123
     };
 
@@ -93,9 +83,7 @@ fn test_std_structs() -> void
 /*
  * test main.
  */
-
-fn main(args: str[]) -> i32
-{
+fn main(args: str[]) -> i32 {
     test_struct();
     test_linked_list();
 

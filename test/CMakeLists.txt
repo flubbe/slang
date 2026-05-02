@@ -712,11 +712,24 @@ set_tests_properties(
 add_test(
     NAME formatter_cli_e2e
     COMMAND ${CMAKE_COMMAND}
-        -DSLANG_BIN=${CMAKE_BINARY_DIR}/slang
-        -DTEST_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/..
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FmtCliE2E.cmake
+    -DSLANG_BIN=${CMAKE_BINARY_DIR}/slang
+    -DTEST_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/..
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FmtCliE2E.cmake
 )
 set_tests_properties(formatter_cli_e2e
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+#
+# Check all supplied .sl files for formatting errors.
+#
+
+add_test(
+    NAME "check formatting"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check .
+)
+set_tests_properties("check formatting"
     PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
