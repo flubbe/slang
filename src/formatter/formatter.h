@@ -43,11 +43,11 @@ struct options
 /** The source formatter. */
 class source_formatter
 {
-    /** Formatting options. */
-    options opts;
-
     /** File manager. */
     file_manager& file_mgr;
+
+    /** Formatting options. */
+    options opts;
 
 public:
     /**
