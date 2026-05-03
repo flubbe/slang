@@ -12,29 +12,26 @@
 
 /** Generic type. */
 #[allow_cast]
-struct type {};
+struct type {
+};
 
 /** 
  * Result type, holding a generic value and an indicator whether the result holds an error. 
  */
 #[native]
-struct result 
-{
-    ok: i32,
-    value: type
+struct result {
+    ok: i32, value: type
 };
 
 /** Wrapper around i32. */
 #[native]
-struct i32s
-{
+struct i32s {
     value: i32
 };
 
 /** Wrapper around f32. */
 #[native]
-struct f32s
-{
+struct f32s {
     value: f32
 };
 
@@ -47,7 +44,7 @@ struct f32s
  *
  * @param s The string to print.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn print(s: str) -> void;
 
 /**
@@ -55,7 +52,7 @@ fn print(s: str) -> void;
  *
  * @param s The string to print.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn println(s: str) -> void;
 
 /*
@@ -68,7 +65,7 @@ fn println(s: str) -> void;
  * @param from The array to copy from.
  * @param to The array to copy into.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn array_copy(from: type, to: type) -> void;
 
 /*
@@ -96,7 +93,7 @@ macro format! {
  * @param s2 The second string.
  * @return Returns the concatentation s1 + s2.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn string_concat(s1: str, s2: str) -> str;
 
 /**
@@ -105,7 +102,7 @@ fn string_concat(s1: str, s2: str) -> str;
  * @param s The string.
  * @return Returns the length of s.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn string_length(s: str) -> i32;
 
 /**
@@ -115,7 +112,7 @@ fn string_length(s: str) -> i32;
  * @param s2 The second string.
  * @return Returns 1 if the strings compare equal, and 0 otherwise.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn string_equals(s1: str, s2: str) -> i32;
 
 /**
@@ -124,7 +121,7 @@ fn string_equals(s1: str, s2: str) -> i32;
  * @param i An i32 integer.
  * @return Returns the string representation of i.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn i32_to_string(i: i32) -> str;
 
 /**
@@ -133,7 +130,7 @@ fn i32_to_string(i: i32) -> str;
  * @param i An i64 integer.
  * @return Returns the string representation of i.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn i64_to_string(i: i64) -> str;
 
 /**
@@ -142,7 +139,7 @@ fn i64_to_string(i: i64) -> str;
  * @param f An f32 float.
  * @return Returns the string representation of f.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn f32_to_string(f: f32) -> str;
 
 /**
@@ -151,7 +148,7 @@ fn f32_to_string(f: f32) -> str;
  * @param f An f64 float.
  * @return Returns the string representation of f.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn f64_to_string(f: f64) -> str;
 
 /**
@@ -160,7 +157,7 @@ fn f64_to_string(f: f64) -> str;
  * @param s The string to parse.
  * @return Returns a `result` containing a `i32s`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn parse_i32(s: str) -> result;
 
 /**
@@ -169,9 +166,9 @@ fn parse_i32(s: str) -> result;
  * @param s The string to parse.
  * @return Returns a `result` containing a `f32s`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn parse_f32(s: str) -> result;
-  
+
 /*
  * Debug.
  */
@@ -182,7 +179,7 @@ fn parse_f32(s: str) -> result;
  * @param condition The condition.
  * @param msg A message that is emitted when the condition is 0.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn assert(condition: i32, msg: str) -> void;
 
 /*
@@ -201,7 +198,7 @@ const SQRT2: f64 = 1.41421356237309504880;
  * @param x A floating point value.
  * @return Returns `abs(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn abs(x: f32) -> f32;
 
 /**
@@ -210,7 +207,7 @@ fn abs(x: f32) -> f32;
  * @param x A floating point value.
  * @return Returns `sqrt(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn sqrt(x: f32) -> f32;
 
 /**
@@ -219,7 +216,7 @@ fn sqrt(x: f32) -> f32;
  * @param x A floating point value.
  * @return Returns `ceil(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn ceil(x: f32) -> f32;
 
 /**
@@ -228,7 +225,7 @@ fn ceil(x: f32) -> f32;
  * @param x A floating point value.
  * @return Returns `ceil(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn floor(x: f32) -> f32;
 
 /**
@@ -237,7 +234,7 @@ fn floor(x: f32) -> f32;
  * @param x A floating point value.
  * @return Returns `trunc(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn trunc(x: f32) -> f32;
 
 /**
@@ -247,7 +244,7 @@ fn trunc(x: f32) -> f32;
  * @param x A floating point value.
  * @return Returns `round(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn round(x: f32) -> f32;
 
 /**
@@ -256,7 +253,7 @@ fn round(x: f32) -> f32;
  * @param x Argument to the sine.
  * @return Returns `sin(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn sin(x: f32) -> f32;
 
 /**
@@ -265,7 +262,7 @@ fn sin(x: f32) -> f32;
  * @param x Argument to the cosine.
  * @return Returns `cos(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn cos(x: f32) -> f32;
 
 /**
@@ -274,7 +271,7 @@ fn cos(x: f32) -> f32;
  * @param x Argument to the tangent.
  * @return Returns `tan(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn tan(x: f32) -> f32;
 
 /**
@@ -283,7 +280,7 @@ fn tan(x: f32) -> f32;
  * @param x Argument to the arc sine.
  * @return Returns `asin(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn asin(x: f32) -> f32;
 
 /**
@@ -292,7 +289,7 @@ fn asin(x: f32) -> f32;
  * @param x Argument to the arc cosine.
  * @return Returns `acos(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn acos(x: f32) -> f32;
 
 /**
@@ -301,7 +298,7 @@ fn acos(x: f32) -> f32;
  * @param x Argument to the arc tangent.
  * @return Returns `atan(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn atan(x: f32) -> f32;
 
 /**
@@ -311,7 +308,7 @@ fn atan(x: f32) -> f32;
  * @param y `f32` value.
  * @return Returns `atan(x)`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn atan2(x: f32, y: f32) -> f32;
 
 /**
@@ -320,7 +317,7 @@ fn atan2(x: f32, y: f32) -> f32;
  * @param x `f32` value.
  * @return Returns `1` if the sign bit of `x` is cleared, i.e., if `x` is positive. Otherwise, return `0`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn is_sign_positive(x: f32) -> i32;
 
 /**
@@ -329,5 +326,5 @@ fn is_sign_positive(x: f32) -> i32;
  * @param x `f32` value.
  * @return Returns `1` if the sign bit of `x` is set, i.e., if `x` is negative. Otherwise, return `0`.
  */
-#[native(lib="slang")]
+#[native(lib = "slang")]
 fn is_sign_negative(x: f32) -> i32;

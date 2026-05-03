@@ -12,6 +12,44 @@ include_directories(
     ../src
 )
 
+add_library(slang_test_frontend_core STATIC
+    ../src/archives/file.cpp
+    ../src/compiler/ast/ast.cpp
+    ../src/compiler/ast/builtins.cpp
+    ../src/compiler/ast/eval.cpp
+    ../src/compiler/ast/macros.cpp
+    ../src/compiler/ast/node_ids.cpp
+    ../src/compiler/ast/node_registry.cpp
+    ../src/compiler/ast/resolve.cpp
+    ../src/compiler/attribute.cpp
+    ../src/compiler/codegen/codegen.cpp
+    ../src/compiler/collect.cpp
+    ../src/compiler/constant.cpp
+    ../src/compiler/lexer.cpp
+    ../src/compiler/loader.cpp
+    ../src/compiler/location.cpp
+    ../src/compiler/lowering.cpp
+    ../src/compiler/macro.cpp
+    ../src/compiler/parser.cpp
+    ../src/compiler/resolve.cpp
+    ../src/compiler/sema.cpp
+    ../src/compiler/token.cpp
+    ../src/compiler/typing.cpp
+    ../src/shared/module.cpp
+    ../src/filemanager.cpp
+    ../src/module_resolver.cpp
+    ../src/utils.cpp
+)
+target_link_libraries(slang_test_frontend_core PUBLIC Microsoft.GSL::GSL)
+
+add_library(slang_test_emitter_core STATIC
+    ../src/compiler/cfg/simplify.cpp
+    ../src/compiler/cfg/verify.cpp
+    ../src/compiler/emitter.cpp
+    ../src/shared/opcodes.cpp
+)
+target_link_libraries(slang_test_emitter_core PUBLIC slang_test_frontend_core)
+
 add_executable(test_package
     test_package.cpp
     ../src/package.cpp
@@ -39,34 +77,8 @@ add_test(NAME lexer COMMAND test_lexer)
 
 add_executable(test_parser
     test_parser.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_parser GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_parser GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_parser PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -93,35 +105,9 @@ add_test(NAME codegen COMMAND test_codegen)
 
 add_executable(test_compile_ir
     test_compile_ir.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
     ../src/compiler/cfg/verify.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_compile_ir GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_compile_ir GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_compile_ir PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -130,34 +116,8 @@ add_test(NAME compile_ir COMMAND test_compile_ir)
 
 add_executable(test_consteval
     test_consteval.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_consteval GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_consteval GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_consteval PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -167,34 +127,8 @@ add_test(NAME consteval COMMAND test_consteval)
 
 add_executable(test_type_system
     test_type_system.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_type_system GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_type_system GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_type_system PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -207,34 +141,8 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_resolve
     test_resolve.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_resolve GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_resolve GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_resolve PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -248,38 +156,8 @@ set_tests_properties(type_system PROPERTIES
 
 add_executable(test_cfg_simplify
     test_cfg_simplify.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/cfg/simplify.cpp
-    ../src/compiler/cfg/verify.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/emitter.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/shared/opcodes.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_cfg_simplify GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_cfg_simplify GTest::gtest GTest::gtest_main slang_test_emitter_core)
 target_compile_options(test_cfg_simplify PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -291,36 +169,8 @@ set_tests_properties(cfg_simplify PROPERTIES
 
 add_executable(test_output
     test_output.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/emitter.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/shared/opcodes.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_output GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_output GTest::gtest GTest::gtest_main slang_test_emitter_core)
 target_compile_options(test_output PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -345,34 +195,8 @@ add_test(NAME serialization COMMAND test_serialization)
 
 add_executable(test_ast_serialization
     test_ast_serialization.cpp
-    ../src/compiler/ast/ast.cpp
-    ../src/compiler/ast/builtins.cpp
-    ../src/compiler/ast/eval.cpp
-    ../src/compiler/ast/macros.cpp
-    ../src/compiler/ast/node_ids.cpp
-    ../src/compiler/ast/node_registry.cpp
-    ../src/compiler/ast/resolve.cpp
-    ../src/compiler/codegen/codegen.cpp
-    ../src/archives/file.cpp
-    ../src/compiler/attribute.cpp
-    ../src/compiler/collect.cpp
-    ../src/compiler/constant.cpp
-    ../src/compiler/lexer.cpp
-    ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/lowering.cpp
-    ../src/compiler/macro.cpp
-    ../src/compiler/parser.cpp
-    ../src/compiler/resolve.cpp
-    ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
-    ../src/compiler/typing.cpp
-    ../src/shared/module.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
-    ../src/utils.cpp
 )
-target_link_libraries(test_ast_serialization GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_link_libraries(test_ast_serialization GTest::gtest GTest::gtest_main slang_test_frontend_core)
 target_compile_options(test_ast_serialization PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
@@ -395,6 +219,18 @@ target_compile_options(test_filemanager PRIVATE
 )
 add_test(NAME filemanager COMMAND test_filemanager)
 set_tests_properties(filemanager PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+add_executable(test_formatter
+    test_formatter.cpp
+    ../src/formatter/formatter.cpp
+)
+target_link_libraries(test_formatter GTest::gtest GTest::gtest_main slang_test_frontend_core)
+target_compile_options(test_formatter PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME formatter COMMAND test_formatter)
+set_tests_properties(formatter PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 add_executable(test_interpreter
     test_interpreter.cpp
@@ -867,4 +703,51 @@ set_tests_properties(
     "native_integration"
     PROPERTIES FIXTURES_REQUIRED
     native_integration
+)
+
+#
+# Formatter CLI end-to-end test.
+#
+
+add_test(
+    NAME formatter_cli_e2e
+    COMMAND ${CMAKE_COMMAND}
+    -DSLANG_BIN=${CMAKE_BINARY_DIR}/slang
+    -DTEST_ROOT=${CMAKE_CURRENT_SOURCE_DIR}/..
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FmtCliE2E.cmake
+)
+set_tests_properties(formatter_cli_e2e
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+#
+# Check all supplied .sl files for formatting errors.
+#
+
+add_test(
+    NAME "check formatting (examples)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check examples
+)
+set_tests_properties("check formatting (examples)"
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+add_test(
+    NAME "check formatting (src)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check src
+)
+set_tests_properties("check formatting (src)"
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+add_test(
+    NAME "check formatting (test)"
+    COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check test
+)
+set_tests_properties("check formatting (test)"
+    PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
 )

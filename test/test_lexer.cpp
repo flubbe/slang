@@ -139,6 +139,45 @@ TEST(lexer, multi_line_comment)
     EXPECT_EQ(tokens[2].type, slang::token_type::identifier);
 }
 
+TEST(lexer, attaches_leading_and_trailing_comments)
+{
+    const std::string test_string =
+      "/* leading block */ // leading line\n"
+      "a // trailing line\n"
+      "/* leading block 2 */ b /* trailing block */";
+
+    slang::lexer lexer{test_string};
+    std::vector<slang::token> tokens;
+
+    std::optional<slang::token> t;
+    while((t = lexer.next()).has_value())
+    {
+        tokens.push_back(*t);
+    }
+
+    ASSERT_EQ(tokens.size(), 2);
+
+    EXPECT_EQ(tokens[0].s, "a");
+    ASSERT_EQ(tokens[0].leading_comments.size(), 2);
+    EXPECT_EQ(tokens[0].leading_comments[0].text, "/* leading block */");
+    EXPECT_TRUE(tokens[0].leading_comments[0].is_block);
+    EXPECT_EQ(tokens[0].leading_comments[1].text, "// leading line");
+    EXPECT_FALSE(tokens[0].leading_comments[1].is_block);
+
+    ASSERT_EQ(tokens[0].trailing_comments.size(), 1);
+    EXPECT_EQ(tokens[0].trailing_comments[0].text, "// trailing line");
+    EXPECT_FALSE(tokens[0].trailing_comments[0].is_block);
+
+    EXPECT_EQ(tokens[1].s, "b");
+    ASSERT_EQ(tokens[1].leading_comments.size(), 1);
+    EXPECT_EQ(tokens[1].leading_comments[0].text, "/* leading block 2 */");
+    EXPECT_TRUE(tokens[1].leading_comments[0].is_block);
+
+    ASSERT_EQ(tokens[1].trailing_comments.size(), 1);
+    EXPECT_EQ(tokens[1].trailing_comments[0].text, "/* trailing block */");
+    EXPECT_TRUE(tokens[1].trailing_comments[0].is_block);
+}
+
 TEST(lexer, operators)
 {
     constexpr auto TOKEN_COUNT = 20;    // token count in the following string.

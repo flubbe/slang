@@ -1,4 +1,5 @@
 import std;
+
 import test_macros;
 
 fn local_function() -> void {
