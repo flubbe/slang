@@ -98,4 +98,4 @@ See [the documentation](docs/language.md) for more details.
 
 ### VS Code integration
 
-A preliminary VS Code extension can be found in [`slang-language-support`](slang-language-support).
+A preliminary VS Code extension can be found in [`vscode/slang-language-support`](vscode/slang-language-support).
