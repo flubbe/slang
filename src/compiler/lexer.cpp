@@ -24,22 +24,48 @@ namespace slang
  */
 
 /**
- * Check if an std::optional<char> is a whitespace character. whitespace
- * characters are: space, tab, line feed / new line, carriage return,
- * form feed / new page, and vertical tab.
+ * Horizontal whitespace (without line breaks): space, tab, form feed / new page
  *
- * @param c The std::optional<char> to check.
- * @return true for whitespaces and false otherwise (including std::nullopt's).
+ * @param c The `std::optional<char>` to check.
+ * @return `true` for horizontal whitespaces and false otherwise (including `std::nullopt`'s).
  */
-static bool is_whitespace(const std::optional<char>& c)
+static bool is_horizontal_whitespace(
+  const std::optional<char>& c)
 {
     return c && (*c == ' '        // space
                  || *c == '\t'    // tab
-                 || *c == '\n'    // line feed / new line
-                 || *c == '\r'    // carriage return
                  || *c == '\f'    // form feed / new page
-                 || *c == '\v'    // vertial tab
            );
+}
+
+/**
+ * Vertical whitespace: carriage return, vertical tab, line feed / new line
+ *
+ * @param c The `std::optional<char>` to check.
+ * @return `true` for vertical whitespaces and false otherwise (including `std::nullopt`'s).
+ */
+static bool is_vertical_whitespace(
+  const std::optional<char>& c)
+{
+    return c && (*c == '\n'       // line feed / new line
+                 || *c == '\r'    // carriage return
+                 || *c == '\v'    // vertical tab
+           );
+}
+
+/**
+ * Check if an `std::optional<char>` is a whitespace character. whitespace
+ * characters are: space, tab, line feed / new line, carriage return,
+ * form feed / new page, and vertical tab.
+ *
+ * @param c The `std::optional<char>` to check.
+ * @return `true` for whitespaces and false otherwise (including `std::nullopt`'s).
+ */
+static bool is_whitespace(
+  const std::optional<char>& c)
+{
+    return is_horizontal_whitespace(c)
+           || is_vertical_whitespace(c);
 }
 
 /**
@@ -50,7 +76,9 @@ static bool is_whitespace(const std::optional<char>& c)
  * @param first_char Whether we are checking the first character.
  * @return Whether the character starts an identifier. Returns false if c was std::nullopt.
  */
-static bool is_identifier(const std::optional<char>& c, bool first_char)
+static bool is_identifier(
+  const std::optional<char>& c,
+  bool first_char)
 {
     if(!c)
     {
@@ -70,7 +98,8 @@ static bool is_identifier(const std::optional<char>& c, bool first_char)
  * @param c The std::optional<char> to check.
  * @return Whether the character is a hex digit. Returns false if c was std::nullopt
  */
-static bool is_hexdigit(const std::optional<char>& c)
+static bool is_hexdigit(
+  const std::optional<char>& c)
 {
     if(!c)
     {
@@ -122,9 +151,10 @@ static const std::array<char, operator_chars_count> operator_chars = {
  * @param c The `std::optional<char>` to check.
  * @return Whether the character starts an operator. Returns `false` if `c` was `std::nullopt`.
  */
-static bool is_operator(const std::optional<char>& c)
+static bool is_operator(
+  const std::optional<char>& c)
 {
-    return c && std::ranges::find(std::as_const(operator_chars), *c) != operator_chars.cend();
+    return c && std::ranges::contains(std::as_const(operator_chars), *c);
 }
 
 /**
@@ -224,7 +254,10 @@ static void validate_suffix(
     const auto& s = suffix.value();
     if(s.ty == suffix_type::integer)
     {
-        if(s.width != 8 && s.width != 16 && s.width != 32 && s.width != 64)
+        if(s.width != 8
+           && s.width != 16
+           && s.width != 32
+           && s.width != 64)
         {
             throw lexical_error(
               std::format(
@@ -235,7 +268,8 @@ static void validate_suffix(
     }
     else if(s.ty == suffix_type::floating_point)
     {
-        if(s.width != 32 && s.width != 64)
+        if(s.width != 32
+           && s.width != 64)
         {
             throw lexical_error(
               std::format(
@@ -253,29 +287,120 @@ std::optional<token> lexer::next()
     token_type type = token_type::unknown;
     std::optional<numeric_suffix> suffix;
     source_location loc;
+    std::vector<comment_trivia> leading_comments;
+    std::vector<comment_trivia> trailing_comments;
+    bool has_blank_line_before_token = false;
 
-    while(!eof())    // this loop is only here for catching comments
+    auto parse_line_comment = [this]() -> comment_trivia
     {
-        type = token_type::unknown;    // reset type on each iteration.
-        current_token.clear();         // clear token on each iteration.
-        eval_token.clear();            // clear evaluation token on each iteration.
-        suffix = std::nullopt;         // clear numeric suffix on each iteration.
+        comment_trivia trivia;
+        trivia.is_block = false;
 
+        trivia.text += *get();    // '/'
+        trivia.text += *get();    // '/'
+
+        while(auto c = peek())
+        {
+            if(*c == '\n')
+            {
+                break;
+            }
+            trivia.text += *get();    // consume comment body
+        }
+
+        return trivia;
+    };
+
+    auto parse_block_comment = [this]() -> comment_trivia
+    {
+        comment_trivia trivia;
+        trivia.is_block = true;
+
+        trivia.text += *get();    // '/'
+        trivia.text += *get();    // '*'
+
+        while(auto c = get())
+        {
+            trivia.text += *c;
+            if(*c == '*' && peek().has_value() && *peek() == '/')
+            {
+                trivia.text += *get();    // '/'
+                return trivia;
+            }
+        }
+
+        throw lexical_error{
+          std::format(
+            "{}: Missing terminating '*/' for block comment.",
+            to_string(get_location()))};
+    };
+
+    // collect whitespace/comments preceding the next token.
+    while(!eof())
+    {
+        std::size_t newline_count = 0;
         while(is_whitespace(peek()))
         {
-            get();
+            if(is_vertical_whitespace(get()))
+            {
+                ++newline_count;
+            }
         }
 
-        loc = get_location();
-
-        std::optional<char> c = get();
-        if(!c.has_value())
+        if(newline_count > 1)
         {
-            return std::nullopt;
+            has_blank_line_before_token = true;
         }
 
-        current_token = {*c};
+        if(peek().has_value() && *peek() == '/')
+        {
+            auto p2 = position;
+            ++p2;
+            if(p2 != input.end()
+               && *p2 == '/')
+            {
+                auto trivia = parse_line_comment();
+                trivia.has_blank_line_before = newline_count > 1;
+                leading_comments.emplace_back(
+                  std::move(trivia));
+                continue;
+            }
+            if(p2 != input.end()
+               && *p2 == '*')
+            {
+                auto trivia = parse_block_comment();
+                trivia.has_blank_line_before = newline_count > 1;
+                leading_comments.emplace_back(
+                  std::move(trivia));
+                continue;
+            }
+        }
 
+        break;
+    }
+
+    if(eof())
+    {
+        return std::nullopt;
+    }
+
+    // get the next token.
+    type = token_type::unknown;    // reset type on each iteration.
+    current_token.clear();         // clear token on each iteration.
+    eval_token.clear();            // clear evaluation token on each iteration.
+    suffix = std::nullopt;         // clear numeric suffix on each iteration.
+
+    loc = get_location();
+
+    std::optional<char> c = get();
+    if(!c.has_value())
+    {
+        return std::nullopt;
+    }
+
+    current_token = {*c};
+    while(true)
+    {
         bool macro_identifier = false;
         if(*c == '$')    // macro identifiers.
         {
@@ -294,7 +419,8 @@ std::optional<token> lexer::next()
             macro_identifier = true;
         }
 
-        if(is_identifier(c, true) || macro_identifier)
+        if(is_identifier(c, true)
+           || macro_identifier)
         {
             while(is_identifier(peek(), false))
             {
@@ -319,49 +445,13 @@ std::optional<token> lexer::next()
             break;
         }
 
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        if(*c == '/' && peek().has_value() && *peek() == '/')    // single-line comment
-        {
-            // skip single-line comment and retry.
-            while((c = get()))
-            {
-                if(*c == '\n')
-                {
-                    break;
-                }
-            }
-
-            // clear token here, since the outer loop condition might not be satisfied anymore.
-            current_token.clear();
-            continue;
-        }
-
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        if(*c == '/' && peek().has_value() && *peek() == '*')    // multi-line comment
-        {
-            // skip multi-line comment and retry.
-            get();
-            while((c = get()))
-            {
-                if(*c == '*' && peek().has_value() && peek() == '/')
-                {
-                    get();
-                    break;
-                }
-            }
-
-            // clear token here, since the outer loop condition might not be satisfied anymore.
-            current_token.clear();
-            continue;
-        }
-
         if(is_operator(c))
         {
             // match the longest operator.
             while((c = peek()))
             {
                 std::string temp_token = current_token + *c;
-                if(std::ranges::find(std::as_const(operators), temp_token) == operators.cend())
+                if(!std::ranges::contains(std::as_const(operators), temp_token))
                 {
                     break;
                 }
@@ -535,7 +625,10 @@ std::optional<token> lexer::next()
                     }
                     if(*c == '\n')
                     {
-                        throw lexical_error(std::format("{}: Missing terminating character '\"'.", to_string(loc)));
+                        throw lexical_error(
+                          std::format(
+                            "{}: Missing terminating character '\"'.",
+                            to_string(loc)));
                     }
                 }
                 else
@@ -577,7 +670,11 @@ std::optional<token> lexer::next()
                     }
                     else
                     {
-                        throw lexical_error(std::format("{}: Unknown escape sequence '\\{}'.", to_string(loc), *c));
+                        throw lexical_error(
+                          std::format(
+                            "{}: Unknown escape sequence '\\{}'.",
+                            to_string(loc),
+                            *c));
                     }
                 }
             }
@@ -631,12 +728,57 @@ std::optional<token> lexer::next()
 
     validate_suffix(loc, suffix);
 
+    // collect trailing comments after the token, if present on the same line.
+    while(true)
+    {
+        while(is_horizontal_whitespace(peek()))
+        {
+            get();
+        }
+
+        if(!peek().has_value() || is_vertical_whitespace(*peek()))
+        {
+            break;
+        }
+
+        if(*peek() != '/')
+        {
+            break;
+        }
+
+        auto p2 = position;
+        ++p2;
+        if(p2 == input.end())
+        {
+            break;
+        }
+
+        if(*p2 == '/')
+        {
+            trailing_comments.emplace_back(
+              parse_line_comment());
+            continue;
+        }
+
+        if(*p2 == '*')
+        {
+            trailing_comments.emplace_back(
+              parse_block_comment());
+            continue;
+        }
+
+        break;
+    }
+
     return slang::token{
       current_token,
       loc,
       type,
       suffix,
-      eval(loc, eval_token, type)};
+      eval(loc, eval_token, type),
+      has_blank_line_before_token,
+      std::move(leading_comments),
+      std::move(trailing_comments)};
 }
 
 }    // namespace slang

@@ -189,6 +189,16 @@ public:
     std::string get_description() const override;
 };
 
+/** Source formatter. */
+class fmt : public command
+{
+public:
+    /** Constructor. */
+    fmt();
+    void invoke(const std::vector<std::string>& args) override;
+    std::string get_description() const override;
+};
+
 /**
  * Set up the default runtime environment for a context.
  *

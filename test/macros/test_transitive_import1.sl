@@ -1,8 +1,8 @@
 import std;
+
 import test_import;
 
-fn test_fn() -> void
-{
+fn test_fn() -> void {
     test_import::test_format_print!();
 }
 

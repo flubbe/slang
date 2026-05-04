@@ -1,4 +1,3 @@
-fn main(i: i32) -> i32
-{
+fn main(i: i32) -> i32 {
     return 0;
 }

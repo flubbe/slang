@@ -2,8 +2,7 @@ import std;
 
 const ABS: f32 = 1e-6 as f32;
 
-fn approx_eq(value: f32, expected: f32, message: str) -> void
-{
+fn approx_eq(value: f32, expected: f32, message: str) -> void {
     std::assert(std::abs(value - expected) < ABS, message);
 }
 
@@ -21,19 +20,16 @@ fn test_i8() -> void {
     std::assert(z == (-120) as i8, "z == -120");
 
     let a: i8 = (100i8 + 100i8 + 100i8);
-    std::println(
-        std::format!("a = {}", a));
+    std::println(std::format!("a = {}", a));
     std::assert(a == 44i8, "a == 44");
 
     let b: i8 = p!() + p!();
-    std::println(
-        std::format!("b = {}", b));
+    std::println(std::format!("b = {}", b));
     std::assert(b == -2i8, "b == -2");
 
     b -= 100i8;
     b -= 90i8;
-    std::println(
-        std::format!("b = {}", b));
+    std::println(std::format!("b = {}", b));
     std::assert(b == 64i8, "b == 64");
 }
 
@@ -145,19 +141,16 @@ struct S {
 };
 
 fn test_struct() -> void {
-    let s: S = S{
+    let s: S = S {
         c: 1i8,
         s: 2i16,
         i: 3i32,
         l: 4i64,
         f: 5.1f32,
-        d: 6.2f64 
+        d: 6.2f64
     };
 
-    std::print(
-        std::format!(
-            "{} {} {} {} {} {}\n", 
-            s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));
+    std::print(std::format!("{} {} {} {} {} {}\n", s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));
 
     std::assert(s.c == 1i8, "s.c == 1i8");
     std::assert(s.s == 2i16, "s.s == 2i16");
@@ -189,13 +182,7 @@ fn test_unary_operators() -> void {
     i1 = ~i0;
 
     let s1: str = std::format!("{} {} {} {}", i0, +i0, -i0, ~i0);
-    std::assert(
-        std::string_equals(
-            s1,
-            "1 1 -1 -2"
-        ),
-        "s1 == 1 1 -1 -2"
-    );
+    std::assert(std::string_equals(s1, "1 1 -1 -2"), "s1 == 1 1 -1 -2");
 
     let i2: i16 = -1i16;
     let i3: i16 = +i2;
@@ -203,13 +190,7 @@ fn test_unary_operators() -> void {
     i3 = ~i2;
 
     let s2: str = std::format!("{} {} {} {}", i2, +i2, -i2, ~i2);
-    std::assert(
-        std::string_equals(
-            s2,
-            "-1 -1 1 0"
-        ),
-        "s1 == -1 -1 1 0"
-    );
+    std::assert(std::string_equals(s2, "-1 -1 1 0"), "s1 == -1 -1 1 0");
 }
 
 fn main(args: str[]) -> i32 {
