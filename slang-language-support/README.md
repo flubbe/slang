@@ -19,7 +19,7 @@ To build and install the extension, use
 
 ````
 npm install -g vsce
-vcse package
+vsce package
 ```
 and install the resulting `slang-language-support-X.Y.Z.vsix` file in VS code.
 
