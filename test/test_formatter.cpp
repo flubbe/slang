@@ -649,4 +649,220 @@ TEST(formatter, golden_examples_exact_output_and_idempotence)
     }
 }
 
+TEST(formatter, attribute_directive_is_tight)
+{
+    const std::string input =
+      "#[test]\n"
+      "fn main() -> void {\n"
+      "    return 1;\n"
+      "}\n";
+
+    const std::string expected =
+      "#[test]\n"
+      "fn main() -> void {\n"
+      "    return 1;\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, once_changed] = formatter.format_text(input);
+    const auto [twice, twice_changed] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+    EXPECT_FALSE(twice_changed);
+}
+
+TEST(formatter, return_paren_has_space)
+{
+    const std::string input =
+      "fn main()->void{return(1);}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    return (1);\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, once_changed] = formatter.format_text(input);
+    const auto [twice, twice_changed] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, call_paren_is_tight)
+{
+    const std::string input =
+      "fn main()->void{foo(1,2);}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    foo(1, 2);\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, indexing_is_tight)
+{
+    const std::string input =
+      "fn main()->void{x=arr[i];}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    x = arr[i];\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, array_literal_spacing)
+{
+    const std::string input =
+      "fn main()->void{x=[1,2,3];}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    x = [1, 2, 3];\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, array_type_is_tight)
+{
+    const std::string input =
+      "fn f(x:i32[])->i32{return x;}\n";
+
+    const std::string expected =
+      "fn f(x: i32[]) -> i32 {\n"
+      "    return x;\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, scope_operator_is_tight)
+{
+    const std::string input =
+      "fn main()->void{x=foo::bar;}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    x = foo::bar;\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, postfix_and_prefix_ops)
+{
+    const std::string input =
+      "fn main()->void{i++;--j;++k;}\n";
+
+    const std::string expected =
+      "fn main() -> void {\n"
+      "    i++;\n"
+      "    --j;\n"
+      "    ++k;\n"
+      "}\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, expected);
+    EXPECT_EQ(twice, expected);
+}
+
+TEST(formatter, wraps_long_binary_expression)
+{
+    const std::string input =
+      "fn main()->void{x=alpha+beta+gamma+delta+epsilon+zeta;}\n";
+
+    slang::formatter::options opts;
+    opts.max_line_length = 40;
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr, opts};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, twice);
+}
+
+TEST(formatter, expands_long_array_literal)
+{
+    const std::string input =
+      "fn main()->void{x=[alpha,beta,gamma,delta,epsilon,zeta];}\n";
+
+    slang::formatter::options opts;
+    opts.max_line_length = 40;
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr, opts};
+
+    const auto [once, _] = formatter.format_text(input);
+    const auto [twice, __] = formatter.format_text(once);
+
+    EXPECT_EQ(once, twice);
+}
+
+TEST(formatter, shorter_output_does_not_leave_garbage)
+{
+    const std::string input =
+      "fn main()->void{    return 1;      }\n";
+
+    file_manager file_mgr;
+    slang::formatter::source_formatter formatter{file_mgr};
+
+    const auto [formatted, _] = formatter.format_text(input);
+
+    // Ensure no trailing spaces or junk
+    EXPECT_EQ(formatted.back(), '\n');
+    EXPECT_EQ(formatted.find("      "), std::string::npos);
+}
+
 }    // namespace
