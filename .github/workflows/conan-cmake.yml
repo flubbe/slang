@@ -70,7 +70,7 @@ jobs:
         run: cmake --preset ${{matrix.conan_preset}}
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --preset ${{matrix.conan_preset}}
+        run: cmake --build --preset ${{matrix.conan_preset}}
 
       - name: Run tests
         run: |
