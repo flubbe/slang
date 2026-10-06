@@ -49,8 +49,13 @@ jobs:
           clang++ --version
           uname -m # Confirms arm64 execution
 
-      - name: Install Conan
+      - name: Install Conan (macOS)
+        if: runner.os == 'macOS'
+        run: brew install conan
+
+      - name: Install Conan (Linux)
         id: conan
+        if: runner.os == 'Linux'
         uses: turtlebrowser/get-conan@main
 
       - name: Conan version
