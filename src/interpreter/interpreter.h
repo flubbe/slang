@@ -49,10 +49,18 @@ class context
     friend class module_loader;
 
     /** Module loaders, indexed by module. */
-    std::unordered_map<std::string, std::unique_ptr<module_loader>> loaders;
+    std::unordered_map<
+      std::string,
+      std::unique_ptr<module_loader>>
+      loaders;
 
     /** Native functions, indexed by module and name. */
-    std::unordered_map<std::string, std::unordered_map<std::string, std::function<void(operand_stack&)>>> native_function_map;
+    std::unordered_map<
+      std::string,
+      std::unordered_map<
+        std::string,
+        std::function<void(operand_stack&)>>>
+      native_function_map;
 
     /** File manager reference. */
     file_manager& file_mgr;
@@ -152,7 +160,9 @@ public:
      * @param file_mgr The file manager to use for module resolution.
      * @param max_call_stack_depth The maximum allowed function call stack depth.
      */
-    context(file_manager& file_mgr, unsigned int max_call_stack_depth = 400)
+    context(
+      file_manager& file_mgr,
+      unsigned int max_call_stack_depth = 400)
     : file_mgr{file_mgr}
     , max_call_stack_depth{max_call_stack_depth}
     {
@@ -170,7 +180,10 @@ public:
      * @throws Throws a `interpreter_error` if the function given by `mod_name` and `fn_name` is already registered,
      *         or if the function `func` is `nullptr`.
      */
-    void register_native_function(const std::string& mod_name, std::string fn_name, std::function<void(operand_stack&)> func);
+    void register_native_function(
+      const std::string& mod_name,
+      std::string fn_name,
+      std::function<void(operand_stack&)> func);
 
     /**
      * Register a type layout. If a layout of the same name already exists, a `gc_error` is thrown.
@@ -180,9 +193,13 @@ public:
      * @returns Returns a layout identifier.
      * @throws Throws a `gc_error´ if the layout already exists.
      */
-    std::size_t register_type_layout(std::string name, std::vector<std::size_t> layout)
+    std::size_t register_type_layout(
+      std::string name,
+      std::vector<std::size_t> layout)
     {
-        return gc.register_type_layout(std::move(name), std::move(layout));
+        return gc.register_type_layout(
+          std::move(name),
+          std::move(layout));
     }
 
     /**
@@ -192,7 +209,8 @@ public:
      * @returns Returns the layout identifier.
      * @throws Throws a ´gc_error` if the name was not found.
      */
-    std::size_t get_type_layout_id(const std::string& name) const
+    std::size_t get_type_layout_id(
+      const std::string& name) const
     {
         return gc.get_type_layout_id(name);
     }
@@ -216,7 +234,8 @@ public:
      * @returns Returns the import name.
      * @throws Throws an `interpreter_error` if the loader does not exist.
      */
-    std::string get_import_name(const module_loader& loader) const;
+    std::string get_import_name(
+      const module_loader& loader) const;
 
     /**
      * Invoke a function from a module by name.
@@ -226,7 +245,10 @@ public:
      * @param args The function's arguments.
      * @returns The function's return value.
      */
-    value invoke(const std::string& module_name, const std::string& function_name, const std::vector<value>& args);
+    value invoke(
+      const std::string& module_name,
+      const std::string& function_name,
+      const std::vector<value>& args);
 
     /**
      * Invoke a function from a module.
@@ -236,7 +258,10 @@ public:
      * @param args The function's arguments.
      * @returns The function's return value.
      */
-    value invoke(const module_loader& loader, const function& fn, const std::vector<value>& args);
+    value invoke(
+      const module_loader& loader,
+      const function& fn,
+      const std::vector<value>& args);
 
     /** Reset the interpreter. Needs to be called when an exception was thrown and caught. */
     void reset()

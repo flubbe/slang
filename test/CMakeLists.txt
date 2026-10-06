@@ -272,6 +272,19 @@ target_compile_options(test_vector PRIVATE
 )
 add_test(NAME vector COMMAND test_vector)
 
+add_executable(test_jit_aarch64
+    ../src/jit/aarch64/compiler.cpp
+    ../src/jit/aarch64/emitter.cpp
+    ../src/shared/opcodes.cpp
+    test_jit_aarch64.cpp
+)
+target_link_libraries(test_jit_aarch64 GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+target_compile_options(test_vector PRIVATE
+    ${COMPILE_OPTIONS_MSVC}
+    ${COMPILE_OPTIONS_NOT_MSVC}
+)
+add_test(NAME jit_aarch64 COMMAND test_jit_aarch64)
+
 #
 # Command line tests.
 #

@@ -2,54 +2,74 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   CONAN_PRESET_NAME: conan-release
-    
+
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Linux (AArch64/x86_64 GCC 14)"
+            os: ubuntu-latest
+            compiler_family: gcc
+            conan_preset: conan-release
+            cppstd: gnu23
 
-    runs-on: ubuntu-latest
+          - name: "macOS (Apple Silicon AArch64 Clang)"
+            os: macos-latest
+            compiler_family: clang
+            conan_preset: conan-release
+            cppstd: 23
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use GCC 14
-      run: |
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 --slave /usr/bin/g++ g++ /usr/bin/g++-14
-        sudo update-alternatives --set gcc /usr/bin/gcc-14
+      - name: Setup GCC 14 (Linux)
+        if: matrix.compiler_family == 'gcc'
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          sudo update-alternatives --set gcc /usr/bin/gcc-14
+          gcc --version
+          g++ --version
 
-    - name: GCC version
-      run: |
-        gcc --version
-        g++ --version
-    
-    - name: Install Conan
-      id: conan
-      uses: turtlebrowser/get-conan@main
+      - name: Verify Apple Clang & Architecture (macOS)
+        if: matrix.compiler_family == 'clang'
+        run: |
+          clang++ --version
+          uname -m # Confirms arm64 execution
 
-    - name: Conan version
-      run: echo "${{ steps.conan.outputs.version }}"
-            
-    - name: Create default profile
-      run: conan profile detect
-            
-    - name: Install dependencies
-      run: conan install . --build=missing -s compiler.cppstd=gnu23
+      - name: Install Conan
+        id: conan
+        uses: turtlebrowser/get-conan@main
 
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake --preset ${{env.CONAN_PRESET_NAME}}
+      - name: Conan version
+        run: echo "${{ steps.conan.outputs.version }}"
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --preset ${{env.CONAN_PRESET_NAME}}
+      - name: Create default profile
+        run: conan profile detect
 
-    - name: Run tests
-      run: |
-        ctest --test-dir ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test --output-on-failure      
+      - name: Install dependencies
+        run: conan install . --build=missing -s compiler.cppstd=gnu23
+
+      - name: Configure CMake
+        # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+        # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+        run: cmake --preset ${{env.CONAN_PRESET_NAME}}
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --preset ${{env.CONAN_PRESET_NAME}}
+
+      - name: Run tests
+        run: |
+          ctest --test-dir ${{github.workspace}}/build/${{env.BUILD_TYPE}}/test --output-on-failure

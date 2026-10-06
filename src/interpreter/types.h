@@ -24,6 +24,16 @@
 #include "value.h"
 #include "vector.h"
 
+// FIXME Replace platform selection code.
+#ifdef SLANG_HAS_AARCH64_JIT
+
+namespace slang::jit
+{
+class jit_compiler_aarch64;
+}    // namespace slang::jit
+
+#endif /* SLANG_HAS_AARCH64_JIT */
+
 namespace slang::interpreter
 {
 
@@ -106,6 +116,11 @@ public:
 /** Operand stack. */
 class operand_stack
 {
+    // FIXME Replace platform selection code.
+#ifdef SLANG_HAS_AARCH64_JIT
+    friend class slang::jit::jit_compiler_aarch64;
+#endif
+
 protected:
     /** The stack. */
     std::vector<std::byte> stack;
@@ -676,9 +691,10 @@ struct stack_frame
      * @param locals_size Size to allocate for the locals.
      * @param stack_size The operand stack size.
      */
-    stack_frame(const std::vector<module_::constant_table_entry>& constants,
-                std::size_t locals_size,
-                std::size_t stack_size)
+    stack_frame(
+      const std::vector<module_::constant_table_entry>& constants,
+      std::size_t locals_size,
+      std::size_t stack_size)
     : constants{constants}
     , locals{locals_size}
     , stack{stack_size}
