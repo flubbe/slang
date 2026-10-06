@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Linux (AArch64/x86_64 GCC 14)"
+          - name: "Linux (x86_64 GCC 14)"
             os: ubuntu-latest
             compiler_family: gcc
             conan_preset: conan-release
