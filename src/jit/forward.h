@@ -16,7 +16,7 @@
  * Check JIT availability.
  */
 
-#ifdef SLANG_ARCH_AARCH64
+#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_POSIX)
 #    define SLANG_JIT_AVAILABLE 1
 #else
 #    define SLANG_JIT_AVAILABLE 0
@@ -33,13 +33,22 @@ namespace slang::jit
 
 namespace aarch64
 {
-class executable_memory;
 class jit_compiler;
-};    // namespace aarch64
+}    // namespace aarch64
 
-using executable_memory = aarch64::executable_memory;
 using jit_compiler = aarch64::jit_compiler;
 
-#endif
+#endif /* SLANG_ARCH_AARCH64 */
+
+#ifdef SLANG_OS_POSIX
+
+namespace posix
+{
+class executable_memory;
+}    // namespace posix
+
+using executable_memory = posix::executable_memory;
+
+#endif /* SLANG_OS_POSIX */
 
 }    // namespace slang::jit

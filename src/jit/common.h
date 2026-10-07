@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <utility>
 
 #include "interpreter/interpreter.h"
@@ -19,8 +20,8 @@
  * Platform specific code.
  */
 
-#if defined(SLANG_ARCH_AARCH64)
-#    include "aarch64/memory.h"
+#ifdef SLANG_OS_POSIX
+#    include "memory_posix.h"
 #else
 #    error "JIT executable_memory is not supported on this target architecture."
 #endif
