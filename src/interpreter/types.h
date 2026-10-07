@@ -107,7 +107,7 @@ public:
 /** Operand stack. */
 class operand_stack
 {
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
     friend slang::jit::jit_compiler;
 #endif
 
