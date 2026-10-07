@@ -75,13 +75,13 @@ TEST(jit, compile_execute_sample_function)
 
     // Compile
     std::optional<sj::jit_function> compiled_fn;
-    ASSERT_NO_THROW(compiled_fn = sj::jit_compiler_aarch64::compile(bytecode_ar.get_buffer()));
+    ASSERT_NO_THROW(compiled_fn = sj::jit_compiler::compile(bytecode_ar.get_buffer()));
     ASSERT_TRUE(compiled_fn.has_value());
     ASSERT_TRUE(compiled_fn->get() != nullptr);
 
     // Setup stack frame
     std::optional<si::stack_frame> frame;
-    ASSERT_NO_THROW(frame.emplace(sj::jit_compiler_aarch64::make_stack(4, 8)));
+    ASSERT_NO_THROW(frame.emplace(sj::jit_compiler::make_stack(4, 8)));
     ASSERT_TRUE(frame.has_value());
 
     ASSERT_EQ(frame->locals.size(), 4);

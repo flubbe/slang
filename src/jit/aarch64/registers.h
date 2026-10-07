@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace slang::jit
+namespace slang::jit::aarch64
 {
 
 /**
@@ -113,4 +113,4 @@ T operator|(T i, register_aarch64 r)
     return i | static_cast<T>(r);
 }
 
-}    // namespace slang::jit
+}    // namespace slang::jit::aarch64

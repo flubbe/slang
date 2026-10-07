@@ -8,8 +8,6 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include <libkern/OSCacheControl.h>
-#include <pthread.h>
 #include <sys/mman.h>
 
 #include "jit/aarch64.h"
@@ -21,21 +19,6 @@ namespace
 
 /** X register size, as `std::int32_t` to avoid some type conversions. */
 constexpr auto x_register_size = static_cast<std::int32_t>(sizeof(std::uint64_t));
-
-/**
- * Return the byte size of the data held by a vector.
- *
- * @param v The vector.
- * @returns Returns the byte size of the vector's data.
- */
-template<
-  typename T,
-  typename Allocator>
-constexpr std::size_t byte_size(
-  const std::vector<T, Allocator>& v) noexcept
-{
-    return v.size() * sizeof(T);
-}
 
 /** Struct helper holding offsets of the stack frame elements. */
 struct stack_frame_offsets
@@ -50,7 +33,8 @@ struct stack_frame_offsets
 /** Calculate the stack frame offsets. */
 stack_frame_offsets calculate_stack_frame_offsets()
 {
-    si::stack_frame dummy_frame{{}, 0, 0};
+    const std::vector<slang::module_::constant_table_entry> dummy_constants;
+    const si::stack_frame dummy_frame{dummy_constants, 0, 0};
 
     const auto base =
       reinterpret_cast<std::uintptr_t>(&dummy_frame);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -69,54 +53,23 @@ stack_frame_offsets calculate_stack_frame_offsets()
 
 }    // namespace
 
-namespace slang::jit
+namespace slang::jit::aarch64
 {
 
-jit_function jit_compiler_aarch64::allocate_executable_memory(
+jit_function jit_compiler::allocate_executable_memory(
   const std::vector<std::uint32_t>& machine_code)
 {
-    const auto byte_size = ::byte_size(machine_code);
-
-    void* code_ptr = mmap(
-      nullptr,
-      byte_size,
-      PROT_READ | PROT_WRITE,
-      MAP_ANON | MAP_PRIVATE | MAP_JIT,
-      -1,
-      0);
-
-    if(code_ptr == MAP_FAILED)
-    {
-        throw std::runtime_error{
-          "jit_compiler_aarch64: mmap failed"};
-    }
-
-    pthread_jit_write_protect_np(0);
-
-    std::memcpy(code_ptr, machine_code.data(), byte_size);
-
-    pthread_jit_write_protect_np(1);
-
-    if(mprotect(code_ptr, byte_size, PROT_READ | PROT_EXEC) != 0)
-    {
-        munmap(code_ptr, byte_size);
-        throw std::runtime_error{
-          "jit_compiler_aarch64: mprotect failed"};
-    }
-
-    sys_icache_invalidate(code_ptr, byte_size);
-
-    executable_memory_aarch64 memory{code_ptr, byte_size};
+    executable_memory memory{machine_code};
 
     auto function =
-      reinterpret_cast<jit_function_pointer>(code_ptr);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+      reinterpret_cast<jit_function_pointer>(memory.data());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
     return jit_function{
       std::move(memory),
       function};
 }
 
-jit_function jit_compiler_aarch64::compile(
+jit_function jit_compiler::compile(
   const std::vector<std::byte>& bytecode)
 {
     /*
@@ -127,7 +80,7 @@ jit_function jit_compiler_aarch64::compile(
      * X20 = Direct pointer to frame->stack.data()
      */
 
-    emitter_aarch64 e;
+    instruction_emitter e;
 
     /*
      * Prologue.
@@ -177,7 +130,10 @@ jit_function jit_compiler_aarch64::compile(
         case opcode::iconst:
         {
             std::int32_t val{0};
-            std::memcpy(&val, &bytecode.at(pc), sizeof(val));
+            std::memcpy(
+              &val,
+              &bytecode.at(pc),
+              sizeof(val));
             pc += sizeof(val);
 
             auto uval = static_cast<std::uint32_t>(val);
@@ -185,55 +141,106 @@ jit_function jit_compiler_aarch64::compile(
             auto high16 = static_cast<std::uint16_t>((uval >> 16u) & 0xFFFFu);    // NOLINT(readability-magic-numbers)
 
             // Always emit MOVZ (low 16 bits) + MOVK (high 16 bits if non-zero)
-            e.movz(register_aarch64::X0, low16, 0);
+            e.movz(
+              register_aarch64::X0,
+              low16,
+              0);
             if(high16 != 0)
             {
-                e.movk(register_aarch64::X0, high16, 16);    // Shift 16 bits left // NOLINT(readability-magic-numbers)
+                e.movk(
+                  register_aarch64::X0,
+                  high16,
+                  16);    // Shift 16 bits left // NOLINT(readability-magic-numbers)
             }
 
-            e.str_w(register_aarch64::X0, register_aarch64::X20, stack_depth);
+            e.str_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth);
             stack_depth += 4;
             break;
         }
         case opcode::iload:
         {
             int64_t local_idx{0};
-            std::memcpy(&local_idx, &bytecode.at(pc), sizeof(local_idx));
+            std::memcpy(
+              &local_idx,
+              &bytecode.at(pc),
+              sizeof(local_idx));
             pc += sizeof(local_idx);
 
             // Read from X19 (locals), push to X20 (stack)
-            e.ldr_w(register_aarch64::X0, register_aarch64::X19, static_cast<std::uint32_t>(local_idx));
-            e.str_w(register_aarch64::X0, register_aarch64::X20, stack_depth);
+            e.ldr_w(
+              register_aarch64::X0,
+              register_aarch64::X19,
+              static_cast<std::uint32_t>(local_idx));
+            e.str_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth);
             stack_depth += 4;
             break;
         }
         case opcode::istore:
         {
             int64_t local_idx{0};
-            std::memcpy(&local_idx, &bytecode.at(pc), sizeof(local_idx));
+            std::memcpy(
+              &local_idx,
+              &bytecode.at(pc),
+              sizeof(local_idx));
             pc += sizeof(local_idx);
 
             stack_depth -= 4;
             // Pop from X20 (stack), write to X19 (locals)
-            e.ldr_w(register_aarch64::X0, register_aarch64::X20, stack_depth);
-            e.str_w(register_aarch64::X0, register_aarch64::X19, static_cast<std::uint32_t>(local_idx));
+            e.ldr_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth);
+            e.str_w(
+              register_aarch64::X0,
+              register_aarch64::X19,
+              static_cast<std::uint32_t>(local_idx));
             break;
         }
         case opcode::iadd:
         {
-            e.ldr_w(register_aarch64::X1, register_aarch64::X20, stack_depth - 4);    // RHS
-            e.ldr_w(register_aarch64::X0, register_aarch64::X20, stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
-            e.add_w(register_aarch64::X0, register_aarch64::X0, register_aarch64::X1);
-            e.str_w(register_aarch64::X0, register_aarch64::X20, stack_depth - 8);    // NOLINT(readability-magic-numbers)
+            e.ldr_w(
+              register_aarch64::X1,
+              register_aarch64::X20,
+              stack_depth - 4);    // RHS
+            e.ldr_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
+            e.add_w(
+              register_aarch64::X0,
+              register_aarch64::X0,
+              register_aarch64::X1);
+            e.str_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth - 8);    // NOLINT(readability-magic-numbers)
             stack_depth -= 4;
             break;
         }
         case opcode::isub:
         {
-            e.ldr_w(register_aarch64::X1, register_aarch64::X20, stack_depth - 4);    // RHS
-            e.ldr_w(register_aarch64::X0, register_aarch64::X20, stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
-            e.sub_w(register_aarch64::X0, register_aarch64::X0, register_aarch64::X1);
-            e.str_w(register_aarch64::X0, register_aarch64::X20, stack_depth - 8);    // NOLINT(readability-magic-numbers)
+            e.ldr_w(
+              register_aarch64::X1,
+              register_aarch64::X20,
+              stack_depth - 4);    // RHS
+            e.ldr_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
+            e.sub_w(
+              register_aarch64::X0,
+              register_aarch64::X0,
+              register_aarch64::X1);
+            e.str_w(
+              register_aarch64::X0,
+              register_aarch64::X20,
+              stack_depth - 8);    // NOLINT(readability-magic-numbers)
             stack_depth -= 4;
             break;
         }
@@ -242,7 +249,11 @@ jit_function jit_compiler_aarch64::compile(
             // Epilogue: restore callee-saved registers
 
             // Pop X19 and X20
-            e.ldp_x_post(register_aarch64::X19, register_aarch64::X20, register_aarch64::SP, 16);    // NOLINT(readability-magic-numbers)
+            e.ldp_x_post(
+              register_aarch64::X19,
+              register_aarch64::X20,
+              register_aarch64::SP,
+              2 * x_register_size);
 
             e.pop_fp_lr();
             e.ret();
@@ -256,4 +267,4 @@ jit_function jit_compiler_aarch64::compile(
     return allocate_executable_memory(e.code);
 }
 
-}    // namespace slang::jit
+}    // namespace slang::jit::aarch64

@@ -28,14 +28,14 @@
 namespace slang::jit
 {
 
+namespace si = slang::interpreter;
+
 /*
  * A JIT compiled function.
  */
 
-namespace si = slang::interpreter;
-
 /** Signature of a JIT compiled function. */
-using jit_function_pointer = std::uint64_t (*)(si::stack_frame* frame);
+using jit_function_pointer = void (*)(si::stack_frame* frame);
 
 /** A Just In Time compiled function. */
 class jit_function
@@ -100,14 +100,13 @@ public:
      * Invoke the function.
      *
      * @param frame The stack frame passed to the function.
-     * @returns TODO
      */
-    std::uint64_t operator()(
+    void operator()(
       si::stack_frame* frame) const
     {
 
         assert(function != nullptr && "Attempted to invoke a moved-from jit_function!");
-        return function(frame);
+        function(frame);
     }
 
     /**

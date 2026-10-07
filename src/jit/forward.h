@@ -31,11 +31,14 @@ namespace slang::jit
 
 #ifdef SLANG_ARCH_AARCH64
 
-class jit_compiler_aarch64;
-using jit_compiler = jit_compiler_aarch64;
+namespace aarch64
+{
+class executable_memory;
+class jit_compiler;
+};    // namespace aarch64
 
-class executable_memory_aarch64;
-using executable_memory = executable_memory_aarch64;
+using executable_memory = aarch64::executable_memory;
+using jit_compiler = aarch64::jit_compiler;
 
 #endif
 

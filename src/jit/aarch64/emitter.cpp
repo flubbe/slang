@@ -10,16 +10,16 @@
 
 #include "jit/aarch64.h"
 
-namespace slang::jit
+namespace slang::jit::aarch64
 {
 
-void emitter_aarch64::emit(
+void instruction_emitter::emit(
   std::uint32_t insn)
 {
     code.push_back(insn);
 }
 
-void emitter_aarch64::emit_ldp_stp_64(
+void instruction_emitter::emit_ldp_stp_64(
   bool is_load,
   register_aarch64 rt,
   register_aarch64 rt2,
@@ -54,7 +54,7 @@ void emitter_aarch64::emit_ldp_stp_64(
     emit(op);
 }
 
-void emitter_aarch64::stp_x_pre(
+void instruction_emitter::stp_x_pre(
   register_aarch64 rt,
   register_aarch64 rt2,
   register_aarch64 rn,
@@ -69,7 +69,7 @@ void emitter_aarch64::stp_x_pre(
       true);
 }
 
-void emitter_aarch64::ldp_x_post(
+void instruction_emitter::ldp_x_post(
   register_aarch64 rt,
   register_aarch64 rt2,
   register_aarch64 rn,
@@ -84,24 +84,24 @@ void emitter_aarch64::ldp_x_post(
       false);
 }
 
-void emitter_aarch64::push_fp_lr()
+void instruction_emitter::push_fp_lr()
 {
     emit(0xA9BF7BFD);
 }
 
-void emitter_aarch64::pop_fp_lr()
+void instruction_emitter::pop_fp_lr()
 {
     emit(0xA8C17BFD);
 }
 
-void emitter_aarch64::mov_reg(
+void instruction_emitter::mov_reg(
   register_aarch64 rd,
   register_aarch64 rn)
 {
     emit(0xAA0003E0 | (rn << 16) | rd);
 }
 
-void emitter_aarch64::movz(
+void instruction_emitter::movz(
   register_aarch64 rd,
   std::uint16_t imm16,
   std::uint32_t shift)
@@ -110,7 +110,7 @@ void emitter_aarch64::movz(
     emit(0x52800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
 }
 
-void emitter_aarch64::movn(
+void instruction_emitter::movn(
   register_aarch64 rd,
   std::uint16_t imm16,
   std::uint32_t shift)
@@ -119,7 +119,7 @@ void emitter_aarch64::movn(
     emit(0x12800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
 }
 
-void emitter_aarch64::movk(
+void instruction_emitter::movk(
   register_aarch64 rd,
   std::uint16_t imm16,
   std::uint32_t shift)
@@ -128,7 +128,7 @@ void emitter_aarch64::movk(
     emit(0x72800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
 }
 
-void emitter_aarch64::mov_w(
+void instruction_emitter::mov_w(
   register_aarch64 rd,
   std::int32_t val)
 {
@@ -154,7 +154,7 @@ void emitter_aarch64::mov_w(
     }
 }
 
-void emitter_aarch64::ldr_w(
+void instruction_emitter::ldr_w(
   register_aarch64 rd,
   register_aarch64 rn,
   std::uint32_t offset_bytes)
@@ -163,7 +163,7 @@ void emitter_aarch64::ldr_w(
     emit(0xB9400000 | (imm12 << 10) | (rn << 5) | rd);
 }
 
-void emitter_aarch64::ldr_x(
+void instruction_emitter::ldr_x(
   register_aarch64 rd,
   register_aarch64 rn,
   std::uint32_t offset_bytes)
@@ -172,7 +172,7 @@ void emitter_aarch64::ldr_x(
     emit(0xF9400000 | (imm12 << 10) | (rn << 5) | rd);
 }
 
-void emitter_aarch64::str_w(
+void instruction_emitter::str_w(
   register_aarch64 rd,
   register_aarch64 rn,
   std::uint32_t offset_bytes)
@@ -181,7 +181,7 @@ void emitter_aarch64::str_w(
     emit(0xB9000000 | (imm12 << 10) | (rn << 5) | rd);
 }
 
-void emitter_aarch64::add_w(
+void instruction_emitter::add_w(
   register_aarch64 rd,
   register_aarch64 rn,
   register_aarch64 rm)
@@ -189,7 +189,7 @@ void emitter_aarch64::add_w(
     emit(0x0B000000 | (rm << 16) | (rn << 5) | rd);
 }
 
-void emitter_aarch64::sub_w(
+void instruction_emitter::sub_w(
   register_aarch64 rd,
   register_aarch64 rn,
   register_aarch64 rm)
@@ -197,9 +197,9 @@ void emitter_aarch64::sub_w(
     emit(0x4B000000 | (rm << 16) | (rn << 5) | rd);
 }
 
-void emitter_aarch64::ret()
+void instruction_emitter::ret()
 {
     emit(0xD65F03C0);
 }
 
-}    // namespace slang::jit
+}    // namespace slang::jit::aarch64

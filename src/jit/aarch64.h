@@ -13,13 +13,13 @@
 #include "aarch64/registers.h"
 #include "common.h"
 
-namespace slang::jit
+namespace slang::jit::aarch64
 {
 
 /** AArch64 instruction emitter. */
-struct emitter_aarch64
+struct instruction_emitter
 {
-    std::vector<std::uint32_t> code;
+    std::vector<std::uint32_t> code{};
 
     void emit(
       std::uint32_t insn);
@@ -114,7 +114,7 @@ struct emitter_aarch64
 };
 
 /** AArch64 JIT compiler. */
-class jit_compiler_aarch64
+class jit_compiler
 {
     static jit_function allocate_executable_memory(
       const std::vector<std::uint32_t>& machine_code);
@@ -134,4 +134,4 @@ public:
       const std::vector<std::byte>& bytecode);
 };
 
-}    // namespace slang::jit
+}    // namespace slang::jit::aarch64
