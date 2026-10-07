@@ -56,7 +56,7 @@ A preliminary (incomplete) documentation of the scripting language can be found 
    ```
    $ conan install . --build=missing -s compiler.cppstd=23 -s build_type=Debug
    $ cmake --preset conan-debug
-   $ cmake --build build --preset conan-debug
+   $ cmake --build --preset conan-debug
    ```
    This project requires a recent C++23 toolchain (for example GCC 14+).
 2. Manually:

@@ -19,20 +19,11 @@
 #include <type_traits>
 #include <vector>
 
+#include "jit/forward.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
 #include "value.h"
 #include "vector.h"
-
-// FIXME Replace platform selection code.
-#ifdef SLANG_HAS_AARCH64_JIT
-
-namespace slang::jit
-{
-class jit_compiler_aarch64;
-}    // namespace slang::jit
-
-#endif /* SLANG_HAS_AARCH64_JIT */
 
 namespace slang::interpreter
 {
@@ -116,9 +107,8 @@ public:
 /** Operand stack. */
 class operand_stack
 {
-    // FIXME Replace platform selection code.
-#ifdef SLANG_HAS_AARCH64_JIT
-    friend class slang::jit::jit_compiler_aarch64;
+#ifdef SLANG_JIT_AVAILABLE
+    friend slang::jit::jit_compiler;
 #endif
 
 protected:

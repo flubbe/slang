@@ -13,16 +13,7 @@
 #include <utility>
 
 #include "interpreter/interpreter.h"
-
-/*
- * Platform detection.
- */
-
-#if defined(__aarch64__) || defined(_M_ARM64)
-#    define SLANG_ARCH_AARCH64 1
-#elif defined(__x86_64__) || defined(_M_X64)
-#    define SLANG_ARCH_X86_64 1
-#endif
+#include "platform.h"
 
 /*
  * Platform specific code.
@@ -30,12 +21,6 @@
 
 #if defined(SLANG_ARCH_AARCH64)
 #    include "aarch64/memory.h"
-
-namespace slang::jit
-{
-using executable_memory = executable_memory_aarch64;
-}
-
 #else
 #    error "JIT executable_memory is not supported on this target architecture."
 #endif

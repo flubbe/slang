@@ -110,8 +110,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
         src/jit/aarch64/compiler.cpp
         src/jit/aarch64/emitter.cpp
     )
-
-    add_compile_definitions(SLANG_HAS_AARCH64_JIT)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    # TODO Add x86_64 source files/definitions here.
 endif()
 
 add_executable(slang ${SOURCES})

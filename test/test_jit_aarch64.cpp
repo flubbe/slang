@@ -81,11 +81,11 @@ TEST(jit, compile_execute_sample_function)
 
     // Setup stack frame
     std::optional<si::stack_frame> frame;
-    ASSERT_NO_THROW(frame.emplace(sj::jit_compiler_aarch64::make_stack(16, 16)));
+    ASSERT_NO_THROW(frame.emplace(sj::jit_compiler_aarch64::make_stack(4, 8)));
     ASSERT_TRUE(frame.has_value());
 
-    ASSERT_EQ(frame->locals.size(), 16);
-    ASSERT_EQ(frame->stack.size(), 16);
+    ASSERT_EQ(frame->locals.size(), 4);
+    ASSERT_EQ(frame->stack.size(), 8);
 
     // Run function.
     ASSERT_NO_THROW(compiled_fn->get()(&frame.value()));
