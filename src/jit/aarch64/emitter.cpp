@@ -10,6 +10,8 @@
 
 #include "jit/aarch64.h"
 
+// NOLINTBEGIN(readability-magic-numbers)
+
 namespace slang::jit::aarch64
 {
 
@@ -19,11 +21,11 @@ void instruction_emitter::emit(
     code.push_back(insn);
 }
 
-void instruction_emitter::emit_ldp_stp_64(
+void instruction_emitter::emit_ldp_stp_x(
   bool is_load,
-  register_aarch64 rt,
-  register_aarch64 rt2,
-  register_aarch64 rn,
+  cpu_registers rt,
+  cpu_registers rt2,
+  cpu_registers rn,
   std::int32_t byte_offset,
   bool pre_index)
 {
@@ -31,22 +33,23 @@ void instruction_emitter::emit_ldp_stp_64(
 
     if(is_load)
     {
-        op |= (1 << 22);    // L bit = 1 for LDP
+        op |= (1u << 22u);    // L bit = 1 for LDP
     }
 
     if(pre_index)
     {
-        op |= (3 << 23);    // Pre-indexed: [rn, #imm]!
+        op |= (3u << 23u);    // Pre-indexed: [rn, #imm]!
     }
     else
     {
-        op |= (1 << 23);    // Post-indexed: [rn], #imm
+        op |= (1u << 23u);    // Post-indexed: [rn], #imm
     }
 
     // Convert byte offset to 8-byte element count and mask to 7 bits
-    int32_t imm7 = (byte_offset / 8) & 0x7F;
+    std::uint32_t imm7 =
+      (static_cast<std::uint32_t>(byte_offset) >> 3u) & 0x7Fu;
 
-    op |= (imm7 << 15);
+    op |= (imm7 << 15u);
     op |= (rt2 << 10);
     op |= (rn << 5);
     op |= rt;
@@ -55,12 +58,12 @@ void instruction_emitter::emit_ldp_stp_64(
 }
 
 void instruction_emitter::stp_x_pre(
-  register_aarch64 rt,
-  register_aarch64 rt2,
-  register_aarch64 rn,
+  cpu_registers rt,
+  cpu_registers rt2,
+  cpu_registers rn,
   std::int32_t offset)
 {
-    emit_ldp_stp_64(
+    emit_ldp_stp_x(
       false,
       rt,
       rt2,
@@ -70,12 +73,12 @@ void instruction_emitter::stp_x_pre(
 }
 
 void instruction_emitter::ldp_x_post(
-  register_aarch64 rt,
-  register_aarch64 rt2,
-  register_aarch64 rn,
+  cpu_registers rt,
+  cpu_registers rt2,
+  cpu_registers rn,
   std::int32_t offset)
 {
-    emit_ldp_stp_64(
+    emit_ldp_stp_x(
       true,
       rt,
       rt2,
@@ -94,107 +97,155 @@ void instruction_emitter::pop_fp_lr()
     emit(0xA8C17BFD);
 }
 
-void instruction_emitter::mov_reg(
-  register_aarch64 rd,
-  register_aarch64 rn)
+void instruction_emitter::mov_reg_x(
+  cpu_registers xd,
+  cpu_registers xm)
 {
-    emit(0xAA0003E0 | (rn << 16) | rd);
+    emit(
+      0xAA0003E0
+      | (xm << 16)
+      | xd);
 }
 
 void instruction_emitter::movz(
-  register_aarch64 rd,
-  std::uint16_t imm16,
+  cpu_registers xd,
+  std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift == 16) ? 1 : 0;
-    emit(0x52800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
+    std::uint32_t hw = (shift >> 4u) & 0x1u;
+    emit(
+      0x52800000u
+      | (hw << 21u)
+      | (static_cast<std::uint32_t>(imm16) << 5u)
+      | static_cast<std::uint32_t>(xd));
 }
 
-void instruction_emitter::movn(
-  register_aarch64 rd,
-  std::uint16_t imm16,
+void instruction_emitter::movn_w(
+  cpu_registers xd,
+  std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift == 16) ? 1 : 0;
-    emit(0x12800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
+    std::uint32_t hw = (shift >> 4u) & 0x1u;
+    emit(
+      0x12800000u
+      | (hw << 21u)
+      | (static_cast<std::uint32_t>(imm16) << 5u)
+      | static_cast<std::uint32_t>(xd));
 }
 
-void instruction_emitter::movk(
-  register_aarch64 rd,
-  std::uint16_t imm16,
+void instruction_emitter::movk_w(
+  cpu_registers xd,
+  std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift == 16) ? 1 : 0;
-    emit(0x72800000 | (hw << 21) | (static_cast<std::uint32_t>(imm16) << 5) | static_cast<std::uint32_t>(rd));
+    std::uint32_t hw = (shift >> 4u) & 0x1u;
+    emit(
+      0x72800000u
+      | (hw << 21u)
+      | (static_cast<std::uint32_t>(imm16) << 5u)
+      | static_cast<std::uint32_t>(xd));
+}
+
+void instruction_emitter::movk_x(
+  cpu_registers xd,
+  std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::uint32_t shift)
+{
+    std::uint32_t hw = (shift >> 4u) & 0x3u;
+    emit(
+      0xf2800000
+      | (hw << 21u)
+      | (static_cast<std::uint32_t>(imm16) << 5u)
+      | static_cast<std::uint32_t>(xd));
 }
 
 void instruction_emitter::mov_w(
-  register_aarch64 rd,
+  cpu_registers xd,
   std::int32_t val)
 {
-    std::uint32_t uval = static_cast<std::uint32_t>(val);
-    std::uint16_t low16 = static_cast<std::uint16_t>(uval & 0xFFFF);
-    std::uint16_t high16 = static_cast<std::uint16_t>((uval >> 16) & 0xFFFF);
+    auto uval = static_cast<std::uint32_t>(val);
+    auto low16 = static_cast<std::uint16_t>(uval & 0xFFFFu);
+    auto high16 = static_cast<std::uint16_t>((uval >> 16u) & 0xFFFFu);
 
     // Case 1: Fits in single MOVZ (0x0000XXXX)
     if(high16 == 0)
     {
-        movz(rd, low16, 0);    // hw = 0
+        movz(xd, low16, 0);    // hw = 0
     }
     // Case 2: Negative/inverted that fits in single MOVN
     else if(low16 == 0xFFFF)
     {
-        movn(rd, static_cast<std::uint16_t>(~high16), 16);    // hw = 1
+        movn_w(xd, static_cast<std::uint16_t>(~high16), 16);    // hw = 1
     }
     // Case 3: Requires 2 instructions (MOVZ + MOVK)
     else
     {
-        movz(rd, low16, 0);      // Load lower 16 bits
-        movk(rd, high16, 16);    // Overwrite upper 16 bits with LSL #16
+        movz(xd, low16, 0);        // Load lower 16 bits
+        movk_w(xd, high16, 16);    // Overwrite upper 16 bits with LSL #16
     }
 }
 
 void instruction_emitter::ldr_w(
-  register_aarch64 rd,
-  register_aarch64 rn,
+  cpu_registers xd,
+  cpu_registers xn,
   std::uint32_t offset_bytes)
 {
-    std::uint32_t imm12 = (offset_bytes / 4) & 0xFFF;
-    emit(0xB9400000 | (imm12 << 10) | (rn << 5) | rd);
+    std::uint32_t imm12 = (offset_bytes >> 2u) & 0xFFFu;
+    emit(
+      0xB9400000
+      | (imm12 << 10u)
+      | (xn << 5u)
+      | xd);
 }
 
 void instruction_emitter::ldr_x(
-  register_aarch64 rd,
-  register_aarch64 rn,
+  cpu_registers xd,
+  cpu_registers xn,
   std::uint32_t offset_bytes)
 {
-    std::uint32_t imm12 = (offset_bytes / 8) & 0xFFF;
-    emit(0xF9400000 | (imm12 << 10) | (rn << 5) | rd);
+    std::uint32_t imm12 = (offset_bytes >> 3u) & 0xFFFu;
+    emit(
+      0xF9400000
+      | (imm12 << 10u)
+      | (xn << 5u)
+      | xd);
 }
 
 void instruction_emitter::str_w(
-  register_aarch64 rd,
-  register_aarch64 rn,
+  cpu_registers xd,
+  cpu_registers xn,
   std::uint32_t offset_bytes)
 {
-    std::uint32_t imm12 = (offset_bytes / 4) & 0xFFF;
-    emit(0xB9000000 | (imm12 << 10) | (rn << 5) | rd);
+    std::uint32_t imm12 = (offset_bytes >> 2u) & 0xFFFu;
+    emit(
+      0xB9000000
+      | (imm12 << 10u)
+      | (xn << 5u)
+      | xd);
 }
 
 void instruction_emitter::add_w(
-  register_aarch64 rd,
-  register_aarch64 rn,
-  register_aarch64 rm)
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
 {
-    emit(0x0B000000 | (rm << 16) | (rn << 5) | rd);
+    emit(
+      0x0B000000u
+      | (xm << 16)
+      | (xn << 5)
+      | xd);
 }
 
 void instruction_emitter::sub_w(
-  register_aarch64 rd,
-  register_aarch64 rn,
-  register_aarch64 rm)
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
 {
-    emit(0x4B000000 | (rm << 16) | (rn << 5) | rd);
+    emit(
+      0x4B000000u
+      | (xm << 16)
+      | (xn << 5)
+      | xd);
 }
 
 void instruction_emitter::ret()
@@ -203,3 +254,5 @@ void instruction_emitter::ret()
 }
 
 }    // namespace slang::jit::aarch64
+
+// NOLINTEND(readability-magic-numbers)

@@ -90,9 +90,9 @@ jit_function jit_compiler::compile(
 
     // Save callee-saved registers X19, X20 to stack
     e.stp_x_pre(
-      register_aarch64::X19,
-      register_aarch64::X20,
-      register_aarch64::SP,
+      cpu_registers::X19,
+      cpu_registers::X20,
+      cpu_registers::SP,
       -2 * x_register_size);
 
     // Get dynamic offsets regardless of non-standard layout rules
@@ -104,14 +104,14 @@ jit_function jit_compiler::compile(
 
     // Load frame->locals.data() into X19
     e.ldr_x(
-      register_aarch64::X19,
-      register_aarch64::X0,
+      cpu_registers::X19,
+      cpu_registers::X0,
       static_cast<std::uint32_t>(locals_offset));
 
     // Load frame->stack.data() into X20
     e.ldr_x(
-      register_aarch64::X20,
-      register_aarch64::X0,
+      cpu_registers::X20,
+      cpu_registers::X0,
       static_cast<std::uint32_t>(stack_offset));
 
     /*
@@ -142,20 +142,20 @@ jit_function jit_compiler::compile(
 
             // Always emit MOVZ (low 16 bits) + MOVK (high 16 bits if non-zero)
             e.movz(
-              register_aarch64::X0,
+              cpu_registers::X0,
               low16,
               0);
             if(high16 != 0)
             {
-                e.movk(
-                  register_aarch64::X0,
+                e.movk_w(
+                  cpu_registers::X0,
                   high16,
                   16);    // Shift 16 bits left // NOLINT(readability-magic-numbers)
             }
 
             e.str_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth);
             stack_depth += 4;
             break;
@@ -171,12 +171,12 @@ jit_function jit_compiler::compile(
 
             // Read from X19 (locals), push to X20 (stack)
             e.ldr_w(
-              register_aarch64::X0,
-              register_aarch64::X19,
+              cpu_registers::X0,
+              cpu_registers::X19,
               static_cast<std::uint32_t>(local_idx));
             e.str_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth);
             stack_depth += 4;
             break;
@@ -193,32 +193,32 @@ jit_function jit_compiler::compile(
             stack_depth -= 4;
             // Pop from X20 (stack), write to X19 (locals)
             e.ldr_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth);
             e.str_w(
-              register_aarch64::X0,
-              register_aarch64::X19,
+              cpu_registers::X0,
+              cpu_registers::X19,
               static_cast<std::uint32_t>(local_idx));
             break;
         }
         case opcode::iadd:
         {
             e.ldr_w(
-              register_aarch64::X1,
-              register_aarch64::X20,
+              cpu_registers::X1,
+              cpu_registers::X20,
               stack_depth - 4);    // RHS
             e.ldr_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
             e.add_w(
-              register_aarch64::X0,
-              register_aarch64::X0,
-              register_aarch64::X1);
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
             e.str_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth - 8);    // NOLINT(readability-magic-numbers)
             stack_depth -= 4;
             break;
@@ -226,20 +226,20 @@ jit_function jit_compiler::compile(
         case opcode::isub:
         {
             e.ldr_w(
-              register_aarch64::X1,
-              register_aarch64::X20,
+              cpu_registers::X1,
+              cpu_registers::X20,
               stack_depth - 4);    // RHS
             e.ldr_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
             e.sub_w(
-              register_aarch64::X0,
-              register_aarch64::X0,
-              register_aarch64::X1);
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
             e.str_w(
-              register_aarch64::X0,
-              register_aarch64::X20,
+              cpu_registers::X0,
+              cpu_registers::X20,
               stack_depth - 8);    // NOLINT(readability-magic-numbers)
             stack_depth -= 4;
             break;
@@ -250,9 +250,9 @@ jit_function jit_compiler::compile(
 
             // Pop X19 and X20
             e.ldp_x_post(
-              register_aarch64::X19,
-              register_aarch64::X20,
-              register_aarch64::SP,
+              cpu_registers::X19,
+              cpu_registers::X20,
+              cpu_registers::SP,
               2 * x_register_size);
 
             e.pop_fp_lr();

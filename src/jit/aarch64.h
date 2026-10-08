@@ -16,98 +16,116 @@
 namespace slang::jit::aarch64
 {
 
-/** AArch64 instruction emitter. */
+/**
+ * AArch64 instruction emitter.
+ *
+ * Reference:
+ *     Arm Architecture Reference Manual Armv8, for Armv8-A architecture profile,
+ *     https://support.arm.com/documentation/ddi0487/latest/
+ */
 struct instruction_emitter
 {
     std::vector<std::uint32_t> code{};
 
+    /** Emit a 32-bit instruction. */
     void emit(
       std::uint32_t insn);
 
-    // Emit STP or LDP for 64-bit registers
-    void emit_ldp_stp_64(
+    /** Emit an STP or LDP instruction for X registers. */
+    void emit_ldp_stp_x(
       bool is_load,
-      register_aarch64 rt,
-      register_aarch64 rt2,
-      register_aarch64 rn,
+      cpu_registers rt,
+      cpu_registers rt2,
+      cpu_registers rn,
       std::int32_t byte_offset,
       bool pre_index);
 
-    // Convenient helper wrappers:
+    /** Emit a pre-indexed STP instruction for X registers. */
     void stp_x_pre(
-      register_aarch64 rt,
-      register_aarch64 rt2,
-      register_aarch64 rn,
+      cpu_registers rt,
+      cpu_registers rt2,
+      cpu_registers rn,
       std::int32_t offset);
 
+    /** Emit a post-indexed LDP instruction for X registers. */
     void ldp_x_post(
-      register_aarch64 rt,
-      register_aarch64 rt2,
-      register_aarch64 rn,
+      cpu_registers rt,
+      cpu_registers rt2,
+      cpu_registers rn,
       std::int32_t offset);
 
-    // STP x29, x30, [sp, #-16]!  (Push frame pointer & link register)
+    /** Push frame pointer and link register. Emits `STP x29, x30, [sp, #-16]!`. */
     void push_fp_lr();
 
-    // LDP x29, x30, [sp], #16   (Pop frame pointer & link register)
+    /** Pop frame pointer and link register. Emits `LDP x29, x30, [sp], #16`. */
     void pop_fp_lr();
 
-    // MOV rd, rn
-    void mov_reg(
-      register_aarch64 rd,
-      register_aarch64 rn);
+    /** Move register value. Emits `MOV Xd, Xm`. */
+    void mov_reg_x(
+      cpu_registers xd,
+      cpu_registers xm);
 
-    // MOVZ w_rd, #imm16, LSL #hw (hw is 0 or 16)
-    void movz(
-      register_aarch64 rd,
+    /**
+     * Move wide with NOT. Emits `MOVN w_rd, #imm16, LSL #hw`.
+     *
+     * `shift` is either 0 (the default), 16, 32, or 48, encoded in the  `hw` field as `<shift>/16`.
+     * */
+    void movn_w(
+      cpu_registers xd,
       std::uint16_t imm16,
       std::uint32_t shift = 0);
 
-    // MOVN w_rd, #imm16, LSL #hw
-    void movn(
-      register_aarch64 rd,
+    /** Move wide with zero. Emits `MOVZ w_rd, #imm16, LSL #hw` (`hw` is 0 or 16). */
+    void movz(
+      cpu_registers xd,
       std::uint16_t imm16,
       std::uint32_t shift = 0);
 
     // MOVK w_rd, #imm16, LSL #hw
-    void movk(
-      register_aarch64 rd,
+    void movk_w(
+      cpu_registers xd,
+      std::uint16_t imm16,
+      std::uint32_t shift = 0);
+
+    // MOVK x_rd, #imm16, LSL #hw
+    void movk_x(
+      cpu_registers xd,
       std::uint16_t imm16,
       std::uint32_t shift = 0);
 
     void mov_w(
-      register_aarch64 rd,
+      cpu_registers xd,
       std::int32_t val);
 
     // LDR w0, [rn, #offset]  (Load 32-bit word, unsigned offset)
     void ldr_w(
-      register_aarch64 rd,
-      register_aarch64 rn,
+      cpu_registers xd,
+      cpu_registers xn,
       std::uint32_t offset_bytes);
 
     // Add 64-bit LDR instruction helper for AArch64
     void ldr_x(
-      register_aarch64 rd,
-      register_aarch64 rn,
+      cpu_registers xd,
+      cpu_registers xn,
       std::uint32_t offset_bytes);
 
     // STR w0, [rn, #offset]  (Store 32-bit word, unsigned offset)
     void str_w(
-      register_aarch64 rd,
-      register_aarch64 rn,
+      cpu_registers xd,
+      cpu_registers xn,
       std::uint32_t offset_bytes);
 
     // ADD w_rd, w_rn, w_rm
     void add_w(
-      register_aarch64 rd,
-      register_aarch64 rn,
-      register_aarch64 rm);
+      cpu_registers xd,
+      cpu_registers xn,
+      cpu_registers xm);
 
     // SUB w_rd, w_rn, w_rm
     void sub_w(
-      register_aarch64 rd,
-      register_aarch64 rn,
-      register_aarch64 rm);
+      cpu_registers xd,
+      cpu_registers xn,
+      cpu_registers xm);
 
     // RET
     void ret();

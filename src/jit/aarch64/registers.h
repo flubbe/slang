@@ -20,7 +20,7 @@ namespace slang::jit::aarch64
  *
  * Bit-encodings correspond directly to the 5-bit register fields in AArch64 machine instructions.
  */
-enum class register_aarch64 : std::uint32_t
+enum class cpu_registers : std::uint32_t
 {
     /*
      * Parameter Passing & Volatile Scratch Registers (Caller-Saved).
@@ -90,7 +90,7 @@ enum class register_aarch64 : std::uint32_t
 template<typename T>
     requires std::is_integral_v<T>
 inline std::uint32_t operator<<(
-  register_aarch64 r,
+  cpu_registers r,
   T imm)
 {
     return static_cast<std::uint32_t>(r) << imm;
@@ -100,7 +100,7 @@ template<typename T>
     requires std::is_integral_v<T>
 inline T& operator|=(
   T& imm,
-  register_aarch64 r)
+  cpu_registers r)
 {
     imm |= static_cast<T>(r);
     return imm;
@@ -108,7 +108,7 @@ inline T& operator|=(
 
 template<typename T>
     requires std::is_integral_v<T>
-T operator|(T i, register_aarch64 r)
+T operator|(T i, cpu_registers r)
 {
     return i | static_cast<T>(r);
 }
