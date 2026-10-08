@@ -169,7 +169,7 @@ jit_function jit_compiler::compile(
             auto high16 = static_cast<std::uint16_t>((uval >> 16u) & 0xFFFFu);    // NOLINT(readability-magic-numbers)
 
             // Always emit MOVZ (low 16 bits) + MOVK (high 16 bits if non-zero)
-            e.movz(
+            e.movz_w(
               cpu_registers::X0,
               low16,
               0);
