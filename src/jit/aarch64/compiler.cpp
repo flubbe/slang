@@ -57,7 +57,9 @@ namespace slang::jit::aarch64
 {
 
 jit_function jit_compiler::allocate_executable_memory(
-  const std::vector<std::uint32_t>& machine_code)
+  const std::vector<std::uint32_t>& machine_code,
+  std::size_t locals_size,
+  std::size_t stack_size)
 {
     executable_memory memory{machine_code};
 
@@ -66,7 +68,9 @@ jit_function jit_compiler::allocate_executable_memory(
 
     return jit_function{
       std::move(memory),
-      function};
+      function,
+      locals_size,
+      stack_size};
 }
 
 jit_function jit_compiler::compile(
@@ -119,7 +123,30 @@ jit_function jit_compiler::compile(
      */
 
     std::size_t pc = 0;
-    std::int32_t stack_depth = 0;    // Simulated stack offset (in bytes)
+
+    std::uint32_t max_stack_size{0};
+    std::uint32_t current_stack_size{0};
+
+    const auto update_stack_size =
+      [&](opcode instr, std::int32_t delta)
+    {
+        if(delta == 0)
+        {
+            return;
+        }
+
+        if(delta < 0
+           && current_stack_size < static_cast<std::uint32_t>(-delta))
+        {
+            throw jit_error{
+              std::format(
+                "Got negative stack size while decoding instruction '{}'.",
+                to_string(instr))};
+        }
+
+        current_stack_size += delta;
+        max_stack_size = std::max(max_stack_size, current_stack_size);
+    };
 
     while(pc < bytecode.size())
     {
@@ -134,6 +161,7 @@ jit_function jit_compiler::compile(
               &val,
               &bytecode.at(pc),
               sizeof(val));
+
             pc += sizeof(val);
 
             auto uval = static_cast<std::uint32_t>(val);
@@ -156,8 +184,10 @@ jit_function jit_compiler::compile(
             e.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth);
-            stack_depth += 4;
+              current_stack_size);
+
+            update_stack_size(op, 4);
+
             break;
         }
         case opcode::iload:
@@ -167,6 +197,7 @@ jit_function jit_compiler::compile(
               &local_idx,
               &bytecode.at(pc),
               sizeof(local_idx));
+
             pc += sizeof(local_idx);
 
             // Read from X19 (locals), push to X20 (stack)
@@ -177,8 +208,10 @@ jit_function jit_compiler::compile(
             e.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth);
-            stack_depth += 4;
+              current_stack_size);
+
+            update_stack_size(op, 4);
+
             break;
         }
         case opcode::istore:
@@ -188,18 +221,20 @@ jit_function jit_compiler::compile(
               &local_idx,
               &bytecode.at(pc),
               sizeof(local_idx));
-            pc += sizeof(local_idx);
 
-            stack_depth -= 4;
+            pc += sizeof(local_idx);
+            update_stack_size(op, -4);
+
             // Pop from X20 (stack), write to X19 (locals)
             e.ldr_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth);
+              current_stack_size);
             e.str_w(
               cpu_registers::X0,
               cpu_registers::X19,
               static_cast<std::uint32_t>(local_idx));
+
             break;
         }
         case opcode::iadd:
@@ -207,11 +242,11 @@ jit_function jit_compiler::compile(
             e.ldr_w(
               cpu_registers::X1,
               cpu_registers::X20,
-              stack_depth - 4);    // RHS
+              current_stack_size - 4);    // RHS
             e.ldr_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
+              current_stack_size - 8);    // LHS // NOLINT(readability-magic-numbers)
             e.add_w(
               cpu_registers::X0,
               cpu_registers::X0,
@@ -219,8 +254,10 @@ jit_function jit_compiler::compile(
             e.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth - 8);    // NOLINT(readability-magic-numbers)
-            stack_depth -= 4;
+              current_stack_size - 8);    // NOLINT(readability-magic-numbers)
+
+            update_stack_size(op, -4);
+
             break;
         }
         case opcode::isub:
@@ -228,11 +265,11 @@ jit_function jit_compiler::compile(
             e.ldr_w(
               cpu_registers::X1,
               cpu_registers::X20,
-              stack_depth - 4);    // RHS
+              current_stack_size - 4);    // RHS
             e.ldr_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth - 8);    // LHS // NOLINT(readability-magic-numbers)
+              current_stack_size - 8);    // LHS // NOLINT(readability-magic-numbers)
             e.sub_w(
               cpu_registers::X0,
               cpu_registers::X0,
@@ -240,8 +277,10 @@ jit_function jit_compiler::compile(
             e.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
-              stack_depth - 8);    // NOLINT(readability-magic-numbers)
-            stack_depth -= 4;
+              current_stack_size - 8);    // NOLINT(readability-magic-numbers)
+
+            update_stack_size(op, -4);
+
             break;
         }
         case opcode::ret:
@@ -264,7 +303,10 @@ jit_function jit_compiler::compile(
         }
     }
 
-    return allocate_executable_memory(e.code);
+    return allocate_executable_memory(
+      e.code,
+      0 /* TODO */,
+      max_stack_size);
 }
 
 }    // namespace slang::jit::aarch64

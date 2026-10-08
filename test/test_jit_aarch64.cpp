@@ -160,26 +160,6 @@ TEST(jit, instruction_encodings)
 
 TEST(jit, compile_execute_sample_function)
 {
-    std::uint32_t max_stack_size{0};
-    std::uint32_t current_stack_size{0};
-
-    const auto update_stack_size =
-      [&](std::int32_t delta)
-    {
-        if(delta == 0)
-        {
-            return;
-        }
-
-        if(delta < 0)
-        {
-            ASSERT_GE(current_stack_size, -delta);
-        }
-
-        current_stack_size += delta;
-        max_stack_size = std::max(max_stack_size, current_stack_size);
-    };
-
     memory_write_archive bytecode_ar{false /* persistent */};
 
     /*
@@ -202,40 +182,31 @@ TEST(jit, compile_execute_sample_function)
     // iconst 100
     emit(bytecode_ar, opcode::iconst);
     emit<std::int32_t>(bytecode_ar, 100);    // NOLINT(readability-magic-numbers)
-    update_stack_size(sizeof(std::int32_t));
 
     // istore 0  (locals[0] = 100)
     emit(bytecode_ar, opcode::istore);
     emit<std::int64_t>(bytecode_ar, 0);    // slot 0
-    update_stack_size(-static_cast<std::int32_t>(sizeof(std::int32_t)));
 
     // iload 0
     emit(bytecode_ar, opcode::iload);
     emit<std::int64_t>(bytecode_ar, 0);    // slot 0
-    update_stack_size(sizeof(std::int32_t));
 
     // iconst 42
     emit(bytecode_ar, opcode::iconst);
     emit<std::int32_t>(bytecode_ar, 42);    // NOLINT(readability-magic-numbers)
-    update_stack_size(sizeof(std::int32_t));
 
     // iadd (100 + 42 = 142)
     emit(bytecode_ar, opcode::iadd);
-    update_stack_size(-static_cast<std::int32_t>(sizeof(std::int32_t)));
 
     // iconst 10
     emit(bytecode_ar, opcode::iconst);
     emit<std::int32_t>(bytecode_ar, 10);    // NOLINT(readability-magic-numbers)
-    update_stack_size(sizeof(std::int32_t));
 
     // isub (142 - 10 = 132)
     emit(bytecode_ar, opcode::isub);
-    update_stack_size(-static_cast<std::int32_t>(sizeof(std::int32_t)));
 
     // ret
     emit(bytecode_ar, opcode::ret);
-
-    ASSERT_EQ(max_stack_size, 8);
 
     // Compile
     std::optional<sj::jit_function> compiled_fn;
@@ -246,11 +217,11 @@ TEST(jit, compile_execute_sample_function)
     // Setup stack frame
     std::optional<si::stack_frame> frame;
     ASSERT_NO_THROW(frame.emplace(
-      sj::jit_compiler::make_stack(4, max_stack_size)));
+      sj::jit_compiler::make_stack(4, compiled_fn->get_stack_size())));
     ASSERT_TRUE(frame.has_value());
 
     ASSERT_EQ(frame->locals.size(), 4);
-    ASSERT_EQ(frame->stack.size(), max_stack_size);
+    ASSERT_EQ(frame->stack.size(), compiled_fn->get_stack_size());
 
     // Run function.
     ASSERT_NO_THROW(compiled_fn->get()(&frame.value()));

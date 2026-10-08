@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cassert>
+#include <stdexcept>
 #include <utility>
 
 #include "interpreter/interpreter.h"
@@ -31,6 +32,12 @@ namespace slang::jit
 
 namespace si = slang::interpreter;
 
+/** JIT compiler error. */
+class jit_error : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
+
 /*
  * A JIT compiled function.
  */
@@ -47,6 +54,12 @@ class jit_function
     /** The function pointer. */
     jit_function_pointer function;
 
+    /** Locals size. */
+    std::size_t locals_size = 0;
+
+    /** Stack size. */
+    std::size_t stack_size = 0;
+
 public:
     /** Deleted default constructor. */
     jit_function() = delete;
@@ -58,6 +71,8 @@ public:
     jit_function(jit_function&& other)
     : memory{std::move(other.memory)}
     , function{std::exchange(other.function, nullptr)}
+    , locals_size{std::exchange(other.locals_size, 0)}
+    , stack_size{std::exchange(other.stack_size, 0)}
     {
     }
 
@@ -66,12 +81,18 @@ public:
      *
      * @param memory Executable memory holding the function's code.
      * @param function Function pointer.
+     * @param locals_size Bytes needed for the locals.
+     * @param stack_size Bytes needed for the stack.
      */
     jit_function(
       executable_memory memory,
-      jit_function_pointer function)
+      jit_function_pointer function,
+      std::size_t locals_size,
+      std::size_t stack_size)
     : memory{std::move(memory)}
     , function{function}
+    , locals_size{locals_size}
+    , stack_size{stack_size}
     {
     }
 
@@ -85,6 +106,8 @@ public:
         {
             memory = std::move(other.memory);
             function = std::exchange(other.function, nullptr);
+            locals_size = std::exchange(other.locals_size, 0);
+            stack_size = std::exchange(other.stack_size, 0);
         }
 
         return *this;
@@ -95,6 +118,20 @@ public:
     jit_function_pointer get() const noexcept
     {
         return function;
+    }
+
+    /** Return the locals size, in bytes. */
+    [[nodiscard]]
+    std::size_t get_locals_size() const noexcept
+    {
+        return locals_size;
+    }
+
+    /** Return the required stack size, in bytes. */
+    [[nodiscard]]
+    std::size_t get_stack_size() const noexcept
+    {
+        return stack_size;
     }
 
     /**

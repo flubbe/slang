@@ -135,7 +135,9 @@ struct instruction_emitter
 class jit_compiler
 {
     static jit_function allocate_executable_memory(
-      const std::vector<std::uint32_t>& machine_code);
+      const std::vector<std::uint32_t>& machine_code,
+      std::size_t locals_size,
+      std::size_t stack_size);
 
 public:
     static si::stack_frame make_stack(
