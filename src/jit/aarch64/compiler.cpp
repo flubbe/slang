@@ -136,7 +136,7 @@ jit_function jit_compiler::compile(
         }
 
         if(delta < 0
-           && current_stack_size < static_cast<std::uint32_t>(-delta))
+           && std::cmp_less(current_stack_size, -delta))
         {
             throw jit_error{
               std::format(
@@ -283,6 +283,7 @@ jit_function jit_compiler::compile(
 
             break;
         }
+        case opcode::iret: [[fallthrough]];
         case opcode::ret:
         {
             // Epilogue: restore callee-saved registers

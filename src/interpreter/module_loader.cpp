@@ -67,15 +67,20 @@ static bool is_garbage_collected(type_class v) noexcept
 }
 
 /** Byte sizes and alignments for built-in types. */
-static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
-  {"void", {0, 0}},
-  {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
-  {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-  {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-  {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
-  {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
-  {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
-  {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
+const auto& type_properties_map()
+{
+    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
+      {"void", {0, 0}},
+      {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
+      {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
+      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
+      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
+      {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
+      {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
+      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
+
+    return map;
+}
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
@@ -90,8 +95,8 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(v.type.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(v.type.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return built_in_it->second.first;
     }
@@ -115,8 +120,8 @@ static std::size_t get_type_or_reference_size(const module_::variable_type& v)
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(v.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(v.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return built_in_it->second.first;
     }
@@ -218,8 +223,8 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
           .layout_id = 0};
     }
 
-    auto built_in_it = type_properties_map.find(type.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(type.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return {
           .flags = 0,
@@ -255,8 +260,8 @@ field_properties module_loader::get_field_properties(
         throw interpreter_error("Invalid struct type name 'void'.");
     }
 
-    auto built_in_it = type_properties_map.find(type_name);
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(type_name);
+    if(built_in_it != type_properties_map().end())
     {
         throw interpreter_error(
           std::format(
@@ -307,8 +312,8 @@ void module_loader::decode_structs()
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
-            auto built_in_it = type_properties_map.find(member_type.base_type.base_type());
-            if(built_in_it != type_properties_map.end())
+            auto built_in_it = type_properties_map().find(member_type.base_type.base_type());
+            if(built_in_it != type_properties_map().end())
             {
                 if(is_garbage_collected(member_type))
                 {

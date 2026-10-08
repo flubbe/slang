@@ -109,6 +109,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     list(APPEND SOURCES
         src/jit/aarch64/compiler.cpp
         src/jit/aarch64/emitter.cpp
+        src/jit/aarch64/module_loader.cpp
     )
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
     # TODO Add x86_64 source files/definitions here.

@@ -10,8 +10,19 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "aarch64/registers.h"
 #include "common.h"
+
+/*
+ * Forward declarations.
+ */
+namespace slang
+{
+class file_manager;
+}    // namespace slang
 
 namespace slang::jit::aarch64
 {
@@ -159,8 +170,101 @@ public:
         return frame;
     }
 
+    /**
+     * Compile a function.
+     *
+     * @param bytecode The function's bytecode.
+     * @returns Returns a compiled function.
+     * @throws Throws a `jit_error` on failure.
+     */
     static jit_function compile(
       const std::vector<std::byte>& bytecode);
+};
+
+class module_loader;
+
+/** An entry in the import table. */
+struct imported_symbol
+{
+    /** Symbol type. */
+    module_::symbol_type type;
+
+    /** Symbol name. */
+    std::string name;
+
+    /** Index into the package import table. Unused for package imports (set to `(uint32_t)(-1)`). */
+    std::uint32_t package_index;
+
+    /** If the import is resolved, this points to the corresponding module or into the export table. Not serialized. */
+    std::variant<
+      const module_loader*,
+      const module_::exported_symbol*>
+      export_reference;
+};
+
+/** Runtime header state owned by the JIT loader. */
+struct module_header
+{
+    /** Import table. */
+    std::vector<imported_symbol> imports;
+
+    /** Export table. */
+    std::vector<module_::exported_symbol> exports;
+
+    /** Constant table. */
+    std::vector<module_::constant_table_entry> constants;
+};
+
+/** A module loader. Represents a loaded module with JITted bytecode. */
+class module_loader
+{
+    /** The module's import name. */
+    std::string import_name;
+
+    /** The module's path. */
+    fs::path path;
+
+    /** JIT-owned runtime header. */
+    module_header header;
+
+    /** JIT-owned bytecode. */
+    std::vector<std::byte> binary;
+
+    /** Decoded types, ordered by name. */
+    std::unordered_map<std::string, module_::struct_descriptor> struct_map;
+
+    /** Compiled functions, ordered by name. */
+    std::unordered_map<std::string, jit_function> function_map;
+
+    /**
+     * Decode the structs. Set types sizes, alignments and offsets.
+     */
+    void decode_structs();
+
+public:
+    /** Defaulted and deleted constructors. */
+    module_loader() = delete;
+    module_loader(const module_loader&) = default;
+    module_loader(module_loader&&) = default;
+
+    /** Default assignments. */
+    module_loader& operator=(const module_loader&) = delete;
+    module_loader& operator=(module_loader&&) = delete;
+
+    /**
+     * Create a new module loader.
+     *
+     * @param file_mgr File manager.
+     * @param import_name The module's import name.
+     * @param path The module's path.
+     */
+    module_loader(
+      slang::file_manager& file_mgr,
+      std::string import_name,
+      fs::path path);
+
+    /** Get a compiled function by its exported name. */
+    jit_function& get_function(const std::string& name);
 };
 
 }    // namespace slang::jit::aarch64

@@ -235,4 +235,23 @@ TEST(jit, compile_execute_sample_function)
     EXPECT_EQ(result, 132);
 }
 
+TEST(jit, module_loader)
+{
+    slang::file_manager file_mgr;
+    file_mgr.add_search_path(".");
+
+    module_loader mod{
+      file_mgr,
+      "test_jit",
+      "test_jit.cmod"};
+
+    auto& function = mod.get_function("test_ret");
+    auto frame = jit_compiler::make_stack(function.get_locals_size(), function.get_stack_size());
+    function(&frame);
+
+    std::int32_t result = 0;
+    std::memcpy(&result, frame.stack.tail(sizeof(result)).data(), sizeof(result));
+    EXPECT_EQ(result, 12);
+}
+
 }    // namespace

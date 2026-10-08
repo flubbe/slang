@@ -274,17 +274,26 @@ add_test(NAME vector COMMAND test_vector)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     add_executable(test_jit_aarch64
+        ../src/archives/file.cpp
         ../src/jit/aarch64/compiler.cpp
         ../src/jit/aarch64/emitter.cpp
+        ../src/jit/aarch64/module_loader.cpp
+        ../src/shared/module.cpp
         ../src/shared/opcodes.cpp
+        ../src/filemanager.cpp
         test_jit_aarch64.cpp
     )
     target_link_libraries(test_jit_aarch64 GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
-    target_compile_options(test_vector PRIVATE
+    target_compile_options(test_jit_aarch64 PRIVATE
         ${COMPILE_OPTIONS_MSVC}
         ${COMPILE_OPTIONS_NOT_MSVC}
     )
     add_test(NAME jit_aarch64 COMMAND test_jit_aarch64)
+
+    set_tests_properties(jit_aarch64 PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        FIXTURES_REQUIRED generate_jit_test
+    )
 endif()
 
 #
@@ -314,6 +323,19 @@ set_tests_properties(
     PROPERTIES FIXTURES_SETUP
     needs_gc
 )
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_compile_test(
+        "build jit test"
+        FALSE
+        test/test_jit
+    )
+    set_tests_properties(
+        "build jit test (default, compile)"
+        PROPERTIES FIXTURES_SETUP
+        generate_jit_test
+    )
+endif()
 
 add_compile_exec_test(
     "slang array"
