@@ -34,9 +34,11 @@ namespace slang::jit
 namespace aarch64
 {
 class jit_compiler;
+class module_loader;
 }    // namespace aarch64
 
 using jit_compiler = aarch64::jit_compiler;
+using module_loader = aarch64::module_loader;
 
 #endif /* SLANG_ARCH_AARCH64 */
 

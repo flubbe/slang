@@ -11,8 +11,10 @@
 #pragma once
 
 #include <cassert>
+#include <functional>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 #include "interpreter/interpreter.h"
 #include "platform.h"
@@ -44,6 +46,15 @@ class jit_error : public std::runtime_error
 
 /** Signature of a JIT compiled function. */
 using jit_function_pointer = void (*)(si::stack_frame* frame);
+
+/** Signature of a native function. */
+using native_function_type = std::function<void(si::operand_stack&)>;
+
+/** A JIT callable function, either native or JIT compiled. */
+using jit_callable = std::variant<
+  std::monostate,
+  jit_function_pointer,
+  native_function_type>;
 
 /** A Just In Time compiled function. */
 class jit_function
@@ -156,6 +167,31 @@ public:
     {
         return function != nullptr;
     }
+};
+
+/** Stable target metadata referenced by generated call instructions. */
+struct jit_call_target
+{
+    /** Native or JITted function. */
+    jit_callable function{std::monostate{}};
+
+    /** Native library name used to resolve native function registrations. */
+    std::optional<std::string> native_library;
+
+    /** Pointer to the module constant table. */
+    const std::vector<module_::constant_table_entry>* constants{nullptr};
+
+    /** Argument size, in bytes. */
+    std::size_t argument_size{0};
+
+    /** Return value size, in bytes. */
+    std::size_t return_size{0};
+
+    /** Locals size, in bytes. */
+    std::size_t locals_size{0};
+
+    /** Required stack size, in bytes. */
+    std::size_t stack_size{0};
 };
 
 }    // namespace slang::jit

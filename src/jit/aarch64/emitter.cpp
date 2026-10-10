@@ -15,6 +15,68 @@
 namespace slang::jit::aarch64
 {
 
+namespace
+{
+
+/** Encode the destination and three source/register fields. */
+std::uint32_t encode_register_fields(
+  std::uint32_t base,
+  cpu_registers rd,
+  cpu_registers rn,
+  cpu_registers rm)
+{
+    return base | (rm << 16) | (rn << 5) | rd;
+}
+
+/** Encode the destination and three source/register fields, including Ra. */
+std::uint32_t encode_register_fields(
+  std::uint32_t base,
+  cpu_registers rd,
+  cpu_registers rn,
+  cpu_registers rm,
+  cpu_registers ra)
+{
+    return encode_register_fields(base, rd, rn, rm) | (ra << 10);
+}
+
+/** Encode an unsigned 12-bit immediate offset field. */
+std::uint32_t encode_unsigned_offset_fields(
+  std::uint32_t base,
+  cpu_registers rt,
+  cpu_registers rn,
+  std::uint32_t imm12)
+{
+    return base | (imm12 << 10u) | (rn << 5u) | rt;
+}
+
+/** Represents a 16-bit immediate and its halfword shift for a wide-immediate instruction. */
+struct wide_immediate_operand
+{
+    /** 16-bit immediate value. */
+    std::uint16_t imm16;
+
+    /** Left shift amount in bits. */
+    std::uint32_t shift_amount;
+
+    /** Mask applied to the encoded halfword selector. */
+    std::uint32_t hw_mask;
+};
+
+/** Encode the destination register and immediate fields of a wide-immediate instruction. */
+std::uint32_t encode_wide_immediate_fields(
+  std::uint32_t base,
+  cpu_registers rd,
+  wide_immediate_operand operand)
+{
+    const std::uint32_t hw = (operand.shift_amount >> 4u) & operand.hw_mask;
+    return base
+           | (hw << 21u)
+           | (static_cast<std::uint32_t>(operand.imm16) << 5u)
+           | rd;
+}
+
+}    // namespace
+
 /*
  * Helpers.
  */
@@ -33,7 +95,19 @@ void instruction_emitter::emit_ldp_stp_x(
   std::int32_t byte_offset,
   bool pre_index)
 {
-    uint32_t op = 0xA8000000;    // Base opcode mask for pair loads/stores
+    if((byte_offset % 8) != 0)
+    {
+        throw jit_error{
+          "LDP/STP X offset must be a multiple of 8"};
+    }
+
+    if(byte_offset < -512 || byte_offset > 504)
+    {
+        throw jit_error{
+          "LDP/STP X offset is out of range"};
+    }
+
+    uint32_t op = 0xA8000000u;    // Base opcode mask for pair loads/stores
 
     if(is_load)
     {
@@ -54,8 +128,8 @@ void instruction_emitter::emit_ldp_stp_x(
       (static_cast<std::uint32_t>(byte_offset) >> 3u) & 0x7Fu;
 
     op |= (imm7 << 15u);
-    op |= (rt2 << 10);
-    op |= (rn << 5);
+    op |= (rt2 << 10u);
+    op |= (rn << 5u);
     op |= rt;
 
     emit(op);
@@ -71,10 +145,58 @@ void instruction_emitter::add_w(
   cpu_registers wm)
 {
     emit(
-      0x0B000000u
-      | (wm << 16)
-      | (wn << 5)
-      | wd);
+      encode_register_fields(0x0B000000u, wd, wn, wm));
+}
+
+void instruction_emitter::add_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x8B000000u, xd, xn, xm));
+}
+
+void instruction_emitter::and_reg_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x0A000000u, wd, wn, wm));
+}
+
+void instruction_emitter::and_reg_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x8A000000u, xd, xn, xm));
+}
+
+void instruction_emitter::blr(
+  cpu_registers xn)
+{
+    emit(0xD63F0000u | (xn << 5u));
+}
+
+void instruction_emitter::eor_reg_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x4A000000u, wd, wn, wm));
+}
+
+void instruction_emitter::eor_reg_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0xCA000000u, xd, xn, xm));
 }
 
 void instruction_emitter::ldp_x_post(
@@ -109,12 +231,9 @@ void instruction_emitter::ldr_w(
           "LDR W offset is out of range"};
     }
 
-    std::uint32_t imm12 = offset_bytes >> 2u;
+    const std::uint32_t imm12 = offset_bytes >> 2u;
     emit(
-      0xB9400000
-      | (imm12 << 10u)
-      | (xn << 5u)
-      | wd);
+      encode_unsigned_offset_fields(0xB9400000u, wd, xn, imm12));
 }
 
 void instruction_emitter::ldr_x(
@@ -134,12 +253,45 @@ void instruction_emitter::ldr_x(
           "LDR X offset is out of range"};
     }
 
-    std::uint32_t imm12 = offset_bytes >> 3u;
+    const std::uint32_t imm12 = offset_bytes >> 3u;
     emit(
-      0xF9400000
-      | (imm12 << 10u)
-      | (xn << 5u)
-      | xd);
+      encode_unsigned_offset_fields(0xF9400000u, xd, xn, imm12));
+}
+
+void instruction_emitter::lslv_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x1AC02000u, wd, wn, wm));
+}
+
+void instruction_emitter::lslv_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x9AC02000u, xd, xn, xm));
+}
+
+void instruction_emitter::lsrv_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x1AC02400u, wd, wn, wm));
+}
+
+void instruction_emitter::lsrv_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x9AC02400u, xd, xn, xm));
 }
 
 void instruction_emitter::movk_w(
@@ -147,12 +299,16 @@ void instruction_emitter::movk_w(
   std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift >> 4u) & 0x1u;
-    emit(
-      0x72800000u
-      | (hw << 21u)
-      | (static_cast<std::uint32_t>(imm16) << 5u)
-      | static_cast<std::uint32_t>(xd));
+    if(shift != 0 && shift != 16)
+    {
+        throw jit_error{
+          "MOVK W shift must be 0 or 16"};
+    }
+
+    emit(encode_wide_immediate_fields(
+      0x72800000u,
+      xd,
+      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
 }
 
 void instruction_emitter::movk_x(
@@ -160,12 +316,16 @@ void instruction_emitter::movk_x(
   std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift >> 4u) & 0x3u;
-    emit(
-      0xf2800000
-      | (hw << 21u)
-      | (static_cast<std::uint32_t>(imm16) << 5u)
-      | static_cast<std::uint32_t>(xd));
+    if(shift != 0 && shift != 16 && shift != 32 && shift != 48)
+    {
+        throw jit_error{
+          "MOVK X shift must be 0, 16, 32 or 48"};
+    }
+
+    emit(encode_wide_immediate_fields(
+      0xF2800000u,
+      xd,
+      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
 }
 
 void instruction_emitter::movn_w(
@@ -173,12 +333,16 @@ void instruction_emitter::movn_w(
   std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift >> 4u) & 0x1u;
-    emit(
-      0x12800000u
-      | (hw << 21u)
-      | (static_cast<std::uint32_t>(imm16) << 5u)
-      | static_cast<std::uint32_t>(xd));
+    if(shift != 0 && shift != 16)
+    {
+        throw jit_error{
+          "MOVN W shift must be 0 or 16"};
+    }
+
+    emit(encode_wide_immediate_fields(
+      0x12800000u,
+      xd,
+      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
 }
 
 void instruction_emitter::movz_w(
@@ -186,17 +350,112 @@ void instruction_emitter::movz_w(
   std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t shift)
 {
-    std::uint32_t hw = (shift >> 4u) & 0x1u;
+    if(shift != 0 && shift != 16)
+    {
+        throw jit_error{
+          "MOVZ W shift must be 0 or 16"};
+    }
+
+    emit(encode_wide_immediate_fields(
+      0x52800000u,
+      xd,
+      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
+}
+
+void instruction_emitter::movz_x(
+  cpu_registers xd,
+  std::uint16_t imm16,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::uint32_t shift)
+{
+    if(shift != 0 && shift != 16 && shift != 32 && shift != 48)
+    {
+        throw jit_error{
+          "MOVZ X shift must be 0, 16, 32 or 48"};
+    }
+
+    emit(encode_wide_immediate_fields(
+      0xD2800000u,
+      xd,
+      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
+}
+
+void instruction_emitter::msub_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm,
+  cpu_registers wa)
+{
     emit(
-      0x52800000u
-      | (hw << 21u)
-      | (static_cast<std::uint32_t>(imm16) << 5u)
-      | static_cast<std::uint32_t>(xd));
+      encode_register_fields(0x1B008000u, wd, wn, wm, wa));
+}
+
+void instruction_emitter::msub_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm,
+  cpu_registers xa)
+{
+    emit(
+      encode_register_fields(0x9B008000u, xd, xn, xm, xa));
+}
+
+void instruction_emitter::mul_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x1B007C00u, wd, wn, wm));
+}
+
+void instruction_emitter::mul_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x9B007C00u, xd, xn, xm));
+}
+
+void instruction_emitter::orr_reg_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x2A000000u, wd, wn, wm));
+}
+
+void instruction_emitter::orr_reg_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0xAA000000u, xd, xn, xm));
 }
 
 void instruction_emitter::ret()
 {
     emit(0xD65F03C0);
+}
+
+void instruction_emitter::sdiv_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    emit(
+      encode_register_fields(0x1AC00C00u, wd, wn, wm));
+}
+
+void instruction_emitter::sdiv_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0x9AC00C00u, xd, xn, xm));
 }
 
 void instruction_emitter::stp_x_pre(
@@ -231,12 +490,27 @@ void instruction_emitter::str_w(
           "STR W offset is out of range"};
     }
 
-    std::uint32_t imm12 = offset_bytes >> 2u;
+    const std::uint32_t imm12 = offset_bytes >> 2u;
     emit(
-      0xB9000000
-      | (imm12 << 10u)
-      | (xn << 5u)
-      | wd);
+      encode_unsigned_offset_fields(0xB9000000u, wd, xn, imm12));
+}
+
+void instruction_emitter::str_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  std::uint32_t offset_bytes)
+{
+    if((offset_bytes & 0x7u) != 0)
+    {
+        throw jit_error{"STR X offset must be a multiple of 8"};
+    }
+    if(offset_bytes > 0xFFFu * 8u)
+    {
+        throw jit_error{"STR X offset is out of range"};
+    }
+
+    const std::uint32_t imm12 = offset_bytes >> 3u;
+    emit(encode_unsigned_offset_fields(0xF9000000u, xd, xn, imm12));
 }
 
 void instruction_emitter::sub_w(
@@ -245,10 +519,16 @@ void instruction_emitter::sub_w(
   cpu_registers wm)
 {
     emit(
-      0x4B000000u
-      | (wm << 16)
-      | (wn << 5)
-      | wd);
+      encode_register_fields(0x4B000000u, wd, wn, wm));
+}
+
+void instruction_emitter::sub_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    emit(
+      encode_register_fields(0xCB000000u, xd, xn, xm));
 }
 
 /*
@@ -260,9 +540,11 @@ void instruction_emitter::mov_reg_x(
   cpu_registers xm)
 {
     emit(
-      0xAA0003E0
-      | (xm << 16)
-      | xd);
+      encode_register_fields(
+        0xAA000000u,
+        xd,
+        cpu_registers::XZR,
+        xm));
 }
 
 void instruction_emitter::mov_w(
@@ -288,6 +570,22 @@ void instruction_emitter::mov_w(
     {
         movz_w(wd, low16, 0);      // Load lower 16 bits
         movk_w(wd, high16, 16);    // Overwrite upper 16 bits with LSL #16
+    }
+}
+
+void instruction_emitter::mov_x(
+  cpu_registers xd,
+  std::int64_t val)
+{
+    auto bits = static_cast<std::uint64_t>(val);
+    movz_x(xd, static_cast<std::uint16_t>(bits & 0xFFFFu));
+    for(std::uint32_t shift = 16; shift < 64; shift += 16)
+    {
+        auto imm16 = static_cast<std::uint16_t>((bits >> shift) & 0xFFFFu);
+        if(imm16 != 0)
+        {
+            movk_x(xd, imm16, shift);
+        }
     }
 }
 

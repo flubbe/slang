@@ -325,15 +325,31 @@ set_tests_properties(
 )
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "build jit library (default, compile)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang compile test/test_jit_library
+    )
+    set_tests_properties("build jit library (default, compile)" PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_SETUP generate_jit_library
+    )
+
     add_compile_test(
         "build jit test"
         FALSE
+        --search-path test
         test/test_jit
     )
     set_tests_properties(
         "build jit test (default, compile)"
-        PROPERTIES FIXTURES_SETUP
+        PROPERTIES
+        FIXTURES_REQUIRED generate_jit_library
+        FIXTURES_SETUP
         generate_jit_test
+    )
+    set_tests_properties(
+        "build jit test (--no-eval-const-subexpr, compile)"
+        PROPERTIES FIXTURES_REQUIRED generate_jit_library
     )
 endif()
 

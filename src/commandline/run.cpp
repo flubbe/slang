@@ -8,12 +8,18 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <chrono>
 #include <format>
 #include <print>
 
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
 #include "interpreter/invoke.h"
+
+#ifdef SLANG_ARCH_AARCH64
+#    include "jit/aarch64.h"
+#endif /* SLANG_ARCH_AARCH64 */
+
 #include "runtime/runtime.h"
 #include "shared/module.h"
 #include "commandline.h"
@@ -21,6 +27,10 @@
 
 namespace rt = slang::runtime;
 namespace si = slang::interpreter;
+
+#ifdef SLANG_JIT_AVAILABLE
+namespace sj = slang::jit;
+#endif /* SLANG_JIT_AVAILABLE */
 
 namespace slang::commandline
 {
@@ -106,6 +116,9 @@ void run::invoke(const std::vector<std::string>& args)
 
     // clang-format off
     options.add_options()
+#ifdef SLANG_JIT_AVAILABLE
+        ("j,jit", "Run using JIT compiler.")
+#endif /* SLANG_JIT_AVAILABLE */
         ("v,verbose", "Verbose output.")
         ("no-lang", "Exclude default language modules.")
         ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
@@ -123,6 +136,9 @@ void run::invoke(const std::vector<std::string>& args)
     }
 
     bool verbose = result.count("verbose") > 0;
+#ifdef SLANG_JIT_AVAILABLE
+    bool use_jit = result.count("jit") > 0;
+#endif /* SLANG_JIT_AVAILABLE */
     bool no_lang = result.count("no-lang") > 0;
 
     auto module_path = fs::absolute(fs::path{result["filename"].as<std::string>()});
@@ -188,37 +204,88 @@ void run::invoke(const std::vector<std::string>& args)
         std::println("Info: module name: {}", module_name.string());
     }
 
-    // Set up interpreter context.
-    si::context ctx{file_mgr};
-    runtime_setup(ctx, verbose);
-
-    si::module_loader& loader = ctx.resolve_module(module_name);
-    si::function& main_function = loader.get_function("main");
-    validate_main_signature(main_function, verbose);
-
-    // call 'main'.
-    if(verbose)
+#ifdef SLANG_JIT_AVAILABLE
+    if(!use_jit)
     {
-        std::println("Info: Invoking 'main'.");
-    }
-    si::value res = si::invoke(
-      main_function,
-      std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()});
+#endif /* SLANG_JIT_AVAILABLE */
+        // Set up interpreter context.
+        si::context ctx{file_mgr};
+        runtime_setup(ctx, verbose);
 
-    const int* return_value = res.get<int>();
+        si::module_loader& loader = ctx.resolve_module(module_name);
+        si::function& main_function = loader.get_function("main");
+        validate_main_signature(main_function, verbose);
 
-    if(return_value == nullptr)
-    {
-        std::println();
-        std::println("Program did not return a valid exit code.");
+        // call 'main'.
+        if(verbose)
+        {
+            std::println("Info: Invoking 'main'.");
+        }
+        si::value res = si::invoke(
+          main_function,
+          std::vector<std::string>{forwarded_args.begin(), forwarded_args.end()});
+
+        const int* return_value = res.get<int>();
+
+        if(return_value == nullptr)
+        {
+            std::println();
+            std::println("Program did not return a valid exit code.");
+        }
+        else
+        {
+            std::println();
+            std::println("Program exited with exit code {}.", *return_value);
+        }
+
+        finalize_gc(ctx.get_gc(), verbose);
+#ifdef SLANG_JIT_AVAILABLE
     }
     else
     {
-        std::println();
-        std::println("Program exited with exit code {}.", *return_value);
-    }
+        auto time_load_compile_start = std::chrono::steady_clock::now();
 
-    finalize_gc(ctx.get_gc(), verbose);
+        sj::module_loader mod{
+          file_mgr,
+          module_name,
+          fs::path{module_name}.replace_extension(package::module_ext)};
+
+        auto time_load_compile_end = std::chrono::steady_clock::now();
+
+        if(verbose)
+        {
+            float load_compile_duration =
+              std::chrono::duration<float, std::milli>(
+                time_load_compile_end - time_load_compile_start)
+                .count();
+            std::println(
+              "Info: Loaded and compiled modules in {:.2f} ms.",
+              load_compile_duration);
+        }
+
+        auto& function = mod.get_function("main");
+
+        auto frame = si::stack_frame::with_capacity(
+          mod.get_constant_table(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        // TODO pass parameters.
+
+        function(&frame);
+
+        std::int32_t return_value = 0;
+        std::memcpy(
+          &return_value,
+          frame.stack.span().data(),
+          sizeof(return_value));
+
+        std::println();
+        std::println("Program exited with exit code {}.", return_value);
+
+        // TODO finalize GC.
+    }
+#endif /* SLANG_JIT_AVAILABLE */
 }
 
 std::string run::get_description() const

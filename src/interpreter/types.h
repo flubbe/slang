@@ -118,26 +118,17 @@ protected:
     /** Maximal size. */
     std::size_t max_size;
 
+    /** Only allow creation through factory functions. */
+    operand_stack() = default;
+
 public:
     /** Defaulted and deleted constructors. */
-    operand_stack() = delete;
     operand_stack(const operand_stack&) = default;
     operand_stack(operand_stack&&) = default;
 
     /** Default assignments. */
     operand_stack& operator=(const operand_stack&) = default;
     operand_stack& operator=(operand_stack&&) = default;
-
-    /**
-     * Construct a stack with a maximal size.
-     *
-     * @param max_size The maximal stack size.
-     */
-    explicit operand_stack(std::size_t max_size)
-    : max_size{max_size}
-    {
-        stack.reserve(max_size);
-    }
 
     /** Check if the stack is empty. */
     bool empty() const noexcept
@@ -356,6 +347,24 @@ public:
           n);
     }
 
+    /**
+     * Push a raw byte sequence onto the stack.
+     *
+     * @param bytes A byte sequence.
+     */
+    void push_bytes(std::span<const std::byte> bytes)
+    {
+        if(stack.size() + bytes.size() > max_size)
+        {
+            throw interpreter_error("Stack overflow.");
+        }
+
+        stack.insert(
+          stack.end(),
+          bytes.begin(),
+          bytes.end());
+    }
+
     /** Pop an category 1 type (32 bit) from the stack. */
     template<typename T>
         requires(sizeof(T) == 4
@@ -368,7 +377,10 @@ public:
         }
 
         T i;
-        std::memcpy(&i, &stack[stack.size() - sizeof(T)], sizeof(T));
+        std::memcpy(
+          &i,
+          &stack[stack.size() - sizeof(T)],
+          sizeof(T));
         stack.resize(stack.size() - sizeof(T));
 
         return i;
@@ -386,7 +398,10 @@ public:
         }
 
         T i;
-        std::memcpy(&i, &stack[stack.size() - sizeof(T)], sizeof(T));
+        std::memcpy(
+          &i,
+          &stack[stack.size() - sizeof(T)],
+          sizeof(T));
         stack.resize(stack.size() - sizeof(T));
 
         return i;
@@ -404,9 +419,15 @@ public:
         }
 
         T v;
-        std::memcpy(&v, &stack[stack.size() - sizeof(T)], sizeof(T));
+        std::memcpy(
+          &v,
+          &stack[stack.size() - sizeof(T)],
+          sizeof(T));
         U u = func(v);
-        std::memcpy(&stack[stack.size() - sizeof(U)], &u, sizeof(U));
+        std::memcpy(
+          &stack[stack.size() - sizeof(U)],
+          &u,
+          sizeof(U));
     }
 
     /** Pop an address from the stack. */
@@ -419,9 +440,24 @@ public:
         }
 
         T* addr;
-        std::memcpy(&addr, &stack[stack.size() - sizeof(T*)], sizeof(T*));
+        std::memcpy(
+          &addr,
+          &stack[stack.size() - sizeof(T*)],
+          sizeof(T*));
         stack.resize(stack.size() - sizeof(T*));
         return addr;
+    }
+
+    /** Get the span for the stack. */
+    std::span<std::byte> span()
+    {
+        return stack;
+    }
+
+    /** Get the span for the stack. */
+    std::span<const std::byte> span() const
+    {
+        return stack;
     }
 
     /**
@@ -452,6 +488,36 @@ public:
             throw interpreter_error("Stack underflow");
         }
         stack.resize(stack.size() - byte_count);
+    }
+
+    /**
+     * Create an operand stack and reserve the capacity.
+     *
+     * @param capacity The capacity to reserve, in bytes.
+     * @returns Returns a new operand stack with the requested capacity.
+     */
+    static operand_stack with_capacity(
+      std::size_t capacity)
+    {
+        operand_stack result;
+        result.max_size = capacity;
+        result.stack.reserve(capacity);
+        return result;
+    }
+
+    /**
+     * Create an operand stack with the given size.
+     *
+     * @param size The stack size, in bytes.
+     * @returns Returns a new operand stack with the requested size.
+     */
+    static operand_stack with_size(
+      std::size_t size)
+    {
+        operand_stack result;
+        result.max_size = size;
+        result.stack.resize(size);
+        return result;
     }
 };
 
@@ -665,30 +731,40 @@ struct stack_frame
     /** The operand stack. */
     operand_stack stack;
 
-    /** Default constructors. */
-    stack_frame() = delete;
-    stack_frame(const stack_frame&) = delete;
-    stack_frame(stack_frame&&) = default;
-
-    /** Default assignments. */
-    stack_frame& operator=(const stack_frame&) = delete;
-    stack_frame& operator=(stack_frame&&) = delete;
+    /**
+     * Allocate a stack frame a given operand stack capacity.
+     *
+     * @param constants Reference to the module constant table.
+     * @param locals_size Size to allocate for the locals.
+     * @param stack_capacity The operand stack capacity.
+     */
+    static stack_frame with_capacity(
+      const std::vector<module_::constant_table_entry>& constants,
+      std::size_t locals_size,
+      std::size_t stack_capacity)
+    {
+        return {
+          .constants = constants,
+          .locals = std::vector<std::byte>(locals_size),
+          .stack = operand_stack::with_capacity(stack_capacity)};
+    }
 
     /**
-     * Construct a stack frame.
+     * Allocate a stack frame with a given operand stack size.
      *
      * @param constants Reference to the module constant table.
      * @param locals_size Size to allocate for the locals.
      * @param stack_size The operand stack size.
      */
-    stack_frame(
+    static stack_frame with_size(
       const std::vector<module_::constant_table_entry>& constants,
       std::size_t locals_size,
       std::size_t stack_size)
-    : constants{constants}
-    , locals{locals_size}
-    , stack{stack_size}
     {
+        return {
+          .constants = constants,
+          .locals = std::vector<std::byte>(locals_size),
+          .stack = operand_stack::with_size(stack_size)};
     }
 };
 
