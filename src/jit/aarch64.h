@@ -84,9 +84,37 @@ struct instruction_emitter
       cpu_registers xn,
       cpu_registers xm);
 
+    /**
+     * Branch.
+     *
+     * Emits `B #<imm26>`, where the signed 26-bit immediate specifies
+     * a PC-relative byte offset divided by four.
+     *
+     * @param byte_offset Signed byte offset from the address of this
+     *     instruction to the branch target. Must be 4-byte aligned and in
+     *     the range `[-2^27, 2^27)`.
+     */
+    void b(
+      std::int32_t byte_offset);
+
     /** Branch with link to register. Emits `BLR <Xn>`. */
     void blr(
       cpu_registers xn);
+
+    /**
+     * Compare and branch if nonzero (32-bit).
+     *
+     * Emits `CBNZ <Wt>, #<imm19>`, where the signed 19-bit immediate
+     * specifies a PC-relative byte offset divided by four.
+     *
+     * @param wt The W register to test.
+     * @param byte_offset Signed byte offset from the address of this
+     *     instruction to the branch target. Must be 4-byte aligned and in
+     *     the range `[-2^20, 2^20)`.
+     */
+    void cbnz_w(
+      cpu_registers wt,
+      std::int32_t byte_offset);
 
     /** Bitwise exclusive-OR (shifted register). Emits `EOR <Wd>, <Wn>, <Wm>`. */
     void eor_reg_w(

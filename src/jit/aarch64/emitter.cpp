@@ -175,10 +175,49 @@ void instruction_emitter::and_reg_x(
       encode_register_fields(0x8A000000u, xd, xn, xm));
 }
 
+void instruction_emitter::b(
+  std::int32_t byte_offset)
+{
+    // byte_offset is encoded into <imm26> as byte_offset = <imm26>*4.
+
+    if((byte_offset % 4) != 0
+       || byte_offset < -(1 << 27)     // NOLINT(bugprone-signed-bitwise)
+       || byte_offset >= (1 << 27))    // NOLINT(bugprone-signed-bitwise)
+    {
+        throw jit_error{
+          "B branch offset is out of range or unaligned."};
+    }
+
+    byte_offset /= 4;    // use division instead of shift because of sign
+
+    emit(0x14000000u | (static_cast<std::uint32_t>(byte_offset) & 0x03FFFFFFu));
+}
+
 void instruction_emitter::blr(
   cpu_registers xn)
 {
     emit(0xD63F0000u | (xn << 5u));
+}
+
+void instruction_emitter::cbnz_w(
+  cpu_registers wt,
+  std::int32_t byte_offset)
+{
+    // byte_offset is encoded into <imm19> as byte_offset = <imm19>*4.
+
+    if((byte_offset % 4) != 0
+       || byte_offset < -(1 << 20)     // NOLINT(bugprone-signed-bitwise)
+       || byte_offset >= (1 << 20))    // NOLINT(bugprone-signed-bitwise)
+    {
+        throw jit_error{
+          "CBNZ branch offset is out of range or unaligned."};
+    }
+    byte_offset /= 4;    // use division instead of shift because of sign
+
+    emit(
+      0x35000000u
+      | ((static_cast<std::uint32_t>(byte_offset) & 0x7FFFFu) << 5u)
+      | static_cast<std::uint32_t>(wt));
 }
 
 void instruction_emitter::eor_reg_w(

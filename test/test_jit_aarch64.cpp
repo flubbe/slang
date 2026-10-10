@@ -207,6 +207,12 @@ TEST(jit, instruction_encodings_others)
     emitter.blr(cpu_registers::X16);
     EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0xd63f0200});
 
+    emitter.b(-24);
+    EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0x17fffffa});
+
+    emitter.cbnz_w(cpu_registers::X4, 16);
+    EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0x35000084});
+
     emitter.ldp_x_post(cpu_registers::X19, cpu_registers::X20, cpu_registers::SP, 0x10);
     EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0xa8c153f3});
 
