@@ -28,7 +28,7 @@
 namespace rt = slang::runtime;
 namespace si = slang::interpreter;
 
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
 namespace sj = slang::jit;
 #endif /* SLANG_JIT_AVAILABLE */
 
@@ -116,7 +116,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     // clang-format off
     options.add_options()
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
         ("j,jit", "Run using JIT compiler.")
 #endif /* SLANG_JIT_AVAILABLE */
         ("v,verbose", "Verbose output.")
@@ -136,7 +136,7 @@ void run::invoke(const std::vector<std::string>& args)
     }
 
     bool verbose = result.count("verbose") > 0;
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
     bool use_jit = result.count("jit") > 0;
 #endif /* SLANG_JIT_AVAILABLE */
     bool no_lang = result.count("no-lang") > 0;
@@ -204,7 +204,7 @@ void run::invoke(const std::vector<std::string>& args)
         std::println("Info: module name: {}", module_name.string());
     }
 
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
     if(!use_jit)
     {
 #endif /* SLANG_JIT_AVAILABLE */
@@ -239,7 +239,7 @@ void run::invoke(const std::vector<std::string>& args)
         }
 
         finalize_gc(ctx.get_gc(), verbose);
-#ifdef SLANG_JIT_AVAILABLE
+#if SLANG_JIT_AVAILABLE
     }
     else
     {
