@@ -77,18 +77,6 @@ class context
     gc::garbage_collector gc;
 
     /**
-     * Resolve a native function.
-     *
-     * @param name The function's name.
-     * @param library_name The function's library name.
-     * @returns Returns the resolved function.
-     * @throws Throws an `interpreter_error` if the resolution failed.
-     */
-    std::function<void(operand_stack&)> resolve_native_function(
-      const std::string& name,
-      const std::string& library_name) const;
-
-    /**
      * Execute a function.
      *
      * @param loader The module loader.
@@ -186,6 +174,21 @@ public:
       const std::string& mod_name,
       std::string fn_name,
       std::function<void(operand_stack&)> func);
+
+    /**
+     * Resolve a native function registered for the given library.
+     *
+     * TODO Public to let the JIT compiler access it. Eventually,
+     *      the bookkeeping/resolution should be factored out and shared.
+     *
+     * @param name The function's name.
+     * @param library_name The function's library name.
+     * @returns Returns the resolved function.
+     * @throws Throws an `interpreter_error` if the resolution failed.
+     */
+    std::function<void(operand_stack&)> resolve_native_function(
+      const std::string& name,
+      const std::string& library_name) const;
 
     /**
      * Register a type layout. If a layout of the same name already exists, a `gc_error` is thrown.

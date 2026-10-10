@@ -330,9 +330,10 @@ void module_loader::decode_structs()
             }
             else
             {
-                if(member_type.base_type.import_index.has_value())
+                if(auto import_index = member_type.base_type.get_import_index();
+                   import_index.has_value())
                 {
-                    std::size_t index = member_type.base_type.import_index.value();
+                    std::size_t index = import_index.value();
                     if(index >= mod.header.imports.size())
                     {
                         throw interpreter_error(
@@ -345,6 +346,7 @@ void module_loader::decode_structs()
                     if(std::get<const module_loader*>(mod.header.imports[index].export_reference) == nullptr)
                     {
                         // load the package containing the type definition.
+
                         if(mod.header.imports[index].type != module_::symbol_type::type)
                         {
                             throw interpreter_error(

@@ -574,6 +574,38 @@ void instruction_emitter::sub_x(
  * Convenience operations.
  */
 
+void instruction_emitter::load_x(
+  cpu_registers reg,
+  std::uint32_t offset)
+{
+    if(offset % sizeof(std::int64_t) == 0)
+    {
+        ldr_x(reg, cpu_registers::X20, offset);
+    }
+    else
+    {
+        mov_x(cpu_registers::X2, static_cast<std::int64_t>(offset));
+        add_x(cpu_registers::X2, cpu_registers::X20, cpu_registers::X2);
+        ldr_x(reg, cpu_registers::X2, 0);
+    }
+}
+
+void instruction_emitter::store_x(
+  cpu_registers reg,
+  std::uint32_t offset)
+{
+    if(offset % sizeof(std::int64_t) == 0)
+    {
+        str_x(reg, cpu_registers::X20, offset);
+    }
+    else
+    {
+        mov_x(cpu_registers::X2, static_cast<std::int64_t>(offset));
+        add_x(cpu_registers::X2, cpu_registers::X20, cpu_registers::X2);
+        str_x(reg, cpu_registers::X2, 0);
+    }
+}
+
 void instruction_emitter::mov_reg_x(
   cpu_registers xd,
   cpu_registers xm)
@@ -636,6 +668,72 @@ void instruction_emitter::push_fp_lr()
 void instruction_emitter::pop_fp_lr()
 {
     emit(0xA8C17BFD);
+}
+
+/*
+ * Patching.
+ */
+
+void instruction_emitter::patch_b(
+  std::size_t instruction_index,
+  std::size_t target_index)
+{
+    const auto instruction = code.at(instruction_index);
+
+    if((instruction & 0xFC000000u) != 0x14000000u)
+    {
+        throw jit_error{
+          "Instruction is not a B instruction."};
+    }
+
+    const auto byte_offset =
+      (static_cast<std::int64_t>(target_index) - static_cast<std::int64_t>(instruction_index))
+      * static_cast<std::int64_t>(sizeof(std::uint32_t));
+
+    if(std::cmp_less(byte_offset, -(1 << 27))
+       || std::cmp_greater_equal(byte_offset, 1 << 27))
+    {
+        throw jit_error{
+          "AArch64 branch target is out of range."};
+    }
+
+    const auto imm26 =
+      static_cast<std::uint32_t>(byte_offset / 4) & 0x03FFFFFFu;
+
+    code.at(instruction_index) =
+      (instruction & ~0x03FFFFFFu) | imm26;
+}
+
+void instruction_emitter::patch_cbnz_w(
+  std::size_t instruction_index,
+  std::size_t target_index)
+{
+    const auto instruction = code.at(instruction_index);
+    static constexpr std::uint32_t opcode_mask = 0xFF000000u;
+    static constexpr std::uint32_t cbnz_w_opcode = 0x35000000u;
+
+    if((instruction & opcode_mask) != cbnz_w_opcode)
+    {
+        throw jit_error{
+          "Instruction is not a CBNZ W instruction."};
+    }
+
+    const auto byte_offset =
+      (static_cast<std::int64_t>(target_index) - static_cast<std::int64_t>(instruction_index))
+      * static_cast<std::int64_t>(sizeof(std::uint32_t));
+
+    if(std::cmp_less(byte_offset, -(1 << 20))
+       || std::cmp_greater_equal(byte_offset, 1 << 20))
+    {
+        throw jit_error{
+          "AArch64 exception branch target is out of range."};
+    }
+
+    const auto imm19 =
+      static_cast<std::uint32_t>(byte_offset / 4) & 0x7FFFFu;
+
+    code.at(instruction_index) =
+      (instruction & ~(0x7FFFFu << 5u)) | (imm19 << 5u);
 }
 
 }    // namespace slang::jit::aarch64

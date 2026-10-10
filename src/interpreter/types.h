@@ -4,24 +4,27 @@
  * interpreter type definitions.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #pragma once
 
-#include <any>
+#include <algorithm>
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "jit/forward.h"
 #include "shared/module.h"
 #include "shared/opcodes.h"
+#include "gc.h"
 #include "value.h"
 #include "vector.h"
 
@@ -730,6 +733,88 @@ struct stack_frame
 
     /** The operand stack. */
     operand_stack stack;
+
+    /** Garbage collector used by JIT runtime helpers, if this is a JIT frame. */
+    slang::gc::garbage_collector* gc{nullptr};
+
+    /** References in JIT locals that are currently registered as GC roots. */
+    std::vector<
+      std::pair<std::size_t, void*>>
+      gc_local_roots;
+
+    /** Exception captured at a native/JIT call boundary. */
+    std::exception_ptr pending_exception;
+
+    /**
+     * Update the GC root associated with a local slot.
+     *
+     * If the slot already contains the given object, no action is taken.
+     * Otherwise, the previous object is unregistered as a GC root, the new
+     * object is registered as a GC root, and the local-slot mapping is updated.
+     *
+     * Passing `nullptr` removes the existing root associated with the slot.
+     *
+     * @param offset The local-slot offset.
+     * @param object The new object, or nullptr to clear the slot.
+     */
+    void update_gc_local_root(
+      std::size_t offset,
+      void* object)
+    {
+        auto it = std::ranges::find(
+          gc_local_roots,
+          offset,
+          &std::pair<std::size_t, void*>::first);
+
+        void* previous =
+          it != gc_local_roots.end()
+            ? it->second
+            : nullptr;
+        if(previous == object)
+        {
+            return;
+        }
+
+        // Synchronize the GC root registration with the new slot value.
+        if(previous != nullptr)
+        {
+            gc->remove_root(previous);
+        }
+
+        // Update the local-slot mapping.
+        if(object != nullptr)
+        {
+            gc->add_root(object);
+
+            if(it != gc_local_roots.end())
+            {
+                it->second = object;
+            }
+            else
+            {
+                gc_local_roots.emplace_back(offset, object);
+            }
+        }
+        else if(it != gc_local_roots.end())
+        {
+            // write last element to `it` and pop back.
+            *it = gc_local_roots.back();
+            gc_local_roots.pop_back();
+        }
+    }
+
+    /** Remove all roots owned by this frame. */
+    void clear_gc_local_roots()
+    {
+        if(gc != nullptr)
+        {
+            for(const auto& root: gc_local_roots)
+            {
+                gc->remove_root(root.second);
+            }
+        }
+        gc_local_roots.clear();
+    }
 
     /**
      * Allocate a stack frame a given operand stack capacity.

@@ -204,14 +204,20 @@ void run::invoke(const std::vector<std::string>& args)
         std::println("Info: module name: {}", module_name.string());
     }
 
+    /*
+     * Set up interpreter context.
+     *
+     * TODO In the JIT path, this is used for bookkepping and should be
+     *      factored into a common shared base used by interpreter and
+     *      compiler.
+     */
+    si::context ctx{file_mgr};
+    runtime_setup(ctx, verbose);
+
 #if SLANG_JIT_AVAILABLE
     if(!use_jit)
     {
 #endif /* SLANG_JIT_AVAILABLE */
-        // Set up interpreter context.
-        si::context ctx{file_mgr};
-        runtime_setup(ctx, verbose);
-
         si::module_loader& loader = ctx.resolve_module(module_name);
         si::function& main_function = loader.get_function("main");
         validate_main_signature(main_function, verbose);
@@ -248,7 +254,14 @@ void run::invoke(const std::vector<std::string>& args)
         sj::module_loader mod{
           file_mgr,
           module_name,
-          fs::path{module_name}.replace_extension(package::module_ext)};
+          fs::path{module_name}.replace_extension(package::module_ext),
+          &ctx};
+
+        mod.register_native_functions(
+          [&ctx](const std::string& function_name, const std::string& library_name)
+          {
+              return ctx.resolve_native_function(function_name, library_name);
+          });
 
         auto time_load_compile_end = std::chrono::steady_clock::now();
 
@@ -265,14 +278,55 @@ void run::invoke(const std::vector<std::string>& args)
 
         auto& function = mod.get_function("main");
 
-        auto frame = si::stack_frame::with_capacity(
+        // TODO Signature validation.
+
+        // Check if there is space for the return value.
+        if(function.get_stack_size() < sizeof(std::int32_t))
+        {
+            throw jit::jit_error{
+              "Invalid return type size for 'main'."};
+        }
+
+        // Construct the arguments,
+        auto* main_args = ctx.get_gc().gc_new_array<std::string*>(
+          forwarded_args.size(),
+          gc::gc_object::of_temporary);
+        for(std::size_t i = 0; i < forwarded_args.size(); ++i)
+        {
+            auto* argument = ctx.get_gc().gc_new<std::string>(
+              gc::gc_object::of_none,
+              false);
+            *argument = forwarded_args[i];
+            (*main_args)[i] = argument;
+        }
+
+        // Construct the stack frame.
+        auto frame = si::stack_frame::with_size(
           mod.get_constant_table(),
           function.get_locals_size(),
           function.get_stack_size());
+        frame.gc = &ctx.get_gc();
 
-        // TODO pass parameters.
+        // Check that we have enough space available for the argument pointer.
+        if(frame.locals.size() < sizeof(main_args))    // NOLINT(bugprone-sizeof-expression)
+        {
+            throw sj::jit_error{
+              "JIT main function has no str[] argument slot."};
+        }
+        std::memcpy(
+          frame.locals.data(),
+          reinterpret_cast<const void*>(&main_args),    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+          sizeof(main_args));                           // NOLINT(bugprone-sizeof-expression)
+        frame.update_gc_local_root(0, main_args);
 
         function(&frame);
+
+        // If there was an error, we re-throw the exception here
+        // so it's visible to the caller/main.
+        if(frame.pending_exception != nullptr)
+        {
+            std::rethrow_exception(frame.pending_exception);
+        }
 
         std::int32_t return_value = 0;
         std::memcpy(
@@ -283,7 +337,10 @@ void run::invoke(const std::vector<std::string>& args)
         std::println();
         std::println("Program exited with exit code {}.", return_value);
 
-        // TODO finalize GC.
+        // Finalize GC.
+        frame.clear_gc_local_roots();
+        ctx.get_gc().remove_temporary(main_args);
+        finalize_gc(ctx.get_gc(), verbose);
     }
 #endif /* SLANG_JIT_AVAILABLE */
 }

@@ -2086,6 +2086,7 @@ public:
                 ctx.get_gc().add_persistent(&locals[offset], layout_id.value());
             }
 
+            // TODO This could be done upfront in the module loader (see e.g. the JIT module loader).
             if(is_garbage_collected(arg_type))
             {
                 ctx.get_gc().add_temporary(&locals[offset]);

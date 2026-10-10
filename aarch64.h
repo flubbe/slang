@@ -31,12 +31,9 @@ namespace slang::jit::aarch64
 /**
  * AArch64 instruction emitter.
  *
- * References
- * ----------
- * 1. Arm Architecture Reference Manual Armv8, for Armv8-A architecture profile,
- *    https://support.arm.com/documentation/ddi0487/latest/
- * 2. Procedure Call Standard for the Arm(R) 64-bit Architecture (AArch64),
- *    https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst
+ * Reference:
+ *     Arm Architecture Reference Manual Armv8, for Armv8-A architecture profile,
+ *     https://support.arm.com/documentation/ddi0487/latest/
  */
 struct instruction_emitter
 {
@@ -292,26 +289,6 @@ struct instruction_emitter
      * Convenience operations.
      */
 
-    /**
-     * Load a 64-bit value from a base register plus a byte offset.
-     *
-     * Uses an immediate-offset load when the offset is encodable;
-     * otherwise, computes the effective address in a temporary register.
-     */
-    void load_x(
-      cpu_registers reg,
-      std::uint32_t offset);
-
-    /**
-     * Store a 64-bit value to a base register plus a byte offset.
-     *
-     * Uses an immediate-offset store when the offset is encodable;
-     * otherwise, computes the effective address in a temporary register.
-     */
-    void store_x(
-      cpu_registers reg,
-      std::uint32_t offset);
-
     /** Move register. Emits `MOV <Xd>, <Xm>`. */
     void mov_reg_x(
       cpu_registers xd,
@@ -332,30 +309,9 @@ struct instruction_emitter
 
     /** Load pair of registers (post-indexed). Emits `LDP X29, X30, [SP], #16`. */
     void pop_fp_lr();
-
-    /*
-     * Patching.
-     */
-
-    /** Patch the target of a `B` instruction. */
-    void patch_b(
-      std::size_t instruction_index,
-      std::size_t target_index);
-
-    /** Patch the target of a `CBNZ <Wt>` instruction. */
-    void patch_cbnz_w(
-      std::size_t instruction_index,
-      std::size_t target_index);
 };
 
-/**
- * AArch64 JIT compiler.
- *
- * Reference
- * ---------
- * Procedure Call Standard for the Arm(R) 64-bit Architecture (AArch64),
- * https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst
- */
+/** AArch64 JIT compiler. */
 class jit_compiler
 {
     /**
@@ -391,7 +347,7 @@ public:
       std::size_t locals_size,
       const std::vector<jit_call_target*>& call_targets,
       const std::vector<jit_call_target*>& import_call_targets,
-      const std::function<module_::struct_descriptor(std::int64_t)>& resolve_type = {});
+      std::function<module_::struct_descriptor(std::int64_t)> resolve_type = {});
 };
 
 class module_loader;
@@ -419,13 +375,13 @@ struct imported_symbol
 struct module_header
 {
     /** Import table. */
-    std::vector<imported_symbol> imports;
+    std::vector<imported_symbol> imports{};
 
     /** Export table. */
-    std::vector<module_::exported_symbol> exports;
+    std::vector<module_::exported_symbol> exports{};
 
     /** Constant table. */
-    std::vector<module_::constant_table_entry> constants;
+    std::vector<module_::constant_table_entry> constants{};
 };
 
 /** A module loader. Represents a loaded module with JITted bytecode. */
@@ -531,7 +487,11 @@ public:
       fs::path path,
       interpreter::context* runtime_context = nullptr);
 
+    /** Default destructor. */
+    ~module_loader() = default;
+
     /** Get the module contant table. */
+    [[nodiscard]]
     const std::vector<
       module_::constant_table_entry>&
       get_constant_table() const

@@ -192,6 +192,12 @@ struct jit_call_target
 
     /** Required stack size, in bytes. */
     std::size_t stack_size{0};
+
+    /** Offsets of GC-managed locals, used to root JIT callee arguments. */
+    std::vector<std::size_t> gc_local_offsets;
+
+    /** Run the runtime's GC safepoint before invoking this target. */
+    std::function<void()> safepoint;
 };
 
 }    // namespace slang::jit

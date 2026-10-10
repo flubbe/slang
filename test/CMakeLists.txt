@@ -275,6 +275,7 @@ add_test(NAME vector COMMAND test_vector)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     add_executable(test_jit_aarch64
         ../src/archives/file.cpp
+        ../src/interpreter/gc.cpp
         ../src/jit/aarch64/compiler.cpp
         ../src/jit/aarch64/emitter.cpp
         ../src/jit/aarch64/module_loader.cpp
@@ -358,6 +359,20 @@ add_compile_exec_test(
     TRUE
     test/test_array
 )
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "slang array (JIT, run)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang run --jit test/test_array
+    )
+    set_tests_properties(
+        "slang array (JIT, run)"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED "slang array (default, compile)"
+    )
+endif()
+
 add_compile_fail_test(
     "slang array fail 1"
     TRUE
@@ -593,6 +608,25 @@ add_compile_exec_test(
     TRUE
     test/test_structs
 )
+add_compile_exec_test(
+    "slang struct import"
+    TRUE
+    test/test_struct_import
+)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "slang struct import (JIT, run)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang run --jit test/test_struct_import
+    )
+    set_tests_properties(
+        "slang struct import (JIT, run)"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED "slang struct import (default, compile)"
+    )
+endif()
+
 add_compile_exec_test(
     "slang unreachable"
     TRUE
