@@ -345,7 +345,7 @@ void context::exec(
         const std::size_t function_end = offset + size;
         while(offset < function_end)
         {
-            auto instr = std::to_integer<opcode_base>(binary[offset]);
+            const auto instr = std::to_integer<opcode_base>(binary[offset]);
             ++offset;
 
             // validate opcode.

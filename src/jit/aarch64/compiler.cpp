@@ -3,6 +3,9 @@
  *
  * Just In Time compiler for AArch64.
  *
+ * The compiler performs partial code generation, with some opcodes lowered to
+ * C++ runtime helper calls.
+ *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
@@ -1887,6 +1890,8 @@ void emit_safepoint(
   instruction_emitter& emitter)
 {
     const auto helper_address = reinterpret_cast<std::intptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    // set up parameters and call the helper.
     emitter.mov_reg_x(
       cpu_registers::X0,
       cpu_registers::X21);
@@ -1901,6 +1906,8 @@ void emit_exception_guard(
   std::vector<std::size_t>& exception_fixups)
 {
     const auto helper_address = reinterpret_cast<std::intptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    // set up parameters and call the helper.
     emitter.mov_reg_x(
       cpu_registers::X0,
       cpu_registers::X21);
@@ -1908,6 +1915,7 @@ void emit_exception_guard(
       cpu_registers::X16,
       static_cast<std::int64_t>(helper_address));
     emitter.blr(cpu_registers::X16);
+
     const auto instruction_index = emitter.code.size();
     emitter.cbnz_w(cpu_registers::X0, 0);
     exception_fixups.push_back(instruction_index);
@@ -2062,7 +2070,18 @@ jit_function jit_compiler::compile(
     // TODO bytecode reading should work through memory_read_archive
     while(pc < bytecode.size())
     {
-        auto op = static_cast<opcode>(bytecode[pc++]);
+        const auto instr = std::to_integer<opcode_base>(bytecode[pc]);
+        ++pc;
+
+        // validate opcode.
+        if(instr >= std::to_underlying(opcode::opcode_count))
+        {
+            throw jit_error{
+              std::format(
+                "'{:02x}' is not an opcode.",
+                instr)};
+        }
+        auto op = static_cast<opcode>(instr);
 
         switch(op)
         {
@@ -2204,6 +2223,8 @@ jit_function jit_compiler::compile(
             }
 
             const auto helper_address = reinterpret_cast<std::intptr_t>(&load_string_constant);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2217,6 +2238,7 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
             update_stack_size(
               op,
               static_cast<std::int32_t>(sizeof(void*)));
@@ -2284,6 +2306,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(void*));
             const auto helper_address = reinterpret_cast<std::intptr_t>(&duplicate_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2294,6 +2317,7 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
             update_stack_size(
               op,
               sizeof(void*));
@@ -2320,6 +2344,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(void*));
             const auto helper_address = reinterpret_cast<std::intptr_t>(&discard_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2330,6 +2355,7 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
             update_stack_size(
               op,
               -static_cast<std::int32_t>(sizeof(void*)));
@@ -2353,9 +2379,12 @@ jit_function jit_compiler::compile(
 
             pc = input.tell();
 
-            const auto size1 = static_cast<std::size_t>(target_type_layout::for_class(type1).size);
-            const auto size2 = static_cast<std::size_t>(target_type_layout::for_class(type2).size);
-            const auto size3 = static_cast<std::size_t>(target_type_layout::for_class(type3).size);
+            const auto size1 = static_cast<std::size_t>(
+              target_type_layout::for_class(type1).size);
+            const auto size2 = static_cast<std::size_t>(
+              target_type_layout::for_class(type2).size);
+            const auto size3 = static_cast<std::size_t>(
+              target_type_layout::for_class(type3).size);
             const auto needs_gc1 =
               type1 == type_class::ref;
             const auto needs_gc2 =
@@ -2377,17 +2406,35 @@ jit_function jit_compiler::compile(
             }
 
             const auto helper_address = reinterpret_cast<std::intptr_t>(&duplicate_stack_block);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
-            emitter.mov_x(cpu_registers::X1, std::to_underlying(op));
-            emitter.mov_x(cpu_registers::X2, size1);
-            emitter.mov_x(cpu_registers::X3, size2);
-            emitter.mov_x(cpu_registers::X4, size3);
-            emitter.mov_x(cpu_registers::X5, needs_gc1);
-            emitter.mov_x(cpu_registers::X6, needs_gc2);
-            emitter.mov_x(cpu_registers::X7, current_stack_size);
-            emitter.mov_x(cpu_registers::X16, static_cast<std::int64_t>(helper_address));
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              static_cast<std::int64_t>(size1));
+            emitter.mov_x(
+              cpu_registers::X3,
+              static_cast<std::int64_t>(size2));
+            emitter.mov_x(
+              cpu_registers::X4,
+              static_cast<std::int64_t>(size3));
+            emitter.mov_x(
+              cpu_registers::X5,
+              static_cast<std::int64_t>(needs_gc1));
+            emitter.mov_x(
+              cpu_registers::X6,
+              static_cast<std::int64_t>(needs_gc2));
+            emitter.mov_x(
+              cpu_registers::X7,
+              current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
             update_stack_size(
@@ -2603,7 +2650,8 @@ jit_function jit_compiler::compile(
                 throw jit_error{
                   "Truncated newarray instruction."};
             }
-            const auto type = static_cast<module_::array_type>(std::to_integer<std::uint8_t>(bytecode[pc++]));
+            const auto type = static_cast<module_::array_type>(
+              std::to_integer<std::uint8_t>(bytecode[pc++]));
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(std::int32_t));
             const auto helper_address = reinterpret_cast<std::intptr_t>(&create_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
@@ -2643,6 +2691,7 @@ jit_function jit_compiler::compile(
             const auto type = resolve_type(type_index.i);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&create_struct);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2713,6 +2762,7 @@ jit_function jit_compiler::compile(
                 ? &set_field
                 : &get_field);
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2724,7 +2774,7 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(field.offset));
             emitter.mov_x(
               cpu_registers::X3,
-              field_needs_gc);
+              static_cast<std::int64_t>(field_needs_gc));
             emitter.mov_x(
               cpu_registers::X4,
               stack_offset);
@@ -2768,6 +2818,7 @@ jit_function jit_compiler::compile(
                 const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(void*));
                 const auto helper_address = reinterpret_cast<std::intptr_t>(&check_cast);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+                // set up parameters and call the helper.
                 emitter.mov_reg_x(
                   cpu_registers::X0,
                   cpu_registers::X21);
@@ -2803,6 +2854,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(std::int32_t));
             const auto helper_address = reinterpret_cast<std::intptr_t>(&create_struct_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2833,6 +2885,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(sizeof(void*));
             const auto helper_address = reinterpret_cast<std::intptr_t>(&get_array_length);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2871,6 +2924,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2918,6 +2972,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&store_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -2995,6 +3050,7 @@ jit_function jit_compiler::compile(
             const auto target_address = reinterpret_cast<std::intptr_t>(target);                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
             const auto helper_address = reinterpret_cast<std::intptr_t>(&invoke_call_target);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_x(
               cpu_registers::X0,
               static_cast<std::int64_t>(target_address));
@@ -3049,7 +3105,8 @@ jit_function jit_compiler::compile(
             branch_fixups.emplace_back(branch_fixup{
               .instruction_index = instruction_index,
               .label_id = label_id.i,
-              .conditional = false});
+              .conditional = false,
+            });
 
             break;
         }
@@ -3126,12 +3183,26 @@ jit_function jit_compiler::compile(
 
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_logical_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-            emitter.mov_reg_x(cpu_registers::X0, cpu_registers::X21);
-            emitter.mov_x(cpu_registers::X1, std::to_underlying(op));
-            emitter.mov_x(cpu_registers::X2, stack_offset);
-            emitter.mov_x(cpu_registers::X16, static_cast<std::int64_t>(helper_address));
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
-            update_stack_size(op, -static_cast<std::int32_t>(sizeof(std::int32_t)));
+
+            update_stack_size(
+              op,
+              -static_cast<std::int32_t>(sizeof(std::int32_t)));
+
             break;
         }
         case opcode::fneg: [[fallthrough]];
@@ -3146,11 +3217,22 @@ jit_function jit_compiler::compile(
 
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(width);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_fp_negation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-            emitter.mov_reg_x(cpu_registers::X0, cpu_registers::X21);
-            emitter.mov_x(cpu_registers::X1, std::to_underlying(op));
-            emitter.mov_x(cpu_registers::X2, stack_offset);
-            emitter.mov_x(cpu_registers::X16, static_cast<std::int64_t>(helper_address));
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
             break;
         }
         case opcode::fadd: [[fallthrough]];
@@ -3185,6 +3267,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(2 * width);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_fp_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -3233,6 +3316,7 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&numeric_conversion);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
+            // set up parameters and call the helper.
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
