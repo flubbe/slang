@@ -31,6 +31,14 @@ using namespace slang;
 using namespace slang::jit;
 using namespace slang::jit::aarch64;
 
+/*
+ * Runtime helper calls for the generated code.
+ */
+
+/*
+ * String constant loading.
+ */
+
 void load_string_constant(
   si::stack_frame* frame,
   std::size_t constant_index,    // NOLINT(bugprone-easily-swappable-parameters)
@@ -63,6 +71,10 @@ void load_string_constant(
       static_cast<const void*>(&string),
       sizeof(string));    // We really want to store the pointer here (not the string) // NOLINT(bugprone-sizeof-expression)
 }
+
+/*
+ * Comparisons.
+ */
 
 template<typename T>
 bool compare_helper(
@@ -200,6 +212,10 @@ void compare_values(
       &result_value,
       sizeof(result_value));
 }
+
+/*
+ * Stack / GC duplication helpers.
+ */
 
 void load_reference_local(
   si::stack_frame* frame,
@@ -372,23 +388,39 @@ void duplicate_stack_block(
     }
 }
 
-void run_gc_safepoint(
-  si::stack_frame* frame)
+/*
+ * Logical operations.
+ */
+
+void execute_logical_operation(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset)
 {
-    if(frame != nullptr
-       && frame->gc != nullptr
-       && frame->gc->is_run_requested())
-    {
-        frame->gc->run();
-    }
+    std::int32_t lhs{0};
+    std::int32_t rhs{0};
+    std::memcpy(
+      &lhs,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(lhs));
+    std::memcpy(
+      &rhs,
+      frame->stack.span().data() + stack_offset + sizeof(lhs),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(rhs));
+
+    const auto result = static_cast<std::int32_t>(
+      operation == opcode::land
+        ? lhs != 0 && rhs != 0
+        : lhs != 0 || rhs != 0);
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
 }
 
-bool has_pending_exception(
-  si::stack_frame* frame) noexcept
-{
-    return frame != nullptr
-           && frame->pending_exception != nullptr;
-}
+/*
+ * Floating-point operations.
+ */
 
 void execute_fp_operation(
   si::stack_frame* frame,
@@ -509,33 +541,13 @@ void execute_fp_negation(
       sizeof(value));
 }
 
-void execute_logical_operation(
-  si::stack_frame* frame,
-  opcode operation,
-  std::size_t stack_offset)
-{
-    std::int32_t lhs{0};
-    std::int32_t rhs{0};
-    std::memcpy(
-      &lhs,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(lhs));
-    std::memcpy(
-      &rhs,
-      frame->stack.span().data() + stack_offset + sizeof(lhs),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(rhs));
+/*
+ * Numeric conversions.
+ */
 
-    const auto result = static_cast<std::int32_t>(
-      operation == opcode::land
-        ? lhs != 0 && rhs != 0
-        : lhs != 0 || rhs != 0);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      &result,
-      sizeof(result));
-}
-
-template<typename Input, typename Output>
+template<
+  typename Input,
+  typename Output>
 void convert_numeric_value(
   si::stack_frame* frame,
   std::size_t stack_offset)
@@ -732,118 +744,9 @@ std::size_t numeric_conversion_output_size(
     }
 }
 
-void create_array(
-  si::stack_frame* frame,
-  module_::array_type type,
-  std::size_t stack_offset)
-{
-    std::int32_t length{0};
-    std::memcpy(
-      &length,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(length));
-
-    if(length < 0)
-    {
-        throw jit_error{
-          std::format(
-            "Invalid array size '{}'.",
-            length)};
-    }
-
-    void* array = nullptr;
-    auto& gc = *frame->gc;
-
-    switch(type)
-    {
-    case module_::array_type::i8:
-        array = gc.gc_new_array<std::int8_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i16:
-        array = gc.gc_new_array<std::int16_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i32:
-        array = gc.gc_new_array<std::int32_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i64:
-        array = gc.gc_new_array<std::int64_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::f32:
-        array = gc.gc_new_array<float>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::f64:
-        array = gc.gc_new_array<double>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::str:
-    {
-        auto* strings = gc.gc_new_array<std::string*>(
-          length,
-          gc::gc_object::of_temporary);
-
-        for(auto& string: *strings)
-        {
-            string = gc.gc_new<std::string>(
-              gc::gc_object::of_none,
-              false);
-        }
-        array = strings;
-
-        break;
-    }
-    case module_::array_type::ref:
-        array = gc.gc_new_array<void*>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    }
-
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&array),
-      sizeof(array));
-}
-
-void create_struct_array(
-  si::stack_frame* frame,
-  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
-{
-    std::int32_t length{0};
-    std::memcpy(
-      &length,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(length));
-
-    if(length < 0)
-    {
-        throw jit_error{
-          std::format(
-            "Invalid array length '{}'.",
-            length)};
-    }
-
-    auto* array = frame->gc->gc_new_array(
-      layout_id,
-      static_cast<std::size_t>(length),
-      gc::gc_object::of_temporary);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
-      static_cast<void*>(&array),
-      sizeof(array));    // We really want to store the pointer here // NOLINT(bugprone-sizeof-expression)
-}
+/*
+ * Structs.
+ */
 
 void create_struct(
   si::stack_frame* frame,
@@ -983,6 +886,10 @@ void get_field(
     }
 }
 
+/*
+ * Casting.
+ */
+
 void check_cast(
   si::stack_frame* frame,
   std::size_t stack_offset,    // NOLINT(bugprone-easily-swappable-parameters)
@@ -1008,6 +915,123 @@ void check_cast(
             frame->gc->layout_to_string(source_layout_id),
             frame->gc->layout_to_string(target_layout_id))};
     }
+}
+
+/*
+ * Arrays.
+ */
+
+void create_array(
+  si::stack_frame* frame,
+  module_::array_type type,
+  std::size_t stack_offset)
+{
+    std::int32_t length{0};
+    std::memcpy(
+      &length,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(length));
+
+    if(length < 0)
+    {
+        throw jit_error{
+          std::format(
+            "Invalid array size '{}'.",
+            length)};
+    }
+
+    void* array = nullptr;
+    auto& gc = *frame->gc;
+
+    switch(type)
+    {
+    case module_::array_type::i8:
+        array = gc.gc_new_array<std::int8_t>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::i16:
+        array = gc.gc_new_array<std::int16_t>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::i32:
+        array = gc.gc_new_array<std::int32_t>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::i64:
+        array = gc.gc_new_array<std::int64_t>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::f32:
+        array = gc.gc_new_array<float>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::f64:
+        array = gc.gc_new_array<double>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    case module_::array_type::str:
+    {
+        auto* strings = gc.gc_new_array<std::string*>(
+          length,
+          gc::gc_object::of_temporary);
+
+        for(auto& string: *strings)
+        {
+            string = gc.gc_new<std::string>(
+              gc::gc_object::of_none,
+              false);
+        }
+        array = strings;
+
+        break;
+    }
+    case module_::array_type::ref:
+        array = gc.gc_new_array<void*>(
+          length,
+          gc::gc_object::of_temporary);
+        break;
+    }
+
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      static_cast<const void*>(&array),
+      sizeof(array));
+}
+
+void create_struct_array(
+  si::stack_frame* frame,
+  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset)
+{
+    std::int32_t length{0};
+    std::memcpy(
+      &length,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(length));
+
+    if(length < 0)
+    {
+        throw jit_error{
+          std::format(
+            "Invalid array length '{}'.",
+            length)};
+    }
+
+    auto* array = frame->gc->gc_new_array(
+      layout_id,
+      static_cast<std::size_t>(length),
+      gc::gc_object::of_temporary);
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+      static_cast<void*>(&array),
+      sizeof(array));    // We really want to store the pointer here // NOLINT(bugprone-sizeof-expression)
 }
 
 std::size_t get_array_length(
@@ -1303,6 +1327,10 @@ void store_array_element(
     }
 }
 
+/*
+ * Function invocation.
+ */
+
 /**
  * Invoke a generated-code target using the VM's stack-frame calling convention.
  *
@@ -1470,6 +1498,32 @@ void invoke_call_target(
           }
       },
       target->function);
+}
+
+/*
+ * Safepoint handler.
+ */
+
+void run_gc_safepoint(
+  si::stack_frame* frame)
+{
+    if(frame != nullptr
+       && frame->gc != nullptr
+       && frame->gc->is_run_requested())
+    {
+        frame->gc->run();
+    }
+}
+
+/*
+ * C++ exception handling.
+ */
+
+bool has_pending_exception(
+  si::stack_frame* frame) noexcept
+{
+    return frame != nullptr
+           && frame->pending_exception != nullptr;
 }
 
 /** X register size, as `std::int32_t` to avoid some type conversions. */
