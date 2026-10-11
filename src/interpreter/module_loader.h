@@ -8,6 +8,8 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#pragma once
+
 #include <filesystem>
 #include <string>
 #include <unordered_map>

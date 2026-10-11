@@ -54,7 +54,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(cxxopts REQUIRED)
 find_package(Microsoft.GSL REQUIRED)
 
-add_executable(slang
+set(SOURCES
     src/archives/file.cpp
     src/compiler/ast/ast.cpp
     src/compiler/ast/builtins.cpp
@@ -103,8 +103,19 @@ add_executable(slang
     src/runtime/strings.cpp
     src/runtime/types.cpp
     src/runtime/utils.cpp
-    src/utils.cpp
-)
+    src/utils.cpp)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    list(APPEND SOURCES
+        src/jit/aarch64/compiler.cpp
+        src/jit/aarch64/emitter.cpp
+        src/jit/aarch64/module_loader.cpp
+    )
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    # TODO Add x86_64 source files/definitions here.
+endif()
+
+add_executable(slang ${SOURCES})
 target_link_libraries(slang cxxopts::cxxopts Microsoft.GSL::GSL)
 
 add_subdirectory(examples)

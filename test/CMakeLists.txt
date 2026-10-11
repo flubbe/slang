@@ -272,6 +272,31 @@ target_compile_options(test_vector PRIVATE
 )
 add_test(NAME vector COMMAND test_vector)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_executable(test_jit_aarch64
+        ../src/archives/file.cpp
+        ../src/interpreter/gc.cpp
+        ../src/jit/aarch64/compiler.cpp
+        ../src/jit/aarch64/emitter.cpp
+        ../src/jit/aarch64/module_loader.cpp
+        ../src/shared/module.cpp
+        ../src/shared/opcodes.cpp
+        ../src/filemanager.cpp
+        test_jit_aarch64.cpp
+    )
+    target_link_libraries(test_jit_aarch64 GTest::gtest GTest::gtest_main Microsoft.GSL::GSL)
+    target_compile_options(test_jit_aarch64 PRIVATE
+        ${COMPILE_OPTIONS_MSVC}
+        ${COMPILE_OPTIONS_NOT_MSVC}
+    )
+    add_test(NAME jit_aarch64 COMMAND test_jit_aarch64)
+
+    set_tests_properties(jit_aarch64 PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        FIXTURES_REQUIRED generate_jit_test
+    )
+endif()
+
 #
 # Command line tests.
 #
@@ -300,11 +325,54 @@ set_tests_properties(
     needs_gc
 )
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "build jit library (default, compile)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang compile test/test_jit_library
+    )
+    set_tests_properties("build jit library (default, compile)" PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_SETUP generate_jit_library
+    )
+
+    add_compile_test(
+        "build jit test"
+        FALSE
+        --search-path test
+        test/test_jit
+    )
+    set_tests_properties(
+        "build jit test (default, compile)"
+        PROPERTIES
+        FIXTURES_REQUIRED generate_jit_library
+        FIXTURES_SETUP
+        generate_jit_test
+    )
+    set_tests_properties(
+        "build jit test (--no-eval-const-subexpr, compile)"
+        PROPERTIES FIXTURES_REQUIRED generate_jit_library
+    )
+endif()
+
 add_compile_exec_test(
     "slang array"
     TRUE
     test/test_array
 )
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "slang array (JIT, run)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang run --jit test/test_array
+    )
+    set_tests_properties(
+        "slang array (JIT, run)"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED "slang array (default, compile)"
+    )
+endif()
+
 add_compile_fail_test(
     "slang array fail 1"
     TRUE
@@ -540,6 +608,25 @@ add_compile_exec_test(
     TRUE
     test/test_structs
 )
+add_compile_exec_test(
+    "slang struct import"
+    TRUE
+    test/test_struct_import
+)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    add_test(
+        NAME "slang struct import (JIT, run)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang run --jit test/test_struct_import
+    )
+    set_tests_properties(
+        "slang struct import (JIT, run)"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED "slang struct import (default, compile)"
+    )
+endif()
+
 add_compile_exec_test(
     "slang unreachable"
     TRUE

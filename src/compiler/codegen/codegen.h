@@ -4,7 +4,7 @@
  * code generation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -877,7 +877,7 @@ public:
         case type_cast::f64_to_i64: result_type = type_kind::i64; break;
         case type_cast::f64_to_f32: result_type = type_kind::f32; break;
         default:
-            throw codegen_error("Unknown cast type.");
+            throw codegen_error{"Unknown cast type."};
         }
     }
 
@@ -955,7 +955,7 @@ public:
     {
         if(!struct_type.get_type_id().has_value())
         {
-            throw codegen_error("Type has no id.");
+            throw codegen_error{"Type has no id."};
         }
 
         if(resolver != nullptr
@@ -1440,10 +1440,10 @@ public:
     {
         if(!native)
         {
-            throw codegen_error(
+            throw codegen_error{
               std::format(
                 "Cannot get import library for function '{}', as it was not declared as native.",
-                get_name()));
+                get_name())};
         }
 
         return import_library;
@@ -1622,7 +1622,7 @@ struct constant_table_entry : public module_::constant_table_entry
     {
         if(add_to_exports && !this->name.has_value())
         {
-            throw codegen_error("Cannot export constant without a name.");
+            throw codegen_error{"Cannot export constant without a name."};
         }
     }
 };
@@ -1697,7 +1697,7 @@ protected:
     {
         if(!insertion_point)
         {
-            throw codegen_error("Invalid insertion point (nullptr).");
+            throw codegen_error{"Invalid insertion point (nullptr)."};
         }
     }
 
@@ -1856,7 +1856,7 @@ public:
     {
         if(validate && insertion_point == nullptr)
         {
-            throw codegen_error("Invalid insertion point.");
+            throw codegen_error{"Invalid insertion point."};
         }
         return insertion_point;
     }
@@ -1870,12 +1870,12 @@ public:
     {
         if(current_function != nullptr)
         {
-            throw codegen_error("Nested function definition.");
+            throw codegen_error{"Nested function definition."};
         }
 
         if(fn == nullptr)
         {
-            throw codegen_error("No function specified.");
+            throw codegen_error{"No function specified."};
         }
 
         current_function = fn;
@@ -1886,7 +1886,7 @@ public:
     {
         if(current_function == nullptr)
         {
-            throw codegen_error("No function to exit.");
+            throw codegen_error{"No function to exit."};
         }
 
         current_function = nullptr;
@@ -1918,7 +1918,7 @@ public:
     {
         if(validate && current_function == nullptr)
         {
-            throw codegen_error("No current function.");
+            throw codegen_error{"No current function."};
         }
         return current_function;
     }
@@ -1942,7 +1942,7 @@ public:
     {
         if(declaration_type_stack.empty())
         {
-            throw codegen_error("Cannot clear declaration type since no variable is being declared.");
+            throw codegen_error{"Cannot clear declaration type since no variable is being declared."};
         }
         declaration_type_stack.pop_back();
     }
@@ -1958,7 +1958,7 @@ public:
     {
         if(declaration_type_stack.empty())
         {
-            throw codegen_error("Cannot get declaration type: Not processing declaration.");
+            throw codegen_error{"Cannot get declaration type: Not processing declaration."};
         }
         return declaration_type_stack.back();
     }
@@ -1985,11 +1985,11 @@ public:
         {
             if(loc.has_value())
             {
-                throw codegen_error(*loc, "Encountered break or continue statement outside of loop.");
+                throw codegen_error{*loc, "Encountered break or continue statement outside of loop."};
             }
             else
             {
-                throw codegen_error("Encountered break or continue statement outside of loop.");
+                throw codegen_error{"Encountered break or continue statement outside of loop."};
             }
         }
         loop_context_stack.pop_back();
@@ -2010,11 +2010,11 @@ public:
         {
             if(loc.has_value())
             {
-                throw codegen_error(*loc, "Encountered break or continue statement outside of loop.");
+                throw codegen_error{*loc, "Encountered break or continue statement outside of loop."};
             }
             else
             {
-                throw codegen_error("Encountered break or continue statement outside of loop.");
+                throw codegen_error{"Encountered break or continue statement outside of loop."};
             }
         }
         return loop_context_stack.back();

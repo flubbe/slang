@@ -85,7 +85,7 @@ class memory_read_archive : public archive
 {
 protected:
     /** The archive's buffer reference. */
-    const std::vector<std::byte>& memory_buffer;
+    std::span<const std::byte> memory_buffer;
 
     /** Current buffer read offset. */
     std::size_t offset = 0;
@@ -119,7 +119,7 @@ public:
      * @param byte_order The target byte order. Only relevant if `persistent` is `true`.
      */
     memory_read_archive(
-      const std::vector<std::byte>& memory_buffer,
+      std::span<const std::byte> memory_buffer,
       bool persistent,
       std::endian byte_order = std::endian::native)
     : archive{true, false, persistent, byte_order}
@@ -149,7 +149,7 @@ public:
     }
 
     /** Get the internal buffer. */
-    const std::vector<std::byte>& get_buffer() const
+    std::span<const std::byte> get_buffer() const
     {
         return memory_buffer;
     }
