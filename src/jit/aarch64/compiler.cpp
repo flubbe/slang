@@ -26,6 +26,7 @@ namespace
 
 using namespace slang;
 using namespace slang::jit;
+using namespace slang::jit::aarch64;
 
 void load_string_constant(
   si::stack_frame* frame,
@@ -473,6 +474,100 @@ void execute_fp_operation(
       sizeof(lhs));
 }
 
+void execute_fp_negation(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset)
+{
+    if(operation == opcode::fneg)
+    {
+        float value{0};
+        std::memcpy(
+          &value,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(value));
+        value = -value;
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &value,
+          sizeof(value));
+        return;
+    }
+
+    double value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+    value = -value;
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &value,
+      sizeof(value));
+}
+
+void execute_logical_operation(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset)
+{
+    std::int32_t lhs{0};
+    std::int32_t rhs{0};
+    std::memcpy(
+      &lhs,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(lhs));
+    std::memcpy(
+      &rhs,
+      frame->stack.span().data() + stack_offset + sizeof(lhs),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(rhs));
+
+    const auto result = static_cast<std::int32_t>(
+      operation == opcode::land
+        ? lhs != 0 && rhs != 0
+        : lhs != 0 || rhs != 0);
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
+}
+
+template<typename Input, typename Output>
+void convert_numeric_value(
+  si::stack_frame* frame,
+  std::size_t stack_offset)
+{
+    Input value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+
+    const auto result = static_cast<Output>(value);
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
+}
+
+template<typename Narrow>
+void convert_i32_narrow(
+  si::stack_frame* frame,
+  std::size_t stack_offset)
+{
+    std::int32_t value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+
+    const auto result = static_cast<std::int32_t>(static_cast<Narrow>(value));    // NOLINT(bugprone-signed-char-misuse)
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
+}
+
 void numeric_conversion(
   si::stack_frame* frame,
   opcode operation,
@@ -480,6 +575,36 @@ void numeric_conversion(
 {
     switch(operation)
     {
+    case opcode::i2c:
+        convert_i32_narrow<std::int8_t>(frame, stack_offset);
+        return;
+    case opcode::i2s:
+        convert_i32_narrow<std::int16_t>(frame, stack_offset);
+        return;
+    case opcode::i2l:
+        convert_numeric_value<std::int32_t, std::int64_t>(frame, stack_offset);
+        return;
+    case opcode::i2d:
+        convert_numeric_value<std::int32_t, double>(frame, stack_offset);
+        return;
+    case opcode::l2i:
+        convert_numeric_value<std::int64_t, std::int32_t>(frame, stack_offset);
+        return;
+    case opcode::l2f:
+        convert_numeric_value<std::int64_t, float>(frame, stack_offset);
+        return;
+    case opcode::l2d:
+        convert_numeric_value<std::int64_t, double>(frame, stack_offset);
+        return;
+    case opcode::f2i:
+        convert_numeric_value<float, std::int32_t>(frame, stack_offset);
+        return;
+    case opcode::f2l:
+        convert_numeric_value<float, std::int64_t>(frame, stack_offset);
+        return;
+    case opcode::d2l:
+        convert_numeric_value<double, std::int64_t>(frame, stack_offset);
+        return;
     case opcode::i2f:
     {
         std::int32_t value{0};
@@ -544,6 +669,60 @@ void numeric_conversion(
 
         return;
     }
+    default:
+        throw jit_error{
+          "Unsupported numeric conversion."};
+    }
+}
+
+std::size_t numeric_conversion_input_size(
+  opcode operation)
+{
+    switch(operation)
+    {
+    case opcode::i2c: [[fallthrough]];
+    case opcode::i2s: [[fallthrough]];
+    case opcode::i2l: [[fallthrough]];
+    case opcode::i2f: [[fallthrough]];
+    case opcode::i2d: [[fallthrough]];
+    case opcode::f2i: [[fallthrough]];
+    case opcode::f2l: [[fallthrough]];
+    case opcode::f2d:
+        return sizeof(std::int32_t);
+    case opcode::l2i: [[fallthrough]];
+    case opcode::l2f: [[fallthrough]];
+    case opcode::l2d: [[fallthrough]];
+    case opcode::d2i: [[fallthrough]];
+    case opcode::d2l: [[fallthrough]];
+    case opcode::d2f:
+        return sizeof(std::int64_t);
+    default:
+        throw jit_error{
+          "Unsupported numeric conversion."};
+    }
+}
+
+std::size_t numeric_conversion_output_size(
+  opcode operation)
+{
+    switch(operation)
+    {
+    case opcode::i2l: [[fallthrough]];
+    case opcode::i2d: [[fallthrough]];
+    case opcode::l2d: [[fallthrough]];
+    case opcode::f2l: [[fallthrough]];
+    case opcode::d2l: [[fallthrough]];
+    case opcode::f2d:
+        return sizeof(std::int64_t);
+    case opcode::i2c: [[fallthrough]];
+    case opcode::i2s: [[fallthrough]];
+    case opcode::i2f: [[fallthrough]];
+    case opcode::l2i: [[fallthrough]];
+    case opcode::l2f: [[fallthrough]];
+    case opcode::f2i: [[fallthrough]];
+    case opcode::d2i: [[fallthrough]];
+    case opcode::d2f:
+        return sizeof(std::int32_t);
     default:
         throw jit_error{
           "Unsupported numeric conversion."};
@@ -816,6 +995,7 @@ void check_cast(
         throw jit_error{
           "Null pointer access during checkcast."};
     }
+
     const auto source_layout_id = frame->gc->get_type_layout_id(object);
     if(source_layout_id != target_layout_id)
     {
@@ -1336,6 +1516,445 @@ struct branch_fixup
     bool conditional;
 };
 
+void update_stack_size(
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr,
+  std::int32_t delta)
+{
+    if(delta == 0)
+    {
+        return;
+    }
+
+    if(delta < 0
+       && std::cmp_less(current_stack_size, -delta))
+    {
+        throw jit_error{
+          std::format(
+            "Got negative stack size while decoding instruction '{}'.",
+            to_string(instr))};
+    }
+
+    current_stack_size += delta;
+    max_stack_size = std::max(max_stack_size, current_stack_size);
+}
+
+struct stack_size_updater
+{
+    std::uint32_t* current_stack_size;
+    std::uint32_t* max_stack_size;
+
+    void operator()(
+      opcode instr,
+      std::int32_t delta) const
+    {
+        update_stack_size(
+          *current_stack_size,
+          *max_stack_size,
+          instr,
+          delta);
+    }
+};
+
+template<
+  typename EmitW,
+  typename EmitX,
+  typename... Args>
+void emit_integer_instruction(
+  instruction_emitter& emitter,
+  bool is_64_bit,
+  EmitW emit_w,
+  EmitX emit_x,
+  Args... args)
+{
+    if(is_64_bit)
+    {
+        (emitter.*emit_x)(args...);
+    }
+    else
+    {
+        (emitter.*emit_w)(args...);
+    }
+}
+
+void emit_integer_binary(
+  instruction_emitter& emitter,
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr,
+  bool is_64_bit)
+{
+    const std::uint32_t width = is_64_bit ? 8u : 4u;
+    if(current_stack_size < 2u * width)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto left_offset = current_stack_size - (2u * width);
+    const auto right_offset = current_stack_size - width;
+
+    if(is_64_bit)
+    {
+        emitter.load_x(
+          cpu_registers::X0,
+          left_offset);
+        emitter.load_x(
+          cpu_registers::X1,
+          right_offset);
+    }
+    else
+    {
+        emitter.ldr_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          left_offset);
+        emitter.ldr_w(
+          cpu_registers::X1,
+          cpu_registers::X20,
+          right_offset);
+    }
+
+    switch(instr)
+    {
+    case opcode::iadd: [[fallthrough]];
+    case opcode::ladd:
+        if(is_64_bit)
+        {
+            emitter.add_x(
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
+        }
+        else
+        {
+            emitter.add_w(
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
+        }
+        break;
+    case opcode::isub: [[fallthrough]];
+    case opcode::lsub:
+        if(is_64_bit)
+        {
+            emitter.sub_x(
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
+        }
+        else
+        {
+            emitter.sub_w(
+              cpu_registers::X0,
+              cpu_registers::X0,
+              cpu_registers::X1);
+        }
+        break;
+    case opcode::imul: [[fallthrough]];
+    case opcode::lmul:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::mul_w,
+          &instruction_emitter::mul_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::idiv: [[fallthrough]];
+    case opcode::ldiv:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::sdiv_w,
+          &instruction_emitter::sdiv_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::imod: [[fallthrough]];
+    case opcode::lmod:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::sdiv_w,
+          &instruction_emitter::sdiv_x,
+          cpu_registers::X2,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::msub_w,
+          &instruction_emitter::msub_x,
+          cpu_registers::X0,
+          cpu_registers::X2,
+          cpu_registers::X1,
+          cpu_registers::X0);
+        break;
+    case opcode::iand:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::and_reg_w,
+          &instruction_emitter::and_reg_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::ior:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::orr_reg_w,
+          &instruction_emitter::orr_reg_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::ixor: [[fallthrough]];
+    case opcode::lxor:
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::eor_reg_w,
+          &instruction_emitter::eor_reg_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    default:
+        throw jit_error{
+          std::format(
+            "Unsupported integer operation '{}'.",
+            to_string(instr))};
+    }
+
+    if(is_64_bit)
+    {
+        emitter.store_x(
+          cpu_registers::X0,
+          left_offset);
+    }
+    else
+    {
+        emitter.str_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          left_offset);
+    }
+
+    update_stack_size(
+      current_stack_size,
+      max_stack_size,
+      instr,
+      -static_cast<std::int32_t>(width));
+}
+
+void emit_integer_shift(
+  instruction_emitter& emitter,
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr,
+  bool is_64_bit)
+{
+    const std::uint32_t width = is_64_bit ? 8u : 4u;
+    if(current_stack_size < width + 4u)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto value_offset = current_stack_size - width - 4u;
+    const auto shift_offset = current_stack_size - 4u;
+
+    if(is_64_bit)
+    {
+        emitter.load_x(
+          cpu_registers::X0,
+          value_offset);
+    }
+    else
+    {
+        emitter.ldr_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          value_offset);
+    }
+
+    emitter.ldr_w(
+      cpu_registers::X1,
+      cpu_registers::X20,
+      shift_offset);
+
+    if(instr == opcode::ishl || instr == opcode::lshl)
+    {
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::lslv_w,
+          &instruction_emitter::lslv_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+    }
+    else
+    {
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::lsrv_w,
+          &instruction_emitter::lsrv_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+    }
+
+    if(is_64_bit)
+    {
+        emitter.store_x(
+          cpu_registers::X0,
+          value_offset);
+    }
+    else
+    {
+        emitter.str_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          value_offset);
+    }
+
+    update_stack_size(
+      current_stack_size,
+      max_stack_size,
+      instr,
+      -4);
+}
+
+void emit_integer_negation(
+  instruction_emitter& emitter,
+  std::uint32_t current_stack_size,
+  opcode instr,
+  bool is_64_bit)
+{
+    const std::uint32_t width = is_64_bit ? 8u : 4u;
+    if(current_stack_size < width)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto offset = current_stack_size - width;
+    if(is_64_bit)
+    {
+        emitter.load_x(
+          cpu_registers::X0,
+          offset);
+        emitter.sub_x(
+          cpu_registers::X0,
+          cpu_registers::XZR,
+          cpu_registers::X0);
+        emitter.store_x(
+          cpu_registers::X0,
+          offset);
+    }
+    else
+    {
+        emitter.ldr_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          offset);
+        emitter.sub_w(
+          cpu_registers::X0,
+          cpu_registers::XZR,
+          cpu_registers::X0);
+        emitter.str_w(
+          cpu_registers::X0,
+          cpu_registers::X20,
+          offset);
+    }
+}
+
+void emit_safepoint(
+  instruction_emitter& emitter)
+{
+    const auto helper_address = reinterpret_cast<std::intptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    emitter.mov_reg_x(
+      cpu_registers::X0,
+      cpu_registers::X21);
+    emitter.mov_x(
+      cpu_registers::X16,
+      static_cast<std::int64_t>(helper_address));
+    emitter.blr(cpu_registers::X16);
+}
+
+void emit_exception_guard(
+  instruction_emitter& emitter,
+  std::vector<std::size_t>& exception_fixups)
+{
+    const auto helper_address = reinterpret_cast<std::intptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    emitter.mov_reg_x(
+      cpu_registers::X0,
+      cpu_registers::X21);
+    emitter.mov_x(
+      cpu_registers::X16,
+      static_cast<std::int64_t>(helper_address));
+    emitter.blr(cpu_registers::X16);
+    const auto instruction_index = emitter.code.size();
+    emitter.cbnz_w(cpu_registers::X0, 0);
+    exception_fixups.push_back(instruction_index);
+}
+
+std::uint32_t read_local_offset(
+  memory_read_archive& input,
+  std::span<const std::byte> bytecode,
+  std::size_t& pc,
+  const std::vector<std::size_t>& local_offsets,
+  opcode instr)
+{
+    if(pc >= bytecode.size())
+    {
+        throw jit_error{
+          std::format(
+            "Missing local index for '{}'.",
+            to_string(instr))};
+    }
+
+    input.seek(pc);
+    vle_int local_index;
+    input & local_index;
+    pc = input.tell();
+
+    if(local_index.i < 0
+       || static_cast<std::size_t>(local_index.i) >= local_offsets.size())
+    {
+        throw jit_error{
+          std::format(
+            "Local index {} for '{}' is out of range.",
+            local_index.i,
+            to_string(instr))};
+    }
+
+    const auto offset = local_offsets.at(static_cast<std::size_t>(local_index.i));
+    if(offset > std::numeric_limits<std::uint32_t>::max())
+    {
+        throw jit_error{
+          std::format(
+            "Local offset {} exceeds the JIT address range.",
+            offset)};
+    }
+
+    return static_cast<std::uint32_t>(offset);
+}
+
 }    // namespace
 
 namespace slang::jit::aarch64
@@ -1435,372 +2054,9 @@ jit_function jit_compiler::compile(
     std::uint32_t current_stack_size{0};
     memory_read_archive input{bytecode, true, std::endian::little};
 
-    const auto update_stack_size =
-      [&](opcode instr, std::int32_t delta)
-    {
-        if(delta == 0)
-        {
-            return;
-        }
-
-        if(delta < 0
-           && std::cmp_less(current_stack_size, -delta))
-        {
-            throw jit_error{
-              std::format(
-                "Got negative stack size while decoding instruction '{}'.",
-                to_string(instr))};
-        }
-
-        current_stack_size += delta;
-        max_stack_size = std::max(max_stack_size, current_stack_size);
-    };
-
-    const auto emit_integer_instruction =
-      [&](bool is_64_bit, auto emit_w, auto emit_x, auto... args)
-    {
-        (emitter.*(is_64_bit ? emit_x : emit_w))(args...);
-    };
-
-    const auto emit_integer_binary =
-      [&](opcode instr, bool is_64_bit)
-    {
-        const std::uint32_t width = is_64_bit ? 8u : 4u;
-        if(current_stack_size < 2u * width)
-        {
-            throw jit_error{
-              std::format(
-                "Not enough stack values for '{}'.",
-                to_string(instr))};
-        }
-
-        const auto left_offset = current_stack_size - (2u * width);
-        const auto right_offset = current_stack_size - width;
-        if(is_64_bit)
-        {
-            emitter.load_x(
-              cpu_registers::X0,
-              left_offset);
-            emitter.load_x(
-              cpu_registers::X1,
-              right_offset);
-        }
-        else
-        {
-            emitter.ldr_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              left_offset);
-            emitter.ldr_w(
-              cpu_registers::X1,
-              cpu_registers::X20,
-              right_offset);
-        }
-
-        switch(instr)
-        {
-        case opcode::iadd: [[fallthrough]];
-        case opcode::ladd:
-            if(is_64_bit)
-            {
-                emitter.add_x(
-                  cpu_registers::X0,
-                  cpu_registers::X0,
-                  cpu_registers::X1);
-            }
-            else
-            {
-                emitter.add_w(
-                  cpu_registers::X0,
-                  cpu_registers::X0,
-                  cpu_registers::X1);
-            }
-            break;
-        case opcode::isub: [[fallthrough]];
-        case opcode::lsub:
-            if(is_64_bit)
-            {
-                emitter.sub_x(
-                  cpu_registers::X0,
-                  cpu_registers::X0,
-                  cpu_registers::X1);
-            }
-            else
-            {
-                emitter.sub_w(
-                  cpu_registers::X0,
-                  cpu_registers::X0,
-                  cpu_registers::X1);
-            }
-            break;
-        case opcode::imul: [[fallthrough]];
-        case opcode::lmul:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::mul_w,
-              &instruction_emitter::mul_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            break;
-        case opcode::idiv: [[fallthrough]];
-        case opcode::ldiv:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::sdiv_w,
-              &instruction_emitter::sdiv_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            break;
-        case opcode::imod: [[fallthrough]];
-        case opcode::lmod:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::sdiv_w,
-              &instruction_emitter::sdiv_x,
-              cpu_registers::X2,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::msub_w,
-              &instruction_emitter::msub_x,
-              cpu_registers::X0,
-              cpu_registers::X2,
-              cpu_registers::X1,
-              cpu_registers::X0);
-            break;
-        case opcode::iand:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::and_reg_w,
-              &instruction_emitter::and_reg_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            break;
-        case opcode::ior:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::orr_reg_w,
-              &instruction_emitter::orr_reg_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            break;
-        case opcode::ixor: [[fallthrough]];
-        case opcode::lxor:
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::eor_reg_w,
-              &instruction_emitter::eor_reg_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-            break;
-        default:
-            throw jit_error{
-              std::format(
-                "Unsupported integer operation '{}'.",
-                to_string(instr))};
-        }
-
-        if(is_64_bit)
-        {
-            emitter.store_x(
-              cpu_registers::X0,
-              left_offset);
-        }
-        else
-        {
-            emitter.str_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              left_offset);
-        }
-        update_stack_size(instr, -static_cast<std::int32_t>(width));
-    };
-
-    const auto emit_integer_shift =
-      [&](opcode instr, bool is_64_bit)
-    {
-        const std::uint32_t width = is_64_bit ? 8u : 4u;
-        if(current_stack_size < width + 4u)
-        {
-            throw jit_error{
-              std::format(
-                "Not enough stack values for '{}'.",
-                to_string(instr))};
-        }
-
-        const auto value_offset = current_stack_size - width - 4u;
-        const auto shift_offset = current_stack_size - 4u;
-        if(is_64_bit)
-        {
-            emitter.load_x(
-              cpu_registers::X0,
-              value_offset);
-        }
-        else
-        {
-            emitter.ldr_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              value_offset);
-        }
-        emitter.ldr_w(
-          cpu_registers::X1,
-          cpu_registers::X20,
-          shift_offset);
-
-        if(instr == opcode::ishl
-           || instr == opcode::lshl)
-        {
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::lslv_w,
-              &instruction_emitter::lslv_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-        }
-        else
-        {
-            emit_integer_instruction(
-              is_64_bit,
-              &instruction_emitter::lsrv_w,
-              &instruction_emitter::lsrv_x,
-              cpu_registers::X0,
-              cpu_registers::X0,
-              cpu_registers::X1);
-        }
-
-        if(is_64_bit)
-        {
-            emitter.store_x(
-              cpu_registers::X0,
-              value_offset);
-        }
-        else
-        {
-            emitter.str_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              value_offset);
-        }
-
-        update_stack_size(instr, -4);
-    };
-
-    const auto emit_integer_negation =
-      [&](opcode instr, bool is_64_bit)
-    {
-        const std::uint32_t width = is_64_bit ? 8u : 4u;
-        if(current_stack_size < width)
-        {
-            throw jit_error{
-              std::format(
-                "Not enough stack values for '{}'.",
-                to_string(instr))};
-        }
-
-        const auto offset = current_stack_size - width;
-        if(is_64_bit)
-        {
-            emitter.load_x(
-              cpu_registers::X0,
-              offset);
-            emitter.sub_x(
-              cpu_registers::X0,
-              cpu_registers::XZR,
-              cpu_registers::X0);
-            emitter.store_x(
-              cpu_registers::X0,
-              offset);
-        }
-        else
-        {
-            emitter.ldr_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              offset);
-            emitter.sub_w(
-              cpu_registers::X0,
-              cpu_registers::XZR,
-              cpu_registers::X0);
-            emitter.str_w(
-              cpu_registers::X0,
-              cpu_registers::X20,
-              offset);
-        }
-    };
-
-    const auto emit_safepoint = [&]
-    {
-        const auto helper_address = reinterpret_cast<std::intptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        emitter.mov_reg_x(
-          cpu_registers::X0,
-          cpu_registers::X21);
-        emitter.mov_x(
-          cpu_registers::X16,
-          static_cast<std::int64_t>(helper_address));
-        emitter.blr(cpu_registers::X16);
-    };
-
-    const auto emit_exception_guard = [&]
-    {
-        const auto helper_address = reinterpret_cast<std::intptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-        emitter.mov_reg_x(
-          cpu_registers::X0,
-          cpu_registers::X21);
-        emitter.mov_x(
-          cpu_registers::X16,
-          static_cast<std::int64_t>(helper_address));
-        emitter.blr(cpu_registers::X16);
-
-        const auto instruction_index = emitter.code.size();
-        emitter.cbnz_w(cpu_registers::X0, 0);
-        exception_fixups.push_back(instruction_index);
-    };
-
-    const auto read_local_offset =
-      [&](opcode instr)
-    {
-        if(pc >= bytecode.size())
-        {
-            throw jit_error{
-              std::format(
-                "Missing local index for '{}'.",
-                to_string(instr))};
-        }
-
-        input.seek(pc);
-        vle_int local_index;
-        input & local_index;
-        pc = input.tell();
-
-        if(local_index.i < 0
-           || static_cast<std::size_t>(local_index.i) >= local_offsets.size())
-        {
-            throw jit_error{
-              std::format(
-                "Local index {} for '{}' is out of range.",
-                local_index.i,
-                to_string(instr))};
-        }
-
-        const auto offset = local_offsets.at(
-          static_cast<std::size_t>(local_index.i));
-        if(offset > std::numeric_limits<std::uint32_t>::max())
-        {
-            throw jit_error{
-              std::format(
-                "Local offset {} exceeds the JIT address range.",
-                offset)};
-        }
-
-        return static_cast<std::uint32_t>(offset);
+    const stack_size_updater update_stack_size{
+      .current_stack_size = &current_stack_size,
+      .max_stack_size = &max_stack_size,
     };
 
     // TODO bytecode reading should work through memory_read_archive
@@ -1896,7 +2152,8 @@ jit_function jit_compiler::compile(
 
             emitter.mov_w(
               cpu_registers::X0,
-              static_cast<std::int32_t>(std::bit_cast<std::uint32_t>(value)));
+              static_cast<std::int32_t>(
+                std::bit_cast<std::uint32_t>(value)));
             emitter.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
@@ -2086,12 +2343,14 @@ jit_function jit_compiler::compile(
             type_class type1;
             type_class type2;
             type_class type3{type_class::cat1};
+
             input.seek(pc);
             input & type1 & type2;
             if(op == opcode::dup_x2)
             {
                 input & type3;
             }
+
             pc = input.tell();
 
             const auto size1 = static_cast<std::size_t>(target_type_layout::for_class(type1).size);
@@ -2105,8 +2364,10 @@ jit_function jit_compiler::compile(
             const auto required_size =
               op == opcode::dup_x1
                 ? size1 + size2
-              : op == opcode::dup_x2 ? size1 + size2 + size3
-                                     : size1 + size2;
+                : (op == opcode::dup_x2
+                     ? size1 + size2 + size3
+                     : size1 + size2);
+
             if(current_stack_size < required_size)
             {
                 throw jit_error{
@@ -2141,7 +2402,7 @@ jit_function jit_compiler::compile(
         case opcode::iload:
         case opcode::fload:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
 
             // Read from X19 (locals), push to X20 (stack)
             emitter.ldr_w(
@@ -2160,7 +2421,7 @@ jit_function jit_compiler::compile(
         case opcode::lload: [[fallthrough]];
         case opcode::dload:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
             emitter.load_x(
               cpu_registers::X0,
               local_offset);
@@ -2177,7 +2438,7 @@ jit_function jit_compiler::compile(
         case opcode::istore:
         case opcode::fstore:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
             update_stack_size(op, -4);
 
             // Pop from X20 (stack), write to X19 (locals)
@@ -2195,7 +2456,7 @@ jit_function jit_compiler::compile(
         case opcode::lstore: [[fallthrough]];
         case opcode::dstore:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
             update_stack_size(
               op,
               -static_cast<std::int32_t>(sizeof(std::int64_t)));
@@ -2210,7 +2471,7 @@ jit_function jit_compiler::compile(
         }
         case opcode::aload:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
             const auto helper_address = reinterpret_cast<std::intptr_t>(&load_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
@@ -2235,7 +2496,7 @@ jit_function jit_compiler::compile(
         }
         case opcode::astore:
         {
-            const auto local_offset = read_local_offset(op);
+            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
             if(current_stack_size < sizeof(void*))
             {
                 throw jit_error{
@@ -2747,7 +3008,7 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
-            emit_exception_guard();
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2780,7 +3041,7 @@ jit_function jit_compiler::compile(
             input & label_id;
             pc = input.tell();
 
-            emit_safepoint();
+            emit_safepoint(emitter);
 
             const auto instruction_index = emitter.code.size();
             emitter.b(0);
@@ -2810,7 +3071,7 @@ jit_function jit_compiler::compile(
             update_stack_size(
               op,
               -static_cast<std::int32_t>(sizeof(std::int32_t)));
-            emit_safepoint();
+            emit_safepoint(emitter);
 
             emitter.ldr_w(
               cpu_registers::X0,
@@ -2843,7 +3104,7 @@ jit_function jit_compiler::compile(
         case opcode::iand: [[fallthrough]];
         case opcode::ior: [[fallthrough]];
         case opcode::ixor:
-            emit_integer_binary(op, false);
+            emit_integer_binary(emitter, current_stack_size, max_stack_size, op, false);
             break;
         case opcode::ladd: [[fallthrough]];
         case opcode::lsub: [[fallthrough]];
@@ -2851,8 +3112,47 @@ jit_function jit_compiler::compile(
         case opcode::ldiv: [[fallthrough]];
         case opcode::lmod: [[fallthrough]];
         case opcode::lxor:
-            emit_integer_binary(op, true);
+            emit_integer_binary(emitter, current_stack_size, max_stack_size, op, true);
             break;
+        case opcode::land: [[fallthrough]];
+        case opcode::lor:
+        {
+            constexpr auto input_size = 2 * sizeof(std::int32_t);
+            if(current_stack_size < input_size)
+            {
+                throw jit_error{
+                  std::format("Not enough stack values for '{}'.", to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
+            const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_logical_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            emitter.mov_reg_x(cpu_registers::X0, cpu_registers::X21);
+            emitter.mov_x(cpu_registers::X1, std::to_underlying(op));
+            emitter.mov_x(cpu_registers::X2, stack_offset);
+            emitter.mov_x(cpu_registers::X16, static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+            update_stack_size(op, -static_cast<std::int32_t>(sizeof(std::int32_t)));
+            break;
+        }
+        case opcode::fneg: [[fallthrough]];
+        case opcode::dneg:
+        {
+            const auto width = op == opcode::fneg ? sizeof(float) : sizeof(double);
+            if(current_stack_size < width)
+            {
+                throw jit_error{
+                  std::format("Not enough stack values for '{}'.", to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(width);
+            const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_fp_negation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            emitter.mov_reg_x(cpu_registers::X0, cpu_registers::X21);
+            emitter.mov_x(cpu_registers::X1, std::to_underlying(op));
+            emitter.mov_x(cpu_registers::X2, stack_offset);
+            emitter.mov_x(cpu_registers::X16, static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+            break;
+        }
         case opcode::fadd: [[fallthrough]];
         case opcode::fsub: [[fallthrough]];
         case opcode::fmul: [[fallthrough]];
@@ -2905,15 +3205,22 @@ jit_function jit_compiler::compile(
 
             break;
         }
+        case opcode::i2c: [[fallthrough]];
+        case opcode::i2s: [[fallthrough]];
+        case opcode::i2l: [[fallthrough]];
         case opcode::i2f: [[fallthrough]];
+        case opcode::i2d: [[fallthrough]];
+        case opcode::l2i: [[fallthrough]];
+        case opcode::l2f: [[fallthrough]];
+        case opcode::l2d: [[fallthrough]];
+        case opcode::f2i: [[fallthrough]];
+        case opcode::f2l: [[fallthrough]];
         case opcode::d2f: [[fallthrough]];
         case opcode::f2d: [[fallthrough]];
         case opcode::d2i:
+        case opcode::d2l:
         {
-            const auto input_size =
-              op == opcode::d2f || op == opcode::d2i
-                ? sizeof(double)
-                : sizeof(std::int32_t);
+            const auto input_size = numeric_conversion_input_size(op);
 
             if(current_stack_size < input_size)
             {
@@ -2940,10 +3247,7 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            const auto output_size =
-              op == opcode::d2i || op == opcode::d2f
-                ? sizeof(std::int32_t)
-                : sizeof(double);
+            const auto output_size = numeric_conversion_output_size(op);
             update_stack_size(
               op,
               static_cast<std::int32_t>(output_size) - static_cast<std::int32_t>(input_size));
@@ -2952,17 +3256,17 @@ jit_function jit_compiler::compile(
         }
         case opcode::ishl: [[fallthrough]];
         case opcode::ishr:
-            emit_integer_shift(op, false);
+            emit_integer_shift(emitter, current_stack_size, max_stack_size, op, false);
             break;
         case opcode::lshl: [[fallthrough]];
         case opcode::lshr:
-            emit_integer_shift(op, true);
+            emit_integer_shift(emitter, current_stack_size, max_stack_size, op, true);
             break;
         case opcode::ineg:
-            emit_integer_negation(op, false);
+            emit_integer_negation(emitter, current_stack_size, op, false);
             break;
         case opcode::lneg:
-            emit_integer_negation(op, true);
+            emit_integer_negation(emitter, current_stack_size, op, true);
             break;
         case opcode::iret: [[fallthrough]];
         case opcode::lret: [[fallthrough]];

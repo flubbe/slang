@@ -90,6 +90,20 @@ T run_bytecode(
     return result;
 }
 
+template<typename Input, typename Output>
+Output run_numeric_conversion(
+  opcode source,
+  opcode conversion,
+  Input value)
+{
+    memory_write_archive bytecode{false};
+    emit(bytecode, source);
+    emit(bytecode, value);
+    emit(bytecode, conversion);
+    emit(bytecode, opcode::ret);
+    return run_bytecode<Output>(bytecode.get_buffer());
+}
+
 }    // namespace
 
 // NOLINTBEGIN(readability-magic-numbers)
@@ -417,6 +431,51 @@ TEST(jit, compile_execute_i64_math)
 
     EXPECT_EQ(run_shift(opcode::lshl, 21, 1), 42);
     EXPECT_EQ(run_shift(opcode::lshr, -84, 1), 0x7fffffffffffffd6);
+}
+
+TEST(jit, compile_execute_remaining_opcodes)
+{
+    EXPECT_EQ((run_numeric_conversion<std::int32_t, std::int32_t>(opcode::iconst, opcode::i2c, 0x180)), -128);
+    EXPECT_EQ((run_numeric_conversion<std::int32_t, std::int32_t>(opcode::iconst, opcode::i2s, 0x18000)), -32768);
+    EXPECT_EQ((run_numeric_conversion<std::int32_t, std::int64_t>(opcode::iconst, opcode::i2l, -42)), -42);
+    EXPECT_EQ((run_numeric_conversion<std::int32_t, double>(opcode::iconst, opcode::i2d, -42)), -42.0);
+    EXPECT_EQ((run_numeric_conversion<std::int64_t, std::int32_t>(opcode::lconst, opcode::l2i, 0x10000002aLL)), 42);
+    EXPECT_EQ((run_numeric_conversion<std::int64_t, float>(opcode::lconst, opcode::l2f, 12)), 12.0F);
+    EXPECT_EQ((run_numeric_conversion<std::int64_t, double>(opcode::lconst, opcode::l2d, -42)), -42.0);
+    EXPECT_EQ((run_numeric_conversion<float, std::int32_t>(opcode::fconst, opcode::f2i, -12.75F)), -12);
+    EXPECT_EQ((run_numeric_conversion<float, std::int64_t>(opcode::fconst, opcode::f2l, -12.75F)), -12);
+    EXPECT_EQ((run_numeric_conversion<float, double>(opcode::fconst, opcode::f2d, 12.5F)), 12.5);
+    EXPECT_EQ((run_numeric_conversion<double, std::int32_t>(opcode::dconst, opcode::d2i, -12.75)), -12);
+    EXPECT_EQ((run_numeric_conversion<double, std::int64_t>(opcode::dconst, opcode::d2l, 12.75)), 12);
+    EXPECT_EQ((run_numeric_conversion<double, float>(opcode::dconst, opcode::d2f, 12.5)), 12.5F);
+
+    const auto run_negation = []<typename Value>(opcode source, opcode operation, Value value)
+    {
+        memory_write_archive bytecode{false};
+        emit(bytecode, source);
+        emit(bytecode, value);
+        emit(bytecode, operation);
+        emit(bytecode, opcode::ret);
+        return run_bytecode<Value>(bytecode.get_buffer());
+    };
+    EXPECT_EQ(run_negation(opcode::fconst, opcode::fneg, 12.5F), -12.5F);
+    EXPECT_EQ(run_negation(opcode::dconst, opcode::dneg, 12.5), -12.5);
+
+    const auto run_logical = [](opcode operation, std::int32_t lhs, std::int32_t rhs)
+    {
+        memory_write_archive bytecode{false};
+        emit(bytecode, opcode::iconst);
+        emit(bytecode, lhs);
+        emit(bytecode, opcode::iconst);
+        emit(bytecode, rhs);
+        emit(bytecode, operation);
+        emit(bytecode, opcode::ret);
+        return run_bytecode<std::int32_t>(bytecode.get_buffer());
+    };
+    EXPECT_EQ(run_logical(opcode::land, -2, 8), 1);
+    EXPECT_EQ(run_logical(opcode::land, 0, 8), 0);
+    EXPECT_EQ(run_logical(opcode::lor, 0, -3), 1);
+    EXPECT_EQ(run_logical(opcode::lor, 0, 0), 0);
 }
 
 TEST(jit, module_loader)
