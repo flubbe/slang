@@ -33,6 +33,13 @@ using namespace slang::jit::aarch64;
 
 /*
  * Runtime helper calls for the generated code.
+ *
+ * Exceptions
+ * ----------
+ * C++ exceptions are not allowed to escape the
+ * helper functions. If an exception is raised/caught,
+ * it must be stored in `frame->pending_exception`
+ * for the local frame.
  */
 
 /*
@@ -42,34 +49,44 @@ using namespace slang::jit::aarch64;
 void load_string_constant(
   si::stack_frame* frame,
   std::size_t constant_index,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    if(frame == nullptr
-       || frame->gc == nullptr)
+    try
     {
-        throw jit_error{
-          "JIT string constant requires a runtime context."};
-    }
-    if(constant_index >= frame->constants.size())
-    {
-        throw jit_error{
-          "Invalid JIT string constant index."};
-    }
+        if(frame == nullptr
+           || frame->gc == nullptr)
+        {
+            throw jit_error{
+              "JIT string constant requires a runtime context."};
+        }
+        if(constant_index >= frame->constants.size())
+        {
+            throw jit_error{
+              "Invalid JIT string constant index."};
+        }
 
-    const auto& constant = frame->constants[constant_index];
-    if(constant.type != module_::constant_type::str)
-    {
-        throw jit_error{
-          "JIT string constant table entry is not a string."};
-    }
+        const auto& constant = frame->constants[constant_index];
+        if(constant.type != module_::constant_type::str)
+        {
+            throw jit_error{
+              "JIT string constant table entry is not a string."};
+        }
 
-    auto* string = frame->gc->gc_new<std::string>(
-      gc::gc_object::of_temporary);
-    *string = std::get<std::string>(constant.data);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&string),
-      sizeof(string));    // We really want to store the pointer here (not the string) // NOLINT(bugprone-sizeof-expression)
+        auto* string = frame->gc->gc_new<std::string>(
+          gc::gc_object::of_temporary);
+        *string = std::get<std::string>(constant.data);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&string),
+          sizeof(string));    // We really want to store the pointer here (not the string) // NOLINT(bugprone-sizeof-expression)
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 /*
@@ -138,79 +155,89 @@ bool compare_helper(
 void compare_values(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    bool result{false};
-    switch(operation)
+    try
     {
-    case opcode::icmpl: [[fallthrough]];
-    case opcode::icmple: [[fallthrough]];
-    case opcode::icmpg: [[fallthrough]];
-    case opcode::icmpge: [[fallthrough]];
-    case opcode::icmpeq: [[fallthrough]];
-    case opcode::icmpne:
-        result = compare_helper<std::int32_t>(
-          frame,
-          operation,
-          stack_offset);
-        break;
-    case opcode::lcmpl: [[fallthrough]];
-    case opcode::lcmple: [[fallthrough]];
-    case opcode::lcmpg: [[fallthrough]];
-    case opcode::lcmpge: [[fallthrough]];
-    case opcode::lcmpeq: [[fallthrough]];
-    case opcode::lcmpne:
-        result = compare_helper<std::int64_t>(
-          frame,
-          operation,
-          stack_offset);
-        break;
-    case opcode::fcmpl: [[fallthrough]];
-    case opcode::fcmple: [[fallthrough]];
-    case opcode::fcmpg: [[fallthrough]];
-    case opcode::fcmpge: [[fallthrough]];
-    case opcode::fcmpeq: [[fallthrough]];
-    case opcode::fcmpne:
-        result = compare_helper<float>(
-          frame,
-          operation,
-          stack_offset);
-        break;
-    case opcode::dcmpl: [[fallthrough]];
-    case opcode::dcmple: [[fallthrough]];
-    case opcode::dcmpg: [[fallthrough]];
-    case opcode::dcmpge: [[fallthrough]];
-    case opcode::dcmpeq: [[fallthrough]];
-    case opcode::dcmpne:
-        result = compare_helper<double>(
-          frame,
-          operation,
-          stack_offset);
-        break;
-    case opcode::acmpeq: [[fallthrough]];
-    case opcode::acmpne:
+        bool result{false};
+        switch(operation)
+        {
+        case opcode::icmpl: [[fallthrough]];
+        case opcode::icmple: [[fallthrough]];
+        case opcode::icmpg: [[fallthrough]];
+        case opcode::icmpge: [[fallthrough]];
+        case opcode::icmpeq: [[fallthrough]];
+        case opcode::icmpne:
+            result = compare_helper<std::int32_t>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::lcmpl: [[fallthrough]];
+        case opcode::lcmple: [[fallthrough]];
+        case opcode::lcmpg: [[fallthrough]];
+        case opcode::lcmpge: [[fallthrough]];
+        case opcode::lcmpeq: [[fallthrough]];
+        case opcode::lcmpne:
+            result = compare_helper<std::int64_t>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::fcmpl: [[fallthrough]];
+        case opcode::fcmple: [[fallthrough]];
+        case opcode::fcmpg: [[fallthrough]];
+        case opcode::fcmpge: [[fallthrough]];
+        case opcode::fcmpeq: [[fallthrough]];
+        case opcode::fcmpne:
+            result = compare_helper<float>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::dcmpl: [[fallthrough]];
+        case opcode::dcmple: [[fallthrough]];
+        case opcode::dcmpg: [[fallthrough]];
+        case opcode::dcmpge: [[fallthrough]];
+        case opcode::dcmpeq: [[fallthrough]];
+        case opcode::dcmpne:
+            result = compare_helper<double>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::acmpeq: [[fallthrough]];
+        case opcode::acmpne:
+        {
+            result = compare_helper<void*>(
+              frame,
+              operation,
+              stack_offset);
+
+            auto* values = reinterpret_cast<void**>(         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              frame->stack.span().data() + stack_offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            frame->gc->remove_temporary(values[0]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            frame->gc->remove_temporary(values[1]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+            break;
+        }
+        default:
+            throw jit_error{"Invalid comparison opcode."};
+        }
+
+        const auto result_value = static_cast<std::int32_t>(result);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &result_value,
+          sizeof(result_value));
+    }
+    catch(...)
     {
-        result = compare_helper<void*>(
-          frame,
-          operation,
-          stack_offset);
-
-        auto* values = reinterpret_cast<void**>(         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-          frame->stack.span().data() + stack_offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        frame->gc->remove_temporary(values[0]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        frame->gc->remove_temporary(values[1]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
-        break;
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
-    default:
-        throw jit_error{"Invalid comparison opcode."};
-    }
-
-    const auto result_value = static_cast<std::int32_t>(result);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      &result_value,
-      sizeof(result_value));
 }
 
 /*
@@ -220,79 +247,119 @@ void compare_values(
 void load_reference_local(
   si::stack_frame* frame,
   std::size_t local_offset,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* reference{nullptr};
-    std::memcpy(
-      static_cast<void*>(&reference),
-      frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(reference));
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
 
-    frame->gc->add_temporary(reference);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&reference),
-      sizeof(reference));
+        frame->gc->add_temporary(reference);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void store_reference_local(
   si::stack_frame* frame,
   std::size_t local_offset,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* reference{nullptr};
-    std::memcpy(
-      static_cast<void*>(&reference),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(reference));
-
-    void* previous{nullptr};
-    std::memcpy(
-      static_cast<void*>(&previous),
-      frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(previous));
-
-    frame->gc->remove_temporary(reference);
-    if(reference != previous)
+    try
     {
-        frame->update_gc_local_root(
-          local_offset,
-          reference);
-    }
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
 
-    std::memcpy(
-      frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&reference),
-      sizeof(reference));
+        void* previous{nullptr};
+        std::memcpy(
+          static_cast<void*>(&previous),
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(previous));
+
+        frame->gc->remove_temporary(reference);
+        if(reference != previous)
+        {
+            frame->update_gc_local_root(
+              local_offset,
+              reference);
+        }
+
+        std::memcpy(
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void duplicate_reference(
   si::stack_frame* frame,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* reference{nullptr};
-    std::memcpy(
-      static_cast<void*>(&reference),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(reference));
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
 
-    frame->gc->add_temporary(reference);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset + sizeof(reference),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&reference),
-      sizeof(reference));
+        frame->gc->add_temporary(reference);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset + sizeof(reference),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void discard_reference(
   si::stack_frame* frame,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* reference{nullptr};
-    std::memcpy(
-      static_cast<void*>(&reference),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(reference));
-    frame->gc->remove_temporary(reference);
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
+        frame->gc->remove_temporary(reference);
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void duplicate_stack_block(
@@ -303,43 +370,81 @@ void duplicate_stack_block(
   std::size_t size3,
   bool needs_gc1,
   bool needs_gc2,
-  std::size_t current_stack_size)
+  std::size_t current_stack_size) noexcept
 {
-    auto stack = frame->stack.span();
-    const auto old_size = current_stack_size;
-    if(old_size > stack.size())
+    try
     {
-        throw jit_error{
-          "Invalid current JIT operand stack size."};
-    }
+        auto stack = frame->stack.span();
+        const auto old_size = current_stack_size;
+        if(old_size > stack.size())
+        {
+            throw jit_error{
+              "Invalid current JIT operand stack size."};
+        }
 
-    const auto below_size =
-      operation == opcode::dup_x1
-        ? size2
-        : size2 + size3;
-    const auto copied_size =
-      operation == opcode::dup2_x0
-        ? size1 + size2
-        : size1;
-    const auto source_offset =
-      operation == opcode::dup2_x0
-        ? old_size - copied_size
-        : old_size - copied_size - below_size;
-    const auto copy_offset =
-      operation == opcode::dup2_x0
-        ? source_offset
-        : source_offset + below_size;
+        const auto below_size =
+          operation == opcode::dup_x1
+            ? size2
+            : size2 + size3;
+        const auto copied_size =
+          operation == opcode::dup2_x0
+            ? size1 + size2
+            : size1;
+        const auto source_offset =
+          operation == opcode::dup2_x0
+            ? old_size - copied_size
+            : old_size - copied_size - below_size;
+        const auto copy_offset =
+          operation == opcode::dup2_x0
+            ? source_offset
+            : source_offset + below_size;
 
-    const std::vector<std::byte> copy{
-      stack.begin() + static_cast<std::ptrdiff_t>(copy_offset),
-      stack.begin() + static_cast<std::ptrdiff_t>(copy_offset + copied_size)};
+        const std::vector<std::byte> copy{
+          stack.begin() + static_cast<std::ptrdiff_t>(copy_offset),
+          stack.begin() + static_cast<std::ptrdiff_t>(copy_offset + copied_size)};
 
-    if(operation == opcode::dup2_x0)
-    {
+        if(operation == opcode::dup2_x0)
+        {
+            std::memcpy(
+              stack.data() + old_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              copy.data(),
+              copied_size);
+
+            if(needs_gc1)
+            {
+                void* reference{nullptr};
+                std::memcpy(
+                  static_cast<void*>(&reference),
+                  copy.data(),
+                  size1);
+                frame->gc->add_temporary(reference);
+            }
+
+            if(needs_gc2)
+            {
+                void* reference{nullptr};
+                std::memcpy(
+                  static_cast<void*>(&reference),
+                  copy.data() + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                  size2);
+                frame->gc->add_temporary(reference);
+            }
+
+            return;
+        }
+
+        std::memmove(
+          stack.data() + source_offset + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          stack.data() + source_offset,            // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          below_size);
         std::memcpy(
-          stack.data() + old_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          stack.data() + source_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
           copy.data(),
-          copied_size);
+          size1);
+        std::memcpy(
+          stack.data() + source_offset + size1 + below_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          copy.data(),
+          size1);
 
         if(needs_gc1)
         {
@@ -350,41 +455,13 @@ void duplicate_stack_block(
               size1);
             frame->gc->add_temporary(reference);
         }
-
-        if(needs_gc2)
-        {
-            void* reference{nullptr};
-            std::memcpy(
-              static_cast<void*>(&reference),
-              copy.data() + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              size2);
-            frame->gc->add_temporary(reference);
-        }
-
-        return;
     }
-
-    std::memmove(
-      stack.data() + source_offset + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      stack.data() + source_offset,            // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      below_size);
-    std::memcpy(
-      stack.data() + source_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      copy.data(),
-      size1);
-    std::memcpy(
-      stack.data() + source_offset + size1 + below_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      copy.data(),
-      size1);
-
-    if(needs_gc1)
+    catch(...)
     {
-        void* reference{nullptr};
-        std::memcpy(
-          static_cast<void*>(&reference),
-          copy.data(),
-          size1);
-        frame->gc->add_temporary(reference);
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -395,7 +472,7 @@ void duplicate_stack_block(
 void execute_logical_operation(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
     std::int32_t lhs{0};
     std::int32_t rhs{0};
@@ -425,7 +502,7 @@ void execute_logical_operation(
 void execute_fp_operation(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
     // 32-bit floating point operations.
 
@@ -512,7 +589,7 @@ void execute_fp_operation(
 void execute_fp_negation(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
     if(operation == opcode::fneg)
     {
@@ -550,7 +627,7 @@ template<
   typename Output>
 void convert_numeric_value(
   si::stack_frame* frame,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
     Input value{0};
     std::memcpy(
@@ -568,7 +645,7 @@ void convert_numeric_value(
 template<typename Narrow>
 void convert_i32_narrow(
   si::stack_frame* frame,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
     std::int32_t value{0};
     std::memcpy(
@@ -586,107 +663,117 @@ void convert_i32_narrow(
 void numeric_conversion(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    switch(operation)
+    try
     {
-    case opcode::i2c:
-        convert_i32_narrow<std::int8_t>(frame, stack_offset);
-        return;
-    case opcode::i2s:
-        convert_i32_narrow<std::int16_t>(frame, stack_offset);
-        return;
-    case opcode::i2l:
-        convert_numeric_value<std::int32_t, std::int64_t>(frame, stack_offset);
-        return;
-    case opcode::i2d:
-        convert_numeric_value<std::int32_t, double>(frame, stack_offset);
-        return;
-    case opcode::l2i:
-        convert_numeric_value<std::int64_t, std::int32_t>(frame, stack_offset);
-        return;
-    case opcode::l2f:
-        convert_numeric_value<std::int64_t, float>(frame, stack_offset);
-        return;
-    case opcode::l2d:
-        convert_numeric_value<std::int64_t, double>(frame, stack_offset);
-        return;
-    case opcode::f2i:
-        convert_numeric_value<float, std::int32_t>(frame, stack_offset);
-        return;
-    case opcode::f2l:
-        convert_numeric_value<float, std::int64_t>(frame, stack_offset);
-        return;
-    case opcode::d2l:
-        convert_numeric_value<double, std::int64_t>(frame, stack_offset);
-        return;
-    case opcode::i2f:
-    {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
+        switch(operation)
+        {
+        case opcode::i2c:
+            convert_i32_narrow<std::int8_t>(frame, stack_offset);
+            return;
+        case opcode::i2s:
+            convert_i32_narrow<std::int16_t>(frame, stack_offset);
+            return;
+        case opcode::i2l:
+            convert_numeric_value<std::int32_t, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::i2d:
+            convert_numeric_value<std::int32_t, double>(frame, stack_offset);
+            return;
+        case opcode::l2i:
+            convert_numeric_value<std::int64_t, std::int32_t>(frame, stack_offset);
+            return;
+        case opcode::l2f:
+            convert_numeric_value<std::int64_t, float>(frame, stack_offset);
+            return;
+        case opcode::l2d:
+            convert_numeric_value<std::int64_t, double>(frame, stack_offset);
+            return;
+        case opcode::f2i:
+            convert_numeric_value<float, std::int32_t>(frame, stack_offset);
+            return;
+        case opcode::f2l:
+            convert_numeric_value<float, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::d2l:
+            convert_numeric_value<double, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::i2f:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
 
-        const auto result = static_cast<float>(value);
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &result,
-          sizeof(result));
+            const auto result = static_cast<float>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
 
-        return;
+            return;
+        }
+        case opcode::d2f:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<float>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        case opcode::f2d:
+        {
+            float value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<double>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        case opcode::d2i:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<std::int32_t>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        default:
+            throw jit_error{
+              "Unsupported numeric conversion."};
+        }
     }
-    case opcode::d2f:
+    catch(...)
     {
-        double value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        const auto result = static_cast<float>(value);
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &result,
-          sizeof(result));
-
-        return;
-    }
-    case opcode::f2d:
-    {
-        float value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        const auto result = static_cast<double>(value);
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &result,
-          sizeof(result));
-
-        return;
-    }
-    case opcode::d2i:
-    {
-        double value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        const auto result = static_cast<std::int32_t>(value);
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &result,
-          sizeof(result));
-
-        return;
-    }
-    default:
-        throw jit_error{
-          "Unsupported numeric conversion."};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -753,17 +840,27 @@ void create_struct(
   std::size_t size,
   std::size_t alignment,
   std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    auto* object = frame->gc->gc_new(
-      layout_id,
-      size,
-      alignment,
-      gc::gc_object::of_temporary);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<void*>(&object),
-      sizeof(object));
+    try
+    {
+        auto* object = frame->gc->gc_new(
+          layout_id,
+          size,
+          alignment,
+          gc::gc_object::of_temporary);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<void*>(&object),
+          sizeof(object));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void set_field(
@@ -771,60 +868,70 @@ void set_field(
   std::size_t field_size,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t field_offset,
   bool field_needs_gc,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* object{nullptr};
-    std::memcpy(
-      static_cast<void*>(&object),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(object));
-    if(object == nullptr)
+    try
     {
-        throw jit_error{
-          "Null pointer access during setfield."};
-    }
-
-    const auto value_offset = stack_offset + sizeof(object);
-    if(field_size == sizeof(void*))
-    {
-        void* value{nullptr};
+        void* object{nullptr};
         std::memcpy(
-          static_cast<void*>(&value),
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        frame->gc->remove_temporary(object);
-        if(field_needs_gc)
+          static_cast<void*>(&object),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(object));
+        if(object == nullptr)
         {
-            frame->gc->remove_temporary(value);
+            throw jit_error{
+              "Null pointer access during setfield."};
         }
 
-        std::memcpy(
-          static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          static_cast<const void*>(&value),
-          sizeof(value));
-    }
-    else if(field_size == sizeof(std::int32_t))
-    {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
+        const auto value_offset = stack_offset + sizeof(object);
+        if(field_size == sizeof(void*))
+        {
+            void* value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&value),
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
 
-        frame->gc->remove_temporary(object);
+            frame->gc->remove_temporary(object);
+            if(field_needs_gc)
+            {
+                frame->gc->remove_temporary(value);
+            }
 
-        std::memcpy(
-          static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &value,
-          sizeof(value));
+            std::memcpy(
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+        }
+        else if(field_size == sizeof(std::int32_t))
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            frame->gc->remove_temporary(object);
+
+            std::memcpy(
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &value,
+              sizeof(value));
+        }
+        else
+        {
+            throw jit_error{
+              std::format(
+                "Invalid field size {} in setfield.",
+                field_size)};
+        }
     }
-    else
+    catch(...)
     {
-        throw jit_error{
-          std::format(
-            "Invalid field size {} in setfield.",
-            field_size)};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -833,56 +940,66 @@ void get_field(
   std::size_t field_size,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t field_offset,
   bool field_needs_gc,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* object{nullptr};
-    std::memcpy(
-      static_cast<void*>(&object),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(object));
-    if(object == nullptr)
+    try
     {
-        throw jit_error{
-          "Null pointer access during getfield."};
-    }
-
-    frame->gc->remove_temporary(object);
-
-    if(field_size == sizeof(void*))
-    {
-        void* value{nullptr};
+        void* object{nullptr};
         std::memcpy(
-          static_cast<void*>(&value),
-          static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-        std::memcpy(
+          static_cast<void*>(&object),
           frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          static_cast<const void*>(&value),
-          sizeof(value));
-
-        if(field_needs_gc)
+          sizeof(object));
+        if(object == nullptr)
         {
-            frame->gc->add_temporary(value);
+            throw jit_error{
+              "Null pointer access during getfield."};
+        }
+
+        frame->gc->remove_temporary(object);
+
+        if(field_size == sizeof(void*))
+        {
+            void* value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&value),
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+
+            if(field_needs_gc)
+            {
+                frame->gc->add_temporary(value);
+            }
+        }
+        else if(field_size == sizeof(std::int32_t))
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &value,
+              sizeof(value));
+        }
+        else
+        {
+            throw jit_error{
+              std::format(
+                "Invalid field size {} in getfield.",
+                field_size)};
         }
     }
-    else if(field_size == sizeof(std::int32_t))
+    catch(...)
     {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          &value,
-          sizeof(value));
-    }
-    else
-    {
-        throw jit_error{
-          std::format(
-            "Invalid field size {} in getfield.",
-            field_size)};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -893,27 +1010,37 @@ void get_field(
 void check_cast(
   si::stack_frame* frame,
   std::size_t stack_offset,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t target_layout_id)
+  std::size_t target_layout_id) noexcept
 {
-    void* object{nullptr};
-    std::memcpy(
-      static_cast<void*>(&object),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(object));
-    if(object == nullptr)
+    try
     {
-        throw jit_error{
-          "Null pointer access during checkcast."};
-    }
+        void* object{nullptr};
+        std::memcpy(
+          static_cast<void*>(&object),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(object));
+        if(object == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during checkcast."};
+        }
 
-    const auto source_layout_id = frame->gc->get_type_layout_id(object);
-    if(source_layout_id != target_layout_id)
+        const auto source_layout_id = frame->gc->get_type_layout_id(object);
+        if(source_layout_id != target_layout_id)
+        {
+            throw jit_error{
+              std::format(
+                "Type cast from '{}' to '{}' failed.",
+                frame->gc->layout_to_string(source_layout_id),
+                frame->gc->layout_to_string(target_layout_id))};
+        }
+    }
+    catch(...)
     {
-        throw jit_error{
-          std::format(
-            "Type cast from '{}' to '{}' failed.",
-            frame->gc->layout_to_string(source_layout_id),
-            frame->gc->layout_to_string(target_layout_id))};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -924,406 +1051,458 @@ void check_cast(
 void create_array(
   si::stack_frame* frame,
   module_::array_type type,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    std::int32_t length{0};
-    std::memcpy(
-      &length,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(length));
-
-    if(length < 0)
+    try
     {
-        throw jit_error{
-          std::format(
-            "Invalid array size '{}'.",
-            length)};
-    }
+        std::int32_t length{0};
+        std::memcpy(
+          &length,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(length));
 
-    void* array = nullptr;
-    auto& gc = *frame->gc;
-
-    switch(type)
-    {
-    case module_::array_type::i8:
-        array = gc.gc_new_array<std::int8_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i16:
-        array = gc.gc_new_array<std::int16_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i32:
-        array = gc.gc_new_array<std::int32_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::i64:
-        array = gc.gc_new_array<std::int64_t>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::f32:
-        array = gc.gc_new_array<float>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::f64:
-        array = gc.gc_new_array<double>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    case module_::array_type::str:
-    {
-        auto* strings = gc.gc_new_array<std::string*>(
-          length,
-          gc::gc_object::of_temporary);
-
-        for(auto& string: *strings)
+        if(length < 0)
         {
-            string = gc.gc_new<std::string>(
-              gc::gc_object::of_none,
-              false);
+            throw jit_error{
+              std::format(
+                "Invalid array size '{}'.",
+                length)};
         }
-        array = strings;
 
-        break;
-    }
-    case module_::array_type::ref:
-        array = gc.gc_new_array<void*>(
-          length,
-          gc::gc_object::of_temporary);
-        break;
-    }
+        void* array = nullptr;
+        auto& gc = *frame->gc;
 
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      static_cast<const void*>(&array),
-      sizeof(array));
+        switch(type)
+        {
+        case module_::array_type::i8:
+            array = gc.gc_new_array<std::int8_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i16:
+            array = gc.gc_new_array<std::int16_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i32:
+            array = gc.gc_new_array<std::int32_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i64:
+            array = gc.gc_new_array<std::int64_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::f32:
+            array = gc.gc_new_array<float>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::f64:
+            array = gc.gc_new_array<double>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::str:
+        {
+            auto* strings = gc.gc_new_array<std::string*>(
+              length,
+              gc::gc_object::of_temporary);
+
+            for(auto& string: *strings)
+            {
+                string = gc.gc_new<std::string>(
+                  gc::gc_object::of_none,
+                  false);
+            }
+            array = strings;
+
+            break;
+        }
+        case module_::array_type::ref:
+            array = gc.gc_new_array<void*>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        }
+
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&array),
+          sizeof(array));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 void create_struct_array(
   si::stack_frame* frame,
   std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    std::int32_t length{0};
-    std::memcpy(
-      &length,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(length));
-
-    if(length < 0)
+    try
     {
-        throw jit_error{
-          std::format(
-            "Invalid array length '{}'.",
-            length)};
+        std::int32_t length{0};
+        std::memcpy(
+          &length,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(length));
+
+        if(length < 0)
+        {
+            throw jit_error{
+              std::format(
+                "Invalid array length '{}'.",
+                length)};
+        }
+
+        auto* array = frame->gc->gc_new_array(
+          layout_id,
+          static_cast<std::size_t>(length),
+          gc::gc_object::of_temporary);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+          static_cast<void*>(&array),
+          sizeof(array));    // We really want to store the pointer here // NOLINT(bugprone-sizeof-expression)
     }
-
-    auto* array = frame->gc->gc_new_array(
-      layout_id,
-      static_cast<std::size_t>(length),
-      gc::gc_object::of_temporary);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
-      static_cast<void*>(&array),
-      sizeof(array));    // We really want to store the pointer here // NOLINT(bugprone-sizeof-expression)
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
 }
 
 std::size_t get_array_length(
   si::stack_frame* frame,
-  void* array)
+  void* array) noexcept
 {
-    if(array == nullptr)
+    try
     {
+        if(array == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during arraylength."};
+        }
+
+        auto& gc = *frame->gc;
+        const auto type = gc.get_object_type(array);
+        gc.remove_temporary(array);
+
+        switch(type)
+        {
+        case gc::gc_object_type::array_i8:
+            return static_cast<si::fixed_vector<std::int8_t>*>(array)->size();
+        case gc::gc_object_type::array_i16:
+            return static_cast<si::fixed_vector<std::int16_t>*>(array)->size();
+        case gc::gc_object_type::array_i32:
+            return static_cast<si::fixed_vector<std::int32_t>*>(array)->size();
+        case gc::gc_object_type::array_i64:
+            return static_cast<si::fixed_vector<std::int64_t>*>(array)->size();
+        case gc::gc_object_type::array_f32:
+            return static_cast<si::fixed_vector<float>*>(array)->size();
+        case gc::gc_object_type::array_f64:
+            return static_cast<si::fixed_vector<double>*>(array)->size();
+        case gc::gc_object_type::array_str:
+        case gc::gc_object_type::array_aref:
+            return static_cast<si::fixed_vector<void*>*>(array)->size();
+        case gc::gc_object_type::str:
+        case gc::gc_object_type::obj:
+            break;
+        }
+
         throw jit_error{
-          "Null pointer access during arraylength."};
+          "arraylength: argument is not an array."};
     }
-
-    auto& gc = *frame->gc;
-    const auto type = gc.get_object_type(array);
-    gc.remove_temporary(array);
-
-    switch(type)
+    catch(...)
     {
-    case gc::gc_object_type::array_i8:
-        return static_cast<si::fixed_vector<std::int8_t>*>(array)->size();
-    case gc::gc_object_type::array_i16:
-        return static_cast<si::fixed_vector<std::int16_t>*>(array)->size();
-    case gc::gc_object_type::array_i32:
-        return static_cast<si::fixed_vector<std::int32_t>*>(array)->size();
-    case gc::gc_object_type::array_i64:
-        return static_cast<si::fixed_vector<std::int64_t>*>(array)->size();
-    case gc::gc_object_type::array_f32:
-        return static_cast<si::fixed_vector<float>*>(array)->size();
-    case gc::gc_object_type::array_f64:
-        return static_cast<si::fixed_vector<double>*>(array)->size();
-    case gc::gc_object_type::array_str:
-    case gc::gc_object_type::array_aref:
-        return static_cast<si::fixed_vector<void*>*>(array)->size();
-    case gc::gc_object_type::str:
-    case gc::gc_object_type::obj:
-        break;
-    }
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
 
-    throw jit_error{
-      "arraylength: argument is not an array."};
+        return 0;
+    }
 }
 
 void load_array_element(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* array{nullptr};
-    std::int32_t index{0};
-    std::memcpy(
-      static_cast<void*>(&array),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(array));
-    std::memcpy(
-      static_cast<void*>(&index),
-      frame->stack.span().data() + stack_offset + sizeof(array),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(index));
-
-    if(array == nullptr)
+    try
     {
-        throw jit_error{
-          std::format(
-            "Null pointer access during {}.",
-            to_string(operation))};
-    }
+        void* array{nullptr};
+        std::int32_t index{0};
+        std::memcpy(
+          static_cast<void*>(&array),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(array));
+        std::memcpy(
+          static_cast<void*>(&index),
+          frame->stack.span().data() + stack_offset + sizeof(array),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(index));
 
-    auto& gc = *frame->gc;
-    gc.remove_temporary(array);
-
-    auto check_index = [index](std::size_t size)
-    {
-        if(index < 0 || std::cmp_greater_equal(index, size))
+        if(array == nullptr)
         {
             throw jit_error{
-              "Out of bounds array access."};
+              std::format(
+                "Null pointer access during {}.",
+                to_string(operation))};
         }
-    };
 
-    auto store = [frame, stack_offset](const auto& value)
-    {
-        std::memcpy(
-          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          static_cast<const void*>(&value),
-          sizeof(value));
-    };
+        auto& gc = *frame->gc;
+        gc.remove_temporary(array);
 
-    switch(operation)
-    {
-    case opcode::caload:
-    {
-        auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
-        check_index(values->size());
-        const std::int32_t value = (*values)[index];    // NOLINT(bugprone-signed-char-misuse)
-        store(value);
-        return;
+        auto check_index = [index](std::size_t size)
+        {
+            if(index < 0 || std::cmp_greater_equal(index, size))
+            {
+                throw jit_error{
+                  "Out of bounds array access."};
+            }
+        };
+
+        auto store = [frame, stack_offset](const auto& value)
+        {
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+        };
+
+        switch(operation)
+        {
+        case opcode::caload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
+            check_index(values->size());
+            const std::int32_t value = (*values)[index];    // NOLINT(bugprone-signed-char-misuse)
+            store(value);
+            return;
+        }
+        case opcode::saload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
+            check_index(values->size());
+            const std::int32_t value = (*values)[index];
+            store(value);
+            return;
+        }
+        case opcode::iaload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
+            check_index(values->size());
+            store((*values)[index]);
+            return;
+        }
+        case opcode::laload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
+            check_index(values->size());
+            store((*values)[index]);
+            return;
+        }
+        case opcode::faload:
+        {
+            auto* values = static_cast<si::fixed_vector<float>*>(array);
+            check_index(values->size());
+            store((*values)[index]);
+            return;
+        }
+        case opcode::daload:
+        {
+            auto* values = static_cast<si::fixed_vector<double>*>(array);
+            check_index(values->size());
+            store((*values)[index]);
+            return;
+        }
+        case opcode::aaload:
+        {
+            auto* values = static_cast<si::fixed_vector<void*>*>(array);
+            check_index(values->size());
+            void* value = (*values)[index];
+            gc.add_temporary(value);
+            store(value);
+            return;
+        }
+        default:
+            throw jit_error{
+              "Invalid array load opcode."};
+        }
     }
-    case opcode::saload:
+    catch(...)
     {
-        auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
-        check_index(values->size());
-        const std::int32_t value = (*values)[index];
-        store(value);
-        return;
-    }
-    case opcode::iaload:
-    {
-        auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
-        check_index(values->size());
-        store((*values)[index]);
-        return;
-    }
-    case opcode::laload:
-    {
-        auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
-        check_index(values->size());
-        store((*values)[index]);
-        return;
-    }
-    case opcode::faload:
-    {
-        auto* values = static_cast<si::fixed_vector<float>*>(array);
-        check_index(values->size());
-        store((*values)[index]);
-        return;
-    }
-    case opcode::daload:
-    {
-        auto* values = static_cast<si::fixed_vector<double>*>(array);
-        check_index(values->size());
-        store((*values)[index]);
-        return;
-    }
-    case opcode::aaload:
-    {
-        auto* values = static_cast<si::fixed_vector<void*>*>(array);
-        check_index(values->size());
-        void* value = (*values)[index];
-        gc.add_temporary(value);
-        store(value);
-        return;
-    }
-    default:
-        throw jit_error{
-          "Invalid array load opcode."};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
 void store_array_element(
   si::stack_frame* frame,
   opcode operation,
-  std::size_t stack_offset)
+  std::size_t stack_offset) noexcept
 {
-    void* array{nullptr};
-    std::int32_t index{0};
-    std::memcpy(
-      static_cast<void*>(&array),
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(array));
-    std::memcpy(
-      static_cast<void*>(&index),
-      frame->stack.span().data() + stack_offset + sizeof(array),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(index));
-    if(array == nullptr)
+    try
     {
-        throw jit_error{
-          std::format(
-            "Null pointer access during {}.",
-            to_string(operation))};
-    }
-
-    auto& gc = *frame->gc;
-    auto check_index = [index](std::size_t size)
-    {
-        if(index < 0 || std::cmp_greater_equal(index, size))
+        void* array{nullptr};
+        std::int32_t index{0};
+        std::memcpy(
+          static_cast<void*>(&array),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(array));
+        std::memcpy(
+          static_cast<void*>(&index),
+          frame->stack.span().data() + stack_offset + sizeof(array),    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(index));
+        if(array == nullptr)
         {
             throw jit_error{
-              "Out of bounds array access."};
+              std::format(
+                "Null pointer access during {}.",
+                to_string(operation))};
         }
-    };
 
-    const auto value_offset = stack_offset + sizeof(array) + sizeof(index);
-    switch(operation)
-    {
-    case opcode::castore:
-    {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
+        auto& gc = *frame->gc;
+        auto check_index = [index](std::size_t size)
+        {
+            if(index < 0 || std::cmp_greater_equal(index, size))
+            {
+                throw jit_error{
+                  "Out of bounds array access."};
+            }
+        };
 
-        auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
-        gc.remove_temporary(array);
+        const auto value_offset = stack_offset + sizeof(array) + sizeof(index);
+        switch(operation)
+        {
+        case opcode::castore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
 
-        check_index(values->size());
-        (*values)[index] = static_cast<std::int8_t>(value);
-        return;
+            auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = static_cast<std::int8_t>(value);
+            return;
+        }
+        case opcode::sastore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = static_cast<std::int16_t>(value);
+            return;
+        }
+        case opcode::iastore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::lastore:
+        {
+            std::int64_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::fastore:
+        {
+            float value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<float>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::dastore:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<double>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::aastore:
+        {
+            void* value{nullptr};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<void*>*>(array);
+            gc.remove_temporary(value);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+            (*values)[index] = value;
+            return;
+        }
+        default:
+            throw jit_error{
+              "Invalid array store opcode."};
+        }
     }
-    case opcode::sastore:
+    catch(...)
     {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = static_cast<std::int16_t>(value);
-        return;
-    }
-    case opcode::iastore:
-    {
-        std::int32_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = value;
-        return;
-    }
-    case opcode::lastore:
-    {
-        std::int64_t value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = value;
-        return;
-    }
-    case opcode::fastore:
-    {
-        float value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<float>*>(array);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = value;
-        return;
-    }
-    case opcode::dastore:
-    {
-        double value{0};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<double>*>(array);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = value;
-        return;
-    }
-    case opcode::aastore:
-    {
-        void* value{nullptr};
-        std::memcpy(
-          &value,
-          frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-          sizeof(value));
-
-        auto* values = static_cast<si::fixed_vector<void*>*>(array);
-        gc.remove_temporary(value);
-        gc.remove_temporary(array);
-
-        check_index(values->size());
-        (*values)[index] = value;
-        return;
-    }
-    default:
-        throw jit_error{
-          "Invalid array store opcode."};
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
@@ -1345,159 +1524,161 @@ void store_array_element(
 void invoke_call_target(
   const jit_call_target* target,
   si::stack_frame* caller,
-  std::size_t argument_offset)
+  std::size_t argument_offset) noexcept
 {
-    if(target == nullptr
-       || caller == nullptr)
+    try
     {
-        throw jit_error{
-          "Invalid JIT call target or caller frame."};
-    }
+        if(target == nullptr
+           || caller == nullptr)
+        {
+            throw jit_error{
+              "Invalid JIT call target or caller frame."};
+        }
 
-    if(target->safepoint)
-    {
-        target->safepoint();
-    }
+        if(target->safepoint)
+        {
+            target->safepoint();
+        }
 
-    std::span<std::byte> caller_stack;
-    if(!caller->stack.empty())
-    {
-        caller_stack = caller->stack.span();
-    }
-    if(argument_offset > caller_stack.size()
-       || target->argument_size > caller_stack.size() - argument_offset
-       || target->return_size > caller_stack.size() - argument_offset)
-    {
-        throw jit_error{
-          "JIT call arguments or return value exceed caller stack storage."};
-    }
+        std::span<std::byte> caller_stack;
+        if(!caller->stack.empty())
+        {
+            caller_stack = caller->stack.span();
+        }
+        if(argument_offset > caller_stack.size()
+           || target->argument_size > caller_stack.size() - argument_offset
+           || target->return_size > caller_stack.size() - argument_offset)
+        {
+            throw jit_error{
+              "JIT call arguments or return value exceed caller stack storage."};
+        }
 
-    auto arguments = std::span<std::byte>{caller_stack}.subspan(
-      argument_offset,
-      target->argument_size);
-    auto return_slot = caller_stack.subspan(
-      argument_offset,
-      target->return_size);
+        auto arguments = std::span<std::byte>{caller_stack}.subspan(
+          argument_offset,
+          target->argument_size);
+        auto return_slot = caller_stack.subspan(
+          argument_offset,
+          target->return_size);
 
-    std::visit(
-      [target, caller, arguments, return_slot](const auto& func) -> void
-      {
-          using T = std::decay_t<decltype(func)>;
-
-          if constexpr(std::is_same_v<T, std::monostate>)
+        std::visit(
+          [target, caller, arguments, return_slot](const auto& func) -> void
           {
-              throw jit_error{
-                "Attempted to invoke an empty function target."};
-          }
-          else if constexpr(std::is_same_v<T, jit_function_pointer>)
-          {
-              if(func == nullptr
-                 || target->constants == nullptr)
+              using T = std::decay_t<decltype(func)>;
+
+              if constexpr(std::is_same_v<T, std::monostate>)
               {
                   throw jit_error{
-                    "Attempted to invoke an incomplete JIT function target."};
+                    "Attempted to invoke an empty function target."};
               }
-              if(target->argument_size > target->locals_size)
+              else if constexpr(std::is_same_v<T, jit_function_pointer>)
               {
-                  throw jit_error{
-                    "JIT function arguments exceed its local storage."};
-              }
-
-              auto callee = si::stack_frame::with_size(
-                *target->constants,
-                target->locals_size,
-                target->stack_size);
-              callee.gc = caller->gc;
-              std::ranges::copy(
-                arguments,
-                callee.locals.begin());
-
-              if(caller->gc != nullptr)
-              {
-                  for(const auto local_offset: target->gc_local_offsets)
+                  if(func == nullptr
+                     || target->constants == nullptr)
                   {
-                      if(local_offset + sizeof(void*) > callee.locals.size())
-                      {
-                          continue;
-                      }
+                      throw jit_error{
+                        "Attempted to invoke an incomplete JIT function target."};
+                  }
+                  if(target->argument_size > target->locals_size)
+                  {
+                      throw jit_error{
+                        "JIT function arguments exceed its local storage."};
+                  }
 
-                      void* reference{nullptr};
-                      std::memcpy(
-                        static_cast<void*>(&reference),
-                        callee.locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-                        sizeof(reference));
-                      if(reference != nullptr)
+                  auto callee = si::stack_frame::with_size(
+                    *target->constants,
+                    target->locals_size,
+                    target->stack_size);
+                  callee.gc = caller->gc;
+                  std::ranges::copy(
+                    arguments,
+                    callee.locals.begin());
+
+                  if(caller->gc != nullptr)
+                  {
+                      for(const auto local_offset: target->gc_local_offsets)
                       {
-                          if(caller->gc->is_temporary(reference))
+                          if(local_offset + sizeof(void*) > callee.locals.size())
                           {
-                              caller->gc->remove_temporary(reference);
+                              continue;
                           }
-                          callee.update_gc_local_root(local_offset, reference);
+
+                          void* reference{nullptr};
+                          std::memcpy(
+                            static_cast<void*>(&reference),
+                            callee.locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                            sizeof(reference));
+                          if(reference != nullptr)
+                          {
+                              if(caller->gc->is_temporary(reference))
+                              {
+                                  caller->gc->remove_temporary(reference);
+                              }
+                              callee.update_gc_local_root(local_offset, reference);
+                          }
                       }
                   }
-              }
 
-              func(&callee);
-              if(callee.pending_exception != nullptr)
-              {
-                  caller->pending_exception = callee.pending_exception;
+                  func(&callee);
+                  if(callee.pending_exception != nullptr)
+                  {
+                      caller->pending_exception = callee.pending_exception;
+                      callee.clear_gc_local_roots();
+                      return;
+                  }
+
+                  if(target->return_size > callee.stack.size())
+                  {
+                      throw jit_error{
+                        "JIT function return value exceeds its operand stack."};
+                  }
+
+                  if(target->return_size != 0)
+                  {
+                      std::ranges::copy(
+                        callee.stack.span().first(target->return_size),
+                        return_slot.begin());
+                  }
+
                   callee.clear_gc_local_roots();
-                  return;
               }
-
-              if(target->return_size > callee.stack.size())
+              else if constexpr(std::is_same_v<T, native_function_type>)
               {
-                  throw jit_error{
-                    "JIT function return value exceeds its operand stack."};
-              }
+                  auto native_stack = si::operand_stack::with_capacity(
+                    target->argument_size + target->return_size);
+                  native_stack.push_bytes(arguments);
 
-              if(target->return_size != 0)
-              {
-                  std::ranges::copy(
-                    callee.stack.span().first(target->return_size),
-                    return_slot.begin());
-              }
-
-              callee.clear_gc_local_roots();
-          }
-          else if constexpr(std::is_same_v<T, native_function_type>)
-          {
-              auto native_stack = si::operand_stack::with_capacity(
-                target->argument_size + target->return_size);
-              native_stack.push_bytes(arguments);
-
-              try
-              {
                   func(native_stack);
-              }
-              catch(...)
-              {
-                  caller->pending_exception = std::current_exception();
-                  return;
-              }
 
-              if(native_stack.size() != target->return_size)
-              {
-                  throw jit_error{
-                    std::format(
-                      "Native function returned {} bytes, expected {}.",
-                      native_stack.size(),
-                      target->return_size)};
-              }
+                  if(native_stack.size() != target->return_size)
+                  {
+                      throw jit_error{
+                        std::format(
+                          "Native function returned {} bytes, expected {}.",
+                          native_stack.size(),
+                          target->return_size)};
+                  }
 
-              if(target->return_size != 0)
-              {
-                  std::ranges::copy(
-                    native_stack.span().first(target->return_size),
-                    return_slot.begin());
+                  if(target->return_size != 0)
+                  {
+                      std::ranges::copy(
+                        native_stack.span().first(target->return_size),
+                        return_slot.begin());
+                  }
               }
-          }
-          else
-          {
-              static_assert(utils::false_type<T>::value, "Unsupported JIT callable function type.");
-          }
-      },
-      target->function);
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported JIT callable function type.");
+              }
+          },
+          target->function);
+    }
+    catch(...)
+    {
+        if(caller->pending_exception == nullptr)
+        {
+            caller->pending_exception = std::current_exception();
+        }
+    }
 }
 
 /*
@@ -1505,18 +1686,28 @@ void invoke_call_target(
  */
 
 void run_gc_safepoint(
-  si::stack_frame* frame)
+  si::stack_frame* frame) noexcept
 {
-    if(frame != nullptr
-       && frame->gc != nullptr
-       && frame->gc->is_run_requested())
+    try
     {
-        frame->gc->run();
+        if(frame != nullptr
+           && frame->gc != nullptr
+           && frame->gc->is_run_requested())
+        {
+            frame->gc->run();
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
     }
 }
 
 /*
- * C++ exception handling.
+ * Exception propagation.
  */
 
 bool has_pending_exception(
@@ -2072,6 +2263,11 @@ jit_function jit_compiler::compile(
 
     emitter.push_fp_lr();
 
+    // Set frame pointer to current SP.
+    emitter.mov_reg_x(
+      cpu_registers::X29,
+      cpu_registers::SP);
+
     // Save callee-saved registers X19–X22 on the stack.
     emitter.stp_x_pre(
       cpu_registers::X19,
@@ -2293,6 +2489,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               static_cast<std::int32_t>(sizeof(void*)));
@@ -2372,6 +2570,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               sizeof(void*));
@@ -2409,6 +2609,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2490,6 +2692,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2589,6 +2793,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               static_cast<std::int32_t>(sizeof(void*)));
@@ -2620,6 +2826,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2690,6 +2898,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               static_cast<std::int32_t>(sizeof(std::int32_t)) - static_cast<std::int32_t>(2 * operand_size));
@@ -2722,6 +2932,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2765,6 +2977,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -2837,6 +3051,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             if(op == opcode::setfield)
             {
                 update_stack_size(
@@ -2886,6 +3102,8 @@ jit_function jit_compiler::compile(
                   cpu_registers::X16,
                   static_cast<std::int64_t>(helper_address));
                 emitter.blr(cpu_registers::X16);
+
+                emit_exception_guard(emitter, exception_fixups);
             }
 
             break;
@@ -2923,6 +3141,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t)));
@@ -2950,6 +3170,16 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            // Preserve the helper's return value and restore later.
+            emitter.mov_reg_x(
+              cpu_registers::X22,    // scratch
+              cpu_registers::X0);
+            emit_exception_guard(emitter, exception_fixups);
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X22);
+
             emitter.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
@@ -2992,6 +3222,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             const auto result_size =
               op == opcode::laload || op == opcode::daload || op == opcode::aaload
@@ -3040,6 +3272,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
               op,
@@ -3118,6 +3352,7 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
             emit_exception_guard(emitter, exception_fixups);
 
             update_stack_size(
@@ -3253,6 +3488,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               -static_cast<std::int32_t>(sizeof(std::int32_t)));
@@ -3286,6 +3523,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             break;
         }
@@ -3336,6 +3575,8 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
+            emit_exception_guard(emitter, exception_fixups);
+
             update_stack_size(
               op,
               -static_cast<std::int32_t>(width));
@@ -3384,6 +3625,8 @@ jit_function jit_compiler::compile(
               cpu_registers::X16,
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(emitter, exception_fixups);
 
             const auto output_size = numeric_conversion_output_size(op);
             update_stack_size(

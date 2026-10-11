@@ -696,7 +696,6 @@ public:
      *
      * @param obj The object.
      * @returns The object.
-     * @throws Throws a `gc_error` if the object is not found in the object list.
      */
     void* add_temporary(void* obj);
 
