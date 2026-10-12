@@ -28,6 +28,9 @@ class file_manager;
 namespace slang::jit::aarch64
 {
 
+/** Stack slot size. Normalized to 8 bytes (64 bits). */
+constexpr std::int32_t stack_slot_size = 8;
+
 /**
  * AArch64 instruction emitter.
  *
@@ -83,6 +86,16 @@ struct instruction_emitter
 
     /** Bitwise AND (shifted register). Emits `AND <Xd>, <Xn>, <Xm>`. */
     void and_reg_x(
+      cpu_registers xd,
+      cpu_registers xn,
+      cpu_registers xm);
+
+    void asrv_w(
+      cpu_registers wd,
+      cpu_registers wn,
+      cpu_registers wm);
+
+    void asrv_x(
       cpu_registers xd,
       cpu_registers xn,
       cpu_registers xm);
@@ -276,6 +289,10 @@ struct instruction_emitter
       cpu_registers xn,
       std::uint32_t offset_bytes);
 
+    void sxtw(
+      cpu_registers xd,
+      cpu_registers xn);
+
     /** Subtract (shifted register). Emits `SUB <Wd>, <Wn>, <Wm>`. */
     void sub_w(
       cpu_registers wd,
@@ -300,6 +317,7 @@ struct instruction_emitter
      */
     void load_x(
       cpu_registers reg,
+      cpu_registers base,
       std::uint32_t offset);
 
     /**
@@ -310,6 +328,7 @@ struct instruction_emitter
      */
     void store_x(
       cpu_registers reg,
+      cpu_registers base,
       std::uint32_t offset);
 
     /** Move register. Emits `MOV <Xd>, <Xm>`. */

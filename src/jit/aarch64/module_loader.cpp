@@ -8,12 +8,13 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <unordered_set>
+
 #include "jit/aarch64.h"
 #include "shared/type_utils.h"
+#include "shared/type_class.h"
 #include "package.h"
 #include "utils.h"
-
-#include <unordered_set>
 
 namespace ty = slang::typing;
 
@@ -106,7 +107,6 @@ static bool is_garbage_collected(
 }
 
 /** Byte sizes and alignments for built-in types. */
-// FIXME duplicated from the interpreter's module_loader.
 static const auto& type_properties_map()
 {
     static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
@@ -132,18 +132,86 @@ static const auto& type_properties_map()
 static std::size_t get_type_size(
   const module_::variable_type& type)
 {
-    if(is_garbage_collected(type))
+    if(type.base_type() == "void")
     {
-        return sizeof(void*);
+        return 0;
     }
 
-    auto built_in_it = type_properties_map().find(type.base_type());
-    if(built_in_it != type_properties_map().end())
+    return stack_slot_size;
+}
+
+/**
+ * Get the class of a type.
+ *
+ * @param type The type.
+ * @returns Returns the type's category.
+ */
+static type_class get_type_class(
+  const module_::variable_type& type)
+{
+    if(type.is_array())
     {
-        return built_in_it->second.first;
+        return type_class::cat2;
     }
 
-    return sizeof(void*);
+    const auto& type_str = type.base_type();
+    if(type_str == "void")
+    {
+        // FIXME Doesn't actually have a category.
+        return type_class::cat1;
+    }
+
+    if(type_str == "i8"
+       || type_str == "i16"
+       || type_str == "i32"
+       || type_str == "f32")
+    {
+        return type_class::cat1;
+    }
+
+    return type_class::cat2;
+}
+
+static cg::type_kind get_type_kind(
+  const module_::variable_type& type)
+{
+    if(type.is_array())
+    {
+        return cg::type_kind::ref;
+    }
+
+    const auto& type_str = type.base_type();
+    if(type_str == "void")
+    {
+        return cg::type_kind::void_;
+    }
+
+    if(type_str == "i8")
+    {
+        return cg::type_kind::i8;
+    }
+    if(type_str == "i16")
+    {
+        return cg::type_kind::i16;
+    }
+    if(type_str == "i32")
+    {
+        return cg::type_kind::i32;
+    }
+    if(type_str == "i64")
+    {
+        return cg::type_kind::i64;
+    }
+    if(type_str == "f32")
+    {
+        return cg::type_kind::f32;
+    }
+    if(type_str == "f64")
+    {
+        return cg::type_kind::f32;
+    }
+
+    return cg::type_kind::ref;
 }
 
 void module_loader::decode_structs()
@@ -362,10 +430,16 @@ std::vector<jit_call_target*> module_loader::create_export_call_target_table()
 
         auto target = std::make_unique<jit_call_target>();
         target->constants = &header.constants;
+        target->return_type_class = get_type_class(desc.signature.return_type);
+        target->return_type_kind = get_type_kind(desc.signature.return_type);
         target->return_size = get_type_size(desc.signature.return_type);
 
         for(const auto& argument_type: desc.signature.arg_types)
         {
+            target->param_sizes.push_back(
+              get_type_class(argument_type) == type_class::cat1 ? 4 : 8);
+            target->param_type_kinds.push_back(
+              get_type_kind(argument_type));
             target->argument_size += get_type_size(argument_type);
         }
 

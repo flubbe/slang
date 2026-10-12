@@ -791,7 +791,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::d2l: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
+    case opcode::lret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
+    case opcode::dret: [[fallthrough]];
     case opcode::aret:
         recorder->record(static_cast<opcode>(instr));
         return 0;
@@ -815,7 +817,7 @@ std::int32_t module_loader::decode_instruction(
         write_value(code, i_u8);
 
         recorder->record(static_cast<opcode>(instr), static_cast<std::int64_t>(i_u8));
-        return static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* opcodes with one 4-byte argument. */
     case opcode::iconst: [[fallthrough]];
@@ -859,7 +861,7 @@ std::int32_t module_loader::decode_instruction(
 
         return static_cast<std::int32_t>(sizeof(std::int64_t));
     }
-        /* opcodes with one VLE integer. */
+    /* opcodes with one VLE integer. */
     case opcode::sconst:
     {
         vle_int i;
@@ -969,9 +971,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x2:
     {
         // type arguments.
-        type_class v1;
-        type_class v2;
-        type_class v3;
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v3;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
         ar & v1 & v2 & v3;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
@@ -1136,6 +1138,7 @@ std::int32_t module_loader::decode_instruction(
 
         // return correct size.
         bool is_store = (static_cast<opcode>(instr) == opcode::istore)
+                        || (static_cast<opcode>(instr) == opcode::lstore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
                         || (static_cast<opcode>(instr) == opcode::dstore)
                         || (static_cast<opcode>(instr) == opcode::astore);
@@ -1337,7 +1340,7 @@ std::int32_t module_loader::decode_instruction(
             recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
         }
 
-        return static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* setfield, getfield. */
     case opcode::setfield: [[fallthrough]];

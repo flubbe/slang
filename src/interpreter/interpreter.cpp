@@ -2166,6 +2166,7 @@ value context::exec(
       loader.get_module().get_header().constants,
       f.get_locals_size(),
       f.get_stack_size());
+    frame.gc = &gc;
 
     const auto& arg_types = f.get_signature().arg_types;
     arguments_scope arg_scope{*this, args, arg_types, frame.locals};

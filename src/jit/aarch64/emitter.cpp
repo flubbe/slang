@@ -175,6 +175,24 @@ void instruction_emitter::and_reg_x(
       encode_register_fields(0x8A000000u, xd, xn, xm));
 }
 
+void instruction_emitter::asrv_w(
+  cpu_registers wd,
+  cpu_registers wn,
+  cpu_registers wm)
+{
+    // AArch64 ASRV (register) base opcode for 32-bit
+    emit(encode_register_fields(0x1AC02800u, wd, wn, wm));
+}
+
+void instruction_emitter::asrv_x(
+  cpu_registers xd,
+  cpu_registers xn,
+  cpu_registers xm)
+{
+    // AArch64 ASRV (register) base opcode for 64-bit
+    emit(encode_register_fields(0x9AC02800u, xd, xn, xm));
+}
+
 void instruction_emitter::b(
   std::int32_t byte_offset)
 {
@@ -552,6 +570,15 @@ void instruction_emitter::str_x(
     emit(encode_unsigned_offset_fields(0xF9000000u, xd, xn, imm12));
 }
 
+void instruction_emitter::sxtw(
+  cpu_registers xd,
+  cpu_registers xn)
+{
+    // SXTW Xd, Wn is encoded as SBFM Xd, Xn, #0, #31
+    // Base mask: 0x93407C00
+    emit(0x93407C00u | (xn << 5u) | xd);
+}
+
 void instruction_emitter::sub_w(
   cpu_registers wd,
   cpu_registers wn,
@@ -576,32 +603,34 @@ void instruction_emitter::sub_x(
 
 void instruction_emitter::load_x(
   cpu_registers reg,
+  cpu_registers base,
   std::uint32_t offset)
 {
     if(offset % sizeof(std::int64_t) == 0)
     {
-        ldr_x(reg, cpu_registers::X20, offset);
+        ldr_x(reg, base, offset);
     }
     else
     {
         mov_x(cpu_registers::X2, static_cast<std::int64_t>(offset));
-        add_x(cpu_registers::X2, cpu_registers::X20, cpu_registers::X2);
+        add_x(cpu_registers::X2, base, cpu_registers::X2);
         ldr_x(reg, cpu_registers::X2, 0);
     }
 }
 
 void instruction_emitter::store_x(
   cpu_registers reg,
+  cpu_registers base,
   std::uint32_t offset)
 {
     if(offset % sizeof(std::int64_t) == 0)
     {
-        str_x(reg, cpu_registers::X20, offset);
+        str_x(reg, base, offset);
     }
     else
     {
         mov_x(cpu_registers::X2, static_cast<std::int64_t>(offset));
-        add_x(cpu_registers::X2, cpu_registers::X20, cpu_registers::X2);
+        add_x(cpu_registers::X2, base, cpu_registers::X2);
         str_x(reg, cpu_registers::X2, 0);
     }
 }

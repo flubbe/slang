@@ -104,6 +104,28 @@ Output run_numeric_conversion(
     return run_bytecode<Output>(bytecode.get_buffer());
 }
 
+std::string exception_message(
+  const std::exception_ptr& exception)
+{
+    if(!exception)
+    {
+        return {};
+    }
+
+    try
+    {
+        std::rethrow_exception(exception);
+    }
+    catch(const std::exception& e)
+    {
+        return e.what();
+    }
+    catch(...)
+    {
+        return "Unknown exception";
+    }
+}
+
 }    // namespace
 
 // NOLINTBEGIN(readability-magic-numbers)
@@ -376,7 +398,7 @@ TEST(jit, compile_execute_i32_math)
     };
 
     EXPECT_EQ(run_shift(opcode::ishl, 21, 1), 42);
-    EXPECT_EQ(run_shift(opcode::ishr, -84, 1), 0x7fffffd6);
+    EXPECT_EQ(run_shift(opcode::ishr, -84, 1), -42);
 }
 
 TEST(jit, compile_execute_i64_math)
@@ -398,7 +420,7 @@ TEST(jit, compile_execute_i64_math)
         emit(bytecode, rhs);
         emit(bytecode, operation);
         emit(bytecode, opcode::lret);
-        return run_bytecode<std::int64_t>(bytecode.get_buffer(), unaligned ? 4 : 0);
+        return run_bytecode<std::int64_t>(bytecode.get_buffer(), unaligned ? 8 /* stack slot size */ : 0);
     };
 
     EXPECT_EQ(run_binary(opcode::ladd, 27, 15), expected_result);
@@ -430,7 +452,7 @@ TEST(jit, compile_execute_i64_math)
     };
 
     EXPECT_EQ(run_shift(opcode::lshl, 21, 1), 42);
-    EXPECT_EQ(run_shift(opcode::lshr, -84, 1), 0x7fffffffffffffd6);
+    EXPECT_EQ(run_shift(opcode::lshr, -84, 1), -42);
 }
 
 TEST(jit, compile_execute_remaining_opcodes)
@@ -499,7 +521,7 @@ TEST(jit, module_loader)
         std::int32_t result = 0;
         std::memcpy(
           &result,
-          frame.stack.tail(sizeof(result)).data(),
+          frame.stack.tail(stack_slot_size).data(),
           sizeof(result));
         EXPECT_EQ(result, 12);
     }
@@ -515,7 +537,7 @@ TEST(jit, module_loader)
         std::int32_t result = 0;
         std::memcpy(
           &result,
-          frame.stack.tail(sizeof(result)).data(),
+          frame.stack.tail(stack_slot_size).data(),
           sizeof(result));
         EXPECT_EQ(result, 12);
     }
@@ -552,6 +574,30 @@ TEST(jit, module_loader)
         EXPECT_EQ(result, 42);
     }
 
+    // Must be declared as cat1/i32. JIT should take care of value truncation.
+    mod.register_native_function(
+      "test",
+      "native_add_i8",
+      [](si::operand_stack& stack)
+      {
+          auto rhs = stack.pop_cat1<std::int32_t>();
+          auto lhs = stack.pop_cat1<std::int32_t>();
+
+          stack.push_cat1(lhs + rhs);
+      });
+
+    // Must be declared as cat1/i32. JIT should take care of value truncation.
+    mod.register_native_function(
+      "test",
+      "native_add_i16",
+      [](si::operand_stack& stack)
+      {
+          auto rhs = stack.pop_cat1<std::int32_t>();
+          auto lhs = stack.pop_cat1<std::int32_t>();
+
+          stack.push_cat1(lhs + rhs);
+      });
+
     mod.register_native_function(
       "test",
       "native_add_i32",
@@ -559,7 +605,41 @@ TEST(jit, module_loader)
       {
           auto rhs = stack.pop_cat1<std::int32_t>();
           auto lhs = stack.pop_cat1<std::int32_t>();
+
           stack.push_cat1(lhs + rhs);
+      });
+
+    mod.register_native_function(
+      "test",
+      "native_add_i64",
+      [](si::operand_stack& stack)
+      {
+          auto rhs = stack.pop_cat2<std::int64_t>();
+          auto lhs = stack.pop_cat2<std::int64_t>();
+
+          stack.push_cat2(lhs + rhs);
+      });
+
+    mod.register_native_function(
+      "test",
+      "native_add_f32",
+      [](si::operand_stack& stack)
+      {
+          auto rhs = stack.pop_cat1<float>();
+          auto lhs = stack.pop_cat1<float>();
+
+          stack.push_cat1(lhs + rhs);
+      });
+
+    mod.register_native_function(
+      "test",
+      "native_add_f64",
+      [](si::operand_stack& stack)
+      {
+          auto rhs = stack.pop_cat2<double>();
+          auto lhs = stack.pop_cat2<double>();
+
+          stack.push_cat2(lhs + rhs);
       });
 
     std::size_t native_void_calls = 0;
@@ -570,12 +650,57 @@ TEST(jit, module_loader)
       { ++native_void_calls; });
 
     {
-        auto& function = mod.get_function("test_native_call");
+        auto& function = mod.get_function("test_native_call_i8");
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
           function.get_stack_size());
+
         function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
+
+        std::int32_t result = 0;
+        std::memcpy(
+          &result,
+          frame.stack.span().data(),
+          sizeof(result));
+        EXPECT_EQ(result, -128);
+    }
+    {
+        auto& function = mod.get_function("test_native_call_i16");
+        auto frame = si::stack_frame::with_size(
+          make_empty_constants(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
+
+        std::int32_t result = 0;
+        std::memcpy(
+          &result,
+          frame.stack.span().data(),
+          sizeof(result));
+        EXPECT_EQ(result, -32768);
+    }
+    {
+        auto& function = mod.get_function("test_native_call_i32");
+        auto frame = si::stack_frame::with_size(
+          make_empty_constants(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
 
         std::int32_t result = 0;
         std::memcpy(
@@ -583,6 +708,66 @@ TEST(jit, module_loader)
           frame.stack.span().data(),
           sizeof(result));
         EXPECT_EQ(result, 42);
+    }
+    {
+        auto& function = mod.get_function("test_native_call_i64");
+        auto frame = si::stack_frame::with_size(
+          make_empty_constants(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
+
+        std::int64_t result = 0;
+        std::memcpy(
+          &result,
+          frame.stack.span().data(),
+          sizeof(result));
+        EXPECT_EQ(result, 4);
+    }
+    {
+        auto& function = mod.get_function("test_native_call_f32");
+        auto frame = si::stack_frame::with_size(
+          make_empty_constants(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
+
+        float result = 0;
+        std::memcpy(
+          &result,
+          frame.stack.span().data(),
+          sizeof(result));
+        EXPECT_EQ(result, 42.f);
+    }
+    {
+        auto& function = mod.get_function("test_native_call_f64");
+        auto frame = si::stack_frame::with_size(
+          make_empty_constants(),
+          function.get_locals_size(),
+          function.get_stack_size());
+
+        function(&frame);
+
+        ASSERT_EQ(frame.pending_exception, nullptr)
+          << "Unexpected exception: "
+          << exception_message(frame.pending_exception);
+
+        double result = 0;
+        std::memcpy(
+          &result,
+          frame.stack.span().data(),
+          sizeof(result));
+        EXPECT_EQ(result, -4.f);
     }
 
     {
