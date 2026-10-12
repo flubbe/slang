@@ -383,16 +383,15 @@ add_my_test("slang gc interface (default, run)" ${CMAKE_BINARY_DIR}/slang run te
 
 set_tests_properties(
     "slang gc interface (default, compile)"
-    "slang gc interface (default, run)"
-    PROPERTIES FIXTURES_REQUIRED needs_gc
+    PROPERTIES FIXTURES_SETUP needs_gc
 )
 set_tests_properties(
     "slang gc interface (default, run)"
-    PROPERTIES FIXTURES_REQUIRED "slang gc interface (default, compile)"
+    PROPERTIES FIXTURES_REQUIRED needs_gc
 )
 
 add_jit_compile_test("slang gc interface" FALSE test/test_gc_interface)
-set_jit_test_properties("slang gc interface" PROPERTIES FIXTURES_SETUP needs_gc)
+set_jit_test_properties("slang gc interface" PROPERTIES FIXTURES_REQUIRED needs_gc)
 
 #
 # Examples
