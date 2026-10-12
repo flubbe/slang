@@ -185,7 +185,7 @@ void parse_f32(si::context& ctx, si::operand_stack& stack)
 
     try
     {
-        // convert first, so that no memory for `i32s` is allocated in case of failure.
+        // convert first, so that no memory for `f32s` is allocated in case of failure.
         float f = std::stof(*s);
 
         r->value = ctx.get_gc().gc_new(

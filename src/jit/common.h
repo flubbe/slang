@@ -16,7 +16,9 @@
 #include <utility>
 #include <vector>
 
+#include "compiler/codegen/type.h"
 #include "interpreter/interpreter.h"
+#include "shared/type_class.h"
 #include "platform.h"
 
 /*
@@ -32,6 +34,7 @@
 namespace slang::jit
 {
 
+namespace cg = slang::codegen;
 namespace si = slang::interpreter;
 
 /** JIT compiler error. */
@@ -181,8 +184,16 @@ struct jit_call_target
     /** Pointer to the module constant table. */
     const std::vector<module_::constant_table_entry>* constants{nullptr};
 
+    /** argument sizes. */
+    std::vector<std::size_t> param_sizes;
+
+    std::vector<cg::type_kind> param_type_kinds;
+
     /** Argument size, in bytes. */
     std::size_t argument_size{0};
+
+    slang::type_class return_type_class;
+    cg::type_kind return_type_kind;
 
     /** Return value size, in bytes. */
     std::size_t return_size{0};

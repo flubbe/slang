@@ -276,6 +276,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     add_executable(test_jit_aarch64
         ../src/archives/file.cpp
         ../src/interpreter/gc.cpp
+        ../src/jit/aarch64/cfg.cpp
         ../src/jit/aarch64/compiler.cpp
         ../src/jit/aarch64/emitter.cpp
         ../src/jit/aarch64/module_loader.cpp
