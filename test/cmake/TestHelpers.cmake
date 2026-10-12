@@ -4,39 +4,39 @@
 
 function(add_my_test test_name)
     add_test(NAME "${test_name}" COMMAND ${ARGN})
-    set_tests_properties("${test_name}" 
-        PROPERTIES 
+    set_tests_properties("${test_name}"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 endfunction()
 
 function(add_compile_test test_name uses_std)
     add_test(
-        NAME "${test_name} (default, compile)" 
+        NAME "${test_name} (default, compile)"
         COMMAND ${CMAKE_BINARY_DIR}/slang compile ${ARGN}
     )
-    set_tests_properties("${test_name} (default, compile)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (default, compile)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     )
 
     add_test(
-        NAME "${test_name} (--no-eval-const-subexpr, compile)" 
+        NAME "${test_name} (--no-eval-const-subexpr, compile)"
         COMMAND ${CMAKE_BINARY_DIR}/slang compile --no-eval-const-subexpr ${ARGN}
     )
-    set_tests_properties("${test_name} (--no-eval-const-subexpr, compile)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (--no-eval-const-subexpr, compile)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     )
 
     if(${uses_std})
         set_tests_properties(
             "${test_name} (default, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
     endif()
@@ -44,21 +44,21 @@ endfunction()
 
 function(add_compile_fail_test test_name uses_std)
     add_test(
-        NAME "${test_name} (default, compile fail)" 
+        NAME "${test_name} (default, compile fail)"
         COMMAND ${CMAKE_BINARY_DIR}/slang compile ${ARGN}
     )
-    set_tests_properties("${test_name} (default, compile fail)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (default, compile fail)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
         WILL_FAIL TRUE
     )
 
     add_test(
-        NAME "${test_name} (--no-eval-const-subexpr, compile fail)" 
+        NAME "${test_name} (--no-eval-const-subexpr, compile fail)"
         COMMAND ${CMAKE_BINARY_DIR}/slang compile --no-eval-const-subexpr ${ARGN}
     )
-    set_tests_properties("${test_name} (--no-eval-const-subexpr, compile fail)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (--no-eval-const-subexpr, compile fail)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
         WILL_FAIL TRUE
     )
@@ -66,12 +66,12 @@ function(add_compile_fail_test test_name uses_std)
     if(${uses_std})
         set_tests_properties(
             "${test_name} (default, compile fail)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, compile fail)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
     endif()
@@ -107,22 +107,22 @@ function(add_compile_exec_test test_name uses_std)
     if(${uses_std})
         set_tests_properties(
             "${test_name} (default, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (default, run)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, run)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
     endif()
@@ -131,16 +131,16 @@ endfunction()
 function(add_compile_exec_fail_test test_name uses_std)
     add_my_test("${test_name} (default, compile)" ${CMAKE_BINARY_DIR}/slang compile ${ARGN})
     add_test(NAME "${test_name} (default, run fail)" COMMAND ${CMAKE_BINARY_DIR}/slang run ${ARGN})
-    set_tests_properties("${test_name} (default, run fail)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (default, run fail)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
         WILL_FAIL TRUE
     )
 
     add_my_test("${test_name} (--no-eval-const-subexpr, compile)" ${CMAKE_BINARY_DIR}/slang compile --no-eval-const-subexpr ${ARGN})
     add_test(NAME "${test_name} (--no-eval-const-subexpr, run fail)" COMMAND ${CMAKE_BINARY_DIR}/slang run ${ARGN})
-    set_tests_properties("${test_name} (--no-eval-const-subexpr, run fail)" 
-        PROPERTIES 
+    set_tests_properties("${test_name} (--no-eval-const-subexpr, run fail)"
+        PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
         WILL_FAIL TRUE
     )
@@ -148,23 +148,53 @@ function(add_compile_exec_fail_test test_name uses_std)
     if(${uses_std})
         set_tests_properties(
             "${test_name} (default, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (default, run fail)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, compile)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
         set_tests_properties(
             "${test_name} (--no-eval-const-subexpr, run fail)"
-            PROPERTIES 
+            PROPERTIES
             FIXTURES_REQUIRED needs_std
         )
     endif()
+endfunction()
+
+function(add_my_jit_test test_name)
+    # Target gate: Only register if JIT is supported
+    if(NOT (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$"))
+        return()
+    endif()
+
+    add_test(NAME "${test_name}" COMMAND ${ARGN})
+    set_tests_properties("${test_name}"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+endfunction()
+
+function(add_jit_compile_test test_name uses_std)
+    # Target gate: Only register if JIT is supported
+    if(NOT (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$"))
+        return()
+    endif()
+
+    add_test(
+        NAME "${test_name} (JIT)"
+        COMMAND ${CMAKE_BINARY_DIR}/slang run --jit ${ARGN}
+    )
+    set_tests_properties(
+        "${test_name} (JIT)"
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED "${test_name} (default, compile)"
+    )
 endfunction()

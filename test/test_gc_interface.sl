@@ -22,7 +22,10 @@ fn print_info() -> void {
 
 fn test_gc_run() -> void {
     gc::run();
-    std::assert(gc::object_count() == 0, "gc::object_count() == 0");
+
+    // NOTE The JIT allocates main's arguments through the GC so we have 1 object.
+    //      The interpreter doesn't do that, so there we have 0 objects.
+    std::assert(gc::object_count() <= 1, "gc::object_count() <= 1");
 
     std::println(std::format!("object count (after):     {}", gc::object_count()));
 
