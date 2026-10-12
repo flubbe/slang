@@ -193,6 +193,7 @@ endif()
 #
 
 include(cmake/TestHelpers.cmake)
+slang_is_jit_supported(JIT_SUPPORTED)
 
 add_compile_test(
     "build std"
@@ -310,25 +311,25 @@ add_compile_exec_test("slang macro import" TRUE test/macros/test_import --search
 set_tests_properties("slang macro import (default, compile)" PROPERTIES FIXTURES_REQUIRED test_macros)
 
 add_jit_compile_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
-set_tests_properties("slang macro import (JIT)" PROPERTIES FIXTURES_REQUIRED test_macros)
+set_jit_test_properties("slang macro import" PROPERTIES FIXTURES_REQUIRED test_macros)
 
 add_compile_exec_test("slang macro transitive import 1" TRUE test/macros/test_transitive_import1 --search-path test/macros)
 set_tests_properties("slang macro transitive import 1 (default, compile)" PROPERTIES FIXTURES_REQUIRED test_import)
 
 add_jit_compile_test("slang macro transitive import 1" TRUE test/macros/test_transitive_import1 --search-path test/macros)
-set_tests_properties("slang macro transitive import 1 (JIT)" PROPERTIES FIXTURES_REQUIRED test_import)
+set_jit_test_properties("slang macro transitive import 1" PROPERTIES FIXTURES_REQUIRED test_import)
 
 add_compile_exec_test("slang macro transitive import 2" TRUE test/macros/test_transitive_import2 --search-path test/macros)
 set_tests_properties("slang macro transitive import 2 (default, compile)" PROPERTIES FIXTURES_REQUIRED test_transitive_import1)
 
 add_jit_compile_test("slang macro transitive import 2" TRUE test/macros/test_transitive_import2 --search-path test/macros)
-set_tests_properties("slang macro transitive import 2 (JIT)" PROPERTIES FIXTURES_REQUIRED test_transitive_import1)
+set_jit_test_properties("slang macro transitive import 2" PROPERTIES FIXTURES_REQUIRED test_transitive_import1)
 
 add_compile_exec_test("slang macro struct" TRUE test/macros/test_struct)
 set_tests_properties("slang macro struct (default, compile)" PROPERTIES FIXTURES_REQUIRED needs_std)
 
 add_jit_compile_test("slang macro struct" TRUE test/macros/test_struct)
-set_tests_properties("slang macro struct (JIT)" PROPERTIES FIXTURES_REQUIRED needs_std)
+set_jit_test_properties("slang macro struct" PROPERTIES FIXTURES_REQUIRED needs_std)
 
 add_compile_exec_test("slang math" TRUE test/test_math)
 add_jit_compile_test("slang math" TRUE test/test_math)
@@ -371,7 +372,7 @@ set_tests_properties(
 )
 
 add_jit_compile_test("slang test_import" TRUE test/test_import --search-path test)
-set_tests_properties("slang test_import (JIT)" PROPERTIES FIXTURES_REQUIRED example_package_hello)
+set_jit_test_properties("slang test_import" PROPERTIES FIXTURES_REQUIRED example_package_hello)
 
 #
 # GC interface test
@@ -391,7 +392,7 @@ set_tests_properties(
 )
 
 add_jit_compile_test("slang gc interface" FALSE test/test_gc_interface)
-set_tests_properties("slang gc interface (JIT)" PROPERTIES FIXTURES_SETUP needs_gc)
+set_jit_test_properties("slang gc interface" PROPERTIES FIXTURES_SETUP needs_gc)
 
 #
 # Examples
@@ -415,8 +416,16 @@ add_jit_compile_test("slang examples/print_args" TRUE examples/print_args)
 add_my_test("slang examples/print_args -- Hello World" ${CMAKE_BINARY_DIR}/slang run examples/print_args -- Hello World)
 set_tests_properties("slang examples/print_args -- Hello World" PROPERTIES FIXTURES_REQUIRED needs_std)
 
-add_my_jit_test("slang examples/print_args -- Hello World (JIT)" ${CMAKE_BINARY_DIR}/slang run -j examples/print_args -- Hello World)
-set_tests_properties("slang examples/print_args -- Hello World (JIT)" PROPERTIES FIXTURES_REQUIRED needs_std)
+if(JIT_SUPPORTED)
+    add_my_test(
+        "slang examples/print_args -- Hello World (JIT)"
+        ${CMAKE_BINARY_DIR}/slang run -j examples/print_args -- Hello World
+    )
+    set_tests_properties(
+        "slang examples/print_args -- Hello World (JIT)"
+        PROPERTIES FIXTURES_REQUIRED needs_std
+    )
+endif()
 
 add_compile_exec_test("slang examples/string_conversion" TRUE examples/string_conversion)
 add_jit_compile_test("slang examples/string_conversion" TRUE examples/string_conversion)
@@ -424,8 +433,16 @@ add_jit_compile_test("slang examples/string_conversion" TRUE examples/string_con
 add_my_test("slang examples/string_conversion -- 3.141 a -1" ${CMAKE_BINARY_DIR}/slang run examples/string_conversion -- 3.141 a -1)
 set_tests_properties("slang examples/string_conversion -- 3.141 a -1" PROPERTIES FIXTURES_REQUIRED needs_std)
 
-add_my_jit_test("slang examples/string_conversion -- 3.141 a -1 (JIT)" ${CMAKE_BINARY_DIR}/slang run -j examples/string_conversion -- 3.141 a -1)
-set_tests_properties("slang examples/string_conversion -- 3.141 a -1 (JIT)" PROPERTIES FIXTURES_REQUIRED needs_std)
+if(JIT_SUPPORTED)
+    add_my_test(
+        "slang examples/string_conversion -- 3.141 a -1 (JIT)"
+        ${CMAKE_BINARY_DIR}/slang run -j examples/string_conversion -- 3.141 a -1
+    )
+    set_tests_properties(
+        "slang examples/string_conversion -- 3.141 a -1 (JIT)"
+        PROPERTIES FIXTURES_REQUIRED needs_std
+    )
+endif()
 
 add_compile_exec_fail_test("slang examples/assert" TRUE examples/assert)
 

@@ -115,8 +115,26 @@ function(add_jit_compile_test test_name uses_std)
         return()
     endif()
 
-    add_my_test("${test_name} (JIT)" slang run --jit ${ARGN})
-    set_tests_properties("${test_name} (JIT)"
+    set(jit_test_name "${test_name} (JIT)")
+    add_my_test("${jit_test_name}" slang run --jit ${ARGN})
+
+    set_tests_properties("${jit_test_name}"
         PROPERTIES FIXTURES_REQUIRED "${test_name} (default, compile)"
     )
+
+    if(uses_std)
+        set_tests_properties("${jit_test_name}"
+            PROPERTIES FIXTURES_REQUIRED needs_std
+        )
+    endif()
+endfunction()
+
+# Helper function to safely set required fixtures on JIT tests only if JIT is enabled on this platform
+function(set_jit_test_properties test_name)
+    slang_is_jit_supported(JIT_SUPPORTED)
+    if(NOT JIT_SUPPORTED)
+        return()
+    endif()
+
+    set_tests_properties("${test_name} (JIT)" ${ARGN})
 endfunction()
