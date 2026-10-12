@@ -288,6 +288,7 @@ std::int32_t get_opcode_stack_delta(
 
         // return correct size.
         bool is_store = (op == opcode::istore)
+                        || (op == opcode::lstore)
                         || (op == opcode::fstore)
                         || (op == opcode::dstore)
                         || (op == opcode::astore);

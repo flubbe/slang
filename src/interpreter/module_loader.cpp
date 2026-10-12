@@ -1138,6 +1138,7 @@ std::int32_t module_loader::decode_instruction(
 
         // return correct size.
         bool is_store = (static_cast<opcode>(instr) == opcode::istore)
+                        || (static_cast<opcode>(instr) == opcode::lstore)
                         || (static_cast<opcode>(instr) == opcode::fstore)
                         || (static_cast<opcode>(instr) == opcode::dstore)
                         || (static_cast<opcode>(instr) == opcode::astore);
