@@ -11,8 +11,6 @@
 #include <cassert>
 #include <utility>
 
-#include <print>    // DEBUG
-
 #include "archives/archive.h"
 #include "jit/aarch64.h"
 #include "shared/opcodes.h"
@@ -139,7 +137,9 @@ std::int32_t get_opcode_stack_delta(
     case opcode::d2l: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
+    case opcode::lret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
+    case opcode::dret: [[fallthrough]];
     case opcode::aret: [[fallthrough]];
     case opcode::i2l: [[fallthrough]];
     case opcode::i2d: [[fallthrough]];
@@ -363,6 +363,257 @@ std::int32_t get_opcode_stack_delta(
     }
 }
 
+void decode_instruction(
+  opcode op,
+  archive& ar)
+{
+    switch(op)
+    {
+    /* opcodes without arguments. */
+    case opcode::aconst_null: [[fallthrough]];
+    case opcode::adup: [[fallthrough]];
+    case opcode::dup: [[fallthrough]];
+    case opcode::dup2: [[fallthrough]];
+    case opcode::pop: [[fallthrough]];
+    case opcode::pop2: [[fallthrough]];
+    case opcode::apop: [[fallthrough]];
+    case opcode::arraylength: [[fallthrough]];
+    case opcode::caload: [[fallthrough]];
+    case opcode::saload: [[fallthrough]];
+    case opcode::iaload: [[fallthrough]];
+    case opcode::faload: [[fallthrough]];
+    case opcode::laload: [[fallthrough]];
+    case opcode::daload: [[fallthrough]];
+    case opcode::aaload: [[fallthrough]];
+    case opcode::castore: [[fallthrough]];
+    case opcode::sastore: [[fallthrough]];
+    case opcode::iastore: [[fallthrough]];
+    case opcode::fastore: [[fallthrough]];
+    case opcode::lastore: [[fallthrough]];
+    case opcode::dastore: [[fallthrough]];
+    case opcode::aastore: [[fallthrough]];
+    case opcode::iadd: [[fallthrough]];
+    case opcode::fadd: [[fallthrough]];
+    case opcode::isub: [[fallthrough]];
+    case opcode::fsub: [[fallthrough]];
+    case opcode::imul: [[fallthrough]];
+    case opcode::fmul: [[fallthrough]];
+    case opcode::idiv: [[fallthrough]];
+    case opcode::fdiv: [[fallthrough]];
+    case opcode::imod: [[fallthrough]];
+    case opcode::iand: [[fallthrough]];
+    case opcode::ior: [[fallthrough]];
+    case opcode::ixor: [[fallthrough]];
+    case opcode::ishl: [[fallthrough]];
+    case opcode::lshl: [[fallthrough]];
+    case opcode::ishr: [[fallthrough]];
+    case opcode::lshr: [[fallthrough]];
+    case opcode::icmpl: [[fallthrough]];
+    case opcode::fcmpl: [[fallthrough]];
+    case opcode::icmple: [[fallthrough]];
+    case opcode::fcmple: [[fallthrough]];
+    case opcode::icmpg: [[fallthrough]];
+    case opcode::fcmpg: [[fallthrough]];
+    case opcode::icmpge: [[fallthrough]];
+    case opcode::fcmpge: [[fallthrough]];
+    case opcode::icmpeq: [[fallthrough]];
+    case opcode::fcmpeq: [[fallthrough]];
+    case opcode::icmpne: [[fallthrough]];
+    case opcode::fcmpne: [[fallthrough]];
+    case opcode::ladd: [[fallthrough]];
+    case opcode::dadd: [[fallthrough]];
+    case opcode::lsub: [[fallthrough]];
+    case opcode::dsub: [[fallthrough]];
+    case opcode::lmul: [[fallthrough]];
+    case opcode::dmul: [[fallthrough]];
+    case opcode::ldiv: [[fallthrough]];
+    case opcode::ddiv: [[fallthrough]];
+    case opcode::lmod: [[fallthrough]];
+    case opcode::land: [[fallthrough]];
+    case opcode::lor: [[fallthrough]];
+    case opcode::lxor: [[fallthrough]];
+    case opcode::lcmpl: [[fallthrough]];
+    case opcode::dcmpl: [[fallthrough]];
+    case opcode::lcmple: [[fallthrough]];
+    case opcode::dcmple: [[fallthrough]];
+    case opcode::lcmpg: [[fallthrough]];
+    case opcode::dcmpg: [[fallthrough]];
+    case opcode::lcmpge: [[fallthrough]];
+    case opcode::dcmpge: [[fallthrough]];
+    case opcode::lcmpeq: [[fallthrough]];
+    case opcode::dcmpeq: [[fallthrough]];
+    case opcode::lcmpne: [[fallthrough]];
+    case opcode::dcmpne: [[fallthrough]];
+    case opcode::acmpeq: [[fallthrough]];
+    case opcode::acmpne: [[fallthrough]];
+    case opcode::ineg: [[fallthrough]];
+    case opcode::lneg: [[fallthrough]];
+    case opcode::fneg: [[fallthrough]];
+    case opcode::dneg: [[fallthrough]];
+    case opcode::i2c: [[fallthrough]];
+    case opcode::i2s: [[fallthrough]];
+    case opcode::i2f: [[fallthrough]];
+    case opcode::l2d: [[fallthrough]];
+    case opcode::f2i: [[fallthrough]];
+    case opcode::d2l: [[fallthrough]];
+    case opcode::ret: [[fallthrough]];
+    case opcode::iret: [[fallthrough]];
+    case opcode::lret: [[fallthrough]];
+    case opcode::fret: [[fallthrough]];
+    case opcode::dret: [[fallthrough]];
+    case opcode::aret: [[fallthrough]];
+    case opcode::i2l: [[fallthrough]];
+    case opcode::i2d: [[fallthrough]];
+    case opcode::f2l: [[fallthrough]];
+    case opcode::f2d: [[fallthrough]];
+    case opcode::l2i: [[fallthrough]];
+    case opcode::l2f: [[fallthrough]];
+    case opcode::d2i: [[fallthrough]];
+    case opcode::d2f:
+        break;
+    /* opcodes with one 1-byte argument. */
+    case opcode::newarray:
+    {
+        std::uint8_t i_u8{0};
+        ar & i_u8;
+
+        break;
+    }
+    /* opcodes with one 4-byte argument. */
+    case opcode::iconst: [[fallthrough]];
+    case opcode::fconst:
+    {
+        std::uint32_t i_u32{0};
+        ar & i_u32;
+
+        break;
+    }
+    /* opcodes with one 8-byte argument. */
+    case opcode::lconst: [[fallthrough]];
+    case opcode::dconst:
+    {
+        std::uint64_t i_u64{0};
+        ar & i_u64;
+
+        break;
+    }
+    /* opcodes with one VLE integer. */
+    case opcode::sconst: [[fallthrough]];
+    case opcode::label: [[fallthrough]];
+    case opcode::jmp:
+    {
+        vle_int i;
+        ar & i;
+
+        break;
+    }
+    /* opcodes with two VLE integers. */
+    case opcode::jnz:
+    {
+        vle_int i1;
+        vle_int i2;
+        ar & i1 & i2;
+
+        break;
+    }
+    /* dup_x1. */
+    case opcode::dup_x1:
+    {
+        // type arguments.
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        ar & v1 & v2;
+
+        break;
+    }
+    /* dup2_x0. */
+    case opcode::dup2_x0:
+    {
+        // type arguments.
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        ar & v1 & v2;
+
+        break;
+    }
+    /* dup_x2. */
+    case opcode::dup_x2:
+    {
+        // type arguments.
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v3;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        ar & v1 & v2 & v3;
+
+        break;
+    }
+    /* invoke */
+    case opcode::invoke:
+    {
+        vle_int i;
+        ar & i;
+
+        break;
+    }
+    /* opcodes that need to resolve a variable. */
+    case opcode::iload: [[fallthrough]];
+    case opcode::lload: [[fallthrough]];
+    case opcode::fload: [[fallthrough]];
+    case opcode::dload: [[fallthrough]];
+    case opcode::aload: [[fallthrough]];
+    case opcode::istore: [[fallthrough]];
+    case opcode::lstore: [[fallthrough]];
+    case opcode::fstore: [[fallthrough]];
+    case opcode::dstore: [[fallthrough]];
+    case opcode::astore:
+    {
+        vle_int i;
+        ar & i;
+
+        break;
+    }
+    /* new. */
+    case opcode::new_:
+    {
+        vle_int i;
+        ar & i;
+
+        break;
+    }
+    /* anewarray. */
+    case opcode::anewarray:
+    {
+        vle_int i;
+        ar & i;
+
+        break;
+    }
+    /* setfield, getfield. */
+    case opcode::setfield: [[fallthrough]];
+    case opcode::getfield:
+    {
+        vle_int struct_index;
+        vle_int field_index;
+        ar & struct_index & field_index;
+
+        break;
+    }
+    /* checkcast */
+    case opcode::checkcast:
+    {
+        vle_int struct_index;
+        ar & struct_index;
+
+        break;
+    }
+    default:
+        throw jit_error{
+          std::format(
+            "Unhandled opcode '{}' in stack delta calculation.",
+            to_string(op))};
+    }
+}
+
 }    // namespace
 
 namespace slang::jit
@@ -375,6 +626,7 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
 {
     std::unordered_map<std::int64_t, std::int32_t> label_depths;
     std::unordered_map<std::int64_t, std::size_t> label_pcs;
+    std::unordered_map<std::size_t, std::int64_t> pcs_label;
     std::unordered_map<std::size_t, std::int32_t> pc_depths;
     std::vector<std::size_t> worklist;
 
@@ -395,6 +647,11 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
             input & label_id;
 
             label_pcs[label_id.i] = pc_start;
+            pcs_label[pc_start] = label_id.i;
+        }
+        else
+        {
+            decode_instruction(op, input);
         }
     }
 
@@ -434,10 +691,17 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
         const std::size_t cur_pc = worklist.back();
         worklist.pop_back();
 
-        auto cur_depth = pc_depths[cur_pc];
+        auto it = pc_depths.find(cur_pc);
+        if(it == pc_depths.end())
+        {
+            throw jit_error{
+              "CFG Depth stack doesn't contain PC"};
+        }
+
+        auto cur_depth = it->second;
 
         input.seek(cur_pc);
-        while(input.tell() < bytecode.size())
+        while(input.tell() < input.size())
         {
             const auto start_pc = input.tell();
 
@@ -448,17 +712,31 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
 
             auto op = static_cast<opcode>(instr);
 
-            if(start_pc >= 580 && start_pc <= 620)
-            {
-                std::print("PC {:3d} | Depth {:2d} | Opcode: {}\n", start_pc, cur_depth, to_string(op));
-            }
-
             if(op == opcode::label)
             {
                 vle_int label_id;
                 input & label_id;
 
+                // 1. If this label was already enqueued by a jump/branch, verify depth consistency
+                auto it = pc_depths.find(start_pc);
+                if(it != pc_depths.end())
+                {
+                    if(it->second != cur_depth)
+                    {
+                        throw jit_error{
+                          std::format(
+                            "CFG Stack Depth Mismatch at label {} (PC {}): fall-through expects {} bytes, path provided {} bytes.",
+                            label_id.i, start_pc, it->second, cur_depth)};
+                    }
+                }
+                else
+                {
+                    // 2. Fall-through into new label: record depth for this PC
+                    enqueue(start_pc, cur_depth);
+                }
+
                 label_depths[label_id.i] = cur_depth;
+
                 continue;
             }
 
@@ -481,31 +759,27 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
                 vle_int else_label;
                 input & then_label & else_label;
 
-                // DEBUG
-                std::print("JNZ at PC {}: cur_depth before pop = {}\n", start_pc, cur_depth);
-                cur_depth -= stack_slot_size;
-                std::print("JNZ at PC {}: cur_depth after pop = {}\n", start_pc, cur_depth);
-
-                if(cur_depth < 0)
+                // Depth BEFORE jnz consumes its operand must be at least 1 slot (8 bytes)
+                if(cur_depth < stack_slot_size)
                 {
                     throw jit_error{
-                      std::format(
-                        "CFG Stack underflow at jnz target labels {} / {}: computed depth is {} bytes.",
-                        then_label.i,
-                        else_label.i,
-                        cur_depth)};
+                      std::format("CFG Stack underflow at jnz at PC {}: depth is {} bytes.", start_pc, cur_depth)};
                 }
 
-                label_depths[then_label.i] = cur_depth;
-                label_depths[else_label.i] = cur_depth;
+                // Depth AFTER jnz consumes its condition operand
+                const auto depth_after_pop = cur_depth - stack_slot_size;
+
+                // Propagate depth_after_pop to branch targets
+                label_depths[then_label.i] = depth_after_pop;
+                label_depths[else_label.i] = depth_after_pop;
 
                 if(auto it = label_pcs.find(then_label.i); it != label_pcs.end())
                 {
-                    enqueue(it->second, cur_depth);
+                    enqueue(it->second, depth_after_pop);
                 }
                 if(auto it = label_pcs.find(else_label.i); it != label_pcs.end())
                 {
-                    enqueue(it->second, cur_depth);
+                    enqueue(it->second, depth_after_pop);
                 }
                 break;
             }
@@ -522,9 +796,13 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
               call_targets,
               import_call_targets);
             cur_depth += delta;
+
             if(cur_depth < 0)
             {
-                std::print("PC {}: Negative cur_depth={} for {}\n", start_pc, cur_depth, to_string(op));
+                throw jit_error{
+                  std::format(
+                    "CFG: Negative stack depth after '{}'.",
+                    to_string(op))};
             }
         }
     }

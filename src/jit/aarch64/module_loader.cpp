@@ -8,13 +8,13 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <unordered_set>
+
 #include "jit/aarch64.h"
 #include "shared/type_utils.h"
 #include "shared/type_class.h"
 #include "package.h"
 #include "utils.h"
-
-#include <unordered_set>
 
 namespace ty = slang::typing;
 

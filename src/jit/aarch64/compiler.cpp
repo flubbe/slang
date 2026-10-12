@@ -18,8 +18,6 @@
 
 #include <sys/mman.h>
 
-#include <print>
-
 #include "archives/memory.h"
 #include "jit/aarch64.h"
 #include "shared/type_class.h"
@@ -780,60 +778,6 @@ void numeric_conversion(
     }
 }
 
-std::size_t numeric_conversion_input_size(
-  opcode operation)
-{
-    switch(operation)
-    {
-    case opcode::i2c: [[fallthrough]];
-    case opcode::i2s: [[fallthrough]];
-    case opcode::i2l: [[fallthrough]];
-    case opcode::i2f: [[fallthrough]];
-    case opcode::i2d: [[fallthrough]];
-    case opcode::f2i: [[fallthrough]];
-    case opcode::f2l: [[fallthrough]];
-    case opcode::f2d:
-        return sizeof(std::int32_t);
-    case opcode::l2i: [[fallthrough]];
-    case opcode::l2f: [[fallthrough]];
-    case opcode::l2d: [[fallthrough]];
-    case opcode::d2i: [[fallthrough]];
-    case opcode::d2l: [[fallthrough]];
-    case opcode::d2f:
-        return sizeof(std::int64_t);
-    default:
-        throw jit_error{
-          "Unsupported numeric conversion."};
-    }
-}
-
-std::size_t numeric_conversion_output_size(
-  opcode operation)
-{
-    switch(operation)
-    {
-    case opcode::i2l: [[fallthrough]];
-    case opcode::i2d: [[fallthrough]];
-    case opcode::l2d: [[fallthrough]];
-    case opcode::f2l: [[fallthrough]];
-    case opcode::d2l: [[fallthrough]];
-    case opcode::f2d:
-        return sizeof(std::int64_t);
-    case opcode::i2c: [[fallthrough]];
-    case opcode::i2s: [[fallthrough]];
-    case opcode::i2f: [[fallthrough]];
-    case opcode::l2i: [[fallthrough]];
-    case opcode::l2f: [[fallthrough]];
-    case opcode::f2i: [[fallthrough]];
-    case opcode::d2i: [[fallthrough]];
-    case opcode::d2f:
-        return sizeof(std::int32_t);
-    default:
-        throw jit_error{
-          "Unsupported numeric conversion."};
-    }
-}
-
 /*
  * Structs.
  */
@@ -984,10 +928,13 @@ void get_field(
               &value,
               static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
               sizeof(value));
+
+            // Sign-extend to 64-bit so the entire 8-byte slot is clean
+            const auto value64 = static_cast<std::int64_t>(value);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             std::memcpy(
-              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              &value,
-              sizeof(value));
+              frame->stack.span().data() + stack_offset,
+              &value64,
+              sizeof(value64));
         }
         else
         {
@@ -2235,12 +2182,6 @@ jit_function jit_compiler::compile(
       call_targets,
       import_call_targets);
 
-    // DEBUG
-    for(const auto& [label, depth]: label_entry_depths)
-    {
-        std::println("{}: {}", label, depth);
-    }
-
     /*
      * Prologue.
      */
@@ -2304,16 +2245,6 @@ jit_function jit_compiler::compile(
     // TODO bytecode reading should work through memory_read_archive
     while(pc < bytecode.size())
     {
-        // DEBUG underflow detection.
-        if(pc >= 18)
-        {
-            int i = 3;
-        }
-        if(*update_stack_size.current_stack_size > 100)
-        {
-            int i = 3;
-        }
-
         const auto instr = std::to_integer<opcode_base>(bytecode[pc]);
         ++pc;
 
@@ -2326,8 +2257,6 @@ jit_function jit_compiler::compile(
                 instr)};
         }
         auto op = static_cast<opcode>(instr);
-
-        // std::print("{:04X} {}\n", pc, to_string(op));
 
         switch(op)
         {
@@ -2875,7 +2804,7 @@ jit_function jit_compiler::compile(
 
             update_stack_size(
               op,
-              -2 * stack_slot_size);
+              -stack_slot_size);
 
             break;
         }
@@ -2985,15 +2914,18 @@ jit_function jit_compiler::compile(
               || base_type == "str"
               || (base_type != "void" && base_type != "i8" && base_type != "i16" && base_type != "i32"
                   && base_type != "i64" && base_type != "f32" && base_type != "f64");
-            const auto input_size = stack_slot_size + (op == opcode::setfield ? field.size : 0);
-            if(current_stack_size < input_size)
+            const auto input_size =
+              op == opcode::setfield
+                ? 2 * stack_slot_size
+                : stack_slot_size;
+            if(std::cmp_less(current_stack_size, input_size))
             {
                 throw jit_error{
                   std::format(
                     "Not enough stack values for '{}'.",
                     to_string(op))};
             }
-            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto stack_offset = current_stack_size - input_size;
             const auto helper_address = reinterpret_cast<std::intptr_t>(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
               op == opcode::setfield
                 ? &set_field
@@ -3026,7 +2958,7 @@ jit_function jit_compiler::compile(
             {
                 update_stack_size(
                   op,
-                  -stack_slot_size);
+                  -2 * stack_slot_size);
             }
 
             break;
@@ -3161,7 +3093,7 @@ jit_function jit_compiler::compile(
                 throw jit_error{
                   std::format("Not enough stack values for '{}'.", to_string(op))};
             }
-            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto stack_offset = current_stack_size - input_size;
             const auto helper_address = reinterpret_cast<std::intptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
@@ -3208,7 +3140,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto stack_offset = current_stack_size - input_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&store_array_element);    // NOLINT
+            const auto helper_address = reinterpret_cast<std::intptr_t>(&store_array_element);
 
             // Set up parameters and call the helper.
             // X0: VM context / state (X21)
@@ -3367,7 +3299,9 @@ jit_function jit_compiler::compile(
             if(current_stack_size < condition_slot_size)
             {
                 throw jit_error{
-                  "Not enough stack values for 'jnz'."};
+                  std::format(
+                    "Not enough stack values for 'jnz' ({} < {}).",
+                    current_stack_size, condition_slot_size)};
             }
 
             input.seek(pc);
@@ -3505,17 +3439,7 @@ jit_function jit_compiler::compile(
         case opcode::dmul: [[fallthrough]];
         case opcode::ddiv:
         {
-            // TODO Not fully compiled yet.
-
-            const bool is_double =
-              op == opcode::dadd
-              || op == opcode::dsub
-              || op == opcode::dmul
-              || op == opcode::ddiv;
-            const auto width =
-              is_double
-                ? sizeof(double)
-                : sizeof(float);
+            const auto width = stack_slot_size;
 
             if(current_stack_size < 2 * width)
             {
@@ -3547,7 +3471,7 @@ jit_function jit_compiler::compile(
 
             update_stack_size(
               op,
-              -static_cast<std::int32_t>(width));
+              -width);
 
             break;
         }
