@@ -743,7 +743,7 @@ struct stack_frame
       gc_local_roots;
 
     /** Exception captured at a native/JIT call boundary. */
-    std::exception_ptr pending_exception;
+    std::exception_ptr pending_exception{nullptr};
 
     /**
      * Update the GC root associated with a local slot.
@@ -833,7 +833,8 @@ struct stack_frame
           .locals = std::vector<std::byte>(locals_size),
           .stack = operand_stack::with_capacity(stack_capacity),
           .gc = nullptr,
-          .gc_local_roots = {}};
+          .gc_local_roots = {},
+          .pending_exception = nullptr};
     }
 
     /**
@@ -853,7 +854,8 @@ struct stack_frame
           .locals = std::vector<std::byte>(locals_size),
           .stack = operand_stack::with_size(stack_size),
           .gc = nullptr,
-          .gc_local_roots = {}};
+          .gc_local_roots = {},
+          .pending_exception = nullptr};
     }
 };
 
