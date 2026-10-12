@@ -831,7 +831,9 @@ struct stack_frame
         return {
           .constants = constants,
           .locals = std::vector<std::byte>(locals_size),
-          .stack = operand_stack::with_capacity(stack_capacity)};
+          .stack = operand_stack::with_capacity(stack_capacity),
+          .gc = nullptr,
+          .gc_local_roots = {}};
     }
 
     /**
@@ -849,7 +851,9 @@ struct stack_frame
         return {
           .constants = constants,
           .locals = std::vector<std::byte>(locals_size),
-          .stack = operand_stack::with_size(stack_size)};
+          .stack = operand_stack::with_size(stack_size),
+          .gc = nullptr,
+          .gc_local_roots = {}};
     }
 };
 
