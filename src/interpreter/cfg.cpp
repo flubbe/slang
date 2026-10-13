@@ -96,8 +96,8 @@ std::int32_t get_opcode_stack_delta(
   const module_loader& loader,
   opcode op,
   archive& ar,
-  const std::__1::vector<exported_symbol>& exports,
-  const std::__1::vector<imported_symbol>& imports,
+  const std::vector<exported_symbol>& exports,
+  const std::vector<imported_symbol>& imports,
   const std::function<const module_loader&(const std::string&)>& resolver)
 {
     switch(op)
@@ -856,8 +856,8 @@ namespace slang::interpreter
 std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
   const module_loader& loader,
   std::span<const std::byte> bytecode,
-  const std::__1::vector<slang::module_::exported_symbol>& exports,
-  const std::__1::vector<slang::module_::imported_symbol>& imports,
+  const std::vector<slang::module_::exported_symbol>& exports,
+  const std::vector<slang::module_::imported_symbol>& imports,
   const std::function<const module_loader&(const std::string&)>& resolver)
 {
     std::unordered_map<std::int64_t, std::int32_t> label_depths;
