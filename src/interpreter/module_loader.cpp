@@ -82,6 +82,22 @@ const auto& type_properties_map()
     return map;
 }
 
+/** Native byte sizes and alignments for built-in types. */
+const auto& native_type_properties_map()
+{
+    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
+      {"void", {0, 0}},
+      {"i8", {sizeof(std::int8_t), std::alignment_of_v<std::int8_t>}},
+      {"i16", {sizeof(std::int16_t), std::alignment_of_v<std::int16_t>}},
+      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
+      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},
+      {"f32", {sizeof(float), std::alignment_of_v<float>}},
+      {"f64", {sizeof(double), std::alignment_of_v<double>}},
+      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};
+
+    return map;
+}
+
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
 {
@@ -305,15 +321,14 @@ void module_loader::decode_structs()
         std::size_t size = 0;
         std::size_t alignment = 0;
         std::vector<std::size_t> layout;
-        int offset = 0;
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
-            auto built_in_it = type_properties_map().find(member_type.base_type.base_type());
-            if(built_in_it != type_properties_map().end())
+            auto built_in_it = native_type_properties_map().find(member_type.base_type.base_type());
+            if(built_in_it != native_type_properties_map().end())
             {
                 if(is_garbage_collected(member_type))
                 {
@@ -397,20 +412,11 @@ void module_loader::decode_structs()
                 add_to_layout = true;
             }
 
-            // store offset.
-            member_type.offset = utils::align(member_type.alignment, offset);
-
-            // calculate member offset as `size_after - size_before`.
-            offset -= utils::numeric_cast<int>(size);
-
-            // update struct size and alignment.
-            size += member_type.size;
             size = utils::align(member_type.alignment, size);
+            member_type.offset = size;
 
+            size += member_type.size;
             alignment = std::max(alignment, member_type.alignment);
-
-            // calculate member offset as `size_after - size_before`.
-            offset += utils::numeric_cast<int>(size);
 
             // update type layout.
             if(add_to_layout)

@@ -306,6 +306,41 @@ static T read_unchecked(
     return v;
 }
 
+/**
+ * Write a field of category 1 back to the struct.
+ *
+ * @tparam T Field type.
+ * @param frame Stack frame.
+ * @param field_offset The field offset in the struct.
+ */
+template<typename T>
+    requires(
+      std::is_integral_v<T>
+      && std::is_signed_v<T>
+      && sizeof(T) <= sizeof(std::int32_t))
+static void write_typed_cat1_field(
+  stack_frame& frame,
+  std::size_t field_offset)
+{
+    auto v = frame.stack.pop_cat1<std::int32_t>();
+    void* type_ref = frame.stack.pop_addr<void>();
+
+    if(type_ref == nullptr)
+    {
+        throw interpreter_error{
+          "Null pointer access during setfield."};
+    }
+
+    frame.gc->remove_temporary(type_ref);
+
+    const auto field_value = static_cast<std::make_unsigned_t<T>>(v);    // retains the correct bytes for signs.
+
+    std::memcpy(
+      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      static_cast<const void*>(&field_value),
+      sizeof(field_value));
+}
+
 void context::exec(
   const module_loader& loader,
   std::size_t entry_point,    // NOLINT(bugprone-easily-swappable-parameters)
@@ -1462,7 +1497,7 @@ void context::exec(
 
                     std::memcpy(
                       static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-                      static_cast<void*>(&v),
+                      static_cast<const void*>(&v),
                       sizeof(v));
                 }
                 else if(field_size == sizeof(std::int32_t))
@@ -1477,12 +1512,27 @@ void context::exec(
 
                     std::memcpy(
                       static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-                      static_cast<void*>(&v),
+                      static_cast<const void*>(&v),
                       sizeof(v));
+                }
+                else if(field_size == sizeof(std::int16_t))
+                {
+                    write_typed_cat1_field<std::int16_t>(
+                      frame,
+                      field_offset);
+                }
+                else if(field_size == sizeof(std::int8_t))
+                {
+                    write_typed_cat1_field<std::int8_t>(
+                      frame,
+                      field_offset);
                 }
                 else
                 {
-                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error{
+                      std::format(
+                        "Invalid field size {} encountered in setfield.",
+                        field_size)};
                 }
 
                 break;
@@ -1526,9 +1576,30 @@ void context::exec(
                       sizeof(v));
                     frame.stack.push_cat1(v);
                 }
+                else if(field_size == sizeof(std::int16_t))
+                {
+                    std::int16_t v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
+                    frame.stack.push_cat1(static_cast<std::int32_t>(v));
+                }
+                else if(field_size == sizeof(std::int8_t))
+                {
+                    std::int8_t v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
+                    frame.stack.push_cat1(static_cast<std::int32_t>(v));
+                }
                 else
                 {
-                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error{
+                      std::format(
+                        "Invalid field size {} encountered in setfield.",
+                        field_size)};
                 }
 
                 break;
