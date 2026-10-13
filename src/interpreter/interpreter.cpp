@@ -192,9 +192,6 @@ std::function<void(operand_stack&)> context::resolve_native_function(
 /** Handle local variable construction and destruction. */
 class locals_scope
 {
-    /** The associated interpreter context. */
-    context& ctx;
-
     /** Locals. */
     const std::vector<module_::variable_descriptor>& locals;
 
@@ -214,18 +211,17 @@ public:
      * Create a scope for creating/destroying variables. If needed, adds the locals as
      * roots to the garbage collector.
      *
-     * @param ctx The interpreter context.
      * @param locals The locals.
      * @param frame The stack frame.
      */
     locals_scope(
-      context& ctx,
       const std::vector<module_::variable_descriptor>& locals,
       stack_frame& frame)
-    : ctx{ctx}
-    , locals{locals}
+    : locals{locals}
     , frame{frame}
     {
+        assert(frame.gc != nullptr);
+
         for(const auto& local: locals)
         {
             if(local.type.is_array() || local.reference)
@@ -234,7 +230,7 @@ public:
                 std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
-                    ctx.get_gc().add_root(addr);
+                    frame.gc->add_root(addr);
                     // FIXME We (likely) want to remove the temporaries from the GC here,
                     //       instead of at the call site (see comment there).
                 }
@@ -285,7 +281,7 @@ public:
                 std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
-                    ctx.get_gc().remove_root(addr);
+                    frame.gc->remove_root(addr);
                 }
             }
         }
@@ -340,7 +336,7 @@ void context::exec(
                 binary.size()));
         }
 
-        locals_scope ls{*this, locals, frame};
+        locals_scope ls{locals, frame};
 
         const std::size_t function_end = offset + size;
         while(offset < function_end)
@@ -1314,6 +1310,7 @@ void context::exec(
                       callee_loader->get_module().get_header().constants,
                       details.locals_size,
                       details.stack_size);
+                    callee_frame.gc = &gc;
 
                     std::ranges::copy(
                       frame.stack.tail(details.args_size),
