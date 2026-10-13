@@ -158,8 +158,8 @@ static type_class get_type_class(
     const auto& type_str = type.base_type();
     if(type_str == "void")
     {
-        // FIXME Doesn't actually have a category.
-        return type_class::cat1;
+        throw jit_error{
+          "Type 'void' does not have a type class."};
     }
 
     if(type_str == "i8"

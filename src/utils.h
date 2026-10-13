@@ -171,8 +171,7 @@ concept smart_ptr =
  * @returns Returns the input value for the new type.
  * @throws Throws a `std::out_of_range` exception if the value does not fit into the target type.
  */
-template<typename T, typename S>
-    requires(std::is_integral_v<T> && std::is_integral_v<S>)
+template<std::integral T, std::integral S>
 constexpr T numeric_cast(S value)
 {
     if constexpr(std::is_signed_v<S> == std::is_signed_v<T>)
@@ -210,12 +209,42 @@ constexpr T numeric_cast(S value)
  * @param v The value to check.
  * @returns Returns whether the value fits into the type.
  */
-template<typename T>
-    requires(std::is_integral_v<T> && std::is_signed_v<T>)
+template<std::signed_integral T>
 constexpr bool fits_in(std::int64_t v)
 {
     return v >= std::numeric_limits<T>::min()
            && v <= std::numeric_limits<T>::max();
+}
+
+/**
+ * Truncate an integer to the width of a signed integer type and sign-extend
+ * the result back to 64 bits.
+ *
+ * The conversion is well-defined for all input values, including values
+ * outside the representable range of `T`.
+ *
+ * @tparam T A signed integer type narrower than `std::int64_t`.
+ * @param value The integer value to truncate.
+ * @return The truncated value, sign-extended to 64 bits.
+ */
+template<std::signed_integral T>
+    requires(sizeof(T) < sizeof(std::int64_t))
+constexpr std::int64_t truncate_and_sign_extend(std::int64_t value)
+{
+    using unsigned_type = std::make_unsigned_t<T>;
+
+    constexpr auto bit_count = sizeof(T) * 8;
+    constexpr auto sign_bit = unsigned_type{1} << (bit_count - 1);
+
+    const auto bits = static_cast<unsigned_type>(value);
+
+    if(bits < sign_bit)
+    {
+        return static_cast<std::int64_t>(bits);
+    }
+
+    return static_cast<std::int64_t>(bits)
+           - (std::int64_t{1} << bit_count);
 }
 
 }    // namespace slang::utils

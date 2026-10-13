@@ -123,8 +123,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = std::get<std::int64_t>(v.value)
-                       & 0xff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int8_t>(
+                std::get<std::int64_t>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -132,8 +132,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = std::get<std::int64_t>(v.value)
-                       & 0xffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int16_t>(
+                std::get<std::int64_t>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -180,8 +180,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = std::get<std::int64_t>(v.value)
-                       & 0xff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int8_t>(
+                std::get<std::int64_t>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -189,8 +189,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = std::get<std::int64_t>(v.value)
-                       & 0xffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int16_t>(
+                std::get<std::int64_t>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -198,8 +198,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = std::get<std::int64_t>(v.value)
-                       & 0xffffffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int32_t>(
+                std::get<std::int64_t>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())
@@ -238,9 +238,9 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int8_t>(
+                static_cast<std::int64_t>(
+                  std::get<double>(v.value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -248,9 +248,9 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int16_t>(
+                static_cast<std::int64_t>(
+                  std::get<double>(v.value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -258,9 +258,9 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xffffffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int32_t>(
+                static_cast<std::int64_t>(
+                  std::get<double>(v.value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())
@@ -300,9 +300,9 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int8_t>(
+                static_cast<std::int64_t>(
+                  std::get<double>(v.value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -310,9 +310,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int16_t>(
+                std::get<double>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -320,9 +319,8 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
-              .value = static_cast<std::int64_t>(
-                         std::get<double>(v.value))
-                       & 0xffffffff};    // NOLINT(readability-magic-numbers)
+              .value = utils::truncate_and_sign_extend<std::int32_t>(
+                std::get<double>(v.value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())

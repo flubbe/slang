@@ -4,12 +4,14 @@ import std;
  * struct creation and member access.
  */
 struct S {
+    c: i8,
     i: i32,
     j: f32
 };
 
 fn init_struct(i: i32, j: f32) -> S {
     return S {
+        c: 23i8,
         i: i,
         j: j
     };
@@ -17,6 +19,11 @@ fn init_struct(i: i32, j: f32) -> S {
 
 fn test_struct() -> void {
     let s: S = init_struct(2, 3.141 as f32);
+
+    std::assert(s.c == 23i8, "s.c == 23");
+    s.c = s.c + 105i8;
+    std::assert(s.c == (-128) as i8, "s.c == -128");
+
     std::assert(s.i + (s.j as i32) == 5, "s.i + (s.j as i32) == 5");
 }
 
