@@ -65,13 +65,13 @@ class jit_function
     executable_memory memory;
 
     /** The function pointer. */
-    jit_function_pointer function;
+    jit_function_pointer function{nullptr};
 
     /** Locals size. */
-    std::size_t locals_size = 0;
+    std::size_t locals_size{0};
 
     /** Stack size. */
-    std::size_t stack_size = 0;
+    std::size_t stack_size{0};
 
 public:
     /** Deleted default constructor. */
@@ -155,7 +155,6 @@ public:
     void operator()(
       si::stack_frame* frame) const
     {
-
         assert(function != nullptr && "Attempted to invoke a moved-from jit_function!");
         function(frame);
     }
@@ -184,13 +183,13 @@ struct jit_call_target
     const std::vector<module_::constant_table_entry>* constants{nullptr};
 
     /** argument sizes. */
-    std::vector<std::size_t> param_sizes;
+    std::vector<std::size_t> param_sizes{};
 
     /** Argument size, in bytes. */
     std::size_t argument_size{0};
 
     /** Return type kind, for JIT/native handover. */
-    cg::type_kind return_type_kind;
+    cg::type_kind return_type_kind{cg::type_kind::null};
 
     /** Return value size, in bytes. */
     std::size_t return_size{0};
@@ -202,10 +201,10 @@ struct jit_call_target
     std::size_t stack_size{0};
 
     /** Offsets of GC-managed locals, used to root JIT callee arguments. */
-    std::vector<std::size_t> gc_local_offsets;
+    std::vector<std::size_t> gc_local_offsets{};
 
     /** Run the runtime's GC safepoint before invoking this target. */
-    std::function<void()> safepoint;
+    std::function<void()> safepoint{nullptr};
 };
 
 }    // namespace slang::jit
