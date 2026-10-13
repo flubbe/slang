@@ -105,7 +105,7 @@ set(SOURCES
     src/runtime/utils.cpp
     src/utils.cpp)
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     list(APPEND SOURCES
         src/jit/aarch64/cfg.cpp
         src/jit/aarch64/compiler.cpp
