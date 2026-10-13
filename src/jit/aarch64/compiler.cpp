@@ -1430,13 +1430,29 @@ void store_array_element(
  * Function invocation.
  */
 
+/**
+ * Sign-extend an integer value to a 64-bit signed integer.
+ *
+ * @param dest The destination memory.
+ * @param src The source memory containing the integer value.
+ */
 template<typename T>
-void store_and_extend(std::span<std::byte> return_slot, std::span<const std::byte> native_span)
+    requires std::is_integral_v<T>
+             && std::is_signed_v<T>
+void store_and_extend(
+  std::span<std::byte> dest,
+  std::span<const std::byte> src)
 {
     T value{};
-    std::memcpy(&value, native_span.data(), sizeof(value));
+    std::memcpy(
+      &value,
+      src.data(),
+      sizeof(value));
     const auto extended = static_cast<std::int64_t>(value);
-    std::memcpy(return_slot.data(), &extended, sizeof(extended));
+    std::memcpy(
+      dest.data(),
+      &extended,
+      sizeof(extended));
 }
 
 /**
