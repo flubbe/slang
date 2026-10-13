@@ -2177,7 +2177,7 @@ jit_function jit_compiler::compile(
     std::vector<std::size_t> exception_fixups;
     std::vector<branch_fixup> branch_fixups;
 
-    const auto label_entry_depths = analyze_basic_block_stack_depths(
+    const auto label_entry_depths = analyze_bytecode_stack_depths(
       bytecode,
       call_targets,
       import_call_targets);

@@ -269,7 +269,8 @@ std::int32_t get_opcode_stack_delta(
                 i.i)};
         }
 
-        return utils::numeric_cast<std::int32_t>(target->return_size) - utils::numeric_cast<std::int32_t>(target->argument_size);
+        return utils::numeric_cast<std::int32_t>(target->return_size)
+               - utils::numeric_cast<std::int32_t>(target->argument_size);
     }
     /* opcodes that need to resolve a variable. */
     case opcode::iload: [[fallthrough]];
@@ -287,11 +288,12 @@ std::int32_t get_opcode_stack_delta(
         ar & i;
 
         // return correct size.
-        bool is_store = (op == opcode::istore)
-                        || (op == opcode::lstore)
-                        || (op == opcode::fstore)
-                        || (op == opcode::dstore)
-                        || (op == opcode::astore);
+        bool is_store =
+          (op == opcode::istore)
+          || (op == opcode::lstore)
+          || (op == opcode::fstore)
+          || (op == opcode::dstore)
+          || (op == opcode::astore);
 
         if((op == opcode::aload)
            || (op == opcode::astore))
@@ -364,7 +366,13 @@ std::int32_t get_opcode_stack_delta(
     }
 }
 
-void decode_instruction(
+/**
+ * Skip instruction operands.
+ *
+ * @param op The instruction.
+ * @param ar The archive holding the bytecode.
+ */
+void skip_operands(
   opcode op,
   archive& ar)
 {
@@ -620,7 +628,7 @@ void decode_instruction(
 namespace slang::jit
 {
 
-std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
+std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
   std::span<const std::byte> bytecode,
   const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets)
@@ -633,7 +641,14 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
 
     memory_read_archive input{bytecode, true, std::endian::little};
 
-    // --- Pass 1: Map all label_id -> bytecode PC offsets ---
+    /*
+     * We're analyzing using 2 passes:
+     * - The first pass maps labels to bytecode offsets.
+     * - The second pass builds the control flow map graph and calculates and validates
+     *   the stack depth across graph edges.
+     */
+
+    // Pass 1: Build label map.
     while(input.tell() < input.size())
     {
         const auto pc_start = input.tell();
@@ -652,18 +667,19 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
         }
         else
         {
-            decode_instruction(op, input);
+            skip_operands(op, input);
         }
     }
 
-    // --- Pass 2: Propagate stack depths across control flow edges ---
+    // Pass 2: Propagate stack depths across control flow edges.
+
     auto enqueue = [&](std::size_t target_pc, std::int32_t depth)
     {
         if(depth < 0)
         {
             throw jit_error{
               std::format(
-                "Attempted to enqueue target PC {} with negative stack depth {}.",
+                "CFG: Attempted to enqueue target PC {} with negative stack depth {}.",
                 target_pc,
                 depth)};
         }
@@ -678,14 +694,15 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
         {
             throw jit_error{
               std::format(
-                "CFG Stack Depth Mismatch at target PC {}: path A expects {} bytes, path B provided {} bytes.",
+                "CFG: Stack Depth Mismatch at target PC {}: path A expects {} bytes, path B provided {} bytes.",
                 target_pc,
                 it->second,
                 depth)};
         }
     };
 
-    enqueue(0, 0);    // Start analysis at entry point
+    // Start analysis at function entry point
+    enqueue(0, 0);
 
     while(!worklist.empty())
     {
@@ -696,7 +713,9 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
         if(it == pc_depths.end())
         {
             throw jit_error{
-              "CFG Depth stack doesn't contain PC"};
+              std::format(
+                "CFG: Depth stack doesn't contain PC {}",
+                cur_pc)};
         }
 
         auto cur_depth = it->second;
@@ -709,7 +728,14 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
             std::byte instr{0};
             input & instr;
 
-            // FIXME check instr range.
+            // Validate instruction range.
+            if(std::to_integer<unsigned int>(instr) >= std::to_underlying(opcode::opcode_count))
+            {
+                throw jit_error{
+                  std::format(
+                    "CFG: Instruction at {} out of range.",
+                    start_pc)};
+            }
 
             auto op = static_cast<opcode>(instr);
 
@@ -718,7 +744,7 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
                 vle_int label_id;
                 input & label_id;
 
-                // 1. If this label was already enqueued by a jump/branch, verify depth consistency
+                // If this label was already enqueued by a jump/branch, verify depth consistency
                 auto it = pc_depths.find(start_pc);
                 if(it != pc_depths.end())
                 {
@@ -727,12 +753,15 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
                         throw jit_error{
                           std::format(
                             "CFG Stack Depth Mismatch at label {} (PC {}): fall-through expects {} bytes, path provided {} bytes.",
-                            label_id.i, start_pc, it->second, cur_depth)};
+                            label_id.i,
+                            start_pc,
+                            it->second,
+                            cur_depth)};
                     }
                 }
                 else
                 {
-                    // 2. Fall-through into new label: record depth for this PC
+                    // Fall-through into new label: record depth for this PC
                     enqueue(start_pc, cur_depth);
                 }
 
@@ -760,14 +789,14 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
                 vle_int else_label;
                 input & then_label & else_label;
 
-                // Depth BEFORE jnz consumes its operand must be at least 1 slot (8 bytes)
                 if(cur_depth < stack_slot_size)
                 {
                     throw jit_error{
-                      std::format("CFG Stack underflow at jnz at PC {}: depth is {} bytes.", start_pc, cur_depth)};
+                      std::format(
+                        "CFG: Stack underflow at jnz at PC {}: depth is {} bytes.",
+                        start_pc,
+                        cur_depth)};
                 }
-
-                // Depth AFTER jnz consumes its condition operand
                 const auto depth_after_pop = cur_depth - stack_slot_size;
 
                 // Propagate depth_after_pop to branch targets

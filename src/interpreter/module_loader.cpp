@@ -1137,11 +1137,12 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), i.i);
 
         // return correct size.
-        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
-                        || (static_cast<opcode>(instr) == opcode::lstore)
-                        || (static_cast<opcode>(instr) == opcode::fstore)
-                        || (static_cast<opcode>(instr) == opcode::dstore)
-                        || (static_cast<opcode>(instr) == opcode::astore);
+        bool is_store =
+          (static_cast<opcode>(instr) == opcode::istore)
+          || (static_cast<opcode>(instr) == opcode::lstore)
+          || (static_cast<opcode>(instr) == opcode::fstore)
+          || (static_cast<opcode>(instr) == opcode::dstore)
+          || (static_cast<opcode>(instr) == opcode::astore);
 
         if((static_cast<opcode>(instr) == opcode::aload)
            || (static_cast<opcode>(instr) == opcode::astore))

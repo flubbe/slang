@@ -22,7 +22,16 @@
 namespace slang::jit
 {
 
-std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
+/**
+ * Analyse the bytecode to calculate the stack depth at each label.
+ * Validates stack-depth consistency across different control-flow paths.
+ *
+ * @param bytecode The bytecode.
+ * @param call_targets Module-local call targets.
+ * @param import_call_targets Call targets imported by the module.
+ * @returns Returns a map from label IDs to stack depths.
+ */
+std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
   std::span<const std::byte> bytecode,
   const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets);
