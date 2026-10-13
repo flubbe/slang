@@ -2154,7 +2154,7 @@ jit_function jit_compiler::compile(
   std::span<const std::byte> bytecode,
   const std::vector<std::size_t>& local_offsets,
   std::size_t locals_size,
-  const std::vector<jit_call_target*>& call_targets,
+  const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets,
   const std::function<module_::struct_descriptor(std::int64_t)>& resolve_type)
 {
@@ -3198,7 +3198,7 @@ jit_function jit_compiler::compile(
                         "Function export index {} is out of range.",
                         function_index.i)};
                 }
-                target = call_targets.at(static_cast<std::size_t>(function_index.i));
+                target = call_targets.at(static_cast<std::size_t>(function_index.i)).get();
             }
 
             if(target == nullptr)

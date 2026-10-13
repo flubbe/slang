@@ -36,7 +36,7 @@ using slang::jit::aarch64::stack_slot_size;
 std::int32_t get_opcode_stack_delta(
   opcode op,
   archive& ar,
-  const std::vector<jit_call_target*>& call_targets,
+  const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets)
 {
     switch(op)
@@ -257,7 +257,7 @@ std::int32_t get_opcode_stack_delta(
         {
             if(static_cast<std::size_t>(i.i) < call_targets.size())
             {
-                target = call_targets.at(static_cast<std::size_t>(i.i));
+                target = call_targets.at(static_cast<std::size_t>(i.i)).get();
             }
         }
 
@@ -622,7 +622,7 @@ namespace slang::jit
 
 std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
   std::span<const std::byte> bytecode,
-  const std::vector<jit_call_target*>& call_targets,
+  const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets)
 {
     std::unordered_map<std::int64_t, std::int32_t> label_depths;

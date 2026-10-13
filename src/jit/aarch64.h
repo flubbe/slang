@@ -43,6 +43,7 @@ constexpr std::int32_t stack_slot_size = 8;
  */
 struct instruction_emitter
 {
+    /** Emitted machine code. */
     std::vector<std::uint32_t> code{};
 
     /*
@@ -90,11 +91,13 @@ struct instruction_emitter
       cpu_registers xn,
       cpu_registers xm);
 
+    /** Arithmetic shift right variable. Emites `ASRV  <Wd>, <Wn>, <Wm>`. */
     void asrv_w(
       cpu_registers wd,
       cpu_registers wn,
       cpu_registers wm);
 
+    /** Arithmetic shift right variable. Emites `ASRV  <Xd>, <Xn>, <Xm>`. */
     void asrv_x(
       cpu_registers xd,
       cpu_registers xn,
@@ -408,12 +411,10 @@ public:
       std::span<const std::byte> bytecode,
       const std::vector<std::size_t>& local_offsets,
       std::size_t locals_size,
-      const std::vector<jit_call_target*>& call_targets,
+      const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
       const std::vector<jit_call_target*>& import_call_targets,
       const std::function<module_::struct_descriptor(std::int64_t)>& resolve_type = {});
 };
-
-class module_loader;
 
 /** An entry in the import table. */
 struct imported_symbol
@@ -429,7 +430,7 @@ struct imported_symbol
 
     /** If the import is resolved, this points to the corresponding module or into the export table. Not serialized. */
     std::variant<
-      const module_loader*,
+      const class module_loader*,
       const module_::exported_symbol*>
       export_reference;
 };
@@ -469,35 +470,47 @@ class module_loader
     std::vector<std::byte> binary;
 
     /** Decoded types, ordered by name. */
-    std::unordered_map<std::string, module_::struct_descriptor> struct_map;
+    std::unordered_map<
+      std::string,
+      module_::struct_descriptor>
+      struct_map;
 
     /** Compiled functions, ordered by name. */
-    std::unordered_map<std::string, jit_function> function_map;
+    std::unordered_map<
+      std::string,
+      jit_function>
+      function_map;
 
     /** Stable call targets, indexed by module export index. */
-    std::vector<std::unique_ptr<jit_call_target>> call_targets;
+    std::vector<
+      std::unique_ptr<jit_call_target>>
+      call_targets;
 
-    /** Imported modules kept alive for imported call targets. */
-    std::unordered_map<std::string, std::unique_ptr<module_loader>> imported_modules;
+    /** Imported modules. Owns imported call targets. */
+    std::unordered_map<
+      std::string,
+      std::unique_ptr<module_loader>>
+      imported_modules;
 
-    /** Call targets indexed by module import index. */
+    /**
+     * Call targets indexed by module import index.
+     * Non-owning pointers into imported modules.
+     */
     std::vector<jit_call_target*> import_call_targets;
 
     /** Resolve and retain an imported module. */
-    module_loader& resolve_module(const std::string& module_name);
+    module_loader& resolve_module(
+      const std::string& module_name);
 
     /**
-     * Create stable call target records for module exports.
+     * Resolve exports into stable call target records for module exports.
      *
      * Populates `call_targets` with owning pointers to function targets and
      * returns a non-owning lookup table corresponding to `header.exports`.
      * The returned table has the same size and index ordering as `header.exports`.
      * Non-function exports are represented by null pointers.
-     *
-     * @returns A non-owning call target table indexed by export index.
-     *     The pointed-to objects are owned by `call_targets`.
      */
-    std::vector<jit_call_target*> create_export_call_target_table();
+    void resolve_exports();
 
     /**
      * Resolve imported symbols and populate the import-indexed call target table.
@@ -512,11 +525,11 @@ class module_loader
     /**
      * Compile all non-native functions in the module.
      *
-     * @param call_target_table Call target table with call targets
+     * @param call_targets Call target table with call targets
      *     appearing in the same order as in the export table.
      */
     void compile_functions(
-      const std::vector<jit_call_target*>& call_target_table);
+      const std::vector<std::unique_ptr<jit_call_target>>& call_targets);
 
     /** Bind matching native exports in this module and its dependencies. */
     std::size_t register_native_function_recursive(

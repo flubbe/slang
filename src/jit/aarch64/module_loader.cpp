@@ -8,6 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#include <ranges>
 #include <unordered_set>
 
 #include "jit/aarch64.h"
@@ -374,6 +375,7 @@ module_loader::module_loader(
     module_load_guard load_guard{this->import_name};
 
     auto read_ar = file_mgr.open(this->path, slang::file_manager::open_mode::read);
+
     module_::module_header serialized_header;
     (*read_ar) & serialized_header;
     (*read_ar) & binary;
@@ -381,6 +383,7 @@ module_loader::module_loader(
     header.exports = std::move(serialized_header.exports);
     header.constants = std::move(serialized_header.constants);
     header.imports.reserve(serialized_header.imports.size());
+
     for(auto& import: serialized_header.imports)
     {
         header.imports.push_back({
@@ -390,7 +393,7 @@ module_loader::module_loader(
         });
     }
 
-    // populate type map before compiling the module.
+    // Populate type map.
     for(auto& it: header.exports)
     {
         if(it.type != module_::symbol_type::type)
@@ -398,31 +401,29 @@ module_loader::module_loader(
             continue;
         }
 
-        struct_map.insert({it.name, std::get<module_::struct_descriptor>(it.desc)});
+        struct_map.insert(
+          {it.name,
+           std::get<module_::struct_descriptor>(it.desc)});
     }
 
-    // resolve exports, imports and structs.
-    auto call_target_table = create_export_call_target_table();
+    // Resolve exports, imports and structs.
+    resolve_exports();
     resolve_imports();
     decode_structs();
 
-    // compile the module.
-    compile_functions(call_target_table);
+    // Compile the module.
+    compile_functions(call_targets);
 }
 
-std::vector<jit_call_target*> module_loader::create_export_call_target_table()
+void module_loader::resolve_exports()
 {
     call_targets.reserve(header.exports.size());
-
-    std::vector<jit_call_target*> call_target_table;
-    call_target_table.reserve(header.exports.size());
 
     for(auto& symbol: header.exports)
     {
         if(symbol.type != module_::symbol_type::function)
         {
             call_targets.push_back(nullptr);
-            call_target_table.push_back(nullptr);
             continue;
         }
 
@@ -450,7 +451,7 @@ std::vector<jit_call_target*> module_loader::create_export_call_target_table()
 
         if(runtime_context != nullptr)
         {
-            target->safepoint = [ctx = runtime_context]()
+            target->safepoint = [ctx = runtime_context]
             {
                 auto& gc = ctx->get_gc();
                 if(gc.is_run_requested())
@@ -460,10 +461,8 @@ std::vector<jit_call_target*> module_loader::create_export_call_target_table()
             };
         }
 
-        call_target_table.push_back(target.get());
         call_targets.push_back(std::move(target));
     }
-    return call_target_table;
 }
 
 void module_loader::resolve_imports()
@@ -546,7 +545,8 @@ void module_loader::resolve_imports()
 }
 
 void module_loader::compile_functions(
-  const std::vector<jit_call_target*>& call_target_table)
+  const std::vector<
+    std::unique_ptr<jit_call_target>>& call_targets)
 {
     for(std::size_t symbol_index = 0;
         symbol_index < header.exports.size();
@@ -586,7 +586,7 @@ void module_loader::compile_functions(
             local_offsets.push_back(locals_size);
             if(is_garbage_collected(local.type))
             {
-                call_target_table.at(symbol_index)->gc_local_offsets.push_back(locals_size);
+                call_targets.at(symbol_index)->gc_local_offsets.push_back(locals_size);
             }
             locals_size += get_type_size(local.type);
         }
@@ -657,7 +657,7 @@ void module_loader::compile_functions(
                   bytecode,
                   local_offsets,
                   locals_size,
-                  call_target_table,
+                  call_targets,
                   import_call_targets,
                   resolve_type);
             }

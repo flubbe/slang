@@ -24,7 +24,7 @@ namespace slang::jit
 
 std::unordered_map<std::int64_t, std::int32_t> analyze_basic_block_stack_depths(
   std::span<const std::byte> bytecode,
-  const std::vector<jit_call_target*>& call_targets,
+  const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
   const std::vector<jit_call_target*>& import_call_targets);
 
 }    // namespace slang::jit
