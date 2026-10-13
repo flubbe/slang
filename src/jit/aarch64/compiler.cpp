@@ -2287,10 +2287,18 @@ jit_function jit_compiler::compile(
             // Sign-extend 32-bit signed int to 64-bit int for the slot
             const auto val64 = static_cast<std::int64_t>(val);
 
-            emitter.mov_x(cpu_registers::X0, val64);
-            emitter.store_x(cpu_registers::X0, cpu_registers::X20, current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X0,
+              val64);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
 
-            update_stack_size(op, stack_slot_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
             break;
         }
         case opcode::lconst:
@@ -2306,7 +2314,9 @@ jit_function jit_compiler::compile(
               cpu_registers::X20,
               current_stack_size);
 
-            update_stack_size(op, stack_slot_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
 
             break;
         }
@@ -2375,7 +2385,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2459,7 +2471,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2495,7 +2509,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2568,7 +2584,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2594,7 +2612,9 @@ jit_function jit_compiler::compile(
               cpu_registers::X20,
               current_stack_size);
 
-            update_stack_size(op, stack_slot_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
 
             break;
         }
@@ -2621,7 +2641,10 @@ jit_function jit_compiler::compile(
         case opcode::fstore:
         {
             const auto local_offset = read_local_offset(input, local_offsets, op);
-            update_stack_size(op, -stack_slot_size);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
 
             // Pop from X20 (stack), write to X19 (locals)
             emitter.ldr_x(
@@ -2639,6 +2662,7 @@ jit_function jit_compiler::compile(
         case opcode::dstore:
         {
             const auto local_offset = read_local_offset(input, local_offsets, op);
+
             update_stack_size(
               op,
               -stack_slot_size);
@@ -2672,7 +2696,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2706,7 +2732,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2768,7 +2796,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2805,7 +2835,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             break;
         }
@@ -2844,7 +2876,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -2878,8 +2912,13 @@ jit_function jit_compiler::compile(
             const bool field_needs_gc =
               field.base_type.is_array()
               || base_type == "str"
-              || (base_type != "void" && base_type != "i8" && base_type != "i16" && base_type != "i32"
-                  && base_type != "i64" && base_type != "f32" && base_type != "f64");
+              || (base_type != "void"
+                  && base_type != "i8"
+                  && base_type != "i16"
+                  && base_type != "i32"
+                  && base_type != "i64"
+                  && base_type != "f32"
+                  && base_type != "f64");
             const auto input_size =
               op == opcode::setfield
                 ? 2 * stack_slot_size
@@ -2918,7 +2957,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             if(op == opcode::setfield)
             {
@@ -2962,7 +3003,9 @@ jit_function jit_compiler::compile(
                   static_cast<std::int64_t>(helper_address));
                 emitter.blr(cpu_registers::X16);
 
-                emit_exception_guard(emitter, exception_fixups);
+                emit_exception_guard(
+                  emitter,
+                  exception_fixups);
             }
 
             break;
@@ -2998,7 +3041,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             break;
         }
@@ -3029,7 +3074,11 @@ jit_function jit_compiler::compile(
             emitter.mov_reg_x(
               cpu_registers::X22,    // scratch
               cpu_registers::X0);
-            emit_exception_guard(emitter, exception_fixups);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X22);
@@ -3053,7 +3102,9 @@ jit_function jit_compiler::compile(
             if(current_stack_size < input_size)
             {
                 throw jit_error{
-                  std::format("Not enough stack values for '{}'.", to_string(op))};
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
             }
             const auto stack_offset = current_stack_size - input_size;
             const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -3073,7 +3124,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -3089,9 +3142,7 @@ jit_function jit_compiler::compile(
         case opcode::dastore: [[fallthrough]];
         case opcode::aastore:
         {
-            // Every item on the VM evaluation stack occupies an 8-byte slot.
-            // Array store pops 3 items: array_ref (8B) + index (8B) + value (8B) = 24 bytes.
-            constexpr std::uint32_t input_size = 3 * stack_slot_size;    // 24 bytes
+            constexpr std::uint32_t input_size = 3 * stack_slot_size;
 
             if(current_stack_size < input_size)
             {
@@ -3104,10 +3155,6 @@ jit_function jit_compiler::compile(
             const auto stack_offset = current_stack_size - input_size;
             const auto helper_address = reinterpret_cast<std::uintptr_t>(&store_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
-            // Set up parameters and call the helper.
-            // X0: VM context / state (X21)
-            // X1: opcode enum (tells helper whether to store 1, 2, 4, or 8 bytes in heap)
-            // X2: stack offset to the start of the 3 x 8-byte arguments
             emitter.mov_reg_x(
               cpu_registers::X0,
               cpu_registers::X21);
@@ -3122,9 +3169,10 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
-            // Pops 3 uniform slots (24 bytes) from the evaluation stack
             update_stack_size(
               op,
               -static_cast<std::int32_t>(input_size));
@@ -3201,7 +3249,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -3217,10 +3267,13 @@ jit_function jit_compiler::compile(
 
             if(!labels.emplace(label_id.i, emitter.code.size()).second)
             {
-                throw jit_error{std::format("Duplicate JIT label {}.", label_id.i)};
+                throw jit_error{
+                  std::format(
+                    "Duplicate JIT label {}.",
+                    label_id.i)};
             }
 
-            // SYNC: Set stack depth to expected depth at this block entry
+            // Set stack depth to expected depth at this block entry
             if(auto it = label_entry_depths.find(label_id.i);
                it != label_entry_depths.end())
             {
@@ -3249,37 +3302,37 @@ jit_function jit_compiler::compile(
         }
         case opcode::jnz:
         {
-            // Under uniform 8-byte slots, the condition value occupies 8 bytes on the stack.
-            constexpr std::uint32_t condition_slot_size = stack_slot_size;    // 8 bytes
-
-            if(current_stack_size < condition_slot_size)
+            if(current_stack_size < stack_slot_size)
             {
                 throw jit_error{
                   std::format(
                     "Not enough stack values for 'jnz' ({} < {}).",
-                    current_stack_size, condition_slot_size)};
+                    current_stack_size, stack_slot_size)};
             }
 
             vle_int then_label;
             vle_int else_label;
             input & then_label & else_label;
 
-            const auto condition_offset = current_stack_size - condition_slot_size;
+            const auto condition_offset = current_stack_size - stack_slot_size;
 
-            // Pop the 8-byte condition slot off the evaluation stack BEFORE emitting branches
             update_stack_size(
               op,
-              -static_cast<std::int32_t>(condition_slot_size));
+              -static_cast<std::int32_t>(stack_slot_size));
+
             emit_safepoint(emitter);
 
-            // Load condition from the 8-byte aligned slot offset
+            // Load condition.
             emitter.ldr_x(
               cpu_registers::X0,
               cpu_registers::X20,
               condition_offset);
 
             const auto conditional_index = emitter.code.size();
-            emitter.cbnz_w(cpu_registers::X0, 0);
+            emitter.cbnz_w(
+              cpu_registers::X0,
+              0);
+
             branch_fixups.push_back(branch_fixup{
               .instruction_index = conditional_index,
               .label_id = then_label.i,
@@ -3288,6 +3341,7 @@ jit_function jit_compiler::compile(
 
             const auto else_index = emitter.code.size();
             emitter.b(0);
+
             branch_fixups.push_back(branch_fixup{
               .instruction_index = else_index,
               .label_id = else_label.i,
@@ -3304,7 +3358,11 @@ jit_function jit_compiler::compile(
         case opcode::iand: [[fallthrough]];
         case opcode::ior: [[fallthrough]];
         case opcode::ixor:
-            emit_integer_binary(emitter, current_stack_size, max_stack_size, op);
+            emit_integer_binary(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op);
             break;
         case opcode::ladd: [[fallthrough]];
         case opcode::lsub: [[fallthrough]];
@@ -3314,7 +3372,11 @@ jit_function jit_compiler::compile(
         case opcode::land: [[fallthrough]];
         case opcode::lor: [[fallthrough]];
         case opcode::lxor:
-            emit_integer_binary(emitter, current_stack_size, max_stack_size, op);
+            emit_integer_binary(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op);
             break;
         case opcode::fneg: [[fallthrough]];
         case opcode::dneg:
@@ -3343,7 +3405,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             break;
         }
@@ -3382,7 +3446,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             update_stack_size(
               op,
@@ -3433,7 +3499,9 @@ jit_function jit_compiler::compile(
               static_cast<std::int64_t>(helper_address));
             emitter.blr(cpu_registers::X16);
 
-            emit_exception_guard(emitter, exception_fixups);
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
 
             const auto output_size = stack_slot_size;
             update_stack_size(
@@ -3444,15 +3512,28 @@ jit_function jit_compiler::compile(
         }
         case opcode::ishl: [[fallthrough]];
         case opcode::ishr:
-            emit_integer_shift(emitter, current_stack_size, max_stack_size, op, false);
+            emit_integer_shift(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op,
+              false);
             break;
         case opcode::lshl: [[fallthrough]];
         case opcode::lshr:
-            emit_integer_shift(emitter, current_stack_size, max_stack_size, op, true);
+            emit_integer_shift(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op,
+              true);
             break;
         case opcode::ineg: [[fallthrough]];
         case opcode::lneg:
-            emit_integer_negation(emitter, current_stack_size, op);
+            emit_integer_negation(
+              emitter,
+              current_stack_size,
+              op);
             break;
         case opcode::iret: [[fallthrough]];
         case opcode::lret: [[fallthrough]];
