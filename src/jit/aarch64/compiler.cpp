@@ -64,7 +64,7 @@ void load_string_constant(
               "Invalid JIT string constant index."};
         }
 
-        const auto& constant = frame->constants[constant_index];
+        const auto& constant = frame->constants.at(constant_index);
         if(constant.type != module_::constant_type::str)
         {
             throw jit_error{
@@ -902,7 +902,7 @@ void get_field(
             // Sign-extend to 64-bit so the entire 8-byte slot is clean
             const auto value64 = static_cast<std::int64_t>(value);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             std::memcpy(
-              frame->stack.span().data() + stack_offset,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
               &value64,
               sizeof(value64));
         }
@@ -1205,7 +1205,11 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
             check_index(values->size());
-            const std::int32_t value = (*values)[index];    // NOLINT(bugprone-signed-char-misuse)
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            const std::int32_t value = (*values)[index];
+
             store(value);
             return;
         }
@@ -1213,7 +1217,11 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             const std::int32_t value = (*values)[index];
+
             store(value);
             return;
         }
@@ -1221,6 +1229,9 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             store((*values)[index]);
             return;
         }
@@ -1228,6 +1239,9 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             store((*values)[index]);
             return;
         }
@@ -1235,6 +1249,9 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<float>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             store((*values)[index]);
             return;
         }
@@ -1242,6 +1259,9 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<double>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             store((*values)[index]);
             return;
         }
@@ -1249,7 +1269,11 @@ void load_array_element(
         {
             auto* values = static_cast<si::fixed_vector<void*>*>(array);
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             void* value = (*values)[index];
+
             gc.add_temporary(value);
             store(value);
             return;
@@ -1303,7 +1327,7 @@ void store_array_element(
             }
         };
 
-        const auto value_offset = stack_offset + 2 * stack_slot_size;
+        const auto value_offset = stack_offset + (2uz * stack_slot_size);
         switch(operation)
         {
         case opcode::castore:
@@ -1318,6 +1342,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = static_cast<std::int8_t>(value);
             return;
         }
@@ -1333,6 +1360,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = static_cast<std::int16_t>(value);
             return;
         }
@@ -1348,6 +1378,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = value;
             return;
         }
@@ -1363,6 +1396,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = value;
             return;
         }
@@ -1378,6 +1414,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = value;
             return;
         }
@@ -1393,6 +1432,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = value;
             return;
         }
@@ -1400,7 +1442,7 @@ void store_array_element(
         {
             void* value{nullptr};
             std::memcpy(
-              &value,
+              static_cast<void*>(&value),
               frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
               sizeof(value));
 
@@ -1409,6 +1451,9 @@ void store_array_element(
             gc.remove_temporary(array);
 
             check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             (*values)[index] = value;
             return;
         }
@@ -1448,7 +1493,7 @@ void store_and_extend(
       &value,
       src.data(),
       sizeof(value));
-    const auto extended = static_cast<std::int64_t>(value);
+    const auto extended = static_cast<std::int64_t>(value);    // NOLINT(bugprone-signed-char-misuse)
     std::memcpy(
       dest.data(),
       &extended,
@@ -1778,9 +1823,10 @@ void update_stack_size(
             to_string(instr))};
     }
 
-    if((delta & 0x7) != 0)
+    if(delta % stack_slot_size != 0)
     {
-        throw jit_error{"stack delta not aligned"};
+        throw jit_error{
+          "Stack delta not aligned."};
     }
 
     current_stack_size += delta;
@@ -1810,8 +1856,7 @@ void emit_integer_binary(
   std::uint32_t& max_stack_size,
   opcode instr)
 {
-    const std::uint32_t width = stack_slot_size;
-    if(current_stack_size < 2u * width)
+    if(current_stack_size < 2u * stack_slot_size)
     {
         throw jit_error{
           std::format(
@@ -1819,8 +1864,8 @@ void emit_integer_binary(
             to_string(instr))};
     }
 
-    const auto left_offset = current_stack_size - (2u * width);
-    const auto right_offset = current_stack_size - width;
+    const auto left_offset = current_stack_size - (2u * stack_slot_size);
+    const auto right_offset = current_stack_size - stack_slot_size;
 
     emitter.load_x(
       cpu_registers::X0,
@@ -1910,7 +1955,7 @@ void emit_integer_binary(
       current_stack_size,
       max_stack_size,
       instr,
-      -static_cast<std::int32_t>(width));
+      -static_cast<std::int32_t>(stack_slot_size));
 }
 
 template<
@@ -1920,17 +1965,17 @@ template<
 void emit_integer_instruction(
   instruction_emitter& emitter,
   bool is_64_bit,
-  EmitW&& emit_w,
-  EmitX&& emit_x,
+  EmitW emit_w,
+  EmitX emit_x,
   Args... args)
 {
     if(is_64_bit)
     {
-        (emitter.*emit_x)(std::forward<Args>(args)...);
+        (emitter.*emit_x)(args...);
     }
     else
     {
-        (emitter.*emit_w)(std::forward<Args>(args)...);
+        (emitter.*emit_w)(args...);
     }
 }
 
@@ -1941,8 +1986,7 @@ void emit_integer_shift(
   opcode instr,
   bool is_64_bit)
 {
-    const std::uint32_t width = stack_slot_size;    // 8 bytes
-    if(current_stack_size < width + stack_slot_size)
+    if(current_stack_size < 2 * stack_slot_size)
     {
         throw jit_error{
           std::format(
@@ -1950,7 +1994,7 @@ void emit_integer_shift(
             to_string(instr))};
     }
 
-    const auto value_offset = current_stack_size - width - stack_slot_size;
+    const auto value_offset = current_stack_size - (2 * stack_slot_size);
     const auto shift_offset = current_stack_size - stack_slot_size;
 
     if(is_64_bit)
@@ -2014,8 +2058,7 @@ void emit_integer_negation(
   std::uint32_t current_stack_size,
   opcode instr)
 {
-    const std::uint32_t width = stack_slot_size;
-    if(current_stack_size < width)
+    if(current_stack_size < stack_slot_size)
     {
         throw jit_error{
           std::format(
@@ -2023,7 +2066,7 @@ void emit_integer_negation(
             to_string(instr))};
     }
 
-    const auto offset = current_stack_size - width;
+    const auto offset = current_stack_size - stack_slot_size;
 
     emitter.load_x(
       cpu_registers::X0,
@@ -2042,7 +2085,7 @@ void emit_integer_negation(
 void emit_safepoint(
   instruction_emitter& emitter)
 {
-    const auto helper_address = reinterpret_cast<std::intptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    const auto helper_address = reinterpret_cast<std::uintptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
     // set up parameters and call the helper.
     emitter.mov_reg_x(
@@ -2058,7 +2101,7 @@ void emit_exception_guard(
   instruction_emitter& emitter,
   std::vector<std::size_t>& exception_fixups)
 {
-    const auto helper_address = reinterpret_cast<std::intptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    const auto helper_address = reinterpret_cast<std::uintptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
     // set up parameters and call the helper.
     emitter.mov_reg_x(
@@ -2233,6 +2276,8 @@ jit_function jit_compiler::compile(
     // TODO bytecode reading should work through memory_read_archive
     while(pc < bytecode.size())
     {
+        // pc is in range by the check above.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         const auto instr = std::to_integer<opcode_base>(bytecode[pc]);
         ++pc;
 
@@ -2256,9 +2301,11 @@ jit_function jit_compiler::compile(
                   "Truncated i32 constant."};
             }
 
+            // pc is in range by the check above.
             std::int32_t val{0};
             std::memcpy(
               &val,
+              // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
               &bytecode[pc],
               sizeof(val));
 
@@ -2370,7 +2417,7 @@ jit_function jit_compiler::compile(
                   "Invalid JIT string constant index."};
             }
 
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&load_string_constant);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_string_constant);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -2457,7 +2504,7 @@ jit_function jit_compiler::compile(
                   "Not enough stack values for 'adup'."};
             }
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&duplicate_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&duplicate_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -2479,11 +2526,7 @@ jit_function jit_compiler::compile(
 
             break;
         }
-        case opcode::pop:
-            update_stack_size(
-              op,
-              -stack_slot_size);
-            break;
+        case opcode::pop: [[fallthrough]];
         case opcode::pop2:
             update_stack_size(
               op,
@@ -2497,7 +2540,7 @@ jit_function jit_compiler::compile(
                   "Not enough stack values for 'apop'."};
             }
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&discard_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&discard_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -2523,8 +2566,9 @@ jit_function jit_compiler::compile(
         case opcode::dup_x2: [[fallthrough]];
         case opcode::dup2_x0:
         {
-            type_class type1;
-            type_class type2;
+            // these are read from input below.
+            type_class type1;    // NOLINT(cppcoreguidelines-init-variables)
+            type_class type2;    // NOLINT(cppcoreguidelines-init-variables)
             type_class type3{type_class::cat1};
 
             input.seek(pc);
@@ -2542,11 +2586,9 @@ jit_function jit_compiler::compile(
               op == opcode::dup2_x0
               && type2 == type_class::ref;
             const std::uint32_t required_size =
-              op == opcode::dup_x1
-                ? 2 * stack_slot_size
-                : (op == opcode::dup_x2
-                     ? 3 * stack_slot_size
-                     : 2 * stack_slot_size);
+              op == opcode::dup_x2
+                ? 3 * stack_slot_size
+                : 2 * stack_slot_size;
 
             if(current_stack_size < required_size)
             {
@@ -2556,7 +2598,7 @@ jit_function jit_compiler::compile(
                     to_string(op))};
             }
 
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&duplicate_stack_block);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&duplicate_stack_block);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -2676,7 +2718,7 @@ jit_function jit_compiler::compile(
         case opcode::aload:
         {
             const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&load_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
               cpu_registers::X0,
@@ -2710,7 +2752,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&store_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&store_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
               cpu_registers::X0,
@@ -2772,7 +2814,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(2 * operand_size);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&compare_values);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&compare_values);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
               cpu_registers::X0,
@@ -2804,10 +2846,12 @@ jit_function jit_compiler::compile(
                 throw jit_error{
                   "Truncated newarray instruction."};
             }
+
+            // pc is in range by the check above.
             const auto type = static_cast<module_::array_type>(
-              std::to_integer<std::uint8_t>(bytecode[pc++]));
+              std::to_integer<std::uint8_t>(bytecode[pc++]));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&create_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
               cpu_registers::X0,
@@ -2841,7 +2885,7 @@ jit_function jit_compiler::compile(
             pc = input.tell();
 
             const auto type = resolve_type(type_index.i);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&create_struct);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_struct);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -2914,7 +2958,7 @@ jit_function jit_compiler::compile(
                     to_string(op))};
             }
             const auto stack_offset = current_stack_size - input_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
               op == opcode::setfield
                 ? &set_field
                 : &get_field);
@@ -2969,7 +3013,7 @@ jit_function jit_compiler::compile(
             if((type.flags & std::to_underlying(module_::struct_flags::allow_cast)) == 0)
             {
                 const auto stack_offset = current_stack_size - stack_slot_size;
-                const auto helper_address = reinterpret_cast<std::intptr_t>(&check_cast);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                const auto helper_address = reinterpret_cast<std::uintptr_t>(&check_cast);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
                 // set up parameters and call the helper.
                 emitter.mov_reg_x(
@@ -3007,7 +3051,7 @@ jit_function jit_compiler::compile(
 
             const auto type = resolve_type(type_index.i);
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&create_struct_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_struct_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3036,7 +3080,7 @@ jit_function jit_compiler::compile(
                   "Not enough stack values for 'arraylength'."};
             }
             const auto stack_offset = current_stack_size - stack_slot_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&get_array_length);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&get_array_length);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3082,7 +3126,7 @@ jit_function jit_compiler::compile(
                   std::format("Not enough stack values for '{}'.", to_string(op))};
             }
             const auto stack_offset = current_stack_size - input_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3128,7 +3172,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto stack_offset = current_stack_size - input_size;
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&store_array_element);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&store_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // Set up parameters and call the helper.
             // X0: VM context / state (X21)
@@ -3211,8 +3255,8 @@ jit_function jit_compiler::compile(
             }
 
             const auto argument_offset = current_stack_size - static_cast<std::uint32_t>(target->argument_size);
-            const auto target_address = reinterpret_cast<std::intptr_t>(target);                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&invoke_call_target);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto target_address = reinterpret_cast<std::uintptr_t>(target);                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&invoke_call_target);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_x(
@@ -3353,15 +3397,14 @@ jit_function jit_compiler::compile(
         case opcode::fneg: [[fallthrough]];
         case opcode::dneg:
         {
-            const auto width = stack_slot_size;
-            if(current_stack_size < width)
+            if(current_stack_size < stack_slot_size)
             {
                 throw jit_error{
                   std::format("Not enough stack values for '{}'.", to_string(op))};
             }
 
-            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(width);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_fp_negation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&execute_fp_negation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3391,9 +3434,7 @@ jit_function jit_compiler::compile(
         case opcode::dmul: [[fallthrough]];
         case opcode::ddiv:
         {
-            const auto width = stack_slot_size;
-
-            if(current_stack_size < 2 * width)
+            if(current_stack_size < 2 * stack_slot_size)
             {
                 throw jit_error{
                   std::format(
@@ -3401,8 +3442,8 @@ jit_function jit_compiler::compile(
                     to_string(op))};
             }
 
-            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(2 * width);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_fp_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto stack_offset = current_stack_size - (2 * stack_slot_size);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&execute_fp_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3423,7 +3464,7 @@ jit_function jit_compiler::compile(
 
             update_stack_size(
               op,
-              -width);
+              -stack_slot_size);
 
             break;
         }
@@ -3453,7 +3494,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&numeric_conversion);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&numeric_conversion);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             // set up parameters and call the helper.
             emitter.mov_reg_x(
@@ -3487,9 +3528,7 @@ jit_function jit_compiler::compile(
         case opcode::lshr:
             emit_integer_shift(emitter, current_stack_size, max_stack_size, op, true);
             break;
-        case opcode::ineg:
-            emit_integer_negation(emitter, current_stack_size, op);
-            break;
+        case opcode::ineg: [[fallthrough]];
         case opcode::lneg:
             emit_integer_negation(emitter, current_stack_size, op);
             break;
