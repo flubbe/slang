@@ -635,7 +635,6 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
 {
     std::unordered_map<std::int64_t, std::int32_t> label_depths;
     std::unordered_map<std::int64_t, std::size_t> label_pcs;
-    std::unordered_map<std::size_t, std::int64_t> pcs_label;
     std::unordered_map<std::size_t, std::int32_t> pc_depths;
     std::vector<std::size_t> worklist;
 
@@ -651,10 +650,19 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
     // Pass 1: Build label map.
     while(input.tell() < input.size())
     {
-        const auto pc_start = input.tell();
+        const auto start_pc = input.tell();
 
         std::byte instr{0};
         input & instr;
+
+        // Validate instruction range.
+        if(std::to_integer<unsigned int>(instr) >= std::to_underlying(opcode::opcode_count))
+        {
+            throw jit_error{
+              std::format(
+                "CFG: Instruction at {} out of range.",
+                start_pc)};
+        }
 
         auto op = static_cast<opcode>(instr);
         if(op == opcode::label)
@@ -662,8 +670,14 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
             vle_int label_id;
             input & label_id;
 
-            label_pcs[label_id.i] = pc_start;
-            pcs_label[pc_start] = label_id.i;
+            if(!label_pcs.try_emplace(label_id.i, start_pc).second)
+            {
+                throw jit_error{
+                  std::format(
+                    "CFG: Duplicate label %{} found at PC {}.",
+                    label_id.i,
+                    start_pc)};
+            }
         }
         else
         {
@@ -673,7 +687,7 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
 
     // Pass 2: Propagate stack depths across control flow edges.
 
-    auto enqueue = [&](std::size_t target_pc, std::int32_t depth)
+    auto enqueue_pc = [&](std::size_t target_pc, std::int32_t depth)
     {
         if(depth < 0)
         {
@@ -701,8 +715,34 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
         }
     };
 
+    auto enqueue_label = [&](std::int64_t label_id, std::int32_t depth)
+    {
+        const auto label_it = label_pcs.find(label_id);
+        if(label_it == label_pcs.end())
+        {
+            throw jit_error{
+              std::format(
+                "CFG: Encountered unknown label '{}' while enqueuing.",
+                label_id)};
+        }
+
+        const auto target_pc = label_it->second;
+        enqueue_pc(target_pc, depth);
+
+        auto [it, inserted] = label_depths.try_emplace(label_id, depth);
+        if(!inserted && it->second != depth)
+        {
+            throw jit_error{
+              std::format(
+                "CFG: Stack Depth Mismatch at label %{}: path A expects {} bytes, path B provided {} bytes.",
+                label_id,
+                it->second,
+                depth)};
+        }
+    };
+
     // Start analysis at function entry point
-    enqueue(0, 0);
+    enqueue_pc(0, 0);
 
     while(!worklist.empty())
     {
@@ -739,34 +779,29 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
 
             auto op = static_cast<opcode>(instr);
 
+            if(op == opcode::iret || op == opcode::lret || op == opcode::fret
+               || op == opcode::dret || op == opcode::aret || op == opcode::ret)
+            {
+                break;
+            }
+
             if(op == opcode::label)
             {
                 vle_int label_id;
                 input & label_id;
 
-                // If this label was already enqueued by a jump/branch, verify depth consistency
-                auto it = pc_depths.find(start_pc);
-                if(it != pc_depths.end())
+                auto [it, inserted] = label_depths.try_emplace(label_id.i, cur_depth);
+                if(!inserted && it->second != cur_depth)
                 {
-                    if(it->second != cur_depth)
-                    {
-                        throw jit_error{
-                          std::format(
-                            "CFG Stack Depth Mismatch at label {} (PC {}): fall-through expects {} bytes, path provided {} bytes.",
-                            label_id.i,
-                            start_pc,
-                            it->second,
-                            cur_depth)};
-                    }
-                }
-                else
-                {
-                    // Fall-through into new label: record depth for this PC
-                    enqueue(start_pc, cur_depth);
+                    throw jit_error{
+                      std::format(
+                        "CFG: Stack Depth Mismatch at label %{}: path A expects {} bytes, path B provided {} bytes.",
+                        label_id.i,
+                        it->second,
+                        cur_depth)};
                 }
 
-                label_depths[label_id.i] = cur_depth;
-
+                // NOTE labels don't terminate blocks, so we continue.
                 continue;
             }
 
@@ -775,11 +810,8 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
                 vle_int label_id;
                 input & label_id;
 
-                label_depths[label_id.i] = cur_depth;
-                if(auto it = label_pcs.find(label_id.i); it != label_pcs.end())
-                {
-                    enqueue(it->second, cur_depth);
-                }
+                enqueue_label(label_id.i, cur_depth);
+
                 break;
             }
 
@@ -800,40 +832,43 @@ std::unordered_map<std::int64_t, std::int32_t> analyze_bytecode_stack_depths(
                 const auto depth_after_pop = cur_depth - stack_slot_size;
 
                 // Propagate depth_after_pop to branch targets
-                label_depths[then_label.i] = depth_after_pop;
-                label_depths[else_label.i] = depth_after_pop;
+                enqueue_label(then_label.i, depth_after_pop);
+                enqueue_label(else_label.i, depth_after_pop);
 
-                if(auto it = label_pcs.find(then_label.i); it != label_pcs.end())
-                {
-                    enqueue(it->second, depth_after_pop);
-                }
-                if(auto it = label_pcs.find(else_label.i); it != label_pcs.end())
-                {
-                    enqueue(it->second, depth_after_pop);
-                }
                 break;
             }
 
-            if(op == opcode::iret || op == opcode::lret || op == opcode::fret
-               || op == opcode::dret || op == opcode::aret || op == opcode::ret)
-            {
-                break;
-            }
-
+            // Record and validate stack delta change.
             const auto delta = get_opcode_stack_delta(
               op,
               input,
               call_targets,
               import_call_targets);
-            cur_depth += delta;
 
-            if(cur_depth < 0)
+            if(delta > 0
+               && cur_depth > std::numeric_limits<std::int32_t>::max() - delta)
+            {
+                throw jit_error{
+                  "CFG: Stack depth overflow."};
+            }
+
+            if(delta < 0
+               && cur_depth < std::numeric_limits<std::int32_t>::min() - delta)
+            {
+                throw jit_error{
+                  "CFG: Stack depth underflow."};
+            }
+
+            if(delta < 0
+               && cur_depth < -delta)
             {
                 throw jit_error{
                   std::format(
                     "CFG: Negative stack depth after '{}'.",
                     to_string(op))};
             }
+
+            cur_depth += delta;
         }
     }
 
