@@ -1615,7 +1615,7 @@ void invoke_call_target(
                   std::size_t jit_offset = 0;
                   for(const auto param_size: target->param_sizes)
                   {
-                      // Copy the active value bytes into native_stack (skipping slot padding)
+                      // Copy the active value bytes into native_stack.
                       native_stack.push_bytes(arguments.subspan(jit_offset, param_size));
 
                       // Evaluation stack slots are always 8-byte aligned in the JIT

@@ -431,7 +431,6 @@ void module_loader::resolve_exports()
 
         auto target = std::make_unique<jit_call_target>();
         target->constants = &header.constants;
-        target->return_type_class = get_type_class(desc.signature.return_type);
         target->return_type_kind = get_type_kind(desc.signature.return_type);
         target->return_size = get_type_size(desc.signature.return_type);
 
@@ -439,8 +438,6 @@ void module_loader::resolve_exports()
         {
             target->param_sizes.push_back(
               get_type_class(argument_type) == type_class::cat1 ? 4 : 8);
-            target->param_type_kinds.push_back(
-              get_type_kind(argument_type));
             target->argument_size += get_type_size(argument_type);
         }
 

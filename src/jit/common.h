@@ -18,7 +18,6 @@
 
 #include "compiler/codegen/type.h"
 #include "interpreter/interpreter.h"
-#include "shared/type_class.h"
 #include "platform.h"
 
 /*
@@ -187,12 +186,10 @@ struct jit_call_target
     /** argument sizes. */
     std::vector<std::size_t> param_sizes;
 
-    std::vector<cg::type_kind> param_type_kinds;
-
     /** Argument size, in bytes. */
     std::size_t argument_size{0};
 
-    slang::type_class return_type_class;
+    /** Return type kind, for JIT/native handover. */
     cg::type_kind return_type_kind;
 
     /** Return value size, in bytes. */
