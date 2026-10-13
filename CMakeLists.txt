@@ -80,6 +80,7 @@ set(SOURCES
     src/compiler/sema.cpp
     src/compiler/token.cpp
     src/compiler/typing.cpp
+    src/interpreter/cfg.cpp
     src/interpreter/gc.cpp
     src/interpreter/interpreter.cpp
     src/interpreter/module_loader.cpp

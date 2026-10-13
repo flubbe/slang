@@ -15,6 +15,7 @@ include_directories(
 add_executable(native_integration
     native_integration.cpp
     ../src/archives/file.cpp
+    ../src/interpreter/cfg.cpp
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp

@@ -25,19 +25,25 @@ namespace slang::utils
 {
 
 /** Returns if the given character is an alphabetic character. */
-inline bool is_alpha(char c)
+[[nodiscard]]
+inline bool is_alpha(
+  char c)
 {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 /** Returns if the given character is one of the 10 decimal digits: `0123456789`. */
-inline bool is_digit(char c)
+[[nodiscard]]
+inline bool is_digit(
+  char c)
 {
     return c >= '0' && c <= '9';
 }
 
 /** Returns if the given character is an alphanumeric character. */
-inline bool is_alnum(char c)
+[[nodiscard]]
+inline bool is_alnum(
+  char c)
 {
     return is_alpha(c) || is_digit(c);
 }
@@ -49,7 +55,10 @@ inline bool is_alnum(char c)
  * @param delimiter The delimiter that separates the string's components.
  * @return A vector of components of the original string.
  */
-std::vector<std::string> split(const std::string& s, const std::string& delimiter);
+[[nodiscard]]
+std::vector<std::string> split(
+  const std::string& s,
+  const std::string& delimiter);
 
 /**
  * Join a vector of strings.
@@ -58,7 +67,10 @@ std::vector<std::string> split(const std::string& s, const std::string& delimite
  * @param separator The seperator to use between the strings.
  * @return A string made of the vector's strings joined together and separated bythe given separator.
  */
-std::string join(const std::vector<std::string>& v, const std::string& separator);
+[[nodiscard]]
+std::string join(
+  const std::vector<std::string>& v,
+  const std::string& separator);
 
 /**
  * Join a vector of strings.
@@ -70,6 +82,7 @@ std::string join(const std::vector<std::string>& v, const std::string& separator
  * @return A string made of the vector's transformed elements joined together and separated bythe given separator.
  */
 template<typename T>
+[[nodiscard]]
 std::string join(
   const std::vector<T>& v,    // NOLINT(bugprone-easily-swappable-parameters)
   std::function<std::string(const T&)> transform,
@@ -130,6 +143,7 @@ struct false_type : public std::false_type
  */
 template<typename T>
     requires(!std::is_integral_v<T>)
+[[nodiscard]]
 constexpr T align(std::size_t alignment, T p)
 {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -145,6 +159,7 @@ constexpr T align(std::size_t alignment, T p)
  * @returns A number bigger or equal to `p`, satisfying the alignment requirement.
  */
 template<std::integral T>
+[[nodiscard]]
 constexpr T align(std::size_t alignment, T p)
 {
     return static_cast<T>((static_cast<std::uintptr_t>(p) + (alignment - 1)) & ~(alignment - 1));
@@ -172,6 +187,7 @@ concept smart_ptr =
  * @throws Throws a `std::out_of_range` exception if the value does not fit into the target type.
  */
 template<std::integral T, std::integral S>
+[[nodiscard]]
 constexpr T numeric_cast(S value)
 {
     if constexpr(std::is_signed_v<S> == std::is_signed_v<T>)
@@ -210,6 +226,7 @@ constexpr T numeric_cast(S value)
  * @returns Returns whether the value fits into the type.
  */
 template<std::signed_integral T>
+[[nodiscard]]
 constexpr bool fits_in(std::int64_t v)
 {
     return v >= std::numeric_limits<T>::min()
@@ -229,6 +246,7 @@ constexpr bool fits_in(std::int64_t v)
  */
 template<std::signed_integral T>
     requires(sizeof(T) < sizeof(std::int64_t))
+[[nodiscard]]
 constexpr std::int64_t truncate_and_sign_extend(std::int64_t value)
 {
     using unsigned_type = std::make_unsigned_t<T>;

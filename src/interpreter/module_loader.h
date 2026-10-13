@@ -259,16 +259,6 @@ class module_loader
     type_properties get_type_properties(const module_::variable_type& type) const;
 
     /**
-     * Get the byte size and offset of a field.
-     *
-     * @param type_name The base type name.
-     * @param field_index The field index.
-     * @return Returns the field properties.
-     * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
-     */
-    field_properties get_field_properties(const std::string& type_name, std::size_t field_index) const;
-
-    /**
      * Decode the structs. Set types sizes, alignments and offsets.
      */
     void decode_structs();
@@ -324,6 +314,16 @@ public:
       std::string import_name,
       fs::path path,
       std::shared_ptr<instruction_recorder> recorder = std::make_shared<instruction_recorder>());
+
+    /**
+     * Get the byte size and offset of a field.
+     *
+     * @param type_name The base type name.
+     * @param field_index The field index.
+     * @return Returns the field properties.
+     * @throws Throws an `interpreter_error` if the type is not known or the field index outside the type's field array.
+     */
+    field_properties get_field_properties(const std::string& type_name, std::size_t field_index) const;
 
     /**
      * Check if the module contains a function.

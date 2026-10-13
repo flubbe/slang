@@ -158,6 +158,7 @@ add_gtest_executable(test_interpreter
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
+    ../src/interpreter/cfg.cpp
     ../src/interpreter/gc.cpp
     ../src/interpreter/interpreter.cpp
     ../src/interpreter/module_loader.cpp

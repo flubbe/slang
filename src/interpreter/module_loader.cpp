@@ -12,8 +12,11 @@
 
 #include "shared/type_class.h"
 #include "shared/type_utils.h"
+#include "cfg.h"
 #include "interpreter.h"
 #include "package.h"
+#include "stack.h"
+#include "utils.h"
 
 namespace slang::interpreter
 {
@@ -264,52 +267,6 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
       .size = type_it->second.size,
       .alignment = type_it->second.alignment,
       .layout_id = type_it->second.layout_id};
-}
-
-field_properties module_loader::get_field_properties(
-  const std::string& type_name,
-  std::size_t field_index) const
-{
-    // built-in types.
-    if(type_name == "void")
-    {
-        throw interpreter_error("Invalid struct type name 'void'.");
-    }
-
-    auto built_in_it = type_properties_map().find(type_name);
-    if(built_in_it != type_properties_map().end())
-    {
-        throw interpreter_error(
-          std::format(
-            "Invalid struct type name '{}'.",
-            type_name));
-    }
-
-    // structs.
-    auto type_it = struct_map.find(type_name);
-    if(type_it == struct_map.end())
-    {
-        throw interpreter_error(
-          std::format(
-            "Cannot resolve size for type '{}': Type not found.",
-            type_name));
-    }
-
-    if(field_index >= type_it->second.member_types.size())
-    {
-        throw interpreter_error(
-          std::format(
-            "Field index out of bounds for type '{}' ({} >= {}).",
-            type_name,
-            field_index,
-            type_it->second.member_types.size()));
-    }
-
-    auto field_info = type_it->second.member_types.at(field_index);
-    return {
-      .size = field_info.second.size,
-      .offset = field_info.second.offset,
-      .needs_gc = is_garbage_collected(field_info.second.base_type)};
 }
 
 void module_loader::decode_structs()
@@ -572,6 +529,16 @@ void module_loader::decode()
      */
     recorder->section("Disassembly");
 
+    auto local_module_resolver = [&](const std::string& module_name) -> const module_loader&
+    {
+        if(module_name == import_name)
+        {
+            return *this;
+        }
+
+        return ctx.resolve_module(module_name);
+    };
+
     std::vector<std::byte> code;
     for(auto& it: mod.header.exports)
     {
@@ -595,6 +562,15 @@ void module_loader::decode()
 
         recorder->function(it.name, details);
 
+        const auto label_entry_depths = analyze_bytecode_stack_depths(
+          *this,
+          std::span{
+            ar.get_buffer().begin() + ar.tell(),
+            details.size},
+          mod.header.exports,
+          mod.header.imports,
+          local_module_resolver);
+
         std::int32_t stack_size = 0;
         std::size_t max_stack_size = 0;
 
@@ -603,13 +579,33 @@ void module_loader::decode()
             std::byte instr{0};
             ar & instr;
 
-            // don't store non-executable instructions.
-            if(static_cast<opcode>(instr) != opcode::label)
+            if(static_cast<opcode>(instr) == opcode::label)
             {
-                code.push_back(instr);
+                vle_int label_id;
+                ar & label_id;
+
+                // store jump target for later resolution.
+                mod.jump_targets.insert({label_id.i, code.size()});
+
+                // Set stack depth to expected depth at this block entry
+                if(auto it = label_entry_depths.find(label_id.i);
+                   it != label_entry_depths.end())
+                {
+                    stack_size = it->second;
+                }
+
+                recorder->label(label_id.i);
+
+                continue;
             }
 
-            stack_size += decode_instruction(ar, instr, details, code);
+            code.push_back(instr);
+
+            stack_size += decode_instruction(
+              ar,
+              instr,
+              details,
+              code);
             if(stack_size < 0)
             {
                 throw interpreter_error(
@@ -876,17 +872,6 @@ std::int32_t module_loader::decode_instruction(
 
         recorder->record(static_cast<opcode>(instr), i.i);
         return static_cast<std::int32_t>(sizeof(std::string*));
-    }
-    case opcode::label:
-    {
-        vle_int i;
-        ar & i;
-
-        // store jump target for later resolution.
-        mod.jump_targets.insert({i.i, code.size()});
-
-        recorder->label(i.i);
-        return 0;
     }
     case opcode::jmp:
     {
@@ -1440,10 +1425,10 @@ std::int32_t module_loader::decode_instruction(
 
         if(static_cast<opcode>(instr) == opcode::setfield)
         {
-            return static_cast<std::int32_t>(-sizeof(void*) - properties.size);
+            return static_cast<std::int32_t>(-sizeof(void*) - utils::get_stack_slot_size(properties.size));
         }
 
-        return static_cast<std::int32_t>(-sizeof(void*) + properties.size);
+        return static_cast<std::int32_t>(-sizeof(void*) + utils::get_stack_slot_size(properties.size));
     }
     /* checkcast */
     case opcode::checkcast:
@@ -1693,6 +1678,52 @@ module_loader::module_loader(
                  details.stack_size}});
         }
     }
+}
+
+field_properties module_loader::get_field_properties(
+  const std::string& type_name,
+  std::size_t field_index) const
+{
+    // built-in types.
+    if(type_name == "void")
+    {
+        throw interpreter_error("Invalid struct type name 'void'.");
+    }
+
+    auto built_in_it = type_properties_map().find(type_name);
+    if(built_in_it != type_properties_map().end())
+    {
+        throw interpreter_error(
+          std::format(
+            "Invalid struct type name '{}'.",
+            type_name));
+    }
+
+    // structs.
+    auto type_it = struct_map.find(type_name);
+    if(type_it == struct_map.end())
+    {
+        throw interpreter_error(
+          std::format(
+            "Cannot resolve size for type '{}': Type not found.",
+            type_name));
+    }
+
+    if(field_index >= type_it->second.member_types.size())
+    {
+        throw interpreter_error(
+          std::format(
+            "Field index out of bounds for type '{}' ({} >= {}).",
+            type_name,
+            field_index,
+            type_it->second.member_types.size()));
+    }
+
+    auto field_info = type_it->second.member_types.at(field_index);
+    return {
+      .size = field_info.second.size,
+      .offset = field_info.second.offset,
+      .needs_gc = is_garbage_collected(field_info.second.base_type)};
 }
 
 bool module_loader::has_function(const std::string& name) const

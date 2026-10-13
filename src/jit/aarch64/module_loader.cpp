@@ -222,7 +222,6 @@ void module_loader::decode_structs()
         std::size_t size = 0;
         std::size_t alignment = 0;
         std::vector<std::size_t> layout;
-        int offset = 0;
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
@@ -301,20 +300,11 @@ void module_loader::decode_structs()
                 add_to_layout = true;
             }
 
-            // store offset.
-            member_type.offset = utils::align(member_type.alignment, offset);
-
-            // calculate member offset as `size_after - size_before`.
-            offset -= utils::numeric_cast<int>(size);
-
-            // update struct size and alignment.
-            size += member_type.size;
             size = utils::align(member_type.alignment, size);
+            member_type.offset = size;
 
+            size += member_type.size;
             alignment = std::max(alignment, member_type.alignment);
-
-            // calculate member offset as `size_after - size_before`.
-            offset += utils::numeric_cast<int>(size);
 
             // update type layout.
             if(add_to_layout)
