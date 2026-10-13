@@ -16,8 +16,6 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include <sys/mman.h>
-
 #include "archives/memory.h"
 #include "jit/aarch64.h"
 #include "shared/type_class.h"
@@ -149,7 +147,8 @@ bool compare_helper(
     case opcode::acmpne:
         return lhs != rhs;
     default:
-        throw jit_error{"Invalid comparison opcode."};
+        throw jit_error{
+          "Invalid comparison opcode."};
     }
 }
 
@@ -223,7 +222,8 @@ void compare_values(
             break;
         }
         default:
-            throw jit_error{"Invalid comparison opcode."};
+            throw jit_error{
+              "Invalid comparison opcode."};
         }
 
         const auto result_value = static_cast<std::int32_t>(result);
@@ -464,36 +464,6 @@ void duplicate_stack_block(
             frame->pending_exception = std::current_exception();
         }
     }
-}
-
-/*
- * Logical operations.
- */
-
-void execute_logical_operation(
-  si::stack_frame* frame,
-  opcode operation,
-  std::size_t stack_offset) noexcept
-{
-    std::int32_t lhs{0};
-    std::int32_t rhs{0};
-    std::memcpy(
-      &lhs,
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(lhs));
-    std::memcpy(
-      &rhs,
-      frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      sizeof(rhs));
-
-    const auto result = static_cast<std::int32_t>(
-      operation == opcode::land    // FIXME other oerations?
-        ? lhs != 0 && rhs != 0
-        : lhs != 0 || rhs != 0);
-    std::memcpy(
-      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      &result,
-      sizeof(result));
 }
 
 /*
@@ -1887,13 +1857,15 @@ void emit_integer_binary(
           cpu_registers::X1,
           cpu_registers::X0);
         break;
-    case opcode::iand:
+    case opcode::iand: [[fallthrough]];
+    case opcode::land:
         emitter.and_reg_x(
           cpu_registers::X0,
           cpu_registers::X0,
           cpu_registers::X1);
         break;
-    case opcode::ior:
+    case opcode::ior: [[fallthrough]];
+    case opcode::lor:
         emitter.orr_reg_x(
           cpu_registers::X0,
           cpu_registers::X0,
@@ -3357,47 +3329,11 @@ jit_function jit_compiler::compile(
         case opcode::lmul: [[fallthrough]];
         case opcode::ldiv: [[fallthrough]];
         case opcode::lmod: [[fallthrough]];
+        case opcode::land: [[fallthrough]];
+        case opcode::lor: [[fallthrough]];
         case opcode::lxor:
             emit_integer_binary(emitter, current_stack_size, max_stack_size, op);
             break;
-        case opcode::land: [[fallthrough]];
-        case opcode::lor:
-        {
-            constexpr auto input_size = 2 * stack_slot_size;
-            if(current_stack_size < input_size)
-            {
-                throw jit_error{
-                  std::format(
-                    "Not enough stack values for '{}'.",
-                    to_string(op))};
-            }
-
-            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
-            const auto helper_address = reinterpret_cast<std::intptr_t>(&execute_logical_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-
-            // set up parameters and call the helper.
-            emitter.mov_reg_x(
-              cpu_registers::X0,
-              cpu_registers::X21);
-            emitter.mov_x(
-              cpu_registers::X1,
-              std::to_underlying(op));
-            emitter.mov_x(
-              cpu_registers::X2,
-              stack_offset);
-            emitter.mov_x(
-              cpu_registers::X16,
-              static_cast<std::int64_t>(helper_address));
-            emitter.blr(cpu_registers::X16);
-
-            emit_exception_guard(emitter, exception_fixups);
-
-            update_stack_size(
-              op,
-              -stack_slot_size);
-
-            break;
-        }
         case opcode::fneg: [[fallthrough]];
         case opcode::dneg:
         {

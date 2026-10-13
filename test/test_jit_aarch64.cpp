@@ -496,9 +496,9 @@ TEST(jit, compile_execute_remaining_opcodes)
         emit(bytecode, opcode::ret);
         return run_bytecode<std::int32_t>(bytecode.get_buffer());
     };
-    EXPECT_EQ(run_logical(opcode::land, -2, 8), 1);
+    EXPECT_EQ(run_logical(opcode::land, -2, 123), 122);
     EXPECT_EQ(run_logical(opcode::land, 0, 8), 0);
-    EXPECT_EQ(run_logical(opcode::lor, 0, -3), 1);
+    EXPECT_EQ(run_logical(opcode::lor, 0, -3), -3);
     EXPECT_EQ(run_logical(opcode::lor, 0, 0), 0);
 }
 

@@ -1572,7 +1572,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
-                  { return (i != 0) && (v != 0); });
+                  { return i & v; });
                 break;
             } /* opcode::land */
             case opcode::ior:
@@ -1588,7 +1588,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
-                  { return (i != 0) || (v != 0); });
+                  { return i | v; });
                 break;
             } /* opcode::lor */
             case opcode::ixor:
