@@ -2119,23 +2119,11 @@ void emit_exception_guard(
 
 std::uint32_t read_local_offset(
   memory_read_archive& input,
-  std::span<const std::byte> bytecode,
-  std::size_t& pc,
   const std::vector<std::size_t>& local_offsets,
   opcode instr)
 {
-    if(pc >= bytecode.size())
-    {
-        throw jit_error{
-          std::format(
-            "Missing local index for '{}'.",
-            to_string(instr))};
-    }
-
-    input.seek(pc);
     vle_int local_index;
     input & local_index;
-    pc = input.tell();
 
     if(local_index.i < 0
        || static_cast<std::size_t>(local_index.i) >= local_offsets.size())
@@ -2262,8 +2250,6 @@ jit_function jit_compiler::compile(
      * Compile bytecode.
      */
 
-    std::size_t pc = 0;
-
     std::uint32_t max_stack_size{0};
     std::uint32_t current_stack_size{0};
     memory_read_archive input{bytecode, true, std::endian::little};
@@ -2273,43 +2259,30 @@ jit_function jit_compiler::compile(
       .max_stack_size = &max_stack_size,
     };
 
-    // TODO bytecode reading should work through memory_read_archive
-    while(pc < bytecode.size())
+    while(input.tell() < input.size())
     {
-        // pc is in range by the check above.
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-        const auto instr = std::to_integer<opcode_base>(bytecode[pc]);
-        ++pc;
+        const auto start_pc = input.tell();
 
-        // validate opcode.
-        if(instr >= std::to_underlying(opcode::opcode_count))
+        std::byte instr{0};
+        input & instr;
+
+        // Validate instruction range.
+        if(std::to_integer<unsigned int>(instr) >= std::to_underlying(opcode::opcode_count))
         {
             throw jit_error{
               std::format(
-                "'{:02x}' is not an opcode.",
-                instr)};
+                "'{:02x}' at PC {} is not an opcode.",
+                std::to_integer<unsigned int>(instr),
+                start_pc)};
         }
-        auto op = static_cast<opcode>(instr);
 
+        auto op = static_cast<opcode>(instr);
         switch(op)
         {
         case opcode::iconst:
         {
-            if(bytecode.size() - pc < sizeof(std::int32_t))
-            {
-                throw jit_error{
-                  "Truncated i32 constant."};
-            }
-
-            // pc is in range by the check above.
             std::int32_t val{0};
-            std::memcpy(
-              &val,
-              // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-              &bytecode[pc],
-              sizeof(val));
-
-            pc += sizeof(val);
+            input & val;
 
             // Sign-extend 32-bit signed int to 64-bit int for the slot
             const auto val64 = static_cast<std::int64_t>(val);
@@ -2322,19 +2295,8 @@ jit_function jit_compiler::compile(
         }
         case opcode::lconst:
         {
-            if(bytecode.size() - pc < sizeof(std::int64_t))
-            {
-                throw jit_error{
-                  "Truncated i64 constant."};
-            }
-
             std::int64_t val{0};
-            auto constant_bytes = bytecode.subspan(pc, sizeof(val));
-            std::memcpy(
-              &val,
-              constant_bytes.data(),
-              sizeof(val));
-            pc += sizeof(val);
+            input & val;
 
             emitter.mov_x(
               cpu_registers::X0,
@@ -2350,23 +2312,13 @@ jit_function jit_compiler::compile(
         }
         case opcode::fconst:
         {
-            if(sizeof(float) > bytecode.size() - pc)
-            {
-                throw jit_error{
-                  "Truncated f32 constant."};
-            }
-
-            float value{0};
-            std::memcpy(
-              &value,
-              bytecode.data() + pc,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
-            pc += sizeof(value);
+            float val{0.f};
+            input & val;
 
             emitter.mov_w(
               cpu_registers::X0,
               static_cast<std::int32_t>(
-                std::bit_cast<std::uint32_t>(value)));
+                std::bit_cast<std::uint32_t>(val)));
             emitter.str_w(
               cpu_registers::X0,
               cpu_registers::X20,
@@ -2379,22 +2331,12 @@ jit_function jit_compiler::compile(
         }
         case opcode::dconst:
         {
-            if(sizeof(double) > bytecode.size() - pc)
-            {
-                throw jit_error{
-                  "Truncated f64 constant."};
-            }
-
-            double value{0};
-            std::memcpy(
-              &value,
-              bytecode.data() + pc,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
-            pc += sizeof(value);
+            double val{0.};
+            input & val;
 
             emitter.mov_x(
               cpu_registers::X0,
-              std::bit_cast<std::int64_t>(value));
+              std::bit_cast<std::int64_t>(val));
             emitter.store_x(
               cpu_registers::X0,
               cpu_registers::X20,
@@ -2407,10 +2349,9 @@ jit_function jit_compiler::compile(
         }
         case opcode::sconst:
         {
-            input.seek(pc);
             vle_int constant_index;
             input & constant_index;
-            pc = input.tell();
+
             if(constant_index.i < 0)
             {
                 throw jit_error{
@@ -2571,14 +2512,11 @@ jit_function jit_compiler::compile(
             type_class type2;    // NOLINT(cppcoreguidelines-init-variables)
             type_class type3{type_class::cat1};
 
-            input.seek(pc);
             input & type1 & type2;
             if(op == opcode::dup_x2)
             {
                 input & type3;
             }
-
-            pc = input.tell();
 
             const auto needs_gc1 =
               type1 == type_class::ref;
@@ -2644,7 +2582,7 @@ jit_function jit_compiler::compile(
         case opcode::iload: [[fallthrough]];
         case opcode::fload:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
 
             // Read from X19 (locals), push to X20 (stack)
             emitter.ldr_x(
@@ -2663,7 +2601,7 @@ jit_function jit_compiler::compile(
         case opcode::lload: [[fallthrough]];
         case opcode::dload:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
             emitter.load_x(
               cpu_registers::X0,
               cpu_registers::X19,
@@ -2682,7 +2620,7 @@ jit_function jit_compiler::compile(
         case opcode::istore:
         case opcode::fstore:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
             update_stack_size(op, -stack_slot_size);
 
             // Pop from X20 (stack), write to X19 (locals)
@@ -2700,7 +2638,7 @@ jit_function jit_compiler::compile(
         case opcode::lstore: [[fallthrough]];
         case opcode::dstore:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
             update_stack_size(
               op,
               -stack_slot_size);
@@ -2717,7 +2655,7 @@ jit_function jit_compiler::compile(
         }
         case opcode::aload:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
             const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
             emitter.mov_reg_x(
@@ -2744,7 +2682,7 @@ jit_function jit_compiler::compile(
         }
         case opcode::astore:
         {
-            const auto local_offset = read_local_offset(input, bytecode, pc, local_offsets, op);
+            const auto local_offset = read_local_offset(input, local_offsets, op);
             if(current_stack_size < stack_slot_size)
             {
                 throw jit_error{
@@ -2840,16 +2778,16 @@ jit_function jit_compiler::compile(
         }
         case opcode::newarray:
         {
-            if(current_stack_size < stack_slot_size
-               || pc >= bytecode.size())
+            if(current_stack_size < stack_slot_size)
             {
                 throw jit_error{
                   "Truncated newarray instruction."};
             }
 
-            // pc is in range by the check above.
-            const auto type = static_cast<module_::array_type>(
-              std::to_integer<std::uint8_t>(bytecode[pc++]));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            // type is read below.
+            module_::array_type type;    // NOLINT(cppcoreguidelines-init-variables)
+            input & type;
+
             const auto stack_offset = current_stack_size - stack_slot_size;
             const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
@@ -2879,10 +2817,8 @@ jit_function jit_compiler::compile(
                   "Struct allocation requires a JIT type resolver."};
             }
 
-            input.seek(pc);
             vle_int type_index;
             input & type_index;
-            pc = input.tell();
 
             const auto type = resolve_type(type_index.i);
             const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_struct);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -2925,11 +2861,9 @@ jit_function jit_compiler::compile(
                   "Struct field access requires a JIT type resolver."};
             }
 
-            input.seek(pc);
             vle_int type_index;
             vle_int field_index;
             input & type_index & field_index;
-            pc = input.tell();
 
             const auto type = resolve_type(type_index.i);
             if(field_index.i < 0
@@ -3004,10 +2938,8 @@ jit_function jit_compiler::compile(
                   "Invalid checkcast instruction."};
             }
 
-            input.seek(pc);
             vle_int type_index;
             input & type_index;
-            pc = input.tell();
 
             const auto type = resolve_type(type_index.i);
             if((type.flags & std::to_underlying(module_::struct_flags::allow_cast)) == 0)
@@ -3044,10 +2976,8 @@ jit_function jit_compiler::compile(
                   "Truncated anewarray instruction."};
             }
 
-            input.seek(pc);
             vle_int type_index;
             input & type_index;
-            pc = input.tell();
 
             const auto type = resolve_type(type_index.i);
             const auto stack_offset = current_stack_size - stack_slot_size;
@@ -3203,10 +3133,8 @@ jit_function jit_compiler::compile(
         }
         case opcode::invoke:
         {
-            input.seek(pc);
             vle_int function_index;
             input & function_index;
-            pc = input.tell();
 
             const jit_call_target* target = nullptr;
             if(function_index.i < 0)
@@ -3284,10 +3212,8 @@ jit_function jit_compiler::compile(
         }
         case opcode::label:
         {
-            input.seek(pc);
             vle_int label_id;
             input & label_id;
-            pc = input.tell();
 
             if(!labels.emplace(label_id.i, emitter.code.size()).second)
             {
@@ -3305,10 +3231,8 @@ jit_function jit_compiler::compile(
         }
         case opcode::jmp:
         {
-            input.seek(pc);
             vle_int label_id;
             input & label_id;
-            pc = input.tell();
 
             emit_safepoint(emitter);
 
@@ -3336,11 +3260,9 @@ jit_function jit_compiler::compile(
                     current_stack_size, condition_slot_size)};
             }
 
-            input.seek(pc);
             vle_int then_label;
             vle_int else_label;
             input & then_label & else_label;
-            pc = input.tell();
 
             const auto condition_offset = current_stack_size - condition_slot_size;
 
