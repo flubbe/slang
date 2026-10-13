@@ -734,7 +734,7 @@ struct stack_frame
     /** The operand stack. */
     operand_stack stack;
 
-    /** Garbage collector used by JIT runtime helpers, if this is a JIT frame. */
+    /** Garbage collector used by runtime helpers. */
     slang::gc::garbage_collector* gc{nullptr};
 
     /** References in JIT locals that are currently registered as GC roots. */
@@ -822,17 +822,19 @@ struct stack_frame
      * @param constants Reference to the module constant table.
      * @param locals_size Size to allocate for the locals.
      * @param stack_capacity The operand stack capacity.
+     * @param gc Garbage collector reference.
      */
     static stack_frame with_capacity(
       const std::vector<module_::constant_table_entry>& constants,
       std::size_t locals_size,
-      std::size_t stack_capacity)
+      std::size_t stack_capacity,
+      gc::garbage_collector* gc)
     {
         return {
           .constants = constants,
           .locals = std::vector<std::byte>(locals_size),
           .stack = operand_stack::with_capacity(stack_capacity),
-          .gc = nullptr,
+          .gc = gc,
           .gc_local_roots = {},
           .pending_exception = nullptr};
     }
@@ -843,17 +845,19 @@ struct stack_frame
      * @param constants Reference to the module constant table.
      * @param locals_size Size to allocate for the locals.
      * @param stack_size The operand stack size.
+     * @param gc Garbage collector reference.
      */
     static stack_frame with_size(
       const std::vector<module_::constant_table_entry>& constants,
       std::size_t locals_size,
-      std::size_t stack_size)
+      std::size_t stack_size,
+      gc::garbage_collector* gc)
     {
         return {
           .constants = constants,
           .locals = std::vector<std::byte>(locals_size),
           .stack = operand_stack::with_size(stack_size),
-          .gc = nullptr,
+          .gc = gc,
           .gc_local_roots = {},
           .pending_exception = nullptr};
     }

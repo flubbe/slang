@@ -304,8 +304,8 @@ void run::invoke(const std::vector<std::string>& args)
         auto frame = si::stack_frame::with_size(
           mod.get_constant_table(),
           function.get_locals_size(),
-          function.get_stack_size());
-        frame.gc = &ctx.get_gc();
+          function.get_stack_size(),
+          &ctx.get_gc());
 
         // Check that we have enough space available for the argument pointer.
         if(frame.locals.size() < sizeof(main_args))    // NOLINT(bugprone-sizeof-expression)

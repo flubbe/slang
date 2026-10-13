@@ -1546,8 +1546,8 @@ void invoke_call_target(
                   auto callee = si::stack_frame::with_size(
                     *target->constants,
                     target->locals_size,
-                    target->stack_size);
-                  callee.gc = caller->gc;
+                    target->stack_size,
+                    caller->gc);
                   std::ranges::copy(
                     arguments,
                     callee.locals.begin());
@@ -1742,7 +1742,7 @@ struct stack_frame_offsets
 stack_frame_offsets calculate_stack_frame_offsets()
 {
     const std::vector<slang::module_::constant_table_entry> dummy_constants;
-    const auto dummy_frame = si::stack_frame::with_capacity(dummy_constants, 0, 0);
+    const auto dummy_frame = si::stack_frame::with_capacity(dummy_constants, 0, 0, nullptr);
 
     const auto base =
       reinterpret_cast<std::uintptr_t>(&dummy_frame);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)

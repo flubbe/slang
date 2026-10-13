@@ -531,7 +531,15 @@ class module_loader
     void compile_functions(
       const std::vector<std::unique_ptr<jit_call_target>>& call_targets);
 
-    /** Bind matching native exports in this module and its dependencies. */
+    /**
+     * Bind matching native exports in this module and its dependencies.
+     * Walks the export tables recursively.
+     *
+     * @param library_name Native library name of the native function.
+     * @param function_name Name of the function.
+     * @param function The function to register.
+     * @returns Returns the total registration count.
+     */
     std::size_t register_native_function_recursive(
       const std::string& library_name,
       const std::string& function_name,

@@ -1309,8 +1309,8 @@ void context::exec(
                     auto callee_frame = stack_frame::with_capacity(
                       callee_loader->get_module().get_header().constants,
                       details.locals_size,
-                      details.stack_size);
-                    callee_frame.gc = &gc;
+                      details.stack_size,
+                      &gc);
 
                     std::ranges::copy(
                       frame.stack.tail(details.args_size),
@@ -2162,8 +2162,8 @@ value context::exec(
     auto frame = stack_frame::with_capacity(
       loader.get_module().get_header().constants,
       f.get_locals_size(),
-      f.get_stack_size());
-    frame.gc = &gc;
+      f.get_stack_size(),
+      &gc);
 
     const auto& arg_types = f.get_signature().arg_types;
     arguments_scope arg_scope{*this, args, arg_types, frame.locals};

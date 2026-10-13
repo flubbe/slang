@@ -76,7 +76,8 @@ T run_bytecode(
     auto frame = si::stack_frame::with_size(
       make_empty_constants(),
       function.get_locals_size(),
-      function.get_stack_size());
+      function.get_stack_size(),
+      nullptr);
     function(&frame);
 
     T result{};
@@ -335,7 +336,8 @@ TEST(jit, compile_execute_sample_function)
       sj::si::stack_frame::with_size(
         make_empty_constants(),
         4,
-        compiled_fn->get_stack_size())));
+        compiled_fn->get_stack_size(),
+        nullptr)));
     ASSERT_TRUE(frame.has_value());
 
     ASSERT_EQ(frame->locals.size(), 4);
@@ -515,7 +517,9 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
+
         function(&frame);
 
         std::int32_t result = 0;
@@ -531,7 +535,9 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
+
         function(&frame);
 
         std::int32_t result = 0;
@@ -547,7 +553,9 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
+
         function(&frame);
 
         std::int32_t result = 0;
@@ -563,7 +571,9 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
+
         function(&frame);
 
         std::int32_t result = 0;
@@ -654,7 +664,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -674,7 +685,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -694,7 +706,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -714,7 +727,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -734,7 +748,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -754,7 +769,8 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
 
         function(&frame);
 
@@ -775,8 +791,11 @@ TEST(jit, module_loader)
         auto frame = si::stack_frame::with_size(
           make_empty_constants(),
           function.get_locals_size(),
-          function.get_stack_size());
+          function.get_stack_size(),
+          nullptr);
+
         function(&frame);
+
         EXPECT_EQ(native_void_calls, 1);
     }
 }
