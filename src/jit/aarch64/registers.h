@@ -9,8 +9,13 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
+#pragma once
+
 #include <cstdint>
+#include <limits>
 #include <type_traits>
+
+#include "jit/common.h"
 
 namespace slang::jit::aarch64
 {
@@ -87,17 +92,54 @@ enum class cpu_registers : std::uint32_t
     XZR = 31 /**< Zero Register (reads as 0, writes are discarded; used in general data processing). */
 };
 
+/*
+ * Helpers.
+ */
+
+/**
+ * Left shift for registers.
+ *
+ * @tparam T Immediate operand type.
+ * @param r CPU register.
+ * @param imm Immediate operand.
+ */
 template<typename T>
-    requires std::is_integral_v<T>
+    requires(
+      std::is_integral_v<T>
+      && !std::is_same_v<std::remove_cv_t<T>, bool>)
 inline std::uint32_t operator<<(
   cpu_registers r,
   T imm)
 {
+    if constexpr(std::is_signed_v<T>)
+    {
+        if(imm < 0)
+        {
+            throw jit_error{
+              "Invalid shift amount."};
+        }
+    }
+
+    if(imm >= std::numeric_limits<std::uint32_t>::digits)
+    {
+        throw jit_error{
+          "Invalid shift amount."};
+    }
+
     return static_cast<std::uint32_t>(r) << imm;
 }
 
+/**
+ * Bitwise or for registers.
+ *
+ * @tparam T Immediate operand type.
+ * @param imm Immediate operand.
+ * @param r CPU register.
+ */
 template<typename T>
-    requires std::is_integral_v<T>
+    requires(
+      std::is_integral_v<T>
+      && !std::is_same_v<std::remove_cv_t<T>, bool>)
 inline T& operator|=(
   T& imm,
   cpu_registers r)
@@ -106,11 +148,22 @@ inline T& operator|=(
     return imm;
 }
 
+/**
+ * Bitwise or for registers.
+ *
+ * @tparam T Immediate operand type.
+ * @param imm Immediate operand.
+ * @param r CPU register.
+ */
 template<typename T>
-    requires std::is_integral_v<T>
-T operator|(T i, cpu_registers r)
+    requires(
+      std::is_integral_v<T>
+      && !std::is_same_v<std::remove_cv_t<T>, bool>)
+T operator|(
+  T imm,
+  cpu_registers r)
 {
-    return i | static_cast<T>(r);
+    return imm | static_cast<T>(r);
 }
 
 }    // namespace slang::jit::aarch64
