@@ -651,6 +651,7 @@ void module_loader::compile_functions(
             try
             {
                 return jit_compiler::compile(
+                  desc.signature,
                   bytecode,
                   local_offsets,
                   locals_size,

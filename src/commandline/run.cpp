@@ -40,13 +40,15 @@ namespace slang::commandline
  */
 
 /**
- * Validate the signature of `main`.
+ * Validate the signature against `fn main(str: [str]) -> i32`.
  *
- * @param main_function The main function to validate the signature of.
+ * @param signature Signature to validate.
  * @param verbose Whether to enable verbose logging.
  * @throws Throws a `std::runtime_error` if validation failed.
  */
-static void validate_main_signature(const si::function& main_function, bool verbose)
+static void validate_main_signature(
+  const module_::function_signature& signature,
+  bool verbose)
 {
     if(verbose)
     {
@@ -54,24 +56,25 @@ static void validate_main_signature(const si::function& main_function, bool verb
     }
 
     // validate function signature for 'main'.
-    const module_::function_signature& sig = main_function.get_signature();
-    if(sig.return_type.base_type() != "i32" || sig.return_type.is_array())
+    if(signature.return_type.base_type() != "i32"
+       || signature.return_type.is_array())
     {
         throw std::runtime_error(std::format(
           "Invalid return type for 'main' expected 'i32', got '{}'.",
-          slang::module_::to_string(sig.return_type)));
+          slang::module_::to_string(signature.return_type)));
     }
-    if(sig.arg_types.size() != 1)
+    if(signature.arg_types.size() != 1)
     {
         throw std::runtime_error(std::format(
           "Invalid parameter count for 'main'. Expected 1 parameter, got {}.",
-          sig.arg_types.size()));
+          signature.arg_types.size()));
     }
-    if(sig.arg_types[0].base_type() != "str" || !sig.arg_types[0].is_array())
+    if(signature.arg_types[0].base_type() != "str"    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+       || !signature.arg_types[0].is_array())         // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     {
         throw std::runtime_error(std::format(
           "Invalid parameter type for 'main'. Expected parameter of type 'str[]', got '{}'.",
-          slang::module_::to_string(sig.arg_types[0])));
+          slang::module_::to_string(signature.arg_types[0])));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     }
 }
 
@@ -141,6 +144,7 @@ void run::invoke(const std::vector<std::string>& args)
 #endif /* SLANG_JIT_AVAILABLE */
     bool no_lang = result.count("no-lang") > 0;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     auto module_path = fs::absolute(fs::path{result["filename"].as<std::string>()});
     if(!module_path.has_extension())
     {
@@ -163,6 +167,7 @@ void run::invoke(const std::vector<std::string>& args)
 
     if(result.count("search-path") > 0)
     {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         std::vector<std::string> v = utils::split(result["search-path"].as<std::string>(), ";");
         for(auto& it: v)
         {
@@ -220,7 +225,7 @@ void run::invoke(const std::vector<std::string>& args)
 #endif /* SLANG_JIT_AVAILABLE */
         si::module_loader& loader = ctx.resolve_module(module_name);
         si::function& main_function = loader.get_function("main");
-        validate_main_signature(main_function, verbose);
+        validate_main_signature(main_function.get_signature(), verbose);
 
         // call 'main'.
         if(verbose)
@@ -276,12 +281,11 @@ void run::invoke(const std::vector<std::string>& args)
               load_compile_duration);
         }
 
-        auto& function = mod.get_function("main");
-
-        // TODO Signature validation.
+        auto& main_function = mod.get_function("main");
+        validate_main_signature(main_function.get_signature(), verbose);
 
         // Check if there is space for the return value.
-        if(function.get_stack_size() < sizeof(std::int32_t))
+        if(main_function.get_stack_size() < sizeof(std::int32_t))
         {
             throw jit::jit_error{
               "Invalid return type size for 'main'."};
@@ -296,15 +300,15 @@ void run::invoke(const std::vector<std::string>& args)
             auto* argument = ctx.get_gc().gc_new<std::string>(
               gc::gc_object::of_none,
               false);
-            *argument = forwarded_args[i];
-            (*main_args)[i] = argument;
+            *argument = forwarded_args[i];    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*main_args)[i] = argument;       // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         }
 
         // Construct the stack frame.
         auto frame = si::stack_frame::with_size(
           mod.get_constant_table(),
-          function.get_locals_size(),
-          function.get_stack_size(),
+          main_function.get_locals_size(),
+          main_function.get_stack_size(),
           &ctx.get_gc());
 
         // Check that we have enough space available for the argument pointer.
@@ -319,7 +323,7 @@ void run::invoke(const std::vector<std::string>& args)
           sizeof(main_args));                           // NOLINT(bugprone-sizeof-expression)
         frame.update_gc_local_root(0, main_args);
 
-        function(&frame);
+        main_function(&frame);
 
         // If there was an error, we re-throw the exception here
         // so it's visible to the caller/main.

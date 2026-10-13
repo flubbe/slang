@@ -383,12 +383,14 @@ class jit_compiler
     /**
      * Create a JIT-compiled function from machine code.
      *
+     * @param signature The function signature.
      * @param machine_code The machine code to execute.
      * @param locals_size Size in bytes of the function's local-variable storage.
      * @param stack_size Size in bytes of the function's required operand stack.
      * @returns A JIT-compiled function owning the executable memory.
      */
     static jit_function create_jit_function(
+      module_::function_signature signature,
       const std::vector<std::uint32_t>& machine_code,
       std::size_t locals_size,
       std::size_t stack_size);
@@ -397,6 +399,7 @@ public:
     /**
      * Compile a function.
      *
+     * @param signature The function signature.
      * @param bytecode The function's bytecode.
      * @param local_offsets Byte offsets of local variables within the function's
      *     local-variable storage, indexed by local-variable index.
@@ -408,6 +411,7 @@ public:
      *    instructions, invalid indices, or incompatible stack requirements.
      */
     static jit_function compile(
+      module_::function_signature signature,
       std::span<const std::byte> bytecode,
       const std::vector<std::size_t>& local_offsets,
       std::size_t locals_size,

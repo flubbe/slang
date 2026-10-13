@@ -2153,6 +2153,7 @@ namespace slang::jit::aarch64
 {
 
 jit_function jit_compiler::create_jit_function(
+  module_::function_signature signature,
   const std::vector<std::uint32_t>& machine_code,
   std::size_t locals_size,
   std::size_t stack_size)
@@ -2163,6 +2164,7 @@ jit_function jit_compiler::create_jit_function(
       reinterpret_cast<jit_function_pointer>(memory.data());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
 
     return jit_function{
+      std::move(signature),
       std::move(memory),
       function,
       locals_size,
@@ -2170,6 +2172,7 @@ jit_function jit_compiler::create_jit_function(
 }
 
 jit_function jit_compiler::compile(
+  module_::function_signature signature,
   std::span<const std::byte> bytecode,
   const std::vector<std::size_t>& local_offsets,
   std::size_t locals_size,
@@ -3608,6 +3611,7 @@ jit_function jit_compiler::compile(
     emitter.ret();
 
     return create_jit_function(
+      std::move(signature),
       emitter.code,
       locals_size,
       max_stack_size);

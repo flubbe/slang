@@ -61,6 +61,9 @@ using jit_callable = std::variant<
 /** A Just In Time compiled function. */
 class jit_function
 {
+    /** Function signature, useful e.g. for validation. */
+    module_::function_signature signature{};
+
     /** Memory holding the compiled function. */
     executable_memory memory;
 
@@ -82,7 +85,8 @@ public:
 
     /** Move constructor. */
     jit_function(jit_function&& other)
-    : memory{std::move(other.memory)}
+    : signature{std::move(other.signature)}
+    , memory{std::move(other.memory)}
     , function{std::exchange(other.function, nullptr)}
     , locals_size{std::exchange(other.locals_size, 0)}
     , stack_size{std::exchange(other.stack_size, 0)}
@@ -92,17 +96,20 @@ public:
     /**
      * Construct a new JIT compiled function.
      *
+     * @param signature Function signature.
      * @param memory Executable memory holding the function's code.
      * @param function Function pointer.
      * @param locals_size Bytes needed for the locals.
      * @param stack_size Bytes needed for the stack.
      */
     jit_function(
+      module_::function_signature signature,
       executable_memory memory,
       jit_function_pointer function,
       std::size_t locals_size,
       std::size_t stack_size)
-    : memory{std::move(memory)}
+    : signature{std::move(signature)}
+    , memory{std::move(memory)}
     , function{function}
     , locals_size{locals_size}
     , stack_size{stack_size}
@@ -124,6 +131,13 @@ public:
         }
 
         return *this;
+    }
+
+    /** Return the function signature. */
+    [[nodiscard]]
+    const module_::function_signature& get_signature() const noexcept
+    {
+        return signature;
     }
 
     /** Return the function pointer. */

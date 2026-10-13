@@ -68,6 +68,7 @@ T run_bytecode(
   std::size_t result_offset = 0)
 {
     auto function = jit_compiler::compile(
+      {},
       bytecode,
       {} /* local_offsets */,
       0 /* locals_size */,
@@ -322,6 +323,7 @@ TEST(jit, compile_execute_sample_function)
     std::optional<sj::jit_function> compiled_fn;
     ASSERT_NO_THROW(
       compiled_fn = sj::jit_compiler::compile(
+        {},
         bytecode_ar.get_buffer(),
         std::vector<std::size_t>{0},
         4,

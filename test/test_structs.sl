@@ -5,6 +5,7 @@ import std;
  */
 struct S {
     c: i8,
+    d: i8,
     i: i32,
     j: f32
 };
@@ -12,6 +13,7 @@ struct S {
 fn init_struct(i: i32, j: f32) -> S {
     return S {
         c: 23i8,
+        d: 100i8,
         i: i,
         j: j
     };
@@ -23,6 +25,7 @@ fn test_struct() -> void {
     std::assert(s.c == 23i8, "s.c == 23");
     s.c = s.c + 105i8;
     std::assert(s.c == (-128) as i8, "s.c == -128");
+    std::assert(s.d == 100i8, "s.d == 100i8");
 
     std::assert(s.i + (s.j as i32) == 5, "s.i + (s.j as i32) == 5");
 }
