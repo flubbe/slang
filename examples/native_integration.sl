@@ -15,7 +15,7 @@ fn print(s: str) -> void;
  */
 #[native]
 struct S {
-    s: str, i: i32
+    a: i8, b: i8, c: i16, s: str, i: i32
 };
 
 /**
@@ -27,6 +27,6 @@ fn test(s: S, f: f32) -> S {
     print("\n");
 
     return S {
-        "Hello from script!", f as i32
+        79i8, s.b + 1i8, s.c - 2i16, "Hello from script!", f as i32
     };
 }

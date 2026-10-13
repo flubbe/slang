@@ -359,6 +359,7 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
 /** Type of a variable stored in the module. */
 class variable_type
 {
+    // FIXME The access problem for following class can likely be addressed in a nicer way.
     friend class si::module_loader;
     friend class si::arguments_scope;
     friend archive& operator&(archive& ar, variable_type& ty);
@@ -992,36 +993,10 @@ struct imported_symbol
     std::uint32_t package_index;
 
     /** If the import is resolved, this points to the corresponding module or into the export table. Not serialized. */
-    std::variant<const si::module_loader*, struct exported_symbol*> export_reference;
-
-    /** Default constructors. */
-    imported_symbol() = default;
-    imported_symbol(const imported_symbol&) = default;
-    imported_symbol(imported_symbol&&) = default;
-
-    /** Default destructor. */
-    ~imported_symbol() = default;
-
-    /** Default assignments. */
-    imported_symbol& operator=(const imported_symbol&) = default;
-    imported_symbol& operator=(imported_symbol&&) = default;
-
-    /**
-     * Construct an imported symbol
-     *
-     * @param type The symbol's type.
-     * @param name The symbol's name.
-     * @param package_index The symbol's package index as an index of the import table. Unused for package imports.
-     */
-    imported_symbol(
-      symbol_type type,
-      std::string name,
-      std::uint32_t package_index = static_cast<std::uint32_t>(-1))
-    : type{type}
-    , name{std::move(name)}
-    , package_index{package_index}
-    {
-    }
+    std::variant<
+      const si::module_loader*,
+      struct exported_symbol*>
+      export_reference;
 };
 
 /**
@@ -1349,6 +1324,7 @@ public:
 
     friend archive& operator&(archive& ar, language_module& mod);
     friend class si::context;
+
     friend class si::module_loader;
     friend class module_resolver;
 };

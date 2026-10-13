@@ -192,9 +192,6 @@ std::function<void(operand_stack&)> context::resolve_native_function(
 /** Handle local variable construction and destruction. */
 class locals_scope
 {
-    /** The associated interpreter context. */
-    context& ctx;
-
     /** Locals. */
     const std::vector<module_::variable_descriptor>& locals;
 
@@ -214,18 +211,17 @@ public:
      * Create a scope for creating/destroying variables. If needed, adds the locals as
      * roots to the garbage collector.
      *
-     * @param ctx The interpreter context.
      * @param locals The locals.
      * @param frame The stack frame.
      */
     locals_scope(
-      context& ctx,
       const std::vector<module_::variable_descriptor>& locals,
       stack_frame& frame)
-    : ctx{ctx}
-    , locals{locals}
+    : locals{locals}
     , frame{frame}
     {
+        assert(frame.gc != nullptr);
+
         for(const auto& local: locals)
         {
             if(local.type.is_array() || local.reference)
@@ -234,7 +230,7 @@ public:
                 std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
-                    ctx.get_gc().add_root(addr);
+                    frame.gc->add_root(addr);
                     // FIXME We (likely) want to remove the temporaries from the GC here,
                     //       instead of at the call site (see comment there).
                 }
@@ -285,7 +281,7 @@ public:
                 std::memcpy(static_cast<void*>(&addr), &frame.locals[local.offset], sizeof(void*));
                 if(addr != nullptr)
                 {
-                    ctx.get_gc().remove_root(addr);
+                    frame.gc->remove_root(addr);
                 }
             }
         }
@@ -308,6 +304,41 @@ static T read_unchecked(
     std::memcpy(&v, &binary[offset], sizeof(T));
     offset += sizeof(T);
     return v;
+}
+
+/**
+ * Write a field of category 1 back to the struct.
+ *
+ * @tparam T Field type.
+ * @param frame Stack frame.
+ * @param field_offset The field offset in the struct.
+ */
+template<typename T>
+    requires(
+      std::is_integral_v<T>
+      && std::is_signed_v<T>
+      && sizeof(T) <= sizeof(std::int32_t))
+static void write_typed_cat1_field(
+  stack_frame& frame,
+  std::size_t field_offset)
+{
+    auto v = frame.stack.pop_cat1<std::int32_t>();
+    void* type_ref = frame.stack.pop_addr<void>();
+
+    if(type_ref == nullptr)
+    {
+        throw interpreter_error{
+          "Null pointer access during setfield."};
+    }
+
+    frame.gc->remove_temporary(type_ref);
+
+    const auto field_value = static_cast<std::make_unsigned_t<T>>(v);    // retains the correct bytes for signs.
+
+    std::memcpy(
+      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      static_cast<const void*>(&field_value),
+      sizeof(field_value));
 }
 
 void context::exec(
@@ -340,12 +371,12 @@ void context::exec(
                 binary.size()));
         }
 
-        locals_scope ls{*this, locals, frame};
+        locals_scope ls{locals, frame};
 
         const std::size_t function_end = offset + size;
         while(offset < function_end)
         {
-            auto instr = std::to_integer<opcode_base>(binary[offset]);
+            const auto instr = std::to_integer<opcode_base>(binary[offset]);
             ++offset;
 
             // validate opcode.
@@ -1310,10 +1341,11 @@ void context::exec(
                     const auto& details = std::get<module_::function_details>(desc->details);
 
                     // prepare stack frame
-                    stack_frame callee_frame{
-                      callee_loader->get_module().header.constants,
+                    auto callee_frame = stack_frame::with_capacity(
+                      callee_loader->get_module().get_header().constants,
                       details.locals_size,
-                      details.stack_size};
+                      details.stack_size,
+                      &gc);
 
                     std::ranges::copy(
                       frame.stack.tail(details.args_size),
@@ -1465,7 +1497,7 @@ void context::exec(
 
                     std::memcpy(
                       static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-                      static_cast<void*>(&v),
+                      static_cast<const void*>(&v),
                       sizeof(v));
                 }
                 else if(field_size == sizeof(std::int32_t))
@@ -1480,12 +1512,27 @@ void context::exec(
 
                     std::memcpy(
                       static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-                      static_cast<void*>(&v),
+                      static_cast<const void*>(&v),
                       sizeof(v));
+                }
+                else if(field_size == sizeof(std::int16_t))
+                {
+                    write_typed_cat1_field<std::int16_t>(
+                      frame,
+                      field_offset);
+                }
+                else if(field_size == sizeof(std::int8_t))
+                {
+                    write_typed_cat1_field<std::int8_t>(
+                      frame,
+                      field_offset);
                 }
                 else
                 {
-                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error{
+                      std::format(
+                        "Invalid field size {} encountered in setfield.",
+                        field_size)};
                 }
 
                 break;
@@ -1529,9 +1576,30 @@ void context::exec(
                       sizeof(v));
                     frame.stack.push_cat1(v);
                 }
+                else if(field_size == sizeof(std::int16_t))
+                {
+                    std::int16_t v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
+                    frame.stack.push_cat1(static_cast<std::int32_t>(v));
+                }
+                else if(field_size == sizeof(std::int8_t))
+                {
+                    std::int8_t v;    // NOLINT(cppcoreguidelines-init-variables)
+                    std::memcpy(
+                      static_cast<void*>(&v),
+                      static_cast<std::byte*>(type_ref) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                      sizeof(v));
+                    frame.stack.push_cat1(static_cast<std::int32_t>(v));
+                }
                 else
                 {
-                    throw interpreter_error(std::format("Invalid field size {} encountered in setfield.", size));
+                    throw interpreter_error{
+                      std::format(
+                        "Invalid field size {} encountered in setfield.",
+                        field_size)};
                 }
 
                 break;
@@ -1575,7 +1643,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
-                  { return (i != 0) && (v != 0); });
+                  { return i & v; });
                 break;
             } /* opcode::land */
             case opcode::ior:
@@ -1591,7 +1659,7 @@ void context::exec(
                 auto v = frame.stack.pop_cat1<std::int32_t>();
                 frame.stack.modify_top<std::int32_t, std::int32_t>(
                   [v](std::int32_t i) -> std::int32_t
-                  { return (i != 0) || (v != 0); });
+                  { return i | v; });
                 break;
             } /* opcode::lor */
             case opcode::ixor:
@@ -2086,6 +2154,7 @@ public:
                 ctx.get_gc().add_persistent(&locals[offset], layout_id.value());
             }
 
+            // TODO This could be done upfront in the module loader (see e.g. the JIT module loader).
             if(is_garbage_collected(arg_type))
             {
                 ctx.get_gc().add_temporary(&locals[offset]);
@@ -2161,10 +2230,11 @@ value context::exec(
     /*
      * allocate locals and decode arguments.
      */
-    stack_frame frame{
+    auto frame = stack_frame::with_capacity(
       loader.get_module().get_header().constants,
       f.get_locals_size(),
-      f.get_stack_size()};
+      f.get_stack_size(),
+      &gc);
 
     const auto& arg_types = f.get_signature().arg_types;
     arguments_scope arg_scope{*this, args, arg_types, frame.locals};

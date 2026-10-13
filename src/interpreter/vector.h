@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 
 namespace slang::interpreter

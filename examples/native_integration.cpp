@@ -20,6 +20,9 @@ namespace rt = slang::runtime;
 /** A struct that is mirrored in the script. */
 struct S
 {
+    std::int8_t a{0};
+    std::int8_t b{0};
+    std::int16_t c{0};
     std::string* s{nullptr};
     std::int32_t i{0};
 };
@@ -95,7 +98,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     // Set up argument for function call.
     std::string str = "Hello from native code!";
-    S s = S{.s = &str, .i = 123};    // NOLINT(readability-magic-numbers)
+    S s = S{.a = 12, .b = 3, .c = 99, .s = &str, .i = 123};    // NOLINT(readability-magic-numbers)
 
     // Invoke the function.
     si::value res;
@@ -127,7 +130,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     {
         std::println("String: {}", *ret_s->s);
     }
-    std::println("Value: {}", ret_s->i);
+    std::println("Value a: {}", ret_s->a);
+    std::println("Value b: {}", ret_s->b);
+    std::println("Value c: {}", ret_s->c);
+    std::println("Value i: {}", ret_s->i);
 
     // Clean up return values.
     ctx.get_gc().remove_temporary(ret_s);

@@ -12,8 +12,11 @@
 
 #include "shared/type_class.h"
 #include "shared/type_utils.h"
+#include "cfg.h"
 #include "interpreter.h"
 #include "package.h"
+#include "stack.h"
+#include "utils.h"
 
 namespace slang::interpreter
 {
@@ -67,15 +70,36 @@ static bool is_garbage_collected(type_class v) noexcept
 }
 
 /** Byte sizes and alignments for built-in types. */
-static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> type_properties_map = {
-  {"void", {0, 0}},
-  {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
-  {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-  {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-  {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
-  {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
-  {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
-  {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
+const auto& type_properties_map()
+{
+    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
+      {"void", {0, 0}},
+      {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
+      {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
+      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
+      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
+      {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
+      {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
+      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
+
+    return map;
+}
+
+/** Native byte sizes and alignments for built-in types. */
+const auto& native_type_properties_map()
+{
+    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
+      {"void", {0, 0}},
+      {"i8", {sizeof(std::int8_t), std::alignment_of_v<std::int8_t>}},
+      {"i16", {sizeof(std::int16_t), std::alignment_of_v<std::int16_t>}},
+      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
+      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},
+      {"f32", {sizeof(float), std::alignment_of_v<float>}},
+      {"f64", {sizeof(double), std::alignment_of_v<double>}},
+      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};
+
+    return map;
+}
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
 static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
@@ -90,8 +114,8 @@ static std::size_t get_type_or_reference_size(const module_::variable_descriptor
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(v.type.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(v.type.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return built_in_it->second.first;
     }
@@ -115,8 +139,8 @@ static std::size_t get_type_or_reference_size(const module_::variable_type& v)
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map.find(v.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(v.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return built_in_it->second.first;
     }
@@ -218,8 +242,8 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
           .layout_id = 0};
     }
 
-    auto built_in_it = type_properties_map.find(type.base_type());
-    if(built_in_it != type_properties_map.end())
+    auto built_in_it = type_properties_map().find(type.base_type());
+    if(built_in_it != type_properties_map().end())
     {
         return {
           .flags = 0,
@@ -245,52 +269,6 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
       .layout_id = type_it->second.layout_id};
 }
 
-field_properties module_loader::get_field_properties(
-  const std::string& type_name,
-  std::size_t field_index) const
-{
-    // built-in types.
-    if(type_name == "void")
-    {
-        throw interpreter_error("Invalid struct type name 'void'.");
-    }
-
-    auto built_in_it = type_properties_map.find(type_name);
-    if(built_in_it != type_properties_map.end())
-    {
-        throw interpreter_error(
-          std::format(
-            "Invalid struct type name '{}'.",
-            type_name));
-    }
-
-    // structs.
-    auto type_it = struct_map.find(type_name);
-    if(type_it == struct_map.end())
-    {
-        throw interpreter_error(
-          std::format(
-            "Cannot resolve size for type '{}': Type not found.",
-            type_name));
-    }
-
-    if(field_index >= type_it->second.member_types.size())
-    {
-        throw interpreter_error(
-          std::format(
-            "Field index out of bounds for type '{}' ({} >= {}).",
-            type_name,
-            field_index,
-            type_it->second.member_types.size()));
-    }
-
-    auto field_info = type_it->second.member_types.at(field_index);
-    return {
-      .size = field_info.second.size,
-      .offset = field_info.second.offset,
-      .needs_gc = is_garbage_collected(field_info.second.base_type)};
-}
-
 void module_loader::decode_structs()
 {
     recorder->section("Types");
@@ -300,15 +278,14 @@ void module_loader::decode_structs()
         std::size_t size = 0;
         std::size_t alignment = 0;
         std::vector<std::size_t> layout;
-        int offset = 0;
 
         for(auto& [member_name, member_type]: desc.member_types)
         {
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
-            auto built_in_it = type_properties_map.find(member_type.base_type.base_type());
-            if(built_in_it != type_properties_map.end())
+            auto built_in_it = native_type_properties_map().find(member_type.base_type.base_type());
+            if(built_in_it != native_type_properties_map().end())
             {
                 if(is_garbage_collected(member_type))
                 {
@@ -325,9 +302,10 @@ void module_loader::decode_structs()
             }
             else
             {
-                if(member_type.base_type.import_index.has_value())
+                if(auto import_index = member_type.base_type.get_import_index();
+                   import_index.has_value())
                 {
-                    std::size_t index = member_type.base_type.import_index.value();
+                    std::size_t index = import_index.value();
                     if(index >= mod.header.imports.size())
                     {
                         throw interpreter_error(
@@ -340,6 +318,7 @@ void module_loader::decode_structs()
                     if(std::get<const module_loader*>(mod.header.imports[index].export_reference) == nullptr)
                     {
                         // load the package containing the type definition.
+
                         if(mod.header.imports[index].type != module_::symbol_type::type)
                         {
                             throw interpreter_error(
@@ -390,20 +369,11 @@ void module_loader::decode_structs()
                 add_to_layout = true;
             }
 
-            // store offset.
-            member_type.offset = utils::align(member_type.alignment, offset);
-
-            // calculate member offset as `size_after - size_before`.
-            offset -= utils::numeric_cast<int>(size);
-
-            // update struct size and alignment.
-            size += member_type.size;
             size = utils::align(member_type.alignment, size);
+            member_type.offset = size;
 
+            size += member_type.size;
             alignment = std::max(alignment, member_type.alignment);
-
-            // calculate member offset as `size_after - size_before`.
-            offset += utils::numeric_cast<int>(size);
 
             // update type layout.
             if(add_to_layout)
@@ -559,6 +529,16 @@ void module_loader::decode()
      */
     recorder->section("Disassembly");
 
+    auto local_module_resolver = [&](const std::string& module_name) -> const module_loader&
+    {
+        if(module_name == import_name)
+        {
+            return *this;
+        }
+
+        return ctx.resolve_module(module_name);
+    };
+
     std::vector<std::byte> code;
     for(auto& it: mod.header.exports)
     {
@@ -582,6 +562,15 @@ void module_loader::decode()
 
         recorder->function(it.name, details);
 
+        const auto label_entry_depths = analyze_bytecode_stack_depths(
+          *this,
+          std::span{
+            ar.get_buffer().begin() + ar.tell(),
+            details.size},
+          mod.header.exports,
+          mod.header.imports,
+          local_module_resolver);
+
         std::int32_t stack_size = 0;
         std::size_t max_stack_size = 0;
 
@@ -590,13 +579,33 @@ void module_loader::decode()
             std::byte instr{0};
             ar & instr;
 
-            // don't store non-executable instructions.
-            if(static_cast<opcode>(instr) != opcode::label)
+            if(static_cast<opcode>(instr) == opcode::label)
             {
-                code.push_back(instr);
+                vle_int label_id;
+                ar & label_id;
+
+                // store jump target for later resolution.
+                mod.jump_targets.insert({label_id.i, code.size()});
+
+                // Set stack depth to expected depth at this block entry
+                if(auto it = label_entry_depths.find(label_id.i);
+                   it != label_entry_depths.end())
+                {
+                    stack_size = it->second;
+                }
+
+                recorder->label(label_id.i);
+
+                continue;
             }
 
-            stack_size += decode_instruction(ar, instr, details, code);
+            code.push_back(instr);
+
+            stack_size += decode_instruction(
+              ar,
+              instr,
+              details,
+              code);
             if(stack_size < 0)
             {
                 throw interpreter_error(
@@ -784,7 +793,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::d2l: [[fallthrough]];
     case opcode::ret: [[fallthrough]];
     case opcode::iret: [[fallthrough]];
+    case opcode::lret: [[fallthrough]];
     case opcode::fret: [[fallthrough]];
+    case opcode::dret: [[fallthrough]];
     case opcode::aret:
         recorder->record(static_cast<opcode>(instr));
         return 0;
@@ -808,7 +819,7 @@ std::int32_t module_loader::decode_instruction(
         write_value(code, i_u8);
 
         recorder->record(static_cast<opcode>(instr), static_cast<std::int64_t>(i_u8));
-        return static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* opcodes with one 4-byte argument. */
     case opcode::iconst: [[fallthrough]];
@@ -852,7 +863,7 @@ std::int32_t module_loader::decode_instruction(
 
         return static_cast<std::int32_t>(sizeof(std::int64_t));
     }
-        /* opcodes with one VLE integer. */
+    /* opcodes with one VLE integer. */
     case opcode::sconst:
     {
         vle_int i;
@@ -861,17 +872,6 @@ std::int32_t module_loader::decode_instruction(
 
         recorder->record(static_cast<opcode>(instr), i.i);
         return static_cast<std::int32_t>(sizeof(std::string*));
-    }
-    case opcode::label:
-    {
-        vle_int i;
-        ar & i;
-
-        // store jump target for later resolution.
-        mod.jump_targets.insert({i.i, code.size()});
-
-        recorder->label(i.i);
-        return 0;
     }
     case opcode::jmp:
     {
@@ -962,9 +962,9 @@ std::int32_t module_loader::decode_instruction(
     case opcode::dup_x2:
     {
         // type arguments.
-        type_class v1;
-        type_class v2;
-        type_class v3;
+        type_class v1;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v2;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
+        type_class v3;    // initialized during serialization. // NOLINT(cppcoreguidelines-init-variables)
         ar & v1 & v2 & v3;
 
         // decode the types into their sizes. only built-in types (excluding 'void') are allowed.
@@ -1128,10 +1128,12 @@ std::int32_t module_loader::decode_instruction(
         recorder->record(static_cast<opcode>(instr), i.i);
 
         // return correct size.
-        bool is_store = (static_cast<opcode>(instr) == opcode::istore)
-                        || (static_cast<opcode>(instr) == opcode::fstore)
-                        || (static_cast<opcode>(instr) == opcode::dstore)
-                        || (static_cast<opcode>(instr) == opcode::astore);
+        bool is_store =
+          (static_cast<opcode>(instr) == opcode::istore)
+          || (static_cast<opcode>(instr) == opcode::lstore)
+          || (static_cast<opcode>(instr) == opcode::fstore)
+          || (static_cast<opcode>(instr) == opcode::dstore)
+          || (static_cast<opcode>(instr) == opcode::astore);
 
         if((static_cast<opcode>(instr) == opcode::aload)
            || (static_cast<opcode>(instr) == opcode::astore))
@@ -1330,7 +1332,7 @@ std::int32_t module_loader::decode_instruction(
             recorder->record(static_cast<opcode>(instr), i.i, exp_symbol.name);
         }
 
-        return static_cast<std::int32_t>(sizeof(void*));
+        return static_cast<std::int32_t>(sizeof(void*)) - static_cast<std::int32_t>(sizeof(std::int32_t));
     }
     /* setfield, getfield. */
     case opcode::setfield: [[fallthrough]];
@@ -1423,10 +1425,10 @@ std::int32_t module_loader::decode_instruction(
 
         if(static_cast<opcode>(instr) == opcode::setfield)
         {
-            return static_cast<std::int32_t>(-sizeof(void*) - properties.size);
+            return static_cast<std::int32_t>(-sizeof(void*) - utils::get_stack_slot_size(properties.size));
         }
 
-        return static_cast<std::int32_t>(-sizeof(void*) + properties.size);
+        return static_cast<std::int32_t>(-sizeof(void*) + utils::get_stack_slot_size(properties.size));
     }
     /* checkcast */
     case opcode::checkcast:
@@ -1676,6 +1678,52 @@ module_loader::module_loader(
                  details.stack_size}});
         }
     }
+}
+
+field_properties module_loader::get_field_properties(
+  const std::string& type_name,
+  std::size_t field_index) const
+{
+    // built-in types.
+    if(type_name == "void")
+    {
+        throw interpreter_error("Invalid struct type name 'void'.");
+    }
+
+    auto built_in_it = type_properties_map().find(type_name);
+    if(built_in_it != type_properties_map().end())
+    {
+        throw interpreter_error(
+          std::format(
+            "Invalid struct type name '{}'.",
+            type_name));
+    }
+
+    // structs.
+    auto type_it = struct_map.find(type_name);
+    if(type_it == struct_map.end())
+    {
+        throw interpreter_error(
+          std::format(
+            "Cannot resolve size for type '{}': Type not found.",
+            type_name));
+    }
+
+    if(field_index >= type_it->second.member_types.size())
+    {
+        throw interpreter_error(
+          std::format(
+            "Field index out of bounds for type '{}' ({} >= {}).",
+            type_name,
+            field_index,
+            type_it->second.member_types.size()));
+    }
+
+    auto field_info = type_it->second.member_types.at(field_index);
+    return {
+      .size = field_info.second.size,
+      .offset = field_info.second.offset,
+      .needs_gc = is_garbage_collected(field_info.second.base_type)};
 }
 
 bool module_loader::has_function(const std::string& name) const

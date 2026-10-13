@@ -1,0 +1,3620 @@
+/**
+ * slang - a simple scripting language.
+ *
+ * Just In Time compiler for AArch64.
+ *
+ * The compiler performs partial code generation, with some opcodes lowered to
+ * C++ runtime helper calls.
+ *
+ * \author Felix Lubbe
+ * \copyright Copyright (c) 2026
+ * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
+ */
+
+#include <bit>
+#include <span>
+#include <type_traits>
+#include <unordered_map>
+
+#include "archives/memory.h"
+#include "jit/aarch64.h"
+#include "shared/type_class.h"
+#include "cfg.h"
+
+namespace si = slang::interpreter;
+
+namespace
+{
+
+using namespace slang;
+using namespace slang::jit;
+using namespace slang::jit::aarch64;
+
+/*
+ * Runtime helper calls for the generated code.
+ *
+ * Exceptions
+ * ----------
+ * C++ exceptions are not allowed to escape the
+ * helper functions. If an exception is raised/caught,
+ * it must be stored in `frame->pending_exception`
+ * for the local frame.
+ */
+
+/*
+ * String constant loading.
+ */
+
+void load_string_constant(
+  si::stack_frame* frame,
+  std::size_t constant_index,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        if(frame == nullptr
+           || frame->gc == nullptr)
+        {
+            throw jit_error{
+              "JIT string constant requires a runtime context."};
+        }
+        if(constant_index >= frame->constants.size())
+        {
+            throw jit_error{
+              "Invalid JIT string constant index."};
+        }
+
+        const auto& constant = frame->constants.at(constant_index);
+        if(constant.type != module_::constant_type::str)
+        {
+            throw jit_error{
+              "JIT string constant table entry is not a string."};
+        }
+
+        auto* string = frame->gc->gc_new<std::string>(
+          gc::gc_object::of_temporary);
+        *string = std::get<std::string>(constant.data);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&string),
+          sizeof(string));    // We really want to store the pointer here (not the string) // NOLINT(bugprone-sizeof-expression)
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Comparisons.
+ */
+
+template<typename T>
+bool compare_helper(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset)
+{
+    T lhs{};
+    T rhs{};
+
+    std::memcpy(
+      static_cast<void*>(&lhs),
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(lhs));
+    std::memcpy(
+      static_cast<void*>(&rhs),
+      frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(rhs));
+
+    switch(operation)
+    {
+    case opcode::icmpl: [[fallthrough]];
+    case opcode::lcmpl: [[fallthrough]];
+    case opcode::fcmpl: [[fallthrough]];
+    case opcode::dcmpl:
+        return lhs < rhs;
+    case opcode::icmple: [[fallthrough]];
+    case opcode::lcmple: [[fallthrough]];
+    case opcode::fcmple: [[fallthrough]];
+    case opcode::dcmple:
+        return lhs <= rhs;
+    case opcode::icmpg: [[fallthrough]];
+    case opcode::lcmpg: [[fallthrough]];
+    case opcode::fcmpg: [[fallthrough]];
+    case opcode::dcmpg:
+        return lhs > rhs;
+    case opcode::icmpge: [[fallthrough]];
+    case opcode::lcmpge: [[fallthrough]];
+    case opcode::fcmpge: [[fallthrough]];
+    case opcode::dcmpge:
+        return lhs >= rhs;
+    case opcode::icmpeq: [[fallthrough]];
+    case opcode::lcmpeq: [[fallthrough]];
+    case opcode::fcmpeq: [[fallthrough]];
+    case opcode::dcmpeq:
+        return lhs == rhs;
+    case opcode::icmpne: [[fallthrough]];
+    case opcode::lcmpne: [[fallthrough]];
+    case opcode::fcmpne: [[fallthrough]];
+    case opcode::dcmpne:
+        return lhs != rhs;
+    case opcode::acmpeq:
+        return lhs == rhs;
+    case opcode::acmpne:
+        return lhs != rhs;
+    default:
+        throw jit_error{
+          "Invalid comparison opcode."};
+    }
+}
+
+void compare_values(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        bool result{false};
+        switch(operation)
+        {
+        case opcode::icmpl: [[fallthrough]];
+        case opcode::icmple: [[fallthrough]];
+        case opcode::icmpg: [[fallthrough]];
+        case opcode::icmpge: [[fallthrough]];
+        case opcode::icmpeq: [[fallthrough]];
+        case opcode::icmpne:
+            result = compare_helper<std::int32_t>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::lcmpl: [[fallthrough]];
+        case opcode::lcmple: [[fallthrough]];
+        case opcode::lcmpg: [[fallthrough]];
+        case opcode::lcmpge: [[fallthrough]];
+        case opcode::lcmpeq: [[fallthrough]];
+        case opcode::lcmpne:
+            result = compare_helper<std::int64_t>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::fcmpl: [[fallthrough]];
+        case opcode::fcmple: [[fallthrough]];
+        case opcode::fcmpg: [[fallthrough]];
+        case opcode::fcmpge: [[fallthrough]];
+        case opcode::fcmpeq: [[fallthrough]];
+        case opcode::fcmpne:
+            result = compare_helper<float>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::dcmpl: [[fallthrough]];
+        case opcode::dcmple: [[fallthrough]];
+        case opcode::dcmpg: [[fallthrough]];
+        case opcode::dcmpge: [[fallthrough]];
+        case opcode::dcmpeq: [[fallthrough]];
+        case opcode::dcmpne:
+            result = compare_helper<double>(
+              frame,
+              operation,
+              stack_offset);
+            break;
+        case opcode::acmpeq: [[fallthrough]];
+        case opcode::acmpne:
+        {
+            result = compare_helper<void*>(
+              frame,
+              operation,
+              stack_offset);
+
+            auto* values = reinterpret_cast<void**>(         // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              frame->stack.span().data() + stack_offset);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            frame->gc->remove_temporary(values[0]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            frame->gc->remove_temporary(values[1]);          // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+            break;
+        }
+        default:
+            throw jit_error{
+              "Invalid comparison opcode."};
+        }
+
+        const auto result_value = static_cast<std::int32_t>(result);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &result_value,
+          sizeof(result_value));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Stack / GC duplication helpers.
+ */
+
+void load_reference_local(
+  si::stack_frame* frame,
+  std::size_t local_offset,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
+
+        frame->gc->add_temporary(reference);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void store_reference_local(
+  si::stack_frame* frame,
+  std::size_t local_offset,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
+
+        void* previous{nullptr};
+        std::memcpy(
+          static_cast<void*>(&previous),
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(previous));
+
+        frame->gc->remove_temporary(reference);
+        if(reference != previous)
+        {
+            frame->update_gc_local_root(
+              local_offset,
+              reference);
+        }
+
+        std::memcpy(
+          frame->locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void duplicate_reference(
+  si::stack_frame* frame,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
+
+        frame->gc->add_temporary(reference);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&reference),
+          sizeof(reference));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void discard_reference(
+  si::stack_frame* frame,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* reference{nullptr};
+        std::memcpy(
+          static_cast<void*>(&reference),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(reference));
+        frame->gc->remove_temporary(reference);
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void duplicate_stack_block(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t size1,
+  std::size_t size2,
+  std::size_t size3,
+  bool needs_gc1,
+  bool needs_gc2,
+  std::size_t current_stack_size) noexcept
+{
+    try
+    {
+        auto stack = frame->stack.span();
+        const auto old_size = current_stack_size;
+        if(old_size > stack.size())
+        {
+            throw jit_error{
+              "Invalid current JIT operand stack size."};
+        }
+
+        const auto below_size =
+          operation == opcode::dup_x1
+            ? size2
+            : size2 + size3;
+        const auto copied_size =
+          operation == opcode::dup2_x0
+            ? size1 + size2
+            : size1;
+        const auto source_offset =
+          operation == opcode::dup2_x0
+            ? old_size - copied_size
+            : old_size - copied_size - below_size;
+        const auto copy_offset =
+          operation == opcode::dup2_x0
+            ? source_offset
+            : source_offset + below_size;
+
+        const std::vector<std::byte> copy{
+          stack.begin() + static_cast<std::ptrdiff_t>(copy_offset),
+          stack.begin() + static_cast<std::ptrdiff_t>(copy_offset + copied_size)};
+
+        if(operation == opcode::dup2_x0)
+        {
+            std::memcpy(
+              stack.data() + old_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              copy.data(),
+              copied_size);
+
+            if(needs_gc1)
+            {
+                void* reference{nullptr};
+                std::memcpy(
+                  static_cast<void*>(&reference),
+                  copy.data(),
+                  size1);
+                frame->gc->add_temporary(reference);
+            }
+
+            if(needs_gc2)
+            {
+                void* reference{nullptr};
+                std::memcpy(
+                  static_cast<void*>(&reference),
+                  copy.data() + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                  size2);
+                frame->gc->add_temporary(reference);
+            }
+
+            return;
+        }
+
+        std::memmove(
+          stack.data() + source_offset + size1,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          stack.data() + source_offset,            // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          below_size);
+        std::memcpy(
+          stack.data() + source_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          copy.data(),
+          size1);
+        std::memcpy(
+          stack.data() + source_offset + size1 + below_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          copy.data(),
+          size1);
+
+        if(needs_gc1)
+        {
+            void* reference{nullptr};
+            std::memcpy(
+              static_cast<void*>(&reference),
+              copy.data(),
+              size1);
+            frame->gc->add_temporary(reference);
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Floating-point operations.
+ */
+
+void execute_fp_operation(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    // 32-bit floating point operations.
+
+    if(operation == opcode::fadd
+       || operation == opcode::fsub
+       || operation == opcode::fmul
+       || operation == opcode::fdiv)
+    {
+        float lhs{0};
+        float rhs{0};
+
+        std::memcpy(
+          &lhs,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(lhs));
+        std::memcpy(
+          &rhs,
+          frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(rhs));
+
+        switch(operation)
+        {
+        case opcode::fadd:
+            lhs += rhs;
+            break;
+        case opcode::fsub:
+            lhs -= rhs;
+            break;
+        case opcode::fmul:
+            lhs *= rhs;
+            break;
+        case opcode::fdiv:
+            lhs /= rhs;
+            break;
+        default:
+            std::unreachable();
+        }
+
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &lhs,
+          sizeof(lhs));
+
+        return;
+    }
+
+    // 64-bit floating point operations.
+
+    double lhs{0};
+    double rhs{0};
+
+    std::memcpy(
+      &lhs,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(lhs));
+    std::memcpy(
+      &rhs,
+      frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(rhs));
+
+    switch(operation)
+    {
+    case opcode::dadd:
+        lhs += rhs;
+        break;
+    case opcode::dsub:
+        lhs -= rhs;
+        break;
+    case opcode::dmul:
+        lhs *= rhs;
+        break;
+    case opcode::ddiv:
+        lhs /= rhs;
+        break;
+    default:
+        std::unreachable();
+    }
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &lhs,
+      sizeof(lhs));
+}
+
+void execute_fp_negation(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    if(operation == opcode::fneg)
+    {
+        float value{0};
+        std::memcpy(
+          &value,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(value));
+        value = -value;
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &value,
+          sizeof(value));
+        return;
+    }
+
+    double value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+    value = -value;
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &value,
+      sizeof(value));
+}
+
+/*
+ * Numeric conversions.
+ */
+
+template<
+  typename Input,
+  typename Output>
+void convert_numeric_value(
+  si::stack_frame* frame,
+  std::size_t stack_offset) noexcept
+{
+    Input value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+
+    const auto result = static_cast<Output>(value);
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
+}
+
+template<typename Narrow>
+void convert_i32_narrow(
+  si::stack_frame* frame,
+  std::size_t stack_offset) noexcept
+{
+    std::int32_t value{0};
+    std::memcpy(
+      &value,
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      sizeof(value));
+
+    const auto result = static_cast<std::int32_t>(static_cast<Narrow>(value));    // NOLINT(bugprone-signed-char-misuse)
+    std::memcpy(
+      frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      &result,
+      sizeof(result));
+}
+
+void numeric_conversion(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        switch(operation)
+        {
+        case opcode::i2c:
+            convert_i32_narrow<std::int8_t>(frame, stack_offset);
+            return;
+        case opcode::i2s:
+            convert_i32_narrow<std::int16_t>(frame, stack_offset);
+            return;
+        case opcode::i2l:
+            convert_numeric_value<std::int32_t, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::i2d:
+            convert_numeric_value<std::int32_t, double>(frame, stack_offset);
+            return;
+        case opcode::l2i:
+            convert_numeric_value<std::int64_t, std::int32_t>(frame, stack_offset);
+            return;
+        case opcode::l2f:
+            convert_numeric_value<std::int64_t, float>(frame, stack_offset);
+            return;
+        case opcode::l2d:
+            convert_numeric_value<std::int64_t, double>(frame, stack_offset);
+            return;
+        case opcode::f2i:
+            convert_numeric_value<float, std::int32_t>(frame, stack_offset);
+            return;
+        case opcode::f2l:
+            convert_numeric_value<float, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::d2l:
+            convert_numeric_value<double, std::int64_t>(frame, stack_offset);
+            return;
+        case opcode::i2f:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<float>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        case opcode::d2f:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<float>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        case opcode::f2d:
+        {
+            float value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<double>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        case opcode::d2i:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            const auto result = static_cast<std::int32_t>(value);
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &result,
+              sizeof(result));
+
+            return;
+        }
+        default:
+            throw jit_error{
+              "Unsupported numeric conversion."};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Structs.
+ */
+
+void create_struct(
+  si::stack_frame* frame,
+  std::size_t size,
+  std::size_t alignment,
+  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        auto* object = frame->gc->gc_new(
+          layout_id,
+          size,
+          alignment,
+          gc::gc_object::of_temporary);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<void*>(&object),
+          sizeof(object));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void set_field(
+  si::stack_frame* frame,
+  std::size_t field_size,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t field_offset,
+  bool field_needs_gc,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* object{nullptr};
+        std::memcpy(
+          static_cast<void*>(&object),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(object));
+        if(object == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during setfield."};
+        }
+
+        const auto value_offset = stack_offset + stack_slot_size;
+        if(field_size == sizeof(void*))
+        {
+            void* value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&value),
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            frame->gc->remove_temporary(object);
+            if(field_needs_gc)
+            {
+                frame->gc->remove_temporary(value);
+            }
+
+            std::memcpy(
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+        }
+        else if(field_size == sizeof(std::int32_t))
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            frame->gc->remove_temporary(object);
+
+            std::memcpy(
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &value,
+              sizeof(value));
+        }
+        else
+        {
+            throw jit_error{
+              std::format(
+                "Invalid field size {} in setfield.",
+                field_size)};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void get_field(
+  si::stack_frame* frame,
+  std::size_t field_size,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t field_offset,
+  bool field_needs_gc,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* object{nullptr};
+        std::memcpy(
+          static_cast<void*>(&object),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(object));
+        if(object == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during getfield."};
+        }
+
+        frame->gc->remove_temporary(object);
+
+        if(field_size == sizeof(void*))
+        {
+            void* value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&value),
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+
+            if(field_needs_gc)
+            {
+                frame->gc->add_temporary(value);
+            }
+        }
+        else if(field_size == sizeof(std::int32_t))
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            // Sign-extend to 64-bit so the entire 8-byte slot is clean
+            const auto value64 = static_cast<std::int64_t>(value);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &value64,
+              sizeof(value64));
+        }
+        else
+        {
+            throw jit_error{
+              std::format(
+                "Invalid field size {} in getfield.",
+                field_size)};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Casting.
+ */
+
+void check_cast(
+  si::stack_frame* frame,
+  std::size_t stack_offset,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t target_layout_id) noexcept
+{
+    try
+    {
+        void* object{nullptr};
+        std::memcpy(
+          static_cast<void*>(&object),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(object));
+        if(object == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during checkcast."};
+        }
+
+        const auto source_layout_id = frame->gc->get_type_layout_id(object);
+        if(source_layout_id != target_layout_id)
+        {
+            throw jit_error{
+              std::format(
+                "Type cast from '{}' to '{}' failed.",
+                frame->gc->layout_to_string(source_layout_id),
+                frame->gc->layout_to_string(target_layout_id))};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Arrays.
+ */
+
+void create_array(
+  si::stack_frame* frame,
+  module_::array_type type,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        std::int32_t length{0};
+        std::memcpy(
+          &length,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(length));
+
+        if(length < 0)
+        {
+            throw jit_error{
+              std::format(
+                "Invalid array size '{}'.",
+                length)};
+        }
+
+        void* array = nullptr;
+        auto& gc = *frame->gc;
+
+        switch(type)
+        {
+        case module_::array_type::i8:
+            array = gc.gc_new_array<std::int8_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i16:
+            array = gc.gc_new_array<std::int16_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i32:
+            array = gc.gc_new_array<std::int32_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::i64:
+            array = gc.gc_new_array<std::int64_t>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::f32:
+            array = gc.gc_new_array<float>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::f64:
+            array = gc.gc_new_array<double>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        case module_::array_type::str:
+        {
+            auto* strings = gc.gc_new_array<std::string*>(
+              length,
+              gc::gc_object::of_temporary);
+
+            for(auto& string: *strings)
+            {
+                string = gc.gc_new<std::string>(
+                  gc::gc_object::of_none,
+                  false);
+            }
+            array = strings;
+
+            break;
+        }
+        case module_::array_type::ref:
+            array = gc.gc_new_array<void*>(
+              length,
+              gc::gc_object::of_temporary);
+            break;
+        }
+
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          static_cast<const void*>(&array),
+          sizeof(array));
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void create_struct_array(
+  si::stack_frame* frame,
+  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        std::int32_t length{0};
+        std::memcpy(
+          &length,
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(length));
+
+        if(length < 0)
+        {
+            throw jit_error{
+              std::format(
+                "Invalid array length '{}'.",
+                length)};
+        }
+
+        auto* array = frame->gc->gc_new_array(
+          layout_id,
+          static_cast<std::size_t>(length),
+          gc::gc_object::of_temporary);
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+          static_cast<void*>(&array),
+          sizeof(array));    // We really want to store the pointer here // NOLINT(bugprone-sizeof-expression)
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+std::size_t get_array_length(
+  si::stack_frame* frame,
+  void* array) noexcept
+{
+    try
+    {
+        if(array == nullptr)
+        {
+            throw jit_error{
+              "Null pointer access during arraylength."};
+        }
+
+        auto& gc = *frame->gc;
+        const auto type = gc.get_object_type(array);
+        gc.remove_temporary(array);
+
+        switch(type)
+        {
+        case gc::gc_object_type::array_i8:
+            return static_cast<si::fixed_vector<std::int8_t>*>(array)->size();
+        case gc::gc_object_type::array_i16:
+            return static_cast<si::fixed_vector<std::int16_t>*>(array)->size();
+        case gc::gc_object_type::array_i32:
+            return static_cast<si::fixed_vector<std::int32_t>*>(array)->size();
+        case gc::gc_object_type::array_i64:
+            return static_cast<si::fixed_vector<std::int64_t>*>(array)->size();
+        case gc::gc_object_type::array_f32:
+            return static_cast<si::fixed_vector<float>*>(array)->size();
+        case gc::gc_object_type::array_f64:
+            return static_cast<si::fixed_vector<double>*>(array)->size();
+        case gc::gc_object_type::array_str:
+        case gc::gc_object_type::array_aref:
+            return static_cast<si::fixed_vector<void*>*>(array)->size();
+        case gc::gc_object_type::str:
+        case gc::gc_object_type::obj:
+            break;
+        }
+
+        throw jit_error{
+          "arraylength: argument is not an array."};
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+
+        return 0;
+    }
+}
+
+void load_array_element(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* array{nullptr};
+        std::int32_t index{0};
+        std::memcpy(
+          static_cast<void*>(&array),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(array));
+        std::memcpy(
+          static_cast<void*>(&index),
+          frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(index));
+
+        if(array == nullptr)
+        {
+            throw jit_error{
+              std::format(
+                "Null pointer access during {}.",
+                to_string(operation))};
+        }
+
+        auto& gc = *frame->gc;
+        gc.remove_temporary(array);
+
+        auto check_index = [index](std::size_t size)
+        {
+            if(index < 0 || std::cmp_greater_equal(index, size))
+            {
+                throw jit_error{
+                  "Out of bounds array access."};
+            }
+        };
+
+        auto store = [frame, stack_offset](const auto& value)
+        {
+            std::memcpy(
+              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              static_cast<const void*>(&value),
+              sizeof(value));
+        };
+
+        switch(operation)
+        {
+        case opcode::caload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            const std::int32_t value = (*values)[index];
+
+            store(value);
+            return;
+        }
+        case opcode::saload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            const std::int32_t value = (*values)[index];
+
+            store(value);
+            return;
+        }
+        case opcode::iaload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            store((*values)[index]);
+            return;
+        }
+        case opcode::laload:
+        {
+            auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            store((*values)[index]);
+            return;
+        }
+        case opcode::faload:
+        {
+            auto* values = static_cast<si::fixed_vector<float>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            store((*values)[index]);
+            return;
+        }
+        case opcode::daload:
+        {
+            auto* values = static_cast<si::fixed_vector<double>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            store((*values)[index]);
+            return;
+        }
+        case opcode::aaload:
+        {
+            auto* values = static_cast<si::fixed_vector<void*>*>(array);
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            void* value = (*values)[index];
+
+            gc.add_temporary(value);
+            store(value);
+            return;
+        }
+        default:
+            throw jit_error{
+              "Invalid array load opcode."};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+void store_array_element(
+  si::stack_frame* frame,
+  opcode operation,
+  std::size_t stack_offset) noexcept
+{
+    try
+    {
+        void* array{nullptr};
+        std::int32_t index{0};
+        std::memcpy(
+          static_cast<void*>(&array),
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(array));
+        std::memcpy(
+          static_cast<void*>(&index),
+          frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(index));
+        if(array == nullptr)
+        {
+            throw jit_error{
+              std::format(
+                "Null pointer access during {}.",
+                to_string(operation))};
+        }
+
+        auto& gc = *frame->gc;
+        auto check_index = [index](std::size_t size)
+        {
+            if(index < 0 || std::cmp_greater_equal(index, size))
+            {
+                throw jit_error{
+                  "Out of bounds array access."};
+            }
+        };
+
+        const auto value_offset = stack_offset + (2uz * stack_slot_size);
+        switch(operation)
+        {
+        case opcode::castore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int8_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = static_cast<std::int8_t>(value);
+            return;
+        }
+        case opcode::sastore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int16_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = static_cast<std::int16_t>(value);
+            return;
+        }
+        case opcode::iastore:
+        {
+            std::int32_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int32_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::lastore:
+        {
+            std::int64_t value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<std::int64_t>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::fastore:
+        {
+            float value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<float>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::dastore:
+        {
+            double value{0};
+            std::memcpy(
+              &value,
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<double>*>(array);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = value;
+            return;
+        }
+        case opcode::aastore:
+        {
+            void* value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&value),
+              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              sizeof(value));
+
+            auto* values = static_cast<si::fixed_vector<void*>*>(array);
+            gc.remove_temporary(value);
+            gc.remove_temporary(array);
+
+            check_index(values->size());
+
+            // Index is validated above.
+            // NOLINTNEXTLINE(bugprone-signed-char-misuse,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+            (*values)[index] = value;
+            return;
+        }
+        default:
+            throw jit_error{
+              "Invalid array store opcode."};
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Function invocation.
+ */
+
+/**
+ * Sign-extend an integer value to a 64-bit signed integer.
+ *
+ * @param dest The destination memory.
+ * @param src The source memory containing the integer value.
+ */
+template<typename T>
+    requires std::is_integral_v<T>
+             && std::is_signed_v<T>
+void store_and_extend(
+  std::span<std::byte> dest,
+  std::span<const std::byte> src)
+{
+    T value{};
+    std::memcpy(
+      &value,
+      src.data(),
+      sizeof(value));
+    const auto extended = static_cast<std::int64_t>(value);    // NOLINT(bugprone-signed-char-misuse)
+    std::memcpy(
+      dest.data(),
+      &extended,
+      sizeof(extended));
+}
+
+/**
+ * Invoke a generated-code target using the VM's stack-frame calling convention.
+ *
+ * Arguments are read from the caller's stack at the specified offset, and
+ * the return value is written back to the same offset.
+ *
+ * @param target The target to invoke.
+ * @param caller The caller's stack frame.
+ * @param argument_offset Byte offset of the arguments and return-value slot
+ *    in the caller's stack storage.
+ */
+void invoke_call_target(
+  const jit_call_target* target,
+  si::stack_frame* caller,
+  std::size_t argument_offset) noexcept
+{
+    try
+    {
+        if(target == nullptr
+           || caller == nullptr)
+        {
+            throw jit_error{
+              "Invalid JIT call target or caller frame."};
+        }
+
+        if(target->safepoint)
+        {
+            target->safepoint();
+        }
+
+        std::span<std::byte> caller_stack;
+        if(!caller->stack.empty())
+        {
+            caller_stack = caller->stack.span();
+        }
+        if(argument_offset > caller_stack.size()
+           || target->argument_size > caller_stack.size() - argument_offset
+           || target->return_size > caller_stack.size() - argument_offset)
+        {
+            throw jit_error{
+              "JIT call arguments or return value exceed caller stack storage."};
+        }
+
+        auto arguments = std::span<std::byte>{caller_stack}.subspan(
+          argument_offset,
+          target->argument_size);
+        auto return_slot = caller_stack.subspan(
+          argument_offset,
+          target->return_size);
+
+        std::visit(
+          [target, caller, arguments, return_slot](const auto& func) -> void
+          {
+              using T = std::decay_t<decltype(func)>;
+
+              if constexpr(std::is_same_v<T, std::monostate>)
+              {
+                  throw jit_error{
+                    "Attempted to invoke an empty function target."};
+              }
+              else if constexpr(std::is_same_v<T, jit_function_pointer>)
+              {
+                  if(func == nullptr
+                     || target->constants == nullptr)
+                  {
+                      throw jit_error{
+                        "Attempted to invoke an incomplete JIT function target."};
+                  }
+                  if(target->argument_size > target->locals_size)
+                  {
+                      throw jit_error{
+                        "JIT function arguments exceed its local storage."};
+                  }
+
+                  auto callee = si::stack_frame::with_size(
+                    *target->constants,
+                    target->locals_size,
+                    target->stack_size,
+                    caller->gc);
+                  std::ranges::copy(
+                    arguments,
+                    callee.locals.begin());
+
+                  if(caller->gc != nullptr)
+                  {
+                      for(const auto local_offset: target->gc_local_offsets)
+                      {
+                          if(local_offset + sizeof(void*) > callee.locals.size())
+                          {
+                              continue;
+                          }
+
+                          void* reference{nullptr};
+                          std::memcpy(
+                            static_cast<void*>(&reference),
+                            callee.locals.data() + local_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                            sizeof(reference));
+                          if(reference != nullptr)
+                          {
+                              if(caller->gc->is_temporary(reference))
+                              {
+                                  caller->gc->remove_temporary(reference);
+                              }
+                              callee.update_gc_local_root(local_offset, reference);
+                          }
+                      }
+                  }
+
+                  func(&callee);
+
+                  if(callee.pending_exception != nullptr)
+                  {
+                      caller->pending_exception = callee.pending_exception;
+                      callee.clear_gc_local_roots();
+                      return;
+                  }
+
+                  if(target->return_size > callee.stack.size())
+                  {
+                      throw jit_error{
+                        "JIT function return value exceeds its operand stack."};
+                  }
+
+                  if(target->return_size != 0)
+                  {
+                      std::ranges::copy(
+                        callee.stack.span().first(target->return_size),
+                        return_slot.begin());
+                  }
+
+                  callee.clear_gc_local_roots();
+              }
+              else if constexpr(std::is_same_v<T, native_function_type>)
+              {
+                  if(func == nullptr)
+                  {
+                      throw jit_error{
+                        "Attempted to invoke an incomplete native function target."};
+                  }
+
+                  auto native_stack = si::operand_stack::with_capacity(
+                    target->argument_size + target->return_size);
+
+                  std::size_t jit_offset = 0;
+                  for(const auto param_size: target->param_sizes)
+                  {
+                      // Copy the active value bytes into native_stack.
+                      native_stack.push_bytes(arguments.subspan(jit_offset, param_size));
+
+                      // Evaluation stack slots are always 8-byte aligned in the JIT
+                      jit_offset += stack_slot_size;
+                  }
+
+                  func(native_stack);
+
+                  if(target->return_size != 0)
+                  {
+                      if(return_slot.size() != target->return_size)
+                      {
+                          throw jit_error{
+                            std::format(
+                              "Native function returned {} bytes, expected {}.",
+                              native_stack.size(),
+                              return_slot.size())};
+                      }
+
+                      // Zero out the target 8-byte JIT slot to ensure upper bits are clean
+                      std::ranges::fill(return_slot, std::byte{0});
+
+                      // Copy the native return value into the return slot
+                      const auto native_return_slot = native_stack.span().first(target->return_size);
+
+                      switch(target->return_type_kind)
+                      {
+                      case cg::type_kind::i8:
+                          store_and_extend<std::int8_t>(return_slot, native_return_slot);
+                          break;
+
+                      case cg::type_kind::i16:
+                          store_and_extend<std::int16_t>(return_slot, native_return_slot);
+                          break;
+
+                      case cg::type_kind::i32:
+                          store_and_extend<std::int32_t>(return_slot, native_return_slot);
+                          break;
+
+                      case cg::type_kind::i64: [[fallthrough]];
+                      case cg::type_kind::f32:
+                          // Preserve the 32-bit IEEE-754 representation.
+                          // The upper 32 bits were zeroed before copying.
+                          [[fallthrough]];
+                      case cg::type_kind::f64: [[fallthrough]];
+                      case cg::type_kind::ref:
+                          std::ranges::copy(
+                            native_return_slot,
+                            return_slot.begin());
+                          break;
+
+                      default:
+                          throw jit_error{
+                            "Native function has unexpected return type kind."};
+                      }
+                  }
+              }
+              else
+              {
+                  static_assert(utils::false_type<T>::value, "Unsupported JIT callable function type.");
+              }
+          },
+          target->function);
+    }
+    catch(...)
+    {
+        if(caller->pending_exception == nullptr)
+        {
+            caller->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Safepoint handler.
+ */
+
+void run_gc_safepoint(
+  si::stack_frame* frame) noexcept
+{
+    try
+    {
+        if(frame != nullptr
+           && frame->gc != nullptr
+           && frame->gc->is_run_requested())
+        {
+            frame->gc->run();
+        }
+    }
+    catch(...)
+    {
+        if(frame->pending_exception == nullptr)
+        {
+            frame->pending_exception = std::current_exception();
+        }
+    }
+}
+
+/*
+ * Exception propagation.
+ */
+
+bool has_pending_exception(
+  si::stack_frame* frame) noexcept
+{
+    return frame != nullptr
+           && frame->pending_exception != nullptr;
+}
+
+/** X register size, as `std::int32_t` to avoid some type conversions. */
+constexpr auto x_register_size = static_cast<std::int32_t>(sizeof(std::uint64_t));
+
+/** Struct helper holding offsets of the stack frame elements. */
+struct stack_frame_offsets
+{
+    /** Offset of the locals. */
+    std::size_t locals;
+
+    /** Offset of the stack. */
+    std::size_t stack;
+};
+
+/** Calculate the stack frame offsets. */
+stack_frame_offsets calculate_stack_frame_offsets()
+{
+    const std::vector<slang::module_::constant_table_entry> dummy_constants;
+    const auto dummy_frame = si::stack_frame::with_capacity(dummy_constants, 0, 0, nullptr);
+
+    const auto base =
+      reinterpret_cast<std::uintptr_t>(&dummy_frame);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    const std::size_t locals_offset =
+      reinterpret_cast<std::uintptr_t>(&dummy_frame.locals) - base;    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    const std::size_t stack_offset =
+      reinterpret_cast<std::uintptr_t>(&dummy_frame.stack) - base;    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    return {
+      .locals = locals_offset,
+      .stack = stack_offset,
+    };
+}
+
+/** Branch fixups to map labels to offsets. */
+struct branch_fixup
+{
+    /** Instruction index in the emitted machine code. */
+    std::size_t instruction_index;
+
+    /** Label id. */
+    std::int64_t label_id;
+
+    /** Whether this is a conditional jump (JNZ). */
+    bool conditional;
+};
+
+void update_stack_size(
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr,
+  std::int32_t delta)
+{
+    if(delta == 0)
+    {
+        return;
+    }
+
+    if(delta < 0
+       && std::cmp_less(current_stack_size, -delta))
+    {
+        throw jit_error{
+          std::format(
+            "Got negative stack size while decoding instruction '{}'.",
+            to_string(instr))};
+    }
+
+    if(delta % stack_slot_size != 0)
+    {
+        throw jit_error{
+          "Stack delta not aligned."};
+    }
+
+    current_stack_size += delta;
+    max_stack_size = std::max(max_stack_size, current_stack_size);
+}
+
+struct stack_size_updater
+{
+    std::uint32_t* current_stack_size;
+    std::uint32_t* max_stack_size;
+
+    void operator()(
+      opcode instr,
+      std::int32_t delta) const
+    {
+        update_stack_size(
+          *current_stack_size,
+          *max_stack_size,
+          instr,
+          delta);
+    }
+};
+
+void emit_integer_binary(
+  instruction_emitter& emitter,
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr)
+{
+    if(current_stack_size < 2u * stack_slot_size)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto left_offset = current_stack_size - (2u * stack_slot_size);
+    const auto right_offset = current_stack_size - stack_slot_size;
+
+    emitter.load_x(
+      cpu_registers::X0,
+      cpu_registers::X20,
+      left_offset);
+    emitter.load_x(
+      cpu_registers::X1,
+      cpu_registers::X20,
+      right_offset);
+
+    switch(instr)
+    {
+    case opcode::iadd: [[fallthrough]];
+    case opcode::ladd:
+        emitter.add_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::isub: [[fallthrough]];
+    case opcode::lsub:
+        emitter.sub_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::imul: [[fallthrough]];
+    case opcode::lmul:
+        emitter.mul_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::idiv: [[fallthrough]];
+    case opcode::ldiv:
+        emitter.sdiv_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::imod: [[fallthrough]];
+    case opcode::lmod:
+        emitter.sdiv_x(
+          cpu_registers::X2,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        emitter.msub_x(
+          cpu_registers::X0,
+          cpu_registers::X2,
+          cpu_registers::X1,
+          cpu_registers::X0);
+        break;
+    case opcode::iand: [[fallthrough]];
+    case opcode::land:
+        emitter.and_reg_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::ior: [[fallthrough]];
+    case opcode::lor:
+        emitter.orr_reg_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    case opcode::ixor: [[fallthrough]];
+    case opcode::lxor:
+        emitter.eor_reg_x(
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+        break;
+    default:
+        throw jit_error{
+          std::format(
+            "Unsupported integer operation '{}'.",
+            to_string(instr))};
+    }
+
+    emitter.store_x(
+      cpu_registers::X0,
+      cpu_registers::X20,
+      left_offset);
+
+    update_stack_size(
+      current_stack_size,
+      max_stack_size,
+      instr,
+      -static_cast<std::int32_t>(stack_slot_size));
+}
+
+template<
+  typename EmitW,
+  typename EmitX,
+  typename... Args>
+void emit_integer_instruction(
+  instruction_emitter& emitter,
+  bool is_64_bit,
+  EmitW emit_w,
+  EmitX emit_x,
+  Args... args)
+{
+    if(is_64_bit)
+    {
+        (emitter.*emit_x)(args...);
+    }
+    else
+    {
+        (emitter.*emit_w)(args...);
+    }
+}
+
+void emit_integer_shift(
+  instruction_emitter& emitter,
+  std::uint32_t& current_stack_size,
+  std::uint32_t& max_stack_size,
+  opcode instr,
+  bool is_64_bit)
+{
+    if(current_stack_size < 2 * stack_slot_size)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto value_offset = current_stack_size - (2 * stack_slot_size);
+    const auto shift_offset = current_stack_size - stack_slot_size;
+
+    if(is_64_bit)
+    {
+        emitter.load_x(cpu_registers::X0, cpu_registers::X20, value_offset);
+        emitter.load_x(cpu_registers::X1, cpu_registers::X20, shift_offset);
+    }
+    else
+    {
+        // For 32-bit shift: load 32 bits and sign-extend value to X0
+        emitter.ldr_w(cpu_registers::X0, cpu_registers::X20, value_offset);
+        emitter.sxtw(cpu_registers::X0, cpu_registers::X0);
+
+        // Load 32-bit shift amount into W1
+        emitter.ldr_w(cpu_registers::X1, cpu_registers::X20, shift_offset);
+    }
+
+    if(instr == opcode::ishl || instr == opcode::lshl)
+    {
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::lslv_w,
+          &instruction_emitter::lslv_x,
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+    }
+    else    // ishr / lshr
+    {
+        emit_integer_instruction(
+          emitter,
+          is_64_bit,
+          &instruction_emitter::asrv_w,    // 0x1AC02C00u
+          &instruction_emitter::asrv_x,    // 0x9AC02C00u
+          cpu_registers::X0,
+          cpu_registers::X0,
+          cpu_registers::X1);
+    }
+
+    // Sign-extend 32-bit results back to 64-bit before writing back to 8-byte stack slot
+    if(!is_64_bit)
+    {
+        emitter.sxtw(cpu_registers::X0, cpu_registers::X0);
+    }
+
+    emitter.store_x(
+      cpu_registers::X0,
+      cpu_registers::X20,
+      value_offset);
+
+    update_stack_size(
+      current_stack_size,
+      max_stack_size,
+      instr,
+      -stack_slot_size);
+}
+
+void emit_integer_negation(
+  instruction_emitter& emitter,
+  std::uint32_t current_stack_size,
+  opcode instr)
+{
+    if(current_stack_size < stack_slot_size)
+    {
+        throw jit_error{
+          std::format(
+            "Not enough stack values for '{}'.",
+            to_string(instr))};
+    }
+
+    const auto offset = current_stack_size - stack_slot_size;
+
+    emitter.load_x(
+      cpu_registers::X0,
+      cpu_registers::X20,
+      offset);
+    emitter.sub_x(
+      cpu_registers::X0,
+      cpu_registers::XZR,
+      cpu_registers::X0);
+    emitter.store_x(
+      cpu_registers::X0,
+      cpu_registers::X20,
+      offset);
+}
+
+void emit_safepoint(
+  instruction_emitter& emitter)
+{
+    const auto helper_address = reinterpret_cast<std::uintptr_t>(&run_gc_safepoint);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    // set up parameters and call the helper.
+    emitter.mov_reg_x(
+      cpu_registers::X0,
+      cpu_registers::X21);
+    emitter.mov_x(
+      cpu_registers::X16,
+      static_cast<std::int64_t>(helper_address));
+    emitter.blr(cpu_registers::X16);
+}
+
+void emit_exception_guard(
+  instruction_emitter& emitter,
+  std::vector<std::size_t>& exception_fixups)
+{
+    const auto helper_address = reinterpret_cast<std::uintptr_t>(&has_pending_exception);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    // set up parameters and call the helper.
+    emitter.mov_reg_x(
+      cpu_registers::X0,
+      cpu_registers::X21);
+    emitter.mov_x(
+      cpu_registers::X16,
+      static_cast<std::int64_t>(helper_address));
+    emitter.blr(cpu_registers::X16);
+
+    const auto instruction_index = emitter.code.size();
+    emitter.cbnz_w(cpu_registers::X0, 0);
+    exception_fixups.push_back(instruction_index);
+}
+
+std::uint32_t read_local_offset(
+  memory_read_archive& input,
+  const std::vector<std::size_t>& local_offsets,
+  opcode instr)
+{
+    vle_int local_index;
+    input & local_index;
+
+    if(local_index.i < 0
+       || static_cast<std::size_t>(local_index.i) >= local_offsets.size())
+    {
+        throw jit_error{
+          std::format(
+            "Local index {} for '{}' is out of range.",
+            local_index.i,
+            to_string(instr))};
+    }
+
+    const auto offset = local_offsets.at(static_cast<std::size_t>(local_index.i));
+    if(offset > std::numeric_limits<std::uint32_t>::max())
+    {
+        throw jit_error{
+          std::format(
+            "Local offset {} exceeds the JIT address range.",
+            offset)};
+    }
+
+    return static_cast<std::uint32_t>(offset);
+}
+
+}    // namespace
+
+namespace slang::jit::aarch64
+{
+
+jit_function jit_compiler::create_jit_function(
+  module_::function_signature signature,
+  const std::vector<std::uint32_t>& machine_code,
+  std::size_t locals_size,
+  std::size_t stack_size)
+{
+    executable_memory memory{machine_code};
+
+    auto function =
+      reinterpret_cast<jit_function_pointer>(memory.data());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    return jit_function{
+      std::move(signature),
+      std::move(memory),
+      function,
+      locals_size,
+      stack_size};
+}
+
+jit_function jit_compiler::compile(
+  module_::function_signature signature,
+  std::span<const std::byte> bytecode,
+  const std::vector<std::size_t>& local_offsets,
+  std::size_t locals_size,
+  const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
+  const std::vector<jit_call_target*>& import_call_targets,
+  const std::function<module_::struct_descriptor(std::int64_t)>& resolve_type)
+{
+    /*
+     * AAPCS64 Register Mapping & Frame Layout
+     * ----------------------------------------
+     * Callee-Saved Registers (Preserved in Prologue, Restored in Epilogue):
+     *   X19 = Pointer to frame->locals.data()
+     *   X20 = Pointer to frame->stack.data()
+     *   X21 = Preserved pointer to runtime `si::stack_frame` (moved from X0)
+     *   X22 = General-purpose JIT scratch register
+     *
+     * Volatile / Parameter Registers:
+     *   X0  = Runtime parameter: Pointer to `si::stack_frame`
+     */
+
+    instruction_emitter emitter;
+    std::unordered_map<std::int64_t, std::size_t> labels;
+    std::vector<std::size_t> return_fixups;
+    std::vector<std::size_t> exception_fixups;
+    std::vector<branch_fixup> branch_fixups;
+
+    const auto label_entry_depths = analyze_bytecode_stack_depths(
+      bytecode,
+      call_targets,
+      import_call_targets);
+
+    /*
+     * Prologue.
+     */
+
+    emitter.push_fp_lr();
+
+    // Set frame pointer to current SP.
+    emitter.mov_reg_x(
+      cpu_registers::X29,
+      cpu_registers::SP);
+
+    // Save callee-saved registers X19–X22 on the stack.
+    emitter.stp_x_pre(
+      cpu_registers::X19,
+      cpu_registers::X20,
+      cpu_registers::SP,
+      -2 * x_register_size);
+    emitter.stp_x_pre(
+      cpu_registers::X21,
+      cpu_registers::X22,
+      cpu_registers::SP,
+      -2 * x_register_size);
+
+    // Preserve the incoming stack-frame pointer in X21
+    emitter.mov_reg_x(cpu_registers::X21, cpu_registers::X0);
+
+    // Get dynamic offsets regardless of non-standard layout rules
+    const auto [locals_offset, stack_offset] = calculate_stack_frame_offsets();
+
+    // The offsets should always be smaller, otherwise something is wrong
+    assert(locals_offset < std::numeric_limits<std::uint32_t>::max());
+    assert(stack_offset < std::numeric_limits<std::uint32_t>::max());
+
+    // Load frame->locals.data() into X19
+    emitter.ldr_x(
+      cpu_registers::X19,
+      cpu_registers::X0,
+      static_cast<std::uint32_t>(locals_offset));
+
+    // Load frame->stack.data() into X20
+    emitter.ldr_x(
+      cpu_registers::X20,
+      cpu_registers::X0,
+      static_cast<std::uint32_t>(stack_offset));
+
+    /*
+     * Compile bytecode.
+     */
+
+    std::uint32_t max_stack_size{0};
+    std::uint32_t current_stack_size{0};
+    memory_read_archive input{bytecode, true, std::endian::little};
+
+    const stack_size_updater update_stack_size{
+      .current_stack_size = &current_stack_size,
+      .max_stack_size = &max_stack_size,
+    };
+
+    while(input.tell() < input.size())
+    {
+        const auto start_pc = input.tell();
+
+        std::byte instr{0};
+        input & instr;
+
+        // Validate instruction range.
+        if(std::to_integer<unsigned int>(instr) >= std::to_underlying(opcode::opcode_count))
+        {
+            throw jit_error{
+              std::format(
+                "'{:02x}' at PC {} is not an opcode.",
+                std::to_integer<unsigned int>(instr),
+                start_pc)};
+        }
+
+        auto op = static_cast<opcode>(instr);
+        switch(op)
+        {
+        case opcode::iconst:
+        {
+            std::int32_t val{0};
+            input & val;
+
+            // Sign-extend 32-bit signed int to 64-bit int for the slot
+            const auto val64 = static_cast<std::int64_t>(val);
+
+            emitter.mov_x(
+              cpu_registers::X0,
+              val64);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::lconst:
+        {
+            std::int64_t val{0};
+            input & val;
+
+            emitter.mov_x(
+              cpu_registers::X0,
+              val);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::fconst:
+        {
+            float val{0.f};
+            input & val;
+
+            emitter.mov_w(
+              cpu_registers::X0,
+              static_cast<std::int32_t>(
+                std::bit_cast<std::uint32_t>(val)));
+            emitter.str_w(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::dconst:
+        {
+            double val{0.};
+            input & val;
+
+            emitter.mov_x(
+              cpu_registers::X0,
+              std::bit_cast<std::int64_t>(val));
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::sconst:
+        {
+            vle_int constant_index;
+            input & constant_index;
+
+            if(constant_index.i < 0)
+            {
+                throw jit_error{
+                  "Invalid JIT string constant index."};
+            }
+
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_string_constant);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              constant_index.i);
+            emitter.mov_x(
+              cpu_registers::X2,
+              current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::aconst_null:
+            emitter.store_x(
+              cpu_registers::XZR,
+              cpu_registers::X20,
+              current_stack_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        case opcode::dup:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'dup'."};
+            }
+
+            emitter.ldr_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size - stack_slot_size);
+            emitter.str_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::dup2:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'dup2'."};
+            }
+
+            emitter.load_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size - stack_slot_size);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::adup:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'adup'."};
+            }
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&duplicate_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::pop: [[fallthrough]];
+        case opcode::pop2:
+            update_stack_size(
+              op,
+              -stack_slot_size);
+            break;
+        case opcode::apop:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'apop'."};
+            }
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&discard_reference);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            break;
+        }
+        case opcode::dup_x1: [[fallthrough]];
+        case opcode::dup_x2: [[fallthrough]];
+        case opcode::dup2_x0:
+        {
+            // these are read from input below.
+            type_class type1;    // NOLINT(cppcoreguidelines-init-variables)
+            type_class type2;    // NOLINT(cppcoreguidelines-init-variables)
+            type_class type3{type_class::cat1};
+
+            input & type1 & type2;
+            if(op == opcode::dup_x2)
+            {
+                input & type3;
+            }
+
+            const auto needs_gc1 =
+              type1 == type_class::ref;
+            const auto needs_gc2 =
+              op == opcode::dup2_x0
+              && type2 == type_class::ref;
+            const std::uint32_t required_size =
+              op == opcode::dup_x2
+                ? 3 * stack_slot_size
+                : 2 * stack_slot_size;
+
+            if(current_stack_size < required_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&duplicate_stack_block);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_slot_size);
+            emitter.mov_x(
+              cpu_registers::X3,
+              stack_slot_size);
+            emitter.mov_x(
+              cpu_registers::X4,
+              stack_slot_size);
+            emitter.mov_x(
+              cpu_registers::X5,
+              static_cast<std::int64_t>(needs_gc1));
+            emitter.mov_x(
+              cpu_registers::X6,
+              static_cast<std::int64_t>(needs_gc2));
+            emitter.mov_x(
+              cpu_registers::X7,
+              current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              static_cast<std::int32_t>(
+                op == opcode::dup2_x0
+                  ? 2 * stack_slot_size
+                  : stack_slot_size));
+
+            break;
+        }
+        case opcode::iload: [[fallthrough]];
+        case opcode::fload:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+
+            // Read from X19 (locals), push to X20 (stack)
+            emitter.ldr_x(
+              cpu_registers::X0,
+              cpu_registers::X19,
+              local_offset);
+            emitter.str_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::lload: [[fallthrough]];
+        case opcode::dload:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+            emitter.load_x(
+              cpu_registers::X0,
+              cpu_registers::X19,
+              local_offset);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::istore:
+        case opcode::fstore:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            // Pop from X20 (stack), write to X19 (locals)
+            emitter.ldr_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            emitter.str_x(
+              cpu_registers::X0,
+              cpu_registers::X19,
+              local_offset);
+
+            break;
+        }
+        case opcode::lstore: [[fallthrough]];
+        case opcode::dstore:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            emitter.load_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              current_stack_size);
+            emitter.store_x(
+              cpu_registers::X0,
+              cpu_registers::X19,
+              local_offset);
+            break;
+        }
+        case opcode::aload:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              local_offset);
+            emitter.mov_x(
+              cpu_registers::X2,
+              current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::astore:
+        {
+            const auto local_offset = read_local_offset(input, local_offsets, op);
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'astore'."};
+            }
+
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&store_reference_local);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              local_offset);
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            break;
+        }
+        case opcode::icmpl: [[fallthrough]];
+        case opcode::lcmpl: [[fallthrough]];
+        case opcode::fcmpl: [[fallthrough]];
+        case opcode::dcmpl: [[fallthrough]];
+        case opcode::icmple: [[fallthrough]];
+        case opcode::lcmple: [[fallthrough]];
+        case opcode::fcmple: [[fallthrough]];
+        case opcode::dcmple: [[fallthrough]];
+        case opcode::icmpg: [[fallthrough]];
+        case opcode::lcmpg: [[fallthrough]];
+        case opcode::fcmpg: [[fallthrough]];
+        case opcode::dcmpg: [[fallthrough]];
+        case opcode::icmpge: [[fallthrough]];
+        case opcode::lcmpge: [[fallthrough]];
+        case opcode::fcmpge: [[fallthrough]];
+        case opcode::dcmpge: [[fallthrough]];
+        case opcode::icmpeq: [[fallthrough]];
+        case opcode::lcmpeq: [[fallthrough]];
+        case opcode::fcmpeq: [[fallthrough]];
+        case opcode::dcmpeq: [[fallthrough]];
+        case opcode::icmpne: [[fallthrough]];
+        case opcode::lcmpne: [[fallthrough]];
+        case opcode::fcmpne: [[fallthrough]];
+        case opcode::dcmpne: [[fallthrough]];
+        case opcode::acmpeq: [[fallthrough]];
+        case opcode::acmpne:
+        {
+            const auto operand_size = stack_slot_size;
+
+            if(current_stack_size < 2 * operand_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(2 * operand_size);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&compare_values);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            break;
+        }
+        case opcode::newarray:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Truncated newarray instruction."};
+            }
+
+            // type is read below.
+            module_::array_type type;    // NOLINT(cppcoreguidelines-init-variables)
+            input & type;
+
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(type));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            break;
+        }
+        case opcode::new_:
+        {
+            if(!resolve_type)
+            {
+                throw jit_error{
+                  "Struct allocation requires a JIT type resolver."};
+            }
+
+            vle_int type_index;
+            input & type_index;
+
+            const auto type = resolve_type(type_index.i);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_struct);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              static_cast<std::int64_t>(type.size));
+            emitter.mov_x(
+              cpu_registers::X2,
+              static_cast<std::int64_t>(type.alignment));
+            emitter.mov_x(
+              cpu_registers::X3,
+              static_cast<std::int64_t>(type.layout_id));
+            emitter.mov_x(
+              cpu_registers::X4,
+              current_stack_size);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              stack_slot_size);
+
+            break;
+        }
+        case opcode::setfield: [[fallthrough]];
+        case opcode::getfield:
+        {
+            if(!resolve_type)
+            {
+                throw jit_error{
+                  "Struct field access requires a JIT type resolver."};
+            }
+
+            vle_int type_index;
+            vle_int field_index;
+            input & type_index & field_index;
+
+            const auto type = resolve_type(type_index.i);
+            if(field_index.i < 0
+               || static_cast<std::size_t>(field_index.i) >= type.member_types.size())
+            {
+                throw jit_error{
+                  "Struct field index is out of range."};
+            }
+
+            const auto& field = type.member_types.at(static_cast<std::size_t>(field_index.i)).second;
+            const auto base_type = field.base_type.base_type();
+            const bool field_needs_gc =
+              field.base_type.is_array()
+              || base_type == "str"
+              || (base_type != "void"
+                  && base_type != "i8"
+                  && base_type != "i16"
+                  && base_type != "i32"
+                  && base_type != "i64"
+                  && base_type != "f32"
+                  && base_type != "f64");
+            const auto input_size =
+              op == opcode::setfield
+                ? 2 * stack_slot_size
+                : stack_slot_size;
+            if(std::cmp_less(current_stack_size, input_size))
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+            const auto stack_offset = current_stack_size - input_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              op == opcode::setfield
+                ? &set_field
+                : &get_field);
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              static_cast<std::int64_t>(field.size));
+            emitter.mov_x(
+              cpu_registers::X2,
+              static_cast<std::int64_t>(field.offset));
+            emitter.mov_x(
+              cpu_registers::X3,
+              static_cast<std::int64_t>(field_needs_gc));
+            emitter.mov_x(
+              cpu_registers::X4,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            if(op == opcode::setfield)
+            {
+                update_stack_size(
+                  op,
+                  -2 * stack_slot_size);
+            }
+
+            break;
+        }
+        case opcode::checkcast:
+        {
+            if(!resolve_type
+               || current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Invalid checkcast instruction."};
+            }
+
+            vle_int type_index;
+            input & type_index;
+
+            const auto type = resolve_type(type_index.i);
+            if((type.flags & std::to_underlying(module_::struct_flags::allow_cast)) == 0)
+            {
+                const auto stack_offset = current_stack_size - stack_slot_size;
+                const auto helper_address = reinterpret_cast<std::uintptr_t>(&check_cast);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+                // set up parameters and call the helper.
+                emitter.mov_reg_x(
+                  cpu_registers::X0,
+                  cpu_registers::X21);
+                emitter.mov_x(
+                  cpu_registers::X1,
+                  stack_offset);
+                emitter.mov_x(
+                  cpu_registers::X2,
+                  static_cast<std::int64_t>(type.layout_id));
+                emitter.mov_x(
+                  cpu_registers::X16,
+                  static_cast<std::int64_t>(helper_address));
+                emitter.blr(cpu_registers::X16);
+
+                emit_exception_guard(
+                  emitter,
+                  exception_fixups);
+            }
+
+            break;
+        }
+        case opcode::anewarray:
+        {
+            if(!resolve_type
+               || current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Truncated anewarray instruction."};
+            }
+
+            vle_int type_index;
+            input & type_index;
+
+            const auto type = resolve_type(type_index.i);
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&create_struct_array);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              static_cast<std::int64_t>(type.layout_id));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            break;
+        }
+        case opcode::arraylength:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for 'arraylength'."};
+            }
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&get_array_length);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.load_x(
+              cpu_registers::X1,
+              cpu_registers::X20,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            // Preserve the helper's return value and restore later.
+            emitter.mov_reg_x(
+              cpu_registers::X22,    // scratch
+              cpu_registers::X0);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X22);
+
+            emitter.str_w(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              stack_offset);
+
+            break;
+        }
+        case opcode::caload: [[fallthrough]];
+        case opcode::saload: [[fallthrough]];
+        case opcode::iaload: [[fallthrough]];
+        case opcode::laload: [[fallthrough]];
+        case opcode::faload: [[fallthrough]];
+        case opcode::daload: [[fallthrough]];
+        case opcode::aaload:
+        {
+            constexpr auto input_size = 2 * stack_slot_size;
+            if(current_stack_size < input_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+            const auto stack_offset = current_stack_size - input_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&load_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            break;
+        }
+        case opcode::castore: [[fallthrough]];
+        case opcode::sastore: [[fallthrough]];
+        case opcode::iastore: [[fallthrough]];
+        case opcode::lastore: [[fallthrough]];
+        case opcode::fastore: [[fallthrough]];
+        case opcode::dastore: [[fallthrough]];
+        case opcode::aastore:
+        {
+            constexpr std::uint32_t input_size = 3 * stack_slot_size;
+
+            if(current_stack_size < input_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - input_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&store_array_element);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -static_cast<std::int32_t>(input_size));
+
+            break;
+        }
+        case opcode::invoke:
+        {
+            vle_int function_index;
+            input & function_index;
+
+            const jit_call_target* target = nullptr;
+            if(function_index.i < 0)
+            {
+                const auto import_index = static_cast<std::uint64_t>(-(function_index.i + 1));
+                if(import_index >= import_call_targets.size())
+                {
+                    throw jit_error{
+                      std::format(
+                        "Function import index {} is out of range.",
+                        import_index)};
+                }
+                target = import_call_targets.at(static_cast<std::size_t>(import_index));
+            }
+            else
+            {
+                if(static_cast<std::size_t>(function_index.i) >= call_targets.size())
+                {
+                    throw jit_error{
+                      std::format(
+                        "Function export index {} is out of range.",
+                        function_index.i)};
+                }
+                target = call_targets.at(static_cast<std::size_t>(function_index.i)).get();
+            }
+
+            if(target == nullptr)
+            {
+                throw jit_error{
+                  std::format(
+                    "Call index {} does not refer to a function.",
+                    function_index.i)};
+            }
+
+            if(current_stack_size < target->argument_size)
+            {
+                throw jit_error{
+                  "Not enough stack values for function call arguments."};
+            }
+
+            if(target->argument_size > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())
+               || target->return_size > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max()))
+            {
+                throw jit_error{
+                  "Function call signature exceeds JIT stack limits."};
+            }
+
+            const auto argument_offset = current_stack_size - static_cast<std::uint32_t>(target->argument_size);
+            const auto target_address = reinterpret_cast<std::uintptr_t>(target);                 // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&invoke_call_target);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_x(
+              cpu_registers::X0,
+              static_cast<std::int64_t>(target_address));
+            emitter.mov_reg_x(
+              cpu_registers::X1,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X2,
+              static_cast<std::int64_t>(argument_offset));
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              static_cast<std::int32_t>(target->return_size)
+                - static_cast<std::int32_t>(target->argument_size));
+
+            break;
+        }
+        case opcode::label:
+        {
+            vle_int label_id;
+            input & label_id;
+
+            if(!labels.emplace(label_id.i, emitter.code.size()).second)
+            {
+                throw jit_error{
+                  std::format(
+                    "Duplicate JIT label {}.",
+                    label_id.i)};
+            }
+
+            // Set stack depth to expected depth at this block entry
+            if(auto it = label_entry_depths.find(label_id.i);
+               it != label_entry_depths.end())
+            {
+                current_stack_size = it->second;
+            }
+
+            break;
+        }
+        case opcode::jmp:
+        {
+            vle_int label_id;
+            input & label_id;
+
+            emit_safepoint(emitter);
+
+            const auto instruction_index = emitter.code.size();
+            emitter.b(0);
+
+            branch_fixups.emplace_back(branch_fixup{
+              .instruction_index = instruction_index,
+              .label_id = label_id.i,
+              .conditional = false,
+            });
+
+            break;
+        }
+        case opcode::jnz:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for 'jnz' ({} < {}).",
+                    current_stack_size, stack_slot_size)};
+            }
+
+            vle_int then_label;
+            vle_int else_label;
+            input & then_label & else_label;
+
+            const auto condition_offset = current_stack_size - stack_slot_size;
+
+            update_stack_size(
+              op,
+              -static_cast<std::int32_t>(stack_slot_size));
+
+            emit_safepoint(emitter);
+
+            // Load condition.
+            emitter.ldr_x(
+              cpu_registers::X0,
+              cpu_registers::X20,
+              condition_offset);
+
+            const auto conditional_index = emitter.code.size();
+            emitter.cbnz_w(
+              cpu_registers::X0,
+              0);
+
+            branch_fixups.push_back(branch_fixup{
+              .instruction_index = conditional_index,
+              .label_id = then_label.i,
+              .conditional = true,
+            });
+
+            const auto else_index = emitter.code.size();
+            emitter.b(0);
+
+            branch_fixups.push_back(branch_fixup{
+              .instruction_index = else_index,
+              .label_id = else_label.i,
+              .conditional = false,
+            });
+
+            break;
+        }
+        case opcode::iadd: [[fallthrough]];
+        case opcode::isub: [[fallthrough]];
+        case opcode::imul: [[fallthrough]];
+        case opcode::idiv: [[fallthrough]];
+        case opcode::imod: [[fallthrough]];
+        case opcode::iand: [[fallthrough]];
+        case opcode::ior: [[fallthrough]];
+        case opcode::ixor:
+            emit_integer_binary(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op);
+            break;
+        case opcode::ladd: [[fallthrough]];
+        case opcode::lsub: [[fallthrough]];
+        case opcode::lmul: [[fallthrough]];
+        case opcode::ldiv: [[fallthrough]];
+        case opcode::lmod: [[fallthrough]];
+        case opcode::land: [[fallthrough]];
+        case opcode::lor: [[fallthrough]];
+        case opcode::lxor:
+            emit_integer_binary(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op);
+            break;
+        case opcode::fneg: [[fallthrough]];
+        case opcode::dneg:
+        {
+            if(current_stack_size < stack_slot_size)
+            {
+                throw jit_error{
+                  std::format("Not enough stack values for '{}'.", to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - stack_slot_size;
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&execute_fp_negation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            break;
+        }
+        case opcode::fadd: [[fallthrough]];
+        case opcode::fsub: [[fallthrough]];
+        case opcode::fmul: [[fallthrough]];
+        case opcode::fdiv: [[fallthrough]];
+        case opcode::dadd: [[fallthrough]];
+        case opcode::dsub: [[fallthrough]];
+        case opcode::dmul: [[fallthrough]];
+        case opcode::ddiv:
+        {
+            if(current_stack_size < 2 * stack_slot_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - (2 * stack_slot_size);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&execute_fp_operation);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            update_stack_size(
+              op,
+              -stack_slot_size);
+
+            break;
+        }
+        case opcode::i2c: [[fallthrough]];
+        case opcode::i2s: [[fallthrough]];
+        case opcode::i2l: [[fallthrough]];
+        case opcode::i2f: [[fallthrough]];
+        case opcode::i2d: [[fallthrough]];
+        case opcode::l2i: [[fallthrough]];
+        case opcode::l2f: [[fallthrough]];
+        case opcode::l2d: [[fallthrough]];
+        case opcode::f2i: [[fallthrough]];
+        case opcode::f2l: [[fallthrough]];
+        case opcode::d2f: [[fallthrough]];
+        case opcode::f2d: [[fallthrough]];
+        case opcode::d2i:
+        case opcode::d2l:
+        {
+            const auto input_size = stack_slot_size;
+
+            if(current_stack_size < input_size)
+            {
+                throw jit_error{
+                  std::format(
+                    "Not enough stack values for '{}'.",
+                    to_string(op))};
+            }
+
+            const auto stack_offset = current_stack_size - static_cast<std::uint32_t>(input_size);
+            const auto helper_address = reinterpret_cast<std::uintptr_t>(&numeric_conversion);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+            // set up parameters and call the helper.
+            emitter.mov_reg_x(
+              cpu_registers::X0,
+              cpu_registers::X21);
+            emitter.mov_x(
+              cpu_registers::X1,
+              std::to_underlying(op));
+            emitter.mov_x(
+              cpu_registers::X2,
+              stack_offset);
+            emitter.mov_x(
+              cpu_registers::X16,
+              static_cast<std::int64_t>(helper_address));
+            emitter.blr(cpu_registers::X16);
+
+            emit_exception_guard(
+              emitter,
+              exception_fixups);
+
+            const auto output_size = stack_slot_size;
+            update_stack_size(
+              op,
+              static_cast<std::int32_t>(output_size) - static_cast<std::int32_t>(input_size));
+
+            break;
+        }
+        case opcode::ishl: [[fallthrough]];
+        case opcode::ishr:
+            emit_integer_shift(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op,
+              false);
+            break;
+        case opcode::lshl: [[fallthrough]];
+        case opcode::lshr:
+            emit_integer_shift(
+              emitter,
+              current_stack_size,
+              max_stack_size,
+              op,
+              true);
+            break;
+        case opcode::ineg: [[fallthrough]];
+        case opcode::lneg:
+            emit_integer_negation(
+              emitter,
+              current_stack_size,
+              op);
+            break;
+        case opcode::iret: [[fallthrough]];
+        case opcode::lret: [[fallthrough]];
+        case opcode::fret: [[fallthrough]];
+        case opcode::dret: [[fallthrough]];
+        case opcode::aret: [[fallthrough]];
+        case opcode::ret:
+        {
+            return_fixups.push_back(emitter.code.size());
+            emitter.b(0);
+            break;
+        }
+        default:
+            throw jit_error{
+              std::format(
+                "Unimplemented opcode '{}'.",
+                to_string(op))};
+        }
+    }
+
+    for(const auto& fixup: branch_fixups)
+    {
+        const auto label_it = labels.find(fixup.label_id);
+        if(label_it == labels.end())
+        {
+            throw jit_error{
+              std::format(
+                "Unknown JIT label {}.",
+                fixup.label_id)};
+        }
+
+        if(fixup.conditional)
+        {
+            emitter.patch_cbnz_w(
+              fixup.instruction_index,
+              label_it->second);
+        }
+        else
+        {
+            emitter.patch_b(
+              fixup.instruction_index,
+              label_it->second);
+        }
+    }
+
+    const auto epilogue_index = emitter.code.size();
+    for(const auto instruction_index: return_fixups)
+    {
+        emitter.patch_b(
+          instruction_index,
+          epilogue_index);
+    }
+
+    for(const auto instruction_index: exception_fixups)
+    {
+        emitter.patch_cbnz_w(
+          instruction_index,
+          epilogue_index);
+    }
+
+    emitter.ldp_x_post(
+      cpu_registers::X21,
+      cpu_registers::X22,
+      cpu_registers::SP,
+      2 * x_register_size);
+    emitter.ldp_x_post(
+      cpu_registers::X19,
+      cpu_registers::X20,
+      cpu_registers::SP,
+      2 * x_register_size);
+    emitter.pop_fp_lr();
+    emitter.ret();
+
+    return create_jit_function(
+      std::move(signature),
+      emitter.code,
+      locals_size,
+      max_stack_size);
+}
+
+}    // namespace slang::jit::aarch64

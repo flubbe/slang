@@ -150,7 +150,7 @@ fn test_struct() -> void {
         d: 6.2f64
     };
 
-    std::print(std::format!("{} {} {} {} {} {}\n", s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));
+    std::print(std::format!("{} {} {} {} {} {}\n", s.c as i32, s.s as i32, s.i, s.l, s.f, s.d));
 
     std::assert(s.c == 1i8, "s.c == 1i8");
     std::assert(s.s == 2i16, "s.s == 2i16");

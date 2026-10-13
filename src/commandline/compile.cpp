@@ -52,6 +52,7 @@ void compile::invoke(const std::vector<std::string>& args)
         ("no-lang", "Exclude default language modules.")
         ("search-path", "Additional search paths for module resolution, separated by ';'.", cxxopts::value<std::string>())
         ("no-eval-const-subexpr", "Disable constant subexpression evaluation")
+        ("no-opt-cfg", "Disable control flow graph analysis")
         ("filename", "The file to compile", cxxopts::value<std::string>());
     // clang-format on
 
@@ -116,6 +117,7 @@ void compile::invoke(const std::vector<std::string>& args)
     // Flags.
 
     bool evaluate_constant_subexpressions = result.count("no-eval-const-subexpr") == 0;
+    bool enable_cfg = result.count("no-opt-cfg") == 0;
     if(verbose)
     {
         if(!evaluate_constant_subexpressions)
@@ -255,15 +257,27 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->type_check(type_ctx, sema_env);
     ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
     ast->expand_late_macros(co_ctx, resolver_ctx, type_ctx, sema_env);
-    ast->evaluate_constant_expressions(type_ctx, const_env);
+    ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
 
     // code generation and verification.
     ast->generate_code(codegen_ctx);
     cfg::verify(codegen_ctx.get_functions());
 
     // CFG simplification and verification.
-    cfg_context.run();
-    cfg::verify(codegen_ctx.get_functions());
+    if(enable_cfg)
+    {
+        if(verbose)
+        {
+            std::println("Info: Running CFG simplification.");
+        }
+
+        cfg_context.run();
+        cfg::verify(codegen_ctx.get_functions());
+    }
+    else if(verbose)
+    {
+        std::println("Info: Not running CFG simplification.");
+    }
 
     emitter.run();
 
