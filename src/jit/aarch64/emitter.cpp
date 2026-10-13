@@ -180,8 +180,8 @@ void instruction_emitter::asrv_w(
   cpu_registers wn,
   cpu_registers wm)
 {
-    // AArch64 ASRV (register) base opcode for 32-bit
-    emit(encode_register_fields(0x1AC02800u, wd, wn, wm));
+    emit(
+      encode_register_fields(0x1AC02800u, wd, wn, wm));
 }
 
 void instruction_emitter::asrv_x(
@@ -189,8 +189,8 @@ void instruction_emitter::asrv_x(
   cpu_registers xn,
   cpu_registers xm)
 {
-    // AArch64 ASRV (register) base opcode for 64-bit
-    emit(encode_register_fields(0x9AC02800u, xd, xn, xm));
+    emit(
+      encode_register_fields(0x9AC02800u, xd, xn, xm));
 }
 
 void instruction_emitter::b(
@@ -362,10 +362,11 @@ void instruction_emitter::movk_w(
           "MOVK W shift must be 0 or 16"};
     }
 
-    emit(encode_wide_immediate_fields(
-      0x72800000u,
-      xd,
-      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
+    emit(
+      encode_wide_immediate_fields(
+        0x72800000u,
+        xd,
+        {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
 }
 
 void instruction_emitter::movk_x(
@@ -379,10 +380,11 @@ void instruction_emitter::movk_x(
           "MOVK X shift must be 0, 16, 32 or 48"};
     }
 
-    emit(encode_wide_immediate_fields(
-      0xF2800000u,
-      xd,
-      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
+    emit(
+      encode_wide_immediate_fields(
+        0xF2800000u,
+        xd,
+        {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
 }
 
 void instruction_emitter::movn_w(
@@ -396,10 +398,11 @@ void instruction_emitter::movn_w(
           "MOVN W shift must be 0 or 16"};
     }
 
-    emit(encode_wide_immediate_fields(
-      0x12800000u,
-      xd,
-      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
+    emit(
+      encode_wide_immediate_fields(
+        0x12800000u,
+        xd,
+        {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
 }
 
 void instruction_emitter::movz_w(
@@ -413,10 +416,11 @@ void instruction_emitter::movz_w(
           "MOVZ W shift must be 0 or 16"};
     }
 
-    emit(encode_wide_immediate_fields(
-      0x52800000u,
-      xd,
-      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
+    emit(
+      encode_wide_immediate_fields(
+        0x52800000u,
+        xd,
+        {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x1u}));
 }
 
 void instruction_emitter::movz_x(
@@ -430,10 +434,11 @@ void instruction_emitter::movz_x(
           "MOVZ X shift must be 0, 16, 32 or 48"};
     }
 
-    emit(encode_wide_immediate_fields(
-      0xD2800000u,
-      xd,
-      {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
+    emit(
+      encode_wide_immediate_fields(
+        0xD2800000u,
+        xd,
+        {.imm16 = imm16, .shift_amount = shift, .hw_mask = 0x3u}));
 }
 
 void instruction_emitter::msub_w(
