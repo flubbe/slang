@@ -16,6 +16,7 @@
 #include "interpreter.h"
 #include "package.h"
 #include "stack.h"
+#include "type_utils.h"
 #include "utils.h"
 
 namespace slang::interpreter
@@ -69,84 +70,113 @@ static bool is_garbage_collected(type_class v) noexcept
     return v == type_class::ref;
 }
 
-/** Byte sizes and alignments for built-in types. */
-const auto& type_properties_map()
+/** Get the byte size and alignment for the native representation of a type. */
+inline std::optional<type_properties> get_native_type_properties(
+  std::string_view type_name)
 {
-    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
-      {"void", {0, 0}},
-      {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
-      {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
-      {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
-      {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
-      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
+    if(type_name == "void")
+    {
+        return type_properties{
+          .size = 0,
+          .alignment = 0,
+          .flags = 0,
+          .layout_id = 0};
+    }
 
-    return map;
-}
+    if(type_name == "i8")
+    {
+        return type_properties{
+          .size = sizeof(std::int8_t),
+          .alignment = alignof(std::int8_t),
+          .flags = 0,
+          .layout_id = 0};
+    }
 
-/** Native byte sizes and alignments for built-in types. */
-const auto& native_type_properties_map()
-{
-    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
-      {"void", {0, 0}},
-      {"i8", {sizeof(std::int8_t), std::alignment_of_v<std::int8_t>}},
-      {"i16", {sizeof(std::int16_t), std::alignment_of_v<std::int16_t>}},
-      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},
-      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},
-      {"f32", {sizeof(float), std::alignment_of_v<float>}},
-      {"f64", {sizeof(double), std::alignment_of_v<double>}},
-      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};
+    if(type_name == "i16")
+    {
+        return type_properties{
+          .size = sizeof(std::int16_t),
+          .alignment = alignof(std::int16_t),
+          .flags = 0,
+          .layout_id = 0};
+    }
 
-    return map;
+    if(type_name == "i32")
+    {
+        return type_properties{
+          .size = sizeof(std::int32_t),
+          .alignment = alignof(std::int32_t),
+          .flags = 0,
+          .layout_id = 0};
+    }
+
+    if(type_name == "i64")
+    {
+        return type_properties{
+          .size = sizeof(std::int64_t),
+          .alignment = alignof(std::int64_t),
+          .flags = 0,
+          .layout_id = 0};
+    }
+
+    if(type_name == "f32")
+    {
+        return type_properties{
+          .size = sizeof(float),
+          .alignment = alignof(float),
+          .flags = 0,
+          .layout_id = 0};
+    }
+
+    if(type_name == "f64")
+    {
+        return type_properties{
+          .size = sizeof(double),
+          .alignment = alignof(double),
+          .flags = 0,
+          .layout_id = 0};
+    }
+
+    if(type_name == "str")
+    {
+        {
+            return type_properties{
+              .size = sizeof(std::string*),
+              .alignment = alignof(std::string*),
+              .flags = 0,
+              .layout_id = 0};
+        }
+    }
+
+    // not a built-in type.
+    return std::nullopt;
 }
 
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const module_::variable_descriptor& v)
+static std::size_t get_type_or_reference_size(
+  const module_::variable_descriptor& v)
 {
     if(v.type.base_type().empty())
     {
         throw interpreter_error("Unable to determine type size for empty type.");
     }
 
-    if(v.type.is_array() || ty::is_reference_type(v.type.base_type()))
+    if(v.type.is_array()
+       || ty::is_reference_type(v.type.base_type()))
     {
         return sizeof(void*);
     }
 
-    auto built_in_it = type_properties_map().find(v.type.base_type());
-    if(built_in_it != type_properties_map().end())
+    auto built_in = get_built_in_type_properties(v.type.base_type());
+    if(built_in.has_value())
     {
-        return built_in_it->second.first;
+        return built_in.value().size;
     }
 
     throw interpreter_error(
       std::format(
         "Unable to determine type size for '{}'.",
         v.type.base_type()));
-}
-
-/** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(const module_::variable_type& v)
-{
-    if(v.base_type().empty())
-    {
-        throw interpreter_error("Unable to determine type size for empty type.");
-    }
-
-    if(v.is_array())
-    {
-        return sizeof(void*);
-    }
-
-    auto built_in_it = type_properties_map().find(v.base_type());
-    if(built_in_it != type_properties_map().end())
-    {
-        return built_in_it->second.first;
-    }
-
-    // FIXME Assume all other types are references.
-    return sizeof(void*);
 }
 
 /**
@@ -226,9 +256,9 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     if(type.is_array())
     {
         return {
-          .flags = 0,
           .size = sizeof(void*),
           .alignment = std::alignment_of_v<void*>,
+          .flags = 0,
           .layout_id = 0};
     }
 
@@ -236,20 +266,16 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     if(type.base_type() == "void")
     {
         return {
-          .flags = 0,
           .size = 0,
           .alignment = 0,
+          .flags = 0,
           .layout_id = 0};
     }
 
-    auto built_in_it = type_properties_map().find(type.base_type());
-    if(built_in_it != type_properties_map().end())
+    auto built_in = get_built_in_type_properties(type.base_type());
+    if(built_in.has_value())
     {
-        return {
-          .flags = 0,
-          .size = built_in_it->second.first,
-          .alignment = built_in_it->second.second,
-          .layout_id = 0};
+        return built_in.value();
     }
 
     // structs.
@@ -263,9 +289,9 @@ type_properties module_loader::get_type_properties(const module_::variable_type&
     }
 
     return {
-      .flags = type_it->second.flags,
       .size = type_it->second.size,
       .alignment = type_it->second.alignment,
+      .flags = type_it->second.flags,
       .layout_id = type_it->second.layout_id};
 }
 
@@ -284,8 +310,8 @@ void module_loader::decode_structs()
             bool add_to_layout = false;
 
             // check that the type exists and get its properties.
-            auto built_in_it = native_type_properties_map().find(member_type.base_type.base_type());
-            if(built_in_it != native_type_properties_map().end())
+            auto built_in = get_native_type_properties(member_type.base_type.base_type());
+            if(built_in.has_value())
             {
                 if(is_garbage_collected(member_type))
                 {
@@ -296,8 +322,8 @@ void module_loader::decode_structs()
                 }
                 else
                 {
-                    member_type.size = built_in_it->second.first;
-                    member_type.alignment = built_in_it->second.second;
+                    member_type.size = built_in.value().size;
+                    member_type.alignment = built_in.value().alignment;
                 }
             }
             else
@@ -1690,8 +1716,8 @@ field_properties module_loader::get_field_properties(
         throw interpreter_error("Invalid struct type name 'void'.");
     }
 
-    auto built_in_it = type_properties_map().find(type_name);
-    if(built_in_it != type_properties_map().end())
+    auto built_in = get_built_in_type_properties(type_name);
+    if(built_in.has_value())
     {
         throw interpreter_error(
           std::format(
