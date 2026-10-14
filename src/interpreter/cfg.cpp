@@ -23,6 +23,8 @@ namespace
 
 using namespace slang;
 using slang::interpreter::field_properties;
+using slang::interpreter::get_stack_delta;
+using slang::interpreter::get_stack_slot_size;
 using slang::interpreter::get_type_or_reference_size;
 using slang::interpreter::interpreter_error;
 using slang::interpreter::module_loader;
@@ -31,26 +33,6 @@ using slang::module_::imported_symbol;
 
 /** JNZ condition size on stack. */
 constexpr auto jnz_condition_size = static_cast<std::int32_t>(sizeof(std::int32_t));
-
-/**
- * Calculate the stack size delta from a function's signature.
- *
- * @param s The signature.
- * @returns The stack size delta.
- */
-// FIXME Duplicated from module_loader.cpp
-std::int32_t get_stack_delta(
-  const module_::function_signature& s)
-{
-    auto return_type_size = get_type_or_reference_size(s.return_type);
-    std::int32_t arg_size = 0;
-    for(const auto& it: s.arg_types)
-    {
-        arg_size += utils::numeric_cast<std::int32_t>(get_type_or_reference_size(it));
-        // NOTE stack contents are not aligned.
-    }
-    return utils::numeric_cast<std::int32_t>(return_type_size) - arg_size;
-}
 
 std::int32_t get_opcode_stack_delta(
   const module_loader& loader,
@@ -529,10 +511,10 @@ std::int32_t get_opcode_stack_delta(
         if(op == opcode::setfield)
         {
             return static_cast<std::int32_t>(
-              -sizeof(void*) - utils::get_stack_slot_size(properties.size));
+              -sizeof(void*) - get_stack_slot_size(properties.size));
         }
 
-        return static_cast<std::int32_t>(-sizeof(void*) + utils::get_stack_slot_size(properties.size));
+        return static_cast<std::int32_t>(-sizeof(void*) + get_stack_slot_size(properties.size));
     }
     /* checkcast */
     case opcode::checkcast:

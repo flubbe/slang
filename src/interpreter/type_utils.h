@@ -1,7 +1,18 @@
+/**
+ * slang - a simple scripting language.
+ *
+ * type helpers.
+ *
+ * \author Felix Lubbe
+ * \copyright Copyright (c) 2025
+ * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
+ */
+
 #pragma once
 
 #include <string_view>
 
+#include "shared/type_utils.h"
 #include "types.h"
 
 namespace slang::interpreter
@@ -96,6 +107,27 @@ inline std::size_t get_type_or_reference_size(
 
     // FIXME Assume all other types are references.
     return sizeof(void*);
+}
+
+/**
+ * Check if a type is garbage collected.
+ *
+ * @param t The type string.
+ * @returns Return whether a type is garbage collected.
+ */
+inline bool is_garbage_collected(
+  const module_::variable_type& t) noexcept
+{
+    namespace ty = slang::typing;
+
+    if(t.base_type() == "void")
+    {
+        return false;
+    }
+
+    // check for built-in non-gc types.
+    return t.is_array()
+           || ty::is_reference_type(t.base_type());
 }
 
 }    // namespace slang::interpreter

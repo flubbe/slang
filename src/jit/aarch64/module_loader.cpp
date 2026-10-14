@@ -12,17 +12,17 @@
 #include <unordered_set>
 
 #include "interpreter/types.h"
+#include "interpreter/type_utils.h"
 #include "jit/aarch64.h"
 #include "shared/type_utils.h"
 #include "shared/type_class.h"
 #include "package.h"
 #include "utils.h"
 
-namespace ty = slang::typing;
-
 namespace slang::jit::aarch64
 {
 
+using slang::interpreter::is_garbage_collected;
 using slang::interpreter::type_properties;
 
 namespace
@@ -75,40 +75,6 @@ public:
 };
 
 }    // namespace
-
-/**
- * Check if a type is garbage collected.
- *
- * FIXME duplicated from the interpreter's module_loader.
- *
- * @param t The type string.
- * @returns Return whether a type is garbage collected.
- */
-bool is_garbage_collected(
-  const module_::variable_type& t) noexcept
-{
-    if(t.base_type() == "void")
-    {
-        return false;
-    }
-
-    // check for built-in non-gc types.
-    return t.is_array() || ty::is_reference_type(t.base_type());
-}
-
-/**
- * Check if a field is garbage collected.
- *
- * FIXME duplicated from the interpreter's module_loader.
- *
- * @param info The type info.
- * @returns Return whether a type is garbage collected.
- */
-static bool is_garbage_collected(
-  const slang::module_::field_descriptor& info) noexcept
-{
-    return info.base_type.is_array() || is_garbage_collected(info.base_type);
-}
 
 /** Get the byte size and alignment for the native representation of a type. */
 inline std::optional<type_properties> get_native_type_properties(
@@ -299,7 +265,7 @@ void module_loader::decode_structs()
             auto built_in = get_native_type_properties(member_type.base_type.base_type());
             if(built_in.has_value())
             {
-                if(is_garbage_collected(member_type))
+                if(is_garbage_collected(member_type.base_type))
                 {
                     member_type.size = sizeof(void*);
                     member_type.alignment = std::alignment_of_v<void*>;

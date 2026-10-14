@@ -37,35 +37,14 @@ static_assert(sizeof(fixed_vector<double>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
 static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
 
-bool is_garbage_collected(const module_::variable_type& t) noexcept
-{
-    if(t.base_type() == "void")
-    {
-        return false;
-    }
-
-    // check for built-in non-gc types.
-    return t.is_array() || ty::is_reference_type(t.base_type());
-}
-
-/**
- * Check if a field is garbage collected.
- *
- * @param info The type info.
- * @returns Return whether a type is garbage collected.
- */
-static bool is_garbage_collected(const slang::module_::field_descriptor& info) noexcept
-{
-    return info.base_type.is_array() || is_garbage_collected(info.base_type);
-}
-
 /**
  * Check if a stack value is garbage collected.
  *
  * @param v The value.
  * @returns Return whether a stack value is garbage collected.
  */
-static bool is_garbage_collected(type_class v) noexcept
+static bool is_garbage_collected(
+  type_class v) noexcept
 {
     return v == type_class::ref;
 }
@@ -177,24 +156,6 @@ static std::size_t get_type_or_reference_size(
       std::format(
         "Unable to determine type size for '{}'.",
         v.type.base_type()));
-}
-
-/**
- * Calculate the stack size delta from a function's signature.
- *
- * @param s The signature.
- * @returns The stack size delta.
- */
-static std::int32_t get_stack_delta(const module_::function_signature& s)
-{
-    auto return_type_size = get_type_or_reference_size(s.return_type);
-    std::int32_t arg_size = 0;
-    for(const auto& it: s.arg_types)
-    {
-        arg_size += utils::numeric_cast<std::int32_t>(get_type_or_reference_size(it));
-        // NOTE stack contents are not aligned.
-    }
-    return utils::numeric_cast<std::int32_t>(return_type_size) - arg_size;
 }
 
 /**
@@ -313,7 +274,7 @@ void module_loader::decode_structs()
             auto built_in = get_native_type_properties(member_type.base_type.base_type());
             if(built_in.has_value())
             {
-                if(is_garbage_collected(member_type))
+                if(is_garbage_collected(member_type.base_type))
                 {
                     member_type.size = sizeof(void*);
                     member_type.alignment = std::alignment_of_v<void*>;
@@ -1451,10 +1412,10 @@ std::int32_t module_loader::decode_instruction(
 
         if(static_cast<opcode>(instr) == opcode::setfield)
         {
-            return static_cast<std::int32_t>(-sizeof(void*) - utils::get_stack_slot_size(properties.size));
+            return static_cast<std::int32_t>(-sizeof(void*) - get_stack_slot_size(properties.size));
         }
 
-        return static_cast<std::int32_t>(-sizeof(void*) + utils::get_stack_slot_size(properties.size));
+        return static_cast<std::int32_t>(-sizeof(void*) + get_stack_slot_size(properties.size));
     }
     /* checkcast */
     case opcode::checkcast:
