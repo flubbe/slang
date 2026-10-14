@@ -19,23 +19,13 @@
 #include "type_utils.h"
 #include "utils.h"
 
-namespace slang::interpreter
+namespace
 {
 
-namespace ty = slang::typing;
-
-/*
- * Verify size assumptions for arrays.
- */
-
-static_assert(sizeof(fixed_vector<std::int8_t>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<std::int16_t>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<std::int32_t>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<std::int64_t>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<double>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
-static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
+using namespace slang;
+using slang::interpreter::get_built_in_type_properties;
+using slang::interpreter::get_type_or_reference_size;
+using slang::interpreter::interpreter_error;
 
 /**
  * Check if a stack value is garbage collected.
@@ -43,101 +33,22 @@ static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
  * @param v The value.
  * @returns Return whether a stack value is garbage collected.
  */
-static bool is_garbage_collected(
+bool is_garbage_collected(
   type_class v) noexcept
 {
     return v == type_class::ref;
 }
 
-/** Get the byte size and alignment for the native representation of a type. */
-inline std::optional<type_properties> get_native_type_properties(
-  std::string_view type_name)
-{
-    if(type_name == "void")
-    {
-        return type_properties{
-          .size = 0,
-          .alignment = 0,
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "i8")
-    {
-        return type_properties{
-          .size = sizeof(std::int8_t),
-          .alignment = alignof(std::int8_t),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "i16")
-    {
-        return type_properties{
-          .size = sizeof(std::int16_t),
-          .alignment = alignof(std::int16_t),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "i32")
-    {
-        return type_properties{
-          .size = sizeof(std::int32_t),
-          .alignment = alignof(std::int32_t),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "i64")
-    {
-        return type_properties{
-          .size = sizeof(std::int64_t),
-          .alignment = alignof(std::int64_t),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "f32")
-    {
-        return type_properties{
-          .size = sizeof(float),
-          .alignment = alignof(float),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "f64")
-    {
-        return type_properties{
-          .size = sizeof(double),
-          .alignment = alignof(double),
-          .flags = 0,
-          .layout_id = 0};
-    }
-
-    if(type_name == "str")
-    {
-        {
-            return type_properties{
-              .size = sizeof(std::string*),
-              .alignment = alignof(std::string*),
-              .flags = 0,
-              .layout_id = 0};
-        }
-    }
-
-    // not a built-in type.
-    return std::nullopt;
-}
-
 /** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-static std::size_t get_type_or_reference_size(
+std::size_t get_type_or_reference_size(
   const module_::variable_descriptor& v)
 {
+    namespace ty = slang::typing;
+
     if(v.type.base_type().empty())
     {
-        throw interpreter_error("Unable to determine type size for empty type.");
+        throw interpreter_error{
+          "Unable to determine type size for empty type."};
     }
 
     if(v.type.is_array()
@@ -163,11 +74,13 @@ static std::size_t get_type_or_reference_size(
  *
  * @param desc The function descriptor.
  */
-static void decode_locals(module_::function_descriptor& desc)
+void decode_locals(
+  module_::function_descriptor& desc)
 {
     if(desc.native)
     {
-        throw interpreter_error("Cannot decode locals for native function.");
+        throw interpreter_error{
+          "Cannot decode locals for native function."};
     }
     auto& details = std::get<module_::function_details>(desc.details);
 
@@ -177,7 +90,8 @@ static void decode_locals(module_::function_descriptor& desc)
     std::size_t arg_count = desc.signature.arg_types.size();
     if(arg_count > details.locals.size())
     {
-        throw interpreter_error("Function argument count exceeds locals count.");
+        throw interpreter_error{
+          "Function argument count exceeds locals count."};
     }
 
     // arguments.
@@ -210,6 +124,26 @@ static void decode_locals(module_::function_descriptor& desc)
     // return type
     details.return_size = get_type_or_reference_size(desc.signature.return_type);
 }
+
+}    // namespace
+
+namespace slang::interpreter
+{
+
+/*
+ * Verify size assumptions for arrays.
+ */
+
+static_assert(sizeof(fixed_vector<std::int8_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::int16_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::int32_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::int64_t>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<float>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<double>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<std::string*>) == sizeof(void*));
+static_assert(sizeof(fixed_vector<void*>) == sizeof(void*));
+
+namespace ty = slang::typing;
 
 type_properties module_loader::get_type_properties(const module_::variable_type& type) const
 {
@@ -908,7 +842,7 @@ std::int32_t module_loader::decode_instruction(
         std::size_t size2 = layout2.size;
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
+        std::uint8_t needs_gc = ::is_garbage_collected(v1) ? 1 : 0;
 
         write_value(code, size1);
         write_value(code, size2);
@@ -934,8 +868,8 @@ std::int32_t module_loader::decode_instruction(
         std::size_t size2 = layout2.size;
 
         // check if the types needs garbage collection.
-        std::uint8_t needs_gc1 = is_garbage_collected(v1) ? 1 : 0;
-        std::uint8_t needs_gc2 = is_garbage_collected(v2) ? 1 : 0;
+        std::uint8_t needs_gc1 = ::is_garbage_collected(v1) ? 1 : 0;
+        std::uint8_t needs_gc2 = ::is_garbage_collected(v2) ? 1 : 0;
 
         write_value(code, size1);
         write_value(code, size2);
@@ -965,7 +899,7 @@ std::int32_t module_loader::decode_instruction(
         std::size_t size3 = layout3.size;
 
         // check if the type needs garbage collection.
-        std::uint8_t needs_gc = is_garbage_collected(v1) ? 1 : 0;
+        std::uint8_t needs_gc = ::is_garbage_collected(v1) ? 1 : 0;
 
         write_value(code, size1);
         write_value(code, size2);
@@ -1514,6 +1448,8 @@ std::int32_t module_loader::decode_instruction(
 
 void module_loader::resolve_type(module_::variable_type& type) const
 {
+    namespace ty = slang::typing;
+
     if(ty::is_builtin_type(type.base_type()))
     {
         if(type.import_index.has_value())
