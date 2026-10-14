@@ -824,12 +824,9 @@ void context::generate_dup(const lvalue& v)
                 std::make_unique<type_class_argument>(
                   lowering_ctx.get_type_class(
                     std::get<field_location_info>(v.get_location()).struct_type)));
-              args.emplace_back(
-                std::make_unique<type_class_argument>(
-                  type_class::cat1));
               insertion_point->add_instruction(
                 std::make_unique<instruction>(
-                  "dup2_x0",
+                  "dup",
                   std::move(args)));
           }
           else
