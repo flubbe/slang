@@ -172,4 +172,18 @@ class opcode_error : public std::runtime_error
  */
 archive& operator&(archive& ar, opcode& op);
 
+/**
+ * Skip instruction operands.
+ *
+ * @note Does not handle `opcode::label`, as it is not an opcode,
+ *     and throws an error instead.
+ *
+ * @param op The instruction.
+ * @param ar The archive holding the bytecode.
+ * @throws Throws `opcode_error` on unknown opcodes and `opcode::label`.
+ */
+void skip_operands(
+  opcode op,
+  archive& ar);
+
 }    // namespace slang
