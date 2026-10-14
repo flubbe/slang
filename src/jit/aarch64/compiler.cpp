@@ -800,48 +800,38 @@ void set_field(
               "Null pointer access during setfield."};
         }
 
-        const auto value_offset = stack_offset + stack_slot_size;
-        if(field_size == sizeof(void*))
+        std::int64_t stack_value{0};
+        std::memcpy(
+          &stack_value,
+          frame->stack.span().data() + stack_offset + stack_slot_size,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          sizeof(stack_value));
+
+        frame->gc->remove_temporary(object);
+
+        if(field_size == sizeof(void*)
+           && field_needs_gc)
         {
-            void* value{nullptr};
+            void* ptr_value{nullptr};
             std::memcpy(
-              static_cast<void*>(&value),
-              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
-
-            frame->gc->remove_temporary(object);
-            if(field_needs_gc)
-            {
-                frame->gc->remove_temporary(value);
-            }
-
-            std::memcpy(
-              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              static_cast<const void*>(&value),
-              sizeof(value));
+              static_cast<void*>(&ptr_value),
+              &stack_value,
+              sizeof(ptr_value));
+            frame->gc->remove_temporary(ptr_value);
         }
-        else if(field_size == sizeof(std::int32_t))
-        {
-            std::int32_t value{0};
-            std::memcpy(
-              &value,
-              frame->stack.span().data() + value_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
 
-            frame->gc->remove_temporary(object);
-
-            std::memcpy(
-              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              &value,
-              sizeof(value));
-        }
-        else
+        if(field_size != 1
+           && field_size != 2
+           && field_size != 4
+           && field_size != 8)    // NOLINT(readability-magic-numbers)
         {
             throw jit_error{
-              std::format(
-                "Invalid field size {} in setfield.",
-                field_size)};
+              std::format("Invalid field size {} in setfield.", field_size)};
         }
+
+        std::memcpy(
+          static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &stack_value,
+          field_size);
     }
     catch(...)
     {
@@ -866,6 +856,7 @@ void get_field(
           static_cast<void*>(&object),
           frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
           sizeof(object));
+
         if(object == nullptr)
         {
             throw jit_error{
@@ -874,44 +865,71 @@ void get_field(
 
         frame->gc->remove_temporary(object);
 
-        if(field_size == sizeof(void*))
-        {
-            void* value{nullptr};
-            std::memcpy(
-              static_cast<void*>(&value),
-              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
-            std::memcpy(
-              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              static_cast<const void*>(&value),
-              sizeof(value));
+        std::int64_t value64{0};
+        const auto* field_location = static_cast<std::byte*>(object) + field_offset;    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
-            if(field_needs_gc)
-            {
-                frame->gc->add_temporary(value);
-            }
+        switch(field_size)
+        {
+        case 1:
+        {
+            std::int8_t val{0};
+            std::memcpy(
+              &val,
+              field_location,
+              sizeof(val));
+            value64 = static_cast<std::int64_t>(val);    // Sign-extend. // NOLINT(bugprone-signed-char-misuse)
+            break;
         }
-        else if(field_size == sizeof(std::int32_t))
+        case 2:
         {
-            std::int32_t value{0};
+            std::int16_t val{0};
             std::memcpy(
-              &value,
-              static_cast<std::byte*>(object) + field_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-              sizeof(value));
-
-            // Sign-extend to 64-bit so the entire 8-byte slot is clean
-            const auto value64 = static_cast<std::int64_t>(value);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &val,
+              field_location,
+              sizeof(val));
+            value64 = static_cast<std::int64_t>(val);    // Sign-extend. // NOLINT(bugprone-signed-char-misuse)
+            break;
+        }
+        case 4:
+        {
+            std::int32_t val{0};
             std::memcpy(
-              frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+              &val,
+              field_location,
+              sizeof(val));
+            value64 = static_cast<std::int64_t>(val);    // Sign-extend. // NOLINT(bugprone-signed-char-misuse)
+            break;
+        }
+        case 8:    // NOLINT(readability-magic-numbers)
+        {
+            std::memcpy(
               &value64,
+              field_location,
               sizeof(value64));
+            break;
         }
-        else
-        {
+        default:
             throw jit_error{
               std::format(
                 "Invalid field size {} in getfield.",
                 field_size)};
+        }
+
+        // Write value the back to the stack slot.
+        std::memcpy(
+          frame->stack.span().data() + stack_offset,    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+          &value64,
+          sizeof(value64));
+
+        if(field_size == sizeof(void*)
+           && field_needs_gc)
+        {
+            void* ptr_value{nullptr};
+            std::memcpy(
+              static_cast<void*>(&ptr_value),
+              &value64,
+              sizeof(ptr_value));
+            frame->gc->add_temporary(ptr_value);
         }
     }
     catch(...)

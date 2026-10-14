@@ -3369,9 +3369,10 @@ std::unique_ptr<cg::rvalue> assignment_expression::emit_rvalue(
 
     if(is_compound)
     {
-        if(lhs->is_array_element_access())
+        if(lhs->is_array_element_access()
+           || lhs->is_struct_member_access())
         {
-            // duplicate array address and index.
+            // duplicate struct/array address and index.
             ctx.generate_dup(*lhs_value);
         }
 

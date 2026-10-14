@@ -30,6 +30,45 @@ fn test_struct() -> void {
     std::assert(s.i + (s.j as i32) == 5, "s.i + (s.j as i32) == 5");
 }
 
+fn object_access(obj: S[]) -> void {
+    let i: i32 = 0;
+    while(i < obj.length) {
+        let elem: S = obj[i];
+        elem.i += elem.j as i32;
+        ++i;
+    }
+}
+
+fn test_array_object_access() -> void {
+    let arr: S[] = new S[2];
+    let i: i32 = 0;
+    while(i < arr.length) {
+        arr[i] = S {
+            c: 0i8,
+            d: 1i8,
+            i: 2,
+            j: 3.f32
+        };
+        ++i;
+    }
+
+    object_access(arr);
+
+    std::assert(arr.length == 2, "arr.length == 2");
+
+    std::assert(arr[0].c == 0i8, "arr[0].c == 0i8");
+    std::assert(arr[1].c == 0i8, "arr[1].c == 0i8");
+
+    std::assert(arr[0].d == 1i8, "arr[0].d == 1i8");
+    std::assert(arr[1].d == 1i8, "arr[1].d == 1i8");
+
+    std::assert(arr[0].i == 5, "arr[0].i == 5");
+    std::assert(arr[1].i == 5, "arr[1].i == 5");
+
+    std::assert(arr[0].j == 3.f32, "arr[0].j == 3.f32");
+    std::assert(arr[1].j == 3.f32, "arr[1].j == 3.f32");
+}
+
 /*
  * linked lists.
  */
@@ -99,6 +138,7 @@ fn test_std_structs() -> void {
  */
 fn main(args: str[]) -> i32 {
     test_struct();
+    test_array_object_access();
     test_linked_list();
 
     test_std_structs();

@@ -14,6 +14,7 @@
 #include "cfg.h"
 #include "module_loader.h"
 #include "stack.h"
+#include "type_utils.h"
 #include "types.h"
 #include "utils.h"
 
@@ -22,75 +23,16 @@ namespace
 
 using namespace slang;
 using slang::interpreter::field_properties;
+using slang::interpreter::get_stack_delta;
+using slang::interpreter::get_stack_slot_size;
+using slang::interpreter::get_type_or_reference_size;
 using slang::interpreter::interpreter_error;
 using slang::interpreter::module_loader;
 using slang::module_::exported_symbol;
 using slang::module_::imported_symbol;
 
-/** Byte sizes and alignments for built-in types. */
-// FIXME Duplicated from module_loader.cpp
-const auto& type_properties_map()
-{
-    static const std::unordered_map<std::string, std::pair<std::size_t, std::size_t>> map{
-      {"void", {0, 0}},
-      {"i8", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},      // cat1
-      {"i16", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-      {"i32", {sizeof(std::int32_t), std::alignment_of_v<std::int32_t>}},     // cat1
-      {"i64", {sizeof(std::int64_t), std::alignment_of_v<std::int64_t>}},     // cat2
-      {"f32", {sizeof(float), std::alignment_of_v<float>}},                   // cat1
-      {"f64", {sizeof(double), std::alignment_of_v<double>}},                 // cat2
-      {"str", {sizeof(std::string*), std::alignment_of_v<std::string*>}}};    // ref
-
-    return map;
-}
-
-/** Get the type size (for built-in types) or the size of a type reference (for custom types). */
-// FIXME Duplicated from module_loader.cpp
-std::size_t get_type_or_reference_size(
-  const module_::variable_type& v)
-{
-    if(v.base_type().empty())
-    {
-        throw interpreter_error("Unable to determine type size for empty type.");
-    }
-
-    if(v.is_array())
-    {
-        return sizeof(void*);
-    }
-
-    auto built_in_it = type_properties_map().find(v.base_type());
-    if(built_in_it != type_properties_map().end())
-    {
-        return built_in_it->second.first;
-    }
-
-    // FIXME Assume all other types are references.
-    return sizeof(void*);
-}
-
 /** JNZ condition size on stack. */
 constexpr auto jnz_condition_size = static_cast<std::int32_t>(sizeof(std::int32_t));
-
-/**
- * Calculate the stack size delta from a function's signature.
- *
- * @param s The signature.
- * @returns The stack size delta.
- */
-// FIXME Duplicated from module_loader.cpp
-std::int32_t get_stack_delta(
-  const module_::function_signature& s)
-{
-    auto return_type_size = get_type_or_reference_size(s.return_type);
-    std::int32_t arg_size = 0;
-    for(const auto& it: s.arg_types)
-    {
-        arg_size += utils::numeric_cast<std::int32_t>(get_type_or_reference_size(it));
-        // NOTE stack contents are not aligned.
-    }
-    return utils::numeric_cast<std::int32_t>(return_type_size) - arg_size;
-}
 
 std::int32_t get_opcode_stack_delta(
   const module_loader& loader,
@@ -569,10 +511,10 @@ std::int32_t get_opcode_stack_delta(
         if(op == opcode::setfield)
         {
             return static_cast<std::int32_t>(
-              -sizeof(void*) - utils::get_stack_slot_size(properties.size));
+              -sizeof(void*) - get_stack_slot_size(properties.size));
         }
 
-        return static_cast<std::int32_t>(-sizeof(void*) + utils::get_stack_slot_size(properties.size));
+        return static_cast<std::int32_t>(-sizeof(void*) + get_stack_slot_size(properties.size));
     }
     /* checkcast */
     case opcode::checkcast:

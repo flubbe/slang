@@ -866,14 +866,14 @@ struct stack_frame
 /** Type properties. */
 struct type_properties
 {
-    /** Type flags. */
-    std::size_t flags{0};
-
     /** Type size. */
     std::size_t size{0};
 
     /** Type alignment. */
     std::size_t alignment{0};
+
+    /** Type flags (always `0` for non-struct types). */
+    std::size_t flags{0};
 
     /** Type layout id (always `0` for non-struct types). */
     std::size_t layout_id{0};

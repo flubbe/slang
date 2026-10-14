@@ -16,6 +16,7 @@
 #include "shared/opcodes.h"
 #include "interpreter.h"
 #include "package.h"
+#include "type_utils.h"
 #include "utils.h"
 #include "vector.h"
 
