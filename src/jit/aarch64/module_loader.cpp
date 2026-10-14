@@ -24,7 +24,6 @@ namespace slang::jit::aarch64
 
 using slang::interpreter::get_native_type_properties;
 using slang::interpreter::is_garbage_collected;
-using slang::interpreter::type_properties;
 
 namespace
 {
