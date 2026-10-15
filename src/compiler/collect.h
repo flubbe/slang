@@ -4,7 +4,7 @@
  * name collection.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -138,20 +138,18 @@ public:
     /**
      * Declare a symbol.
      *
-     * @param name The symbol name.
+     * @param tok The symbol token.
      * @param qualified_name Fully qualified symbol name.
      * @param type The symbol type.
-     * @param loc The symbol's location in the source.
      * @param declaring_module Symbol id of the module declaring the name, or `symbol_id::invalid` for the current module.
      * @param transitive Whether the symbol is transitively imported.
      * @param reference Optional reference (AST node or export header entry) to attach.
      * @returns The symbol id.
      */
     sema::symbol_id declare(
-      std::string name,
+      const token& tok,
       std::string qualified_name,
       sema::symbol_type type,
-      source_location loc,
       sema::symbol_id declaring_module,
       bool transitive,
       std::optional<
@@ -182,11 +180,14 @@ public:
      *
      * @param name Qualified or unqualified name of the symbol. If the name is fully qualified,
      *             the symbol will be searched in the global scope.
+     * @param type The symbol type.
+     * @param context Syntax context for hygiene. Defaults to `root_syntax_context`.
      * @returns Returns whether the symbol exists in the semantic environment.
      */
     bool has_symbol(
       const std::string& name,
-      sema::symbol_type type) const;
+      sema::symbol_type type,
+      syntax_context_id context = root_syntax_context) const;
 
     /**
      * Enter a scope by pushing it onto the scope stack.

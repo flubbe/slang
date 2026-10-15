@@ -4,7 +4,7 @@
  * `fmt` command implementation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -42,7 +42,7 @@ void write_file(
 bool is_supported_glob(
   const std::string& p)
 {
-    return p.find("**/*") != std::string::npos
+    return p.contains("**/*")
            || p.ends_with("/**")
            || p.ends_with("\\**");
 }
@@ -202,7 +202,7 @@ void fmt::invoke(
     std::set<fs::path> seen;
     for(const auto& arg: file_args)
     {
-        const bool explicit_extension_glob = arg.find("**/*.") != std::string::npos;
+        const bool explicit_extension_glob = arg.contains("**/*.");
         std::vector<fs::path> expanded;
         if(is_supported_glob(arg))
         {

@@ -4,7 +4,7 @@
  * abstract syntax tree (macros).
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -465,10 +465,9 @@ void macro_branch::collect_names(co::context& ctx)
           arg_name.s);
 
         ctx.declare(
-          arg_name.s,
+          arg_name,
           canonical_name,
           sema::symbol_type::macro_argument,
-          arg_name.location,
           sema::symbol_id::invalid,
           false);
     }
@@ -578,10 +577,9 @@ void macro_expression::collect_names(
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::macro,
-      name.location,
       sema::symbol_id::invalid,
       false,
       this);
