@@ -4,7 +4,7 @@
  * token helpers.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -96,6 +96,12 @@ struct comment_trivia
 /** `comment_trivia` serializer. */
 archive& operator&(archive& ar, comment_trivia& trivia);
 
+/** Syntax context id for hygiene tracking. */
+using syntax_context_id = std::uint32_t;
+
+/** Root syntax context (source code tokens outside macros). */
+inline constexpr syntax_context_id root_syntax_context{0};
+
 /** An evaluated token. */
 struct token
 {
@@ -129,6 +135,9 @@ struct token
     /** Trailing comments attached to this token. */
     std::vector<comment_trivia> trailing_comments;
 
+    /** Syntax context for hygiene tracking. */
+    syntax_context_id context{root_syntax_context};
+
     /** Default constructors. */
     token() = default;
     token(const token&) = default;
@@ -148,8 +157,9 @@ struct token
      * @param value The token's value. Defaults to `std::nullopt`.
      * @param leading_comments Leading comments. Defaults to empty.
      * @param trailing_comments Trailing comments. Defaults to empty.
+     * @param context Syntax context for hygiene tracking. Defaults to `root_syntax_context`.
      */
-     token(
+    token(
       std::string s,
       source_location location,
       token_type type = token_type::unknown,
@@ -157,7 +167,8 @@ struct token
       std::optional<const_value> value = std::nullopt,
       bool has_blank_line_before = false,
       std::vector<comment_trivia> leading_comments = {},
-      std::vector<comment_trivia> trailing_comments = {})
+      std::vector<comment_trivia> trailing_comments = {},
+      syntax_context_id context = root_syntax_context)
     : s{std::move(s)}
     , location{std::move(location)}
     , type{type}
@@ -166,29 +177,8 @@ struct token
     , has_blank_line_before{has_blank_line_before}
     , leading_comments{std::move(leading_comments)}
     , trailing_comments{std::move(trailing_comments)}
+    , context{context}
     {
-    }
-
-    /** Comparison operator. */
-    bool operator<(const token& other) const
-    {
-        if(location.line < other.location.line)
-        {
-            return true;
-        }
-        else if(location.line == other.location.line)
-        {
-            if(location.col < other.location.col)
-            {
-                return true;
-            }
-            else if(location.col == other.location.col)
-            {
-                return s < other.s;
-            }
-        }
-
-        return false;
     }
 };
 

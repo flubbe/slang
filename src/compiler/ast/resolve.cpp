@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -38,7 +38,8 @@ void type_expression::resolve_names(rs::context& ctx)
     ctx.resolve(
       get_qualified_name(),
       sema::symbol_type::type,
-      sema::scope::invalid_id);
+      sema::scope::invalid_id,
+      type_name.context);
 }
 
 /*
@@ -101,14 +102,16 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         symbol_id = ctx.resolve(
           get_qualified_name(),
           sema::symbol_type::macro_argument,
-          scope_id.value());
+          scope_id.value(),
+          name.context);
     }
     else
     {
         symbol_id = ctx.resolve(
           get_qualified_name(),
           sema::symbol_type::variable,
-          scope_id.value());
+          scope_id.value(),
+          name.context);
         if(symbol_id.has_value())
         {
             return;
@@ -117,7 +120,8 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         symbol_id = ctx.resolve(
           get_qualified_name(),
           sema::symbol_type::constant,
-          scope_id.value());
+          scope_id.value(),
+          name.context);
         if(symbol_id.has_value())
         {
             return;
@@ -239,7 +243,8 @@ void struct_named_initializer_expression::resolve_names(rs::context& ctx)
     symbol_id = ctx.resolve(
       qualified_name,
       sema::symbol_type::type,
-      scope_id.value());
+      scope_id.value(),
+      name.context);
     if(!symbol_id.has_value())
     {
         throw cg::codegen_error(
@@ -349,7 +354,8 @@ void call_expression::resolve_names(rs::context& ctx)
     symbol_id = ctx.resolve(
       name,
       sema::symbol_type::function,
-      scope_id.value());
+      scope_id.value(),
+      callee.context);
     if(!symbol_id.has_value())
     {
         throw cg::codegen_error(
@@ -390,7 +396,8 @@ void macro_invocation::resolve_names(rs::context& ctx)
     symbol_id = ctx.resolve(
       qualified_name,
       sema::symbol_type::macro,
-      scope_id.value());
+      scope_id.value(),
+      name.context);
     if(!symbol_id.has_value())
     {
         throw cg::codegen_error(

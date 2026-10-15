@@ -4,7 +4,7 @@
  * shared semantic environment.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -81,9 +81,10 @@ archive& operator&(archive& ar, symbol_id& id)
 std::optional<symbol_id> env::get_symbol_id(
   const std::string& name,
   symbol_type type,
-  scope_id id) const
+  scope_id id,
+  syntax_context_id context) const
 {
-    bool is_qualified_name = name.find("::") != std::string::npos;
+    bool is_qualified_name = name.contains("::");
     if(is_qualified_name)
     {
         // search the symbol table for qualified names.
@@ -101,6 +102,7 @@ std::optional<symbol_id> env::get_symbol_id(
     }
 
     // search scope bindings.
+    const bound_identifier bound_id{name, context};
     while(id != scope::invalid_id)
     {
         auto scope_it = scope_map.find(id);
@@ -112,13 +114,33 @@ std::optional<symbol_id> env::get_symbol_id(
                 id));
         }
 
-        auto it = scope_it->second.bindings.find(name);
+        auto it = scope_it->second.bindings.find(bound_id);
         if(it != scope_it->second.bindings.end())
         {
             auto symbol_it = it->second.find(type);
             if(symbol_it != it->second.end())
             {
                 return symbol_it->second;
+            }
+        }
+
+        // If context is non-root, also allow matching root_syntax_context in the global scope
+        // for global symbol types (function, type, constant, module_).
+        if(id == global_scope_id
+           && context != root_syntax_context
+           && type != symbol_type::variable
+           && type != symbol_type::argument
+           && type != symbol_type::macro_argument)
+        {
+            const bound_identifier root_bound_id{name, root_syntax_context};
+            auto root_it = scope_it->second.bindings.find(root_bound_id);
+            if(root_it != scope_it->second.bindings.end())
+            {
+                auto symbol_it = root_it->second.find(type);
+                if(symbol_it != root_it->second.end())
+                {
+                    return symbol_it->second;
+                }
             }
         }
 
@@ -236,7 +258,7 @@ std::string to_string(const env& env)
               "    ---------------------------------------------\n",
               scope_id);
 
-            for(const auto& [name, type_symbol_map]: s.bindings)
+            for(const auto& [bound_id, type_symbol_map]: s.bindings)
             {
                 for(const auto& [symbol_type, symbol_id]: type_symbol_map)
                 {
@@ -244,7 +266,9 @@ std::string to_string(const env& env)
                       "    {:>9}    {:>20}    {}\n",
                       symbol_id.value,
                       to_string(symbol_type),
-                      name);
+                      bound_id.context != root_syntax_context
+                        ? std::format("{}#{}", bound_id.name, bound_id.context)
+                        : bound_id.name);
                 }
             }
         }

@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -1632,7 +1632,7 @@ void import_statement::collect_names(co::context& ctx)
     super::collect_names(ctx);
 
     symbol_id = ctx.declare(
-      path.begin()->s,
+      *path.begin(),
       utils::join(
         path
           | std::views::transform([](const auto& c)
@@ -1640,7 +1640,6 @@ void import_statement::collect_names(co::context& ctx)
           | std::ranges::to<std::vector>(),
         "::"),
       sema::symbol_type::module_,
-      path.begin()->location,
       sema::symbol_id::invalid,
       false);
 }
@@ -2337,10 +2336,9 @@ void variable_declaration_expression::collect_names(co::context& ctx)
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::variable,
-      name.location,
       sema::symbol_id::invalid,
       false);
 
@@ -2533,10 +2531,9 @@ void constant_declaration_expression::collect_names(co::context& ctx)
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::constant,
-      name.location,
       sema::symbol_id::invalid,
       false);
 
@@ -2779,10 +2776,9 @@ void struct_definition_expression::collect_names(co::context& ctx)
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::type,
-      name.location,
       sema::symbol_id::invalid,
       false,
       this);
@@ -4980,10 +4976,9 @@ void prototype_ast::collect_names(co::context& ctx)
           std::get<0>(arg).s);
 
         std::get<1>(arg) = ctx.declare(
-          std::get<0>(arg).s,
+          std::get<0>(arg),
           canonical_name,
           sema::symbol_type::variable,
-          std::get<0>(arg).location,
           sema::symbol_id::invalid,
           false);
     }
@@ -5405,10 +5400,9 @@ void function_expression::collect_names(co::context& ctx)
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::function,
-      name.location,
       sema::symbol_id::invalid,
       false,
       this);
@@ -5638,7 +5632,7 @@ std::optional<ty::type_id> call_expression::type_check(
         auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
 
         std::string type_str = desc.signature.return_type.base_type();
-        if(type_str.find("::") == std::string::npos)
+        if(!type_str.contains("::"))
         {
             // Could be a built-in type or a local type.
             if(!ctx.has_type(type_str)
@@ -5679,16 +5673,15 @@ std::optional<ty::type_id> call_expression::type_check(
         for(std::size_t i = 0; i < args.size(); ++i)
         {
             std::string type_str = desc.signature.arg_types[i].base_type();
-            if(type_str.find("::") == std::string::npos)
+
+            if(!type_str.contains("::")
+               // Could be a built-in type or a local type.
+               && (!ctx.has_type(type_str)
+                   || !ctx.is_builtin(ctx.get_type(type_str))))
             {
-                // Could be a built-in type or a local type.
-                if(!ctx.has_type(type_str)
-                   || !ctx.is_builtin(ctx.get_type(type_str)))
-                {
-                    type_str = name::qualified_name(
-                      env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
-                      type_str);
-                }
+                type_str = name::qualified_name(
+                  env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
+                  type_str);
             }
 
             auto expected_arg_type = ctx.get_type(type_str);

@@ -4,7 +4,7 @@
  * token helpers.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -162,6 +162,7 @@ archive& operator&(archive& ar, token& tok)
     ar & tok.has_blank_line_before;
     ar & tok.leading_comments;
     ar & tok.trailing_comments;
+    ar & tok.context;
 
     return ar;
 }

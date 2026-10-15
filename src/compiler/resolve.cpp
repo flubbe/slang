@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -343,7 +343,7 @@ std::optional<sema::symbol_id> context::resolve_external(
     }
 
     global_scope_it->second.bindings.insert(
-      {info.qualified_name,
+      {sema::bound_identifier{info.qualified_name, root_syntax_context},
        std::unordered_map<sema::symbol_type, sema::symbol_id>{
          {info.type, new_symbol_id}}});
 
@@ -438,9 +438,10 @@ std::optional<sema::symbol_id> context::resolve_external(
 std::optional<sema::symbol_id> context::resolve(
   const std::string& name,
   sema::symbol_type type,
-  sema::scope_id scope_id)
+  sema::scope_id scope_id,
+  syntax_context_id context)
 {
-    if(name.rfind("::") != std::string_view::npos)
+    if(name.contains("::"))
     {
         // FIXME triple work
         std::string mod_name{name::module_path(name)};
@@ -512,7 +513,7 @@ std::optional<sema::symbol_id> context::resolve(
           s_it->second.bindings,
           [&name, &type](const auto& b) -> bool
           {
-              if(b.first != name)
+              if(b.first.name != name)
               {
                   return false;
               }
@@ -534,7 +535,8 @@ std::optional<sema::symbol_id> context::resolve(
     return sema_env.get_symbol_id(
       name,
       type,
-      scope_id);
+      scope_id,
+      context);
 }
 
 /**
@@ -722,10 +724,9 @@ void context::resolve_imports(
             }
 
             return import_collector.declare(
-              unqualified_name,
+              {unqualified_name, spec.location},
               qualified_module_name,
               sema::symbol_type::module_,
-              spec.location,
               spec.origin,
               transitive);
         }();
@@ -831,10 +832,9 @@ void context::resolve_imports(
               it.name);
 
             import_collector.declare(
-              it.name,
+              {it.name, resolved_it->second.location},
               qualified_name,
               to_sema_symbol_type(it.type),
-              resolved_it->second.location,
               module_id,
               transitive,
               &it);

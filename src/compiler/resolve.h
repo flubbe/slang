@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -199,12 +199,14 @@ public:
      * @param name The symbol's name (qualified or unqualified).
      * @param type Symbol type.
      * @param scope_id The scope id.
+     * @param context The syntax context for hygiene. Defaults to `root_syntax_context`.
      * @returns Returns the symbol id or `std::nullopt`.
      */
     std::optional<sema::symbol_id> resolve(
       const std::string& name,
       sema::symbol_type type,
-      sema::scope_id scope_id);
+      sema::scope_id scope_id,
+      syntax_context_id context = root_syntax_context);
 
     /**
      * Resolve imports.

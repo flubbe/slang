@@ -4,7 +4,7 @@
  * type system context.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -398,7 +398,7 @@ bool context::has_type(const std::string& name) const
 
 type_id context::get_type(const std::string& name) const
 {
-    bool is_name_qualified = name.find("::") != std::string::npos;
+    bool is_name_qualified = name.contains("::");
 
     auto it = std::ranges::find_if(
       type_info_map,
