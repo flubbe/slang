@@ -1,10 +1,10 @@
 /**
  * slang - a simple scripting language.
  *
- * the lexer.
+ * The lexer.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -118,7 +118,8 @@ public:
      *
      * @param str The input string.
      */
-    lexer(std::string str)
+    explicit lexer(
+      std::string str)
     : input{std::move(str)}
     , position{input.begin()}
     {
@@ -140,7 +141,8 @@ public:
      *
      * @param str The new input string. This is copied into the lexer.
      */
-    void set_input(const std::string& str)
+    void set_input(
+      const std::string& str)
     {
         input = str;
         position = input.begin();
@@ -160,8 +162,8 @@ public:
     /**
      * Get the next tokens.
      *
-     * @return The token produced by the lexer, or std::nullopt if the end of the stream was reached.
-     * @throws lexical_error on errors, including eof.
+     * @return The token produced by the lexer, or `std::nullopt` if the end of the stream was reached.
+     * @throws `lexical_error` on errors, including eof.
      */
     std::optional<token> next();
 
@@ -169,13 +171,15 @@ public:
      * Set the horizonal tab size.
      *
      * @param s How many spaces a tab is interpreted as. Must be at least 1.
-     * @throws Throws std::runtime_error if the size was zero.
+     * @throws Throws `std::runtime_error` if the size was zero.
      */
-    void set_tab_size(std::size_t s)
+    void set_tab_size(
+      std::size_t s)
     {
         if(s == 0)
         {
-            throw std::runtime_error("Invalid tab size.");
+            throw std::runtime_error{
+              "Invalid tab size."};
         }
         tab_size = s;
     }
