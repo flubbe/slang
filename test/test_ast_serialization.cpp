@@ -40,11 +40,8 @@ void run_test(
 {
     const std::string filename = std::format("ast_serialization_{}.bin", test_id);
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    ASSERT_NO_THROW(parser.parse(lexer));
+    ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
 
     slang::file_manager mgr;
     mgr.add_search_path(".");

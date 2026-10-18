@@ -37,13 +37,8 @@ TEST(resolve, std)
         const std::string test_input =
           "import std;\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -79,13 +74,8 @@ TEST(resolve, std)
           " return 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -123,13 +113,8 @@ TEST(resolve, std)
           " std::println(1);\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -169,6 +154,7 @@ TEST(resolve, syntax_context_hygiene)
 
     // First scope pushed is the global scope.
     auto global_scope = co_ctx.push_scope(std::string{"global"}, {1, 1});
+    (void)global_scope;
     // Create a local scope.
     auto local_scope = co_ctx.push_scope(std::string{"local_scope"}, {2, 1});
 
@@ -225,6 +211,7 @@ TEST(resolve, syntax_context_global_fallback)
 
     // First scope pushed is the global scope.
     auto global_scope = co_ctx.push_scope(std::string{"global"}, {1, 1});
+    (void)global_scope;
 
     // Declare a function 'foo' in global scope with root context.
     slang::token fn_tok{"foo", {1, 1}, slang::token_type::identifier, std::nullopt, std::nullopt, false, {}, {}, slang::root_syntax_context};

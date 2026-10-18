@@ -829,4 +829,21 @@ std::optional<token> lexer::next()
       std::move(trailing_comments)};
 }
 
+token_stream lexer::lex(
+  std::string_view input)
+{
+    lexer lexer{std::string{input}};
+
+    std::optional<token> current_token;
+    std::vector<token> tokens;
+
+    while((current_token = lexer.next()).has_value())
+    {
+        tokens.push_back(current_token.value());
+    }
+
+    return token_stream{
+      std::move(tokens)};
+}
+
 }    // namespace slang

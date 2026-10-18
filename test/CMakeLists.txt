@@ -43,6 +43,7 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
     ../src/compiler/token.cpp
+    ../src/compiler/token_stream.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
@@ -90,6 +91,9 @@ add_gtest_executable(test_lexer
 
 add_gtest_executable(test_parser test_parser.cpp)
 target_link_libraries(test_parser PRIVATE slang_test_frontend_core)
+
+add_gtest_executable(test_token_stream test_token_stream.cpp)
+target_link_libraries(test_token_stream PRIVATE slang_test_frontend_core)
 
 add_gtest_executable(test_codegen
     test_codegen.cpp

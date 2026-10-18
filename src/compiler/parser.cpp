@@ -1786,10 +1786,17 @@ void parser::pop_directive()
     directive_stack.pop_back();
 }
 
-void parser::parse(lexer& lexer)
+void parser::parse(
+  token_stream tokens)
 {
-    current_lexer = &lexer;
-    auto start_location = current_lexer->get_location();
+    this->tokens = std::move(tokens);
+    token_index = 0;
+    macro_asts.clear();
+    directive_stack.clear();
+
+    auto start_location = this->tokens->empty()
+                            ? source_location{1, 1}
+                            : this->tokens->front().location;
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
     while((current_token = get_next_token(false)).has_value())
@@ -1807,11 +1814,6 @@ void parser::parse(lexer& lexer)
         {
             macro_asts.emplace_back(exprs.back().get());
         }
-    }
-
-    if(!lexer.eof())
-    {
-        throw parser_error("Not all tokens parsed.");
     }
 
     ast = std::make_unique<ast::translation_unit>(

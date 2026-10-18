@@ -186,17 +186,10 @@ void compile::invoke(const std::vector<std::string>& args)
         input_ar->serialize(std::as_writable_bytes(std::span(input_buffer)));
     }
 
-    slang::lexer lexer;
     slang::parser parser;
 
-    lexer.set_input(input_buffer);
-    parser.parse(lexer);
-
-    if(!lexer.eof())
-    {
-        std::println("Lexer did not complete input reading.");
-        return;
-    }
+    auto tokens = slang::lexer::lex(input_buffer);
+    parser.parse(std::move(tokens));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     if(!ast)

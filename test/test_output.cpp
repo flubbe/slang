@@ -60,13 +60,8 @@ TEST(output, native_binding)
           "#[native(lib=slang)]\n"
           "fn println(s: str) -> void;\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -251,13 +246,8 @@ TEST(output, emitter)
           " return a as i32;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -313,13 +303,8 @@ TEST(output, hello_world)
           "\treturn 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -368,13 +353,8 @@ TEST(output, hello_world)
           "\treturn 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -438,13 +418,8 @@ TEST(output, operators)
           "fn shr(a: i32, b: i32) -> i32 { return a >> b; }\n"
           "fn mod(a: i32, b: i32) -> i32 { return a % b; }\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -490,13 +465,8 @@ TEST(output, operators)
           "\treturn 1 + 2;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -548,13 +518,8 @@ TEST(output, string_operations)
           "\treturn 0;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -600,13 +565,8 @@ TEST(output, string_operations)
           "\tlet c: str = \"a\" + \"b\";\n"    // cannot add strings
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -677,13 +637,8 @@ TEST(output, prefix_postfix)
           "\treturn i--;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -759,13 +714,8 @@ TEST(output, control_flow)
       " std::println(\"Test\");\n"
       "}\n";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    parser.parse(lexer);
-
-    EXPECT_TRUE(lexer.eof());
+    parser.parse(slang::lexer::lex(test_input));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -821,13 +771,8 @@ TEST(output, loops)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -892,13 +837,8 @@ TEST(output, loops)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -948,13 +888,8 @@ TEST(output, infinite_recursion)
           " inf();\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1009,13 +944,8 @@ TEST(output, arrays)
           " return b[1];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1098,13 +1028,8 @@ TEST(output, arrays)
           " let b: i32[] = new i32[-1];\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1149,13 +1074,8 @@ TEST(output, arrays)
           " return b[0];\n"    // wrong return type
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1193,13 +1113,8 @@ TEST(output, arrays)
           " return b[0];\n"    // not an array
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1237,13 +1152,8 @@ TEST(output, arrays)
           " return b;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1286,13 +1196,8 @@ TEST(output, arrays)
           " return b.length;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1364,13 +1269,8 @@ TEST(output, arrays)
           " array_copy(a, b);\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1411,11 +1311,8 @@ TEST(output, arrays)
         const std::string test_input =
           "fn array_copy(from: [], to: []) -> void;";    // need array type.
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        ASSERT_THROW(parser.parse(slang::lexer::lex(test_input)), slang::syntax_error);
     }
 }
 
@@ -1432,13 +1329,8 @@ TEST(output, return_discard)
           " return 123;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1500,13 +1392,8 @@ TEST(output, return_discard)
           " return r;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1555,13 +1442,8 @@ TEST(output, return_discard)
           " return r;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1609,13 +1491,8 @@ TEST(output, missing_return)
           "{\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1661,13 +1538,8 @@ TEST(output, structs)
           " t: str\n"
           "};";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1717,13 +1589,8 @@ TEST(output, structs)
           " return s.i + s.j as i32;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1779,13 +1646,8 @@ TEST(output, structs)
           " return i + s.i + s.j;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1832,13 +1694,8 @@ TEST(output, structs)
           " let s: S = S{s: null};\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1886,13 +1743,8 @@ TEST(output, structs)
           " s.i = 10;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1941,13 +1793,8 @@ TEST(output, structs)
           " return S{i:1, j:2.3 as f32, s: \"test\"};"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -1998,13 +1845,8 @@ TEST(output, structs)
           " s.s = \"test\";\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2057,13 +1899,8 @@ TEST(output, nested_structs)
           " root.next.next = null;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2121,13 +1958,8 @@ TEST(output, nested_structs)
           " return c.data.i + (c.data.f as i32);\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2180,13 +2012,8 @@ TEST(output, type_imports)
           " return c.data.i + (c.data.f as i32);\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2236,13 +2063,8 @@ TEST(output, null_assignment)
           " let s: i32 = null;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2286,13 +2108,8 @@ TEST(output, null_access)
           " return 0;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -2346,13 +2163,8 @@ TEST(output, multiple_modules)
 
         for(const auto& s: module_inputs)
         {
-            slang::lexer lexer;
             slang::parser parser;
-
-            lexer.set_input(s.second);
-            parser.parse(lexer);
-
-            EXPECT_TRUE(lexer.eof());
+            parser.parse(slang::lexer::lex(s.second));
 
             std::shared_ptr<ast::expression> ast = parser.get_ast();
 

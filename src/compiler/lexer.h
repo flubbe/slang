@@ -16,6 +16,7 @@
 #include <variant>
 
 #include "token.h"
+#include "token_stream.h"
 
 namespace slang
 {
@@ -166,6 +167,15 @@ public:
      * @throws `lexical_error` on errors, including eof.
      */
     std::optional<token> next();
+
+    /**
+     * Lex all input into a token stream.
+     *
+     * @param input The input string.
+     * @returns Returns a token stream.
+     */
+    static token_stream lex(
+      std::string_view input);
 
     /**
      * Set the horizonal tab size.

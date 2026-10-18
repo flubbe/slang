@@ -62,13 +62,8 @@ TEST(opt_cfg, remove_unreachable_blocks)
         }
         )";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    parser.parse(lexer);
-
-    EXPECT_TRUE(lexer.eof());
+    parser.parse(slang::lexer::lex(test_input));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
@@ -129,13 +124,8 @@ TEST(opt_cfg, while_loop_unreachable_blocks)
           "    return 0;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -198,13 +188,8 @@ TEST(opt_cfg, while_empty_blocks)
           "    return 0;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -267,13 +252,8 @@ TEST(opt_cfg, while_merge_blocks)
           "    return 0;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
