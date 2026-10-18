@@ -475,7 +475,7 @@ public:
         {
             throw interpreter_error("Stack underflow");
         }
-        return {&stack[stack.size() - n], n};
+        return std::span<std::byte>{stack}.last(n);
     }
 
     /**
