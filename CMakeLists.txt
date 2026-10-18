@@ -79,6 +79,7 @@ set(SOURCES
     src/compiler/resolve.cpp
     src/compiler/sema.cpp
     src/compiler/token.cpp
+    src/compiler/token_stream.cpp
     src/compiler/typing.cpp
     src/interpreter/cfg.cpp
     src/interpreter/gc.cpp
