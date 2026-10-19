@@ -42,6 +42,7 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
+    ../src/compiler/syntax_context.cpp
     ../src/compiler/token.cpp
     ../src/compiler/token_stream.cpp
     ../src/compiler/typing.cpp

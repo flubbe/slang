@@ -232,4 +232,128 @@ TEST(resolve, syntax_context_global_fallback)
     co_ctx.pop_scope();
 }
 
+TEST(resolve, syntax_context_table_management)
+{
+    // Standalone table verification.
+    slang::syntax_context_table table;
+    auto c1 = table.allocate(slang::root_syntax_context);
+    auto c2 = table.allocate(c1);
+
+    EXPECT_NE(c1, slang::root_syntax_context);
+    EXPECT_NE(c2, c1);
+    EXPECT_EQ(table.parent(c1), slang::root_syntax_context);
+    EXPECT_EQ(table.parent(c2), c1);
+    EXPECT_EQ(table.parent(999), slang::root_syntax_context);
+
+    // sema::env integration.
+    sema::env env1;
+    auto e1 = env1.syntax_contexts.allocate(slang::root_syntax_context);
+    auto e2 = env1.syntax_contexts.allocate(e1);
+    EXPECT_EQ(env1.syntax_contexts.parent(e1), slang::root_syntax_context);
+    EXPECT_EQ(env1.syntax_contexts.parent(e2), e1);
+
+    // Separate env instances have independent state (no global leak).
+    sema::env env2;
+    auto e3 = env2.syntax_contexts.allocate(slang::root_syntax_context);
+    EXPECT_EQ(e3, e1);    // fresh allocation starts at root_syntax_context + 1
+}
+
+TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
+{
+    slang::syntax_context_table contexts;
+    const auto definition_context = contexts.allocate(slang::root_syntax_context);
+    const auto call_site_context = contexts.allocate(slang::root_syntax_context);
+
+    slang::module_::macro_descriptor desc;
+    slang::module_::macro_branch_descriptor branch;
+    branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
+    branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$x",
+        {1, 1},
+        slang::token_type::macro_identifier},
+      slang::token{
+        "local",
+        {1, 4},
+        slang::token_type::identifier}}};
+    desc.branches.emplace_back(std::move(branch));
+
+    macro::macro m{
+      "test!",
+      std::move(desc),
+      std::nullopt,
+      definition_context};
+
+    slang::token argument{
+      "argument",
+      {2, 1},
+      slang::token_type::identifier,
+      std::nullopt,
+      std::nullopt,
+      false,
+      {},
+      {},
+      99};
+
+    const auto expanded = m.expand_macro(
+      {slang::token_stream{std::vector<slang::token>{argument}}},
+      call_site_context,
+      contexts);
+
+    ASSERT_EQ(expanded.size(), 2);
+    EXPECT_EQ(expanded[0].context, call_site_context);
+    EXPECT_NE(expanded[1].context, call_site_context);
+    EXPECT_EQ(contexts.parent(expanded[1].context), definition_context);
+
+    const auto second_expansion = m.expand_macro(
+      {slang::token_stream{std::vector<slang::token>{argument}}},
+      call_site_context,
+      contexts);
+    ASSERT_EQ(second_expansion.size(), 2);
+    EXPECT_NE(second_expansion[1].context, expanded[1].context);
+}
+
+TEST(macro, expansion_uses_branch_specific_parameters)
+{
+    slang::module_::macro_descriptor desc;
+
+    slang::module_::macro_branch_descriptor zero_branch;
+    zero_branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "zero",
+        {1, 1},
+        slang::token_type::identifier}}};
+
+    slang::module_::macro_branch_descriptor one_branch;
+    one_branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
+    one_branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$x",
+        {2, 1},
+        slang::token_type::macro_identifier}}};
+
+    desc.branches.emplace_back(std::move(zero_branch));
+    desc.branches.emplace_back(std::move(one_branch));
+
+    macro::macro m{"test!", std::move(desc)};
+    slang::syntax_context_table contexts;
+    const auto call_site_context = contexts.allocate(slang::root_syntax_context);
+
+    const auto zero = m.expand_macro({}, call_site_context, contexts);
+    ASSERT_EQ(zero.size(), 1);
+    EXPECT_EQ(zero[0].s, "zero");
+
+    slang::token argument{
+      "argument",
+      {3, 1},
+      slang::token_type::identifier};
+    const auto one = m.expand_macro(
+      {slang::token_stream{std::vector<slang::token>{argument}}},
+      call_site_context,
+      contexts);
+    ASSERT_EQ(one.size(), 1);
+    EXPECT_EQ(one[0].s, "argument");
+    EXPECT_EQ(one[0].context, call_site_context);
+}
+
 }    // namespace

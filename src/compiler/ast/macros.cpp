@@ -732,12 +732,36 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
     auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
     ar& expression_serializer{cloned_expr};
 
+    // Preserve each branch's capture list independently. Branches may have
+    // different arities and may use different parameter names.
+    std::vector<module_::macro_branch_descriptor> branch_descriptors;
+    branch_descriptors.reserve(branches.size());
+    for(const auto& branch: branches)
+    {
+        std::vector<module_::macro_parameter> params;
+        params.reserve(branch->args.size());
+        for(const auto& [arg_name, arg_type]: branch->args)
+        {
+            // FIXME arg_type unused in descriptor
+            params.emplace_back(module_::macro_parameter{arg_name.s});
+        }
+
+        branch_descriptors.emplace_back(
+          module_::macro_branch_descriptor{
+            std::move(params),
+            branch->args_end_with_list,
+            std::nullopt});
+    }
+
+    // Create descriptor and attach branch metadata. Token-body capture is a
+    // separate migration step; the legacy serialized AST remains populated.
+    module_::macro_descriptor desc{std::move(attributes), ar.get_buffer()};
+    desc.branches = std::move(branch_descriptors);
     macro_env.add_macro(
       name.s,
-      module_::macro_descriptor{
-        std::move(attributes),
-        ar.get_buffer()},
-      get_namespace_path());
+      desc,
+      get_namespace_path(),
+      name.context);
 }
 
 /**

@@ -3975,7 +3975,11 @@ public:
     }
 };
 
-/** Macro branch. */
+/**
+ * Macro branch.
+ *
+ * TODO More common names seem to be: macro_rule, macro_arm
+ */
 class macro_branch : public expression
 {
     friend class macro_expression;

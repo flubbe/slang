@@ -18,6 +18,7 @@
 
 #include "attribute.h"
 #include "location.h"
+#include "syntax_context.h"
 #include "token.h"
 #include "type.h"
 
@@ -256,6 +257,9 @@ struct env
 
     /** Current function name. */
     std::optional<std::string> current_function_name{std::nullopt};
+
+    /** Syntax context table for hygiene. */
+    syntax_context_table syntax_contexts;
 
     /** Default constructors. */
     env() = default;

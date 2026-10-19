@@ -4,7 +4,7 @@
  * compiled binary file (=module) support.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -20,6 +20,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
+#include "compiler/token_stream.h"
 
 /* Forward declarations. */
 namespace slang::interpreter
@@ -817,6 +818,26 @@ inline archive& operator&(archive& ar, directive_descriptor& desc)
     return ar;
 }
 
+/** Macro parameters. */
+struct macro_parameter
+{
+    /** Parameter name. */
+    std::string name;
+};
+
+/** Descriptor for one macro branch. */
+struct macro_branch_descriptor
+{
+    /** Parameters captured by this branch. */
+    std::vector<macro_parameter> params;
+
+    /** Whether the final parameter captures an expression list. */
+    bool args_end_with_list{false};
+
+    /** Token-stream body, when available. */
+    std::optional<token_stream> body;
+};
+
 /** Macro descriptor. */
 struct macro_descriptor
 {
@@ -825,6 +846,13 @@ struct macro_descriptor
 
     /** Serialized macro AST, or `std::nullopt` (for built-in macros). */
     std::optional<std::vector<std::byte>> serialized_ast;
+
+    /*
+     * TODO Remove old serialization code once done.
+     */
+
+    /** Branches for the token-stream macro implementation. */
+    std::vector<macro_branch_descriptor> branches;
 
     /** Default constructors. */
     macro_descriptor() = default;
