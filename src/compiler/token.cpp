@@ -65,6 +65,7 @@ std::string to_string(token_type ty)
     case token_type::int_literal: return "int_literal";
     case token_type::fp_literal: return "fp_literal";
     case token_type::str_literal: return "str_literal";
+    case token_type::end_of_input: return "end_of_input";
     }
 
     return "<unknown>";

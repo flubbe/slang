@@ -81,6 +81,12 @@ protected:
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
 
+    /** Parser-owned token used as lookahead after the input is exhausted. */
+    inline static const token end_of_input_token{
+      "<end-of-input>",
+      {1, 1},
+      token_type::end_of_input};
+
     /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
     bool parsing_native{false};
 
@@ -97,13 +103,14 @@ protected:
     /**
      * Get the next token and store it in the token buffer `current_token`.
      *
-     * @param throw_on_eof Whether to throw a `syntax_error` if the next token indicates the end of the file.
-     * @return Returns the read token.
+     * At the end of the stream, stores and returns the parser-owned
+     * `end_of_input` token. This gives parsing routines a stable lookahead
+     * token without adding an EOF token to the source token stream.
+     *
+     * @return Returns the read token, or the end-of-input token.
      * @throws A `parser_error` if no token stream is set.
-     *         A `syntax_error` if `throw_on_eof` is set and no token is available.
      */
-    std::optional<token> get_next_token(
-      bool throw_on_eof = true)
+    std::optional<token> get_next_token()
     {
         if(!tokens.has_value())
         {
@@ -113,12 +120,11 @@ protected:
 
         if(token_index >= tokens->size())
         {
-            if(throw_on_eof)
-            {
-                throw syntax_error{
-                  "Unexpected end of file."};
-            }
-            return std::nullopt;
+            current_token = end_of_input_token;
+            current_token->location = tokens->empty()
+                                        ? source_location{1, 1}
+                                        : tokens->back().location;
+            return current_token;
         }
 
         current_token = (*tokens)[token_index++];
@@ -323,6 +329,13 @@ public:
     /** Default constructor. */
     parser() = default;
 
+    /** Construct a parser for a token stream. */
+    explicit parser(
+      token_stream tokens)
+    : tokens{std::move(tokens)}
+    {
+    }
+
     /** Copy and move constructors. */
     parser(const parser&) = delete;
     parser(parser&&) = default;
@@ -356,6 +369,19 @@ public:
     {
         return self.macro_asts;
     }
+
+    /**
+     * Parse exactly one expression from a token stream.
+     *
+     * @param tokens The token stream containing the expression.
+     * @return The parsed expression.
+     * @throws A syntax_error if the stream is empty, the expression is
+     *     invalid, or tokens remain after the expression.
+     */
+    static std::unique_ptr<
+      ast::expression>
+      parse_expression(
+        token_stream tokens);
 };
 
 }    // namespace slang

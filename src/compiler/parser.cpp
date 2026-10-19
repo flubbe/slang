@@ -218,7 +218,7 @@ std::unique_ptr<ast::import_statement> parser::parse_import()
         token last_token = *current_token;    // store token for error reporting
         get_next_token();
 
-        if(!current_token.has_value())
+        if(current_token->type == token_type::end_of_input)
         {
             throw syntax_error(
               last_token,
@@ -350,7 +350,7 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
     source_location loc = current_token->location;
     std::unique_ptr<ast::prototype_ast> proto = parse_prototype();
-    if(!current_token.has_value())
+    if(current_token->type == token_type::end_of_input)
     {
         throw syntax_error("Unexpected end of file.");
     }
@@ -420,11 +420,22 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     if(current_token->s == "=")
     {
         get_next_token();    // skip '='.
+
+        auto expr = parse_expression();
+        if(current_token->s != ";")
+        {
+            throw syntax_error(
+              *current_token,
+              std::format(
+                "Expected ';', got '{}'.",
+                current_token->s));
+        }
+
         return std::make_unique<ast::variable_declaration_expression>(
           loc,
           std::move(name),
           std::move(type),
-          parse_expression());
+          std::move(expr));
     }
 
     throw syntax_error(
@@ -481,11 +492,21 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
 
     get_next_token();    // skip '='.
 
+    auto expr = parse_expression();
+    if(current_token->s != ";")
+    {
+        throw syntax_error(
+          *current_token,
+          std::format(
+            "Expected ';', got '{}'.",
+            current_token->s));
+    }
+
     return std::make_unique<ast::constant_declaration_expression>(
       loc,
       std::move(name),
       std::move(type),
-      parse_expression());
+      std::move(expr));
 }
 
 std::unique_ptr<ast::type_expression> parser::parse_type(
@@ -683,6 +704,12 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
     }
 
     get_next_token();    // skip "}"
+
+    if(current_token->type == token_type::end_of_input)
+    {
+        throw syntax_error("Unexpected end of file.");
+    }
+
     return std::make_unique<ast::struct_definition_expression>(
       loc,
       std::move(name),
@@ -830,7 +857,7 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
 
     if(skip_closing_brace)
     {
-        get_next_token(false);    // skip "}". (We might hit the end of the input.)
+        get_next_token();    // skip "}". (We might hit the end of the input.)
     }
 
     return std::make_unique<ast::block>(
@@ -1744,7 +1771,7 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
             "Expected ';', got '{}'.",
             current_token->s));
     }
-    get_next_token(false);    // skip ";".
+    get_next_token();    // skip ";".
 
     return std::make_unique<ast::macro_branch>(
       location,
@@ -1799,7 +1826,8 @@ void parser::parse(
                             : this->tokens->front().location;
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
-    while((current_token = get_next_token(false)).has_value())
+    while((current_token = get_next_token()).has_value()
+          && current_token->type != token_type::end_of_input)
     {
         // skip empty statements.
         if(current_token->s == ";")
@@ -1819,6 +1847,27 @@ void parser::parse(
     ast = std::make_unique<ast::translation_unit>(
       start_location,
       std::move(exprs));
+}
+
+std::unique_ptr<ast::expression> parser::parse_expression(
+  token_stream tokens)
+{
+    parser expression_parser{std::move(tokens)};
+    expression_parser.get_next_token();    // set up current_token
+
+    auto expression = expression_parser.parse_expression();
+
+    if(expression_parser.current_token->type
+       != token_type::end_of_input)
+    {
+        throw syntax_error(
+          *expression_parser.current_token,
+          std::format(
+            "Unexpected token '{}'.",
+            expression_parser.current_token->s));
+    }
+
+    return expression;
 }
 
 }    // namespace slang

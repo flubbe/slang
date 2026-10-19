@@ -35,6 +35,27 @@ TEST(parser, parse_token_stream)
     EXPECT_NE(parser.get_ast(), nullptr);
 }
 
+TEST(parser, parse_expression_token_stream)
+{
+    auto expression = slang::parser::parse_expression(
+      slang::lexer::lex("1 + 2"));
+    EXPECT_NE(expression, nullptr);
+}
+
+TEST(parser, parse_expression_token_stream_requires_full_consumption)
+{
+    EXPECT_THROW(
+      slang::parser::parse_expression(slang::lexer::lex("1 + 2 3")),
+      slang::syntax_error);
+}
+
+TEST(parser, parse_expression_token_stream_rejects_empty_input)
+{
+    EXPECT_THROW(
+      slang::parser::parse_expression(slang::token_stream{}),
+      slang::syntax_error);
+}
+
 TEST(parser, import_statement)
 {
     {
