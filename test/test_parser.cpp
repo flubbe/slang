@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/lexer.h"
 #include "compiler/parser.h"
 
 namespace

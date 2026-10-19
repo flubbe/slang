@@ -17,6 +17,7 @@
 #include "compiler/codegen/codegen.h"
 #include "compiler/constant.h"
 #include "compiler/emitter.h"
+#include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/lowering.h"
 #include "compiler/macro.h"

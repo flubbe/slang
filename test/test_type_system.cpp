@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "compiler/codegen/codegen.h"
+#include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"

@@ -15,6 +15,7 @@
 
 #include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/lexer.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"

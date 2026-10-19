@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * the parser. generates an AST from the lexer output.
+ * The parser. Generates an AST from a token stream.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -16,7 +16,6 @@
 #include <vector>
 
 #include "ast/ast.h"
-#include "lexer.h"
 #include "token_stream.h"
 
 namespace slang
@@ -65,7 +64,7 @@ enum class associativity : std::uint8_t
 
 /**
  * This class implements a recursive descent LL(1) parser.
- * It uses a lexer to turn tokens into an abstract syntax tree.
+ * It turns a token stream into an abstract syntax tree.
  */
 class parser
 {
