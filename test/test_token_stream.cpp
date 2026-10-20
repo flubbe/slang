@@ -12,7 +12,7 @@
 
 #include "archives/memory.h"
 #include "compiler/lexer.h"
-#include "compiler/token_stream.h"
+#include "shared/token_stream.h"
 
 namespace
 {

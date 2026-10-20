@@ -8,8 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "compiler/token_stream.h"
-#include "compiler/lexer.h"
+#include "token_stream.h"
 
 namespace slang
 {

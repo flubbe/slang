@@ -15,8 +15,8 @@
 #include <string>
 #include <variant>
 
-#include "token.h"
-#include "token_stream.h"
+#include "shared/token.h"
+#include "shared/token_stream.h"
 
 namespace slang
 {

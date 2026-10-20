@@ -51,6 +51,22 @@ struct branch_selection
 };
 
 /**
+ * Return whether a descriptor has a complete token-expansion body.
+ *
+ * Capability is deliberately checked together with the body metadata. This
+ * keeps the token-expansion entry point from treating a partially populated
+ * migration descriptor as a successful empty expansion.
+ */
+bool has_token_expansion_body(
+  const slang::module_::macro_branch_descriptor& branch)
+{
+    return branch.capability
+             == slang::module_::macro_expansion_capability::token_stream
+           && branch.body.has_value()
+           && branch.body_is_expression;
+}
+
+/**
  * Select the best matching branch for a macro invocation.
  *
  * Exact non-variadic branches win over exact variadic branches, which win
@@ -108,10 +124,11 @@ namespace slang::macro
 bool macro::supports_token_expansion(
   const std::vector<token_stream>& args) const
 {
-    // TODO(macro-migration): Remove this temporary gate once nested macro
-    // placeholders can be substituted directly in token streams. A
-    // macro-local placeholder can only be resolved by the legacy AST expander
-    // at this stage.
+    // TODO(macro-migration): Remove this gate once nested macro placeholders
+    // can be substituted directly in token streams.
+    // A macro-local placeholder can only be resolved by the legacy AST
+    // expander at this stage. Keep this as an explicit capability gate rather
+    // than allowing a partial token expansion to reach the parser.
     for(const auto& arg: args)
     {
         if(std::ranges::any_of(
@@ -129,9 +146,7 @@ bool macro::supports_token_expansion(
 
     return selection.branch != nullptr
            && !selection.ambiguous
-           && selection.branch->capability == module_::macro_expansion_capability::token_stream
-           && selection.branch->body.has_value()
-           && selection.branch->body_is_expression;
+           && has_token_expansion_body(*selection.branch);
 }
 
 token_stream macro::expand_macro(
@@ -143,6 +158,25 @@ token_stream macro::expand_macro(
     if(desc.branches.empty())
     {
         return token_stream{};
+    }
+
+    // Nested macro placeholders still require the legacy AST substitution
+    // path. Reject them here as well as in supports_token_expansion() so that
+    // direct callers cannot accidentally consume a partial token expansion.
+    for(const auto& arg: args)
+    {
+        if(std::ranges::any_of(
+             arg,
+             [](const token& tok)
+             {
+                 return tok.type == token_type::macro_identifier;
+             }))
+        {
+            throw macro_error{
+              std::format(
+                "Macro '{}' argument contains an unresolved macro placeholder.",
+                name)};
+        }
     }
 
     const auto selection = select_branch(desc.branches, args);
@@ -163,17 +197,15 @@ token_stream macro::expand_macro(
             name)};
     }
 
-    // TODO(macro-migration): Remove this compatibility state once every
-    // descriptor has a token body.
-    // A selected branch without a token body is still valid for the legacy
-    // migration stage, but has nothing for the token expander to emit.
     if(!branch->body.has_value())
     {
-        return token_stream{};
+        throw macro_error{
+          std::format(
+            "Macro '{}' branch has no token-expansion body.",
+            name)};
     }
 
-    if(branch->capability != module_::macro_expansion_capability::token_stream
-       || !branch->body_is_expression)
+    if(!has_token_expansion_body(*branch))
     {
         throw macro_error{
           std::format(
@@ -190,8 +222,8 @@ token_stream macro::expand_macro(
      * 2. Walk the macro body token stream.
      * 3. If an identifier matches a macro parameter, substitute the
      *    corresponding argument token stream, retagging its tokens with
-     *    the call-site context so that they retain the caller's name-resolution
-     *    environment.
+     *    the call-site context. Preserving nested capture contexts is deferred
+     *    to the hygiene completion step.
      * 4. Otherwise, keep the token but retag it with the fresh expansion
      *    context, so that identifiers originating in the macro body remain
      *    distinct from identifiers originating at the call site.
@@ -221,16 +253,30 @@ token_stream macro::expand_macro(
                 const auto& param = branch->params[i];    // bounds are check in loop condition. // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                 if(tok.s == param.name)
                 {
-                    // Parameter match → splice argument tokens, retagged.
-                    if(i < args.size())
+                    // Parameter match -> splice argument tokens, retagged.
+                    if(i >= args.size())
                     {
-                        result = result.concat(
-                          retag(args[i], call_site));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+                        throw macro_error{
+                          std::format(
+                            "Macro '{}' is missing argument for '{}'.",
+                            name,
+                            param.name)};
                     }
+                    result = result.concat(
+                      retag(args[i], call_site));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                     replaced = true;
                     break;
                 }
             }
+        }
+
+        if(tok.type == token_type::macro_identifier && !replaced)
+        {
+            throw macro_error{
+              std::format(
+                "Macro '{}' references unknown parameter '{}'.",
+                name,
+                tok.s)};
         }
 
         if(!replaced)

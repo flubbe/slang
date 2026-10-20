@@ -54,6 +54,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(cxxopts REQUIRED)
 find_package(Microsoft.GSL REQUIRED)
 
+add_library(slang_shared_core STATIC
+    src/shared/location.cpp
+    src/shared/token.cpp
+    src/shared/token_stream.cpp
+)
+
 set(SOURCES
     src/archives/file.cpp
     src/compiler/ast/ast.cpp
@@ -72,15 +78,12 @@ set(SOURCES
     src/compiler/emitter.cpp
     src/compiler/lexer.cpp
     src/compiler/loader.cpp
-    src/compiler/location.cpp
     src/compiler/lowering.cpp
     src/compiler/macro.cpp
     src/compiler/parser.cpp
     src/compiler/resolve.cpp
     src/compiler/sema.cpp
     src/compiler/syntax_context.cpp
-    src/compiler/token.cpp
-    src/compiler/token_stream.cpp
     src/compiler/typing.cpp
     src/interpreter/cfg.cpp
     src/interpreter/gc.cpp
@@ -120,7 +123,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
 endif()
 
 add_executable(slang ${SOURCES})
-target_link_libraries(slang cxxopts::cxxopts Microsoft.GSL::GSL)
+target_link_libraries(slang slang_shared_core cxxopts::cxxopts Microsoft.GSL::GSL)
 
 add_subdirectory(examples)
 add_subdirectory(test)

@@ -16,7 +16,7 @@
 #include <vector>
 
 #include "archives/archive.h"
-#include "location.h"
+#include "shared/location.h"
 
 namespace slang
 {

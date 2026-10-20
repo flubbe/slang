@@ -16,8 +16,8 @@
 #include <unordered_map>
 
 #include "shared/module.h"
+#include "shared/token_stream.h"
 #include "syntax_context.h"
-#include "token_stream.h"
 
 namespace slang::macro
 {

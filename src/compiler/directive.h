@@ -13,7 +13,7 @@
 #include <vector>
 #include <utility>
 
-#include "token.h"
+#include "shared/token.h"
 
 namespace slang::codegen
 {

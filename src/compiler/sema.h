@@ -16,10 +16,10 @@
 #include <stdexcept>
 #include <variant>
 
+#include "shared/location.h"
+#include "shared/token.h"
 #include "attribute.h"
-#include "location.h"
 #include "syntax_context.h"
-#include "token.h"
 #include "type.h"
 
 namespace slang::ast

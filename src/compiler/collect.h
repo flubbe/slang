@@ -12,7 +12,7 @@
 
 #include <string>
 
-#include "location.h"
+#include "shared/location.h"
 #include "sema.h"
 
 namespace slang::collect

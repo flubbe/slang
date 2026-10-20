@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "archives/memory.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/lexer.h"
 #include "compiler/loader.h"
@@ -315,6 +316,85 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
     EXPECT_NE(second_expansion[1].context, expanded[1].context);
 }
 
+TEST(macro, descriptor_serialization_round_trip)
+{
+    slang::module_::macro_descriptor descriptor;
+    descriptor.serialized_ast = std::vector<std::byte>{std::byte{0x01}, std::byte{0x02}};
+
+    slang::module_::macro_branch_descriptor branch;
+    branch.params.emplace_back(slang::module_::macro_parameter{"$value"});
+    branch.args_end_with_list = true;
+    branch.separators.emplace_back(
+      slang::token{",", {1, 3}, slang::token_type::delimiter, std::nullopt, std::nullopt, false, {}, {}, 7});
+    branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$value",
+        {1, 1},
+        slang::token_type::macro_identifier,
+        std::nullopt,
+        std::nullopt,
+        false,
+        {},
+        {},
+        11},
+      slang::token{
+        ";",
+        {1, 7},
+        slang::token_type::delimiter,
+        std::nullopt,
+        std::nullopt,
+        false,
+        {},
+        {},
+        13}}};
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = true;
+    descriptor.branches.emplace_back(std::move(branch));
+
+    slang::memory_write_archive write_ar{true};
+    write_ar & descriptor;
+
+    slang::memory_read_archive read_ar{write_ar.get_buffer(), true};
+    slang::module_::macro_descriptor decoded;
+    read_ar & decoded;
+
+    ASSERT_TRUE(decoded.serialized_ast.has_value());
+    EXPECT_EQ(decoded.serialized_ast.value(), descriptor.serialized_ast.value());
+    ASSERT_EQ(decoded.branches.size(), 1);
+    const auto& decoded_branch = decoded.branches.front();
+    ASSERT_EQ(decoded_branch.params.size(), 1);
+    EXPECT_EQ(decoded_branch.params.front().name, "$value");
+    EXPECT_EQ(decoded_branch.args_end_with_list, true);
+    ASSERT_EQ(decoded_branch.separators.size(), 1);
+    EXPECT_EQ(decoded_branch.separators.front().s, ",");
+    EXPECT_EQ(decoded_branch.separators.front().context, 7);
+    ASSERT_TRUE(decoded_branch.body.has_value());
+    ASSERT_EQ(decoded_branch.body->size(), 2);
+    EXPECT_EQ(decoded_branch.body->front().context, 11);
+    EXPECT_EQ(decoded_branch.capability, slang::module_::macro_expansion_capability::token_stream);
+    EXPECT_EQ(decoded_branch.body_is_expression, true);
+
+    slang::module_::module_header header;
+    header.exports.emplace_back(
+      slang::module_::symbol_type::macro,
+      "round_trip!",
+      descriptor);
+
+    slang::memory_write_archive module_write_ar{true};
+    module_write_ar & header;
+    slang::memory_read_archive module_read_ar{module_write_ar.get_buffer(), true};
+    slang::module_::module_header decoded_header;
+    module_read_ar & decoded_header;
+
+    EXPECT_EQ(decoded_header.tag, slang::module_::module_tag);
+    ASSERT_EQ(decoded_header.exports.size(), 1);
+    const auto& module_descriptor = std::get<slang::module_::macro_descriptor>(
+      decoded_header.exports.front().desc);
+    ASSERT_EQ(module_descriptor.branches.size(), 1);
+    ASSERT_TRUE(module_descriptor.branches.front().body.has_value());
+    EXPECT_EQ(module_descriptor.branches.front().body->front().context, 11);
+}
+
 TEST(macro, expansion_uses_branch_specific_parameters)
 {
     slang::module_::macro_descriptor desc;
@@ -360,6 +440,67 @@ TEST(macro, expansion_uses_branch_specific_parameters)
     ASSERT_EQ(one.size(), 1);
     EXPECT_EQ(one[0].s, "argument");
     EXPECT_EQ(one[0].context, call_site_context);
+}
+
+TEST(macro, token_expansion_capability_rejects_unsupported_inputs)
+{
+    slang::module_::macro_descriptor desc;
+    slang::module_::macro_branch_descriptor branch;
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = true;
+    branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
+    branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$x",
+        {1, 1},
+        slang::token_type::macro_identifier}}};
+    desc.branches.emplace_back(std::move(branch));
+
+    macro::macro m{"test!", std::move(desc)};
+    slang::syntax_context_table contexts;
+    const auto call_site_context = contexts.allocate(slang::root_syntax_context);
+
+    slang::token nested_placeholder{
+      "$nested",
+      {2, 1},
+      slang::token_type::macro_identifier};
+    const std::vector<slang::token_stream> args{
+      slang::token_stream{std::vector<slang::token>{nested_placeholder}}};
+
+    EXPECT_FALSE(m.supports_token_expansion(args));
+    EXPECT_THROW(
+      m.expand_macro(args, call_site_context, contexts),
+      macro::macro_error);
+}
+
+TEST(macro, token_expansion_rejects_unknown_body_parameter)
+{
+    slang::module_::macro_descriptor desc;
+    slang::module_::macro_branch_descriptor branch;
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = true;
+    branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
+    branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$unknown",
+        {1, 1},
+        slang::token_type::macro_identifier}}};
+    desc.branches.emplace_back(std::move(branch));
+
+    macro::macro m{"test!", std::move(desc)};
+    slang::syntax_context_table contexts;
+    const auto call_site_context = contexts.allocate(slang::root_syntax_context);
+    slang::token argument{
+      "argument",
+      {2, 1},
+      slang::token_type::identifier};
+
+    EXPECT_THROW(
+      m.expand_macro(
+        {slang::token_stream{std::vector<slang::token>{argument}}},
+        call_site_context,
+        contexts),
+      macro::macro_error);
 }
 
 TEST(macro, local_expression_body_uses_token_expansion)

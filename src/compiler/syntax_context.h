@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <unordered_map>
 
-#include "token.h"
+#include "shared/token.h"
 
 namespace slang
 {

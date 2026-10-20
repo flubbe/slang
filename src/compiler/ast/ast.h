@@ -21,7 +21,7 @@
 #include "compiler/collect.h"
 #include "compiler/constant.h"
 #include "compiler/directive.h"
-#include "compiler/token_stream.h"
+#include "shared/token_stream.h"
 #include "compiler/typing.h"
 #include "node_ids.h"
 #include "utils.h"

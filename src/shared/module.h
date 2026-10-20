@@ -20,7 +20,7 @@
 
 #include "archives/archive.h"
 #include "archives/memory.h"
-#include "compiler/token_stream.h"
+#include "token_stream.h"
 
 /* Forward declarations. */
 namespace slang::interpreter
@@ -35,6 +35,12 @@ namespace slang::module_
 {
 
 namespace si = slang::interpreter;
+
+/** Module tag. `sl2c` in little endian. */
+inline constexpr std::uint32_t module_tag = 0x63326c73;
+
+/** Module version. */
+inline constexpr std::uint32_t module_format_version = 1;
 
 /** A module error. */
 class module_error : public std::runtime_error
@@ -58,9 +64,11 @@ enum class symbol_type : std::uint8_t
  * @param ar The archive to use for serialization.
  * @param s The symbol type to serialize.
  */
-inline archive& operator&(archive& ar, symbol_type& s)
+inline archive& operator&(
+  archive& ar,
+  symbol_type& s)
 {
-    auto i = static_cast<std::uint8_t>(s);
+    auto i = std::to_underlying(s);
     ar & i;
 
     if(i != std::to_underlying(symbol_type::package)
@@ -69,7 +77,8 @@ inline archive& operator&(archive& ar, symbol_type& s)
        && i != std::to_underlying(symbol_type::constant)
        && i != std::to_underlying(symbol_type::macro))
     {
-        throw serialization_error("Invalid symbol type.");
+        throw serialization_error{
+          "Invalid symbol type."};
     }
 
     s = static_cast<symbol_type>(i);
@@ -77,7 +86,8 @@ inline archive& operator&(archive& ar, symbol_type& s)
 }
 
 /** Return a readable string for a symbol type. */
-inline std::string to_string(symbol_type s)
+inline std::string to_string(
+  symbol_type s)
 {
     switch(s)
     {
@@ -106,7 +116,9 @@ struct symbol
  * @param ar The archive to use for serialization.
  * @param s The symbol.
  */
-inline archive& operator&(archive& ar, symbol& s)
+inline archive& operator&(
+  archive& ar,
+  symbol& s)
 {
     ar & s.offset;
     ar & s.size;
@@ -127,7 +139,8 @@ enum class array_type : std::uint8_t
 };
 
 /** Convert `array_type` to a readable string. */
-inline std::string to_string(array_type type)
+inline std::string to_string(
+  array_type type)
 {
     switch(type)
     {
@@ -141,7 +154,7 @@ inline std::string to_string(array_type type)
     case array_type::ref: return "ref";
     }
 
-    return "unknown";
+    return "<unknown>";
 }
 
 /**
@@ -150,9 +163,11 @@ inline std::string to_string(array_type type)
  * @param ar The archive to use for serialization.
  * @param t The array type.
  */
-inline archive& operator&(archive& ar, array_type& t)
+inline archive& operator&(
+  archive& ar,
+  array_type& t)
 {
-    auto v = static_cast<std::uint8_t>(t);
+    auto v = std::to_underlying(t);
     ar & v;
     if(v != std::to_underlying(array_type::i8)
        && v != std::to_underlying(array_type::i16)
@@ -163,8 +178,10 @@ inline archive& operator&(archive& ar, array_type& t)
        && v != std::to_underlying(array_type::str)
        && v != std::to_underlying(array_type::ref))
     {
-        throw serialization_error("Invalid array type.");
+        throw serialization_error{
+          "Invalid array type."};
     }
+
     t = static_cast<array_type>(v);
     return ar;
 }
@@ -180,7 +197,8 @@ enum class constant_type : std::uint8_t
 };
 
 /** Convert `constant_type` to a readable string. */
-inline std::string to_string(constant_type type)
+inline std::string to_string(
+  constant_type type)
 {
     switch(type)
     {
@@ -192,6 +210,32 @@ inline std::string to_string(constant_type type)
     }
 
     return "<unknown>";
+}
+
+/**
+ * Constant type serializer.
+ *
+ * @param ar The archive to use for serialization.
+ * @param t The constant type.
+ */
+inline archive& operator&(
+  archive& ar,
+  constant_type& t)
+{
+    auto v = std::to_underlying(t);
+    ar & v;
+
+    if(v != std::to_underlying(constant_type::i32)
+       && v != std::to_underlying(constant_type::f32)
+       && v != std::to_underlying(constant_type::f64)
+       && v != std::to_underlying(constant_type::str))
+    {
+        throw serialization_error{
+          "Invalid constant type."};
+    }
+
+    t = static_cast<constant_type>(v);
+    return ar;
 }
 
 /** Data type for constant table entries. */
@@ -213,17 +257,8 @@ struct constant_table_entry
     /** Constant data. */
     constant_data_type data;
 
-    /** Default constructors. */
+    /** Default constructor. */
     constant_table_entry() = default;
-    constant_table_entry(const constant_table_entry&) = default;
-    constant_table_entry(constant_table_entry&&) = default;
-
-    /** Default destructor. */
-    ~constant_table_entry() = default;
-
-    /** Default assignments. */
-    constant_table_entry& operator=(const constant_table_entry&) = default;
-    constant_table_entry& operator=(constant_table_entry&&) = default;
 
     /**
      * Initialize a constant table entry.
@@ -246,25 +281,18 @@ struct constant_table_entry
  * @param ar The archive to use for serialization.
  * @param desc The constant table entry.
  */
-inline archive& operator&(archive& ar, constant_table_entry& entry)
+inline archive& operator&(
+  archive& ar,
+  constant_table_entry& entry)
 {
-    if(!ar.is_reading() && !ar.is_writing())
+    if(!ar.is_reading()
+       && !ar.is_writing())
     {
-        throw serialization_error("Archive has to be reading or writing.");
+        throw serialization_error{
+          "Archive has to be reading or writing."};
     }
 
-    auto t = static_cast<std::uint8_t>(entry.type);
-    ar & t;
-
-    if(t != std::to_underlying(constant_type::i32)
-       && t != std::to_underlying(constant_type::f32)
-       && t != std::to_underlying(constant_type::f64)
-       && t != std::to_underlying(constant_type::str))
-    {
-        throw serialization_error("Invalid constant type.");
-    }
-
-    entry.type = static_cast<constant_type>(t);
+    ar & entry.type;
 
     if(ar.is_reading())
     {
@@ -306,10 +334,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(
+            throw serialization_error{
               std::format(
                 "No serialization for constant type '{}'.",
-                to_string(entry.type)));
+                to_string(entry.type))};
         }
     }
     else if(ar.is_writing())
@@ -347,10 +375,10 @@ inline archive& operator&(archive& ar, constant_table_entry& entry)
             break;
         }
         default:
-            throw serialization_error(
+            throw serialization_error{
               std::format(
                 "No serialization for constant type '{}'.",
-                to_string(entry.type)));
+                to_string(entry.type))};
         }
     }
 
@@ -383,17 +411,8 @@ class variable_type
     std::optional<std::size_t> import_index;
 
 public:
-    /** Default constructors. */
+    /** Default constructor. */
     variable_type() = default;
-    variable_type(const variable_type&) = default;
-    variable_type(variable_type&&) = default;
-
-    /** Default destructor. */
-    ~variable_type() = default;
-
-    /** Default assignments. */
-    variable_type& operator=(const variable_type&) = default;
-    variable_type& operator=(variable_type&&) = default;
 
     /**
      * Construct a variable type.
@@ -486,7 +505,9 @@ public:
  * @param ar The archive to use for serialization.
  * @param ty The variable type.
  */
-archive& operator&(archive& ar, variable_type& ty);
+archive& operator&(
+  archive& ar,
+  variable_type& ty);
 
 /**
  * Convert a `variable_type` to a readable string.
@@ -494,7 +515,8 @@ archive& operator&(archive& ar, variable_type& ty);
  * @param t The type.
  * @returns Returns a readable variable type string.
  */
-std::string to_string(const variable_type& t);
+std::string to_string(
+  const variable_type& t);
 
 /** Variable descriptor. */
 struct variable_descriptor : public symbol
@@ -505,24 +527,16 @@ struct variable_descriptor : public symbol
     /** Whether the base type is a reference type. This is inferred from `type`. */
     bool reference;
 
-    /** Default constructors. */
+    /** Default constructor. */
     variable_descriptor() = default;
-    variable_descriptor(const variable_descriptor&) = default;
-    variable_descriptor(variable_descriptor&&) = default;
-
-    /** Default destructor. */
-    ~variable_descriptor() = default;
-
-    /** Default assignments. */
-    variable_descriptor& operator=(const variable_descriptor&) = default;
-    variable_descriptor& operator=(variable_descriptor&&) = default;
 
     /**
      * Initialize the variable descriptor with a type.
      *
      * @param type The variable type.
      */
-    explicit variable_descriptor(variable_type type);
+    explicit variable_descriptor(
+      variable_type type);
 };
 
 /**
@@ -531,7 +545,9 @@ struct variable_descriptor : public symbol
  * @param ar The archive to use for serialization.
  * @param desc The variable descriptor.
  */
-archive& operator&(archive& ar, variable_descriptor& desc);
+archive& operator&(
+  archive& ar,
+  variable_descriptor& desc);
 
 /** Function signature. */
 struct function_signature
@@ -542,17 +558,8 @@ struct function_signature
     /** Argument type list. */
     std::vector<variable_type> arg_types;
 
-    /** Default constructors. */
+    /** Default constructor. */
     function_signature() = default;
-    function_signature(const function_signature&) = default;
-    function_signature(function_signature&&) = default;
-
-    /** Default destructor. */
-    ~function_signature() = default;
-
-    /** Default assignments. */
-    function_signature& operator=(const function_signature&) = default;
-    function_signature& operator=(function_signature&&) = default;
 
     /**
      * Construct a function signature from a return type and argument types.
@@ -575,7 +582,9 @@ struct function_signature
  * @param ar The archive to use for serialization.
  * @param s The symbol type to serialize.
  */
-inline archive& operator&(archive& ar, function_signature& s)
+inline archive& operator&(
+  archive& ar,
+  function_signature& s)
 {
     ar & s.return_type;
     ar & s.arg_types;
@@ -591,24 +600,16 @@ struct native_function_details
     /** The resolved function. Not serialized. */
     std::function<void(si::operand_stack&)> func;
 
-    /** Default constructors. */
+    /** Default constructor. */
     native_function_details() = default;
-    native_function_details(const native_function_details&) = default;
-    native_function_details(native_function_details&&) = default;
-
-    /** Default destructor. */
-    ~native_function_details() = default;
-
-    /** Default assignments. */
-    native_function_details& operator=(const native_function_details&) = default;
-    native_function_details& operator=(native_function_details&&) = default;
 
     /**
      * Construct the function details.
      *
      * @param library_name The name of the library this function is implemented in.
      */
-    explicit native_function_details(std::string library_name)
+    explicit native_function_details(
+      std::string library_name)
     : library_name{std::move(library_name)}
     {
     }
@@ -646,17 +647,8 @@ struct function_details : public symbol
     /** Operand stack size needed for this function. Not serialized. */
     std::size_t stack_size{0};
 
-    /** Default constructors. */
+    /** Default constructor. */
     function_details() = default;
-    function_details(const function_details&) = default;
-    function_details(function_details&&) = default;
-
-    /** Default destructor. */
-    ~function_details() = default;
-
-    /** Default assignments. */
-    function_details& operator=(const function_details&) = default;
-    function_details& operator=(function_details&&) = default;
 
     /**
      * Construct function details.
@@ -681,7 +673,9 @@ struct function_details : public symbol
  * @param ar The archive to use for serialization.
  * @param details The function details.
  */
-inline archive& operator&(archive& ar, function_details& details)
+inline archive& operator&(
+  archive& ar,
+  function_details& details)
 {
     ar& static_cast<symbol&>(details);
     ar & details.locals;
@@ -700,17 +694,8 @@ struct function_descriptor
     /** Details. */
     std::variant<function_details, native_function_details> details;
 
-    /** Default constructors. */
+    /** Default constructor. */
     function_descriptor() = default;
-    function_descriptor(const function_descriptor&) = default;
-    function_descriptor(function_descriptor&&) = default;
-
-    /** Default destructor. */
-    ~function_descriptor() = default;
-
-    /** Default assignments. */
-    function_descriptor& operator=(const function_descriptor&) = default;
-    function_descriptor& operator=(function_descriptor&&) = default;
 
     /**
      * Construct a function descriptor.
@@ -736,11 +721,15 @@ struct function_descriptor
  * @param ar The archive to use for serialization.
  * @param details The function descriptor.
  */
-inline archive& operator&(archive& ar, function_descriptor& desc)
+inline archive& operator&(
+  archive& ar,
+  function_descriptor& desc)
 {
-    if(!ar.is_reading() && !ar.is_writing())
+    if(!ar.is_reading()
+       && !ar.is_writing())
     {
-        throw serialization_error("Archive has to be reading or writing.");
+        throw serialization_error{
+          "Archive has to be reading or writing."};
     }
 
     ar & desc.signature;
@@ -782,17 +771,8 @@ struct directive_descriptor
     /** The directive's arguments. */
     std::vector<std::pair<std::string, std::string>> args;
 
-    /** Default constructors. */
+    /** Default constructor. */
     directive_descriptor() = default;
-    directive_descriptor(const directive_descriptor&) = default;
-    directive_descriptor(directive_descriptor&&) = default;
-
-    /** Default destructor. */
-    ~directive_descriptor() = default;
-
-    /** Default assignments. */
-    directive_descriptor& operator=(const directive_descriptor&) = default;
-    directive_descriptor& operator=(directive_descriptor&&) = default;
 
     /**
      * Construct a directive descriptor.
@@ -812,7 +792,9 @@ struct directive_descriptor
  * @param ar The archive to use for serialization.
  * @param desc The directive descriptor.
  */
-inline archive& operator&(archive& ar, directive_descriptor& desc)
+inline archive& operator&(
+  archive& ar,
+  directive_descriptor& desc)
 {
     ar & desc.args;
     return ar;
@@ -822,6 +804,22 @@ enum class macro_fragment_kind : std::uint8_t
 {
     expression,
 };
+
+/** Serializer for macro fragment kinds. */
+inline archive& operator&(
+  archive& ar,
+  macro_fragment_kind& kind)
+{
+    auto value = std::to_underlying(kind);
+    ar & value;
+    if(value != std::to_underlying(macro_fragment_kind::expression))
+    {
+        throw serialization_error{
+          "Invalid macro fragment kind."};
+    }
+    kind = static_cast<macro_fragment_kind>(value);
+    return ar;
+}
 
 /**
  * Temporary migration gate for macro branch expansion.
@@ -835,6 +833,22 @@ enum class macro_expansion_capability : std::uint8_t
     token_stream,
 };
 
+/** Serializer for macro expansion capabilities. */
+inline archive& operator&(
+  archive& ar,
+  macro_expansion_capability& capability)
+{
+    auto value = std::to_underlying(capability);
+    ar & value;
+    if(value > std::to_underlying(macro_expansion_capability::token_stream))
+    {
+        throw serialization_error{
+          "Invalid macro expansion capability."};
+    }
+    capability = static_cast<macro_expansion_capability>(value);
+    return ar;
+}
+
 /** Macro parameters. */
 struct macro_parameter
 {
@@ -844,6 +858,16 @@ struct macro_parameter
     /** Fragment captured by this parameter. */
     macro_fragment_kind fragment{macro_fragment_kind::expression};
 };
+
+/** Serializer for macro parameters. */
+inline archive& operator&(
+  archive& ar,
+  macro_parameter& parameter)
+{
+    ar & parameter.name;
+    ar & parameter.fragment;
+    return ar;
+}
 
 /** Descriptor for one macro branch. */
 struct macro_branch_descriptor
@@ -877,6 +901,20 @@ struct macro_branch_descriptor
     bool body_is_expression{false};
 };
 
+/** Serializer for one macro branch descriptor. */
+inline archive& operator&(
+  archive& ar,
+  macro_branch_descriptor& branch)
+{
+    ar & branch.params;
+    ar & branch.args_end_with_list;
+    ar & branch.separators;
+    ar & branch.body;
+    ar & branch.capability;
+    ar & branch.body_is_expression;
+    return ar;
+}
+
 /** Macro descriptor. */
 struct macro_descriptor
 {
@@ -898,17 +936,8 @@ struct macro_descriptor
     /** Branches for the token-stream macro implementation. */
     std::vector<macro_branch_descriptor> branches;
 
-    /** Default constructors. */
+    /** Default constructor. */
     macro_descriptor() = default;
-    macro_descriptor(const macro_descriptor&) = default;
-    macro_descriptor(macro_descriptor&&) = default;
-
-    /** Default destructor. */
-    ~macro_descriptor() = default;
-
-    /** Default assignments. */
-    macro_descriptor& operator=(const macro_descriptor&) = default;
-    macro_descriptor& operator=(macro_descriptor&&) = default;
 
     /**
      * Construct a macro descriptor.
@@ -926,18 +955,42 @@ struct macro_descriptor
 };
 
 /**
+ * Serialize a macro descriptor using an explicit descriptor format version.
+ *
+ * Version one contains directives, the serialized AST fallback, and branch
+ * token-stream descriptors.
+ */
+inline archive& serialize_macro_descriptor(
+  archive& ar,
+  macro_descriptor& desc,
+  std::uint32_t format_version)
+{
+    if(format_version != module_format_version)
+    {
+        throw serialization_error{
+          "Unsupported macro descriptor format version."};
+    }
+
+    ar & desc.directives;
+    ar & desc.serialized_ast;
+    ar & desc.branches;
+    return ar;
+}
+
+/**
  * Serializer for macro descriptors.
  *
  * @param ar The archive to use for serialization.
  * @param desc The macro descriptor.
  */
-inline archive& operator&(archive& ar, macro_descriptor& desc)
+inline archive& operator&(
+  archive& ar,
+  macro_descriptor& desc)
 {
-    // TODO(macro-migration): Replace this legacy-only serialization with a
-    // versioned serializer for branch descriptors and token bodies.
-    ar & desc.directives;
-    ar & desc.serialized_ast;
-    return ar;
+    return serialize_macro_descriptor(
+      ar,
+      desc,
+      module_format_version);
 }
 
 /** Field descriptor. */
@@ -955,17 +1008,8 @@ struct field_descriptor
     /** Offset (not serialized). */
     std::size_t offset{0};
 
-    /** Default constructors. */
+    /** Default constructor. */
     field_descriptor() = default;
-    field_descriptor(const field_descriptor&) = default;
-    field_descriptor(field_descriptor&&) = default;
-
-    /** Default destructor. */
-    ~field_descriptor() = default;
-
-    /** Default assignments. */
-    field_descriptor& operator=(const field_descriptor&) = default;
-    field_descriptor& operator=(field_descriptor&&) = default;
 
     /**
      * Create a new `field_descriptor`.
@@ -1008,7 +1052,9 @@ struct field_descriptor
  * @param ar The archive to use for serialization.
  * @param desc The field descriptor.
  */
-inline archive& operator&(archive& ar, field_descriptor& desc)
+inline archive& operator&(
+  archive& ar,
+  field_descriptor& desc)
 {
     ar & desc.base_type;
     return ar;
@@ -1029,7 +1075,11 @@ struct struct_descriptor
     std::uint8_t flags{0};
 
     /** Members as (name, type). */
-    std::vector<std::pair<std::string, field_descriptor>> member_types;
+    std::vector<
+      std::pair<
+        std::string,
+        field_descriptor>>
+      member_types;
 
     /** Type size (not serialized). */
     std::size_t size{0};
@@ -1047,7 +1097,9 @@ struct struct_descriptor
  * @param ar The archive to use for serialization.
  * @param details The struct descriptor.
  */
-inline archive& operator&(archive& ar, struct_descriptor& desc)
+inline archive& operator&(
+  archive& ar,
+  struct_descriptor& desc)
 {
     ar & desc.flags;
     ar & desc.member_types;
@@ -1079,7 +1131,9 @@ struct imported_symbol
  * @param ar The archive to use for serialization.
  * @param details The imported symbol.
  */
-inline archive& operator&(archive& ar, imported_symbol& s)
+inline archive& operator&(
+  archive& ar,
+  imported_symbol& s)
 {
     ar & s.type;
     ar & s.name;
@@ -1104,17 +1158,8 @@ struct exported_symbol
       macro_descriptor>
       desc;
 
-    /** Default constructors. */
+    /** Default constructor. */
     exported_symbol() = default;
-    exported_symbol(const exported_symbol&) = default;
-    exported_symbol(exported_symbol&&) = default;
-
-    /** Default destructor. */
-    ~exported_symbol() = default;
-
-    /** Default assignments. */
-    exported_symbol& operator=(const exported_symbol&) = default;
-    exported_symbol& operator=(exported_symbol&&) = default;
 
     /**
      * Construct an exported symbol.
@@ -1140,16 +1185,22 @@ struct exported_symbol
 };
 
 /**
- * Serializer for exported symbols.
+ * Serialize an exported symbol using an explicit macro descriptor version.
  *
  * @param ar The archive to use for serialization.
- * @param details The exported symbol.
+ * @param s The exported symbol.
+ * @param macro_format_version Macro descriptor format version.
  */
-inline archive& operator&(archive& ar, exported_symbol& s)
+inline archive& serialize_exported_symbol(
+  archive& ar,
+  exported_symbol& s,
+  std::uint32_t macro_format_version)
 {
-    if(!ar.is_reading() && !ar.is_writing())
+    if(!ar.is_reading()
+       && !ar.is_writing())
     {
-        throw serialization_error("Archive has to be reading or writing.");
+        throw serialization_error{
+          "Archive has to be reading or writing."};
     }
 
     ar & s.type;
@@ -1205,21 +1256,39 @@ inline archive& operator&(archive& ar, exported_symbol& s)
         if(ar.is_reading())
         {
             macro_descriptor desc;
-            ar & desc;
+            serialize_macro_descriptor(
+              ar,
+              desc,
+              macro_format_version);
             s.desc = std::move(desc);
         }
         else if(ar.is_writing())
         {
             auto& desc = std::get<macro_descriptor>(s.desc);
-            ar & desc;
+            serialize_macro_descriptor(
+              ar,
+              desc,
+              macro_format_version);
         }
     }
     else
     {
-        throw serialization_error("Unknown symbol type.");
+        throw serialization_error{
+          "Unknown symbol type."};
     }
 
     return ar;
+}
+
+/** Serializer for exported symbols using the current module format. */
+inline archive& operator&(
+  archive& ar,
+  exported_symbol& s)
+{
+    return serialize_exported_symbol(
+      ar,
+      s,
+      module_format_version);
 }
 
 /** Header of a module. */
@@ -1251,33 +1320,28 @@ class language_module
     bool decoded = false;
 
     /** Jump targets as `(label_id, offset)`. Only valid during instruction decoding. */
-    std::unordered_map<std::int64_t, std::size_t> jump_targets;
+    std::unordered_map<
+      std::int64_t,
+      std::size_t>
+      jump_targets;
 
     /** Jump origins as `(offset, target_label_id)`. Only valid during instruction decoding. */
-    std::unordered_map<std::size_t, std::int64_t> jump_origins;
+    std::unordered_map<
+      std::size_t,
+      std::int64_t>
+      jump_origins;
 
 public:
-    /** Module tag. */
-    static constexpr std::uint32_t tag = 0x63326c73;
-
-    /** Default constructors. */
+    /** Default constructor. */
     language_module() = default;
-    language_module(const language_module&) = default;
-    language_module(language_module&&) = default;
-
-    /** Default destructor. */
-    ~language_module() = default;
-
-    /** Default assignments. */
-    language_module& operator=(const language_module&) = default;
-    language_module& operator=(language_module&&) = default;
 
     /**
      * Construct a module from header.
      *
      * @param header THe module's header.
      */
-    explicit language_module(module_header header)
+    explicit language_module(
+      module_header header)
     : header{std::move(header)}
     {
     }
@@ -1345,7 +1409,9 @@ public:
      * @param name The constant's name.
      * @param i An index into the constant table.
      */
-    void add_constant(std::string name, std::size_t i);
+    void add_constant(
+      std::string name,
+      std::size_t i);
 
     /**
      * Add a macro to the module.
@@ -1353,14 +1419,17 @@ public:
      * @param name The macro's name.
      * @param desc The macro descriptor.
      */
-    void add_macro(std::string name, macro_descriptor desc);
+    void add_macro(
+      std::string name,
+      macro_descriptor desc);
 
     /**
      * Set the constant table.
      *
      * @param constants The new constant table.
      */
-    void set_constant_table(const std::vector<constant_table_entry>& constants)
+    void set_constant_table(
+      const std::vector<constant_table_entry>& constants)
     {
         header.constants = constants;
     }
@@ -1370,7 +1439,8 @@ public:
      *
      * @param binary The binary part.
      */
-    void set_binary(std::vector<std::byte> binary)
+    void set_binary(
+      std::vector<std::byte> binary)
     {
         this->binary = std::move(binary);
     }
@@ -1409,19 +1479,55 @@ public:
  * @param ar The archive to use for serialization.
  * @param header The module header.
  */
-inline archive& operator&(archive& ar, module_header& header)
+inline archive& operator&(
+  archive& ar,
+  module_header& header)
 {
     if(ar.is_writing())
     {
-        header.tag = language_module::tag;
+        header.tag = module_tag;
     }
     ar & header.tag;
-    if(ar.is_reading() && header.tag != language_module::tag)
+
+    if(ar.is_reading() && header.tag != module_tag)
     {
-        throw module_error("Not a module.");
+        throw module_error{
+          "Not a module."};
     }
+
+    std::uint32_t format_version = module_format_version;
+    ar & format_version;
+    if(format_version != module_format_version)
+    {
+        throw module_error{
+          "Unsupported module format version."};
+    }
+
     ar & header.imports;
-    ar & header.exports;
+
+    vle_int export_count;
+    if(ar.is_writing())
+    {
+        export_count.i = static_cast<std::int64_t>(header.exports.size());
+    }
+    ar & export_count;
+    if(ar.is_reading())
+    {
+        if(export_count.i < 0)
+        {
+            throw serialization_error{
+              "Invalid export table size."};
+        }
+        header.exports.resize(static_cast<std::size_t>(export_count.i));
+    }
+    for(auto& symbol: header.exports)
+    {
+        serialize_exported_symbol(
+          ar,
+          symbol,
+          format_version);
+    }
+
     ar & header.constants;
     return ar;
 }
@@ -1432,7 +1538,9 @@ inline archive& operator&(archive& ar, module_header& header)
  * @param ar The archive.
  * @returns The archive.
  */
-inline archive& operator&(archive& ar, language_module& mod)
+inline archive& operator&(
+  archive& ar,
+  language_module& mod)
 {
     ar & mod.header;
     ar & mod.binary;

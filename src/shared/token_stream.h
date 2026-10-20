@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "archives/archive.h"
-#include "token.h"
+#include "shared/token.h"
 
 namespace slang
 {
