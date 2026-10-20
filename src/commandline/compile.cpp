@@ -15,6 +15,7 @@
 #include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -186,17 +187,10 @@ void compile::invoke(const std::vector<std::string>& args)
         input_ar->serialize(std::as_writable_bytes(std::span(input_buffer)));
     }
 
-    slang::lexer lexer;
     slang::parser parser;
 
-    lexer.set_input(input_buffer);
-    parser.parse(lexer);
-
-    if(!lexer.eof())
-    {
-        std::println("Lexer did not complete input reading.");
-        return;
-    }
+    auto tokens = slang::lexer::lex(input_buffer);
+    parser.parse(std::move(tokens));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     if(!ast)
@@ -247,6 +241,7 @@ void compile::invoke(const std::vector<std::string>& args)
       resolver_ctx,
       codegen_ctx,
       macro_env,
+      sema_env.syntax_contexts,
       module_macro_asts));
 
     ast->resolve_names(resolver_ctx);

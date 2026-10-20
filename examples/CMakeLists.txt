@@ -30,7 +30,7 @@ add_executable(native_integration
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(native_integration Microsoft.GSL::GSL)
+target_link_libraries(native_integration slang_shared_core Microsoft.GSL::GSL)
 target_compile_options(native_integration PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}

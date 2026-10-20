@@ -4,7 +4,7 @@
  * macro collection / expansion environment.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -16,6 +16,8 @@
 #include <unordered_map>
 
 #include "shared/module.h"
+#include "shared/token_stream.h"
+#include "syntax_context.h"
 
 namespace slang::macro
 {
@@ -38,6 +40,9 @@ class macro
     /** Import path. */
     std::optional<std::string> import_path;
 
+    /** Syntax context at the macro definition site. */
+    syntax_context_id definition_context{root_syntax_context};
+
 public:
     /** Constructors. */
     macro() = delete;
@@ -57,14 +62,17 @@ public:
      * @param name The macro's name.
      * @param desc Macro descriptor.
      * @param import_path Optional import path.
+     * @param definition_context Syntax context at the macro definition site.
      */
     explicit macro(
       std::string name,
       module_::macro_descriptor desc,
-      std::optional<std::string> import_path = std::nullopt)
+      std::optional<std::string> import_path = std::nullopt,
+      syntax_context_id definition_context = root_syntax_context)
     : name{std::move(name)}
     , desc{std::move(desc)}
     , import_path{std::move(import_path)}
+    , definition_context{definition_context}
     {
     }
 
@@ -103,6 +111,25 @@ public:
         return is_import() && name.starts_with("$");
     }
 
+    /** Get the definition-site syntax context. */
+    [[nodiscard]]
+    syntax_context_id get_definition_context() const
+    {
+        return definition_context;
+    }
+
+    /**
+     * Return whether the selected branch is supported by token expansion.
+     *
+     * TODO(macro-migration): Remove this dispatch gate when all macro shapes
+     * use token expansion; branch matching should then be authoritative.
+     *
+     * @param args Token streams for the macro arguments.
+     */
+    [[nodiscard]]
+    bool supports_token_expansion(
+      const std::vector<token_stream>& args) const;
+
     /** Set transitivity. */
     void set_transitive(bool transitive)
     {
@@ -116,6 +143,20 @@ public:
             name = std::string{"$"} + name;
         }
     }
+
+    /**
+     * Expand a macro hygienically using a syntax context table.
+     *
+     * @param args Token streams for the macro arguments.
+     * @param call_site Syntax context id of the invocation site (used to tag
+     *     substituted argument tokens).
+     * @param contexts Syntax context table for allocating expansion contexts.
+     * @return A token_stream representing the expanded macro body.
+     */
+    token_stream expand_macro(
+      const std::vector<token_stream>& args,
+      syntax_context_id call_site,
+      syntax_context_table& contexts) const;
 };
 
 /** Macro collection / expansion environment. */
@@ -131,11 +172,13 @@ struct env
      * @param name The macro name.
      * @param desc The macro descriptor.
      * @param import_path Import path of the macro, or `std::nullopt`.
+     * @param definition_context Syntax context at the macro definition site.
      */
     void add_macro(
       std::string name,
       module_::macro_descriptor desc,
-      std::optional<std::string> import_path);
+      std::optional<std::string> import_path,
+      syntax_context_id definition_context = root_syntax_context);
 
     /**
      * Get a macro.

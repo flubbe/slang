@@ -1,10 +1,10 @@
 /**
  * slang - a simple scripting language.
  *
- * the lexer.
+ * The lexer.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -16,8 +16,10 @@
 #include "lexer.h"
 #include "utils.h"
 
-namespace slang
+namespace
 {
+
+using namespace slang;
 
 /*
  * Helper functions.
@@ -29,12 +31,13 @@ namespace slang
  * @param c The `std::optional<char>` to check.
  * @return `true` for horizontal whitespaces and false otherwise (including `std::nullopt`'s).
  */
-static bool is_horizontal_whitespace(
+bool is_horizontal_whitespace(
   const std::optional<char>& c)
 {
-    return c && (*c == ' '        // space
-                 || *c == '\t'    // tab
-                 || *c == '\f'    // form feed / new page
+    return c.has_value()
+           && (c.value() == ' '        // space
+               || c.value() == '\t'    // tab
+               || c.value() == '\f'    // form feed / new page
            );
 }
 
@@ -44,12 +47,13 @@ static bool is_horizontal_whitespace(
  * @param c The `std::optional<char>` to check.
  * @return `true` for vertical whitespaces and false otherwise (including `std::nullopt`'s).
  */
-static bool is_vertical_whitespace(
+bool is_vertical_whitespace(
   const std::optional<char>& c)
 {
-    return c && (*c == '\n'       // line feed / new line
-                 || *c == '\r'    // carriage return
-                 || *c == '\v'    // vertical tab
+    return c.has_value()
+           && (c.value() == '\n'       // line feed / new line
+               || c.value() == '\r'    // carriage return
+               || c.value() == '\v'    // vertical tab
            );
 }
 
@@ -61,7 +65,7 @@ static bool is_vertical_whitespace(
  * @param c The `std::optional<char>` to check.
  * @return `true` for whitespaces and false otherwise (including `std::nullopt`'s).
  */
-static bool is_whitespace(
+bool is_whitespace(
   const std::optional<char>& c)
 {
     return is_horizontal_whitespace(c)
@@ -76,20 +80,22 @@ static bool is_whitespace(
  * @param first_char Whether we are checking the first character.
  * @return Whether the character starts an identifier. Returns false if c was std::nullopt.
  */
-static bool is_identifier(
+bool is_identifier(
   const std::optional<char>& c,
   bool first_char)
 {
-    if(!c)
+    if(!c.has_value())
     {
         return false;
     }
 
     if(first_char)
     {
-        return utils::is_alpha(*c) || *c == '_';
+        return utils::is_alpha(c.value())
+               || c.value() == '_';
     }
-    return utils::is_alnum(*c) || *c == '_';
+    return utils::is_alnum(c.value())
+           || c.value() == '_';
 }
 
 /**
@@ -98,15 +104,15 @@ static bool is_identifier(
  * @param c The std::optional<char> to check.
  * @return Whether the character is a hex digit. Returns false if c was std::nullopt
  */
-static bool is_hexdigit(
+bool is_hexdigit(
   const std::optional<char>& c)
 {
-    if(!c)
+    if(!c.has_value())
     {
         return false;
     }
 
-    return std::isdigit(*c) != 0
+    return std::isdigit(c.value()) != 0
            || (c >= 'a' && c <= 'f')
            || (c >= 'A' && c <= 'F');
 }
@@ -119,7 +125,7 @@ constexpr std::size_t operator_count = 36;
  *
  * @note We treat the access operator `.` separately, since it could also start a floating-point literal.
  */
-static const std::array<std::string, operator_count> operators = {
+constexpr std::array<std::string_view, operator_count> operators = {
   // clang-format off
   "+", "-", "*", "/", "%",             // arithmetic / prefixes
   "&&", "||", "!",                     // logical
@@ -139,9 +145,9 @@ static const std::array<std::string, operator_count> operators = {
 constexpr std::size_t operator_chars_count = 14;
 
 /** The starting characters of the operators. */
-static const std::array<char, operator_chars_count> operator_chars = {
+constexpr std::array<char, operator_chars_count> operator_chars = {
   // clang-format off
-  '+', '-', '*', '/', '%', '&', '^', '|', '!', '~', '<', '>', '=', ':'
+  '+', '-', '*', '/', '%', '&', '^', '|', '!', '~', '<', '>', '=', ':',    // NOLINT(readability-trailing-comma)
   // clang-format on
 };
 
@@ -151,10 +157,13 @@ static const std::array<char, operator_chars_count> operator_chars = {
  * @param c The `std::optional<char>` to check.
  * @return Whether the character starts an operator. Returns `false` if `c` was `std::nullopt`.
  */
-static bool is_operator(
+bool is_operator(
   const std::optional<char>& c)
 {
-    return c && std::ranges::contains(std::as_const(operator_chars), *c);
+    return c.has_value()
+           && std::ranges::contains(
+             std::as_const(operator_chars),
+             c.value());
 }
 
 /**
@@ -167,7 +176,7 @@ static bool is_operator(
  * @return Returns the evaluated token or std::nullopt.
  * @throws Throws a `lexical_error` if evaluation failed.
  */
-static std::optional<const_value> eval(
+std::optional<const_value> eval(
   source_location loc,
   const std::string& s,
   token_type type)
@@ -190,19 +199,19 @@ static std::optional<const_value> eval(
         }
         catch(const std::invalid_argument&)
         {
-            throw lexical_error(
+            throw lexical_error{
               std::format(
                 "{}: Invalid argument for integer conversion: '{}'.",
                 to_string(loc),
-                s));
+                s)};
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(
+            throw lexical_error{
               std::format(
                 "{}: Argument out of range for integer conversion: '{}'.",
                 to_string(loc),
-                s));
+                s)};
         }
     }
     else if(type == token_type::fp_literal)
@@ -213,28 +222,24 @@ static std::optional<const_value> eval(
         }
         catch(const std::invalid_argument& e)
         {
-            throw lexical_error(
+            throw lexical_error{
               std::format(
                 "{}: Invalid argument for floating point conversion: '{}'.",
                 to_string(loc),
-                s));
+                s)};
         }
         catch(const std::out_of_range& e)
         {
-            throw lexical_error(
+            throw lexical_error{
               std::format(
                 "{}: Argument out of range for floating point conversion: '{}'.",
                 to_string(loc),
-                s));
+                s)};
         }
     }
 
     return std::nullopt;
 }
-
-/*
- * lexer implementation.
- */
 
 /**
  * Validate suffix: Make sure the suffix is one of: i8, i16, i32, i64, f32, f64.
@@ -242,7 +247,7 @@ static std::optional<const_value> eval(
  * @param loc Source location for error reporting.
  * @param suffix The suffix to validate.
  */
-static void validate_suffix(
+void validate_suffix(
   source_location loc,
   const std::optional<numeric_suffix>& suffix)
 {
@@ -252,33 +257,40 @@ static void validate_suffix(
     }
 
     const auto& s = suffix.value();
-    if(s.ty == suffix_type::integer)
+    if(s.ty == suffix_type::integer
+       && (s.width != 8         // NOLINT(readability-magic-numbers)
+           && s.width != 16     // NOLINT(readability-magic-numbers)
+           && s.width != 32     // NOLINT(readability-magic-numbers)
+           && s.width != 64)    // NOLINT(readability-magic-numbers)
+    )
     {
-        if(s.width != 8
-           && s.width != 16
-           && s.width != 32
-           && s.width != 64)
-        {
-            throw lexical_error(
-              std::format(
-                "{}: Invalid width {} for integer type suffix. Valid widths are 8, 16, 32, 64.",
-                slang::to_string(loc),
-                s.width));
-        }
+        throw lexical_error{
+          std::format(
+            "{}: Invalid width {} for integer type suffix. Valid widths are 8, 16, 32, 64.",
+            slang::to_string(loc),
+            s.width)};
     }
-    else if(s.ty == suffix_type::floating_point)
+
+    if(s.ty == suffix_type::floating_point
+       && (s.width != 32         // NOLINT(readability-magic-numbers)
+           && s.width != 64))    // NOLINT(readability-magic-numbers)
     {
-        if(s.width != 32
-           && s.width != 64)
-        {
-            throw lexical_error(
-              std::format(
-                "{}: Invalid width {} for floating point type suffix. Valid widths are 32, 64.",
-                slang::to_string(loc),
-                s.width));
-        }
+        throw lexical_error{
+          std::format(
+            "{}: Invalid width {} for floating point type suffix. Valid widths are 32, 64.",
+            slang::to_string(loc),
+            s.width)};
     }
 }
+
+}    // namespace
+
+namespace slang
+{
+
+/*
+ * Lexer implementation.
+ */
 
 std::optional<token> lexer::next()
 {
@@ -291,7 +303,7 @@ std::optional<token> lexer::next()
     std::vector<comment_trivia> trailing_comments;
     bool has_blank_line_before_token = false;
 
-    auto parse_line_comment = [this]() -> comment_trivia
+    auto parse_line_comment = [this]
     {
         comment_trivia trivia;
         trivia.is_block = false;
@@ -301,7 +313,7 @@ std::optional<token> lexer::next()
 
         while(auto c = peek())
         {
-            if(*c == '\n')
+            if(c.value() == '\n')
             {
                 break;
             }
@@ -311,7 +323,7 @@ std::optional<token> lexer::next()
         return trivia;
     };
 
-    auto parse_block_comment = [this]() -> comment_trivia
+    auto parse_block_comment = [this]
     {
         comment_trivia trivia;
         trivia.is_block = true;
@@ -321,8 +333,10 @@ std::optional<token> lexer::next()
 
         while(auto c = get())
         {
-            trivia.text += *c;
-            if(*c == '*' && peek().has_value() && *peek() == '/')
+            trivia.text += c.value();
+            if(c.value() == '*'
+               && peek().has_value()
+               && *peek() == '/')
             {
                 trivia.text += *get();    // '/'
                 return trivia;
@@ -352,7 +366,8 @@ std::optional<token> lexer::next()
             has_blank_line_before_token = true;
         }
 
-        if(peek().has_value() && *peek() == '/')
+        if(peek().has_value()
+           && *peek() == '/')
         {
             auto p2 = position;
             ++p2;
@@ -398,24 +413,23 @@ std::optional<token> lexer::next()
         return std::nullopt;
     }
 
-    current_token = {*c};
+    current_token = {c.value()};
     while(true)
     {
         bool macro_identifier = false;
-        if(*c == '$')    // macro identifiers.
+        if(c.value() == '$')    // macro identifiers.
         {
             c = get();
-            current_token += *c;    // NOLINT(bugprone-unchecked-optional-access)
-
             if(!is_identifier(c, true))
             {
-                throw lexical_error(
+                throw lexical_error{
                   std::format(
                     "{}: Expected identifier, got '{}'.",
                     to_string(loc),
-                    *c));    // NOLINT(bugprone-unchecked-optional-access)
+                    c.value())};
             }
 
+            current_token += c.value();
             macro_identifier = true;
         }
 
@@ -424,8 +438,7 @@ std::optional<token> lexer::next()
         {
             while(is_identifier(peek(), false))
             {
-                // NOTE peek() ensures that get() returns a valid value.
-                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
             }
 
             if(macro_identifier)
@@ -434,7 +447,7 @@ std::optional<token> lexer::next()
             }
             else if(peek() == '!')
             {
-                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
                 type = token_type::macro_name;
             }
             else
@@ -448,44 +461,55 @@ std::optional<token> lexer::next()
         if(is_operator(c))
         {
             // match the longest operator.
-            while((c = peek()))
+            while((c = peek()).has_value())
             {
-                std::string temp_token = current_token + *c;
+                std::string temp_token = current_token + c.value();
                 if(!std::ranges::contains(std::as_const(operators), temp_token))
                 {
                     break;
                 }
-                current_token += *get();
+
+                current_token += c.value();
+                get();    // advance to next character
             }
 
             break;
         }
 
-        if(*c == '(' || *c == ')' || *c == '[' || *c == ']' || *c == '{' || *c == '}')    // parentheses, brackets and braces
+        if(c.value() == '(' || c.value() == ')'
+           || c.value() == '[' || c.value() == ']'
+           || c.value() == '{' || c.value() == '}')    // parentheses, brackets and braces
         {
             break;
         }
 
-        if(std::isdigit(*c) != 0
-           // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-           || (*c == '.' && peek().has_value() && std::isdigit(*peek()) != 0))    //  integer or floating-point literal
+        if(std::isdigit(c.value()) != 0
+           || (c.value() == '.'
+               && peek().has_value()
+               && std::isdigit(*peek()) != 0))    //  integer or floating-point literal
         {
-            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-            if(*c == '0' && peek().has_value() && *peek() == 'x')
+            if(c.value() == '0'
+               && peek().has_value()
+               && *peek() == 'x')
             {
-                current_token += *get();                                                            // NOLINT(bugprone-unchecked-optional-access)
-                while(peek().has_value() && (std::isdigit(*peek()) != 0 || is_hexdigit(peek())))    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
+
+                while((c = peek()).has_value()
+                      && (std::isdigit(c.value()) != 0
+                          || is_hexdigit(c)))
                 {
-                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += *get();
                 }
 
-                if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
+                if(c = peek();
+                   c.has_value()
+                   && utils::is_alpha(c.value()))
                 {
-                    throw lexical_error(
+                    throw lexical_error{
                       std::format(
                         "{}: Expected non-alphabetic character, got '{}'.",
                         to_string(loc),
-                        *peek()));    // NOLINT(bugprone-unchecked-optional-access)
+                        c.value())};
                 }
 
                 type = token_type::int_literal;
@@ -494,41 +518,49 @@ std::optional<token> lexer::next()
                 break;
             }
 
-            if(*c != '.')
+            if(c.value() != '.')
             {
-                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+                while((c = peek()).has_value()
+                      && std::isdigit(c.value()) != 0)
                 {
-                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += *get();
                 }
 
                 type = token_type::int_literal;    // this might get adjusted below.
                 c = peek();
             }
 
-            if(c.has_value() && *c == '.')
+            if(c.has_value()
+               && c.value() == '.')
             {
-                current_token += *get();                                   // NOLINT(bugprone-unchecked-optional-access)
-                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
+
+                while((c = peek()).has_value()
+                      && std::isdigit(c.value()) != 0)
                 {
-                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += *get();
                 }
 
                 type = token_type::fp_literal;
                 c = peek();
             }
 
-            if(c.has_value() && (*c == 'e' || *c == 'E'))
+            if(c.has_value()
+               && (c.value() == 'e' || c.value() == 'E'))
             {
-                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
 
-                if(peek().has_value() && (*peek() == '+' || *peek() == '-'))    // NOLINT(bugprone-unchecked-optional-access)
+                if(c = peek();
+                   c.has_value()
+                   && (c.value() == '+' || c.value() == '-'))
                 {
-                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += *get();
                 }
 
-                while(peek().has_value() && std::isdigit(*peek()) != 0)    // NOLINT(bugprone-unchecked-optional-access)
+                while(peek().has_value()
+                      && std::isdigit(*peek()) != 0)
                 {
-                    current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    current_token += *get();
                 }
 
                 type = token_type::fp_literal;
@@ -536,11 +568,13 @@ std::optional<token> lexer::next()
 
             eval_token = current_token;
 
-            if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
+            if(c = peek();
+               c.has_value()
+               && utils::is_alpha(c.value()))
             {
-                suffix_type type = [this, loc, &current_token]()
+                suffix_type type = [this, loc, &current_token]
                 {
-                    auto type_char = *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    auto type_char = *get();
                     current_token += type_char;
 
                     if(type_char == 'i')
@@ -553,63 +587,72 @@ std::optional<token> lexer::next()
                         return suffix_type::floating_point;
                     }
 
-                    throw lexical_error(
+                    throw lexical_error{
                       std::format(
                         "{}: Invalid numeric suffix: Unknown type identifier.",
-                        to_string(loc)));
+                        to_string(loc))};
                 }();
 
-                if(!peek().has_value() || std::isdigit(*peek()) == 0)
+                if(c = peek();
+                   !c.has_value()
+                   || std::isdigit(c.value()) == 0)
                 {
-                    throw lexical_error(
+                    throw lexical_error{
                       std::format(
                         "{}: Invalid numeric suffix: Expected width specifier.",
-                        to_string(loc)));
+                        to_string(loc))};
                 }
 
                 std::string width_specifier;
-                while(peek().has_value() && (std::isdigit(*peek()) != 0))    // NOLINT(bugprone-unchecked-optional-access)
+                while(peek().has_value()
+                      && (std::isdigit(*peek()) != 0))
                 {
-                    width_specifier += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                    width_specifier += *get();
                 }
                 current_token += width_specifier;
 
                 suffix = numeric_suffix{
                   .ty = type,
-                  .width = static_cast<std::uint32_t>(stoi(width_specifier))};
+                  .width = static_cast<std::uint32_t>(stoi(width_specifier)),
+                };
             }
 
             break;
         }
 
-        if(*c == '.')    // element access or ellipsis. Needs to come after parsing floating-point literals.
+        if(c.value() == '.')    // element access or ellipsis. Needs to come after parsing floating-point literals.
         {
-            if(peek().has_value() && *peek() == '.')    // NOLINT(bugprone-unchecked-optional-access)
+            if(c = peek();
+               c.has_value()
+               && c.value() == '.')
             {
                 // ellipsis.
-                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
 
-                if(peek().has_value() && *peek() != '.')    // NOLINT(bugprone-unchecked-optional-access)
+                if(c = peek();
+                   c.has_value()
+                   && c.value() != '.')
                 {
-                    throw lexical_error(
+                    throw lexical_error{
                       std::format(
                         "{}: Expected '.', got '{}'.",
                         to_string(loc),
-                        *peek()));    // NOLINT(bugprone-unchecked-optional-access)
+                        c.value())};
                 }
 
-                current_token += *get();    // NOLINT(bugprone-unchecked-optional-access)
+                current_token += *get();
             }
 
             break;
         }
 
-        if(*c == '"')    // string literals.
+        if(c.value() == '"')    // string literals.
         {
             bool escaped = false;
             while((c = get()))
             {
-                if(*c == '\\' && !escaped)
+                if(c.value() == '\\'
+                   && !escaped)
                 {
                     escaped = true;
                     continue;
@@ -617,18 +660,19 @@ std::optional<token> lexer::next()
 
                 if(!escaped)
                 {
-                    current_token += *c;
+                    current_token += c.value();
 
-                    if(*c == '"')
+                    if(c.value() == '"')
                     {
                         break;
                     }
-                    if(*c == '\n')
+
+                    if(c.value() == '\n')
                     {
-                        throw lexical_error(
+                        throw lexical_error{
                           std::format(
                             "{}: Missing terminating character '\"'.",
-                            to_string(loc)));
+                            to_string(loc))};
                     }
                 }
                 else
@@ -636,56 +680,58 @@ std::optional<token> lexer::next()
                     // handle escape sequences.
                     escaped = false;
 
-                    if(*c == 't') /* tab */
+                    if(c.value() == 't') /* tab */
                     {
                         current_token += '\t';
                     }
-                    else if(*c == 'n') /* line feed / new line */
+                    else if(c.value() == 'n') /* line feed / new line */
                     {
                         current_token += '\n';
                     }
-                    else if(*c == 'r') /* carriage return */
+                    else if(c.value() == 'r') /* carriage return */
                     {
                         current_token += '\r';
                     }
-                    else if(*c == 'f') /* form feed / new page */
+                    else if(c.value() == 'f') /* form feed / new page */
                     {
                         current_token += '\f';
                     }
-                    else if(*c == 'v') /* vertial tab */
+                    else if(c.value() == 'v') /* vertial tab */
                     {
                         current_token += '\v';
                     }
-                    else if(*c == '"') /* double quote */
+                    else if(c.value() == '"') /* double quote */
                     {
                         current_token += '"';
                     }
-                    else if(*c == '\'') /* single quote */
+                    else if(c.value() == '\'') /* single quote */
                     {
                         current_token += '\'';
                     }
-                    else if(*c == '\\') /* backslash */
+                    else if(c.value() == '\\') /* backslash */
                     {
                         current_token += '\\';
                     }
                     else
                     {
-                        throw lexical_error(
+                        throw lexical_error{
                           std::format(
                             "{}: Unknown escape sequence '\\{}'.",
                             to_string(loc),
-                            *c));
+                            c.value())};
                     }
                 }
             }
 
-            if(peek().has_value() && utils::is_alpha(*peek()))    // NOLINT(bugprone-unchecked-optional-access)
+            if(c = peek();
+               c.has_value()
+               && utils::is_alpha(c.value()))
             {
-                throw lexical_error(
+                throw lexical_error{
                   std::format(
                     "{}: Invalid suffix '{}' on string literal.",
                     to_string(loc),
-                    *peek()));    // NOLINT(bugprone-unchecked-optional-access)
+                    c.value())};
             }
 
             type = token_type::str_literal;
@@ -694,27 +740,27 @@ std::optional<token> lexer::next()
             break;
         }
 
-        if(*c == ',')    // comma operator / separator.
+        if(c.value() == ',')    // comma operator / separator.
         {
             break;
         }
 
-        if(*c == ';')    // statement end
+        if(c.value() == ';')    // statement end
         {
             break;
         }
 
-        if(*c == '#')    // directives
+        if(c.value() == '#')    // directives
         {
             break;
         }
 
-        throw lexical_error(
+        throw lexical_error{
           std::format(
             "{}: Unexpected character '{}' (0x{:x})",
             to_string(loc),
-            *c,
-            static_cast<int>(*c)));
+            c.value(),
+            static_cast<int>(c.value()))};
     }
 
     if(current_token.empty())
@@ -723,7 +769,8 @@ std::optional<token> lexer::next()
         {
             return std::nullopt;
         }
-        throw lexical_error("lext::next: No token parsed.");
+        throw lexical_error{
+          "lext::next: No token parsed."};
     }
 
     validate_suffix(loc, suffix);
@@ -736,7 +783,8 @@ std::optional<token> lexer::next()
             get();
         }
 
-        if(!peek().has_value() || is_vertical_whitespace(*peek()))
+        if(!peek().has_value()
+           || is_vertical_whitespace(peek()))
         {
             break;
         }
@@ -779,6 +827,23 @@ std::optional<token> lexer::next()
       has_blank_line_before_token,
       std::move(leading_comments),
       std::move(trailing_comments)};
+}
+
+token_stream lexer::lex(
+  std::string_view input)
+{
+    lexer lexer{std::string{input}};
+
+    std::optional<token> current_token;
+    std::vector<token> tokens;
+
+    while((current_token = lexer.next()).has_value())
+    {
+        tokens.push_back(current_token.value());
+    }
+
+    return token_stream{
+      std::move(tokens)};
 }
 
 }    // namespace slang

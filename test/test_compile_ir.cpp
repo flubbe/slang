@@ -15,6 +15,7 @@
 
 #include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/lexer.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
@@ -172,13 +173,8 @@ TEST(compile_ir, empty)
     // test: empty input
     const std::string test_input;
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    parser.parse(lexer);
-
-    EXPECT_TRUE(lexer.eof());
+    parser.parse(slang::lexer::lex(test_input));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     sema::env sema_env;
@@ -213,13 +209,8 @@ TEST(compile_ir, double_definition)
           "let a: i32;\n"
           "let a: f32;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -240,13 +231,8 @@ TEST(compile_ir, double_definition)
           " let a: f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -268,13 +254,8 @@ TEST(compile_ir, double_definition)
           "{\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -303,13 +284,8 @@ TEST(compile_ir, builtin_types)
           " let s: str;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -356,13 +332,8 @@ TEST(compile_ir, convert_i32)
           " let a: i8 = 2 as i8;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -401,13 +372,8 @@ TEST(compile_ir, convert_i32)
           " let a: i16 = 2 as i16;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -446,13 +412,8 @@ TEST(compile_ir, convert_i32)
           " let a: i64 = 2 as i64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -491,13 +452,8 @@ TEST(compile_ir, convert_i32)
           " let a: f32 = 2 as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -536,13 +492,8 @@ TEST(compile_ir, convert_i32)
           " let a: f64 = 2 as f64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -587,13 +538,8 @@ TEST(compile_ir, convert_i8)
           " let b: i16 = a as i16;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -637,13 +583,8 @@ TEST(compile_ir, convert_i8)
           " let b: i32 = a as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -686,13 +627,8 @@ TEST(compile_ir, convert_i8)
           " let b: i64 = a as i64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -736,13 +672,8 @@ TEST(compile_ir, convert_i8)
           " let b: f32 = a as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -786,13 +717,8 @@ TEST(compile_ir, convert_i8)
           " let b: f64 = a as f64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -841,13 +767,8 @@ TEST(compile_ir, convert_i16)
           " let b: i8 = a as i8;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -891,13 +812,8 @@ TEST(compile_ir, convert_i16)
           " let b: i32 = a as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -940,13 +856,8 @@ TEST(compile_ir, convert_i16)
           " let b: i64 = a as i64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -990,13 +901,8 @@ TEST(compile_ir, convert_i16)
           " let b: f32 = a as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1040,13 +946,8 @@ TEST(compile_ir, convert_i16)
           " let b: f64 = a as f64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1095,13 +996,8 @@ TEST(compile_ir, convert_i64)
           " let b: i8 = a as i8;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1146,13 +1042,8 @@ TEST(compile_ir, convert_i64)
           " let b: i16 = a as i16;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1197,13 +1088,8 @@ TEST(compile_ir, convert_i64)
           " let b: i32 = a as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1247,13 +1133,8 @@ TEST(compile_ir, convert_i64)
           " let b: f32 = a as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1297,13 +1178,8 @@ TEST(compile_ir, convert_i64)
           " let b: f64 = a as f64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1352,13 +1228,8 @@ TEST(compile_ir, convert_f32)
           " let b: i8 = a as i8;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1403,13 +1274,8 @@ TEST(compile_ir, convert_f32)
           " let b: i16 = a as i16;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1454,13 +1320,8 @@ TEST(compile_ir, convert_f32)
           " let b: i32 = a as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1504,13 +1365,8 @@ TEST(compile_ir, convert_f32)
           " let b: i64 = a as i64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1554,13 +1410,8 @@ TEST(compile_ir, convert_f32)
           " let b: f64 = a as f64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1609,13 +1460,8 @@ TEST(compile_ir, convert_f64)
           " let b: i8 = a as i8;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1660,13 +1506,8 @@ TEST(compile_ir, convert_f64)
           " let b: i16 = a as i16;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1711,13 +1552,8 @@ TEST(compile_ir, convert_f64)
           " let b: i32 = a as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1761,13 +1597,8 @@ TEST(compile_ir, convert_f64)
           " let b: i64 = a as i64;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1811,13 +1642,8 @@ TEST(compile_ir, convert_f64)
           " let b: f32 = a as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -1866,13 +1692,8 @@ TEST(compile_ir, arithmetic_i8)
               " let b: i8 = (3*a) as i8;\n"
               "}";
 
-            slang::lexer lexer;
             slang::parser parser;
-
-            lexer.set_input(test_input);
-            parser.parse(lexer);
-
-            EXPECT_TRUE(lexer.eof());
+            parser.parse(slang::lexer::lex(test_input));
 
             std::shared_ptr<ast::expression> ast = parser.get_ast();
             sema::env sema_env;
@@ -1923,13 +1744,8 @@ TEST(compile_ir, arithmetic_i16)
               " let b: i16 = (3*a) as i16;\n"
               "}";
 
-            slang::lexer lexer;
             slang::parser parser;
-
-            lexer.set_input(test_input);
-            parser.parse(lexer);
-
-            EXPECT_TRUE(lexer.eof());
+            parser.parse(slang::lexer::lex(test_input));
 
             std::shared_ptr<ast::expression> ast = parser.get_ast();
             sema::env sema_env;
@@ -1978,13 +1794,8 @@ TEST(compile_ir, logical_operators)
           " let a: i32 = 1 && 2;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2034,13 +1845,8 @@ TEST(compile_ir, logical_operators)
           " let a: i32 = 1 || 2;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2093,13 +1899,8 @@ TEST(compile_ir, empty_function)
       "{\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    parser.parse(lexer);
-
-    EXPECT_TRUE(lexer.eof());
+    parser.parse(slang::lexer::lex(test_input));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     sema::env sema_env;
@@ -2138,13 +1939,8 @@ TEST(compile_ir, builtin_return_values)
           " return 1;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2183,13 +1979,8 @@ TEST(compile_ir, builtin_return_values)
           " return 1.323 as f32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2229,13 +2020,8 @@ TEST(compile_ir, builtin_return_values)
           " return \"test\";\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2278,13 +2064,8 @@ TEST(compile_ir, function_arguments_and_locals)
           "{\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2321,13 +2102,8 @@ TEST(compile_ir, function_arguments_and_locals)
           " return a;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2368,13 +2144,8 @@ TEST(compile_ir, function_arguments_and_locals)
           " return a;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2415,13 +2186,8 @@ TEST(compile_ir, function_arguments_and_locals)
           " return j;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2461,13 +2227,8 @@ TEST(compile_ir, function_arguments_and_locals)
           " return j;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2514,13 +2275,8 @@ TEST(compile_ir, arrays)
           " let b: i32[] = [1, 2];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2571,13 +2327,8 @@ TEST(compile_ir, arrays)
           " return b;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2629,13 +2380,8 @@ TEST(compile_ir, arrays)
           " return b[0];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2685,13 +2431,8 @@ TEST(compile_ir, arrays)
           " return b[0];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2745,11 +2486,8 @@ TEST(compile_ir, arrays)
           " return b[0];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(slang::lexer::lex(test_input)), slang::syntax_error);
     }
     {
         // test: invalid new operator syntax
@@ -2762,11 +2500,8 @@ TEST(compile_ir, arrays)
           " return b[0];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(slang::lexer::lex(test_input)), slang::syntax_error);
     }
     {
         // test: invalid new operator syntax
@@ -2779,11 +2514,8 @@ TEST(compile_ir, arrays)
           " return b[0];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(slang::lexer::lex(test_input)), slang::syntax_error);
     }
 }
 
@@ -2795,13 +2527,9 @@ TEST(compile_ir, unary_operators)
           " let b: i32 = -1;\n"
           " return a+b;\n"
           "}\n";
-        slang::lexer lexer;
+
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2842,13 +2570,9 @@ TEST(compile_ir, unary_operators)
           " let b: i32 = ~1;\n"
           " return a+b;\n"
           "}\n";
-        slang::lexer lexer;
+
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2896,13 +2620,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2946,13 +2665,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -2996,13 +2710,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3046,13 +2755,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3100,13 +2804,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3154,13 +2853,8 @@ TEST(compile_ir, binary_operators)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3211,13 +2905,8 @@ TEST(compile_ir, postfix_operators)
       " i++;\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    parser.parse(lexer);
-
-    EXPECT_TRUE(lexer.eof());
+    parser.parse(slang::lexer::lex(test_input));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     sema::env sema_env;
@@ -3264,13 +2953,8 @@ TEST(compile_ir, compound_assignments)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3316,13 +3000,8 @@ TEST(compile_ir, compound_assignments)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3375,13 +3054,8 @@ TEST(compile_ir, compound_assignments)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3432,13 +3106,8 @@ TEST(compile_ir, compound_assignments)
           " return i;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3472,13 +3141,8 @@ TEST(compile_ir, function_calls)
           "fn g() -> void\n"
           "{}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3523,13 +3187,8 @@ TEST(compile_ir, function_calls)
           " return 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3582,13 +3241,8 @@ TEST(compile_ir, function_calls)
           "fn g(i: i32, j:f32) -> void {\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3637,13 +3291,8 @@ TEST(compile_ir, function_calls)
           " return arg(a) - 1;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3682,13 +3331,8 @@ TEST(compile_ir, function_calls)
           " return -1.0 as f32;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3747,13 +3391,8 @@ TEST(compile_ir, function_calls)
           " return S{i: 1};\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3812,13 +3451,8 @@ TEST(compile_ir, if_statement)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3880,13 +3514,8 @@ TEST(compile_ir, control_flow)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -3945,13 +3574,8 @@ TEST(compile_ir, control_flow)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4012,13 +3636,8 @@ TEST(compile_ir, control_flow)
           " return 3;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4072,13 +3691,8 @@ TEST(compile_ir, break_fail)
           " break;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4110,13 +3724,8 @@ TEST(compile_ir, continue_fail)
           " continue;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4153,13 +3762,8 @@ TEST(compile_ir, structs)
           " let s: S = S{ i: 2, j: 3 as f32 };\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4215,13 +3819,8 @@ TEST(compile_ir, structs)
           " let s: S = S{ i: 2, j: 3 as f32 };\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4275,13 +3874,8 @@ TEST(compile_ir, structs)
           " let s: S = S{ 2, 3 as f32 };\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4337,13 +3931,8 @@ TEST(compile_ir, structs)
           " return s.i + s.j as i32;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4408,13 +3997,8 @@ TEST(compile_ir, structs)
           " return s.i + s.j;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4481,13 +4065,8 @@ TEST(compile_ir, nested_structs)
           " let s: S = S{ i: 1, next: S{i: 3, next: null} };\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4546,13 +4125,8 @@ TEST(compile_ir, nested_structs)
           " return s.next.i;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4616,13 +4190,8 @@ TEST(compile_ir, nested_structs)
           " return s.i + s.next.i;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;
@@ -4696,13 +4265,8 @@ TEST(compile_ir, nested_structs)
           " root.next.next = null;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        parser.parse(lexer);
-
-        EXPECT_TRUE(lexer.eof());
+        parser.parse(slang::lexer::lex(test_input));
 
         std::shared_ptr<ast::expression> ast = parser.get_ast();
         sema::env sema_env;

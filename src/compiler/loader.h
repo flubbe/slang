@@ -13,8 +13,8 @@
 #include <stdexcept>
 
 #include "compiler/collect.h"
-#include "compiler/token.h"
 #include "shared/module.h"
+#include "shared/token.h"
 #include "filemanager.h"
 #include "module_resolver.h"
 

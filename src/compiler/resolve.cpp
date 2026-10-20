@@ -4,7 +4,7 @@
  * name resolution.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -53,12 +53,14 @@ void context::import_constant(
             symbol_info_it->second.qualified_name));
     }
 
+    // bounds are checked above.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     const module_::constant_table_entry& const_entry = header.constants[const_idx];
 
     // store constant info and add constant to type map.
     const_env.register_constant(symbol_id);
 
-    ty::type_id new_type_id = [this, &symbol_info_it, &symbol_id, &const_entry]() -> ty::type_id
+    ty::type_id new_type_id = [this, &symbol_info_it, &symbol_id, &const_entry] -> ty::type_id
     {
         if(const_entry.type == module_::constant_type::i32)
         {
@@ -67,7 +69,8 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::i32,
-                .value = std::get<std::int32_t>(const_entry.data)});
+                .value = std::get<std::int32_t>(const_entry.data),
+              });
 
             return type_ctx.get_i32_type();
         }
@@ -79,7 +82,8 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::i64,
-                .value = std::get<std::int64_t>(const_entry.data)});
+                .value = std::get<std::int64_t>(const_entry.data),
+              });
 
             return type_ctx.get_i64_type();
         }
@@ -91,7 +95,8 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::f32,
-                .value = std::get<float>(const_entry.data)});
+                .value = std::get<float>(const_entry.data),
+              });
 
             return type_ctx.get_f32_type();
         }
@@ -115,7 +120,8 @@ void context::import_constant(
               const_::const_info{
                 .origin_module_id = symbol_info_it->second.declaring_module,
                 .type = const_::constant_type::str,
-                .value = std::get<std::string>(const_entry.data)});
+                .value = std::get<std::string>(const_entry.data),
+              });
 
             return type_ctx.get_str_type();
         }
@@ -185,10 +191,22 @@ void context::import_macro(
             symbol_id.value));
     }
 
+    /*
+     * Context IDs from the defining module are not valid in this semantic
+     * environment.
+     *
+     * TODO Import/remap the macro's definition syntax context
+     *      and the contexts referenced by its body, preserving their ancestry.
+     *      For now, use a fresh context rooted in this environment.
+     */
+    const auto definition_context = sema_env.syntax_contexts.allocate(
+      root_syntax_context);
+
     macro_env.add_macro(
       name::unqualified_name(symbol_info_it->second.name),
       desc,
-      module_name);
+      module_name,
+      definition_context);
 }
 
 ty::type_id context::resolve_imported_type(
@@ -298,7 +316,7 @@ std::optional<sema::symbol_id> context::resolve_external(
             info.qualified_name));
     }
 
-    auto declaring_module_symbol_id = [this, &info, &declaring_module_it]() -> sema::symbol_id
+    auto declaring_module_symbol_id = [this, &info, &declaring_module_it] -> sema::symbol_id
     {
         if(auto id = sema_env.get_symbol_id(
              declaring_module_it->second.qualified_name,
@@ -318,7 +336,8 @@ std::optional<sema::symbol_id> context::resolve_external(
              .loc = info.loc,
              .scope = sema_env.global_scope_id,
              .declaring_module = sema::symbol_info::current_module_id,
-             .reference = std::nullopt}});
+             .reference = std::nullopt,
+           }});
         if(!success)
         {
             throw std::runtime_error(
@@ -343,9 +362,14 @@ std::optional<sema::symbol_id> context::resolve_external(
     }
 
     global_scope_it->second.bindings.insert(
-      {info.qualified_name,
-       std::unordered_map<sema::symbol_type, sema::symbol_id>{
-         {info.type, new_symbol_id}}});
+      {
+        sema::bound_identifier{
+          .name = info.qualified_name,
+          .context = root_syntax_context,
+        },
+        std::unordered_map<sema::symbol_type, sema::symbol_id>{
+          {info.type, new_symbol_id}},
+      });
 
     auto [entry, success] = sema_env.symbol_table.insert(
       {new_symbol_id,
@@ -356,7 +380,8 @@ std::optional<sema::symbol_id> context::resolve_external(
          .loc = info.loc,
          .scope = sema_env.global_scope_id,
          .declaring_module = declaring_module_symbol_id,
-         .reference = info.reference}});
+         .reference = info.reference,
+       }});
     if(!success)
     {
         throw std::runtime_error(
@@ -438,9 +463,10 @@ std::optional<sema::symbol_id> context::resolve_external(
 std::optional<sema::symbol_id> context::resolve(
   const std::string& name,
   sema::symbol_type type,
-  sema::scope_id scope_id)
+  sema::scope_id scope_id,
+  syntax_context_id context)
 {
-    if(name.rfind("::") != std::string_view::npos)
+    if(name.contains("::"))
     {
         // FIXME triple work
         std::string mod_name{name::module_path(name)};
@@ -512,7 +538,7 @@ std::optional<sema::symbol_id> context::resolve(
           s_it->second.bindings,
           [&name, &type](const auto& b) -> bool
           {
-              if(b.first != name)
+              if(b.first.name != name)
               {
                   return false;
               }
@@ -534,7 +560,8 @@ std::optional<sema::symbol_id> context::resolve(
     return sema_env.get_symbol_id(
       name,
       type,
-      scope_id);
+      scope_id,
+      context);
 }
 
 /**
@@ -648,13 +675,12 @@ std::unordered_map<std::string, import_module_spec> context::collect_unresolved_
           {symbol_info.qualified_name,
            import_module_spec{
              .origin = symbol_info.declaring_module,
-             .location = symbol_info.loc}});
-        if(!success)
+             .location = symbol_info.loc,
+           }});
+        if(!success
+           && symbol_info.declaring_module == sema::symbol_info::current_module_id)
         {
-            if(symbol_info.declaring_module == sema::symbol_info::current_module_id)
-            {
-                entry->second.origin = sema::symbol_info::current_module_id;
-            }
+            entry->second.origin = sema::symbol_info::current_module_id;
         }
     }
 
@@ -701,7 +727,7 @@ void context::resolve_imports(
            transitive,
            &import_collector,
            &unqualified_name,
-           &qualified_module_name]() -> sema::symbol_id
+           &qualified_module_name] -> sema::symbol_id
         {
             if(!transitive)
             {
@@ -722,10 +748,9 @@ void context::resolve_imports(
             }
 
             return import_collector.declare(
-              unqualified_name,
+              {unqualified_name, spec.location},
               qualified_module_name,
               sema::symbol_type::module_,
-              spec.location,
               spec.origin,
               transitive);
         }();
@@ -779,7 +804,8 @@ void context::resolve_imports(
               {qualified_name,
                import_module_spec{
                  .origin = module_symbol_id,
-                 .location = spec.location}});
+                 .location = spec.location,
+               }});
         }
     }
 
@@ -831,10 +857,9 @@ void context::resolve_imports(
               it.name);
 
             import_collector.declare(
-              it.name,
+              {it.name, resolved_it->second.location},
               qualified_name,
               to_sema_symbol_type(it.type),
-              resolved_it->second.location,
               module_id,
               transitive,
               &it);

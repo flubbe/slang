@@ -21,6 +21,7 @@
 #include "compiler/collect.h"
 #include "compiler/constant.h"
 #include "compiler/directive.h"
+#include "shared/token_stream.h"
 #include "compiler/typing.h"
 #include "node_ids.h"
 #include "utils.h"
@@ -452,7 +453,12 @@ public:
      * @param rs_ctx Name resolution context.
      * @param codegen_ctx Code generation context.
      * @param macro_env Macro collection / expansion environment.
+     * @param syntax_contexts Syntax-context table for macro expansion.
      * @param macro_asts The module's macros as AST's.
+     *
+     * TODO(macro-migration): Remove this parameter when local descriptor
+     * lookup replaces the legacy AST expansion path.
+     *
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
     bool expand_macros(
@@ -460,6 +466,7 @@ public:
       rs::context& rs_ctx,
       cg::context& codegen_ctx,
       macro::env& macro_env,
+      syntax_context_table& syntax_contexts,
       const std::vector<expression*>& macro_asts);
 
     /**
@@ -3259,6 +3266,16 @@ class macro_invocation : public named_expression
     /** Expressions the macro operates on. */
     std::vector<std::unique_ptr<expression>> exprs;
 
+    /** Raw token streams for the macro arguments. */
+    std::vector<token_stream> argument_tokens;
+
+    /** Separators between raw macro arguments. */
+    std::vector<token> argument_separators;
+
+    /** Delimiters surrounding the raw macro arguments. */
+    std::optional<token> argument_opening_delimiter;
+    std::optional<token> argument_closing_delimiter;
+
     /** An optional index expression for return value array access. */
     std::unique_ptr<expression> index_expr;
 
@@ -3280,6 +3297,10 @@ public:
                   return ptr->clone();
               })
             | std::ranges::to<std::vector>()}
+    , argument_tokens{other.argument_tokens}
+    , argument_separators{other.argument_separators}
+    , argument_opening_delimiter{other.argument_opening_delimiter}
+    , argument_closing_delimiter{other.argument_closing_delimiter}
     , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
     , expansion{other.expansion ? other.expansion->clone() : nullptr}
     {
@@ -3413,6 +3434,47 @@ public:
     const std::vector<std::unique_ptr<expression>>& get_exprs() const
     {
         return exprs;
+    }
+
+    /** Get the raw token streams for the macro arguments. */
+    [[nodiscard]]
+    const std::vector<token_stream>& get_argument_tokens() const
+    {
+        return argument_tokens;
+    }
+
+    /** Get the separators between raw macro arguments. */
+    [[nodiscard]]
+    const std::vector<token>& get_argument_separators() const
+    {
+        return argument_separators;
+    }
+
+    /** Get the opening delimiter for the raw macro arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_opening_delimiter() const
+    {
+        return argument_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for the raw macro arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_closing_delimiter() const
+    {
+        return argument_closing_delimiter;
+    }
+
+    /** Store raw token data captured by the parser. */
+    void set_argument_tokens(
+      std::vector<token_stream> tokens,
+      std::vector<token> separators,
+      std::optional<token> opening_delimiter,
+      std::optional<token> closing_delimiter)
+    {
+        argument_tokens = std::move(tokens);
+        argument_separators = std::move(separators);
+        argument_opening_delimiter = std::move(opening_delimiter);
+        argument_closing_delimiter = std::move(closing_delimiter);
     }
 
     /** Whether this macro is expanded. */
@@ -3975,7 +4037,11 @@ public:
     }
 };
 
-/** Macro branch. */
+/**
+ * Macro branch.
+ *
+ * TODO More common names seem to be: macro_rule, macro_arm
+ */
 class macro_branch : public expression
 {
     friend class macro_expression;
@@ -3986,8 +4052,27 @@ class macro_branch : public expression
     /** Whether the arguments end with a list. */
     bool args_end_with_list{false};
 
-    /** Body. */
+    /** Separators between macro branch arguments. */
+    std::vector<token> argument_separators;
+
+    /** Delimiters surrounding the macro branch arguments. */
+    std::optional<token> argument_opening_delimiter;
+    std::optional<token> argument_closing_delimiter;
+
+    /**
+     * Legacy parsed body.
+     *
+     * TODO(macro-migration): Remove this AST body once macro descriptors
+     * contain the complete validated token body.
+     */
     std::unique_ptr<block> body;
+
+    /** Raw body tokens, excluding the outer braces. */
+    std::optional<token_stream> body_tokens;
+
+    /** Delimiters surrounding the raw body tokens. */
+    std::optional<token> body_opening_delimiter;
+    std::optional<token> body_closing_delimiter;
 
 public:
     using super = expression;
@@ -3998,7 +4083,13 @@ public:
     : super{other}
     , args{other.args}
     , args_end_with_list{other.args_end_with_list}
+    , argument_separators{other.argument_separators}
+    , argument_opening_delimiter{other.argument_opening_delimiter}
+    , argument_closing_delimiter{other.argument_closing_delimiter}
     , body{static_cast<block*>(other.body->clone().release())}
+    , body_tokens{other.body_tokens}
+    , body_opening_delimiter{other.body_opening_delimiter}
+    , body_closing_delimiter{other.body_closing_delimiter}
     {
     }
     macro_branch(macro_branch&&) = default;
@@ -4013,17 +4104,29 @@ public:
      * @param loc The branch location.
      * @param args Macro arguments.
      * @param args_end_with_list Whether the arguments end with a list.
-     * @param body Branch body.
+     * @param body Legacy parsed branch body.
      */
     macro_branch(
       source_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
-      std::unique_ptr<block> body)
+      std::unique_ptr<block> body,
+      std::vector<token> argument_separators = {},
+      std::optional<token> argument_opening_delimiter = std::nullopt,
+      std::optional<token> argument_closing_delimiter = std::nullopt,
+      std::optional<token_stream> body_tokens = std::nullopt,
+      std::optional<token> body_opening_delimiter = std::nullopt,
+      std::optional<token> body_closing_delimiter = std::nullopt)
     : expression{loc}
     , args{std::move(args)}
     , args_end_with_list{args_end_with_list}
+    , argument_separators{std::move(argument_separators)}
+    , argument_opening_delimiter{std::move(argument_opening_delimiter)}
+    , argument_closing_delimiter{std::move(argument_closing_delimiter)}
     , body{std::move(body)}
+    , body_tokens{std::move(body_tokens)}
+    , body_opening_delimiter{std::move(body_opening_delimiter)}
+    , body_closing_delimiter{std::move(body_closing_delimiter)}
     {
     }
 
@@ -4070,11 +4173,15 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
+        // TODO(macro-migration): Remove AST-body traversal with the legacy
+        // macro branch representation.
         return {body.get()};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
+        // TODO(macro-migration): Remove AST-body traversal with the legacy
+        // macro branch representation.
         return {body.get()};
     }
 
@@ -4092,11 +4199,53 @@ public:
         return args_end_with_list;
     }
 
+    /** Get the separators between macro branch arguments. */
+    [[nodiscard]]
+    const std::vector<token>& get_argument_separators() const
+    {
+        return argument_separators;
+    }
+
+    /** Get the opening delimiter for macro branch arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_opening_delimiter() const
+    {
+        return argument_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for macro branch arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_closing_delimiter() const
+    {
+        return argument_closing_delimiter;
+    }
+
     /** Get the macro branch body. */
     [[nodiscard]]
     const std::unique_ptr<block>& get_body() const
     {
         return body;
+    }
+
+    /** Get the raw body tokens, excluding the outer braces. */
+    [[nodiscard]]
+    const std::optional<token_stream>& get_body_tokens() const
+    {
+        return body_tokens;
+    }
+
+    /** Get the opening delimiter for the raw body tokens. */
+    [[nodiscard]]
+    const std::optional<token>& get_body_opening_delimiter() const
+    {
+        return body_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for the raw body tokens. */
+    [[nodiscard]]
+    const std::optional<token>& get_body_closing_delimiter() const
+    {
+        return body_closing_delimiter;
     }
 };
 

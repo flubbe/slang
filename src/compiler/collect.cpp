@@ -4,7 +4,7 @@
  * name collection.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -93,10 +93,9 @@ sema::scope_id context::create_scope(
 }
 
 sema::symbol_id context::declare(
-  std::string name,
+  const token& tok,
   std::string qualified_name,
   sema::symbol_type type,
-  source_location loc,
   sema::symbol_id declaring_module,
   bool transitive,
   std::optional<
@@ -107,18 +106,10 @@ sema::symbol_id context::declare(
 {
     sema::scope* s = get_scope(current_scope);
 
-    auto it = std::ranges::find_if(
-      s->bindings,
-      [&name, type](const auto& b) -> bool
-      {
-          if(b.first != name)
-          {
-              return false;
-          }
+    const sema::bound_identifier bound_id{tok.s, tok.context};
 
-          return b.second.contains(type);
-      });
-    if(it != s->bindings.end())
+    auto it = s->bindings.find(bound_id);
+    if(it != s->bindings.end() && it->second.contains(type))
     {
         auto symbol_id = it->second[type];
 
@@ -136,29 +127,23 @@ sema::symbol_id context::declare(
             throw std::runtime_error(
               std::format(
                 "{}: Redefinition of symbol '{}', but original definition not found in symbol table.",
-                to_string(loc),
-                name));
+                to_string(tok.location),
+                tok.s));
         }
 
         throw redefinition_error(
-          name,
-          loc,
+          tok.s,
+          tok.location,
           original->second.loc);
     }
 
     // insert new declaration.
     auto new_symbol_id = generate_symbol_id();
 
-    it = std::ranges::find_if(
-      s->bindings,
-      [&name](const auto& b) -> bool
-      {
-          return b.first == name;
-      });
     if(it == s->bindings.end())
     {
         s->bindings.insert(
-          {name,
+          {bound_id,
            std::unordered_map<sema::symbol_type, sema::symbol_id>{
              {type, new_symbol_id}}});
     }
@@ -170,18 +155,19 @@ sema::symbol_id context::declare(
     auto [entry, success] = env.symbol_table.insert(
       {new_symbol_id,
        sema::symbol_info{
-         .name = std::move(name),
+         .name = tok.s,
          .qualified_name = std::move(qualified_name),
          .type = type,
-         .loc = loc,
+         .loc = tok.location,
          .scope = current_scope,
+         .context = tok.context,
          .declaring_module = declaring_module,
          .reference = reference}});
     if(!success)
     {
         throw redefinition_error(
           entry->second.name,
-          loc,
+          tok.location,
           entry->second.loc);
     }
 
@@ -200,18 +186,10 @@ bool context::declare_external(
 {
     sema::scope* s = get_scope(context::global_scope_id);
 
-    auto it = std::ranges::find_if(
-      s->bindings,
-      [&qualified_name, type](const auto& b) -> bool
-      {
-          if(b.first != qualified_name)
-          {
-              return false;
-          }
+    const sema::bound_identifier bound_id{qualified_name, root_syntax_context};
 
-          return b.second.contains(type);
-      });
-    if(it != s->bindings.end())
+    auto it = s->bindings.find(bound_id);
+    if(it != s->bindings.end() && it->second.contains(type))
     {
         auto symbol_id = it->second[type];
 
@@ -227,16 +205,10 @@ bool context::declare_external(
     // insert new declaration.
     auto new_symbol_id = generate_symbol_id();
 
-    it = std::ranges::find_if(
-      s->bindings,
-      [&qualified_name](const auto& b) -> bool
-      {
-          return b.first == qualified_name;
-      });
     if(it == s->bindings.end())
     {
         s->bindings.insert(
-          {qualified_name,
+          {bound_id,
            std::unordered_map<sema::symbol_type, sema::symbol_id>{
              {type, new_symbol_id}}});
     }
@@ -253,6 +225,7 @@ bool context::declare_external(
          .type = type,
          .loc = loc,
          .scope = current_scope,
+         .context = root_syntax_context,
          .declaring_module = sema::symbol_info::current_module_id,
          .reference = std::nullopt}});
     if(!success)
@@ -268,9 +241,10 @@ bool context::declare_external(
 
 bool context::has_symbol(
   const std::string& name,
-  sema::symbol_type type) const
+  sema::symbol_type type,
+  syntax_context_id context) const
 {
-    if(name.find("::") != std::string::npos)
+    if(name.contains("::"))
     {
         auto it = std::ranges::find_if(
           env.symbol_table,
@@ -284,20 +258,15 @@ bool context::has_symbol(
     }
 
     const sema::scope* s = get_scope(current_scope);
+    const sema::bound_identifier bound_id{name, context};
 
-    auto it = std::ranges::find_if(
-      s->bindings,
-      [&name, type](const auto& b) -> bool
-      {
-          if(b.first != name)
-          {
-              return false;
-          }
+    auto it = s->bindings.find(bound_id);
+    if(it != s->bindings.cend())
+    {
+        return it->second.contains(type);
+    }
 
-          return b.second.contains(type);
-      });
-
-    return it != s->bindings.cend();
+    return false;
 }
 
 sema::scope_id context::push_scope(

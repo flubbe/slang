@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * the parser. generates an AST from the lexer output.
+ * The parser. Generates an AST from a token stream.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2025
@@ -11,12 +11,14 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "ast/ast.h"
-#include "lexer.h"
+#include "shared/token_stream.h"
 
 namespace slang
 {
@@ -24,39 +26,39 @@ namespace slang
 /**
  * An error during parsing.
  */
-class parser_error : public std::runtime_error
+struct parser_error : public std::runtime_error
 {
     using std::runtime_error::runtime_error;
 
-public:
     /**
      * Construct a syntax_error.
      *
      * @param tok The token where the error occured.
      * @param message The error message.
      */
-    parser_error(const token& tok, const std::string& message);
+    parser_error(
+      const token& tok,
+      const std::string& message);
 };
 
-/**
- * A syntax error.
- */
-class syntax_error : public std::runtime_error
+/** A syntax error. */
+struct syntax_error : public std::runtime_error
 {
     using std::runtime_error::runtime_error;
 
-public:
     /**
      * Construct a syntax_error.
      *
      * @param tok The token where the error occured.
      * @param message The error message.
      */
-    syntax_error(const token& tok, const std::string& message);
+    syntax_error(
+      const token& tok,
+      const std::string& message);
 };
 
 /** Operator associativity. */
-enum class associativity
+enum class associativity : std::uint8_t
 {
     left_to_right,
     right_to_left
@@ -64,50 +66,86 @@ enum class associativity
 
 /**
  * This class implements a recursive descent LL(1) parser.
- * It uses a lexer to turn tokens into an abstract syntax tree.
+ * It turns a token stream into an abstract syntax tree.
  */
 class parser
 {
 protected:
-    /** The lexer common to all internal parse calls. */
-    lexer* current_lexer{nullptr};
+    /** The token stream being parsed. */
+    std::optional<token_stream> tokens{std::nullopt};
+
+    /** Current position in the token stream. */
+    std::size_t token_index{0};
 
     /** The parsed AST. */
-    std::shared_ptr<ast::translation_unit> ast;
+    std::shared_ptr<ast::translation_unit> ast{};
 
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
+
+    /** Parser-owned token used as lookahead after the input is exhausted. */
+    inline static const token end_of_input_token{
+      "<end-of-input>",
+      {1, 1},
+      token_type::end_of_input};
 
     /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
     bool parsing_native{false};
 
     /** Directive stack with entries `(name, restore_function)`. */
-    std::vector<std::pair<token, std::function<void(void)>>> directive_stack;
+    std::vector<
+      std::pair<
+        token,
+        std::function<void(void)>>>
+      directive_stack{};
 
-    /** Macro AST's. Point into the parsed AST. */
-    std::vector<ast::expression*> macro_asts;
+    /**
+     * Macro AST's. Point into the parsed AST.
+     *
+     * TODO(macro-migration): Remove this legacy expansion lookup once local
+     * macro descriptors are authoritative.
+     */
+    std::vector<ast::expression*> macro_asts{};
+
+    /** Find the closing delimiter matching a source-stream delimiter. */
+    std::optional<std::size_t> find_matching_delimiter(
+      std::size_t opening_index,
+      std::string_view opening,
+      std::string_view closing) const;
+
+    /** Copy a half-open range from the parser-owned source token stream. */
+    token_stream copy_token_range(
+      std::size_t begin,
+      std::size_t end) const;
 
     /**
      * Get the next token and store it in the token buffer `current_token`.
      *
-     * @param throw_on_eof Whether to throw a `syntax_error` if the next token indicates the end of the file.
-     * @return Returns the read token.
-     * @throws A `parser_error` if no lexer is available.
-     *         A `syntax_error` if `throw_on_eof` is set and no token is available.
+     * At the end of the stream, stores and returns the parser-owned
+     * `end_of_input` token. This gives parsing routines a stable lookahead
+     * token without adding an EOF token to the source token stream.
+     *
+     * @return Returns the read token, or the end-of-input token.
+     * @throws A `parser_error` if no token stream is set.
      */
-    std::optional<token> get_next_token(bool throw_on_eof = true)
+    std::optional<token> get_next_token()
     {
-        if(!current_lexer)
+        if(!tokens.has_value())
         {
-            throw parser_error("No lexer set for parsing.");
+            throw parser_error{
+              "No token stream set for parsing."};
         }
 
-        current_token = current_lexer->next();
-        if(!current_token.has_value() && throw_on_eof)
+        if(token_index >= tokens->size())
         {
-            throw syntax_error("Unexpected end of file.");
+            current_token = end_of_input_token;
+            current_token->location = tokens->empty()
+                                        ? source_location{1, 1}
+                                        : tokens->back().location;
+            return current_token;
         }
 
+        current_token = (*tokens)[token_index++];
         return current_token;
     }
 
@@ -123,25 +161,39 @@ protected:
      *
      * @return The associativity for the current token, or std::nullopt.
      */
-    std::optional<associativity> get_token_associativity() const;
+    std::optional<
+      associativity>
+      get_token_associativity() const;
 
     /** Parse a top level statement. */
-    std::unique_ptr<ast::expression> parse_top_level_statement();
+    std::unique_ptr<
+      ast::expression>
+      parse_top_level_statement();
 
     /** Parse an import statement. */
-    std::unique_ptr<ast::import_statement> parse_import();
+    std::unique_ptr<
+      ast::import_statement>
+      parse_import();
 
     /** Parse a function prototype. */
-    std::unique_ptr<ast::prototype_ast> parse_prototype();
+    std::unique_ptr<
+      ast::prototype_ast>
+      parse_prototype();
 
     /** Parse a function definition. */
-    std::unique_ptr<ast::function_expression> parse_definition();
+    std::unique_ptr<
+      ast::function_expression>
+      parse_definition();
 
     /** Parse a variable declaration. */
-    std::unique_ptr<ast::variable_declaration_expression> parse_variable();
+    std::unique_ptr<
+      ast::variable_declaration_expression>
+      parse_variable();
 
     /** Parse a constant expression. */
-    std::unique_ptr<ast::constant_declaration_expression> parse_const();
+    std::unique_ptr<
+      ast::constant_declaration_expression>
+      parse_const();
 
     /**
      * Parse a type.
@@ -149,16 +201,27 @@ protected:
      * @param parse_array_suffix Whether to parse the array suffix.
      * @return Returns a type expression.
      * */
-    std::unique_ptr<ast::type_expression> parse_type(bool parse_array_suffix = true);
+    std::unique_ptr<
+      ast::type_expression>
+      parse_type(
+        bool parse_array_suffix = true);
 
     /** Parse an array initializer expression. */
-    std::unique_ptr<ast::array_initializer_expression> parse_array_initializer_expression();
+    std::unique_ptr<
+      ast::array_initializer_expression>
+      parse_array_initializer_expression();
 
     /** Parse a struct definition. */
-    std::unique_ptr<ast::struct_definition_expression> parse_struct();
+    std::unique_ptr<
+      ast::struct_definition_expression>
+      parse_struct();
 
     /** Parse a compiler directive. */
-    std::pair<token, std::vector<std::pair<token, token>>> get_directive();
+    std::pair<
+      token,
+      std::vector<
+        std::pair<token, token>>>
+      get_directive();
 
     /**
      * Parse any block of expressions between { and }.
@@ -168,67 +231,119 @@ protected:
      *
      * @param skip_closing_brace Whether to skip the block's closing brace.
      */
-    std::unique_ptr<ast::block> parse_block(bool skip_closing_brace = true);
+    std::unique_ptr<
+      ast::block>
+      parse_block(
+        bool skip_closing_brace = true);
 
     /**
      * Parse a statement in a block. Returns an empty `std::unique_ptr`
      * if the statement was empty.
      */
-    std::unique_ptr<ast::expression> parse_block_stmt();
+    std::unique_ptr<
+      ast::expression>
+      parse_block_stmt();
 
     /** Parse a primary expression. */
-    std::unique_ptr<ast::expression> parse_primary();
+    std::unique_ptr<
+      ast::expression>
+      parse_primary();
 
     /** Parse the right-hand side of a binary operator expression. */
-    std::unique_ptr<ast::expression> parse_bin_op_rhs(int prec, std::unique_ptr<ast::expression> lhs);
+    std::unique_ptr<
+      ast::expression>
+      parse_bin_op_rhs(
+        int prec,
+        std::unique_ptr<ast::expression> lhs);
 
     /** Parse a unary operator expression. */
-    std::unique_ptr<ast::expression> parse_unary(bool ignore_type_cast = false);
+    std::unique_ptr<
+      ast::expression>
+      parse_unary(
+        bool ignore_type_cast = false);
 
     /** Parse the new operator. */
-    std::unique_ptr<ast::expression> parse_new();
+    std::unique_ptr<
+      ast::expression>
+      parse_new();
 
     /** Parse identifier expression. */
-    std::unique_ptr<ast::expression> parse_identifier_expression();
+    std::unique_ptr<
+      ast::expression>
+      parse_identifier_expression();
 
     /** Parse a member access expression. */
-    std::unique_ptr<ast::expression> parse_access_expression(std::unique_ptr<ast::expression> lhs);
+    std::unique_ptr<
+      ast::expression>
+      parse_access_expression(
+        std::unique_ptr<ast::expression> lhs);
 
     /** Parse literal expression. */
-    std::unique_ptr<ast::literal_expression> parse_literal_expression();
+    std::unique_ptr<
+      ast::literal_expression>
+      parse_literal_expression();
 
     /** Parse parenthesized expression. */
-    std::unique_ptr<ast::expression> parse_paren_expression();
+    std::unique_ptr<
+      ast::expression>
+      parse_paren_expression();
 
     /** Parse expression. */
-    std::unique_ptr<ast::expression> parse_expression();
+    std::unique_ptr<
+      ast::expression>
+      parse_expression();
 
     /** Parse a type cast expression. */
-    std::unique_ptr<ast::expression> parse_type_cast_expression(std::unique_ptr<ast::expression> expr);
+    std::unique_ptr<
+      ast::expression>
+      parse_type_cast_expression(
+        std::unique_ptr<ast::expression> expr);
 
     /** Parse an if statement. */
-    std::unique_ptr<ast::if_statement> parse_if();
+    std::unique_ptr<
+      ast::if_statement>
+      parse_if();
 
     /** Parse an while statement. */
-    std::unique_ptr<ast::expression> parse_while();
+    std::unique_ptr<
+      ast::expression>
+      parse_while();
 
     /** Parse an break statement. */
-    std::unique_ptr<ast::expression> parse_break();
+    std::unique_ptr<
+      ast::expression>
+      parse_break();
 
     /** Parse an continue statement. */
-    std::unique_ptr<ast::expression> parse_continue();
+    std::unique_ptr<
+      ast::expression>
+      parse_continue();
 
     /** Parse an return statement. */
-    std::unique_ptr<ast::return_statement> parse_return();
+    std::unique_ptr<
+      ast::return_statement>
+      parse_return();
 
     /** Parse a macro. */
-    std::unique_ptr<ast::macro_expression> parse_macro();
+    std::unique_ptr<
+      ast::macro_expression>
+      parse_macro();
 
-    /** Parse a macro branch. */
-    std::unique_ptr<ast::macro_branch> parse_macro_branch();
+    /**
+     * Parse a macro branch.
+     *
+     * TODO(macro-migration): Keep the token-capture logic, but remove the
+     * AST-body construction once macro descriptors are authoritative.
+     */
+    std::unique_ptr<
+      ast::macro_branch>
+      parse_macro_branch();
 
     /** Push a directive onto the directive stack. */
-    void push_directive(const token& name, const std::vector<std::pair<token, token>>& args);
+    void push_directive(
+      const token& name,
+      const std::vector<
+        std::pair<token, token>>& args);
 
     /** Pop last directive from directive stack. */
     void pop_directive();
@@ -236,6 +351,13 @@ protected:
 public:
     /** Default constructor. */
     parser() = default;
+
+    /** Construct a parser for a token stream. */
+    explicit parser(
+      token_stream tokens)
+    : tokens{std::move(tokens)}
+    {
+    }
 
     /** Copy and move constructors. */
     parser(const parser&) = delete;
@@ -249,23 +371,40 @@ public:
     parser& operator=(parser&&) = default;
 
     /**
-     * Parse tokens from a lexer into an abstract syntax tree.
+     * Parse tokens from a token stream into an abstract syntax tree.
      *
-     * @param lexer The lexer to use.
+     * @param tokens The token stream to parse.
      */
-    void parse(lexer& lexer);
+    void parse(
+      token_stream tokens);
 
     /** Get the AST. */
-    std::shared_ptr<ast::translation_unit> get_ast() const
+    std::shared_ptr<
+      ast::translation_unit>
+      get_ast() const
     {
         return ast;
     }
 
     /** Get the macros (pointers into the AST). */
-    auto& get_macro_asts(this auto&& self)
+    auto& get_macro_asts(
+      this auto&& self)
     {
         return self.macro_asts;
     }
+
+    /**
+     * Parse exactly one expression from a token stream.
+     *
+     * @param tokens The token stream containing the expression.
+     * @return The parsed expression.
+     * @throws A syntax_error if the stream is empty, the expression is
+     *     invalid, or tokens remain after the expression.
+     */
+    static std::unique_ptr<
+      ast::expression>
+      parse_expression(
+        token_stream tokens);
 };
 
 }    // namespace slang

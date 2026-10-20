@@ -4,7 +4,7 @@
  * shared semantic environment.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -16,8 +16,10 @@
 #include <stdexcept>
 #include <variant>
 
+#include "shared/location.h"
+#include "shared/token.h"
 #include "attribute.h"
-#include "location.h"
+#include "syntax_context.h"
 #include "type.h"
 
 namespace slang::ast
@@ -132,6 +134,30 @@ struct symbol_id
  */
 archive& operator&(archive& ar, symbol_id& id);
 
+/** An identifier bound to a scope, distinguished by name and syntax context (hygiene). */
+struct bound_identifier
+{
+    /** Symbol name. */
+    std::string name;
+
+    /** Syntax context. */
+    syntax_context_id context{root_syntax_context};
+
+    /** Equality comparison. */
+    bool operator==(const bound_identifier& other) const = default;
+
+    /** Hash functor. */
+    struct hash
+    {
+        std::size_t operator()(const bound_identifier& id) const noexcept
+        {
+            std::size_t h1 = std::hash<std::string>{}(id.name);
+            std::size_t h2 = std::hash<syntax_context_id>{}(id.context);
+            return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+        }
+    };
+};
+
 /** Scope id. */
 using scope_id = std::uint64_t;
 
@@ -152,10 +178,11 @@ struct scope
 
     /** Symbol bindings. */
     std::unordered_map<
-      std::string,
+      bound_identifier,
       std::unordered_map<
         symbol_type,
-        symbol_id>>
+        symbol_id>,
+      bound_identifier::hash>
       bindings;
 };
 
@@ -176,6 +203,9 @@ struct symbol_info
 
     /** Scope id. */
     scope_id scope;
+
+    /** Syntax context. */
+    syntax_context_id context{root_syntax_context};
 
     /** Module declaring the symbol, or `symbol_info::current_module_id` for the compiled module. */
     symbol_id declaring_module;
@@ -228,6 +258,9 @@ struct env
     /** Current function name. */
     std::optional<std::string> current_function_name{std::nullopt};
 
+    /** Syntax context table for hygiene. */
+    syntax_context_table syntax_contexts;
+
     /** Default constructors. */
     env() = default;
     env(const env&) = default;
@@ -246,14 +279,16 @@ struct env
      * @note Qualified names are detected by containing `::`.
      * @param name The symbol's name, qualified or unqualified.
      * @param type The symbol's type.
-     * @param scope_id The symbol's scope.
+     * @param id The symbol's scope.
+     * @param context The syntax context (for hygiene). Defaults to `root_syntax_context`.
      * @returns Returns the symbol id or `std::nullopt` if the symbol was not found.
      */
     [[nodiscard]]
     std::optional<symbol_id> get_symbol_id(
       const std::string& name,
       symbol_type type,
-      scope_id id) const;
+      scope_id id,
+      syntax_context_id context = root_syntax_context) const;
 
     /**
      * Get a symbol id.

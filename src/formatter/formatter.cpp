@@ -498,9 +498,9 @@ void validate_syntax_if_enabled(
         return;
     }
 
-    lexer parser_lexer{source};
     parser parser;
-    parser.parse(parser_lexer);
+    auto tokens = lexer::lex(source);
+    parser.parse(std::move(tokens));
 }
 
 /** Lex source text into formatter input tokens. */

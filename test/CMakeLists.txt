@@ -36,20 +36,19 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/constant.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/loader.cpp
-    ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
-    ../src/compiler/token.cpp
+    ../src/compiler/syntax_context.cpp
     ../src/compiler/typing.cpp
     ../src/shared/module.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
     ../src/utils.cpp
 )
-target_link_libraries(slang_test_frontend_core PUBLIC Microsoft.GSL::GSL)
+target_link_libraries(slang_test_frontend_core PUBLIC slang_shared_core Microsoft.GSL::GSL)
 
 add_library(slang_test_emitter_core STATIC
     ../src/compiler/cfg/simplify.cpp
@@ -84,25 +83,26 @@ add_gtest_executable(test_package
 add_gtest_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
-    ../src/compiler/location.cpp
-    ../src/compiler/token.cpp
 )
+target_link_libraries(test_lexer PRIVATE slang_shared_core)
 
 add_gtest_executable(test_parser test_parser.cpp)
 target_link_libraries(test_parser PRIVATE slang_test_frontend_core)
+
+add_gtest_executable(test_token_stream test_token_stream.cpp)
+target_link_libraries(test_token_stream PRIVATE slang_test_frontend_core)
 
 add_gtest_executable(test_codegen
     test_codegen.cpp
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
-    ../src/compiler/location.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/sema.cpp
     ../src/compiler/typing.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_codegen PRIVATE Microsoft.GSL::GSL)
+target_link_libraries(test_codegen PRIVATE slang_shared_core Microsoft.GSL::GSL)
 
 add_gtest_executable(test_compile_ir test_compile_ir.cpp ../src/compiler/cfg/verify.cpp)
 target_link_libraries(test_compile_ir PRIVATE slang_test_frontend_core)
@@ -167,7 +167,7 @@ add_gtest_executable(test_interpreter
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(test_interpreter PRIVATE Microsoft.GSL::GSL)
+target_link_libraries(test_interpreter PRIVATE slang_shared_core Microsoft.GSL::GSL)
 set_tests_properties(interpreter PROPERTIES FIXTURES_REQUIRED output)
 
 add_gtest_executable(test_vector test_vector.cpp)
@@ -185,7 +185,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
         ../src/filemanager.cpp
         test_jit_aarch64.cpp
     )
-    target_link_libraries(test_jit_aarch64 PRIVATE Microsoft.GSL::GSL)
+    target_link_libraries(test_jit_aarch64 PRIVATE slang_shared_core Microsoft.GSL::GSL)
     set_tests_properties(jit_aarch64 PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} FIXTURES_REQUIRED generate_jit_test)
 endif()
 

@@ -12,10 +12,49 @@
 
 #include <gtest/gtest.h>
 
+#include "compiler/lexer.h"
 #include "compiler/parser.h"
 
 namespace
 {
+
+TEST(parser, parse_token_stream)
+{
+    const std::string test_input =
+      "fn add(a: i32, b: i32) -> i32\n"
+      "{\n"
+      "    return a + b;\n"
+      "}";
+
+    slang::token_stream stream{
+      slang::lexer::lex(test_input)};
+    EXPECT_FALSE(stream.empty());
+
+    slang::parser parser;
+    EXPECT_NO_THROW(parser.parse(stream));
+    EXPECT_NE(parser.get_ast(), nullptr);
+}
+
+TEST(parser, parse_expression_token_stream)
+{
+    auto expression = slang::parser::parse_expression(
+      slang::lexer::lex("1 + 2"));
+    EXPECT_NE(expression, nullptr);
+}
+
+TEST(parser, parse_expression_token_stream_requires_full_consumption)
+{
+    EXPECT_THROW(
+      slang::parser::parse_expression(slang::lexer::lex("1 + 2 3")),
+      slang::syntax_error);
+}
+
+TEST(parser, parse_expression_token_stream_rejects_empty_input)
+{
+    EXPECT_THROW(
+      slang::parser::parse_expression(slang::token_stream{}),
+      slang::syntax_error);
+}
 
 TEST(parser, import_statement)
 {
@@ -23,55 +62,44 @@ TEST(parser, import_statement)
         const std::string test_input =
           "import std;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "import a::b::c;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "import a";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
           "import a.b;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
           "import a + b;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -81,50 +109,34 @@ TEST(parser, function)
         const std::string test_input =
           "fn f(s: str) -> i32 {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "fn f(s: str, i: i32, f: f32) -> i32 {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "fn f(s: str) -> i32 {a = b; c;}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "fn f() -> void {}\n"
           "fn g() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -134,79 +146,69 @@ TEST(parser, function)
           " a = -23;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         // test incomplete definition.
         const std::string test_input =
           "fn f(s: ";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         // test incomplete definition.
         const std::string test_input =
           "fn f(s: str)";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         // test missing return type.
         const std::string test_input =
           "fn f(s: str) {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         // test missing/incomplete return type.
         const std::string test_input =
           "fn f(s: str) -> {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         // test incomplete function body.
         const std::string test_input =
           "fn f(s: str) -> i32 {";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         // test nested function definitions.
         const std::string test_input =
           "fn f(s: str) -> i32 { fn g() -> void {} }";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -221,13 +223,9 @@ TEST(parser, return_statement)
           "\treturn 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -238,13 +236,9 @@ TEST(parser, return_statement)
           "\treturn +1234.5;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -255,13 +249,9 @@ TEST(parser, return_statement)
           "\treturn -1+2*3;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -272,13 +262,9 @@ TEST(parser, return_statement)
           "\treturn \"Test\";\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -289,11 +275,10 @@ TEST(parser, return_statement)
           "\treturn 0\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -303,11 +288,10 @@ TEST(parser, return_statement)
           "{"
           "return 0";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -317,13 +301,9 @@ TEST(parser, operators)
         const std::string test_input =
           "let a: i32 = 1 + 1;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -356,13 +336,9 @@ TEST(parser, operators)
         const std::string test_input =
           "let a: i32 = 2 * 1 + 1;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected = 
@@ -400,13 +376,9 @@ TEST(parser, operators)
         const std::string test_input =
           "let a: i32 = 2 + 1 * 1;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected = 
@@ -444,13 +416,9 @@ TEST(parser, operators)
         const std::string test_input =
           "let a: i32 = b = c = 1;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected = 
@@ -488,26 +456,18 @@ TEST(parser, operators)
         const std::string test_input =
           "let a: i32 = 1 + b * (c = 3 = 4) / 5 & 6;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "let s: i32 = ++a * --b;\n"
           "let t: i32 = a++ * b--;\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -576,13 +536,9 @@ TEST(parser, hello_world)
       "\tstd::print(\"Hello, World!\\n\");\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, function_call)
@@ -594,13 +550,9 @@ TEST(parser, function_call)
           " return add(+4, -5) + mul(-7, add(1,-2));\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -609,13 +561,9 @@ TEST(parser, function_call)
           " return add(sub(2, 3+4.3), 5) + mul(7, add(1,2));\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -624,11 +572,10 @@ TEST(parser, function_call)
           " return add(+4, *5) + mul(-7, add(1,-2));\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -646,13 +593,9 @@ TEST(parser, if_statement)
           " }\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -667,13 +610,9 @@ TEST(parser, if_statement)
           " let a: i32 = 0;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
 }
 
@@ -694,13 +633,9 @@ TEST(parser, if_else_statement)
       " }\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, if_elseif_statement)
@@ -720,13 +655,9 @@ TEST(parser, if_elseif_statement)
       " }\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, while_statement)
@@ -742,13 +673,9 @@ TEST(parser, while_statement)
       " }\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, while_if_break_statement)
@@ -768,13 +695,9 @@ TEST(parser, while_if_break_statement)
       " }\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, while_if_continue_statement)
@@ -794,13 +717,9 @@ TEST(parser, while_if_continue_statement)
       " }\n"
       "}";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    EXPECT_NO_THROW(parser.parse(lexer));
-
-    EXPECT_TRUE(lexer.eof());
+    EXPECT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 }
 
 TEST(parser, variable_declaration)
@@ -817,13 +736,9 @@ TEST(parser, variable_declaration)
           " let b : f32 = 2*a;"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -832,11 +747,9 @@ TEST(parser, variable_declaration)
           " let b: i32[] = [1, 2];\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -880,38 +793,33 @@ TEST(parser, variable_declaration)
         // clang-format on
 
         EXPECT_EQ(parser.get_ast()->to_string(), expected);
-
-        EXPECT_TRUE(lexer.eof());
     }
     {
         const std::string test_input =
           "let 1: i32 = 2;";    // non-identifier as name.
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
           "let if: i32 = 2;";    // keyword as name.
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
           "let i: i32 = 2";    // missing semicolon.
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -920,11 +828,9 @@ TEST(parser, explicit_cast)
     const std::string test_input =
       "let k: i32 = 3.0 as i32;";
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    ASSERT_NO_THROW(parser.parse(lexer));
+    ASSERT_NO_THROW(parser.parse(
+      slang::lexer::lex(test_input)));
 
     // clang-format off
     const std::string expected =
@@ -953,8 +859,6 @@ TEST(parser, explicit_cast)
     // clang-format on
 
     EXPECT_EQ(parser.get_ast()->to_string(), expected);
-
-    EXPECT_TRUE(lexer.eof());
 }
 
 TEST(parser, struct_definition)
@@ -967,13 +871,9 @@ TEST(parser, struct_definition)
           " b: f32\n"
           "};";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -983,13 +883,10 @@ TEST(parser, struct_definition)
           " b: f32\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1000,13 +897,9 @@ TEST(parser, struct_definition)
           "{\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -1015,11 +908,10 @@ TEST(parser, struct_definition)
           " struct S{};\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -1034,13 +926,9 @@ TEST(parser, struct_initialization)
           "let s1: S = S{123};\n"
           "let s2: S = S{a: 124, b: 2};";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -1050,11 +938,10 @@ TEST(parser, struct_initialization)
           "};\n"
           "let s1: S = S{123, a: 2};\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1064,11 +951,10 @@ TEST(parser, struct_initialization)
           "};\n"
           "let s1: S = S{a: 123, 2};\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -1078,13 +964,9 @@ TEST(parser, struct_member_access)
         const std::string test_input =
           "let s1: i32 = s.a;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -1116,13 +998,9 @@ TEST(parser, struct_member_access)
         const std::string test_input =
           "let s1: i32 = s.a.b;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -1159,23 +1037,18 @@ TEST(parser, struct_member_access)
         const std::string test_input =
           "let s1: i32 = s.a.b + t.c;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "let s1: i32 = s..c;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::lexical_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::lexical_error);
     }
 }
 
@@ -1188,13 +1061,9 @@ TEST(parser, struct_cast)
           "    (s as S).v = 12;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -1252,11 +1121,9 @@ TEST(parser, null)
         const std::string test_input =
           "let s: S = null;";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
@@ -1265,11 +1132,10 @@ TEST(parser, null)
           " let null: i32 = 1;\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1277,11 +1143,10 @@ TEST(parser, null)
           " i: i32\n"
           "}\n";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -1292,61 +1157,47 @@ TEST(parser, directives)
           "#[native(lib=\"test\")]\n"
           "fn f() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "#[test]\n"
           "fn f() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "#[test()]\n"
           "fn f() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
-
-        EXPECT_TRUE(lexer.eof());
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "#[test(]\n"
           "fn f() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
           "#[test()\n"
           "fn f() -> void {}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_THROW(parser.parse(lexer), slang::syntax_error);
+        EXPECT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
 }
 
@@ -1356,31 +1207,25 @@ TEST(parser, array_return)
         const std::string test_input =
           "fn f() -> i32[] { return [1, 2]; }";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "fn f() -> void { let a: i32 = g()[0]; }";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
     {
         const std::string test_input =
           "fn f() -> i32 { return g()[0]; }";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        EXPECT_NO_THROW(parser.parse(lexer));
+        EXPECT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
     }
 }
 
@@ -1395,11 +1240,9 @@ TEST(parser, struct_array_access)
           " return l[0].f as i32;\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -1518,11 +1361,9 @@ TEST(parser, macro_definition)
           "    };\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_NO_THROW(parser.parse(lexer));
+        ASSERT_NO_THROW(parser.parse(
+          slang::lexer::lex(test_input)));
 
         // clang-format off
         const std::string expected =
@@ -1601,11 +1442,10 @@ TEST(parser, macro_definition)
           "    };\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1614,11 +1454,10 @@ TEST(parser, macro_definition)
           "    };\n"
           "}";
 
-        slang::lexer lexer;
         slang::parser parser;
-
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1633,11 +1472,11 @@ TEST(parser, macro_definition)
           "        return $a + sum!($b);\n"
           "    };\n"
           "}";
-        slang::lexer lexer;
-        slang::parser parser;
 
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        slang::parser parser;
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
     {
         const std::string test_input =
@@ -1652,12 +1491,103 @@ TEST(parser, macro_definition)
           "        return $a + sum!($b);\n"
           "    };\n"
           "}";
-        slang::lexer lexer;
-        slang::parser parser;
 
-        lexer.set_input(test_input);
-        ASSERT_THROW(parser.parse(lexer), slang::syntax_error);
+        slang::parser parser;
+        ASSERT_THROW(parser.parse(
+                       slang::lexer::lex(test_input)),
+                     slang::syntax_error);
     }
+}
+
+TEST(parser, captures_macro_token_streams)
+{
+    const std::string test_input =
+      "macro id! {\n"
+      "    ($x: expr, $y: expr) => {\n"
+      "        // branch body\n"
+      "        return $x; // trailing body comment\n"
+      "    };\n"
+      "}\n"
+      "fn test() -> i32 {\n"
+      "    return id!(/* first argument */ 1 + 2, foo(3, 4));\n"
+      "}";
+
+    slang::parser parser;
+    ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
+
+    ASSERT_EQ(parser.get_macro_asts().size(), 1);
+    const auto* macro = parser.get_macro_asts().front()->as_macro_expression();
+    ASSERT_EQ(macro->get_children().size(), 1);
+
+    const auto* branch = macro->get_children().front()->as_macro_branch();
+    ASSERT_TRUE(branch->get_argument_opening_delimiter().has_value());
+    ASSERT_TRUE(branch->get_argument_closing_delimiter().has_value());
+    EXPECT_EQ(branch->get_argument_opening_delimiter()->s, "(");
+    EXPECT_EQ(branch->get_argument_closing_delimiter()->s, ")");
+    ASSERT_EQ(branch->get_argument_separators().size(), 1);
+    EXPECT_EQ(branch->get_argument_separators().front().s, ",");
+
+    ASSERT_TRUE(branch->get_body_tokens().has_value());
+    ASSERT_TRUE(branch->get_body_opening_delimiter().has_value());
+    ASSERT_TRUE(branch->get_body_closing_delimiter().has_value());
+    EXPECT_EQ(branch->get_body_opening_delimiter()->s, "{");
+    EXPECT_EQ(branch->get_body_closing_delimiter()->s, "}");
+
+    const auto& body_tokens = branch->get_body_tokens().value();
+    ASSERT_EQ(body_tokens.size(), 3);
+    EXPECT_EQ(body_tokens[0].s, "return");
+    EXPECT_EQ(body_tokens[1].s, "$x");
+    EXPECT_EQ(body_tokens[1].type, slang::token_type::macro_identifier);
+    EXPECT_EQ(body_tokens[2].s, ";");
+    EXPECT_EQ(body_tokens[0].context, slang::root_syntax_context);
+    EXPECT_EQ(body_tokens[0].location.line, 4);
+    ASSERT_EQ(body_tokens[0].leading_comments.size(), 1);
+    EXPECT_EQ(body_tokens[0].leading_comments.front().text, "// branch body");
+    ASSERT_EQ(body_tokens[2].trailing_comments.size(), 1);
+    EXPECT_EQ(
+      body_tokens[2].trailing_comments.front().text,
+      "// trailing body comment");
+
+    const slang::ast::macro_invocation* invocation = nullptr;
+    parser.get_ast()->visit_nodes(
+      [&invocation](slang::ast::expression& expression)
+      {
+          if(expression.is_macro_invocation())
+          {
+              invocation = expression.as_macro_invocation();
+          }
+      },
+      true);
+
+    ASSERT_NE(invocation, nullptr);
+    ASSERT_TRUE(invocation->get_argument_opening_delimiter().has_value());
+    ASSERT_TRUE(invocation->get_argument_closing_delimiter().has_value());
+    EXPECT_EQ(invocation->get_argument_opening_delimiter()->s, "(");
+    EXPECT_EQ(invocation->get_argument_closing_delimiter()->s, ")");
+    ASSERT_EQ(invocation->get_argument_separators().size(), 1);
+    EXPECT_EQ(invocation->get_argument_separators().front().s, ",");
+
+    const auto& argument_tokens = invocation->get_argument_tokens();
+    ASSERT_EQ(argument_tokens.size(), 2);
+    ASSERT_EQ(argument_tokens[0].size(), 3);
+    EXPECT_EQ(argument_tokens[0][0].s, "1");
+    ASSERT_EQ(
+      invocation->get_argument_opening_delimiter()->trailing_comments.size(),
+      1);
+    EXPECT_EQ(
+      invocation->get_argument_opening_delimiter()
+        ->trailing_comments.front()
+        .text,
+      "/* first argument */");
+    EXPECT_EQ(argument_tokens[0][1].s, "+");
+    EXPECT_EQ(argument_tokens[0][2].s, "2");
+    ASSERT_EQ(argument_tokens[1].size(), 6);
+    EXPECT_EQ(argument_tokens[1][0].s, "foo");
+    EXPECT_EQ(argument_tokens[1][1].s, "(");
+    EXPECT_EQ(argument_tokens[1][2].s, "3");
+    EXPECT_EQ(argument_tokens[1][3].s, ",");
+    EXPECT_EQ(argument_tokens[1][4].s, "4");
+    EXPECT_EQ(argument_tokens[1][5].s, ")");
 }
 
 }    // namespace

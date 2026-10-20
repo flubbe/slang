@@ -113,6 +113,8 @@ bool context::resolve_macros(
   co::context& co_ctx,
   macro::env& env)
 {
+    // TODO(macro-migration): Remove this serialized-AST traversal once
+    // imported token descriptors can perform namespace resolution directly.
     bool needs_import_resolution = false;
 
     for(auto& m: env.macros)

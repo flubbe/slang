@@ -4,7 +4,7 @@
  * token helpers.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -65,6 +65,7 @@ std::string to_string(token_type ty)
     case token_type::int_literal: return "int_literal";
     case token_type::fp_literal: return "fp_literal";
     case token_type::str_literal: return "str_literal";
+    case token_type::end_of_input: return "end_of_input";
     }
 
     return "<unknown>";
@@ -162,6 +163,7 @@ archive& operator&(archive& ar, token& tok)
     ar & tok.has_blank_line_before;
     ar & tok.leading_comments;
     ar & tok.trailing_comments;
+    ar & tok.context;
 
     return ar;
 }

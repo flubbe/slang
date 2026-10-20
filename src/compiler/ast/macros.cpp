@@ -4,7 +4,7 @@
  * abstract syntax tree (macros).
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -13,6 +13,7 @@
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/name_utils.h"
+#include "compiler/parser.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
@@ -35,9 +36,13 @@ bool expression::expand_macros(
   rs::context& rs_ctx,
   cg::context& codegen_ctx,
   macro::env& macro_env,
+  syntax_context_table& syntax_contexts,
   const std::vector<expression*>& macro_asts)
 {
     std::size_t macro_expansion_count{0};
+
+    // TODO(macro-migration): Remove this bookkeeping with the imported AST
+    // expansion path.
     std::vector<ast::macro_invocation*> expanded_imported_macros;
 
     auto filter_macros = [](const expression& e) -> bool
@@ -45,12 +50,15 @@ bool expression::expand_macros(
         return !e.is_macro_expression();
     };
 
-    // replace macro nodes by the macro AST.
+    // TODO(macro-migration): Remove the AST lookup and fallback once all
+    // local macro shapes use token expansion.
+    // Replace macro nodes by their token or legacy AST expansion.
     auto macro_expansion_visitor =
       [&co_ctx,
        &rs_ctx,
        &codegen_ctx,
        &macro_env,
+       &syntax_contexts,
        &macro_asts,
        &macro_expansion_count,
        &expanded_imported_macros](expression& e)
@@ -99,8 +107,40 @@ bool expression::expand_macros(
                     macro_expr->get_name()));
             }
 
-            macro_expr->set_expansion(
-              (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+            auto* descriptor_macro = macro_env.get_macro(
+              macro_expr->get_name(),
+              std::nullopt);
+            bool token_expanded = false;
+            if(descriptor_macro->supports_token_expansion(
+                 macro_expr->get_argument_tokens()))
+            {
+                try
+                {
+                    auto expanded_tokens = descriptor_macro->expand_macro(
+                      macro_expr->get_argument_tokens(),
+                      macro_expr->get_name_token().context,
+                      syntax_contexts);
+                    macro_expr->set_expansion(
+                      parser::parse_expression(std::move(expanded_tokens)));
+                    token_expanded = true;
+                }
+                catch(const macro::macro_error&)
+                {
+                    // TODO(macro-migration): Remove this fallback once token
+                    // expansion reports complete, authoritative results.
+                }
+                catch(const syntax_error&)
+                {
+                    // TODO(macro-migration): Remove this fallback once token
+                    // expansion reports complete, authoritative results.
+                }
+            }
+
+            if(!token_expanded)
+            {
+                macro_expr->set_expansion(
+                  (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+            }
 
             if(!macro_expr->scope_id.has_value())
             {
@@ -113,7 +153,10 @@ bool expression::expand_macros(
         }
         else
         {
-            // expand imported macro.
+            // TODO(macro-migration): Replace this entire imported serialized
+            // AST path with descriptor-based token expansion. Keep it until
+            // imported token descriptors and context remapping are complete.
+            // Expand imported macro.
             auto* m = macro_env.get_macro(
               macro_expr->get_name(),
               macro_expr->get_namespace_path());
@@ -422,6 +465,10 @@ std::string macro_invocation::get_qualified_callee_name() const
 
 /*
  * macro_branch.
+ *
+ * TODO(macro-migration): This AST branch implementation is the legacy macro
+ * representation. Remove its AST expansion, serialization, and semantic
+ * traversal once token descriptors are complete.
  */
 
 std::unique_ptr<expression> macro_branch::clone() const
@@ -465,10 +512,9 @@ void macro_branch::collect_names(co::context& ctx)
           arg_name.s);
 
         ctx.declare(
-          arg_name.s,
+          arg_name,
           canonical_name,
           sema::symbol_type::macro_argument,
-          arg_name.location,
           sema::symbol_id::invalid,
           false);
     }
@@ -578,10 +624,9 @@ void macro_expression::collect_names(
       name.s);
 
     symbol_id = ctx.declare(
-      name.s,
+      name,
       canonical_name,
       sema::symbol_type::macro,
-      name.location,
       sema::symbol_id::invalid,
       false,
       this);
@@ -730,16 +775,73 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
                      | std::ranges::to<std::vector>();
     }
 
+    // TODO(macro-migration): Remove legacy AST serialization once descriptor
+    // serialization is versioned and available for imported expansion.
     memory_write_archive ar{true, std::endian::little};
     auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
     ar& expression_serializer{cloned_expr};
 
+    // Preserve each branch's capture list independently. Branches may have
+    // different arities and may use different parameter names.
+    std::vector<module_::macro_branch_descriptor> branch_descriptors;
+    branch_descriptors.reserve(branches.size());
+    for(const auto& branch: branches)
+    {
+        module_::macro_branch_descriptor descriptor;
+        descriptor.args_end_with_list = branch->ends_with_list_capture();
+        descriptor.separators = branch->get_argument_separators();
+
+        // TODO(macro-migration): Replace this temporary subset gate with
+        // complete token-pattern/body validation.
+        bool token_body_supported = branch->get_body_tokens().has_value()
+                                    && !branch->ends_with_list_capture();
+        std::set<std::string> parameter_names;
+        descriptor.params.reserve(branch->get_args().size());
+        for(const auto& [arg_name, arg_type]: branch->args)
+        {
+            module_::macro_parameter parameter;
+            parameter.name = arg_name.s;
+            parameter.fragment = module_::macro_fragment_kind::expression;
+            descriptor.params.emplace_back(std::move(parameter));
+
+            if(arg_type.s != "expr"
+               || !parameter_names.emplace(arg_name.s).second)
+            {
+                token_body_supported = false;
+            }
+        }
+
+        // TODO(macro-migration): Validate the supported body shape directly
+        // from tokens, then remove this dependency on the legacy AST body.
+        const auto body_children = branch->get_body()->get_children();
+        token_body_supported = token_body_supported
+                               && body_children.size() == 1
+                               && body_children.front()->get_id()
+                                    == node_identifier::expression_statement
+                               && !branch->get_body_tokens()->empty()
+                               && branch->get_body_tokens()->back().s == ";";
+
+        if(token_body_supported)
+        {
+            descriptor.body = branch->get_body_tokens();
+            descriptor.capability =
+              module_::macro_expansion_capability::token_stream;
+            descriptor.body_is_expression = true;
+        }
+
+        branch_descriptors.emplace_back(std::move(descriptor));
+    }
+
+    // Create descriptor and attach branch metadata. Unsupported branches keep
+    // their legacy AST representation and are selected by the compatibility
+    // fallback in the expansion path.
+    module_::macro_descriptor desc{std::move(attributes), ar.get_buffer()};
+    desc.branches = std::move(branch_descriptors);
     macro_env.add_macro(
       name.s,
-      module_::macro_descriptor{
-        std::move(attributes),
-        ar.get_buffer()},
-      get_namespace_path());
+      desc,
+      get_namespace_path(),
+      name.context);
 }
 
 /**
@@ -910,6 +1012,8 @@ std::unique_ptr<expression> macro_expression::expand(
   cg::context& ctx,
   const macro_invocation& invocation) const
 {
+    // TODO(macro-migration): Remove this legacy AST expander after all local
+    // and imported macro shapes have equivalent token-stream coverage.
     // Get invocation expressions and expand macro expression lists.
     std::vector<std::unique_ptr<expression>> invocation_exprs = expand_invocation_args(invocation);
 
