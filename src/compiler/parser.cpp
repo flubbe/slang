@@ -141,6 +141,59 @@ parser_error::parser_error(
  * Parser implementation.
  */
 
+std::optional<std::size_t> parser::find_matching_delimiter(
+  std::size_t opening_index,
+  std::string_view opening,
+  std::string_view closing) const
+{
+    if(!tokens.has_value()
+       || opening_index >= tokens->size()
+       || (*tokens)[opening_index].s != opening)
+    {
+        return std::nullopt;
+    }
+
+    std::size_t depth{0};
+    for(std::size_t i = opening_index; i < tokens->size(); ++i)
+    {
+        if((*tokens)[i].s == opening)
+        {
+            ++depth;
+        }
+        else if((*tokens)[i].s == closing)
+        {
+            --depth;
+            if(depth == 0)
+            {
+                return i;
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
+token_stream parser::copy_token_range(
+  std::size_t begin,
+  std::size_t end) const
+{
+    if(!tokens.has_value()
+       || begin > end
+       || end > tokens->size())
+    {
+        throw parser_error("Invalid token-stream capture range.");
+    }
+
+    std::vector<token> captured;
+    captured.reserve(end - begin);
+    for(std::size_t i = begin; i < end; ++i)
+    {
+        captured.emplace_back((*tokens)[i]);
+    }
+
+    return token_stream{std::move(captured)};
+}
+
 std::unique_ptr<ast::expression> parser::parse_top_level_statement()
 {
     if(current_token->s == "#")
@@ -1260,17 +1313,34 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
 
     if(current_token->s == "(")    // function call or macro invocation.
     {
+        const auto argument_opening_delimiter = *current_token;
         get_next_token();    // skip "("
 
         std::vector<std::unique_ptr<ast::expression>> args;
+        std::vector<token_stream> argument_tokens;
+        std::vector<token> argument_separators;
+        std::optional<token> argument_closing_delimiter;
+
         if(current_token->s != ")")
         {
             while(true)
             {
+                const std::size_t argument_begin = token_index - 1;
                 args.emplace_back(parse_expression());
+
+                // The current token is the delimiter after the expression.
+                // It is not part of the captured argument, except when the
+                // parser is looking at its own end-of-input token.
+                const std::size_t argument_end =
+                  current_token->type == token_type::end_of_input
+                    ? token_index
+                    : token_index - 1;
+                argument_tokens.emplace_back(
+                  copy_token_range(argument_begin, argument_end));
 
                 if(current_token->s == ")")
                 {
+                    argument_closing_delimiter = *current_token;
                     break;
                 }
 
@@ -1280,16 +1350,28 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
                       *current_token,
                       "Expected ')' or ','.");
                 }
+
+                argument_separators.emplace_back(*current_token);
                 get_next_token();
             }
+        }
+        else
+        {
+            argument_closing_delimiter = *current_token;
         }
         get_next_token();    // skip ")"
 
         if(identifier.type == token_type::macro_name)
         {
-            return std::make_unique<ast::macro_invocation>(
+            auto invocation = std::make_unique<ast::macro_invocation>(
               std::move(identifier),
               std::move(args));
+            invocation->set_argument_tokens(
+              std::move(argument_tokens),
+              std::move(argument_separators),
+              argument_opening_delimiter,
+              std::move(argument_closing_delimiter));
+            return invocation;
         }
 
         return std::make_unique<ast::call_expression>(
@@ -1683,9 +1765,11 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
 std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
 {
     auto location = current_token->location;
+    const token argument_opening_delimiter = *current_token;
     get_next_token();    // skip '('.
 
     std::vector<std::pair<token, token>> args;
+    std::vector<token> argument_separators;
     bool args_end_with_list = false;
 
     while(current_token->s != ")")
@@ -1744,9 +1828,12 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
 
         if(current_token->s == ",")
         {
+            argument_separators.emplace_back(*current_token);
             get_next_token();
         }
     }
+
+    const token argument_closing_delimiter = *current_token;
 
     // skip ')'.
     get_next_token();
@@ -1761,6 +1848,26 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
     }
     get_next_token();    // skip "=>".
 
+    const token body_opening_delimiter = *current_token;
+    const std::size_t body_opening_index = token_index - 1;
+    std::optional<token_stream> body_tokens;
+    std::optional<token> body_closing_delimiter;
+
+    if(const auto body_closing_index = find_matching_delimiter(
+         body_opening_index,
+         "{",
+         "}");
+       body_closing_index.has_value())
+    {
+        body_tokens = copy_token_range(
+          body_opening_index + 1,
+          body_closing_index.value());
+        body_closing_delimiter = (*tokens)[body_closing_index.value()];
+    }
+
+    // TODO(macro-migration): Replace this legacy AST-body parse with token
+    // body validation once macro descriptors are authoritative. The raw body
+    // capture above is part of the token-stream path and must remain.
     auto block = parse_block();
 
     if(current_token->s != ";")
@@ -1777,7 +1884,13 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
       location,
       std::move(args),
       args_end_with_list,
-      std::move(block));
+      std::move(block),
+      std::move(argument_separators),
+      argument_opening_delimiter,
+      argument_closing_delimiter,
+      std::move(body_tokens),
+      body_opening_delimiter,
+      std::move(body_closing_delimiter));
 }
 
 void parser::push_directive(

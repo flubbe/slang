@@ -1499,4 +1499,95 @@ TEST(parser, macro_definition)
     }
 }
 
+TEST(parser, captures_macro_token_streams)
+{
+    const std::string test_input =
+      "macro id! {\n"
+      "    ($x: expr, $y: expr) => {\n"
+      "        // branch body\n"
+      "        return $x; // trailing body comment\n"
+      "    };\n"
+      "}\n"
+      "fn test() -> i32 {\n"
+      "    return id!(/* first argument */ 1 + 2, foo(3, 4));\n"
+      "}";
+
+    slang::parser parser;
+    ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
+
+    ASSERT_EQ(parser.get_macro_asts().size(), 1);
+    const auto* macro = parser.get_macro_asts().front()->as_macro_expression();
+    ASSERT_EQ(macro->get_children().size(), 1);
+
+    const auto* branch = macro->get_children().front()->as_macro_branch();
+    ASSERT_TRUE(branch->get_argument_opening_delimiter().has_value());
+    ASSERT_TRUE(branch->get_argument_closing_delimiter().has_value());
+    EXPECT_EQ(branch->get_argument_opening_delimiter()->s, "(");
+    EXPECT_EQ(branch->get_argument_closing_delimiter()->s, ")");
+    ASSERT_EQ(branch->get_argument_separators().size(), 1);
+    EXPECT_EQ(branch->get_argument_separators().front().s, ",");
+
+    ASSERT_TRUE(branch->get_body_tokens().has_value());
+    ASSERT_TRUE(branch->get_body_opening_delimiter().has_value());
+    ASSERT_TRUE(branch->get_body_closing_delimiter().has_value());
+    EXPECT_EQ(branch->get_body_opening_delimiter()->s, "{");
+    EXPECT_EQ(branch->get_body_closing_delimiter()->s, "}");
+
+    const auto& body_tokens = branch->get_body_tokens().value();
+    ASSERT_EQ(body_tokens.size(), 3);
+    EXPECT_EQ(body_tokens[0].s, "return");
+    EXPECT_EQ(body_tokens[1].s, "$x");
+    EXPECT_EQ(body_tokens[1].type, slang::token_type::macro_identifier);
+    EXPECT_EQ(body_tokens[2].s, ";");
+    EXPECT_EQ(body_tokens[0].context, slang::root_syntax_context);
+    EXPECT_EQ(body_tokens[0].location.line, 4);
+    ASSERT_EQ(body_tokens[0].leading_comments.size(), 1);
+    EXPECT_EQ(body_tokens[0].leading_comments.front().text, "// branch body");
+    ASSERT_EQ(body_tokens[2].trailing_comments.size(), 1);
+    EXPECT_EQ(
+      body_tokens[2].trailing_comments.front().text,
+      "// trailing body comment");
+
+    const slang::ast::macro_invocation* invocation = nullptr;
+    parser.get_ast()->visit_nodes(
+      [&invocation](slang::ast::expression& expression)
+      {
+          if(expression.is_macro_invocation())
+          {
+              invocation = expression.as_macro_invocation();
+          }
+      },
+      true);
+
+    ASSERT_NE(invocation, nullptr);
+    ASSERT_TRUE(invocation->get_argument_opening_delimiter().has_value());
+    ASSERT_TRUE(invocation->get_argument_closing_delimiter().has_value());
+    EXPECT_EQ(invocation->get_argument_opening_delimiter()->s, "(");
+    EXPECT_EQ(invocation->get_argument_closing_delimiter()->s, ")");
+    ASSERT_EQ(invocation->get_argument_separators().size(), 1);
+    EXPECT_EQ(invocation->get_argument_separators().front().s, ",");
+
+    const auto& argument_tokens = invocation->get_argument_tokens();
+    ASSERT_EQ(argument_tokens.size(), 2);
+    ASSERT_EQ(argument_tokens[0].size(), 3);
+    EXPECT_EQ(argument_tokens[0][0].s, "1");
+    ASSERT_EQ(
+      invocation->get_argument_opening_delimiter()->trailing_comments.size(),
+      1);
+    EXPECT_EQ(
+      invocation->get_argument_opening_delimiter()
+        ->trailing_comments.front()
+        .text,
+      "/* first argument */");
+    EXPECT_EQ(argument_tokens[0][1].s, "+");
+    EXPECT_EQ(argument_tokens[0][2].s, "2");
+    ASSERT_EQ(argument_tokens[1].size(), 6);
+    EXPECT_EQ(argument_tokens[1][0].s, "foo");
+    EXPECT_EQ(argument_tokens[1][1].s, "(");
+    EXPECT_EQ(argument_tokens[1][2].s, "3");
+    EXPECT_EQ(argument_tokens[1][3].s, ",");
+    EXPECT_EQ(argument_tokens[1][4].s, "4");
+    EXPECT_EQ(argument_tokens[1][5].s, ")");
+}
+
 }    // namespace

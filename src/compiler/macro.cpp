@@ -43,29 +43,31 @@ token_stream retag(
     return token_stream{std::move(new_tokens)};
 }
 
-}    // namespace
-
-namespace slang::macro
+/** Result of selecting a macro branch. */
+struct branch_selection
 {
+    const slang::module_::macro_branch_descriptor* branch{nullptr};
+    bool ambiguous{false};
+};
 
-token_stream macro::expand_macro(
-  const std::vector<token_stream>& args,
-  syntax_context_id call_site,
-  syntax_context_table& contexts) const
+/**
+ * Select the best matching branch for a macro invocation.
+ *
+ * Exact non-variadic branches win over exact variadic branches, which win
+ * over variadic branches with additional arguments.
+ *
+ * TODO(macro-migration): Replace this compatibility matcher with complete
+ * token-pattern matching once all branch patterns are represented.
+ */
+branch_selection select_branch(
+  const std::vector<slang::module_::macro_branch_descriptor>& branches,
+  const std::vector<token_stream>& args)
 {
-    // Don't expand empty macros.
-    if(desc.branches.empty())
-    {
-        return token_stream{};
-    }
-
-    // Select the same kind of best matching branch as the legacy AST
-    // implementation: exact non-variadic, exact variadic, then a variadic
-    // branch with additional arguments.
-    const module_::macro_branch_descriptor* branch{nullptr};
+    const slang::module_::macro_branch_descriptor* branch{nullptr};
     std::size_t best_score{0};
     bool ambiguous{false};
-    for(const auto& candidate: desc.branches)
+
+    for(const auto& candidate: branches)
     {
         std::optional<std::size_t> score;
         if(args.size() == candidate.params.size())
@@ -95,6 +97,57 @@ token_stream macro::expand_macro(
         }
     }
 
+    return branch_selection{branch, ambiguous};
+}
+
+}    // namespace
+
+namespace slang::macro
+{
+
+bool macro::supports_token_expansion(
+  const std::vector<token_stream>& args) const
+{
+    // TODO(macro-migration): Remove this temporary gate once nested macro
+    // placeholders can be substituted directly in token streams. A
+    // macro-local placeholder can only be resolved by the legacy AST expander
+    // at this stage.
+    for(const auto& arg: args)
+    {
+        if(std::ranges::any_of(
+             arg,
+             [](const token& tok)
+             {
+                 return tok.type == token_type::macro_identifier;
+             }))
+        {
+            return false;
+        }
+    }
+
+    const auto selection = select_branch(desc.branches, args);
+
+    return selection.branch != nullptr
+           && !selection.ambiguous
+           && selection.branch->capability == module_::macro_expansion_capability::token_stream
+           && selection.branch->body.has_value()
+           && selection.branch->body_is_expression;
+}
+
+token_stream macro::expand_macro(
+  const std::vector<token_stream>& args,
+  syntax_context_id call_site,
+  syntax_context_table& contexts) const
+{
+    // Don't expand empty macros.
+    if(desc.branches.empty())
+    {
+        return token_stream{};
+    }
+
+    const auto selection = select_branch(desc.branches, args);
+    const auto* branch = selection.branch;
+
     if(branch == nullptr)
     {
         throw macro_error{
@@ -102,7 +155,7 @@ token_stream macro::expand_macro(
             "Could not match a branch of macro '{}'.",
             name)};
     }
-    if(ambiguous)
+    if(selection.ambiguous)
     {
         throw macro_error{
           std::format(
@@ -110,11 +163,22 @@ token_stream macro::expand_macro(
             name)};
     }
 
+    // TODO(macro-migration): Remove this compatibility state once every
+    // descriptor has a token body.
     // A selected branch without a token body is still valid for the legacy
     // migration stage, but has nothing for the token expander to emit.
     if(!branch->body.has_value())
     {
         return token_stream{};
+    }
+
+    if(branch->capability != module_::macro_expansion_capability::token_stream
+       || !branch->body_is_expression)
+    {
+        throw macro_error{
+          std::format(
+            "Macro '{}' branch is not supported by token expansion.",
+            name)};
     }
 
     /*
@@ -176,6 +240,19 @@ token_stream macro::expand_macro(
             copy.context = expansion_ctx;
             result = result.append(copy);
         }
+    }
+
+    if(branch->body_is_expression
+       && !result.empty()
+       && result.back().s == ";")
+    {
+        std::vector<token> expression_tokens;
+        expression_tokens.reserve(result.size() - 1);
+        for(std::size_t i = 0; i + 1 < result.size(); ++i)
+        {
+            expression_tokens.emplace_back(result[i]);
+        }
+        return token_stream{std::move(expression_tokens)};
     }
 
     return result;

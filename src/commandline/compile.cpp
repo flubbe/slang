@@ -241,6 +241,7 @@ void compile::invoke(const std::vector<std::string>& args)
       resolver_ctx,
       codegen_ctx,
       macro_env,
+      sema_env.syntax_contexts,
       module_macro_asts));
 
     ast->resolve_names(resolver_ctx);

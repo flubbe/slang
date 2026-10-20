@@ -266,6 +266,8 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
 
     slang::module_::macro_descriptor desc;
     slang::module_::macro_branch_descriptor branch;
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = true;
     branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     branch.body = slang::token_stream{std::vector<slang::token>{
       slang::token{
@@ -318,6 +320,8 @@ TEST(macro, expansion_uses_branch_specific_parameters)
     slang::module_::macro_descriptor desc;
 
     slang::module_::macro_branch_descriptor zero_branch;
+    zero_branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    zero_branch.body_is_expression = true;
     zero_branch.body = slang::token_stream{std::vector<slang::token>{
       slang::token{
         "zero",
@@ -325,6 +329,8 @@ TEST(macro, expansion_uses_branch_specific_parameters)
         slang::token_type::identifier}}};
 
     slang::module_::macro_branch_descriptor one_branch;
+    one_branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    one_branch.body_is_expression = true;
     one_branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     one_branch.body = slang::token_stream{std::vector<slang::token>{
       slang::token{
@@ -354,6 +360,139 @@ TEST(macro, expansion_uses_branch_specific_parameters)
     ASSERT_EQ(one.size(), 1);
     EXPECT_EQ(one[0].s, "argument");
     EXPECT_EQ(one[0].context, call_site_context);
+}
+
+TEST(macro, local_expression_body_uses_token_expansion)
+{
+    const std::string input =
+      "macro identity! {\n"
+      "  ($x: expr) => {\n"
+      "    $x;\n"
+      "  };\n"
+      "}\n"
+      "fn test() -> i32 {\n"
+      "  return identity!(1 + 2);\n"
+      "}\n";
+
+    slang::parser parser;
+    parser.parse(slang::lexer::lex(input));
+    auto ast_root = parser.get_ast();
+
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
+    co::context co_ctx{sema_env};
+    ty::context type_ctx;
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+
+    ASSERT_NO_THROW(ast_root->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast_root->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast_root->collect_macros(sema_env, macro_env));
+
+    auto* descriptor_macro = macro_env.get_macro("identity!", std::nullopt);
+    ASSERT_EQ(descriptor_macro->get_desc().branches.size(), 1);
+    const auto& descriptor = descriptor_macro->get_desc().branches.front();
+    EXPECT_EQ(
+      descriptor.capability,
+      slang::module_::macro_expansion_capability::token_stream);
+    ASSERT_TRUE(descriptor.body.has_value());
+    EXPECT_TRUE(descriptor.body_is_expression);
+    ASSERT_FALSE(descriptor.body->empty());
+    EXPECT_EQ(descriptor.body->back().s, ";");
+
+    ASSERT_TRUE(ast_root->expand_macros(
+      co_ctx,
+      resolver_ctx,
+      codegen_ctx,
+      macro_env,
+      sema_env.syntax_contexts,
+      parser.get_macro_asts()));
+
+    const ast::macro_invocation* invocation = nullptr;
+    ast_root->visit_nodes(
+      [&invocation](ast::expression& expression)
+      {
+          if(expression.is_macro_invocation())
+          {
+              invocation = expression.as_macro_invocation();
+          }
+      },
+      true);
+
+    ASSERT_NE(invocation, nullptr);
+    ASSERT_TRUE(invocation->has_expansion());
+    ASSERT_EQ(invocation->get_children().size(), 1);
+    EXPECT_EQ(
+      invocation->get_children().front()->get_id(),
+      ast::node_identifier::binary_expression);
+}
+
+TEST(macro, local_unsupported_body_falls_back_to_ast_expansion)
+{
+    const std::string input =
+      "macro multi! {\n"
+      "  () => {\n"
+      "    1;\n"
+      "    2;\n"
+      "  };\n"
+      "}\n"
+      "fn test() -> i32 {\n"
+      "  multi!();\n"
+      "  return 0;\n"
+      "}\n";
+
+    slang::parser parser;
+    parser.parse(slang::lexer::lex(input));
+    auto ast_root = parser.get_ast();
+
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
+    co::context co_ctx{sema_env};
+    ty::context type_ctx;
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    tl::context lowering_ctx{type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+
+    ASSERT_NO_THROW(ast_root->collect_names(co_ctx));
+    ASSERT_NO_THROW(ast_root->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast_root->collect_macros(sema_env, macro_env));
+
+    auto* descriptor_macro = macro_env.get_macro("multi!", std::nullopt);
+    ASSERT_EQ(descriptor_macro->get_desc().branches.size(), 1);
+    const auto& descriptor = descriptor_macro->get_desc().branches.front();
+    EXPECT_EQ(
+      descriptor.capability,
+      slang::module_::macro_expansion_capability::legacy_ast);
+    EXPECT_FALSE(descriptor.body.has_value());
+
+    ASSERT_TRUE(ast_root->expand_macros(
+      co_ctx,
+      resolver_ctx,
+      codegen_ctx,
+      macro_env,
+      sema_env.syntax_contexts,
+      parser.get_macro_asts()));
+
+    const ast::macro_invocation* invocation = nullptr;
+    ast_root->visit_nodes(
+      [&invocation](ast::expression& expression)
+      {
+          if(expression.is_macro_invocation())
+          {
+              invocation = expression.as_macro_invocation();
+          }
+      },
+      true);
+
+    ASSERT_NE(invocation, nullptr);
+    ASSERT_TRUE(invocation->has_expansion());
+    ASSERT_EQ(invocation->get_children().size(), 1);
+    EXPECT_EQ(
+      invocation->get_children().front()->get_id(),
+      ast::node_identifier::macro_branch);
 }
 
 }    // namespace

@@ -818,11 +818,31 @@ inline archive& operator&(archive& ar, directive_descriptor& desc)
     return ar;
 }
 
+enum class macro_fragment_kind : std::uint8_t
+{
+    expression,
+};
+
+/**
+ * Temporary migration gate for macro branch expansion.
+ *
+ * TODO(macro-migration): Remove this enum and the corresponding descriptor
+ * field once token expansion is the only supported expansion path.
+ */
+enum class macro_expansion_capability : std::uint8_t
+{
+    legacy_ast,
+    token_stream,
+};
+
 /** Macro parameters. */
 struct macro_parameter
 {
     /** Parameter name. */
     std::string name;
+
+    /** Fragment captured by this parameter. */
+    macro_fragment_kind fragment{macro_fragment_kind::expression};
 };
 
 /** Descriptor for one macro branch. */
@@ -834,8 +854,27 @@ struct macro_branch_descriptor
     /** Whether the final parameter captures an expression list. */
     bool args_end_with_list{false};
 
+    /** Separators in the branch's capture pattern. */
+    std::vector<token> separators;
+
     /** Token-stream body, when available. */
     std::optional<token_stream> body;
+
+    /**
+     * Temporary migration gate for this branch.
+     *
+     * TODO(macro-migration): Remove once all branch shapes use token
+     * expansion and legacy AST fallback is gone.
+     */
+    macro_expansion_capability capability{macro_expansion_capability::legacy_ast};
+
+    /**
+     * Temporary gate for the initial expression-body subset.
+     *
+     * TODO(macro-migration): Replace with the complete token-body
+     * representation, then remove this field.
+     */
+    bool body_is_expression{false};
 };
 
 /** Macro descriptor. */
@@ -844,7 +883,12 @@ struct macro_descriptor
     /** Directive list. */
     std::vector<std::pair<std::string, directive_descriptor>> directives;
 
-    /** Serialized macro AST, or `std::nullopt` (for built-in macros). */
+    /**
+     * Legacy serialized macro AST, or `std::nullopt` (for built-in macros).
+     *
+     * TODO(macro-migration): Remove after token descriptor serialization and
+     * imported token-stream expansion are available.
+     */
     std::optional<std::vector<std::byte>> serialized_ast;
 
     /*
@@ -889,6 +933,8 @@ struct macro_descriptor
  */
 inline archive& operator&(archive& ar, macro_descriptor& desc)
 {
+    // TODO(macro-migration): Replace this legacy-only serialization with a
+    // versioned serializer for branch descriptors and token bodies.
     ar & desc.directives;
     ar & desc.serialized_ast;
     return ar;

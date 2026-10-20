@@ -118,6 +118,18 @@ public:
         return definition_context;
     }
 
+    /**
+     * Return whether the selected branch is supported by token expansion.
+     *
+     * TODO(macro-migration): Remove this dispatch gate when all macro shapes
+     * use token expansion; branch matching should then be authoritative.
+     *
+     * @param args Token streams for the macro arguments.
+     */
+    [[nodiscard]]
+    bool supports_token_expansion(
+      const std::vector<token_stream>& args) const;
+
     /** Set transitivity. */
     void set_transitive(bool transitive)
     {
