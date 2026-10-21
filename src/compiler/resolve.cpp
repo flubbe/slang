@@ -193,14 +193,16 @@ void context::import_macro(
 
     /*
      * Context IDs from the defining module are not valid in this semantic
-     * environment.
-     *
-     * TODO Import/remap the macro's definition syntax context
-     *      and the contexts referenced by its body, preserving their ancestry.
-     *      For now, use a fresh context rooted in this environment.
+     * environment. Remap the exported macro's definition syntax context
+     * into the importing environment, preserving its ancestry.
      */
-    const auto definition_context = sema_env.syntax_contexts.allocate(
-      root_syntax_context);
+    const auto exported_definition_context =
+      static_cast<syntax_context_id>(
+        std::get<module_::macro_descriptor>(symbol.desc)
+          .branches.front()
+          .definition_context);
+    const auto definition_context =
+      sema_env.syntax_contexts.remap(exported_definition_context);
 
     macro_env.add_macro(
       name::unqualified_name(symbol_info_it->second.name),

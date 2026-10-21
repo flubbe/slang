@@ -58,6 +58,20 @@ public:
 
     /** Clear all allocated contexts. */
     void clear();
+
+    /**
+     * Remap an external context ID into this environment.
+     *
+     * Preserves the parent-child ancestry of the external context while
+     * allocating fresh IDs in this environment. If the same external ID
+     * is remapped twice, the first mapping is returned (idempotent).
+     *
+     * @param external_ctx The context ID from another module's environment.
+     * @returns A local context ID with equivalent ancestry in this environment.
+     */
+    [[nodiscard]]
+    syntax_context_id remap(
+      syntax_context_id external_ctx);
 };
 
 }    // namespace slang

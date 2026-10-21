@@ -38,4 +38,24 @@ void syntax_context_table::clear()
     parent_map.clear();
 }
 
+syntax_context_id syntax_context_table::remap(syntax_context_id external_ctx)
+{
+    // Already remapped — return the cached local ID.
+    auto it = parent_map.find(external_ctx);
+    if(it != parent_map.end())
+    {
+        return it->second;
+    }
+
+    // First time seeing this external context.
+    // Register it in the parent_map with root_syntax_context as parent.
+    // This ensures parent(external_ctx) == root_syntax_context.
+    parent_map[external_ctx] = root_syntax_context;
+
+    // Allocate a fresh local ID that maps to root_syntax_context.
+    syntax_context_id id = next_id++;
+    parent_map[id] = root_syntax_context;
+    return id;
+}
+
 }    // namespace slang

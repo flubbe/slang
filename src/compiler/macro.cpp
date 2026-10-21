@@ -124,8 +124,6 @@ namespace slang::macro
 bool macro::supports_token_expansion(
   const std::vector<token_stream>& args) const
 {
-    // TODO(macro-migration): Remove this gate once nested macro placeholders
-    // can be substituted directly in token streams.
     // A macro-local placeholder can only be resolved by the legacy AST
     // expander at this stage. Keep this as an explicit capability gate rather
     // than allowing a partial token expansion to reach the parser.

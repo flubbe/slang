@@ -41,8 +41,8 @@ bool expression::expand_macros(
 {
     std::size_t macro_expansion_count{0};
 
-    // TODO(macro-migration): Remove this bookkeeping with the imported AST
-    // expansion path.
+    // TODO(macro-migration): Fold namespace fixup into the expansion
+    // pipeline and remove this bookkeeping.
     std::vector<ast::macro_invocation*> expanded_imported_macros;
 
     auto filter_macros = [](const expression& e) -> bool
@@ -52,6 +52,38 @@ bool expression::expand_macros(
 
     // TODO(macro-migration): Remove the AST lookup and fallback once all
     // local macro shapes use token expansion.
+    // Shared token-stream expansion helper.
+    auto try_token_expansion =
+      [&](const macro::macro* descriptor_macro, macro_invocation* expr) -> bool
+    {
+        if(!descriptor_macro->supports_token_expansion(
+              expr->get_argument_tokens()))
+        {
+            return false;
+        }
+        try
+        {
+            auto expanded_tokens = descriptor_macro->expand_macro(
+              expr->get_argument_tokens(),
+              expr->get_name_token().context,
+              syntax_contexts);
+            expr->set_expansion(
+              parser::parse_expression(std::move(expanded_tokens)));
+            return true;
+        }
+        catch(const macro::macro_error&)
+        {
+            // TODO(macro-migration): Remove this fallback once token
+            // expansion reports complete, authoritative results.
+        }
+        catch(const syntax_error&)
+        {
+            // TODO(macro-migration): Remove this fallback once token
+            // expansion reports complete, authoritative results.
+        }
+        return false;
+    };
+
     // Replace macro nodes by their token or legacy AST expansion.
     auto macro_expansion_visitor =
       [&co_ctx,
@@ -61,7 +93,8 @@ bool expression::expand_macros(
        &syntax_contexts,
        &macro_asts,
        &macro_expansion_count,
-       &expanded_imported_macros](expression& e)
+       &expanded_imported_macros,
+       &try_token_expansion](expression& e)
     {
         if(!e.is_macro_invocation())
         {
@@ -110,33 +143,7 @@ bool expression::expand_macros(
             auto* descriptor_macro = macro_env.get_macro(
               macro_expr->get_name(),
               std::nullopt);
-            bool token_expanded = false;
-            if(descriptor_macro->supports_token_expansion(
-                 macro_expr->get_argument_tokens()))
-            {
-                try
-                {
-                    auto expanded_tokens = descriptor_macro->expand_macro(
-                      macro_expr->get_argument_tokens(),
-                      macro_expr->get_name_token().context,
-                      syntax_contexts);
-                    macro_expr->set_expansion(
-                      parser::parse_expression(std::move(expanded_tokens)));
-                    token_expanded = true;
-                }
-                catch(const macro::macro_error&)
-                {
-                    // TODO(macro-migration): Remove this fallback once token
-                    // expansion reports complete, authoritative results.
-                }
-                catch(const syntax_error&)
-                {
-                    // TODO(macro-migration): Remove this fallback once token
-                    // expansion reports complete, authoritative results.
-                }
-            }
-
-            if(!token_expanded)
+            if(!try_token_expansion(descriptor_macro, macro_expr))
             {
                 macro_expr->set_expansion(
                   (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
@@ -153,9 +160,6 @@ bool expression::expand_macros(
         }
         else
         {
-            // TODO(macro-migration): Replace this entire imported serialized
-            // AST path with descriptor-based token expansion. Keep it until
-            // imported token descriptors and context remapping are complete.
             // Expand imported macro.
             auto* m = macro_env.get_macro(
               macro_expr->get_name(),
@@ -170,7 +174,7 @@ bool expression::expand_macros(
                     macro_expr->get_location(),
                     macro_expr->get_exprs()));
             }
-            else
+            else if(!try_token_expansion(m, macro_expr))
             {
                 if(!m->get_desc().serialized_ast.has_value())
                 {
@@ -189,28 +193,35 @@ bool expression::expand_macros(
                 std::unique_ptr<expression> macro_ast;
                 ar& expression_serializer{macro_ast};
 
-                // Local macros and functions need to have their namespace added here.
+                // Apply namespace fixup to the parsed macro AST.
                 macro_ast->visit_nodes(
                   [&macro_expr](expression& e)
                   {
-                      if(!e.is_call_expression() && !e.is_macro_invocation())
+                      if(!e.is_call_expression()
+                             && !e.is_macro_invocation())
                       {
                           return;
                       }
 
-                      // make sure that we have the actual expression (and not a namespace access),
-                      // and that the namespace is empty (meaning the expression invokes a local macro/function).
-                      if(e.get_id() != ast::node_identifier::namespace_access_expression
+                      // Make sure that we have the actual expression
+                      // (and not a namespace access), and that the
+                      // namespace is empty (meaning the expression
+                      // invokes a local macro/function).
+                      if(e.get_id()
+                             != ast::node_identifier::namespace_access_expression
                          && !e.get_namespace_path().has_value())
                       {
-                          // Set the namespace to the import's name (stored in macro_expr).
+                          // Set the namespace to the import's name
+                          // (stored in macro_expr).
                           e.set_namespace(macro_expr->get_namespace());
                       }
                   },
                   false);
 
                 macro_expr->set_expansion(
-                  macro_ast->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+                  macro_ast->as_macro_expression()->expand(
+                    codegen_ctx,
+                    *macro_expr));
 
                 expanded_imported_macros.push_back(macro_expr);
             }
@@ -828,6 +839,10 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
               module_::macro_expansion_capability::token_stream;
             descriptor.body_is_expression = true;
         }
+
+        // Local macro: definition context is already in this module's
+        // syntax_context_table. Mark it as root for the importer.
+        descriptor.definition_context = root_syntax_context;
 
         branch_descriptors.emplace_back(std::move(descriptor));
     }

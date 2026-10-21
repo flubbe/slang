@@ -899,6 +899,14 @@ struct macro_branch_descriptor
      * representation, then remove this field.
      */
     bool body_is_expression{false};
+
+    /**
+     * Definition-site syntax context ID from the exporting module.
+     *
+     * Used to import the macro's definition context into the importing
+     * module's environment. For locally defined macros, this is `root_syntax_context`.
+     */
+    syntax_context_id definition_context{root_syntax_context};
 };
 
 /** Serializer for one macro branch descriptor. */
@@ -912,6 +920,7 @@ inline archive& operator&(
     ar & branch.body;
     ar & branch.capability;
     ar & branch.body_is_expression;
+    ar & branch.definition_context;
     return ar;
 }
 
