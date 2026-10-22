@@ -822,14 +822,13 @@ inline archive& operator&(
 }
 
 /**
- * Temporary migration gate for macro branch expansion.
+ * Expansion capability for a macro branch.
  *
- * TODO(macro-migration): Remove this enum and the corresponding descriptor
- * field once token expansion is the only supported expansion path.
+ * TODO(macro-migration): Remove this enum once token expansion
+ * is fully authoritative and the field is no longer serialized.
  */
 enum class macro_expansion_capability : std::uint8_t
 {
-    legacy_ast,
     token_stream,
 };
 
@@ -888,9 +887,9 @@ struct macro_branch_descriptor
      * Temporary migration gate for this branch.
      *
      * TODO(macro-migration): Remove once all branch shapes use token
-     * expansion and legacy AST fallback is gone.
+     * expansion and the gate is fully authoritative.
      */
-    macro_expansion_capability capability{macro_expansion_capability::legacy_ast};
+    macro_expansion_capability capability{macro_expansion_capability::token_stream};
 
     /**
      * Temporary gate for the initial expression-body subset.
@@ -930,44 +929,17 @@ struct macro_descriptor
     /** Directive list. */
     std::vector<std::pair<std::string, directive_descriptor>> directives;
 
-    /**
-     * Legacy serialized macro AST, or `std::nullopt` (for built-in macros).
-     *
-     * TODO(macro-migration): Remove after token descriptor serialization and
-     * imported token-stream expansion are available.
-     */
-    std::optional<std::vector<std::byte>> serialized_ast;
-
-    /*
-     * TODO Remove old serialization code once done.
-     */
-
     /** Branches for the token-stream macro implementation. */
     std::vector<macro_branch_descriptor> branches;
 
     /** Default constructor. */
     macro_descriptor() = default;
-
-    /**
-     * Construct a macro descriptor.
-     *
-     * @param directives Directive list.
-     * @param serialized_ast The serialized macro AST, or `std::nullopt` for built-in macros.
-     */
-    macro_descriptor(
-      std::vector<std::pair<std::string, directive_descriptor>> directives,
-      std::optional<std::vector<std::byte>> serialized_ast)
-    : directives{std::move(directives)}
-    , serialized_ast{std::move(serialized_ast)}
-    {
-    }
 };
 
 /**
  * Serialize a macro descriptor using an explicit descriptor format version.
  *
- * Version one contains directives, the serialized AST fallback, and branch
- * token-stream descriptors.
+ * Version one contains directives and branch token-stream descriptors.
  */
 inline archive& serialize_macro_descriptor(
   archive& ar,
@@ -981,7 +953,6 @@ inline archive& serialize_macro_descriptor(
     }
 
     ar & desc.directives;
-    ar & desc.serialized_ast;
     ar & desc.branches;
     return ar;
 }

@@ -214,6 +214,13 @@ public:
      * @param loader The loader to use for resolution.
      */
     void resolve_imports(ld::context& loader);
+
+    /** Return the type context. */
+    [[nodiscard]]
+    ty::context& get_type_ctx()
+    {
+        return type_ctx;
+    }
 };
 
 }    // namespace slang::resolve

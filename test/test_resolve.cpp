@@ -301,7 +301,8 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
     const auto expanded = m.expand_macro(
       {slang::token_stream{std::vector<slang::token>{argument}}},
       call_site_context,
-      contexts);
+      contexts,
+      slang::source_location{0, 0});
 
     ASSERT_EQ(expanded.size(), 2);
     EXPECT_EQ(expanded[0].context, call_site_context);
@@ -311,7 +312,8 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
     const auto second_expansion = m.expand_macro(
       {slang::token_stream{std::vector<slang::token>{argument}}},
       call_site_context,
-      contexts);
+      contexts,
+      slang::source_location{0, 0});
     ASSERT_EQ(second_expansion.size(), 2);
     EXPECT_NE(second_expansion[1].context, expanded[1].context);
 }
@@ -319,7 +321,6 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
 TEST(macro, descriptor_serialization_round_trip)
 {
     slang::module_::macro_descriptor descriptor;
-    descriptor.serialized_ast = std::vector<std::byte>{std::byte{0x01}, std::byte{0x02}};
 
     slang::module_::macro_branch_descriptor branch;
     branch.params.emplace_back(slang::module_::macro_parameter{"$value"});
@@ -358,8 +359,6 @@ TEST(macro, descriptor_serialization_round_trip)
     slang::module_::macro_descriptor decoded;
     read_ar & decoded;
 
-    ASSERT_TRUE(decoded.serialized_ast.has_value());
-    EXPECT_EQ(decoded.serialized_ast.value(), descriptor.serialized_ast.value());
     ASSERT_EQ(decoded.branches.size(), 1);
     const auto& decoded_branch = decoded.branches.front();
     ASSERT_EQ(decoded_branch.params.size(), 1);
@@ -425,7 +424,7 @@ TEST(macro, expansion_uses_branch_specific_parameters)
     slang::syntax_context_table contexts;
     const auto call_site_context = contexts.allocate(slang::root_syntax_context);
 
-    const auto zero = m.expand_macro({}, call_site_context, contexts);
+    const auto zero = m.expand_macro({}, call_site_context, contexts, slang::source_location{0, 0});
     ASSERT_EQ(zero.size(), 1);
     EXPECT_EQ(zero[0].s, "zero");
 
@@ -436,7 +435,8 @@ TEST(macro, expansion_uses_branch_specific_parameters)
     const auto one = m.expand_macro(
       {slang::token_stream{std::vector<slang::token>{argument}}},
       call_site_context,
-      contexts);
+      contexts,
+      slang::source_location{0, 0});
     ASSERT_EQ(one.size(), 1);
     EXPECT_EQ(one[0].s, "argument");
     EXPECT_EQ(one[0].context, call_site_context);
@@ -469,7 +469,7 @@ TEST(macro, token_expansion_capability_rejects_unsupported_inputs)
 
     EXPECT_FALSE(m.supports_token_expansion(args));
     EXPECT_THROW(
-      m.expand_macro(args, call_site_context, contexts),
+      m.expand_macro(args, call_site_context, contexts, slang::source_location{0, 0}),
       macro::macro_error);
 }
 
@@ -499,7 +499,8 @@ TEST(macro, token_expansion_rejects_unknown_body_parameter)
       m.expand_macro(
         {slang::token_stream{std::vector<slang::token>{argument}}},
         call_site_context,
-        contexts),
+        contexts,
+        slang::source_location{0, 0}),
       macro::macro_error);
 }
 
@@ -570,8 +571,11 @@ TEST(macro, local_expression_body_uses_token_expansion)
       ast::node_identifier::binary_expression);
 }
 
-TEST(macro, local_unsupported_body_falls_back_to_ast_expansion)
+TEST(macro, unsupported_macro_body_throws_on_expand)
 {
+    // A macro with a multi-statement body cannot be represented as a
+    // single expression token stream, so token expansion is unsupported.
+    // Expanding such a macro must throw an error.
     const std::string input =
       "macro multi! {\n"
       "  () => {\n"
@@ -606,34 +610,77 @@ TEST(macro, local_unsupported_body_falls_back_to_ast_expansion)
     const auto& descriptor = descriptor_macro->get_desc().branches.front();
     EXPECT_EQ(
       descriptor.capability,
-      slang::module_::macro_expansion_capability::legacy_ast);
+      slang::module_::macro_expansion_capability::token_stream);
+    // Multi-statement body is not a supported expression body.
     EXPECT_FALSE(descriptor.body.has_value());
 
-    ASSERT_TRUE(ast_root->expand_macros(
-      co_ctx,
-      resolver_ctx,
-      codegen_ctx,
-      macro_env,
-      sema_env.syntax_contexts,
-      parser.get_macro_asts()));
+    // Expanding an unsupported macro must throw.
+    EXPECT_THROW(
+      ast_root->expand_macros(
+        co_ctx,
+        resolver_ctx,
+        codegen_ctx,
+        macro_env,
+        sema_env.syntax_contexts,
+        parser.get_macro_asts()),
+      cg::codegen_error);
+}
 
-    const ast::macro_invocation* invocation = nullptr;
-    ast_root->visit_nodes(
-      [&invocation](ast::expression& expression)
-      {
-          if(expression.is_macro_invocation())
-          {
-              invocation = expression.as_macro_invocation();
-          }
-      },
-      true);
+TEST(macro, local_macro_in_namespace_uses_token_stream)
+{
+    // A macro with a namespace path should be expandable
+    // via the token-stream path.
+    slang::syntax_context_table contexts;
+    const auto call_site_context = contexts.allocate(slang::root_syntax_context);
 
-    ASSERT_NE(invocation, nullptr);
-    ASSERT_TRUE(invocation->has_expansion());
-    ASSERT_EQ(invocation->get_children().size(), 1);
+    slang::module_::macro_branch_descriptor branch;
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = true;
+    branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
+    branch.body = slang::token_stream{std::vector<slang::token>{
+      slang::token{
+        "$x",
+        {1, 1},
+        slang::token_type::macro_identifier}}};
+
+    slang::module_::macro_descriptor desc;
+    desc.branches.emplace_back(std::move(branch));
+
+    macro::macro m{
+      "identity!",
+      std::move(desc),
+      std::string{"myns"},
+      slang::root_syntax_context};
+
+    macro::env env;
+    env.add_macro(
+      "identity!",
+      m.get_desc(),
+      std::string{"myns"},
+      slang::root_syntax_context);
+
+    // Verify the macro was stored and retrieved with its namespace path.
+    auto* retrieved = env.get_macro("identity!", std::string{"myns"});
+    ASSERT_NE(retrieved, nullptr);
+    EXPECT_EQ(retrieved->get_desc().branches.size(), 1);
     EXPECT_EQ(
-      invocation->get_children().front()->get_id(),
-      ast::node_identifier::macro_branch);
+      retrieved->get_desc().branches.front().capability,
+      slang::module_::macro_expansion_capability::token_stream);
+
+    // Verify the macro can be expanded via token stream.
+    slang::token argument{
+      "42",
+      {1, 1},
+      slang::token_type::int_literal};
+    const auto expanded = m.expand_macro(
+      {slang::token_stream{std::vector<slang::token>{argument}}},
+      call_site_context,
+      contexts,
+      slang::source_location{0, 0});
+
+    ASSERT_EQ(expanded.size(), 1);
+    EXPECT_EQ(expanded[0].s, "42");
+    EXPECT_EQ(expanded[0].context, call_site_context);
 }
 
 }    // namespace

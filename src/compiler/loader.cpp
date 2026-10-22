@@ -110,64 +110,12 @@ std::string context::resolve_name(const std::string& name) const
 }
 
 bool context::resolve_macros(
-  co::context& co_ctx,
-  macro::env& env)
+  [[maybe_unused]] co::context& co_ctx,
+  [[maybe_unused]] macro::env& env)
 {
-    // TODO(macro-migration): Remove this serialized-AST traversal once
-    // imported token descriptors can perform namespace resolution directly.
-    bool needs_import_resolution = false;
-
-    for(auto& m: env.macros)
-    {
-        const auto& desc = m->get_desc();
-        if(!desc.serialized_ast.has_value())
-        {
-            throw resolve_error(
-              std::format(
-                "Macro '{}' has empty AST.",
-                m->get_name()));
-        }
-
-        memory_read_archive ar{
-          desc.serialized_ast.value(),
-          true,
-          std::endian::little};
-
-        std::unique_ptr<ast::expression> macro_ast;
-        ar& ast::expression_serializer{macro_ast};
-
-        // update namespace information.
-        macro_ast->visit_nodes(
-          [&co_ctx, &needs_import_resolution](ast::expression& e) -> void
-          {
-              if(e.get_id() != ast::node_identifier::namespace_access_expression)
-              {
-                  return;
-              }
-
-              if(e.is_macro_invocation()
-                 || e.is_call_expression())
-              {
-                  e.update_namespace();
-
-                  co_ctx.push_scope(co::context::global_scope_id);
-
-                  if(co_ctx.declare_external(
-                       e.get_namespace_path().value(),
-                       sema::symbol_type::module_,
-                       e.get_location()))
-                  {
-                      needs_import_resolution = true;
-                  }
-
-                  co_ctx.pop_scope();
-              }
-          },
-          false,
-          false);
-    }
-
-    return needs_import_resolution;
+    // TODO(macro-migration): Remove this placeholder once imported
+    // token descriptors can perform namespace resolution directly.
+    return false;
 }
 
 }    // namespace slang::loader

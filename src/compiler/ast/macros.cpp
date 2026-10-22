@@ -14,6 +14,7 @@
 #include "compiler/macro.h"
 #include "compiler/name_utils.h"
 #include "compiler/parser.h"
+#include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "shared/module.h"
 #include "ast.h"
@@ -66,7 +67,9 @@ bool expression::expand_macros(
             auto expanded_tokens = descriptor_macro->expand_macro(
               expr->get_argument_tokens(),
               expr->get_name_token().context,
-              syntax_contexts);
+              syntax_contexts,
+              expr->get_location(),
+              &rs_ctx.get_type_ctx());
             expr->set_expansion(
               parser::parse_expression(std::move(expanded_tokens)));
             return true;
@@ -145,8 +148,11 @@ bool expression::expand_macros(
               std::nullopt);
             if(!try_token_expansion(descriptor_macro, macro_expr))
             {
-                macro_expr->set_expansion(
-                  (*it)->as_macro_expression()->expand(codegen_ctx, *macro_expr));
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' is not supported by token expansion.",
+                    macro_expr->get_name()));
             }
 
             if(!macro_expr->scope_id.has_value())
@@ -165,65 +171,13 @@ bool expression::expand_macros(
               macro_expr->get_name(),
               macro_expr->get_namespace_path());
 
-            // check for built-in macros.
-            if(m->get_import_path().value_or("<invalid-import-path>") == "std"
-               && m->get_name() == "format!")
+            if(!try_token_expansion(m, macro_expr))
             {
-                macro_expr->set_expansion(
-                  std::make_unique<format_macro_expression>(
-                    macro_expr->get_location(),
-                    macro_expr->get_exprs()));
-            }
-            else if(!try_token_expansion(m, macro_expr))
-            {
-                if(!m->get_desc().serialized_ast.has_value())
-                {
-                    throw cg::codegen_error(
-                      macro_expr->get_location(),
-                      std::format(
-                        "Could not load macro '{}' (no data).",
-                        macro_expr->get_name()));
-                }
-
-                memory_read_archive ar{
-                  m->get_desc().serialized_ast.value(),
-                  true,
-                  std::endian::little};
-
-                std::unique_ptr<expression> macro_ast;
-                ar& expression_serializer{macro_ast};
-
-                // Apply namespace fixup to the parsed macro AST.
-                macro_ast->visit_nodes(
-                  [&macro_expr](expression& e)
-                  {
-                      if(!e.is_call_expression()
-                             && !e.is_macro_invocation())
-                      {
-                          return;
-                      }
-
-                      // Make sure that we have the actual expression
-                      // (and not a namespace access), and that the
-                      // namespace is empty (meaning the expression
-                      // invokes a local macro/function).
-                      if(e.get_id()
-                             != ast::node_identifier::namespace_access_expression
-                         && !e.get_namespace_path().has_value())
-                      {
-                          // Set the namespace to the import's name
-                          // (stored in macro_expr).
-                          e.set_namespace(macro_expr->get_namespace());
-                      }
-                  },
-                  false);
-
-                macro_expr->set_expansion(
-                  macro_ast->as_macro_expression()->expand(
-                    codegen_ctx,
-                    *macro_expr));
-
-                expanded_imported_macros.push_back(macro_expr);
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' is not supported by token expansion.",
+                    macro_expr->get_name()));
             }
 
             if(!macro_expr->scope_id.has_value())
@@ -292,6 +246,53 @@ void expression::expand_late_macros(
 {
     auto expansion_visitor = [&co_ctx, &rs_ctx, &type_ctx, &env](expression& e)
     {
+        // Handle format! macro invocations that went through the
+        // token-stream expansion path. The early expansion produces
+        // a plain expression list; the actual format evaluation is
+        // deferred here where type information is available.
+        if(e.get_id() == node_identifier::macro_invocation)
+        {
+            auto* macro_inv = e.as_macro_invocation();
+            if(macro_inv->get_name() == "format!")
+            {
+                // Extract arguments from the macro_invocation.
+                std::vector<std::unique_ptr<expression>> args;
+                for(auto& arg: macro_inv->get_exprs())
+                {
+                    args.push_back(arg->clone());
+                }
+
+                // Construct a format_macro_expression to handle
+                // the format string evaluation with type info.
+                format_macro_expression fmt_macro{
+                  macro_inv->get_location(),
+                  args};
+
+                // Perform the actual format evaluation.
+                fmt_macro.expand_late_macros(type_ctx, env);
+
+                if(!macro_inv->scope_id.has_value())
+                {
+                    throw cg::codegen_error(
+                      macro_inv->get_location(),
+                      "Macro 'format!' has no scope.");
+                }
+
+                co_ctx.push_scope(macro_inv->scope_id.value());
+                fmt_macro.collect_names(co_ctx);
+                co_ctx.pop_scope();
+
+                fmt_macro.resolve_names(rs_ctx);
+
+                // set the expression types of the expanded macro.
+                (void)fmt_macro.type_check(type_ctx, env);
+
+                // Replace the macro_invocation with the evaluated result.
+                e = std::move(fmt_macro).expansion;
+                return;
+            }
+        }
+
         if(e.get_id() != node_identifier::format_macro_expression)
         {
             return;
@@ -786,12 +787,6 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
                      | std::ranges::to<std::vector>();
     }
 
-    // TODO(macro-migration): Remove legacy AST serialization once descriptor
-    // serialization is versioned and available for imported expansion.
-    memory_write_archive ar{true, std::endian::little};
-    auto cloned_expr = clone();    // FIXME Needed for std::unique_ptr, so that expression_serializer matches
-    ar& expression_serializer{cloned_expr};
-
     // Preserve each branch's capture list independently. Branches may have
     // different arities and may use different parameter names.
     std::vector<module_::macro_branch_descriptor> branch_descriptors;
@@ -847,10 +842,28 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
         branch_descriptors.emplace_back(std::move(descriptor));
     }
 
-    // Create descriptor and attach branch metadata. Unsupported branches keep
-    // their legacy AST representation and are selected by the compatibility
-    // fallback in the expansion path.
-    module_::macro_descriptor desc{std::move(attributes), ar.get_buffer()};
+    // Detect format! and inject a placeholder body for token-stream expansion.
+    if(name.s == "format!")
+    {
+        branch_descriptors.clear();
+        module_::macro_branch_descriptor format_branch;
+        format_branch.params = {{
+            {"format_str", module_::macro_fragment_kind::expression}
+        }};
+        format_branch.body_is_expression = true;
+        format_branch.capability = module_::macro_expansion_capability::token_stream;
+        format_branch.body = token_stream{std::vector<token>{
+            token{"__format_builtin__", loc, token_type::macro_identifier},
+            token{";", loc, token_type::delimiter}
+        }};
+        format_branch.definition_context = root_syntax_context;
+        branch_descriptors.emplace_back(std::move(format_branch));
+    }
+
+    // Create descriptor and attach branch metadata. Unsupported branches
+    // will throw at expansion time.
+    module_::macro_descriptor desc;
+    desc.directives = std::move(attributes);
     desc.branches = std::move(branch_descriptors);
     macro_env.add_macro(
       name.s,
