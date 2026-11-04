@@ -571,11 +571,9 @@ TEST(macro, local_expression_body_uses_token_expansion)
       ast::node_identifier::binary_expression);
 }
 
-TEST(macro, unsupported_macro_body_throws_on_expand)
+TEST(macro, multi_statement_macro_body_uses_token_stream)
 {
-    // A macro with a multi-statement body cannot be represented as a
-    // single expression token stream, so token expansion is unsupported.
-    // Expanding such a macro must throw an error.
+    // A macro with a multi-statement body is supported as a block expression.
     const std::string input =
       "macro multi! {\n"
       "  () => {\n"
@@ -611,19 +609,35 @@ TEST(macro, unsupported_macro_body_throws_on_expand)
     EXPECT_EQ(
       descriptor.capability,
       slang::module_::macro_expansion_capability::token_stream);
-    // Multi-statement body is not a supported expression body.
-    EXPECT_FALSE(descriptor.body.has_value());
+    EXPECT_TRUE(descriptor.body.has_value());
+    EXPECT_FALSE(descriptor.body_is_expression);
 
-    // Expanding an unsupported macro must throw.
-    EXPECT_THROW(
+    EXPECT_NO_THROW(
       ast_root->expand_macros(
         co_ctx,
         resolver_ctx,
         codegen_ctx,
         macro_env,
         sema_env.syntax_contexts,
-        parser.get_macro_asts()),
-      cg::codegen_error);
+        parser.get_macro_asts()));
+}
+
+TEST(macro, unsupported_macro_body_throws_on_expand)
+{
+    // A macro branch with no token body throws on expansion.
+    slang::module_::macro_descriptor desc;
+    slang::module_::macro_branch_descriptor branch;
+    branch.capability = slang::module_::macro_expansion_capability::token_stream;
+    branch.body_is_expression = false;
+    branch.body = std::nullopt;
+    desc.branches.push_back(std::move(branch));
+
+    slang::syntax_context_table contexts;
+    slang::macro::macro m{"unsupported!", std::move(desc)};
+    EXPECT_FALSE(m.supports_token_expansion({}));
+    EXPECT_THROW(
+      m.expand_macro({}, slang::root_syntax_context, contexts, {0, 0}),
+      slang::macro::macro_error);
 }
 
 TEST(macro, local_macro_in_namespace_uses_token_stream)

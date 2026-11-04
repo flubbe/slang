@@ -53,6 +53,7 @@ const token& format_macro_expander::get_format_token()
 
 void format_macro_expander::create_format_string_placeholders()
 {
+    placeholders.clear();
     std::optional<format_string_placeholder> current_placeholder{std::nullopt};
     std::string current_format_specifier;
 
@@ -166,12 +167,19 @@ void format_macro_expression::expand_late_macros(
           "Double 'format!' macro expansion.");
     }
 
-    if(placeholders.size() + 1 != exprs.size())
+    format_macro_expander expander{loc, exprs};
+    expander.create_format_string_placeholders();
+    if(expander.get_placeholders().size() + 1 != exprs.size())
     {
         throw cg::codegen_error(
           loc,
-          "Unmatched format placeholders or syntax error in macro invocation.");
+          std::format(
+            "Unmatched format placeholders ({}), or syntax error in macro invocation. exprs={}",
+            expander.get_placeholders().size(),
+            exprs.size()));
     }
+
+    placeholders = expander.get_placeholders();
 
     const auto& format_string = exprs[0]->as_literal()->get_token();
 
@@ -190,17 +198,20 @@ void format_macro_expression::expand_late_macros(
     for(std::size_t i = 0; i < placeholders.size(); ++i)
     {
         const auto& fph = placeholders[i];
-        if(!fph.arg_type.has_value())
+
+        std::size_t expr_index = i + 1;
+        const auto& expr = exprs[expr_index];
+
+        // Get the argument type by type-checking it.
+        std::optional<ty::type_id> arg_type = expr->type_check(ctx, env);
+        if(!arg_type.has_value())
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "No argument type for argument at position {}.",
+                "No type for argument at position {}.",
                 i));
         }
-
-        std::size_t expr_index = i + 1;
-        const auto& expr = exprs[expr_index];
 
         // get string fragment.
         std::string fragment = format_string.s.substr(
@@ -235,13 +246,13 @@ void format_macro_expression::expand_late_macros(
         }
 
         std::unique_ptr<ast::expression> conversion_ast;
-        if(fph.arg_type == ctx.get_i8_type()
-           || fph.arg_type == ctx.get_i16_type()
-           || fph.arg_type == ctx.get_i32_type())
+        if(arg_type.value() == ctx.get_i8_type()
+           || arg_type.value() == ctx.get_i16_type()
+           || arg_type.value() == ctx.get_i32_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
 
-            if(fph.arg_type != ctx.get_i32_type())
+            if(arg_type.value() != ctx.get_i32_type())
             {
                 conversion_args.emplace_back(
                   std::make_unique<type_cast_expression>(
@@ -266,7 +277,7 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.arg_type == ctx.get_i64_type())
+        else if(arg_type.value() == ctx.get_i64_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
             conversion_args.emplace_back(expr->clone());
@@ -279,7 +290,7 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.arg_type == ctx.get_f32_type())
+        else if(arg_type.value() == ctx.get_f32_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
             conversion_args.emplace_back(expr->clone());
@@ -292,7 +303,7 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.arg_type == ctx.get_f64_type())
+        else if(arg_type.value() == ctx.get_f64_type())
         {
             auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
             conversion_args.emplace_back(expr->clone());
@@ -305,7 +316,7 @@ void format_macro_expression::expand_late_macros(
               token{"std", loc},
               std::move(to_string_expr));
         }
-        else if(fph.arg_type == ctx.get_str_type())
+        else if(arg_type.value() == ctx.get_str_type())
         {
             // No conversion needed.
             conversion_ast = expr->clone();
@@ -316,7 +327,7 @@ void format_macro_expression::expand_late_macros(
               expr->get_location(),
               std::format(
                 "No formatter for type '{}'.",
-                ctx.to_string(fph.arg_type.value())));
+                ctx.to_string(arg_type.value())));
         }
 
         if(expansion)

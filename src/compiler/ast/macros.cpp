@@ -57,6 +57,13 @@ bool expression::expand_macros(
     auto try_token_expansion =
       [&](const macro::macro* descriptor_macro, macro_invocation* expr) -> bool
     {
+        // format! uses a dedicated late-expansion path with type-aware
+        // format string evaluation; skip token expansion for it.
+        if(expr->get_name() == "format!")
+        {
+            return false;
+        }
+
         if(!descriptor_macro->supports_token_expansion(
               expr->get_argument_tokens()))
         {
@@ -105,6 +112,45 @@ bool expression::expand_macros(
         }
 
         auto* macro_expr = e.as_macro_invocation();
+
+        // format! uses a dedicated late-expansion path with type-aware
+        // format string evaluation. Create the placeholder node here,
+        // before the main type-check pass, so that type_check sees a
+        // valid expansion; the actual string building is filled in later
+        // by expand_late_macros (which runs after the type map is bound).
+        if(macro_expr->get_name() == "format!")
+        {
+            // Already expanded on a previous pass. Do nothing and, crucially,
+            // do not count this as an expansion. The driver runs
+            // do { ... } while(ast->expand_macros(...)), so re-counting the
+            // same format! invocation on every pass would loop forever.
+            if(macro_expr->has_expansion())
+            {
+                return;
+            }
+
+            macro_expr->set_expansion(
+              std::make_unique<format_macro_expression>(
+                macro_expr->get_location(),
+                macro_expr->get_exprs()));
+
+            if(!macro_expr->scope_id.has_value())
+            {
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  std::format(
+                    "Macro '{}' has no scope.",
+                    macro_expr->get_name()));
+            }
+
+            co_ctx.push_scope(macro_expr->scope_id.value());
+            macro_expr->expansion->collect_names(co_ctx);
+            co_ctx.pop_scope();
+            macro_expr->expansion->resolve_names(rs_ctx);
+            ++macro_expansion_count;
+            return;
+        }
+
         if(macro_expr->has_expansion())
         {
             return;
@@ -188,6 +234,41 @@ bool expression::expand_macros(
                     "Macro '{}' has no scope.",
                     macro_expr->get_name()));
             }
+
+            // Adjust local namespaces for macro invocations and calls inside the expansion
+            // so they resolve in the imported macro's defining module. Also promote any
+            // referenced transitive modules to external so the expansion can resolve them.
+            macro_expr->expansion->visit_nodes(
+              [&macro_expr, &co_ctx](expression& e) -> void
+              {
+                  if(e.is_macro_invocation() || e.is_call_expression())
+                  {
+                      if(e.get_id() != ast::node_identifier::namespace_access_expression
+                         && !e.get_namespace_path().has_value())
+                      {
+                          e.set_namespace(macro_expr->get_namespace());
+                      }
+                  }
+
+                  if(e.get_id() == ast::node_identifier::namespace_access_expression)
+                  {
+                      co_ctx.declare_external(
+                        e.as_named_expression()->get_name(),
+                        sema::symbol_type::module_,
+                        e.get_location());
+                  }
+
+                  auto ns = e.get_namespace_path();
+                  if(ns.has_value())
+                  {
+                      co_ctx.declare_external(
+                        ns.value(),
+                        sema::symbol_type::module_,
+                        e.get_location());
+                  }
+              },
+              true,
+              false);
         }
 
         co_ctx.push_scope(macro_expr->scope_id.value());
@@ -244,84 +325,39 @@ void expression::expand_late_macros(
   ty::context& type_ctx,
   sema::env& env)
 {
-    auto expansion_visitor = [&co_ctx, &rs_ctx, &type_ctx, &env](expression& e)
+    // Post-order traversal that fills in format! string-building
+    // expansions in place.
+    std::function<void(expression&)> visit = [&](expression& e)
     {
-        // Handle format! macro invocations that went through the
-        // token-stream expansion path. The early expansion produces
-        // a plain expression list; the actual format evaluation is
-        // deferred here where type information is available.
-        if(e.get_id() == node_identifier::macro_invocation)
+        // Recurse into children first
+        for (auto* child : e.get_children())
+            visit(*child);
+
+        // The format! placeholder node (a format_macro_expression) is
+        // created as the macro_invocation's expansion during the early
+        // expand_macros pass, so it is reachable here as a child. Fill
+        // its string-building expansion in place, then bind it.
+        if(e.get_id() == node_identifier::format_macro_expression)
         {
-            auto* macro_inv = e.as_macro_invocation();
-            if(macro_inv->get_name() == "format!")
+            auto* macro_expr = static_cast<format_macro_expression*>(&e);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+            macro_expr->expand_late_macros(type_ctx, env);
+
+            if(!macro_expr->scope_id.has_value())
             {
-                // Extract arguments from the macro_invocation.
-                std::vector<std::unique_ptr<expression>> args;
-                for(auto& arg: macro_inv->get_exprs())
-                {
-                    args.push_back(arg->clone());
-                }
-
-                // Construct a format_macro_expression to handle
-                // the format string evaluation with type info.
-                format_macro_expression fmt_macro{
-                  macro_inv->get_location(),
-                  args};
-
-                // Perform the actual format evaluation.
-                fmt_macro.expand_late_macros(type_ctx, env);
-
-                if(!macro_inv->scope_id.has_value())
-                {
-                    throw cg::codegen_error(
-                      macro_inv->get_location(),
-                      "Macro 'format!' has no scope.");
-                }
-
-                co_ctx.push_scope(macro_inv->scope_id.value());
-                fmt_macro.collect_names(co_ctx);
-                co_ctx.pop_scope();
-
-                fmt_macro.resolve_names(rs_ctx);
-
-                // set the expression types of the expanded macro.
-                (void)fmt_macro.type_check(type_ctx, env);
-
-                // Replace the macro_invocation with the evaluated result.
-                e = std::move(fmt_macro).expansion;
-                return;
+                throw cg::codegen_error(
+                  macro_expr->get_location(),
+                  "Macro 'format!' has no scope.");
             }
+
+            co_ctx.push_scope(macro_expr->scope_id.value());
+            macro_expr->collect_names(co_ctx);
+            co_ctx.pop_scope();
+            macro_expr->resolve_names(rs_ctx);
+            (void)macro_expr->type_check(type_ctx, env);
         }
-
-        if(e.get_id() != node_identifier::format_macro_expression)
-        {
-            return;
-        }
-
-        auto* macro_expr = static_cast<format_macro_expression*>(&e);    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
-        macro_expr->expand_late_macros(type_ctx, env);
-
-        if(!macro_expr->scope_id.has_value())
-        {
-            throw cg::codegen_error(
-              macro_expr->get_location(),
-              "Macro 'format!' has no scope.");
-        }
-
-        co_ctx.push_scope(macro_expr->scope_id.value());
-        macro_expr->collect_names(co_ctx);
-        co_ctx.pop_scope();
-
-        macro_expr->resolve_names(rs_ctx);
-
-        // set the expression types of the expanded macro.
-        (void)macro_expr->type_check(type_ctx, env);
     };
 
-    visit_nodes(
-      expansion_visitor,
-      false,
-      false);
+    visit(*this);
 }
 
 /*
@@ -797,42 +833,47 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
         descriptor.args_end_with_list = branch->ends_with_list_capture();
         descriptor.separators = branch->get_argument_separators();
 
-        // TODO(macro-migration): Replace this temporary subset gate with
-        // complete token-pattern/body validation.
-        bool token_body_supported = branch->get_body_tokens().has_value()
-                                    && !branch->ends_with_list_capture();
-        std::set<std::string> parameter_names;
-        descriptor.params.reserve(branch->get_args().size());
-        for(const auto& [arg_name, arg_type]: branch->args)
-        {
-            module_::macro_parameter parameter;
-            parameter.name = arg_name.s;
-            parameter.fragment = module_::macro_fragment_kind::expression;
-            descriptor.params.emplace_back(std::move(parameter));
+        // Convert branch args to descriptor params.
+        for(const auto& [arg_name, type_name]: branch->args)
+            descriptor.params.emplace_back(module_::macro_parameter{
+                .name = arg_name.s,
+                .fragment = module_::macro_fragment_kind::expression});
 
-            if(arg_type.s != "expr"
-               || !parameter_names.emplace(arg_name.s).second)
-            {
-                token_body_supported = false;
-            }
-        }
-
+        // A token body is supported for two shapes:
+        //   - a single-expression body (exactly one trailing ';'), and
+        //   - a block body: a statement list terminated by ';' (one or more
+        //     ';'), rebuilt by the parse-back as a block whose value is its
+        //     tail expression.
         // TODO(macro-migration): Validate the supported body shape directly
         // from tokens, then remove this dependency on the legacy AST body.
-        const auto body_children = branch->get_body()->get_children();
-        token_body_supported = token_body_supported
-                               && body_children.size() == 1
-                               && body_children.front()->get_id()
-                                    == node_identifier::expression_statement
-                               && !branch->get_body_tokens()->empty()
-                               && branch->get_body_tokens()->back().s == ";";
+        bool token_body_supported = false;
+        std::size_t semicolon_count = 0;
+        if(branch->get_body_tokens().has_value()
+           && !branch->get_body_tokens()->empty()
+           && branch->get_body_tokens()->back().s == ";")
+        {
+            for(const auto& tok: *branch->get_body_tokens())
+                if(tok.s == ";")
+                    ++semicolon_count;
+            // One ';' is a single-expression body; more than one is a
+            // block/statement-list body. Both are token-expandable.
+            token_body_supported = (semicolon_count >= 1);
+        }
 
         if(token_body_supported)
         {
             descriptor.body = branch->get_body_tokens();
             descriptor.capability =
               module_::macro_expansion_capability::token_stream;
-            descriptor.body_is_expression = true;
+            // body_is_expression distinguishes the two shapes for the
+            // expander: true -> drop the trailing ';' and parse as a single
+            // expression; false -> keep the ';' and parse as a block.
+            descriptor.body_is_expression = (semicolon_count == 1);
+        }
+        else
+        {
+            // Unsupported branch: leave without a token body. It will throw
+            // at expansion time with a clear message.
         }
 
         // Local macro: definition context is already in this module's
@@ -851,6 +892,7 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
             {"format_str", module_::macro_fragment_kind::expression}
         }};
         format_branch.body_is_expression = true;
+        format_branch.args_end_with_list = true;
         format_branch.capability = module_::macro_expansion_capability::token_stream;
         format_branch.body = token_stream{std::vector<token>{
             token{"__format_builtin__", loc, token_type::macro_identifier},

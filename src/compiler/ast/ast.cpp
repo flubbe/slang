@@ -367,6 +367,43 @@ void expression::bind_constant_declarations(
     );
 }
 
+void expression::bind_variable_declarations(
+  ty::context& ctx,
+  sema::env& env)
+{
+    visit_nodes(
+      [&ctx, &env](expression& expr) -> void
+      {
+          if(!expr.is_variable_declaration())
+          {
+              return;
+          }
+
+          auto* var = expr.as_variable_declaration();
+
+          std::optional<sema::symbol_id> symbol_id = var->get_symbol_id();
+          if(!symbol_id.has_value())
+          {
+              throw std::runtime_error(
+                std::format(
+                  "{}: Variable has no symbol id.",
+                  ::slang::to_string(expr.get_location())));
+          }
+
+          const auto& type = var->get_type();
+          auto type_id = ctx.get_type(type->get_qualified_name());
+          if(type->is_array())
+          {
+              type_id = ctx.get_array(type_id, 1);
+          }
+
+          env.type_map.insert({symbol_id.value(), type_id});
+      },
+      false, /* don't visit this node */
+      false  /* pre-order traversal */
+    );
+}
+
 void expression::evaluate_constant_expressions(
   ty::context& ctx,
   const_::env& env)

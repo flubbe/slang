@@ -483,6 +483,11 @@ std::optional<sema::symbol_id> context::resolve(
             return std::nullopt;
         }
 
+        if(sema_env.transitive_imports.contains(mod_symbol_id.value()))
+        {
+            return std::nullopt;
+        }
+
         // FIXME check the module exists?
         auto mod_symbol_info = sema_env.symbol_table.find(
           mod_symbol_id.value());

@@ -508,11 +508,15 @@ TEST(jit, module_loader)
 {
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");
+    file_mgr.add_search_path("lang");
+    file_mgr.add_search_path("test");
 
+    si::context context{file_mgr};
     module_loader mod{
       file_mgr,
       "test_jit",
-      std::format("test_jit.{}", slang::package::module_ext)};
+      std::format("test_jit.{}", slang::package::module_ext),
+      &context};
 
     {
         auto& function = mod.get_function("test_ret");

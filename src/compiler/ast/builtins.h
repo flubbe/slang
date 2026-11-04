@@ -64,6 +64,7 @@ class format_macro_expander
      */
     const token& get_format_token();
 
+public:
     /**
      * Create the format string placeholders.
      *
@@ -126,10 +127,9 @@ class format_macro_expression : public expression
     /** Format specifiers/placeholders. Set during type checking. */
     std::vector<format_string_placeholder> placeholders;
 
+public:
     /** Expansion. */
     std::unique_ptr<expression> expansion;
-
-public:
     /** Set the super class. */
     using super = expression;
 

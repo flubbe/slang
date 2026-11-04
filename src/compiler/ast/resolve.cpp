@@ -126,6 +126,17 @@ void variable_reference_expression::resolve_names(rs::context& ctx)
         {
             return;
         }
+
+        // Also try module_ type (for namespace/module prefixes like `std` in `std::format!`).
+        symbol_id = ctx.resolve(
+          get_qualified_name(),
+          sema::symbol_type::module_,
+          scope_id.value(),
+          name.context);
+        if(symbol_id.has_value())
+        {
+            return;
+        }
     }
 
     if(!symbol_id.has_value())

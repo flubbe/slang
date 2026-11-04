@@ -186,7 +186,10 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
         test_jit_aarch64.cpp
     )
     target_link_libraries(test_jit_aarch64 PRIVATE slang_shared_core Microsoft.GSL::GSL)
-    set_tests_properties(jit_aarch64 PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} FIXTURES_REQUIRED generate_jit_test)
+    set_tests_properties(jit_aarch64
+        PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED generate_jit_test)
 endif()
 
 #
@@ -331,6 +334,14 @@ set_tests_properties("slang macro struct (default, compile)" PROPERTIES FIXTURES
 
 add_jit_compile_test("slang macro struct" TRUE test/macros/test_struct)
 set_jit_test_properties("slang macro struct" PROPERTIES FIXTURES_REQUIRED needs_std)
+
+# Phase 0a hygiene probes (2026-11-02): body-originated names must NOT capture
+# call-site bindings. Under correct hygiene each FAILS to compile (the body name
+# is undefined in the macro's definition context), so these are compile-fail
+# regression guards: ctest is green exactly while hygiene holds.
+# See .notes/format_macro_context.md, "Hygiene plan", Phase 0a.
+add_compile_fail_test("slang macros hygiene single" TRUE test/macros/test_hygiene_single)
+add_compile_fail_test("slang macros hygiene nested" TRUE test/macros/test_hygiene_nested)
 
 add_compile_exec_test("slang math" TRUE test/test_math)
 add_jit_compile_test("slang math" TRUE test/test_math)

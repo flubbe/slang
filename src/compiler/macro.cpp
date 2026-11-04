@@ -63,15 +63,15 @@ bool has_token_expansion_body(
 {
     return branch.capability
              == slang::module_::macro_expansion_capability::token_stream
-           && branch.body.has_value()
-           && branch.body_is_expression;
+           && branch.body.has_value();
 }
 
 /**
  * Select the best matching branch for a macro invocation.
  *
- * Exact non-variadic branches win over exact variadic branches, which win
- * over variadic branches with additional arguments.
+ * Priority: exact non-variadic (3) > exact variadic (2) > variadic with
+ * additional arguments (1).  This ensures a single-arg call like sum!(1)
+ * prefers the non-variadic branch over the variadic one.
  *
  * TODO(macro-migration): Replace this compatibility matcher with complete
  * token-pattern matching once all branch patterns are represented.
@@ -89,10 +89,10 @@ branch_selection select_branch(
         std::optional<std::size_t> score;
         if(args.size() == candidate.params.size())
         {
-            score = candidate.args_end_with_list ? 2 : 3;
+            score = candidate.args_end_with_list ? 3 : 2;
         }
         else if(candidate.args_end_with_list
-                && args.size() > candidate.params.size())
+                && args.size() >= candidate.params.size())
         {
             score = 1;
         }
@@ -314,14 +314,45 @@ token_stream macro::expand_macro(
                     // Parameter match -> splice argument tokens, retagged.
                     if(i >= args.size())
                     {
-                        throw macro_error{
-                          std::format(
-                            "Macro '{}' is missing argument for '{}'.",
-                            name,
-                            param.name)};
+                        // Variadic parameter with no remaining arguments.
+                        if(branch->args_end_with_list)
+                        {
+                            // Empty variadic capture is valid.
+                        }
+                        else
+                        {
+                            throw macro_error{
+                              std::format(
+                                "Macro '{}' is missing argument for '{}'.",
+                                name,
+                                param.name)};
+                        }
                     }
-                    result = result.concat(
-                      retag(args[i], call_site));    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+                    else if(branch->args_end_with_list && i == branch->params.size() - 1)
+                    {
+                        // Variadic parameter: splice all remaining args.
+                        std::vector<token> variadic_tokens;
+                        for (std::size_t j = i; j < args.size(); ++j)
+                        {
+                            if (j > i)
+                            {
+                                variadic_tokens.emplace_back(
+                                  ",", call_loc, token_type::delimiter);
+                            }
+                            for (const auto& t : args[j].data())
+                            {
+                                token copy = t;
+                                copy.context = call_site;
+                                variadic_tokens.push_back(std::move(copy));
+                            }
+                        }
+                        result = result.concat(
+                          token_stream{std::move(variadic_tokens)});
+                    }
+                    else
+                    {
+                        result = result.concat(retag(args[i], call_site));
+                    }
                     replaced = true;
                     break;
                 }
@@ -330,11 +361,15 @@ token_stream macro::expand_macro(
 
         if(tok.type == token_type::macro_identifier && !replaced)
         {
-            throw macro_error{
-              std::format(
-                "Macro '{}' references unknown parameter '{}'.",
-                name,
-                tok.s)};
+            // Allow self-recursion: don't throw for the macro's own name.
+            if(tok.s != name)
+            {
+                throw macro_error{
+                  std::format(
+                    "Macro '{}' references unknown parameter '{}'.",
+                    name,
+                    tok.s)};
+            }
         }
 
         if(!replaced)
@@ -350,6 +385,8 @@ token_stream macro::expand_macro(
        && !result.empty()
        && result.back().s == ";")
     {
+        // Single-expression body: drop the trailing ';' so the parse-back
+        // sees a bare expression.
         std::vector<token> expression_tokens;
         expression_tokens.reserve(result.size() - 1);
         for(std::size_t i = 0; i + 1 < result.size(); ++i)
@@ -357,6 +394,24 @@ token_stream macro::expand_macro(
             expression_tokens.emplace_back(result[i]);
         }
         return token_stream{std::move(expression_tokens)};
+    }
+
+    // Block body: wrap the retagged statement list in synthetic braces so the
+    // parse-back (parse_expression) can rebuild it as a block whose value is
+    // its tail expression. The braces are syntactic and carry no context. This
+    // is produced only on the token path, so block-as-value stays a
+    // macro-expansion construct rather than a general language expression.
+    if(!branch->body_is_expression && branch->body.has_value())
+    {
+        std::vector<token> wrapped;
+        wrapped.reserve(result.size() + 2);
+        wrapped.emplace_back("{", call_loc, token_type::delimiter);
+        for(std::size_t i = 0; i < result.size(); ++i)
+        {
+            wrapped.emplace_back(result[i]);
+        }
+        wrapped.emplace_back("}", call_loc, token_type::delimiter);
+        return token_stream{std::move(wrapped)};
     }
 
     return result;

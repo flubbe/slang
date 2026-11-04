@@ -435,6 +435,16 @@ public:
     /** Bind constant declarations (no evaluation). */
     void bind_constant_declarations(sema::env& sema_env, const_::env& const_env) const;
 
+    /**
+     * Bind variable declarations' declared types into the type map
+     * (no initializer evaluation).
+     *
+     * This runs before `expand_late_macros` so that `format!` arguments
+     * referencing local variables can be type-checked during the early
+     * expansion pass, before the main type-check binds those symbols.
+     */
+    void bind_variable_declarations(ty::context& ctx, sema::env& env);
+
     /** Constant evaluation and folding. */
     void evaluate_constant_expressions(
       ty::context& ctx,
@@ -1142,18 +1152,16 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return expr->get_children();
+        // The only direct child is the contained expression. Its own
+        // children are visited when the contained expression is traversed.
+        // Returning them here as well would make the generic DFS (which
+        // recurses via get_children) visit the subtree twice.
+        return {expr.get()};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        std::vector<const expression*> exprs;
-        exprs.reserve(expr->get_children().size());
-        for(auto& c: expr->get_children())
-        {
-            exprs.emplace_back(c);
-        }
-        return exprs;
+        return {expr.get()};
     }
 
     /** Return the contained expression. */

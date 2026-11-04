@@ -594,6 +594,16 @@ std::set<std::string> instruction_emitter::collect_jump_targets() const
 
 void instruction_emitter::collect_imports()
 {
+    // walk explicit module imports.
+    for(const auto& [id, symbol_info]: sema_env.symbol_table)
+    {
+        if(symbol_info.type == sema::symbol_type::module_
+           && !sema_env.transitive_imports.contains(id))
+        {
+            imports.intern_package(symbol_info.qualified_name);
+        }
+    }
+
     // walk types.
     for(const auto& [id, symbol_info]: sema_env.symbol_table)
     {
