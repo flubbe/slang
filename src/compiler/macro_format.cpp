@@ -51,8 +51,10 @@ std::vector<token>
     if(cast_to_i32)
     {
         body.emplace_back("(", call_loc, token_type::delimiter);
-        for(const auto& t: arg.data())
-            body.push_back(t);
+        body.insert(
+          body.end(),
+          arg.data().begin(),
+          arg.data().end());
         body.emplace_back(")", call_loc, token_type::delimiter);
         body.emplace_back("as", call_loc, token_type::identifier);
         body.emplace_back("i32", call_loc, token_type::identifier);
@@ -137,16 +139,18 @@ token_stream expand_format_builtin(
   source_location call_loc,
   const typing::context& type_ctx)
 {
-    // -----------------------------------------------------------------
-    // 1. Extract the format string literal (the first argument).
-    // -----------------------------------------------------------------
-    if(args.empty() || args[0].data().empty())
+    /*
+     * 1. Extract the format string literal (the first argument).
+     */
+
+    if(args.empty()
+       || args[0].data().empty())    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     {
         throw macro_error{
           "Macro 'format!': No format string provided."};
     }
 
-    const token& fmt_tok = args[0].data().front();
+    const token& fmt_tok = args[0].data().front();    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     if(fmt_tok.type != token_type::str_literal)
     {
         throw macro_error{
@@ -162,16 +166,16 @@ token_stream expand_format_builtin(
     // Strip the surrounding quotes.
     const std::string fmt = fmt_tok.s.substr(1, fmt_tok.s.length() - 2);
 
-    // -----------------------------------------------------------------
-    // 2. Parse placeholders.
-    // -----------------------------------------------------------------
+    /*
+     * 2. Parse placeholders.
+     */
     const auto placeholders =
       format_util::parse_format_string(fmt, fmt_tok.location);
 
-    // -----------------------------------------------------------------
-    // 3. Validate argument types.  arg_types is aligned with args[1..],
-    //    i.e. arg_types[i] is the type of args[i + 1].
-    // -----------------------------------------------------------------
+    /*
+     * 3. Validate argument types.  arg_types is aligned with args[1..],
+     *    i.e. arg_types[i] is the type of args[i + 1].
+     */
     if(arg_types.size() != placeholders.size())
     {
         throw macro_error{
@@ -184,8 +188,8 @@ token_stream expand_format_builtin(
     for(std::size_t i = 0; i < placeholders.size(); ++i)
     {
         format_util::validate_arg_type(
-          arg_types[i],
-          placeholders[i].specifier,
+          arg_types[i],                 // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+          placeholders[i].specifier,    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
           type_ctx,
           fmt_tok.location);
     }
@@ -196,21 +200,22 @@ token_stream expand_format_builtin(
         return token_stream{std::vector<token>{fmt_tok}};
     }
 
-    // -----------------------------------------------------------------
-    // 4. Build the left‑nested std::string_concat(...) chain.
-    // -----------------------------------------------------------------
+    /*
+     * 4. Build the left‑nested std::string_concat(...) chain.
+     */
+
     std::vector<token> result;
 
     // last_fragment_end tracks the offset into `fmt` after the previous
-    // placeholder. `fmt` is the *unquoted* format string, so the leading
+    // placeholder. `fmt` is the unquoted format string, so the leading
     // fragment starts at 0.
     std::size_t last_fragment_end = 0;
 
     for(std::size_t i = 0; i < placeholders.size(); ++i)
     {
-        const auto& fph = placeholders[i];
+        const auto& fph = placeholders[i];    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         const std::size_t arg_index = i + 1;
-        const int arg_type = arg_types[i];
+        const auto arg_type = arg_types[i];    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
         // String fragment before this placeholder.
         const std::string fragment = fmt.substr(
@@ -235,26 +240,38 @@ token_stream expand_format_builtin(
         {
             conversion = to_string_call(
               "i32_to_string",
-              args[arg_index],
+              args[arg_index],    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
               arg_type != type_ctx.get_i32_type(),
               call_loc);
         }
         else if(arg_type == type_ctx.get_i64_type())
         {
-            conversion = to_string_call("i64_to_string", args[arg_index], false, call_loc);
+            conversion = to_string_call(
+              "i64_to_string",
+              args[arg_index],    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+              false,
+              call_loc);
         }
         else if(arg_type == type_ctx.get_f32_type())
         {
-            conversion = to_string_call("f32_to_string", args[arg_index], false, call_loc);
+            conversion = to_string_call(
+              "f32_to_string",
+              args[arg_index],    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+              false,
+              call_loc);
         }
         else if(arg_type == type_ctx.get_f64_type())
         {
-            conversion = to_string_call("f64_to_string", args[arg_index], false, call_loc);
+            conversion = to_string_call(
+              "f64_to_string",
+              args[arg_index],    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+              false,
+              call_loc);
         }
         else if(arg_type == type_ctx.get_str_type())
         {
             // No conversion needed: splice the argument as‑is.
-            conversion = args[arg_index].data();
+            conversion = args[arg_index].data();    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         }
         else
         {
