@@ -436,16 +436,6 @@ public:
     /** Bind constant declarations (no evaluation). */
     void bind_constant_declarations(sema::env& sema_env, const_::env& const_env) const;
 
-    /**
-     * Bind variable declarations' declared types into the type map
-     * (no initializer evaluation).
-     *
-     * This runs before `expand_late_macros` so that `format!` arguments
-     * referencing local variables can be type-checked during the early
-     * expansion pass, before the main type-check binds those symbols.
-     */
-    void bind_variable_declarations(ty::context& ctx, sema::env& env);
-
     /** Constant evaluation and folding. */
     void evaluate_constant_expressions(
       ty::context& ctx,
