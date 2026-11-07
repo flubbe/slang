@@ -29,41 +29,6 @@ namespace slang::ast
 namespace
 {
 
-module_::macro_body_kind get_token_body_kind(
-  const token_stream& body,
-  source_location loc)
-{
-    if(!body.empty() && body.back().s == ";")
-    {
-        std::vector<token> expression_tokens;
-        expression_tokens.reserve(body.size() - 1);
-        expression_tokens.insert(
-          expression_tokens.end(),
-          body.data().begin(),
-          body.data().end() - 1);
-
-        try
-        {
-            (void)parser::parse_expression(
-              token_stream{std::move(expression_tokens)});
-            return module_::macro_body_kind::expression;
-        }
-        catch(const syntax_error&)
-        {
-            // A statement list may parse as a block rather than an expression.
-        }
-    }
-
-    std::vector<token> block_tokens;
-    block_tokens.reserve(body.size() + 2);
-    block_tokens.emplace_back("{", loc, token_type::delimiter);
-    block_tokens.insert(block_tokens.end(), body.data().begin(), body.data().end());
-    block_tokens.emplace_back("}", loc, token_type::delimiter);
-
-    (void)parser::parse_expression(token_stream{std::move(block_tokens)});
-    return module_::macro_body_kind::statement_list;
-}
-
 std::unique_ptr<block> parse_macro_rule_body(const macro_rule& branch)
 {
     const auto& opening = branch.get_body_opening_delimiter();
@@ -867,8 +832,7 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
         }
         const auto body_tokens = *branch->get_body_tokens();
         descriptor.body = module_::macro_body_descriptor{
-          .tokens = body_tokens,
-          .kind = get_token_body_kind(body_tokens, branch->get_location())};
+          .tokens = body_tokens};
 
         // Local macro: definition context is already in this module's
         // syntax_context_table. Mark it as root for the importer.

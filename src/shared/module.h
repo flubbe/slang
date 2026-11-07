@@ -821,29 +821,6 @@ inline archive& operator&(
     return ar;
 }
 
-/** Shape of a macro rule's token body. */
-enum class macro_body_kind : std::uint8_t
-{
-    expression,
-    statement_list,
-};
-
-/** Serializer for macro body kinds. */
-inline archive& operator&(
-  archive& ar,
-  macro_body_kind& kind)
-{
-    auto value = std::to_underlying(kind);
-    ar & value;
-    if(value > std::to_underlying(macro_body_kind::statement_list))
-    {
-        throw serialization_error{
-          "Invalid macro body kind."};
-    }
-    kind = static_cast<macro_body_kind>(value);
-    return ar;
-}
-
 /** Macro parameters. */
 struct macro_parameter
 {
@@ -864,14 +841,11 @@ inline archive& operator&(
     return ar;
 }
 
-/** Token body and parse shape for one macro rule. */
+/** Token body for one macro rule. */
 struct macro_body_descriptor
 {
     /** Body tokens, excluding the surrounding braces. */
     token_stream tokens;
-
-    /** Whether expansion should parse the tokens as an expression or block. */
-    macro_body_kind kind{macro_body_kind::statement_list};
 };
 
 /** Serialize a macro body descriptor. */
@@ -880,7 +854,6 @@ inline archive& operator&(
   macro_body_descriptor& body)
 {
     ar & body.tokens;
-    ar & body.kind;
     return ar;
 }
 

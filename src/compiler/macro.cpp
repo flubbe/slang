@@ -351,40 +351,18 @@ token_stream macro::expand_macro(
         }
     }
 
-    if(branch->body.kind == slang::module_::macro_body_kind::expression
-       && !result.empty()
-       && result.back().s == ";")
+    // Wrap the body in a block so expressions execute in order and the tail
+    // expression supplies the value. The braces are syntactic and carry no
+    // context.
+    std::vector<token> wrapped;
+    wrapped.reserve(result.size() + 2);
+    wrapped.emplace_back("{", call_loc, token_type::delimiter);
+    for(std::size_t i = 0; i < result.size(); ++i)
     {
-        // Single-expression body: drop the trailing ';' so the parse-back
-        // sees a bare expression.
-        std::vector<token> expression_tokens;
-        expression_tokens.reserve(result.size() - 1);
-        for(std::size_t i = 0; i + 1 < result.size(); ++i)
-        {
-            expression_tokens.emplace_back(result[i]);
-        }
-        return token_stream{std::move(expression_tokens)};
+        wrapped.emplace_back(result[i]);
     }
-
-    // Block body: wrap the retagged statement list in synthetic braces so the
-    // parse-back (parse_expression) can rebuild it as a block whose value is
-    // its tail expression. The braces are syntactic and carry no context. This
-    // is produced only on the token path, so block-as-value stays a
-    // macro-expansion construct rather than a general language expression.
-    if(branch->body.kind == slang::module_::macro_body_kind::statement_list)
-    {
-        std::vector<token> wrapped;
-        wrapped.reserve(result.size() + 2);
-        wrapped.emplace_back("{", call_loc, token_type::delimiter);
-        for(std::size_t i = 0; i < result.size(); ++i)
-        {
-            wrapped.emplace_back(result[i]);
-        }
-        wrapped.emplace_back("}", call_loc, token_type::delimiter);
-        return token_stream{std::move(wrapped)};
-    }
-
-    return result;
+    wrapped.emplace_back("}", call_loc, token_type::delimiter);
+    return token_stream{std::move(wrapped)};
 }
 
 void env::add_macro(
