@@ -4166,8 +4166,9 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return validation_body ? std::vector<expression*>{validation_body.get()}
-                               : std::vector<expression*>{};
+        return validation_body
+                 ? std::vector<expression*>{validation_body.get()}
+                 : std::vector<expression*>{};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
