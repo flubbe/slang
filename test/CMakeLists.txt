@@ -125,7 +125,7 @@ target_link_libraries(test_cfg_simplify PRIVATE slang_test_emitter_core)
 add_gtest_executable(test_output test_output.cpp)
 target_link_libraries(test_output PRIVATE slang_test_emitter_core)
 set_tests_properties(output PROPERTIES
-    FIXTURES_REQUIRED needs_std
+    FIXTURES_REQUIRED "needs_std;test_macros_module"
     FIXTURES_SETUP output
 )
 
@@ -136,7 +136,7 @@ add_gtest_executable(test_serialization
 
 add_gtest_executable(test_ast_serialization test_ast_serialization.cpp)
 target_link_libraries(test_ast_serialization PRIVATE slang_test_frontend_core)
-set_tests_properties(ast_serialization PROPERTIES FIXTURES_REQUIRED needs_std)
+set_tests_properties(ast_serialization PROPERTIES FIXTURES_REQUIRED "needs_std;output")
 
 add_gtest_executable(test_filemanager
     test_filemanager.cpp
@@ -218,7 +218,7 @@ add_compile_test(
 )
 set_tests_properties(
     "build gc (default, compile)"
-    PROPERTIES FIXTURES_SETUP needs_gc
+    PROPERTIES FIXTURES_SETUP gc_module
 )
 
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
@@ -288,6 +288,10 @@ add_compile_exec_fail_test("slang invalid main signature 1" FALSE test/test_inva
 add_compile_exec_fail_test("slang invalid main signature 2" FALSE test/test_invalid_main_signature2)
 
 add_compile_exec_test("slang macros" TRUE test/macros/test_macros)
+set_property(
+    TEST "slang macros (default, compile)"
+    APPEND PROPERTY FIXTURES_SETUP test_macros_module
+)
 add_jit_compile_test("slang macros" TRUE test/macros/test_macros)
 
 add_compile_exec_test("slang macros recursion" TRUE test/macros/test_recursion)
@@ -314,28 +318,58 @@ add_compile_fail_test("slang macros format fail 2" TRUE test/macros/test_format_
 add_compile_fail_test("slang macros format fail 3" TRUE test/macros/test_format_fail3)
 
 add_compile_exec_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
-set_tests_properties("slang macro import (default, compile)" PROPERTIES FIXTURES_REQUIRED test_macros)
+set_property(
+    TEST
+        "slang macro import (default, compile)"
+        "slang macro import (--no-eval-const-subexpr, compile)"
+        "slang macro import (default, run)"
+        "slang macro import (--no-eval-const-subexpr, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED test_macros_module
+)
+set_property(
+    TEST "slang macro import (default, compile)"
+    APPEND PROPERTY FIXTURES_SETUP test_import
+)
 
 add_jit_compile_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
-set_jit_test_properties("slang macro import" PROPERTIES FIXTURES_REQUIRED test_macros)
+set_jit_test_properties("slang macro import" APPEND PROPERTY FIXTURES_REQUIRED test_macros_module)
+set_jit_test_properties("slang macro import" APPEND PROPERTY FIXTURES_REQUIRED test_import)
 
 add_compile_exec_test("slang macro transitive import 1" TRUE test/macros/test_transitive_import1 --search-path test/macros)
-set_tests_properties("slang macro transitive import 1 (default, compile)" PROPERTIES FIXTURES_REQUIRED test_import)
+set_property(
+    TEST
+        "slang macro transitive import 1 (default, compile)"
+        "slang macro transitive import 1 (--no-eval-const-subexpr, compile)"
+        "slang macro transitive import 1 (default, run)"
+        "slang macro transitive import 1 (--no-eval-const-subexpr, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED test_import
+)
+set_property(
+    TEST "slang macro transitive import 1 (default, compile)"
+    APPEND PROPERTY FIXTURES_SETUP test_transitive_import1
+)
 
 add_jit_compile_test("slang macro transitive import 1" TRUE test/macros/test_transitive_import1 --search-path test/macros)
-set_jit_test_properties("slang macro transitive import 1" PROPERTIES FIXTURES_REQUIRED test_import)
+set_jit_test_properties("slang macro transitive import 1" APPEND PROPERTY FIXTURES_REQUIRED test_import)
 
 add_compile_exec_test("slang macro transitive import 2" TRUE test/macros/test_transitive_import2 --search-path test/macros)
-set_tests_properties("slang macro transitive import 2 (default, compile)" PROPERTIES FIXTURES_REQUIRED test_transitive_import1)
+set_property(
+    TEST
+        "slang macro transitive import 2 (default, compile)"
+        "slang macro transitive import 2 (--no-eval-const-subexpr, compile)"
+        "slang macro transitive import 2 (default, run)"
+        "slang macro transitive import 2 (--no-eval-const-subexpr, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED test_transitive_import1
+)
 
 add_jit_compile_test("slang macro transitive import 2" TRUE test/macros/test_transitive_import2 --search-path test/macros)
-set_jit_test_properties("slang macro transitive import 2" PROPERTIES FIXTURES_REQUIRED test_transitive_import1)
+set_jit_test_properties("slang macro transitive import 2" APPEND PROPERTY FIXTURES_REQUIRED test_transitive_import1)
 
 add_compile_exec_test("slang macro struct" TRUE test/macros/test_struct)
-set_tests_properties("slang macro struct (default, compile)" PROPERTIES FIXTURES_REQUIRED needs_std)
+set_property(TEST "slang macro struct (default, compile)" APPEND PROPERTY FIXTURES_REQUIRED needs_std)
 
 add_jit_compile_test("slang macro struct" TRUE test/macros/test_struct)
-set_jit_test_properties("slang macro struct" PROPERTIES FIXTURES_REQUIRED needs_std)
+set_jit_test_properties("slang macro struct" APPEND PROPERTY FIXTURES_REQUIRED needs_std)
 
 # Phase 0a hygiene probes (2026-11-02): body-originated names must NOT capture
 # call-site bindings. Under correct hygiene each FAILS to compile (the body name
@@ -348,8 +382,8 @@ add_compile_fail_test("slang macros hygiene nested" TRUE test/macros/test_hygien
 add_compile_exec_test("slang math" TRUE test/test_math)
 add_jit_compile_test("slang math" TRUE test/test_math)
 
-add_compile_exec_test("slang expression without effect" FALSE test/test_expr_no_effect)
-add_jit_compile_test("slang expression without effect" FALSE test/test_expr_no_effect)
+add_compile_exec_test("slang expression without effect" TRUE test/test_expr_no_effect)
+add_jit_compile_test("slang expression without effect" TRUE test/test_expr_no_effect)
 
 add_compile_exec_test("slang operators" TRUE test/test_operators)
 add_jit_compile_test("slang operators" TRUE test/test_operators)
@@ -377,16 +411,26 @@ add_compile_test("slang example_package/hello" TRUE test/example_package/hello)
 set_tests_properties("slang example_package/hello (default, compile)" PROPERTIES FIXTURES_SETUP example_package_hello)
 
 add_compile_exec_test("slang test_import" TRUE test/test_import --search-path test)
-set_tests_properties(
-    "slang test_import (default, compile)"
-    "slang test_import (--no-eval-const-subexpr, compile)"
-    "slang test_import (default, run)"
-    "slang test_import (--no-eval-const-subexpr, run)"
-    PROPERTIES FIXTURES_REQUIRED example_package_hello
+set_property(
+    TEST
+        "slang test_import (default, compile)"
+        "slang test_import (--no-eval-const-subexpr, compile)"
+        "slang test_import (default, run)"
+        "slang test_import (--no-eval-const-subexpr, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED
+        example_package_hello
+        "slang const export (default, compile)"
+        "slang structs (default, compile)"
 )
 
 add_jit_compile_test("slang test_import" TRUE test/test_import --search-path test)
-set_jit_test_properties("slang test_import" PROPERTIES FIXTURES_REQUIRED example_package_hello)
+set_jit_test_properties("slang test_import" APPEND PROPERTY FIXTURES_REQUIRED example_package_hello)
+set_jit_test_properties(
+    "slang test_import"
+    APPEND PROPERTY FIXTURES_REQUIRED
+        "slang const export (default, compile)"
+        "slang structs (default, compile)"
+)
 
 #
 # GC interface test
@@ -395,17 +439,26 @@ set_jit_test_properties("slang test_import" PROPERTIES FIXTURES_REQUIRED example
 add_my_test("slang gc interface (default, compile)" ${CMAKE_BINARY_DIR}/slang compile test/test_gc_interface)
 add_my_test("slang gc interface (default, run)" ${CMAKE_BINARY_DIR}/slang run test/test_gc_interface)
 
+set_property(
+    TEST "slang gc interface (default, compile)"
+    APPEND PROPERTY FIXTURES_REQUIRED "needs_std;gc_module"
+)
+set_property(
+    TEST "slang gc interface (default, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED needs_std
+)
 set_tests_properties(
     "slang gc interface (default, compile)"
-    PROPERTIES FIXTURES_SETUP needs_gc
+    PROPERTIES FIXTURES_SETUP gc_interface
 )
-set_tests_properties(
-    "slang gc interface (default, run)"
-    PROPERTIES FIXTURES_REQUIRED needs_gc
+set_property(
+    TEST "slang gc interface (default, run)"
+    APPEND PROPERTY FIXTURES_REQUIRED gc_interface
 )
 
-add_jit_compile_test("slang gc interface" FALSE test/test_gc_interface)
-set_jit_test_properties("slang gc interface" PROPERTIES FIXTURES_REQUIRED needs_gc)
+add_jit_compile_test("slang gc interface" TRUE test/test_gc_interface)
+set_jit_test_properties("slang gc interface" APPEND PROPERTY FIXTURES_REQUIRED gc_module)
+set_jit_test_properties("slang gc interface" APPEND PROPERTY FIXTURES_REQUIRED gc_interface)
 
 #
 # Examples
@@ -427,7 +480,10 @@ add_compile_exec_test("slang examples/print_args" TRUE examples/print_args)
 add_jit_compile_test("slang examples/print_args" TRUE examples/print_args)
 
 add_my_test("slang examples/print_args -- Hello World" ${CMAKE_BINARY_DIR}/slang run examples/print_args -- Hello World)
-set_tests_properties("slang examples/print_args -- Hello World" PROPERTIES FIXTURES_REQUIRED needs_std)
+set_tests_properties(
+    "slang examples/print_args -- Hello World"
+    PROPERTIES FIXTURES_REQUIRED "slang examples/print_args (default, compile);needs_std"
+)
 
 if(JIT_SUPPORTED)
     add_my_test(
@@ -436,7 +492,7 @@ if(JIT_SUPPORTED)
     )
     set_tests_properties(
         "slang examples/print_args -- Hello World (JIT)"
-        PROPERTIES FIXTURES_REQUIRED needs_std
+        PROPERTIES FIXTURES_REQUIRED "slang examples/print_args (default, compile);needs_std"
     )
 endif()
 
@@ -444,7 +500,10 @@ add_compile_exec_test("slang examples/string_conversion" TRUE examples/string_co
 add_jit_compile_test("slang examples/string_conversion" TRUE examples/string_conversion)
 
 add_my_test("slang examples/string_conversion -- 3.141 a -1" ${CMAKE_BINARY_DIR}/slang run examples/string_conversion -- 3.141 a -1)
-set_tests_properties("slang examples/string_conversion -- 3.141 a -1" PROPERTIES FIXTURES_REQUIRED needs_std)
+set_tests_properties(
+    "slang examples/string_conversion -- 3.141 a -1"
+    PROPERTIES FIXTURES_REQUIRED "slang examples/string_conversion (default, compile);needs_std"
+)
 
 if(JIT_SUPPORTED)
     add_my_test(
@@ -453,7 +512,7 @@ if(JIT_SUPPORTED)
     )
     set_tests_properties(
         "slang examples/string_conversion -- 3.141 a -1 (JIT)"
-        PROPERTIES FIXTURES_REQUIRED needs_std
+        PROPERTIES FIXTURES_REQUIRED "slang examples/string_conversion (default, compile);needs_std"
     )
 endif()
 

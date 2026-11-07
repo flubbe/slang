@@ -4,7 +4,7 @@
  * Compiler output tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -40,6 +40,66 @@ namespace ty = slang::typing;
 
 namespace
 {
+
+void generate_nested_structs2_module()
+{
+    const std::string test_input =
+      "struct Data {\n"
+      " i: i32,\n"
+      " f: f32,\n"
+      " s: str,\n"
+      " next: Data"
+      "};"
+      "struct Container {\n"
+      " data: Data,\n"
+      " flags: i32\n"
+      "};\n"
+      "fn test() -> i32\n"
+      "{\n"
+      " let c: Container = Container{\n"
+      "  data: Data{i: -1, f: 3.14 as f32, s: \"Test\", next: null},\n"
+      "  flags: 4096\n"
+      " };\n"
+      " return c.data.i + (c.data.f as i32);\n"
+      "}\n";
+
+    slang::parser parser;
+    parser.parse(slang::lexer::lex(test_input));
+
+    std::shared_ptr<ast::expression> ast = parser.get_ast();
+
+    slang::file_manager mgr;
+    ld::context loader_ctx{mgr};
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+    slang::instruction_emitter emitter{
+      sema_env,
+      const_env,
+      macro_env,
+      type_ctx,
+      codegen_ctx};
+
+    ast->collect_names(co_ctx);
+    resolver_ctx.resolve_imports(loader_ctx);
+    ast->resolve_names(resolver_ctx);
+    ast->collect_attributes(sema_env);
+    ast->declare_types(type_ctx, sema_env);
+    ast->define_types(type_ctx);
+    ast->declare_functions(type_ctx, sema_env);
+    ast->type_check(type_ctx, sema_env);
+    ast->generate_code(codegen_ctx);
+    emitter.run();
+
+    slang::module_::language_module mod = emitter.to_module();
+    slang::file_write_archive write_ar("nested_structs2.cmod");
+    write_ar & mod;
+}
 
 TEST(output, native_binding)
 {
@@ -1938,69 +1998,13 @@ TEST(output, nested_structs)
         slang::file_write_archive write_ar("nested_structs.cmod");
         EXPECT_NO_THROW(write_ar & mod);
     }
-    {
-        const std::string test_input =
-          "struct Data {\n"
-          " i: i32,\n"
-          " f: f32,\n"
-          " s: str,\n"
-          " next: Data"
-          "};"
-          "struct Container {\n"
-          " data: Data,\n"
-          " flags: i32\n"
-          "};\n"
-          "fn test() -> i32\n"
-          "{\n"
-          " let c: Container = Container{\n"
-          "  data: Data{i: -1, f: 3.14 as f32, s: \"Test\", next: null},\n"
-          "  flags: 4096\n"
-          " };\n"
-          " return c.data.i + (c.data.f as i32);\n"
-          "}\n";
-
-        slang::parser parser;
-        parser.parse(slang::lexer::lex(test_input));
-
-        std::shared_ptr<ast::expression> ast = parser.get_ast();
-
-        slang::file_manager mgr;
-        ld::context loader_ctx{mgr};
-        sema::env sema_env;
-        const_::env const_env;
-        macro::env macro_env;
-        ty::context type_ctx;
-        tl::context lowering_ctx{type_ctx};
-        co::context co_ctx{sema_env};
-        rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
-        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-        slang::instruction_emitter emitter{
-          sema_env,
-          const_env,
-          macro_env,
-          type_ctx,
-          codegen_ctx};
-
-        ASSERT_NO_THROW(ast->collect_names(co_ctx));
-        ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
-        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
-        ASSERT_NO_THROW(ast->collect_attributes(sema_env));
-        ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
-        ASSERT_NO_THROW(ast->define_types(type_ctx));
-        ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
-        ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
-        ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
-        ASSERT_NO_THROW(emitter.run());
-
-        slang::module_::language_module mod = emitter.to_module();
-
-        slang::file_write_archive write_ar("nested_structs2.cmod");
-        EXPECT_NO_THROW(write_ar & mod);
-    }
+    ASSERT_NO_THROW(generate_nested_structs2_module());
 }
 
 TEST(output, type_imports)
 {
+    ASSERT_NO_THROW(generate_nested_structs2_module());
+
     {
         const std::string test_input =
           "import nested_structs2;\n"
@@ -2057,8 +2061,15 @@ TEST(output, type_imports)
 
 TEST(output, unused_module_imports)
 {
+    // generate unused import module.
+    {
+        slang::module_::language_module mod;
+        slang::file_write_archive write_ar{"unused_module.cmod"};
+        ASSERT_NO_THROW(write_ar & mod);
+    }
+
     const std::string test_input =
-      "import test_const_export;\n"
+      "import unused_module;\n"    // unused import
       "import test_macros;\n"
       "macro use_import! {\n"
       " () => {\n"
@@ -2076,6 +2087,7 @@ TEST(output, unused_module_imports)
     std::shared_ptr<ast::expression> ast = parser.get_ast();
 
     slang::file_manager mgr;
+    mgr.add_search_path(".");
     mgr.add_search_path("test");
     mgr.add_search_path("test/macros");
     mgr.add_search_path("lang");
