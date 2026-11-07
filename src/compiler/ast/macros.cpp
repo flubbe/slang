@@ -218,13 +218,11 @@ bool expression::expand_macros(
             macro_expr->expansion->visit_nodes(
               [&macro_expr, &co_ctx](expression& e) -> void
               {
-                  if(e.is_macro_invocation() || e.is_call_expression())
+                  if((e.is_macro_invocation() || e.is_call_expression())
+                     && e.get_id() != ast::node_identifier::namespace_access_expression
+                     && !e.get_namespace_path().has_value())
                   {
-                      if(e.get_id() != ast::node_identifier::namespace_access_expression
-                         && !e.get_namespace_path().has_value())
-                      {
-                          e.set_namespace(macro_expr->get_namespace());
-                      }
+                      e.set_namespace(macro_expr->get_namespace());
                   }
 
                   if(e.get_id() == ast::node_identifier::namespace_access_expression)
@@ -281,7 +279,9 @@ void expression::expand_late_macros(
     {
         // Recurse into children first
         for(auto* child: e.get_children())
+        {
             visit(*child);
+        }
 
         // The format! placeholder node (a format_macro_expression) is
         // created as the macro_invocation's expansion during the early
@@ -457,14 +457,18 @@ std::string macro_invocation::to_string() const
     {
         for(std::size_t i = 0; i < exprs.size() - 1; ++i)
         {
-            ret += std::format("{}, ", exprs[i]->to_string());
+            ret += std::format(
+              "{}, ",
+              exprs[i]->to_string());    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
         }
         ret += std::format("{}", exprs.back()->to_string());
     }
+
     if(expansion)
     {
         ret += std::format("), expansion=({}", expansion->to_string());
     }
+
     ret += "))";
     return ret;
 }
@@ -558,9 +562,8 @@ std::string macro_rule::to_string() const
     std::string ret = std::format("MacroBranch(args=(");
     if(!args.empty())
     {
-        for(std::size_t i = 0; i < args.size() - 1; ++i)
+        for(const auto& arg: args | std::views::take(args.size() - 1))
         {
-            const auto& arg = args[i];
             ret += std::format("(name={}, type={}), ", arg.first.s, arg.second.s);
         }
         ret += std::format("(name={}, type={})", args.back().first.s, args.back().second.s);
@@ -613,9 +616,9 @@ std::string macro_expression_list::to_string() const
     std::string ret = std::format("MacroExpressionList(expr_list=(");
     if(!expr_list.empty())
     {
-        for(std::size_t i = 0; i < expr_list.size() - 1; ++i)
+        for(const auto& expr: expr_list | std::views::take(expr_list.size() - 1))
         {
-            ret += std::format("{}, ", expr_list[i]->to_string());
+            ret += std::format("{}, ", expr->to_string());
         }
         ret += std::format("{}", expr_list.back()->to_string());
     }
@@ -759,9 +762,8 @@ std::string macro_expression::to_string() const
     std::string ret = std::format("Macro(name={}, branches=(", name.s);
     if(!branches.empty())
     {
-        for(std::size_t i = 0; i < branches.size() - 1; ++i)
+        for(const auto& branch: branches | std::views::take(branches.size() - 1))
         {
-            const auto& branch = branches[i];
             ret += std::format("{}, ", branch->to_string());
         }
         ret += std::format("{}", branches.back()->to_string());
@@ -817,9 +819,11 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
 
         // Convert branch args to descriptor params.
         for(const auto& [arg_name, type_name]: branch->args)
+        {
             descriptor.params.emplace_back(module_::macro_parameter{
               .name = arg_name.s,
               .fragment = module_::macro_fragment_kind::expression});
+        }
 
         if(!branch->get_body_tokens().has_value())
         {
