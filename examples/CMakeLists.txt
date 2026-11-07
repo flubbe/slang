@@ -25,12 +25,15 @@ add_executable(native_integration
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
+    ../src/shared/location.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
+    ../src/shared/token_stream.cpp
+    ../src/shared/token.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )
-target_link_libraries(native_integration slang_shared_core Microsoft.GSL::GSL)
+target_link_libraries(native_integration Microsoft.GSL::GSL)
 target_compile_options(native_integration PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
