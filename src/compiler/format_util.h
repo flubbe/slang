@@ -52,22 +52,23 @@ struct placeholder
  * @throws std::runtime_error on invalid format string.
  */
 std::vector<placeholder> parse_format_string(
-    const std::string& fmt,
-    source_location loc);
+  const std::string& fmt,
+  source_location loc);
 
 /**
  * Validate that an argument type satisfies a format specifier.
  *
- * @param arg_type The resolved argument type (as int).
+ * @param arg_type The resolved argument type.
  * @param specifier The placeholder specifier (d/f/s/nullopt).
  * @param ctx The type context for type comparison.
  * @param loc Source location for error reporting.
- * @throws std::runtime_error if the type does not satisfy the specifier.
+ * @throws std::runtime_error if the specifier is unsupported or the type does
+ *     not satisfy it.
  */
 void validate_arg_type(
-    int arg_type,
-    const std::optional<char>& specifier,
-    const typing::context& ctx,
-    source_location loc);
+  typing::type_id arg_type,
+  const std::optional<char>& specifier,
+  const typing::context& ctx,
+  source_location loc);
 
 }    // namespace slang::format_util

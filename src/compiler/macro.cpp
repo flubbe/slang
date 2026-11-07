@@ -12,7 +12,6 @@
 
 #include "compiler/macro.h"
 #include "compiler/parser.h"
-#include "sema.h"
 #include "syntax_context.h"
 
 namespace
@@ -117,54 +116,6 @@ branch_selection select_branch(
     return branch_selection{branch, ambiguous};
 }
 
-/**
- * Pass-through for format! macro arguments.
- *
- * The actual format string evaluation is deferred to
- * expand_late_macros, where type information is available.
- *
- * This simply concatenates the arguments as a comma-separated
- * expression list. The format_macro_expression::expand_late_macros
- * method will detect the format string and validate/evaluate it.
- */
-token_stream build_format_pass_through(
-  const std::vector<token_stream>& args,
-  [[maybe_unused]] slang::source_location call_loc,
-  [[maybe_unused]] slang::syntax_context_table& contexts,
-  [[maybe_unused]] const slang::typing::context* type_ctx)
-{
-    // Validate format string argument exists.
-    if(args.empty() || args[0].data().empty())
-    {
-        throw slang::macro::macro_error{
-          "Macro 'format!': No format string provided."};
-    }
-
-    // Build a comma-separated expression list of all arguments.
-    std::vector<slang::token> body;
-    body.reserve(256);
-
-    auto add = [&](const slang::token_stream& ts)
-    {
-        for(const auto& t: ts.data())
-        {
-            body.push_back(t);
-        }
-    };
-
-    // Format string (first argument).
-    add(args[0]);
-
-    // Remaining arguments.
-    for(std::size_t i = 1; i < args.size(); ++i)
-    {
-        body.emplace_back(slang::token{",", call_loc, slang::token_type::delimiter});
-        add(args[i]);
-    }
-
-    return slang::token_stream{std::move(body)};
-}
-
 }    // namespace
 
 namespace slang::macro
@@ -200,8 +151,7 @@ token_stream macro::expand_macro(
   const std::vector<token_stream>& args,
   syntax_context_id call_site,
   syntax_context_table& contexts,
-  source_location call_loc,
-  const typing::context* type_ctx) const
+  source_location call_loc) const
 {
     // Don't expand empty macros.
     if(desc.branches.empty())
@@ -281,15 +231,6 @@ token_stream macro::expand_macro(
 
     token_stream result;
 
-    // Special case: format! builtin. Detect the placeholder body and
-    // produce a std::format_runtime() call instead of walking the body.
-    if(branch->body.has_value()
-       && !branch->body.value().data().empty()
-       && branch->body.value().data()[0].s == "__format_builtin__")
-    {
-        return build_format_pass_through(args, call_loc, contexts, type_ctx);
-    }
-
     /*
      * Fresh expansion context.
      *
@@ -332,14 +273,14 @@ token_stream macro::expand_macro(
                     {
                         // Variadic parameter: splice all remaining args.
                         std::vector<token> variadic_tokens;
-                        for (std::size_t j = i; j < args.size(); ++j)
+                        for(std::size_t j = i; j < args.size(); ++j)
                         {
-                            if (j > i)
+                            if(j > i)
                             {
                                 variadic_tokens.emplace_back(
                                   ",", call_loc, token_type::delimiter);
                             }
-                            for (const auto& t : args[j].data())
+                            for(const auto& t: args[j].data())
                             {
                                 token copy = t;
                                 copy.context = call_site;
@@ -424,12 +365,12 @@ void env::add_macro(
   syntax_context_id definition_context)
 {
     auto it = std::ranges::find_if(
-         macros,
-         [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
-         {
-             return m->get_name() == name
-                    && m->get_import_path() == import_path;
-         });
+      macros,
+      [&name, &import_path](const std::unique_ptr<macro>& m) -> bool
+      {
+          return m->get_name() == name
+                 && m->get_import_path() == import_path;
+      });
 
     // Idempotent: replace existing macro rather than throwing.
     // This supports format! migration where collect_macro() may

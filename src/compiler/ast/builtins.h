@@ -4,7 +4,7 @@
  * abstract syntax tree (built-ins).
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -25,107 +25,14 @@ struct macro_descriptor;
 namespace slang::ast
 {
 
-/** Format string placeholder. */
-struct format_string_placeholder
-{
-    /** Starting offset into the string. */
-    std::size_t start{0};
-
-    /** One past the ending offset into the string. */
-    std::size_t end{0};
-
-    /** Specifier: `{`, `}`, `d` (i32/i64), `f` (f32/f64) or `s` (str). */
-    std::optional<std::uint8_t> specifier{std::nullopt};
-
-    /** Argument type. */
-    std::optional<ty::type_id> arg_type{std::nullopt};
-};
-
-/** Expansion helper for format macro. */
-class format_macro_expander
-{
-    /** Location of the macro invocation. */
-    source_location loc;
-
-    /** Expressions the macro operates on. */
-    const std::vector<std::unique_ptr<ast::expression>>& exprs;
-
-    /** Format string. */
-    const token& format_string;
-
-    /** Format specifiers/placeholders. */
-    std::vector<format_string_placeholder> placeholders;
-
-    /**
-     * Check and return the token holding the format string.
-     *
-     * @throws Throws a `codegen_error` if validation failed.
-     * @returns Returns the token holding the format string.
-     */
-    const token& get_format_token();
-
-public:
-    /**
-     * Create the format string placeholders.
-     *
-     * @throws Throws a `codegen_error` when an invalid or unsupported
-     *         format specifier was found.
-     */
-    void create_format_string_placeholders();
-
-public:
-    /** Deleted constructors. */
-    format_macro_expander() = delete;
-    format_macro_expander(const format_macro_expander&) = delete;
-    format_macro_expander(format_macro_expander&&) = delete;
-
-    /** Default destructor. */
-    ~format_macro_expander() = default;
-
-    /** Deleted assignments. */
-    format_macro_expander& operator=(const format_macro_expander&) = delete;
-    format_macro_expander& operator=(format_macro_expander&&) = delete;
-
-    /**
-     * Constructor.
-     *
-     * @param desc Descriptor for the `format!` macro.
-     * @param loc Location of the macro invocation.
-     * @param exprs Expressions the macro operates on.
-     */
-    format_macro_expander(
-      source_location loc,
-      const std::vector<std::unique_ptr<ast::expression>>& exprs)
-    : loc{loc}
-    , exprs{exprs}
-    , format_string{get_format_token()}
-    {
-        create_format_string_placeholders();
-    }
-
-    /** Return the token containing the format string. */
-    [[nodiscard]]
-    const token& get_format_string() const
-    {
-        return format_string;
-    }
-
-    /** Return the format specifiers/placeholders. */
-    [[nodiscard]]
-    const std::vector<format_string_placeholder>& get_placeholders() const
-    {
-        return placeholders;
-    }
-};
-
-/** Format macro AST for code generation. */
+/** Format macro AST placeholder for late expansion. */
 class format_macro_expression : public expression
 {
     /** The argument expressions. */
     std::vector<std::unique_ptr<expression>> exprs;
 
-    /** Format specifiers/placeholders. Set during type checking. */
-    std::vector<format_string_placeholder> placeholders;
+    /** Raw token streams for the macro arguments (fed to the token-stream builder). */
+    std::vector<token_stream> arg_tokens;
 
 public:
     /** Expansion. */
@@ -143,18 +50,21 @@ public:
     format_macro_expression& operator=(format_macro_expression&&) = delete;
 
     /** Default destructor. */
-    ~format_macro_expression() = default;
+    ~format_macro_expression() override = default;
 
     /**
      * Construct a format! macro expression.
      *
      * @param loc The location.
      * @param exprs The argument expressions.
+     * @param arg_tokens Raw token streams for the macro arguments.
      */
     format_macro_expression(
       source_location loc,
-      const std::vector<std::unique_ptr<expression>>& exprs)
+      const std::vector<std::unique_ptr<expression>>& exprs,
+      std::vector<token_stream> arg_tokens = {})
     : expression{loc}
+    , arg_tokens{std::move(arg_tokens)}
     {
         this->exprs =
           exprs
@@ -164,6 +74,12 @@ public:
                 return e->clone();
             })
           | std::ranges::to<std::vector>();
+    }
+
+    [[nodiscard]]
+    const std::vector<token_stream>& get_argument_tokens() const
+    {
+        return arg_tokens;
     }
 
     [[nodiscard]]

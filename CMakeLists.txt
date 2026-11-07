@@ -80,6 +80,8 @@ set(SOURCES
     src/compiler/loader.cpp
     src/compiler/lowering.cpp
     src/compiler/macro.cpp
+    src/compiler/macro_format.cpp
+    src/compiler/format_util.cpp
     src/compiler/parser.cpp
     src/compiler/resolve.cpp
     src/compiler/sema.cpp

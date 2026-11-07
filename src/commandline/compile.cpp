@@ -4,7 +4,7 @@
  * `compile` command implementation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -251,7 +251,15 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->bind_constant_declarations(sema_env, const_env);
     ast->type_check(type_ctx, sema_env);
     ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
-    ast->expand_late_macros(co_ctx, resolver_ctx, type_ctx, sema_env);
+    ast->expand_late_macros(
+      co_ctx,
+      resolver_ctx,
+      type_ctx,
+      sema_env,
+      &codegen_ctx,
+      &macro_env,
+      &sema_env.syntax_contexts,
+      module_macro_asts);
     ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
 
     // code generation and verification.

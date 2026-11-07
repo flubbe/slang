@@ -196,11 +196,11 @@ void context::import_macro(
      * environment. Remap the exported macro's definition syntax context
      * into the importing environment, preserving its ancestry.
      */
-    const auto exported_definition_context =
-      static_cast<syntax_context_id>(
-        std::get<module_::macro_descriptor>(symbol.desc)
-          .branches.front()
-          .definition_context);
+    const auto exported_definition_context = desc.branches.empty()
+                                               ? root_syntax_context
+                                               : static_cast<syntax_context_id>(
+                                                   desc.branches.front()
+                                                     .definition_context);
     const auto definition_context =
       sema_env.syntax_contexts.remap(exported_definition_context);
 

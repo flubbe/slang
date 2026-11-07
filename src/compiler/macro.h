@@ -10,19 +10,14 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 #include "shared/module.h"
 #include "shared/token_stream.h"
 #include "syntax_context.h"
-
-namespace slang::typing
-{
-class context;
-}    // namespace slang::typing
 
 namespace slang::macro
 {
@@ -157,16 +152,13 @@ public:
      *     substituted argument tokens).
      * @param contexts Syntax context table for allocating expansion contexts.
      * @param call_loc Source location for generated tokens (e.g. builtin calls).
-     * @param type_ctx Optional type context for type-aware expansion (e.g. format!
-     *     type validation).
      * @return A token_stream representing the expanded macro body.
      */
     token_stream expand_macro(
       const std::vector<token_stream>& args,
       syntax_context_id call_site,
       syntax_context_table& contexts,
-      source_location call_loc,
-      const typing::context* type_ctx = nullptr) const;
+      source_location call_loc) const;
 };
 
 /** Macro collection / expansion environment. */

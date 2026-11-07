@@ -65,7 +65,7 @@ bool expression::expand_macros(
         }
 
         if(!descriptor_macro->supports_token_expansion(
-              expr->get_argument_tokens()))
+             expr->get_argument_tokens()))
         {
             return false;
         }
@@ -75,8 +75,7 @@ bool expression::expand_macros(
               expr->get_argument_tokens(),
               expr->get_name_token().context,
               syntax_contexts,
-              expr->get_location(),
-              &rs_ctx.get_type_ctx());
+              expr->get_location());
             expr->set_expansion(
               parser::parse_expression(std::move(expanded_tokens)));
             return true;
@@ -132,7 +131,8 @@ bool expression::expand_macros(
             macro_expr->set_expansion(
               std::make_unique<format_macro_expression>(
                 macro_expr->get_location(),
-                macro_expr->get_exprs()));
+                macro_expr->get_exprs(),
+                macro_expr->get_argument_tokens()));
 
             if(!macro_expr->scope_id.has_value())
             {
@@ -323,14 +323,18 @@ void expression::expand_late_macros(
   co::context& co_ctx,
   rs::context& rs_ctx,
   ty::context& type_ctx,
-  sema::env& env)
+  sema::env& env,
+  cg::context* codegen_ctx,
+  macro::env* macro_env,
+  syntax_context_table* syntax_contexts,
+  const std::vector<expression*>& macro_asts)
 {
     // Post-order traversal that fills in format! string-building
     // expansions in place.
     std::function<void(expression&)> visit = [&](expression& e)
     {
         // Recurse into children first
-        for (auto* child : e.get_children())
+        for(auto* child: e.get_children())
             visit(*child);
 
         // The format! placeholder node (a format_macro_expression) is
@@ -349,10 +353,31 @@ void expression::expand_late_macros(
                   "Macro 'format!' has no scope.");
             }
 
+            // Collect names first so newly parsed nodes receive scope_id.
             co_ctx.push_scope(macro_expr->scope_id.value());
             macro_expr->collect_names(co_ctx);
             co_ctx.pop_scope();
             macro_expr->resolve_names(rs_ctx);
+
+            // Expand any macro invocations produced by the expansion (e.g. format args that were macros).
+            if(codegen_ctx && macro_env && syntax_contexts && macro_expr->expansion)
+            {
+                while(macro_expr->expansion->expand_macros(
+                  co_ctx,
+                  rs_ctx,
+                  *codegen_ctx,
+                  *macro_env,
+                  *syntax_contexts,
+                  macro_asts))
+                {
+                }
+
+                co_ctx.push_scope(macro_expr->scope_id.value());
+                macro_expr->collect_names(co_ctx);
+                co_ctx.pop_scope();
+                macro_expr->resolve_names(rs_ctx);
+            }
+
             (void)macro_expr->type_check(type_ctx, env);
         }
     };
@@ -836,8 +861,8 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
         // Convert branch args to descriptor params.
         for(const auto& [arg_name, type_name]: branch->args)
             descriptor.params.emplace_back(module_::macro_parameter{
-                .name = arg_name.s,
-                .fragment = module_::macro_fragment_kind::expression});
+              .name = arg_name.s,
+              .fragment = module_::macro_fragment_kind::expression});
 
         // A token body is supported for two shapes:
         //   - a single-expression body (exactly one trailing ';'), and
@@ -881,25 +906,6 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
         descriptor.definition_context = root_syntax_context;
 
         branch_descriptors.emplace_back(std::move(descriptor));
-    }
-
-    // Detect format! and inject a placeholder body for token-stream expansion.
-    if(name.s == "format!")
-    {
-        branch_descriptors.clear();
-        module_::macro_branch_descriptor format_branch;
-        format_branch.params = {{
-            {"format_str", module_::macro_fragment_kind::expression}
-        }};
-        format_branch.body_is_expression = true;
-        format_branch.args_end_with_list = true;
-        format_branch.capability = module_::macro_expansion_capability::token_stream;
-        format_branch.body = token_stream{std::vector<token>{
-            token{"__format_builtin__", loc, token_type::macro_identifier},
-            token{";", loc, token_type::delimiter}
-        }};
-        format_branch.definition_context = root_syntax_context;
-        branch_descriptors.emplace_back(std::move(format_branch));
     }
 
     // Create descriptor and attach branch metadata. Unsupported branches

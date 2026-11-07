@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -21,8 +21,8 @@
 #include "compiler/collect.h"
 #include "compiler/constant.h"
 #include "compiler/directive.h"
-#include "shared/token_stream.h"
 #include "compiler/typing.h"
+#include "shared/token_stream.h"
 #include "node_ids.h"
 #include "utils.h"
 
@@ -480,8 +480,8 @@ public:
       const std::vector<expression*>& macro_asts);
 
     /**
-     * Macro expansion (after type checking). Calls the corresponding
-     * function on the macro.
+     * Finish late macro expansion after type checking. Expands the built-in
+     * `format!` placeholder, then binds and type-checks its generated expression.
      *
      * @note Explicitly checks for the built-in `format!` macro, since this is
      *       the only macro using type information.
@@ -489,13 +489,26 @@ public:
      * @param co_ctx Name collection context.
      * @param rs_ctx Name resolution context.
      * @param type_ctx Type system context.
-     * @param sema_env The semantic environment.
+     * @param env The semantic environment.
+     * @param codegen_ctx Optional code generation context; together with
+     *     `macro_env` and `syntax_contexts`, enables expansion of macro
+     *     invocations produced by the format expansion.
+     * @param macro_env Optional macro collection / expansion environment,
+     *     used with `codegen_ctx` and `syntax_contexts`.
+     * @param syntax_contexts Optional syntax-context table used with
+     *     `codegen_ctx` and `macro_env`.
+     * @param macro_asts The module's macros as ASTs, used to expand generated
+     *     macro invocations when all three optional contexts are supplied.
      */
     void expand_late_macros(
       co::context& co_ctx,
       rs::context& rs_ctx,
       ty::context& type_ctx,
-      sema::env& env);
+      sema::env& env,
+      cg::context* codegen_ctx = nullptr,
+      macro::env* macro_env = nullptr,
+      syntax_context_table* syntax_contexts = nullptr,
+      const std::vector<expression*>& macro_asts = {});
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.

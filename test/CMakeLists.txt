@@ -34,10 +34,12 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
+    ../src/compiler/format_util.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/loader.cpp
     ../src/compiler/lowering.cpp
     ../src/compiler/macro.cpp
+    ../src/compiler/macro_format.cpp
     ../src/compiler/parser.cpp
     ../src/compiler/resolve.cpp
     ../src/compiler/sema.cpp
