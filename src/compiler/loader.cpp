@@ -16,13 +16,10 @@
 #include "codegen/codegen.h"
 #include "shared/type_utils.h"
 #include "loader.h"
-#include "macro.h"
-#include "typing.h"
 #include "package.h"
 #include "utils.h"
 
 namespace cg = slang::codegen;
-namespace ty = slang::typing;
 namespace si = slang::interpreter;
 
 namespace slang::loader
@@ -107,15 +104,6 @@ std::string context::resolve_name(const std::string& name) const
     file_mgr.resolve(fs_path);
 
     return name;
-}
-
-bool context::resolve_macros(
-  [[maybe_unused]] co::context& co_ctx,
-  [[maybe_unused]] macro::env& env)
-{
-    // TODO(macro-migration): Remove this placeholder once imported
-    // token descriptors can perform namespace resolution directly.
-    return false;
 }
 
 }    // namespace slang::loader

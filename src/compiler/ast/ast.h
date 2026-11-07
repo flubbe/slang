@@ -464,10 +464,6 @@ public:
      * @param codegen_ctx Code generation context.
      * @param macro_env Macro collection / expansion environment.
      * @param syntax_contexts Syntax-context table for macro expansion.
-     * @param macro_asts The module's macros as AST's.
-     *
-     * TODO(macro-migration): Remove this parameter when local descriptor
-     * lookup replaces the legacy AST expansion path.
      *
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
@@ -476,8 +472,7 @@ public:
       rs::context& rs_ctx,
       cg::context& codegen_ctx,
       macro::env& macro_env,
-      syntax_context_table& syntax_contexts,
-      const std::vector<expression*>& macro_asts);
+      syntax_context_table& syntax_contexts);
 
     /**
      * Finish late macro expansion after type checking. Expands the built-in
@@ -497,8 +492,6 @@ public:
      *     used with `codegen_ctx` and `syntax_contexts`.
      * @param syntax_contexts Optional syntax-context table used with
      *     `codegen_ctx` and `macro_env`.
-     * @param macro_asts The module's macros as ASTs, used to expand generated
-     *     macro invocations when all three optional contexts are supplied.
      */
     void expand_late_macros(
       co::context& co_ctx,
@@ -507,8 +500,7 @@ public:
       sema::env& env,
       cg::context* codegen_ctx = nullptr,
       macro::env* macro_env = nullptr,
-      syntax_context_table* syntax_contexts = nullptr,
-      const std::vector<expression*>& macro_asts = {});
+      syntax_context_table* syntax_contexts = nullptr);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -4080,20 +4072,18 @@ class macro_branch : public expression
     std::optional<token> argument_opening_delimiter;
     std::optional<token> argument_closing_delimiter;
 
-    /**
-     * Legacy parsed body.
-     *
-     * TODO(macro-migration): Remove this AST body once macro descriptors
-     * contain the complete validated token body.
-     */
-    std::unique_ptr<block> body;
-
     /** Raw body tokens, excluding the outer braces. */
     std::optional<token_stream> body_tokens;
 
     /** Delimiters surrounding the raw body tokens. */
     std::optional<token> body_opening_delimiter;
     std::optional<token> body_closing_delimiter;
+
+    /**
+     * Temporary parse tree used by normal semantic passes to validate every
+     * macro definition, including macros that are never expanded.
+     */
+    std::unique_ptr<block> validation_body;
 
 public:
     using super = expression;
@@ -4107,10 +4097,12 @@ public:
     , argument_separators{other.argument_separators}
     , argument_opening_delimiter{other.argument_opening_delimiter}
     , argument_closing_delimiter{other.argument_closing_delimiter}
-    , body{static_cast<block*>(other.body->clone().release())}
     , body_tokens{other.body_tokens}
     , body_opening_delimiter{other.body_opening_delimiter}
     , body_closing_delimiter{other.body_closing_delimiter}
+    , validation_body{other.validation_body
+                        ? static_cast<block*>(other.validation_body->clone().release())
+                        : nullptr}
     {
     }
     macro_branch(macro_branch&&) = default;
@@ -4125,13 +4117,11 @@ public:
      * @param loc The branch location.
      * @param args Macro arguments.
      * @param args_end_with_list Whether the arguments end with a list.
-     * @param body Legacy parsed branch body.
      */
     macro_branch(
       source_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
-      std::unique_ptr<block> body,
       std::vector<token> argument_separators = {},
       std::optional<token> argument_opening_delimiter = std::nullopt,
       std::optional<token> argument_closing_delimiter = std::nullopt,
@@ -4144,7 +4134,6 @@ public:
     , argument_separators{std::move(argument_separators)}
     , argument_opening_delimiter{std::move(argument_opening_delimiter)}
     , argument_closing_delimiter{std::move(argument_closing_delimiter)}
-    , body{std::move(body)}
     , body_tokens{std::move(body_tokens)}
     , body_opening_delimiter{std::move(body_opening_delimiter)}
     , body_closing_delimiter{std::move(body_closing_delimiter)}
@@ -4194,16 +4183,15 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        // TODO(macro-migration): Remove AST-body traversal with the legacy
-        // macro branch representation.
-        return {body.get()};
+        return validation_body ? std::vector<expression*>{validation_body.get()}
+                               : std::vector<expression*>{};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        // TODO(macro-migration): Remove AST-body traversal with the legacy
-        // macro branch representation.
-        return {body.get()};
+        return validation_body
+                 ? std::vector<const expression*>{validation_body.get()}
+                 : std::vector<const expression*>{};
     }
 
     /** Get the macro branch arguments. */
@@ -4239,13 +4227,6 @@ public:
     const std::optional<token>& get_argument_closing_delimiter() const
     {
         return argument_closing_delimiter;
-    }
-
-    /** Get the macro branch body. */
-    [[nodiscard]]
-    const std::unique_ptr<block>& get_body() const
-    {
-        return body;
     }
 
     /** Get the raw body tokens, excluding the outer braces. */
@@ -4470,17 +4451,6 @@ public:
     void collect_macro(
       sema::env& sema_env,
       macro::env& macro_env) const;
-
-    /**
-     * Expand the macro given a macro invocation.
-     *
-     * @param ctx The code generation context.
-     * @param invocation The macro invocation expression/context.
-     * @return The macro expansion AST for the invocation.
-     */
-    std::unique_ptr<expression> expand(
-      cg::context& ctx,
-      const macro_invocation& invocation) const;
 };
 
 /** AST of a translation unit. */

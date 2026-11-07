@@ -119,16 +119,16 @@ public:
     }
 
     /**
-     * Return whether the selected branch is supported by token expansion.
+     * Return whether a branch matches and can be expanded from these tokens.
      *
-     * TODO(macro-migration): Remove this dispatch gate when all macro shapes
-     * use token expansion; branch matching should then be authoritative.
-     *
+     * @note Nested macro invocations in arguments must be expanded first.
      * @param args Token streams for the macro arguments.
+     * @param separators Separators between macro arguments.
      */
     [[nodiscard]]
     bool supports_token_expansion(
-      const std::vector<token_stream>& args) const;
+      const std::vector<token_stream>& args,
+      const std::vector<token>& separators = {}) const;
 
     /** Set transitivity. */
     void set_transitive(bool transitive)
@@ -152,13 +152,15 @@ public:
      *     substituted argument tokens).
      * @param contexts Syntax context table for allocating expansion contexts.
      * @param call_loc Source location for generated tokens (e.g. builtin calls).
+     * @param separators Separators between macro arguments.
      * @return A token_stream representing the expanded macro body.
      */
     token_stream expand_macro(
       const std::vector<token_stream>& args,
       syntax_context_id call_site,
       syntax_context_table& contexts,
-      source_location call_loc) const;
+      source_location call_loc,
+      const std::vector<token>& separators = {}) const;
 };
 
 /** Macro collection / expansion environment. */

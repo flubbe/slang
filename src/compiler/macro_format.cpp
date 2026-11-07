@@ -70,7 +70,7 @@ std::vector<token>
  * Append `item` to a growing left‑nested `std::string_concat(...)` chain.
  *
  * If `result` is empty it becomes the item; otherwise it is wrapped as
- * `std::string_concat(result, item)`, mirroring the legacy AST builder.
+ * `std::string_concat(result, item)`.
  */
 void append_concat_item(
   std::vector<token>& result,

@@ -1830,6 +1830,20 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
         {
             argument_separators.emplace_back(*current_token);
             get_next_token();
+            if(current_token->s == ")")
+            {
+                throw syntax_error(
+                  *current_token,
+                  "Expected <macro-identifier> after ','.");
+            }
+        }
+        else if(current_token->s != ")")
+        {
+            throw syntax_error(
+              *current_token,
+              std::format(
+                "Expected ',' or ')', got '{}'.",
+                current_token->s));
         }
     }
 
@@ -1849,26 +1863,36 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
     get_next_token();    // skip "=>".
 
     const token body_opening_delimiter = *current_token;
+    if(body_opening_delimiter.s != "{")
+    {
+        throw syntax_error(
+          body_opening_delimiter,
+          std::format(
+            "Expected '{{', got '{}'.",
+            body_opening_delimiter.s));
+    }
+
     const std::size_t body_opening_index = token_index - 1;
     std::optional<token_stream> body_tokens;
     std::optional<token> body_closing_delimiter;
 
-    if(const auto body_closing_index = find_matching_delimiter(
-         body_opening_index,
-         "{",
-         "}");
-       body_closing_index.has_value())
+    const auto body_closing_index = find_matching_delimiter(
+      body_opening_index,
+      "{",
+      "}");
+    if(!body_closing_index.has_value())
     {
-        body_tokens = copy_token_range(
-          body_opening_index + 1,
-          body_closing_index.value());
-        body_closing_delimiter = (*tokens)[body_closing_index.value()];
+        throw syntax_error(
+          body_opening_delimiter,
+          "Expected '}' to close macro branch body.");
     }
 
-    // TODO(macro-migration): Replace this legacy AST-body parse with token
-    // body validation once macro descriptors are authoritative. The raw body
-    // capture above is part of the token-stream path and must remain.
-    auto block = parse_block();
+    body_tokens = copy_token_range(
+      body_opening_index + 1,
+      body_closing_index.value());
+    body_closing_delimiter = (*tokens)[body_closing_index.value()];
+    token_index = body_closing_index.value() + 1;
+    get_next_token();
 
     if(current_token->s != ";")
     {
@@ -1884,7 +1908,6 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
       location,
       std::move(args),
       args_end_with_list,
-      std::move(block),
       std::move(argument_separators),
       argument_opening_delimiter,
       argument_closing_delimiter,
@@ -1931,7 +1954,6 @@ void parser::parse(
 {
     this->tokens = std::move(tokens);
     token_index = 0;
-    macro_asts.clear();
     directive_stack.clear();
 
     auto start_location = this->tokens->empty()
@@ -1949,12 +1971,6 @@ void parser::parse(
         }
 
         exprs.emplace_back(parse_top_level_statement());
-
-        // Add macros.
-        if(exprs.back()->is_macro_expression())
-        {
-            macro_asts.emplace_back(exprs.back().get());
-        }
     }
 
     ast = std::make_unique<ast::translation_unit>(

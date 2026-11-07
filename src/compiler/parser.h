@@ -99,14 +99,6 @@ protected:
         std::function<void(void)>>>
       directive_stack{};
 
-    /**
-     * Macro AST's. Point into the parsed AST.
-     *
-     * TODO(macro-migration): Remove this legacy expansion lookup once local
-     * macro descriptors are authoritative.
-     */
-    std::vector<ast::expression*> macro_asts{};
-
     /** Find the closing delimiter matching a source-stream delimiter. */
     std::optional<std::size_t> find_matching_delimiter(
       std::size_t opening_index,
@@ -329,12 +321,7 @@ protected:
       ast::macro_expression>
       parse_macro();
 
-    /**
-     * Parse a macro branch.
-     *
-     * TODO(macro-migration): Keep the token-capture logic, but remove the
-     * AST-body construction once macro descriptors are authoritative.
-     */
+    /** Parse a macro branch and capture its token-pattern metadata. */
     std::unique_ptr<
       ast::macro_branch>
       parse_macro_branch();
@@ -384,13 +371,6 @@ public:
       get_ast() const
     {
         return ast;
-    }
-
-    /** Get the macros (pointers into the AST). */
-    auto& get_macro_asts(
-      this auto&& self)
-    {
-        return self.macro_asts;
     }
 
     /**

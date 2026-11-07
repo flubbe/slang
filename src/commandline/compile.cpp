@@ -199,8 +199,6 @@ void compile::invoke(const std::vector<std::string>& args)
         return;
     }
 
-    const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
-
     ld::context loader_ctx{file_mgr};
     sema::env sema_env;
     const_::env const_env;
@@ -232,17 +230,13 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->collect_macros(sema_env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
-        do    // NOLINT(cppcoreguidelines-avoid-do-while)
-        {
-            resolver_ctx.resolve_imports(loader_ctx);
-        } while(ld::context::resolve_macros(co_ctx, macro_env));
+        resolver_ctx.resolve_imports(loader_ctx);
     } while(ast->expand_macros(
       co_ctx,
       resolver_ctx,
       codegen_ctx,
       macro_env,
-      sema_env.syntax_contexts,
-      module_macro_asts));
+      sema_env.syntax_contexts));
 
     ast->resolve_names(resolver_ctx);
     ast->declare_types(type_ctx, sema_env);
@@ -258,8 +252,7 @@ void compile::invoke(const std::vector<std::string>& args)
       sema_env,
       &codegen_ctx,
       &macro_env,
-      &sema_env.syntax_contexts,
-      module_macro_asts);
+      &sema_env.syntax_contexts);
     ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
 
     // code generation and verification.

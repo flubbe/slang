@@ -1515,8 +1515,10 @@ TEST(parser, captures_macro_token_streams)
     slang::parser parser;
     ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
 
-    ASSERT_EQ(parser.get_macro_asts().size(), 1);
-    const auto* macro = parser.get_macro_asts().front()->as_macro_expression();
+    const auto declarations = parser.get_ast()->get_children();
+    ASSERT_EQ(declarations.size(), 2);
+    ASSERT_TRUE(declarations.front()->is_macro_expression());
+    const auto* macro = declarations.front()->as_macro_expression();
     ASSERT_EQ(macro->get_children().size(), 1);
 
     const auto* branch = macro->get_children().front()->as_macro_branch();

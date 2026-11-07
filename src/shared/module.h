@@ -821,30 +821,26 @@ inline archive& operator&(
     return ar;
 }
 
-/**
- * Expansion capability for a macro branch.
- *
- * TODO(macro-migration): Remove this enum once token expansion
- * is fully authoritative and the field is no longer serialized.
- */
-enum class macro_expansion_capability : std::uint8_t
+/** Shape of a macro branch's token body. */
+enum class macro_body_kind : std::uint8_t
 {
-    token_stream,
+    expression,
+    statement_list,
 };
 
-/** Serializer for macro expansion capabilities. */
+/** Serializer for macro body kinds. */
 inline archive& operator&(
   archive& ar,
-  macro_expansion_capability& capability)
+  macro_body_kind& kind)
 {
-    auto value = std::to_underlying(capability);
+    auto value = std::to_underlying(kind);
     ar & value;
-    if(value > std::to_underlying(macro_expansion_capability::token_stream))
+    if(value > std::to_underlying(macro_body_kind::statement_list))
     {
         throw serialization_error{
-          "Invalid macro expansion capability."};
+          "Invalid macro body kind."};
     }
-    capability = static_cast<macro_expansion_capability>(value);
+    kind = static_cast<macro_body_kind>(value);
     return ar;
 }
 
@@ -868,6 +864,26 @@ inline archive& operator&(
     return ar;
 }
 
+/** Token body and parse shape for one macro branch. */
+struct macro_body_descriptor
+{
+    /** Body tokens, excluding the surrounding braces. */
+    token_stream tokens;
+
+    /** Whether expansion should parse the tokens as an expression or block. */
+    macro_body_kind kind{macro_body_kind::statement_list};
+};
+
+/** Serialize a macro body descriptor. */
+inline archive& operator&(
+  archive& ar,
+  macro_body_descriptor& body)
+{
+    ar & body.tokens;
+    ar & body.kind;
+    return ar;
+}
+
 /** Descriptor for one macro branch. */
 struct macro_branch_descriptor
 {
@@ -880,24 +896,8 @@ struct macro_branch_descriptor
     /** Separators in the branch's capture pattern. */
     std::vector<token> separators;
 
-    /** Token-stream body, when available. */
-    std::optional<token_stream> body;
-
-    /**
-     * Temporary migration gate for this branch.
-     *
-     * TODO(macro-migration): Remove once all branch shapes use token
-     * expansion and the gate is fully authoritative.
-     */
-    macro_expansion_capability capability{macro_expansion_capability::token_stream};
-
-    /**
-     * Temporary gate for the initial expression-body subset.
-     *
-     * TODO(macro-migration): Replace with the complete token-body
-     * representation, then remove this field.
-     */
-    bool body_is_expression{false};
+    /** Token body and its expansion shape. */
+    macro_body_descriptor body;
 
     /**
      * Definition-site syntax context ID from the exporting module.
@@ -917,8 +917,6 @@ inline archive& operator&(
     ar & branch.args_end_with_list;
     ar & branch.separators;
     ar & branch.body;
-    ar & branch.capability;
-    ar & branch.body_is_expression;
     ar & branch.definition_context;
     return ar;
 }
@@ -937,9 +935,7 @@ struct macro_descriptor
 };
 
 /**
- * Serialize a macro descriptor using an explicit descriptor format version.
- *
- * Version one contains directives and branch token-stream descriptors.
+ * Serialize a macro descriptor using the supplied module format version.
  */
 inline archive& serialize_macro_descriptor(
   archive& ar,

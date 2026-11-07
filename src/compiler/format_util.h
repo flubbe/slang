@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "shared/token.h"
+#include "type.h"
 
 namespace slang::typing
 {

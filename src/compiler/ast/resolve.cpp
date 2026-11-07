@@ -473,7 +473,10 @@ void while_statement::resolve_names(rs::context& ctx)
 
 void macro_branch::resolve_names(rs::context& ctx)
 {
-    body->resolve_names(ctx);
+    if(validation_body)
+    {
+        validation_body->resolve_names(ctx);
+    }
 }
 
 /*
@@ -493,9 +496,9 @@ void macro_expression::resolve_names(rs::context& ctx)
 {
     std::ranges::for_each(
       branches,
-      [&ctx](std::unique_ptr<macro_branch>& b)
+      [&ctx](std::unique_ptr<macro_branch>& branch)
       {
-          b->resolve_names(ctx);
+          branch->resolve_names(ctx);
       });
 }
 

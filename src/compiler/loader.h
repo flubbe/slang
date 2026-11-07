@@ -12,30 +12,13 @@
 
 #include <stdexcept>
 
-#include "compiler/collect.h"
 #include "shared/module.h"
 #include "shared/token.h"
 #include "filemanager.h"
 #include "module_resolver.h"
 
-/*
- * Forward declarations.
- */
-namespace slang::typing
-{
-class context;
-}    // namespace slang::typing
-
-namespace slang::macro
-{
-struct env;
-}    // namespace slang::macro
-
 namespace slang::loader
 {
-
-namespace co = slang::collect;
-namespace ty = slang::typing;
 
 /**
  * Generate an import name.
@@ -135,20 +118,6 @@ public:
      * @returns Returns the resolved name.
      */
     std::string resolve_name(const std::string& name) const;
-
-    /**
-     * Resolve macros.
-     *
-     * @note Macro resolution might lead to additional imports being needed. That is,
-     *       if the function returns `true`, import resolution needs to be run.
-     *
-     * @param co_ctx Collection context.
-     * @param env Macro collection / expansion environment.
-     * @returns `true` if macros were resolved, and `false` otherwise.
-     */
-    static bool resolve_macros(
-      co::context& co_ctx,
-      macro::env& env);
 };
 
 }    // namespace slang::loader

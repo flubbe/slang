@@ -9,6 +9,7 @@
  */
 
 #include <algorithm>
+#include <utility>
 
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -51,63 +52,108 @@ struct branch_selection
 };
 
 /**
- * Return whether a descriptor has a complete token-expansion body.
- *
- * Capability is deliberately checked together with the body metadata. This
- * keeps the token-expansion entry point from treating a partially populated
- * migration descriptor as a successful empty expansion.
+ * Check whether a branch's captured pattern metadata is internally consistent
+ * and matches the invocation's argument count and separators.
  */
-bool has_token_expansion_body(
-  const slang::module_::macro_branch_descriptor& branch)
+bool matches_branch_pattern(
+  const slang::module_::macro_branch_descriptor& branch,
+  const std::vector<token_stream>& args,
+  const std::vector<token>& separators)
 {
-    return branch.capability
-             == slang::module_::macro_expansion_capability::token_stream
-           && branch.body.has_value();
+    if(branch.args_end_with_list && branch.params.empty())
+    {
+        return false;
+    }
+
+    if(branch.params.empty())
+    {
+        if(!branch.separators.empty())
+        {
+            return false;
+        }
+    }
+    else if(branch.separators.size() != branch.params.size() - 1)
+    {
+        return false;
+    }
+
+    const std::size_t fixed_param_count =
+      branch.params.size() - static_cast<std::size_t>(branch.args_end_with_list);
+    if(separators.size() != (args.empty() ? 0 : args.size() - 1))
+    {
+        return false;
+    }
+
+    if(!branch.args_end_with_list && args.size() != branch.params.size())
+    {
+        return false;
+    }
+    if(branch.args_end_with_list && args.size() < fixed_param_count)
+    {
+        return false;
+    }
+
+    for(std::size_t i = 0; i < separators.size(); ++i)
+    {
+        if(branch.args_end_with_list && fixed_param_count == 0)
+        {
+            if(separators[i].s != ",")
+            {
+                return false;
+            }
+        }
+        else
+        {
+            const std::size_t pattern_index =
+              std::min(i, branch.separators.size() - 1);
+            const auto& expected = branch.separators[pattern_index];
+            // Token kinds can differ between parsed macro patterns and calls;
+            // the separator spelling is the syntax that determines a match.
+            if(separators[i].s != expected.s)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 /**
- * Select the best matching branch for a macro invocation.
- *
- * Priority: exact non-variadic (3) > exact variadic (2) > variadic with
- * additional arguments (1).  This ensures a single-arg call like sum!(1)
- * prefers the non-variadic branch over the variadic one.
- *
- * TODO(macro-migration): Replace this compatibility matcher with complete
- * token-pattern matching once all branch patterns are represented.
+ * Select the most specific matching branch. Fixed-arity branches take
+ * precedence over variadic branches; among variadic branches, the one with
+ * the longest fixed prefix takes precedence.
  */
 branch_selection select_branch(
   const std::vector<slang::module_::macro_branch_descriptor>& branches,
-  const std::vector<token_stream>& args)
+  const std::vector<token_stream>& args,
+  const std::vector<token>& separators)
 {
     const slang::module_::macro_branch_descriptor* branch{nullptr};
-    std::size_t best_score{0};
+    std::pair<bool, std::size_t> best_score{false, 0};
     bool ambiguous{false};
 
     for(const auto& candidate: branches)
     {
-        std::optional<std::size_t> score;
-        if(args.size() == candidate.params.size())
-        {
-            score = candidate.args_end_with_list ? 3 : 2;
-        }
-        else if(candidate.args_end_with_list
-                && args.size() >= candidate.params.size())
-        {
-            score = 1;
-        }
-
-        if(!score.has_value())
+        if(!matches_branch_pattern(candidate, args, separators))
         {
             continue;
         }
 
-        if(branch == nullptr || score.value() > best_score)
+        const std::size_t fixed_param_count =
+          candidate.params.size()
+          - static_cast<std::size_t>(candidate.args_end_with_list);
+        const auto score = std::pair{
+          !candidate.args_end_with_list,
+          fixed_param_count};
+
+        if(branch == nullptr || score > best_score)
         {
             branch = &candidate;
-            best_score = score.value();
+            best_score = score;
             ambiguous = false;
         }
-        else if(score.value() == best_score)
+        else if(score == best_score)
         {
             ambiguous = true;
         }
@@ -122,11 +168,11 @@ namespace slang::macro
 {
 
 bool macro::supports_token_expansion(
-  const std::vector<token_stream>& args) const
+  const std::vector<token_stream>& args,
+  const std::vector<token>& separators) const
 {
-    // A macro-local placeholder can only be resolved by the legacy AST
-    // expander at this stage. Keep this as an explicit capability gate rather
-    // than allowing a partial token expansion to reach the parser.
+    // Nested macro invocations must be expanded before their argument tokens
+    // can be substituted into this macro.
     for(const auto& arg: args)
     {
         if(std::ranges::any_of(
@@ -140,18 +186,17 @@ bool macro::supports_token_expansion(
         }
     }
 
-    const auto selection = select_branch(desc.branches, args);
+    const auto selection = select_branch(desc.branches, args, separators);
 
-    return selection.branch != nullptr
-           && !selection.ambiguous
-           && has_token_expansion_body(*selection.branch);
+    return selection.branch != nullptr && !selection.ambiguous;
 }
 
 token_stream macro::expand_macro(
   const std::vector<token_stream>& args,
   syntax_context_id call_site,
   syntax_context_table& contexts,
-  source_location call_loc) const
+  source_location call_loc,
+  const std::vector<token>& separators) const
 {
     // Don't expand empty macros.
     if(desc.branches.empty())
@@ -159,9 +204,9 @@ token_stream macro::expand_macro(
         return token_stream{};
     }
 
-    // Nested macro placeholders still require the legacy AST substitution
-    // path. Reject them here as well as in supports_token_expansion() so that
-    // direct callers cannot accidentally consume a partial token expansion.
+    // Reject unresolved nested macro invocations here as well as in
+    // supports_token_expansion() so direct callers cannot consume a partial
+    // expansion.
     for(const auto& arg: args)
     {
         if(std::ranges::any_of(
@@ -178,7 +223,7 @@ token_stream macro::expand_macro(
         }
     }
 
-    const auto selection = select_branch(desc.branches, args);
+    const auto selection = select_branch(desc.branches, args, separators);
     const auto* branch = selection.branch;
 
     if(branch == nullptr)
@@ -193,22 +238,6 @@ token_stream macro::expand_macro(
         throw macro_error{
           std::format(
             "Macro '{}' has ambiguous branches.",
-            name)};
-    }
-
-    if(!branch->body.has_value())
-    {
-        throw macro_error{
-          std::format(
-            "Macro '{}' branch has no token-expansion body.",
-            name)};
-    }
-
-    if(!has_token_expansion_body(*branch))
-    {
-        throw macro_error{
-          std::format(
-            "Macro '{}' branch is not supported by token expansion.",
             name)};
     }
 
@@ -240,7 +269,7 @@ token_stream macro::expand_macro(
     syntax_context_id expansion_ctx = contexts.allocate(definition_context);
 
     // Process each token.
-    for(const auto& tok: branch->body.value().data())
+    for(const auto& tok: branch->body.tokens.data())
     {
         // Check if token is an identifier that matches a macro parameter.
         bool replaced = false;
@@ -322,7 +351,7 @@ token_stream macro::expand_macro(
         }
     }
 
-    if(branch->body_is_expression
+    if(branch->body.kind == slang::module_::macro_body_kind::expression
        && !result.empty()
        && result.back().s == ";")
     {
@@ -342,7 +371,7 @@ token_stream macro::expand_macro(
     // its tail expression. The braces are syntactic and carry no context. This
     // is produced only on the token path, so block-as-value stays a
     // macro-expansion construct rather than a general language expression.
-    if(!branch->body_is_expression && branch->body.has_value())
+    if(branch->body.kind == slang::module_::macro_body_kind::statement_list)
     {
         std::vector<token> wrapped;
         wrapped.reserve(result.size() + 2);
@@ -372,10 +401,8 @@ void env::add_macro(
                  && m->get_import_path() == import_path;
       });
 
-    // Idempotent: replace existing macro rather than throwing.
-    // This supports format! migration where collect_macro() may
-    // produce an empty descriptor that gets replaced by the
-    // token-stream descriptor in the detection block.
+    // Repeated import-resolution passes may register the same macro again.
+    // Replace its descriptor rather than adding duplicate entries.
     if(it != macros.end())
     {
         (*it) = std::make_unique<macro>(
