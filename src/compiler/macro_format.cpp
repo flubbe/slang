@@ -59,7 +59,10 @@ std::vector<token>
     }
     else
     {
-        body.append_range(arg.data());
+        body.insert(
+          body.end(),
+          arg.data().begin(),
+          arg.data().end());
     }
 
     body.emplace_back(")", call_loc, token_type::delimiter);
