@@ -320,10 +320,10 @@ add_compile_fail_test("slang macros format fail 3" TRUE test/macros/test_format_
 add_compile_exec_test("slang macro import" TRUE test/macros/test_import --search-path test/macros)
 set_property(
     TEST
-        "slang macro import (default, compile)"
-        "slang macro import (--no-eval-const-subexpr, compile)"
-        "slang macro import (default, run)"
-        "slang macro import (--no-eval-const-subexpr, run)"
+    "slang macro import (default, compile)"
+    "slang macro import (--no-eval-const-subexpr, compile)"
+    "slang macro import (default, run)"
+    "slang macro import (--no-eval-const-subexpr, run)"
     APPEND PROPERTY FIXTURES_REQUIRED test_macros_module
 )
 set_property(
@@ -338,10 +338,10 @@ set_jit_test_properties("slang macro import" APPEND PROPERTY FIXTURES_REQUIRED t
 add_compile_exec_test("slang macro transitive import 1" TRUE test/macros/test_transitive_import1 --search-path test/macros)
 set_property(
     TEST
-        "slang macro transitive import 1 (default, compile)"
-        "slang macro transitive import 1 (--no-eval-const-subexpr, compile)"
-        "slang macro transitive import 1 (default, run)"
-        "slang macro transitive import 1 (--no-eval-const-subexpr, run)"
+    "slang macro transitive import 1 (default, compile)"
+    "slang macro transitive import 1 (--no-eval-const-subexpr, compile)"
+    "slang macro transitive import 1 (default, run)"
+    "slang macro transitive import 1 (--no-eval-const-subexpr, run)"
     APPEND PROPERTY FIXTURES_REQUIRED test_import
 )
 set_property(
@@ -355,10 +355,10 @@ set_jit_test_properties("slang macro transitive import 1" APPEND PROPERTY FIXTUR
 add_compile_exec_test("slang macro transitive import 2" TRUE test/macros/test_transitive_import2 --search-path test/macros)
 set_property(
     TEST
-        "slang macro transitive import 2 (default, compile)"
-        "slang macro transitive import 2 (--no-eval-const-subexpr, compile)"
-        "slang macro transitive import 2 (default, run)"
-        "slang macro transitive import 2 (--no-eval-const-subexpr, run)"
+    "slang macro transitive import 2 (default, compile)"
+    "slang macro transitive import 2 (--no-eval-const-subexpr, compile)"
+    "slang macro transitive import 2 (default, run)"
+    "slang macro transitive import 2 (--no-eval-const-subexpr, run)"
     APPEND PROPERTY FIXTURES_REQUIRED test_transitive_import1
 )
 
@@ -371,11 +371,6 @@ set_property(TEST "slang macro struct (default, compile)" APPEND PROPERTY FIXTUR
 add_jit_compile_test("slang macro struct" TRUE test/macros/test_struct)
 set_jit_test_properties("slang macro struct" APPEND PROPERTY FIXTURES_REQUIRED needs_std)
 
-# Phase 0a hygiene probes (2026-11-02): body-originated names must NOT capture
-# call-site bindings. Under correct hygiene each FAILS to compile (the body name
-# is undefined in the macro's definition context), so these are compile-fail
-# regression guards: ctest is green exactly while hygiene holds.
-# See .notes/format_macro_context.md, "Hygiene plan", Phase 0a.
 add_compile_fail_test("slang macros hygiene single" TRUE test/macros/test_hygiene_single)
 add_compile_fail_test("slang macros hygiene nested" TRUE test/macros/test_hygiene_nested)
 
@@ -413,14 +408,14 @@ set_tests_properties("slang example_package/hello (default, compile)" PROPERTIES
 add_compile_exec_test("slang test_import" TRUE test/test_import --search-path test)
 set_property(
     TEST
-        "slang test_import (default, compile)"
-        "slang test_import (--no-eval-const-subexpr, compile)"
-        "slang test_import (default, run)"
-        "slang test_import (--no-eval-const-subexpr, run)"
+    "slang test_import (default, compile)"
+    "slang test_import (--no-eval-const-subexpr, compile)"
+    "slang test_import (default, run)"
+    "slang test_import (--no-eval-const-subexpr, run)"
     APPEND PROPERTY FIXTURES_REQUIRED
-        example_package_hello
-        "slang const export (default, compile)"
-        "slang structs (default, compile)"
+    example_package_hello
+    "slang const export (default, compile)"
+    "slang structs (default, compile)"
 )
 
 add_jit_compile_test("slang test_import" TRUE test/test_import --search-path test)
@@ -428,8 +423,8 @@ set_jit_test_properties("slang test_import" APPEND PROPERTY FIXTURES_REQUIRED ex
 set_jit_test_properties(
     "slang test_import"
     APPEND PROPERTY FIXTURES_REQUIRED
-        "slang const export (default, compile)"
-        "slang structs (default, compile)"
+    "slang const export (default, compile)"
+    "slang structs (default, compile)"
 )
 
 #
