@@ -2055,6 +2055,66 @@ TEST(output, type_imports)
     }
 }
 
+TEST(output, unused_module_imports)
+{
+    const std::string test_input =
+      "import test_const_export;\n"
+      "import test_macros;\n"
+      "macro use_import! {\n"
+      " () => {\n"
+      "  test_macros::test_format();\n"
+      " };\n"
+      "}\n"
+      "fn test() -> i32\n"
+      "{\n"
+      " return 1;\n"
+      "}\n";
+
+    slang::parser parser;
+    parser.parse(slang::lexer::lex(test_input));
+
+    std::shared_ptr<ast::expression> ast = parser.get_ast();
+
+    slang::file_manager mgr;
+    mgr.add_search_path("test");
+    mgr.add_search_path("test/macros");
+    mgr.add_search_path("lang");
+
+    ld::context loader_ctx{mgr};
+    sema::env sema_env;
+    const_::env const_env;
+    macro::env macro_env;
+    ty::context type_ctx;
+    tl::context lowering_ctx{type_ctx};
+    co::context co_ctx{sema_env};
+    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
+    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+    slang::instruction_emitter emitter{
+      sema_env,
+      const_env,
+      macro_env,
+      type_ctx,
+      codegen_ctx};
+
+    ASSERT_NO_THROW(ast->collect_names(co_ctx));
+    ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
+    ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+    ASSERT_NO_THROW(ast->collect_attributes(sema_env));
+    ASSERT_NO_THROW(ast->collect_macros(sema_env, macro_env));
+    ASSERT_NO_THROW(ast->declare_types(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->define_types(type_ctx));
+    ASSERT_NO_THROW(ast->declare_functions(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->type_check(type_ctx, sema_env));
+    ASSERT_NO_THROW(ast->generate_code(codegen_ctx));
+    ASSERT_NO_THROW(emitter.run());
+
+    const slang::module_::language_module mod = emitter.to_module();
+    const auto& imports = mod.get_header().imports;
+    ASSERT_EQ(imports.size(), 1);
+    EXPECT_EQ(imports[0].type, slang::module_::symbol_type::package);
+    EXPECT_EQ(imports[0].name, "test_macros");
+}
+
 TEST(output, null_assignment)
 {
     {

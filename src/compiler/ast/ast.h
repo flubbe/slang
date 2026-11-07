@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <ranges>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -4348,6 +4349,9 @@ class macro_expression : public named_expression
     /** The macro's branches. */
     std::vector<std::unique_ptr<macro_branch>> branches;
 
+    /** Modules referenced by this macro's validated body. */
+    std::set<std::string> referenced_modules;
+
 public:
     /** Set the super class. */
     using super = named_expression;
@@ -4364,6 +4368,7 @@ public:
                        static_cast<macro_branch*>(ptr->clone().release()));
                  })
                | std::ranges::to<std::vector>()}
+    , referenced_modules{other.referenced_modules}
     {
     }
     macro_expression(macro_expression&&) = default;
@@ -4451,6 +4456,13 @@ public:
     void collect_macro(
       sema::env& sema_env,
       macro::env& macro_env) const;
+
+    /** Get modules referenced by this macro's validated body. */
+    [[nodiscard]]
+    const std::set<std::string>& get_referenced_modules() const
+    {
+        return referenced_modules;
+    }
 };
 
 /** AST of a translation unit. */

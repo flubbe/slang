@@ -710,6 +710,8 @@ std::optional<ty::type_id> macro_expression::type_check(
   ty::context& ctx,
   sema::env& env)
 {
+    referenced_modules.clear();
+
     auto validate_references = [this, &env](expression& e) -> void
     {
         std::optional<std::string> namespace_path{std::nullopt};
@@ -728,17 +730,22 @@ std::optional<ty::type_id> macro_expression::type_check(
                     ::slang::to_string(e.get_location())));
             }
 
-            if(!env.get_symbol_id(
-                     namespace_path.value(),
-                     sema::symbol_type::module_,
-                     env.global_scope_id)
-                  .has_value())
+            auto module_id = env.get_symbol_id(
+              namespace_path.value(),
+              sema::symbol_type::module_,
+              env.global_scope_id);
+            if(!module_id.has_value())
             {
                 throw ty::type_error(
                   loc,
                   std::format(
                     "Unresolved import '{}',",
                     namespace_path.value()));
+            }
+
+            if(!env.transitive_imports.contains(module_id.value()))
+            {
+                referenced_modules.insert(namespace_path.value());
             }
         }
 
