@@ -821,7 +821,7 @@ inline archive& operator&(
     return ar;
 }
 
-/** Shape of a macro branch's token body. */
+/** Shape of a macro rule's token body. */
 enum class macro_body_kind : std::uint8_t
 {
     expression,
@@ -864,7 +864,7 @@ inline archive& operator&(
     return ar;
 }
 
-/** Token body and parse shape for one macro branch. */
+/** Token body and parse shape for one macro rule. */
 struct macro_body_descriptor
 {
     /** Body tokens, excluding the surrounding braces. */
@@ -884,8 +884,8 @@ inline archive& operator&(
     return ar;
 }
 
-/** Descriptor for one macro branch. */
-struct macro_branch_descriptor
+/** Descriptor for one macro rule. */
+struct macro_rule_descriptor
 {
     /** Parameters captured by this branch. */
     std::vector<macro_parameter> params;
@@ -908,10 +908,10 @@ struct macro_branch_descriptor
     syntax_context_id definition_context{root_syntax_context};
 };
 
-/** Serializer for one macro branch descriptor. */
+/** Serializer for one macro rule descriptor. */
 inline archive& operator&(
   archive& ar,
-  macro_branch_descriptor& branch)
+  macro_rule_descriptor& branch)
 {
     ar & branch.params;
     ar & branch.args_end_with_list;
@@ -928,7 +928,7 @@ struct macro_descriptor
     std::vector<std::pair<std::string, directive_descriptor>> directives;
 
     /** Branches for the token-stream macro implementation. */
-    std::vector<macro_branch_descriptor> branches;
+    std::vector<macro_rule_descriptor> branches;
 
     /** Default constructor. */
     macro_descriptor() = default;

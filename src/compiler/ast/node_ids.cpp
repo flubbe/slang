@@ -49,7 +49,7 @@ std::string to_string(node_identifier node_id)
     case node_identifier::while_statement: return "while_statement";
     case node_identifier::break_statement: return "break_statement";
     case node_identifier::continue_statement: return "continue_statement";
-    case node_identifier::macro_branch: return "macro_branch";
+    case node_identifier::macro_rule: return "macro_rule";
     case node_identifier::macro_expression_list: return "macro_expression_list";
     case node_identifier::macro_expression: return "macro_expression";
     case node_identifier::translation_unit: return "translation_unit";

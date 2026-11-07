@@ -1739,10 +1739,10 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
     }
     get_next_token();
 
-    std::vector<std::unique_ptr<ast::macro_branch>> branches;
+    std::vector<std::unique_ptr<ast::macro_rule>> branches;
     while(current_token->s == "(")
     {
-        branches.emplace_back(parse_macro_branch());
+        branches.emplace_back(parse_macro_rule());
     }
 
     if(current_token->s != "}")
@@ -1762,7 +1762,7 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
       std::move(branches));
 }
 
-std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
+std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
 {
     auto location = current_token->location;
     const token argument_opening_delimiter = *current_token;
@@ -1884,7 +1884,7 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
     {
         throw syntax_error(
           body_opening_delimiter,
-          "Expected '}' to close macro branch body.");
+          "Expected '}' to close macro rule body.");
     }
 
     body_tokens = copy_token_range(
@@ -1904,7 +1904,7 @@ std::unique_ptr<ast::macro_branch> parser::parse_macro_branch()
     }
     get_next_token();    // skip ";".
 
-    return std::make_unique<ast::macro_branch>(
+    return std::make_unique<ast::macro_rule>(
       location,
       std::move(args),
       args_end_with_list,

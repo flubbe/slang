@@ -219,28 +219,28 @@ public:
      */
     virtual class macro_expression* as_macro_expression();
 
-    /** Whether this expression is a macro branch. */
+    /** Whether this expression is a macro rule. */
     [[nodiscard]]
-    virtual bool is_macro_branch() const
+    virtual bool is_macro_rule() const
     {
         return false;
     }
 
     /**
-     * Get the expression as a macro branch.
+     * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
-    virtual class macro_branch* as_macro_branch();
+    virtual class macro_rule* as_macro_rule();
 
     /**
-     * Get the expression as a macro branch.
+     * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
-    virtual const class macro_branch* as_macro_branch() const;
+    virtual const class macro_rule* as_macro_rule() const;
 
     /** Whether the expression is a macro expression list. */
     [[nodiscard]]
@@ -1148,10 +1148,6 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        // The only direct child is the contained expression. Its own
-        // children are visited when the contained expression is traversed.
-        // Returning them here as well would make the generic DFS (which
-        // recurses via get_children) visit the subtree twice.
         return {expr.get()};
     }
     [[nodiscard]]
@@ -4041,12 +4037,8 @@ public:
     }
 };
 
-/**
- * Macro branch.
- *
- * TODO More common names seem to be: macro_rule, macro_arm
- */
-class macro_branch : public expression
+/** Macro matching rule. */
+class macro_rule : public expression
 {
     friend class macro_expression;
 
@@ -4056,10 +4048,10 @@ class macro_branch : public expression
     /** Whether the arguments end with a list. */
     bool args_end_with_list{false};
 
-    /** Separators between macro branch arguments. */
+    /** Separators between macro rule arguments. */
     std::vector<token> argument_separators;
 
-    /** Delimiters surrounding the macro branch arguments. */
+    /** Delimiters surrounding the macro rule arguments. */
     std::optional<token> argument_opening_delimiter;
     std::optional<token> argument_closing_delimiter;
 
@@ -4080,8 +4072,8 @@ public:
     using super = expression;
 
     /** Defaulted and deleted constructors. */
-    macro_branch() = default;
-    macro_branch(const macro_branch& other)
+    macro_rule() = default;
+    macro_rule(const macro_rule& other)
     : super{other}
     , args{other.args}
     , args_end_with_list{other.args_end_with_list}
@@ -4096,20 +4088,20 @@ public:
                         : nullptr}
     {
     }
-    macro_branch(macro_branch&&) = default;
+    macro_rule(macro_rule&&) = default;
 
     /** Assignment operators. */
-    macro_branch& operator=(const macro_branch&) = delete;
-    macro_branch& operator=(macro_branch&&) = default;
+    macro_rule& operator=(const macro_rule&) = delete;
+    macro_rule& operator=(macro_rule&&) = default;
 
     /**
-     * Construct a macro branch.
+     * Construct a macro rule.
      *
      * @param loc The branch location.
      * @param args Macro arguments.
      * @param args_end_with_list Whether the arguments end with a list.
      */
-    macro_branch(
+    macro_rule(
       source_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
@@ -4134,7 +4126,7 @@ public:
     [[nodiscard]]
     node_identifier get_id() const override
     {
-        return node_identifier::macro_branch;
+        return node_identifier::macro_rule;
     }
 
     [[nodiscard]]
@@ -4142,19 +4134,19 @@ public:
     void serialize(archive& ar) override;
 
     [[nodiscard]]
-    bool is_macro_branch() const override
+    bool is_macro_rule() const override
     {
         return true;
     }
 
     [[nodiscard]]
-    macro_branch* as_macro_branch() override
+    macro_rule* as_macro_rule() override
     {
         return this;
     }
 
     [[nodiscard]]
-    virtual const class macro_branch* as_macro_branch() const override
+    virtual const class macro_rule* as_macro_rule() const override
     {
         return this;
     }
@@ -4185,35 +4177,35 @@ public:
                  : std::vector<const expression*>{};
     }
 
-    /** Get the macro branch arguments. */
+    /** Get the macro rule arguments. */
     [[nodiscard]]
     const std::vector<std::pair<token, token>>& get_args() const
     {
         return args;
     }
 
-    /** Whether this macro branch ens with an expression list capture.  */
+    /** Whether this macro rule ens with an expression list capture.  */
     [[nodiscard]]
     bool ends_with_list_capture() const
     {
         return args_end_with_list;
     }
 
-    /** Get the separators between macro branch arguments. */
+    /** Get the separators between macro rule arguments. */
     [[nodiscard]]
     const std::vector<token>& get_argument_separators() const
     {
         return argument_separators;
     }
 
-    /** Get the opening delimiter for macro branch arguments. */
+    /** Get the opening delimiter for macro rule arguments. */
     [[nodiscard]]
     const std::optional<token>& get_argument_opening_delimiter() const
     {
         return argument_opening_delimiter;
     }
 
-    /** Get the closing delimiter for macro branch arguments. */
+    /** Get the closing delimiter for macro rule arguments. */
     [[nodiscard]]
     const std::optional<token>& get_argument_closing_delimiter() const
     {
@@ -4337,7 +4329,7 @@ public:
 class macro_expression : public named_expression
 {
     /** The macro's branches. */
-    std::vector<std::unique_ptr<macro_branch>> branches;
+    std::vector<std::unique_ptr<macro_rule>> branches;
 
     /** Modules referenced by this macro's validated body. */
     std::set<std::string> referenced_modules;
@@ -4354,8 +4346,8 @@ public:
                | std::views::transform(
                  [](const auto& ptr)
                  {
-                     return std::unique_ptr<macro_branch>(
-                       static_cast<macro_branch*>(ptr->clone().release()));
+                     return std::unique_ptr<macro_rule>(
+                       static_cast<macro_rule*>(ptr->clone().release()));
                  })
                | std::ranges::to<std::vector>()}
     , referenced_modules{other.referenced_modules}
@@ -4377,7 +4369,7 @@ public:
     macro_expression(
       source_location loc,
       token name,
-      std::vector<std::unique_ptr<macro_branch>> branches)
+      std::vector<std::unique_ptr<macro_rule>> branches)
     : named_expression{loc, std::move(name)}
     , branches{std::move(branches)}
     {

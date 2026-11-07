@@ -1521,7 +1521,7 @@ TEST(parser, captures_macro_token_streams)
     const auto* macro = declarations.front()->as_macro_expression();
     ASSERT_EQ(macro->get_children().size(), 1);
 
-    const auto* branch = macro->get_children().front()->as_macro_branch();
+    const auto* branch = macro->get_children().front()->as_macro_rule();
     ASSERT_TRUE(branch->get_argument_opening_delimiter().has_value());
     ASSERT_TRUE(branch->get_argument_closing_delimiter().has_value());
     EXPECT_EQ(branch->get_argument_opening_delimiter()->s, "(");

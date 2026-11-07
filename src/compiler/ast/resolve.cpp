@@ -468,10 +468,10 @@ void while_statement::resolve_names(rs::context& ctx)
 }
 
 /*
- * macro_branch.
+ * macro_rule.
  */
 
-void macro_branch::resolve_names(rs::context& ctx)
+void macro_rule::resolve_names(rs::context& ctx)
 {
     if(validation_body)
     {
@@ -496,7 +496,7 @@ void macro_expression::resolve_names(rs::context& ctx)
 {
     std::ranges::for_each(
       branches,
-      [&ctx](std::unique_ptr<macro_branch>& branch)
+      [&ctx](std::unique_ptr<macro_rule>& branch)
       {
           branch->resolve_names(ctx);
       });

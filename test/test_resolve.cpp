@@ -266,7 +266,7 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
     const auto call_site_context = contexts.allocate(slang::root_syntax_context);
 
     slang::module_::macro_descriptor desc;
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     branch.body.kind = slang::module_::macro_body_kind::expression;
     branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     branch.body.tokens = slang::token_stream{std::vector<slang::token>{
@@ -321,7 +321,7 @@ TEST(macro, descriptor_serialization_round_trip)
 {
     slang::module_::macro_descriptor descriptor;
 
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     branch.params.emplace_back(slang::module_::macro_parameter{"$value"});
     branch.args_end_with_list = true;
     branch.separators.emplace_back(
@@ -397,7 +397,7 @@ TEST(macro, expansion_uses_branch_specific_parameters)
 {
     slang::module_::macro_descriptor desc;
 
-    slang::module_::macro_branch_descriptor zero_branch;
+    slang::module_::macro_rule_descriptor zero_branch;
     zero_branch.body.kind = slang::module_::macro_body_kind::expression;
     zero_branch.body.tokens = slang::token_stream{std::vector<slang::token>{
       slang::token{
@@ -405,7 +405,7 @@ TEST(macro, expansion_uses_branch_specific_parameters)
         {1, 1},
         slang::token_type::identifier}}};
 
-    slang::module_::macro_branch_descriptor one_branch;
+    slang::module_::macro_rule_descriptor one_branch;
     one_branch.body.kind = slang::module_::macro_body_kind::expression;
     one_branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     one_branch.body.tokens = slang::token_stream{std::vector<slang::token>{
@@ -443,7 +443,7 @@ TEST(macro, branch_matching_uses_separators_and_prefers_fixed_patterns)
 {
     slang::module_::macro_descriptor desc;
 
-    slang::module_::macro_branch_descriptor variadic_branch;
+    slang::module_::macro_rule_descriptor variadic_branch;
     variadic_branch.args_end_with_list = true;
     variadic_branch.params.emplace_back(slang::module_::macro_parameter{"$first"});
     variadic_branch.params.emplace_back(slang::module_::macro_parameter{"$rest"});
@@ -453,7 +453,7 @@ TEST(macro, branch_matching_uses_separators_and_prefers_fixed_patterns)
     variadic_branch.body.tokens = slang::token_stream{std::vector<slang::token>{
       slang::token{"variadic", {1, 1}, slang::token_type::identifier}}};
 
-    slang::module_::macro_branch_descriptor fixed_branch;
+    slang::module_::macro_rule_descriptor fixed_branch;
     fixed_branch.params.emplace_back(slang::module_::macro_parameter{"$first"});
     fixed_branch.params.emplace_back(slang::module_::macro_parameter{"$second"});
     fixed_branch.separators.emplace_back(
@@ -505,7 +505,7 @@ TEST(macro, branch_matching_uses_separators_and_prefers_fixed_patterns)
 TEST(macro, token_expansion_rejects_unexpanded_nested_macro_arguments)
 {
     slang::module_::macro_descriptor desc;
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     branch.body.kind = slang::module_::macro_body_kind::expression;
     branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     branch.body.tokens = slang::token_stream{std::vector<slang::token>{
@@ -535,7 +535,7 @@ TEST(macro, token_expansion_rejects_unexpanded_nested_macro_arguments)
 TEST(macro, token_expansion_rejects_unknown_body_parameter)
 {
     slang::module_::macro_descriptor desc;
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     branch.body.kind = slang::module_::macro_body_kind::expression;
     branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     branch.body.tokens = slang::token_stream{std::vector<slang::token>{
@@ -719,7 +719,7 @@ TEST(macro, multi_statement_macro_body_uses_token_stream)
 TEST(macro, empty_body_expands_as_an_empty_statement_list)
 {
     slang::module_::macro_descriptor desc;
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     desc.branches.push_back(std::move(branch));
 
     slang::syntax_context_table contexts;
@@ -742,7 +742,7 @@ TEST(macro, local_macro_in_namespace_uses_token_stream)
     slang::syntax_context_table contexts;
     const auto call_site_context = contexts.allocate(slang::root_syntax_context);
 
-    slang::module_::macro_branch_descriptor branch;
+    slang::module_::macro_rule_descriptor branch;
     branch.body.kind = slang::module_::macro_body_kind::expression;
     branch.params.emplace_back(slang::module_::macro_parameter{"$x"});
     branch.body.tokens = slang::token_stream{std::vector<slang::token>{

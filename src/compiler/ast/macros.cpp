@@ -64,7 +64,7 @@ module_::macro_body_kind get_token_body_kind(
     return module_::macro_body_kind::statement_list;
 }
 
-std::unique_ptr<block> parse_macro_branch_body(const macro_branch& branch)
+std::unique_ptr<block> parse_macro_rule_body(const macro_rule& branch)
 {
     const auto& opening = branch.get_body_opening_delimiter();
     const auto& closing = branch.get_body_closing_delimiter();
@@ -76,7 +76,7 @@ std::unique_ptr<block> parse_macro_branch_body(const macro_branch& branch)
             "=>",
             branch.get_location(),
             token_type::delimiter},
-          "Macro branch body tokens are incomplete.");
+          "Macro rule body tokens are incomplete.");
     }
 
     std::vector<token> tokens;
@@ -90,7 +90,7 @@ std::unique_ptr<block> parse_macro_branch_body(const macro_branch& branch)
     {
         throw parser_error(
           opening.value(),
-          "Expected a block as the macro branch body.");
+          "Expected a block as the macro rule body.");
     }
 
     return std::unique_ptr<block>{
@@ -517,18 +517,18 @@ std::string macro_invocation::get_qualified_callee_name() const
 }
 
 /*
- * macro_branch.
+ * macro_rule.
  *
  * Branch bodies are captured as tokens and parsed temporarily for definition-
  * time semantic validation.
  */
 
-std::unique_ptr<expression> macro_branch::clone() const
+std::unique_ptr<expression> macro_rule::clone() const
 {
-    return std::make_unique<macro_branch>(*this);
+    return std::make_unique<macro_rule>(*this);
 }
 
-void macro_branch::serialize(archive& ar)
+void macro_rule::serialize(archive& ar)
 {
     super::serialize(ar);
     ar & args;
@@ -541,22 +541,22 @@ void macro_branch::serialize(archive& ar)
     ar & body_closing_delimiter;
 }
 
-void macro_branch::generate_code([[maybe_unused]] cg::context& ctx) const
+void macro_rule::generate_code([[maybe_unused]] cg::context& ctx) const
 {
 }
 
-std::unique_ptr<cg::rvalue> macro_branch::emit_rvalue(
+std::unique_ptr<cg::rvalue> macro_rule::emit_rvalue(
   [[maybe_unused]] cg::context& ctx,
   [[maybe_unused]] bool result_used) const
 {
-    throw cg::codegen_error(loc, "Macro branch cannot be emitted.");
+    throw cg::codegen_error(loc, "Macro rule cannot be emitted.");
 }
 
-void macro_branch::collect_names(co::context& ctx)
+void macro_rule::collect_names(co::context& ctx)
 {
     super::collect_names(ctx);
 
-    // FIXME macro branches are uniquely identified by their
+    // FIXME macro rulees are uniquely identified by their
     //       parent macro name and its parameters.
     ctx.push_scope(std::nullopt, loc);
 
@@ -574,12 +574,12 @@ void macro_branch::collect_names(co::context& ctx)
           false);
     }
 
-    validation_body = parse_macro_branch_body(*this);
+    validation_body = parse_macro_rule_body(*this);
     validation_body->collect_names(ctx, false);
     ctx.pop_scope();
 }
 
-std::optional<ty::type_id> macro_branch::type_check(
+std::optional<ty::type_id> macro_rule::type_check(
   ty::context& ctx,
   sema::env& env)
 {
@@ -588,7 +588,7 @@ std::optional<ty::type_id> macro_branch::type_check(
              : std::nullopt;
 }
 
-std::string macro_branch::to_string() const
+std::string macro_rule::to_string() const
 {
     std::string ret = std::format("MacroBranch(args=(");
     if(!args.empty())
@@ -605,7 +605,7 @@ std::string macro_branch::to_string() const
       args_end_with_list ? "true" : "false",
       validation_body
         ? validation_body->to_string()
-        : parse_macro_branch_body(*this)->to_string());
+        : parse_macro_rule_body(*this)->to_string());
     return ret;
 }
 
@@ -692,9 +692,9 @@ void macro_expression::collect_names(
 
     ctx.push_scope(std::format("{}@macro", name.s), name.location);
 
-    for(auto& macro_branch: branches)
+    for(auto& macro_rule: branches)
     {
-        macro_branch->collect_names(ctx);
+        macro_rule->collect_names(ctx);
     }
 
     ctx.pop_scope();
@@ -842,11 +842,11 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
 
     // Preserve each branch's capture list independently. Branches may have
     // different arities and may use different parameter names.
-    std::vector<module_::macro_branch_descriptor> branch_descriptors;
+    std::vector<module_::macro_rule_descriptor> branch_descriptors;
     branch_descriptors.reserve(branches.size());
     for(const auto& branch: branches)
     {
-        module_::macro_branch_descriptor descriptor;
+        module_::macro_rule_descriptor descriptor;
         descriptor.args_end_with_list = branch->ends_with_list_capture();
         descriptor.separators = branch->get_argument_separators();
 
@@ -863,7 +863,7 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
                 "=>",
                 branch->get_location(),
                 token_type::delimiter},
-              "Macro branch body tokens are incomplete.");
+              "Macro rule body tokens are incomplete.");
         }
         const auto body_tokens = *branch->get_body_tokens();
         descriptor.body = module_::macro_body_descriptor{

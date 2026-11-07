@@ -59,14 +59,14 @@ macro_expression* expression::as_macro_expression()
     throw std::runtime_error("Expression is not a macro.");
 }
 
-macro_branch* expression::as_macro_branch()
+macro_rule* expression::as_macro_rule()
 {
-    throw std::runtime_error("Expression is not a macro branch.");
+    throw std::runtime_error("Expression is not a macro rule.");
 }
 
-const macro_branch* expression::as_macro_branch() const
+const macro_rule* expression::as_macro_rule() const
 {
-    throw std::runtime_error("Expression is not a macro branch.");
+    throw std::runtime_error("Expression is not a macro rule.");
 }
 
 macro_expression_list* expression::as_macro_expression_list()
@@ -425,8 +425,8 @@ void expression::evaluate_constant_expressions(
       true,  /* post-order traversal */
       [](const slang::ast::expression& expr) -> bool
       {
-          // A macro branch has no type information, so we skip it.
-          return !expr.is_macro_branch();
+          // A macro rule has no type information, so we skip it.
+          return !expr.is_macro_rule();
       });
 }
 

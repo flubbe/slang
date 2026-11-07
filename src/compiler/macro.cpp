@@ -44,10 +44,10 @@ token_stream retag(
     return token_stream{std::move(new_tokens)};
 }
 
-/** Result of selecting a macro branch. */
-struct branch_selection
+/** Result of selecting a macro rule. */
+struct rule_selection
 {
-    const slang::module_::macro_branch_descriptor* branch{nullptr};
+    const slang::module_::macro_rule_descriptor* rule{nullptr};
     bool ambiguous{false};
 };
 
@@ -56,7 +56,7 @@ struct branch_selection
  * and matches the invocation's argument count and separators.
  */
 bool matches_branch_pattern(
-  const slang::module_::macro_branch_descriptor& branch,
+  const slang::module_::macro_rule_descriptor& branch,
   const std::vector<token_stream>& args,
   const std::vector<token>& separators)
 {
@@ -124,12 +124,12 @@ bool matches_branch_pattern(
  * precedence over variadic branches; among variadic branches, the one with
  * the longest fixed prefix takes precedence.
  */
-branch_selection select_branch(
-  const std::vector<slang::module_::macro_branch_descriptor>& branches,
+rule_selection select_branch(
+  const std::vector<slang::module_::macro_rule_descriptor>& branches,
   const std::vector<token_stream>& args,
   const std::vector<token>& separators)
 {
-    const slang::module_::macro_branch_descriptor* branch{nullptr};
+    const slang::module_::macro_rule_descriptor* branch{nullptr};
     std::pair<bool, std::size_t> best_score{false, 0};
     bool ambiguous{false};
 
@@ -159,7 +159,7 @@ branch_selection select_branch(
         }
     }
 
-    return branch_selection{branch, ambiguous};
+    return rule_selection{branch, ambiguous};
 }
 
 }    // namespace
@@ -188,7 +188,7 @@ bool macro::supports_token_expansion(
 
     const auto selection = select_branch(desc.branches, args, separators);
 
-    return selection.branch != nullptr && !selection.ambiguous;
+    return selection.rule != nullptr && !selection.ambiguous;
 }
 
 token_stream macro::expand_macro(
@@ -224,7 +224,7 @@ token_stream macro::expand_macro(
     }
 
     const auto selection = select_branch(desc.branches, args, separators);
-    const auto* branch = selection.branch;
+    const auto* branch = selection.rule;
 
     if(branch == nullptr)
     {

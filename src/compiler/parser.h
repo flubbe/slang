@@ -321,10 +321,10 @@ protected:
       ast::macro_expression>
       parse_macro();
 
-    /** Parse a macro branch and capture its token-pattern metadata. */
+    /** Parse a macro rule and capture its token-pattern metadata. */
     std::unique_ptr<
-      ast::macro_branch>
-      parse_macro_branch();
+      ast::macro_rule>
+      parse_macro_rule();
 
     /** Push a directive onto the directive stack. */
     void push_directive(
