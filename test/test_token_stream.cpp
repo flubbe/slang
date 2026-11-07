@@ -127,8 +127,9 @@ TEST(token_stream, iteration)
 
 TEST(token_stream, serialization)
 {
-    slang::token_stream ts{
-      slang::lexer::lex("let val = 123;")};
+    auto tokens = slang::lexer::lex("let val = 123;").data();
+    tokens[0].context = 42;
+    slang::token_stream ts{std::move(tokens)};
 
     slang::memory_write_archive write_ar{true};
     write_ar & ts;
@@ -143,6 +144,7 @@ TEST(token_stream, serialization)
         EXPECT_EQ(ts[i].s, deserialized[i].s);
         EXPECT_EQ(ts[i].type, deserialized[i].type);
         EXPECT_EQ(ts[i].location, deserialized[i].location);
+        EXPECT_EQ(deserialized[i].context, slang::root_syntax_context);
     }
 }
 

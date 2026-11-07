@@ -118,6 +118,7 @@ set_tests_properties(type_system PROPERTIES FIXTURES_REQUIRED needs_std)
 
 add_gtest_executable(test_resolve test_resolve.cpp)
 target_link_libraries(test_resolve PRIVATE slang_test_frontend_core)
+set_tests_properties(resolve PROPERTIES FIXTURES_REQUIRED needs_std)
 
 add_gtest_executable(test_cfg_simplify test_cfg_simplify.cpp)
 target_link_libraries(test_cfg_simplify PRIVATE slang_test_emitter_core)

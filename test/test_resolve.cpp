@@ -364,9 +364,11 @@ TEST(macro, descriptor_serialization_round_trip)
     EXPECT_EQ(decoded_branch.args_end_with_list, true);
     ASSERT_EQ(decoded_branch.separators.size(), 1);
     EXPECT_EQ(decoded_branch.separators.front().s, ",");
-    EXPECT_EQ(decoded_branch.separators.front().context, 7);
+    EXPECT_EQ(decoded_branch.separators.front().context, slang::root_syntax_context);
     ASSERT_EQ(decoded_branch.body.tokens.size(), 2);
-    EXPECT_EQ(decoded_branch.body.tokens.front().context, 11);
+    EXPECT_EQ(
+      decoded_branch.body.tokens.front().context,
+      slang::root_syntax_context);
     EXPECT_EQ(decoded_branch.body.kind, slang::module_::macro_body_kind::expression);
 
     slang::module_::module_header header;
@@ -388,7 +390,7 @@ TEST(macro, descriptor_serialization_round_trip)
     ASSERT_EQ(module_descriptor.branches.size(), 1);
     EXPECT_EQ(
       module_descriptor.branches.front().body.tokens.front().context,
-      11);
+      slang::root_syntax_context);
 }
 
 TEST(macro, expansion_uses_branch_specific_parameters)

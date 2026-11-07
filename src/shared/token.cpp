@@ -163,7 +163,11 @@ archive& operator&(archive& ar, token& tok)
     ar & tok.has_blank_line_before;
     ar & tok.leading_comments;
     ar & tok.trailing_comments;
-    ar & tok.context;
+
+    if(ar.is_reading())
+    {
+        tok.context = root_syntax_context;
+    }
 
     return ar;
 }
