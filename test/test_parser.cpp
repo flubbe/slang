@@ -56,6 +56,28 @@ TEST(parser, parse_expression_token_stream_rejects_empty_input)
       slang::syntax_error);
 }
 
+TEST(parser, parse_expression_token_stream_rejects_block)
+{
+    EXPECT_THROW(
+      slang::parser::parse_expression(slang::lexer::lex("{ 1; }")),
+      slang::syntax_error);
+}
+
+TEST(parser, parse_block_expression_token_stream)
+{
+    auto block = slang::parser::parse_block_expression(
+      slang::lexer::lex("{ 1; }"));
+    EXPECT_NE(block, nullptr);
+}
+
+TEST(parser, parse_block_expression_token_stream_requires_full_consumption)
+{
+    EXPECT_THROW(
+      slang::parser::parse_block_expression(
+        slang::lexer::lex("{ 1; } { 2; }")),
+      slang::syntax_error);
+}
+
 TEST(parser, import_statement)
 {
     {

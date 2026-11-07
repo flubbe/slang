@@ -1983,22 +1983,7 @@ std::unique_ptr<ast::expression> parser::parse_expression(
 {
     parser expression_parser{std::move(tokens)};
     expression_parser.get_next_token();    // set up current_token
-
-    std::unique_ptr<ast::expression> expression;
-
-    // Macro-only block expansion: a macro body that is a statement list is
-    // wrapped in synthetic braces by the expander. Rebuild it as a block
-    // (value = its tail expression) instead of a single expression. This branch
-    // is only reachable from the macro parse-back, so it does not make '{...}'
-    // a general language expression.
-    if(expression_parser.current_token->s == "{")
-    {
-        expression = expression_parser.parse_block(true);
-    }
-    else
-    {
-        expression = expression_parser.parse_expression();
-    }
+    auto expression = expression_parser.parse_expression();
 
     if(expression_parser.current_token->type
        != token_type::end_of_input)
@@ -2011,6 +1996,25 @@ std::unique_ptr<ast::expression> parser::parse_expression(
     }
 
     return expression;
+}
+
+std::unique_ptr<ast::block> parser::parse_block_expression(
+  token_stream tokens)
+{
+    parser block_parser{std::move(tokens)};
+    block_parser.get_next_token();    // set up current_token
+    auto block = block_parser.parse_block(true);
+
+    if(block_parser.current_token->type != token_type::end_of_input)
+    {
+        throw syntax_error(
+          *block_parser.current_token,
+          std::format(
+            "Unexpected token '{}'.",
+            block_parser.current_token->s));
+    }
+
+    return block;
 }
 
 }    // namespace slang

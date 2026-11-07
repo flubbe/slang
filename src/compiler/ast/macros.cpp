@@ -50,16 +50,7 @@ std::unique_ptr<block> parse_macro_rule_body(const macro_rule& branch)
     tokens.insert(tokens.end(), body->data().begin(), body->data().end());
     tokens.push_back(closing.value());
 
-    auto parsed_body = parser::parse_expression(token_stream{std::move(tokens)});
-    if(parsed_body->get_id() != node_identifier::block)
-    {
-        throw parser_error(
-          opening.value(),
-          "Expected a block as the macro rule body.");
-    }
-
-    return std::unique_ptr<block>{
-      static_cast<block*>(parsed_body.release())};    // NOLINT(cppcoreguidelines-pro-type-static-cast-downcast)
+    return parser::parse_block_expression(token_stream{std::move(tokens)});
 }
 
 }    // namespace
@@ -99,7 +90,7 @@ bool expression::expand_macros(
           expr->get_location(),
           expr->get_argument_separators());
         expr->set_expansion(
-          parser::parse_expression(std::move(expanded_tokens)));
+          parser::parse_block_expression(std::move(expanded_tokens)));
         return true;
     };
 

@@ -385,6 +385,18 @@ public:
       ast::expression>
       parse_expression(
         token_stream tokens);
+
+    /**
+     * Parse exactly one block from a token stream.
+     *
+     * @param tokens The token stream containing the block.
+     * @return The parsed block.
+     * @throws A syntax_error if the stream does not contain exactly one block.
+     */
+    static std::unique_ptr<
+      ast::block>
+      parse_block_expression(
+        token_stream tokens);
 };
 
 }    // namespace slang
