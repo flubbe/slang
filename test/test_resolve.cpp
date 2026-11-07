@@ -277,7 +277,7 @@ TEST(macro, expansion_distinguishes_definition_and_call_site_contexts)
         "local",
         {1, 4},
         slang::token_type::identifier}}};
-    desc.branches.emplace_back(std::move(branch));
+    desc.rules.emplace_back(std::move(branch));
 
     macro::macro m{
       "test!",
@@ -348,7 +348,7 @@ TEST(macro, descriptor_serialization_round_trip)
         {},
         {},
         13}}};
-    descriptor.branches.emplace_back(std::move(branch));
+    descriptor.rules.emplace_back(std::move(branch));
 
     slang::memory_write_archive write_ar{true};
     write_ar & descriptor;
@@ -357,8 +357,8 @@ TEST(macro, descriptor_serialization_round_trip)
     slang::module_::macro_descriptor decoded;
     read_ar & decoded;
 
-    ASSERT_EQ(decoded.branches.size(), 1);
-    const auto& decoded_branch = decoded.branches.front();
+    ASSERT_EQ(decoded.rules.size(), 1);
+    const auto& decoded_branch = decoded.rules.front();
     ASSERT_EQ(decoded_branch.params.size(), 1);
     EXPECT_EQ(decoded_branch.params.front().name, "$value");
     EXPECT_EQ(decoded_branch.args_end_with_list, true);
@@ -385,9 +385,9 @@ TEST(macro, descriptor_serialization_round_trip)
     ASSERT_EQ(decoded_header.exports.size(), 1);
     const auto& module_descriptor = std::get<slang::module_::macro_descriptor>(
       decoded_header.exports.front().desc);
-    ASSERT_EQ(module_descriptor.branches.size(), 1);
+    ASSERT_EQ(module_descriptor.rules.size(), 1);
     EXPECT_EQ(
-      module_descriptor.branches.front().body.tokens.front().context,
+      module_descriptor.rules.front().body.tokens.front().context,
       slang::root_syntax_context);
 }
 
@@ -410,8 +410,8 @@ TEST(macro, expansion_uses_branch_specific_parameters)
         {2, 1},
         slang::token_type::macro_identifier}}};
 
-    desc.branches.emplace_back(std::move(zero_branch));
-    desc.branches.emplace_back(std::move(one_branch));
+    desc.rules.emplace_back(std::move(zero_branch));
+    desc.rules.emplace_back(std::move(one_branch));
 
     macro::macro m{"test!", std::move(desc)};
     slang::syntax_context_table contexts;
@@ -460,8 +460,8 @@ TEST(macro, branch_matching_uses_separators_and_prefers_fixed_patterns)
     fixed_branch.body.tokens = slang::token_stream{std::vector<slang::token>{
       slang::token{"fixed", {2, 2}, slang::token_type::identifier}}};
 
-    desc.branches.emplace_back(std::move(variadic_branch));
-    desc.branches.emplace_back(std::move(fixed_branch));
+    desc.rules.emplace_back(std::move(variadic_branch));
+    desc.rules.emplace_back(std::move(fixed_branch));
 
     macro::macro m{"test!", std::move(desc)};
     slang::syntax_context_table contexts;
@@ -510,7 +510,7 @@ TEST(macro, token_expansion_rejects_unexpanded_nested_macro_arguments)
         "$x",
         {1, 1},
         slang::token_type::macro_identifier}}};
-    desc.branches.emplace_back(std::move(branch));
+    desc.rules.emplace_back(std::move(branch));
 
     macro::macro m{"test!", std::move(desc)};
     slang::syntax_context_table contexts;
@@ -539,7 +539,7 @@ TEST(macro, token_expansion_rejects_unknown_body_parameter)
         "$unknown",
         {1, 1},
         slang::token_type::macro_identifier}}};
-    desc.branches.emplace_back(std::move(branch));
+    desc.rules.emplace_back(std::move(branch));
 
     macro::macro m{"test!", std::move(desc)};
     slang::syntax_context_table contexts;
@@ -588,8 +588,8 @@ TEST(macro, local_expression_list_body_uses_block_expansion)
     ASSERT_NO_THROW(ast_root->collect_macros(sema_env, macro_env));
 
     auto* descriptor_macro = macro_env.get_macro("identity!", std::nullopt);
-    ASSERT_EQ(descriptor_macro->get_desc().branches.size(), 1);
-    const auto& descriptor = descriptor_macro->get_desc().branches.front();
+    ASSERT_EQ(descriptor_macro->get_desc().rules.size(), 1);
+    const auto& descriptor = descriptor_macro->get_desc().rules.front();
     ASSERT_FALSE(descriptor.body.tokens.empty());
     EXPECT_EQ(descriptor.body.tokens.back().s, ";");
 
@@ -652,7 +652,7 @@ TEST(macro, multi_statement_macro_body_uses_token_stream)
     ASSERT_NO_THROW(ast_root->collect_macros(sema_env, macro_env));
 
     auto* descriptor_macro = macro_env.get_macro("multi!", std::nullopt);
-    ASSERT_EQ(descriptor_macro->get_desc().branches.size(), 1);
+    ASSERT_EQ(descriptor_macro->get_desc().rules.size(), 1);
 
     EXPECT_NO_THROW(
       ast_root->expand_macros(
@@ -667,7 +667,7 @@ TEST(macro, empty_body_expands_as_an_empty_statement_list)
 {
     slang::module_::macro_descriptor desc;
     slang::module_::macro_rule_descriptor branch;
-    desc.branches.push_back(std::move(branch));
+    desc.rules.push_back(std::move(branch));
 
     slang::syntax_context_table contexts;
     slang::macro::macro m{"empty!", std::move(desc)};
@@ -698,7 +698,7 @@ TEST(macro, local_macro_in_namespace_uses_token_stream)
         slang::token_type::macro_identifier}}};
 
     slang::module_::macro_descriptor desc;
-    desc.branches.emplace_back(std::move(branch));
+    desc.rules.emplace_back(std::move(branch));
 
     macro::macro m{
       "identity!",
@@ -716,7 +716,7 @@ TEST(macro, local_macro_in_namespace_uses_token_stream)
     // Verify the macro was stored and retrieved with its namespace path.
     auto* retrieved = env.get_macro("identity!", std::string{"myns"});
     ASSERT_NE(retrieved, nullptr);
-    EXPECT_EQ(retrieved->get_desc().branches.size(), 1);
+    EXPECT_EQ(retrieved->get_desc().rules.size(), 1);
 
     // Verify the macro can be expanded via token stream.
     slang::token argument{

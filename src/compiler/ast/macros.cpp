@@ -848,7 +848,7 @@ void macro_expression::collect_macro(sema::env& sema_env, macro::env& macro_env)
     // Create descriptor and attach branch metadata.
     module_::macro_descriptor desc;
     desc.directives = std::move(attributes);
-    desc.branches = std::move(branch_descriptors);
+    desc.rules = std::move(branch_descriptors);
     macro_env.add_macro(
       name.s,
       desc,

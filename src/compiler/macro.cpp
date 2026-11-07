@@ -52,52 +52,54 @@ struct rule_selection
 };
 
 /**
- * Check whether a branch's captured pattern metadata is internally consistent
+ * Check whether a rule's captured pattern metadata is internally consistent
  * and matches the invocation's argument count and separators.
  */
-bool matches_branch_pattern(
-  const slang::module_::macro_rule_descriptor& branch,
+bool matches_rule_pattern(
+  const slang::module_::macro_rule_descriptor& rule,
   const std::vector<token_stream>& args,
   const std::vector<token>& separators)
 {
-    if(branch.args_end_with_list && branch.params.empty())
+    if(rule.args_end_with_list && rule.params.empty())
     {
         return false;
     }
 
-    if(branch.params.empty())
+    if(rule.params.empty())
     {
-        if(!branch.separators.empty())
+        if(!rule.separators.empty())
         {
             return false;
         }
     }
-    else if(branch.separators.size() != branch.params.size() - 1)
+    else if(rule.separators.size() != rule.params.size() - 1)
     {
         return false;
     }
 
     const std::size_t fixed_param_count =
-      branch.params.size() - static_cast<std::size_t>(branch.args_end_with_list);
+      rule.params.size() - static_cast<std::size_t>(rule.args_end_with_list);
     if(separators.size() != (args.empty() ? 0 : args.size() - 1))
     {
         return false;
     }
 
-    if(!branch.args_end_with_list && args.size() != branch.params.size())
+    if(!rule.args_end_with_list && args.size() != rule.params.size())
     {
         return false;
     }
-    if(branch.args_end_with_list && args.size() < fixed_param_count)
+
+    if(rule.args_end_with_list && args.size() < fixed_param_count)
     {
         return false;
     }
 
     for(std::size_t i = 0; i < separators.size(); ++i)
     {
-        if(branch.args_end_with_list && fixed_param_count == 0)
+        if(rule.args_end_with_list
+           && fixed_param_count == 0)
         {
-            if(separators[i].s != ",")
+            if(separators[i].s != ",")    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             {
                 return false;
             }
@@ -105,11 +107,12 @@ bool matches_branch_pattern(
         else
         {
             const std::size_t pattern_index =
-              std::min(i, branch.separators.size() - 1);
-            const auto& expected = branch.separators[pattern_index];
+              std::min(i, rule.separators.size() - 1);
+            const auto& expected = rule.separators[pattern_index];    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
             // Token kinds can differ between parsed macro patterns and calls;
             // the separator spelling is the syntax that determines a match.
-            if(separators[i].s != expected.s)
+            if(separators[i].s != expected.s)    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
             {
                 return false;
             }
@@ -120,22 +123,22 @@ bool matches_branch_pattern(
 }
 
 /**
- * Select the most specific matching branch. Fixed-arity branches take
- * precedence over variadic branches; among variadic branches, the one with
+ * Select the most specific matching rule. Fixed-arity rules take
+ * precedence over variadic rules; among variadic rules, the one with
  * the longest fixed prefix takes precedence.
  */
-rule_selection select_branch(
-  const std::vector<slang::module_::macro_rule_descriptor>& branches,
+rule_selection select_rule(
+  const std::vector<slang::module_::macro_rule_descriptor>& rules,
   const std::vector<token_stream>& args,
   const std::vector<token>& separators)
 {
-    const slang::module_::macro_rule_descriptor* branch{nullptr};
+    const slang::module_::macro_rule_descriptor* rule{nullptr};
     std::pair<bool, std::size_t> best_score{false, 0};
     bool ambiguous{false};
 
-    for(const auto& candidate: branches)
+    for(const auto& candidate: rules)
     {
-        if(!matches_branch_pattern(candidate, args, separators))
+        if(!matches_rule_pattern(candidate, args, separators))
         {
             continue;
         }
@@ -147,9 +150,9 @@ rule_selection select_branch(
           !candidate.args_end_with_list,
           fixed_param_count};
 
-        if(branch == nullptr || score > best_score)
+        if(rule == nullptr || score > best_score)
         {
-            branch = &candidate;
+            rule = &candidate;
             best_score = score;
             ambiguous = false;
         }
@@ -159,7 +162,10 @@ rule_selection select_branch(
         }
     }
 
-    return rule_selection{branch, ambiguous};
+    return rule_selection{
+      .rule = rule,
+      .ambiguous = ambiguous,
+    };
 }
 
 }    // namespace
@@ -186,7 +192,7 @@ bool macro::supports_token_expansion(
         }
     }
 
-    const auto selection = select_branch(desc.branches, args, separators);
+    const auto selection = select_rule(desc.rules, args, separators);
 
     return selection.rule != nullptr && !selection.ambiguous;
 }
@@ -199,7 +205,7 @@ token_stream macro::expand_macro(
   const std::vector<token>& separators) const
 {
     // Don't expand empty macros.
-    if(desc.branches.empty())
+    if(desc.rules.empty())
     {
         return token_stream{};
     }
@@ -223,21 +229,21 @@ token_stream macro::expand_macro(
         }
     }
 
-    const auto selection = select_branch(desc.branches, args, separators);
-    const auto* branch = selection.rule;
+    const auto selection = select_rule(desc.rules, args, separators);
+    const auto* rule = selection.rule;
 
-    if(branch == nullptr)
+    if(rule == nullptr)
     {
         throw macro_error{
           std::format(
-            "Could not match a branch of macro '{}'.",
+            "Could not match a rule of macro '{}'.",
             name)};
     }
     if(selection.ambiguous)
     {
         throw macro_error{
           std::format(
-            "Macro '{}' has ambiguous branches.",
+            "Macro '{}' has ambiguous rules.",
             name)};
     }
 
@@ -269,23 +275,23 @@ token_stream macro::expand_macro(
     syntax_context_id expansion_ctx = contexts.allocate(definition_context);
 
     // Process each token.
-    for(const auto& tok: branch->body.tokens.data())
+    for(const auto& tok: rule->body.tokens.data())
     {
         // Check if token is an identifier that matches a macro parameter.
         bool replaced = false;
         if(tok.type == token_type::macro_identifier)
         {
             // Search parameters by name.
-            for(std::size_t i = 0; i < branch->params.size(); ++i)
+            for(std::size_t i = 0; i < rule->params.size(); ++i)
             {
-                const auto& param = branch->params[i];    // bounds are check in loop condition. // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+                const auto& param = rule->params[i];    // bounds are check in loop condition. // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                 if(tok.s == param.name)
                 {
                     // Parameter match -> splice argument tokens, retagged.
                     if(i >= args.size())
                     {
                         // Variadic parameter with no remaining arguments.
-                        if(branch->args_end_with_list)
+                        if(rule->args_end_with_list)
                         {
                             // Empty variadic capture is valid.
                         }
@@ -298,7 +304,7 @@ token_stream macro::expand_macro(
                                 param.name)};
                         }
                     }
-                    else if(branch->args_end_with_list && i == branch->params.size() - 1)
+                    else if(rule->args_end_with_list && i == rule->params.size() - 1)
                     {
                         // Variadic parameter: splice all remaining args.
                         std::vector<token> variadic_tokens;
@@ -309,7 +315,8 @@ token_stream macro::expand_macro(
                                 variadic_tokens.emplace_back(
                                   ",", call_loc, token_type::delimiter);
                             }
-                            for(const auto& t: args[j].data())
+
+                            for(const auto& t: args[j].data())    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                             {
                                 token copy = t;
                                 copy.context = call_site;
@@ -321,7 +328,10 @@ token_stream macro::expand_macro(
                     }
                     else
                     {
-                        result = result.concat(retag(args[i], call_site));
+                        result = result.concat(
+                          retag(
+                            args[i],    // NOLINT(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+                            call_site));
                     }
                     replaced = true;
                     break;
@@ -329,7 +339,8 @@ token_stream macro::expand_macro(
             }
         }
 
-        if(tok.type == token_type::macro_identifier && !replaced)
+        if(tok.type == token_type::macro_identifier
+           && !replaced)
         {
             // Allow self-recursion: don't throw for the macro's own name.
             if(tok.s != name)
@@ -357,10 +368,10 @@ token_stream macro::expand_macro(
     std::vector<token> wrapped;
     wrapped.reserve(result.size() + 2);
     wrapped.emplace_back("{", call_loc, token_type::delimiter);
-    for(std::size_t i = 0; i < result.size(); ++i)
-    {
-        wrapped.emplace_back(result[i]);
-    }
+    wrapped.insert(
+      wrapped.end(),
+      result.begin(),
+      result.end());
     wrapped.emplace_back("}", call_loc, token_type::delimiter);
     return token_stream{std::move(wrapped)};
 }

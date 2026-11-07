@@ -901,7 +901,7 @@ struct macro_descriptor
     std::vector<std::pair<std::string, directive_descriptor>> directives;
 
     /** Branches for the token-stream macro implementation. */
-    std::vector<macro_rule_descriptor> branches;
+    std::vector<macro_rule_descriptor> rules;
 
     /** Default constructor. */
     macro_descriptor() = default;
@@ -922,7 +922,7 @@ inline archive& serialize_macro_descriptor(
     }
 
     ar & desc.directives;
-    ar & desc.branches;
+    ar & desc.rules;
     return ar;
 }
 
