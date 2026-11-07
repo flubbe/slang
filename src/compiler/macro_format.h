@@ -23,18 +23,17 @@ namespace slang::macro
  * The produced token stream is a left-nested `std::string_concat(...)` chain
  * interleaving literal fragments of the format string with per-argument
  * `std::<type>_to_string(...)` conversions (or the argument itself, for
- * `str`-typed arguments).  It re-parses cleanly via `parser::parse_expression`
- * and reuses the existing string runtime, so no new runtime function is needed.
+ * `str`-typed arguments).
  *
- * @param args      Token streams for the macro arguments (`args[0]` = format
- *                  string, `args[1..]` = the format arguments).
- * @param arg_types  Resolved type of each format argument, aligned with
- *                  `args[1..]` (i.e. `arg_types[i]` is the type of `args[i + 1]`).
- * @param call_loc  Source location for generated tokens.
- * @param type_ctx  Typing context used for argument-type validation.
+ * @param args Token streams for the macro arguments (`args[0]` = format
+ *     string, `args[1..]` = the format arguments).
+ * @param arg_types Resolved type of each format argument, aligned with
+ *     `args[1..]` (i.e. `arg_types[i]` is the type of `args[i + 1]`).
+ * @param call_loc Source location for generated tokens.
+ * @param type_ctx Typing context used for argument-type validation.
  * @return Token stream representing the expanded macro body.
- * @throws macro_error if the arguments are missing or unsupported.
- * @throws std::runtime_error if the format string is invalid or an argument
+ * @throws `macro_error` if the arguments are missing or unsupported.
+ * @throws `std::runtime_error` if the format string is invalid or an argument
  *     type does not satisfy its specifier.
  */
 token_stream
