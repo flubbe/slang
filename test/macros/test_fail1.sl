@@ -5,6 +5,6 @@ macro sum! {
 }
 
 fn main(args: str[]) -> i32 {
-    let s1: i32 = sum!(1); // no matching macro branch
+    let s1: i32 = sum!(1); // no matching macro rule
     return 0;
 }

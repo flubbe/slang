@@ -12,6 +12,7 @@
 
 #include "compiler/ast/node_registry.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -40,11 +41,8 @@ void run_test(
 {
     const std::string filename = std::format("ast_serialization_{}.bin", test_id);
 
-    slang::lexer lexer;
     slang::parser parser;
-
-    lexer.set_input(test_input);
-    ASSERT_NO_THROW(parser.parse(lexer));
+    ASSERT_NO_THROW(parser.parse(slang::lexer::lex(test_input)));
 
     slang::file_manager mgr;
     mgr.add_search_path(".");

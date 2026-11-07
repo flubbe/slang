@@ -573,7 +573,7 @@ public:
       slang::file_manager& file_mgr,
       std::string import_name,
       fs::path path,
-      interpreter::context* runtime_context = nullptr);
+      interpreter::context* runtime_context);
 
     /** Get the module contant table. */
     const std::vector<

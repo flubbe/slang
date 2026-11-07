@@ -4,7 +4,7 @@
  * abstract syntax tree.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <ranges>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -22,6 +23,7 @@
 #include "compiler/constant.h"
 #include "compiler/directive.h"
 #include "compiler/typing.h"
+#include "shared/token_stream.h"
 #include "node_ids.h"
 #include "utils.h"
 
@@ -217,28 +219,28 @@ public:
      */
     virtual class macro_expression* as_macro_expression();
 
-    /** Whether this expression is a macro branch. */
+    /** Whether this expression is a macro rule. */
     [[nodiscard]]
-    virtual bool is_macro_branch() const
+    virtual bool is_macro_rule() const
     {
         return false;
     }
 
     /**
-     * Get the expression as a macro branch.
+     * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
-    virtual class macro_branch* as_macro_branch();
+    virtual class macro_rule* as_macro_rule();
 
     /**
-     * Get the expression as a macro branch.
+     * Get the expression as a macro rule.
      *
-     * @throws Throws a `std::runtime_error` if the expression is not a macro branch.
+     * @throws Throws a `std::runtime_error` if the expression is not a macro rule.
      */
     [[nodiscard]]
-    virtual const class macro_branch* as_macro_branch() const;
+    virtual const class macro_rule* as_macro_rule() const;
 
     /** Whether the expression is a macro expression list. */
     [[nodiscard]]
@@ -452,7 +454,8 @@ public:
      * @param rs_ctx Name resolution context.
      * @param codegen_ctx Code generation context.
      * @param macro_env Macro collection / expansion environment.
-     * @param macro_asts The module's macros as AST's.
+     * @param syntax_contexts Syntax-context table for macro expansion.
+     *
      * @returns `true` if macros were expanded and `false` if no macros were expanded.
      */
     bool expand_macros(
@@ -460,11 +463,11 @@ public:
       rs::context& rs_ctx,
       cg::context& codegen_ctx,
       macro::env& macro_env,
-      const std::vector<expression*>& macro_asts);
+      syntax_context_table& syntax_contexts);
 
     /**
-     * Macro expansion (after type checking). Calls the corresponding
-     * function on the macro.
+     * Finish late macro expansion after type checking. Expands the built-in
+     * `format!` placeholder, then binds and type-checks its generated expression.
      *
      * @note Explicitly checks for the built-in `format!` macro, since this is
      *       the only macro using type information.
@@ -472,13 +475,23 @@ public:
      * @param co_ctx Name collection context.
      * @param rs_ctx Name resolution context.
      * @param type_ctx Type system context.
-     * @param sema_env The semantic environment.
+     * @param env The semantic environment.
+     * @param codegen_ctx Optional code generation context; together with
+     *     `macro_env` and `syntax_contexts`, enables expansion of macro
+     *     invocations produced by the format expansion.
+     * @param macro_env Optional macro collection / expansion environment,
+     *     used with `codegen_ctx` and `syntax_contexts`.
+     * @param syntax_contexts Optional syntax-context table used with
+     *     `codegen_ctx` and `macro_env`.
      */
     void expand_late_macros(
       co::context& co_ctx,
       rs::context& rs_ctx,
       ty::context& type_ctx,
-      sema::env& env);
+      sema::env& env,
+      cg::context* codegen_ctx = nullptr,
+      macro::env* macro_env = nullptr,
+      syntax_context_table* syntax_contexts = nullptr);
 
     /**
      * Get a directive. If the directive is not unique, a `codegen_error` is thrown.
@@ -1135,18 +1148,12 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return expr->get_children();
+        return {expr.get()};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        std::vector<const expression*> exprs;
-        exprs.reserve(expr->get_children().size());
-        for(auto& c: expr->get_children())
-        {
-            exprs.emplace_back(c);
-        }
-        return exprs;
+        return {expr.get()};
     }
 
     /** Return the contained expression. */
@@ -3259,6 +3266,16 @@ class macro_invocation : public named_expression
     /** Expressions the macro operates on. */
     std::vector<std::unique_ptr<expression>> exprs;
 
+    /** Raw token streams for the macro arguments. */
+    std::vector<token_stream> argument_tokens;
+
+    /** Separators between raw macro arguments. */
+    std::vector<token> argument_separators;
+
+    /** Delimiters surrounding the raw macro arguments. */
+    std::optional<token> argument_opening_delimiter;
+    std::optional<token> argument_closing_delimiter;
+
     /** An optional index expression for return value array access. */
     std::unique_ptr<expression> index_expr;
 
@@ -3280,6 +3297,10 @@ public:
                   return ptr->clone();
               })
             | std::ranges::to<std::vector>()}
+    , argument_tokens{other.argument_tokens}
+    , argument_separators{other.argument_separators}
+    , argument_opening_delimiter{other.argument_opening_delimiter}
+    , argument_closing_delimiter{other.argument_closing_delimiter}
     , index_expr{other.index_expr ? other.index_expr->clone() : nullptr}
     , expansion{other.expansion ? other.expansion->clone() : nullptr}
     {
@@ -3413,6 +3434,47 @@ public:
     const std::vector<std::unique_ptr<expression>>& get_exprs() const
     {
         return exprs;
+    }
+
+    /** Get the raw token streams for the macro arguments. */
+    [[nodiscard]]
+    const std::vector<token_stream>& get_argument_tokens() const
+    {
+        return argument_tokens;
+    }
+
+    /** Get the separators between raw macro arguments. */
+    [[nodiscard]]
+    const std::vector<token>& get_argument_separators() const
+    {
+        return argument_separators;
+    }
+
+    /** Get the opening delimiter for the raw macro arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_opening_delimiter() const
+    {
+        return argument_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for the raw macro arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_closing_delimiter() const
+    {
+        return argument_closing_delimiter;
+    }
+
+    /** Store raw token data captured by the parser. */
+    void set_argument_tokens(
+      std::vector<token_stream> tokens,
+      std::vector<token> separators,
+      std::optional<token> opening_delimiter,
+      std::optional<token> closing_delimiter)
+    {
+        argument_tokens = std::move(tokens);
+        argument_separators = std::move(separators);
+        argument_opening_delimiter = std::move(opening_delimiter);
+        argument_closing_delimiter = std::move(closing_delimiter);
     }
 
     /** Whether this macro is expanded. */
@@ -3975,8 +4037,8 @@ public:
     }
 };
 
-/** Macro branch. */
-class macro_branch : public expression
+/** Macro matching rule. */
+class macro_rule : public expression
 {
     friend class macro_expression;
 
@@ -3986,51 +4048,85 @@ class macro_branch : public expression
     /** Whether the arguments end with a list. */
     bool args_end_with_list{false};
 
-    /** Body. */
-    std::unique_ptr<block> body;
+    /** Separators between macro rule arguments. */
+    std::vector<token> argument_separators;
+
+    /** Delimiters surrounding the macro rule arguments. */
+    std::optional<token> argument_opening_delimiter;
+    std::optional<token> argument_closing_delimiter;
+
+    /** Raw body tokens, excluding the outer braces. */
+    std::optional<token_stream> body_tokens;
+
+    /** Delimiters surrounding the raw body tokens. */
+    std::optional<token> body_opening_delimiter;
+    std::optional<token> body_closing_delimiter;
+
+    /**
+     * Temporary parse tree used by normal semantic passes to validate every
+     * macro definition, including macros that are never expanded.
+     */
+    std::unique_ptr<block> validation_body;
 
 public:
     using super = expression;
 
     /** Defaulted and deleted constructors. */
-    macro_branch() = default;
-    macro_branch(const macro_branch& other)
+    macro_rule() = default;
+    macro_rule(const macro_rule& other)
     : super{other}
     , args{other.args}
     , args_end_with_list{other.args_end_with_list}
-    , body{static_cast<block*>(other.body->clone().release())}
+    , argument_separators{other.argument_separators}
+    , argument_opening_delimiter{other.argument_opening_delimiter}
+    , argument_closing_delimiter{other.argument_closing_delimiter}
+    , body_tokens{other.body_tokens}
+    , body_opening_delimiter{other.body_opening_delimiter}
+    , body_closing_delimiter{other.body_closing_delimiter}
+    , validation_body{other.validation_body
+                        ? static_cast<block*>(other.validation_body->clone().release())
+                        : nullptr}
     {
     }
-    macro_branch(macro_branch&&) = default;
+    macro_rule(macro_rule&&) = default;
 
     /** Assignment operators. */
-    macro_branch& operator=(const macro_branch&) = delete;
-    macro_branch& operator=(macro_branch&&) = default;
+    macro_rule& operator=(const macro_rule&) = delete;
+    macro_rule& operator=(macro_rule&&) = default;
 
     /**
-     * Construct a macro branch.
+     * Construct a macro rule.
      *
      * @param loc The branch location.
      * @param args Macro arguments.
      * @param args_end_with_list Whether the arguments end with a list.
-     * @param body Branch body.
      */
-    macro_branch(
+    macro_rule(
       source_location loc,
       std::vector<std::pair<token, token>> args,
       bool args_end_with_list,
-      std::unique_ptr<block> body)
+      std::vector<token> argument_separators = {},
+      std::optional<token> argument_opening_delimiter = std::nullopt,
+      std::optional<token> argument_closing_delimiter = std::nullopt,
+      std::optional<token_stream> body_tokens = std::nullopt,
+      std::optional<token> body_opening_delimiter = std::nullopt,
+      std::optional<token> body_closing_delimiter = std::nullopt)
     : expression{loc}
     , args{std::move(args)}
     , args_end_with_list{args_end_with_list}
-    , body{std::move(body)}
+    , argument_separators{std::move(argument_separators)}
+    , argument_opening_delimiter{std::move(argument_opening_delimiter)}
+    , argument_closing_delimiter{std::move(argument_closing_delimiter)}
+    , body_tokens{std::move(body_tokens)}
+    , body_opening_delimiter{std::move(body_opening_delimiter)}
+    , body_closing_delimiter{std::move(body_closing_delimiter)}
     {
     }
 
     [[nodiscard]]
     node_identifier get_id() const override
     {
-        return node_identifier::macro_branch;
+        return node_identifier::macro_rule;
     }
 
     [[nodiscard]]
@@ -4038,19 +4134,19 @@ public:
     void serialize(archive& ar) override;
 
     [[nodiscard]]
-    bool is_macro_branch() const override
+    bool is_macro_rule() const override
     {
         return true;
     }
 
     [[nodiscard]]
-    macro_branch* as_macro_branch() override
+    macro_rule* as_macro_rule() override
     {
         return this;
     }
 
     [[nodiscard]]
-    virtual const class macro_branch* as_macro_branch() const override
+    virtual const class macro_rule* as_macro_rule() const override
     {
         return this;
     }
@@ -4070,33 +4166,72 @@ public:
     [[nodiscard]]
     std::vector<expression*> get_children() override
     {
-        return {body.get()};
+        return validation_body
+                 ? std::vector<expression*>{validation_body.get()}
+                 : std::vector<expression*>{};
     }
     [[nodiscard]]
     std::vector<const expression*> get_children() const override
     {
-        return {body.get()};
+        return validation_body
+                 ? std::vector<const expression*>{validation_body.get()}
+                 : std::vector<const expression*>{};
     }
 
-    /** Get the macro branch arguments. */
+    /** Get the macro rule arguments. */
     [[nodiscard]]
     const std::vector<std::pair<token, token>>& get_args() const
     {
         return args;
     }
 
-    /** Whether this macro branch ens with an expression list capture.  */
+    /** Whether this macro rule ens with an expression list capture.  */
     [[nodiscard]]
     bool ends_with_list_capture() const
     {
         return args_end_with_list;
     }
 
-    /** Get the macro branch body. */
+    /** Get the separators between macro rule arguments. */
     [[nodiscard]]
-    const std::unique_ptr<block>& get_body() const
+    const std::vector<token>& get_argument_separators() const
     {
-        return body;
+        return argument_separators;
+    }
+
+    /** Get the opening delimiter for macro rule arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_opening_delimiter() const
+    {
+        return argument_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for macro rule arguments. */
+    [[nodiscard]]
+    const std::optional<token>& get_argument_closing_delimiter() const
+    {
+        return argument_closing_delimiter;
+    }
+
+    /** Get the raw body tokens, excluding the outer braces. */
+    [[nodiscard]]
+    const std::optional<token_stream>& get_body_tokens() const
+    {
+        return body_tokens;
+    }
+
+    /** Get the opening delimiter for the raw body tokens. */
+    [[nodiscard]]
+    const std::optional<token>& get_body_opening_delimiter() const
+    {
+        return body_opening_delimiter;
+    }
+
+    /** Get the closing delimiter for the raw body tokens. */
+    [[nodiscard]]
+    const std::optional<token>& get_body_closing_delimiter() const
+    {
+        return body_closing_delimiter;
     }
 };
 
@@ -4195,7 +4330,10 @@ public:
 class macro_expression : public named_expression
 {
     /** The macro's branches. */
-    std::vector<std::unique_ptr<macro_branch>> branches;
+    std::vector<std::unique_ptr<macro_rule>> branches;
+
+    /** Modules referenced by this macro's validated body. */
+    std::set<std::string> referenced_modules;
 
 public:
     /** Set the super class. */
@@ -4209,10 +4347,11 @@ public:
                | std::views::transform(
                  [](const auto& ptr)
                  {
-                     return std::unique_ptr<macro_branch>(
-                       static_cast<macro_branch*>(ptr->clone().release()));
+                     return std::unique_ptr<macro_rule>(
+                       static_cast<macro_rule*>(ptr->clone().release()));
                  })
                | std::ranges::to<std::vector>()}
+    , referenced_modules{other.referenced_modules}
     {
     }
     macro_expression(macro_expression&&) = default;
@@ -4231,7 +4370,7 @@ public:
     macro_expression(
       source_location loc,
       token name,
-      std::vector<std::unique_ptr<macro_branch>> branches)
+      std::vector<std::unique_ptr<macro_rule>> branches)
     : named_expression{loc, std::move(name)}
     , branches{std::move(branches)}
     {
@@ -4301,16 +4440,12 @@ public:
       sema::env& sema_env,
       macro::env& macro_env) const;
 
-    /**
-     * Expand the macro given a macro invocation.
-     *
-     * @param ctx The code generation context.
-     * @param invocation The macro invocation expression/context.
-     * @return The macro expansion AST for the invocation.
-     */
-    std::unique_ptr<expression> expand(
-      cg::context& ctx,
-      const macro_invocation& invocation) const;
+    /** Get modules referenced by this macro's validated body. */
+    [[nodiscard]]
+    const std::set<std::string>& get_referenced_modules() const
+    {
+        return referenced_modules;
+    }
 };
 
 /** AST of a translation unit. */

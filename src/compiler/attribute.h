@@ -15,7 +15,7 @@
 #include <string>
 #include <variant>
 
-#include "location.h"
+#include "shared/location.h"
 
 namespace slang::attribs
 {

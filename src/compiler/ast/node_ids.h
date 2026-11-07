@@ -56,7 +56,7 @@ enum class node_identifier : std::uint8_t
     while_statement,
     break_statement,
     continue_statement,
-    macro_branch,
+    macro_rule,
     macro_expression_list,
     macro_expression,
     translation_unit,

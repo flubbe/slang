@@ -25,8 +25,11 @@ add_executable(native_integration
     ../src/runtime/strings.cpp
     ../src/runtime/types.cpp
     ../src/runtime/utils.cpp
+    ../src/shared/location.cpp
     ../src/shared/module.cpp
     ../src/shared/opcodes.cpp
+    ../src/shared/token_stream.cpp
+    ../src/shared/token.cpp
     ../src/filemanager.cpp
     ../src/module_resolver.cpp
 )

@@ -60,10 +60,11 @@ function(add_compile_exec_test test_name uses_std)
     set_tests_properties("${noeval_run}" PROPERTIES FIXTURES_REQUIRED "${noeval_compile}")
 
     if(uses_std)
-        set_tests_properties(
-            "${default_compile}" "${default_run}"
-            "${noeval_compile}" "${noeval_run}"
-            PROPERTIES FIXTURES_REQUIRED needs_std
+        set_property(
+            TEST
+                "${default_compile}" "${default_run}"
+                "${noeval_compile}" "${noeval_run}"
+            APPEND PROPERTY FIXTURES_REQUIRED needs_std
         )
     endif()
 endfunction()
@@ -123,8 +124,8 @@ function(add_jit_compile_test test_name uses_std)
     )
 
     if(uses_std)
-        set_tests_properties("${jit_test_name}"
-            PROPERTIES FIXTURES_REQUIRED needs_std
+        set_property(TEST "${jit_test_name}"
+            APPEND PROPERTY FIXTURES_REQUIRED needs_std
         )
     endif()
 endfunction()
@@ -136,5 +137,9 @@ function(set_jit_test_properties test_name)
         return()
     endif()
 
-    set_tests_properties("${test_name} (JIT)" ${ARGN})
+    if(ARGV1 STREQUAL "APPEND")
+        set_property(TEST "${test_name} (JIT)" ${ARGN})
+    else()
+        set_tests_properties("${test_name} (JIT)" ${ARGN})
+    endif()
 endfunction()

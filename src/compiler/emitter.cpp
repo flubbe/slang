@@ -594,6 +594,35 @@ std::set<std::string> instruction_emitter::collect_jump_targets() const
 
 void instruction_emitter::collect_imports()
 {
+    // walk symbol table to collect macro dependencies/modules.
+    for(const auto& symbol_entry: sema_env.symbol_table)
+    {
+        const auto& symbol_info = symbol_entry.second;
+        if(symbol_info.type != sema::symbol_type::macro
+           || symbol_info.declaring_module != sema::symbol_info::current_module_id
+           || !symbol_info.reference.has_value())
+        {
+            continue;
+        }
+
+        const auto* declaration = std::get_if<const ast::expression*>(
+          &symbol_info.reference.value());
+
+        if(declaration == nullptr
+           || !(*declaration)->is_macro_expression())
+        {
+            continue;
+        }
+
+        const auto* macro_declaration = static_cast<const ast::macro_expression*>(
+          *declaration);
+
+        for(const auto& package_name: macro_declaration->get_referenced_modules())
+        {
+            imports.intern_package(package_name);
+        }
+    }
+
     // walk types.
     for(const auto& [id, symbol_info]: sema_env.symbol_table)
     {

@@ -4,7 +4,7 @@
  * Code generation tests.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -191,10 +191,9 @@ void add_arg(
   cg::type ty)
 {
     auto id = ctx.declare(
-      name,
+      {name, {0, 0}},
       name,
       sema::symbol_type::argument,
-      {0, 0},
       sema::symbol_id::invalid,
       false);
 
@@ -585,10 +584,9 @@ sema::symbol_id add_local(
   cg::type ty)
 {
     auto local_id = ctx.declare(
-      name,
+      {name, {0, 0}},
       slang::name::qualified_name(fn->get_name(), name),
       sema::symbol_type::variable,
-      {0, 0},
       sema::symbol_id::invalid,
       false);
 
@@ -855,10 +853,9 @@ TEST(codegen, invoke)
           {0, 0});
 
         const sema::symbol_id function_symbol_id = co_ctx.declare(
-          "g",
+          {"g", {0, 0}},
           "g",
           sema::symbol_type::variable,
-          {0, 0},
           mock_scope_id,
           false,
           std::nullopt);
@@ -1059,10 +1056,9 @@ TEST(codegen, invoke)
           {0, 0});
 
         co_ctx.declare(
-          "g",
+          {"g", {0, 0}},
           "g",
           sema::symbol_type::variable,
-          {0, 0},
           mock_scope_id,
           false,
           std::nullopt);

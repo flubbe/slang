@@ -323,8 +323,8 @@ protected:
     std::set<std::string> collect_jump_targets() const;
 
     /**
-     * Collect imports by inspecting the instructions `invoke` and `new`,
-     * and macros.
+     * Collect imports from referenced types, instructions, and local macro
+     * bodies.
      */
     void collect_imports();
 

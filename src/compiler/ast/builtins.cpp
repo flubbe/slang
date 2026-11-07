@@ -4,11 +4,14 @@
  * abstract syntax tree (built-ins).
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #include "compiler/codegen/codegen.h"
+#include "compiler/format_util.h"
+#include "compiler/macro_format.h"
+#include "compiler/parser.h"
 #include "compiler/resolve.h"
 #include "compiler/typing.h"
 #include "builtins.h"
@@ -20,144 +23,12 @@ namespace slang::ast
 {
 
 /*
- * format_macro_expander.
- */
-
-const token& format_macro_expander::get_format_token()
-{
-    if(exprs.empty())
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot evaluate macro 'format!' with no arguments. Consider removing it.");
-    }
-
-    if(!exprs[0]->is_literal())
-    {
-        throw cg::codegen_error(
-          loc,
-          "Cannot evaluate macro 'format!': Expected <string-literal> as its first argument.");
-    }
-
-    auto* format_expr = exprs[0]->as_literal();
-    const auto& format_token = format_expr->get_token();
-    if(format_token.type != token_type::str_literal)
-    {
-        throw cg::codegen_error(
-          format_token.location,
-          "Expected <string-literal>.");
-    }
-
-    return format_token;
-}
-
-void format_macro_expander::create_format_string_placeholders()
-{
-    std::optional<format_string_placeholder> current_placeholder{std::nullopt};
-    std::string current_format_specifier;
-
-    for(std::size_t i = 0; i < format_string.s.length(); ++i)
-    {
-        if(format_string.s[i] == '{')
-        {
-            if(current_placeholder.has_value())
-            {
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid format string '{}'.",
-                    format_string.s));
-            }
-
-            if(i + 1 < format_string.s.length() && format_string.s[i + 1] == '{')
-            {
-                placeholders.emplace_back(
-                  format_string_placeholder{
-                    .start = i,
-                    .end = i + 1,
-                    .specifier = '{'});
-                i += 1;
-                continue;
-            }
-
-            current_placeholder = format_string_placeholder{
-              .start = i,
-              .end = 0,
-              .specifier = std::nullopt,
-              .arg_type = std::nullopt};
-        }
-        else if(format_string.s[i] == '}')
-        {
-            if(current_placeholder.has_value())
-            {
-                current_placeholder->end = i + 1;
-
-                if(current_format_specifier.length() > 1
-                   || (current_format_specifier.length() == 1
-                       && (current_format_specifier[0] != 'd'
-                           && current_format_specifier[0] != 'f'
-                           && current_format_specifier[0] != 's')))
-                {
-                    throw cg::codegen_error(
-                      loc,
-                      std::format(
-                        "Unsupported format specifier '{}'.",
-                        current_format_specifier));
-                }
-                current_placeholder->specifier = !current_format_specifier.empty()
-                                                   ? std::make_optional(current_format_specifier[0])
-                                                   : std::nullopt;
-                current_format_specifier.clear();
-
-                placeholders.emplace_back(*current_placeholder);
-                current_placeholder = std::nullopt;
-            }
-            else
-            {
-                if(i + 1 < format_string.s.length() && format_string.s[i + 1] == '}')
-                {
-                    placeholders.emplace_back(
-                      format_string_placeholder{
-                        .start = i,
-                        .end = i + 1,
-                        .specifier = '}'});
-                    i += 1;
-                    continue;
-                }
-
-                throw cg::codegen_error(
-                  loc,
-                  std::format(
-                    "Invalid format string '{}'.",
-                    format_string.s));
-            }
-        }
-        else
-        {
-            if(current_placeholder.has_value())
-            {
-                current_format_specifier += format_string.s[i];
-            }
-        }
-    }
-
-    if(current_placeholder.has_value())
-    {
-        throw cg::codegen_error(
-          loc,
-          std::format(
-            "Invalid format string '{}'.",
-            format_string.s));
-    }
-}
-
-/*
  * format_macro_expression.
  */
 
 void format_macro_expression::expand_late_macros(
   ty::context& ctx,
-  [[maybe_unused]] sema::env& env)
+  sema::env& env)
 {
     if(expansion)
     {
@@ -166,208 +37,37 @@ void format_macro_expression::expand_late_macros(
           "Double 'format!' macro expansion.");
     }
 
-    if(placeholders.size() + 1 != exprs.size())
+    std::vector<ty::type_id> arg_types;
+    arg_types.reserve(exprs.size() > 1 ? exprs.size() - 1 : 0);
+    for(std::size_t i = 1; i < exprs.size(); ++i)
     {
-        throw cg::codegen_error(
-          loc,
-          "Unmatched format placeholders or syntax error in macro invocation.");
-    }
-
-    const auto& format_string = exprs[0]->as_literal()->get_token();
-
-    // String only.
-    if(exprs.size() == 1)
-    {
-        expansion = std::make_unique<ast::literal_expression>(
-          format_string.location,
-          format_string);
-
-        return;
-    }
-
-    // Go through the placeholder list and convert tokens as needed.
-    std::size_t last_string_fragment_end = 1;    // skip '"'.
-    for(std::size_t i = 0; i < placeholders.size(); ++i)
-    {
-        const auto& fph = placeholders[i];
-        if(!fph.arg_type.has_value())
+        std::optional<ty::type_id> arg_type = exprs[i]->type_check(ctx, env);
+        if(!arg_type.has_value())
         {
             throw cg::codegen_error(
               loc,
               std::format(
-                "No argument type for argument at position {}.",
+                "No type for argument at position {}.",
                 i));
         }
-
-        std::size_t expr_index = i + 1;
-        const auto& expr = exprs[expr_index];
-
-        // get string fragment.
-        std::string fragment = format_string.s.substr(
-          last_string_fragment_end,
-          fph.start - last_string_fragment_end);
-        last_string_fragment_end = fph.end;
-
-        if(!fragment.empty())
-        {
-            if(expansion)
-            {
-                auto concat_args = std::vector<std::unique_ptr<ast::expression>>{};
-                concat_args.emplace_back(std::move(expansion));
-                concat_args.emplace_back(
-                  std::make_unique<ast::literal_expression>(
-                    loc,
-                    token{fragment, loc, token_type::str_literal, std::nullopt, fragment}));
-
-                auto concat_expr = std::make_unique<ast::call_expression>(
-                  token{"string_concat", loc},
-                  std::move(concat_args));
-
-                expansion = std::make_unique<ast::namespace_access_expression>(
-                  token{"std", loc},
-                  std::move(concat_expr));
-            }
-            else
-            {
-                expansion = std::make_unique<ast::literal_expression>(
-                  loc, token{fragment, loc, token_type::str_literal, std::nullopt, fragment});
-            }
-        }
-
-        std::unique_ptr<ast::expression> conversion_ast;
-        if(fph.arg_type == ctx.get_i8_type()
-           || fph.arg_type == ctx.get_i16_type()
-           || fph.arg_type == ctx.get_i32_type())
-        {
-            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-
-            if(fph.arg_type != ctx.get_i32_type())
-            {
-                conversion_args.emplace_back(
-                  std::make_unique<type_cast_expression>(
-                    loc,
-                    expr->clone(),
-                    std::make_unique<type_expression>(
-                      loc,
-                      token{"i32", loc},
-                      std::vector<token>{},
-                      false)));
-            }
-            else
-            {
-                conversion_args.emplace_back(expr->clone());
-            }
-
-            auto to_string_expr = std::make_unique<ast::call_expression>(
-              token{"i32_to_string", loc},
-              std::move(conversion_args));
-
-            conversion_ast = std::make_unique<ast::namespace_access_expression>(
-              token{"std", loc},
-              std::move(to_string_expr));
-        }
-        else if(fph.arg_type == ctx.get_i64_type())
-        {
-            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-            conversion_args.emplace_back(expr->clone());
-
-            auto to_string_expr = std::make_unique<ast::call_expression>(
-              token{"i64_to_string", loc},
-              std::move(conversion_args));
-
-            conversion_ast = std::make_unique<ast::namespace_access_expression>(
-              token{"std", loc},
-              std::move(to_string_expr));
-        }
-        else if(fph.arg_type == ctx.get_f32_type())
-        {
-            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-            conversion_args.emplace_back(expr->clone());
-
-            auto to_string_expr = std::make_unique<ast::call_expression>(
-              token{"f32_to_string", loc},
-              std::move(conversion_args));
-
-            conversion_ast = std::make_unique<ast::namespace_access_expression>(
-              token{"std", loc},
-              std::move(to_string_expr));
-        }
-        else if(fph.arg_type == ctx.get_f64_type())
-        {
-            auto conversion_args = std::vector<std::unique_ptr<ast::expression>>{};
-            conversion_args.emplace_back(expr->clone());
-
-            auto to_string_expr = std::make_unique<ast::call_expression>(
-              token{"f64_to_string", loc},
-              std::move(conversion_args));
-
-            conversion_ast = std::make_unique<ast::namespace_access_expression>(
-              token{"std", loc},
-              std::move(to_string_expr));
-        }
-        else if(fph.arg_type == ctx.get_str_type())
-        {
-            // No conversion needed.
-            conversion_ast = expr->clone();
-        }
-        else
-        {
-            throw cg::codegen_error(
-              expr->get_location(),
-              std::format(
-                "No formatter for type '{}'.",
-                ctx.to_string(fph.arg_type.value())));
-        }
-
-        if(expansion)
-        {
-            auto concat_args = std::vector<std::unique_ptr<ast::expression>>{};
-            concat_args.emplace_back(std::move(expansion));
-            concat_args.emplace_back(std::move(conversion_ast));
-
-            auto concat_expr = std::make_unique<ast::call_expression>(
-              token{"string_concat", loc},
-              std::move(concat_args));
-
-            expansion = std::make_unique<ast::namespace_access_expression>(
-              token{"std", loc},
-              std::move(concat_expr));
-        }
-        else
-        {
-            expansion = std::move(conversion_ast);
-        }
+        arg_types.push_back(arg_type.value());
     }
 
-    if(!expansion)
+    token_stream expansion_tokens;
+    try
     {
-        throw cg::codegen_error(
+        expansion_tokens = macro::expand_format_builtin(
+          arg_tokens,
+          arg_types,
           loc,
-          "Empty 'format!' macro expansion.");
+          ctx);
     }
-
-    // trailing format string fragments.
-    if(last_string_fragment_end != format_string.s.length() - 1)    // skip trailing quote.
+    catch(const macro::macro_error& e)
     {
-        std::string fragment = format_string.s.substr(
-          last_string_fragment_end,
-          format_string.s.length() - last_string_fragment_end - 1);
-
-        auto concat_args = std::vector<std::unique_ptr<ast::expression>>{};
-        concat_args.emplace_back(std::move(expansion));
-        concat_args.emplace_back(
-          std::make_unique<ast::literal_expression>(
-            loc,
-            token{fragment, loc, token_type::str_literal, std::nullopt, fragment}));
-
-        auto concat_expr = std::make_unique<ast::call_expression>(
-          token{"string_concat", loc},
-          std::move(concat_args));
-
-        expansion = std::make_unique<ast::namespace_access_expression>(
-          token{"std", loc},
-          std::move(concat_expr));
+        throw cg::codegen_error(loc, e.what());
     }
+
+    expansion = parser::parse_expression(std::move(expansion_tokens));
 }
 
 std::unique_ptr<cg::rvalue> format_macro_expression::emit_rvalue(
@@ -417,19 +117,23 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
     {
         throw ty::type_error(
           loc,
-          std::format(
-            "Macro 'format!': No format string found."));
+          "Macro 'format!': No format string found.");
     }
 
-    format_macro_expander expander{loc, exprs};
-    if(expander.get_placeholders().size() != exprs.size() - 1)
+    if(!exprs[0]->is_literal())
     {
         throw ty::type_error(
-          loc,
-          std::format(
-            "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
-            exprs.size() - 1,
-            expander.get_placeholders().size()));
+          exprs[0]->get_location(),
+          "Expected <string-literal>.");
+    }
+
+    auto* format_expr = exprs[0]->as_literal();
+    const auto& format_token = format_expr->get_token();
+    if(format_token.type != token_type::str_literal)
+    {
+        throw ty::type_error(
+          format_token.location,
+          "Expected <string-literal>.");
     }
 
     if(exprs[0]->type_check(ctx, env) != ctx.get_str_type())
@@ -439,11 +143,39 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
           "Expected <string-literal>.");
     }
 
-    // check that all expressions and specifiers match, or that the inferred type is supported.
+    if(format_token.s.length() < 2)
+    {
+        throw ty::type_error(
+          format_token.location,
+          "Macro 'format!': Malformed format string.");
+    }
+
+    std::string fmt = format_token.s.substr(1, format_token.s.length() - 2);
+
+    std::vector<format_util::placeholder> placeholders;
+    try
+    {
+        placeholders = format_util::parse_format_string(fmt, format_token.location);
+    }
+    catch(const std::exception& e)
+    {
+        throw ty::type_error(loc, e.what());
+    }
+
+    if(placeholders.size() != exprs.size() - 1)
+    {
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Macro 'format!': Argument count does not match placeholder count: {} != {}.",
+            exprs.size() - 1,
+            placeholders.size()));
+    }
+
     for(std::size_t i = 1; i < exprs.size(); ++i)
     {
         const auto& e = exprs[i];
-        const auto& p = expander.get_placeholders()[i - 1];
+        const auto& p = placeholders[i - 1];
 
         std::optional<ty::type_id> t = e->type_check(ctx, env);
         if(!t.has_value())
@@ -455,60 +187,17 @@ std::optional<ty::type_id> format_macro_expression::type_check(ty::context& ctx,
                 i));
         }
 
-        // supported types are i32, i64, f32, f64 and str.
-        if(p.specifier.has_value())
+        try
         {
-            if(((t == ctx.get_i32_type() || t == ctx.get_i64_type()) && p.specifier.value() == 'd')
-               || ((t == ctx.get_f32_type() || t == ctx.get_f64_type()) && p.specifier.value() == 'f')
-               || (t == ctx.get_str_type() && p.specifier.value() == 's'))
-            {
-                auto& ph = placeholders.emplace_back(p);
-                ph.arg_type = t;
-            }
-            else
-            {
-                throw ty::type_error(
-                  e->get_location(),
-                  std::format(
-                    "Macro 'format!': Argument at position {} has wrong type.",
-                    i));
-            }
+            format_util::validate_arg_type(
+              t.value(),
+              p.specifier,
+              ctx,
+              e->get_location());
         }
-        else
+        catch(const std::exception& err)
         {
-            // store type in placeholders.
-            if(t == ctx.get_i32_type() || t == ctx.get_i64_type())
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .specifier = 'd',
-                  .arg_type = t});
-            }
-            else if(t == ctx.get_f32_type() || ctx.get_f64_type())
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .specifier = 'f',
-                  .arg_type = t});
-            }
-            else if(t == ctx.get_str_type())
-            {
-                placeholders.emplace_back(format_string_placeholder{
-                  .start = p.start,
-                  .end = p.end,
-                  .specifier = 's',
-                  .arg_type = t});
-            }
-            else
-            {
-                throw ty::type_error(
-                  e->get_location(),
-                  std::format(
-                    "Macro 'format!': Argument at position '{}' is not convertible to a string.",
-                    i));
-            }
+            throw ty::type_error(e->get_location(), err.what());
         }
     }
 

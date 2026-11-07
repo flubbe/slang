@@ -54,7 +54,7 @@ std::unique_ptr<expression> construct(node_identifier id)
     case node_identifier::while_statement: return std::make_unique<while_statement>();
     case node_identifier::break_statement: return std::make_unique<break_statement>();
     case node_identifier::continue_statement: return std::make_unique<continue_statement>();
-    case node_identifier::macro_branch: return std::make_unique<macro_branch>();
+    case node_identifier::macro_rule: return std::make_unique<macro_rule>();
     case node_identifier::macro_expression_list: return std::make_unique<macro_expression_list>();
     case node_identifier::macro_expression: return std::make_unique<macro_expression>();
     case node_identifier::translation_unit: return std::make_unique<translation_unit>();

@@ -17,8 +17,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "shared/token.h"
 #include "sema.h"
-#include "token.h"
 #include "type.h"
 
 /*

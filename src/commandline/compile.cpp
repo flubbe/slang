@@ -4,7 +4,7 @@
  * `compile` command implementation.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -15,6 +15,7 @@
 #include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
 #include "compiler/emitter.h"
+#include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
@@ -186,17 +187,10 @@ void compile::invoke(const std::vector<std::string>& args)
         input_ar->serialize(std::as_writable_bytes(std::span(input_buffer)));
     }
 
-    slang::lexer lexer;
     slang::parser parser;
 
-    lexer.set_input(input_buffer);
-    parser.parse(lexer);
-
-    if(!lexer.eof())
-    {
-        std::println("Lexer did not complete input reading.");
-        return;
-    }
+    auto tokens = slang::lexer::lex(input_buffer);
+    parser.parse(std::move(tokens));
 
     std::shared_ptr<ast::expression> ast = parser.get_ast();
     if(!ast)
@@ -204,8 +198,6 @@ void compile::invoke(const std::vector<std::string>& args)
         std::println("No AST produced.");
         return;
     }
-
-    const std::vector<ast::expression*> module_macro_asts = parser.get_macro_asts();
 
     ld::context loader_ctx{file_mgr};
     sema::env sema_env;
@@ -238,16 +230,13 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->collect_macros(sema_env, macro_env);
     do    // NOLINT(cppcoreguidelines-avoid-do-while)
     {
-        do    // NOLINT(cppcoreguidelines-avoid-do-while)
-        {
-            resolver_ctx.resolve_imports(loader_ctx);
-        } while(ld::context::resolve_macros(co_ctx, macro_env));
+        resolver_ctx.resolve_imports(loader_ctx);
     } while(ast->expand_macros(
       co_ctx,
       resolver_ctx,
       codegen_ctx,
       macro_env,
-      module_macro_asts));
+      sema_env.syntax_contexts));
 
     ast->resolve_names(resolver_ctx);
     ast->declare_types(type_ctx, sema_env);
@@ -256,7 +245,14 @@ void compile::invoke(const std::vector<std::string>& args)
     ast->bind_constant_declarations(sema_env, const_env);
     ast->type_check(type_ctx, sema_env);
     ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
-    ast->expand_late_macros(co_ctx, resolver_ctx, type_ctx, sema_env);
+    ast->expand_late_macros(
+      co_ctx,
+      resolver_ctx,
+      type_ctx,
+      sema_env,
+      &codegen_ctx,
+      &macro_env,
+      &sema_env.syntax_contexts);
     ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
 
     // code generation and verification.
