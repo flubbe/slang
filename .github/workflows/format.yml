@@ -1,0 +1,21 @@
+name: Format
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-20
+
+      - name: Check formatting
+        run: |
+          CLANG_FORMAT=clang-format-20 ./scripts/check-format.sh
