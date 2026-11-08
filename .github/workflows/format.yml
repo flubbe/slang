@@ -14,8 +14,8 @@ jobs:
       - name: Install clang-format
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format-20
+          sudo apt-get install -y clang-format-22
 
       - name: Check formatting
         run: |
-          CLANG_FORMAT=clang-format-20 bash ./scripts/check-format.sh
+          CLANG_FORMAT=clang-format-22 bash ./scripts/check-format.sh
