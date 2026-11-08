@@ -72,6 +72,9 @@ function(add_gtest_executable target_name)
     set_tests_properties("${clean_test_name}" PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/..")
 endfunction()
 
+include(cmake/TestHelpers.cmake)
+slang_is_jit_supported(JIT_SUPPORTED)
+
 #
 # Unit tests
 #
@@ -176,31 +179,47 @@ set_tests_properties(interpreter PROPERTIES FIXTURES_REQUIRED output)
 add_gtest_executable(test_vector test_vector.cpp)
 
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-    add_gtest_executable(test_jit_aarch64
+    add_gtest_executable(test_jit_apple_aarch64
         ../src/archives/file.cpp
         ../src/interpreter/gc.cpp
-        ../src/jit/aarch64/cfg.cpp
-        ../src/jit/aarch64/compiler.cpp
+        ../src/jit/cfg.cpp
+        ../src/jit/abi/apple_aarch64/compiler.cpp
+        ../src/jit/module_loader.cpp
         ../src/jit/aarch64/emitter.cpp
-        ../src/jit/aarch64/module_loader.cpp
         ../src/shared/module.cpp
         ../src/shared/opcodes.cpp
         ../src/filemanager.cpp
-        test_jit_aarch64.cpp
+        test_jit_apple_aarch64.cpp
     )
-    target_link_libraries(test_jit_aarch64 PRIVATE slang_shared_core Microsoft.GSL::GSL)
-    set_tests_properties(jit_aarch64
+    target_link_libraries(test_jit_apple_aarch64 PRIVATE slang_shared_core Microsoft.GSL::GSL)
+    set_tests_properties(jit_apple_aarch64
         PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED generate_jit_test)
+endif()
+
+if(UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    add_gtest_executable(test_jit_x86_64_sysv
+        ../src/archives/file.cpp
+        ../src/interpreter/gc.cpp
+        ../src/jit/cfg.cpp
+        ../src/jit/abi/sysv_x86_64/compiler.cpp
+        ../src/jit/module_loader.cpp
+        ../src/jit/x86_64/emitter.cpp
+        ../src/shared/module.cpp
+        ../src/shared/opcodes.cpp
+        ../src/filemanager.cpp
+        test_jit_x86_64_sysv.cpp
+    )
+    target_link_libraries(test_jit_x86_64_sysv PRIVATE slang_shared_core Microsoft.GSL::GSL)
+    set_tests_properties(jit_x86_64_sysv
+        PROPERTIES
         FIXTURES_REQUIRED generate_jit_test)
 endif()
 
 #
 # Command line tests
 #
-
-include(cmake/TestHelpers.cmake)
-slang_is_jit_supported(JIT_SUPPORTED)
 
 add_compile_test(
     "build std"
@@ -222,7 +241,7 @@ set_tests_properties(
     PROPERTIES FIXTURES_SETUP gc_module
 )
 
-if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+if(JIT_SUPPORTED)
     add_test(
         NAME "build jit library (default, compile)"
         COMMAND ${CMAKE_BINARY_DIR}/slang compile test/test_jit_library

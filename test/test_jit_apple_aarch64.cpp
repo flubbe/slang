@@ -11,7 +11,9 @@
 #include <gtest/gtest.h>
 
 #include "archives/memory.h"
-#include "jit/aarch64.h"
+#include "jit/abi/apple_aarch64/apple_aarch64.h"
+#include "jit/module_loader.h"
+#include "jit/aarch64/emitter.h"
 #include "package.h"
 
 namespace
@@ -21,6 +23,9 @@ namespace si = slang::interpreter;
 namespace sj = slang::jit;
 
 using namespace sj::aarch64;
+using namespace sj::abi::apple_aarch64;
+using sj::module_loader;
+using sj::stack_slot_size;
 
 template<typename T>
 using constant_serializer = slang::constant_serializer<T>;
@@ -132,7 +137,7 @@ std::string exception_message(
 
 // NOLINTBEGIN(readability-magic-numbers)
 
-TEST(jit, instruction_encodings_i32)
+TEST(jit_apple_aarch64, instruction_encodings_i32)
 {
     /*
      * Compare generated machine code against
@@ -178,7 +183,7 @@ TEST(jit, instruction_encodings_i32)
     EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0x4b020020});
 }
 
-TEST(jit, instruction_encodings_i64)
+TEST(jit_apple_aarch64, instruction_encodings_i64)
 {
     /*
      * Compare generated machine code against
@@ -233,7 +238,7 @@ TEST(jit, instruction_encodings_i64)
     EXPECT_EQ(hex_value{emitter.code.back()}, hex_value{0xcb020020});
 }
 
-TEST(jit, instruction_encodings_others)
+TEST(jit_apple_aarch64, instruction_encodings_others)
 {
     /*
      * Compare generated machine code against
@@ -269,7 +274,7 @@ TEST(jit, instruction_encodings_others)
 
 // NOLINTEND(readability-magic-numbers)
 
-TEST(jit, compile_execute_sample_function)
+TEST(jit_apple_aarch64, compile_execute_sample_function)
 {
     memory_write_archive bytecode_ar{false /* persistent */};
 
@@ -357,7 +362,7 @@ TEST(jit, compile_execute_sample_function)
     EXPECT_EQ(result, 132);
 }
 
-TEST(jit, compile_execute_i32_math)
+TEST(jit_apple_aarch64, compile_execute_i32_math)
 {
     constexpr std::int32_t expected_result = 42;
 
@@ -405,7 +410,7 @@ TEST(jit, compile_execute_i32_math)
     EXPECT_EQ(run_shift(opcode::ishr, -84, 1), -42);
 }
 
-TEST(jit, compile_execute_i64_math)
+TEST(jit_apple_aarch64, compile_execute_i64_math)
 {
     constexpr std::int64_t expected_result = 42;
     constexpr std::int32_t unaligned_prefix_value = 7;
@@ -459,7 +464,7 @@ TEST(jit, compile_execute_i64_math)
     EXPECT_EQ(run_shift(opcode::lshr, -84, 1), -42);
 }
 
-TEST(jit, compile_execute_remaining_opcodes)
+TEST(jit_apple_aarch64, compile_execute_remaining_opcodes)
 {
     EXPECT_EQ((run_numeric_conversion<std::int32_t, std::int32_t>(opcode::iconst, opcode::i2c, 0x180)), -128);
     EXPECT_EQ((run_numeric_conversion<std::int32_t, std::int32_t>(opcode::iconst, opcode::i2s, 0x18000)), -32768);
@@ -504,7 +509,7 @@ TEST(jit, compile_execute_remaining_opcodes)
     EXPECT_EQ(run_logical(opcode::lor, 0, 0), 0);
 }
 
-TEST(jit, module_loader)
+TEST(jit_apple_aarch64, module_loader)
 {
     slang::file_manager file_mgr;
     file_mgr.add_search_path(".");

@@ -17,9 +17,10 @@
 #include <unordered_map>
 
 #include "archives/memory.h"
-#include "jit/aarch64.h"
+#include "jit/aarch64/emitter.h"
+#include "jit/abi/apple_aarch64/apple_aarch64.h"
+#include "jit/cfg.h"
 #include "shared/type_class.h"
-#include "cfg.h"
 
 namespace si = slang::interpreter;
 
@@ -29,6 +30,7 @@ namespace
 using namespace slang;
 using namespace slang::jit;
 using namespace slang::jit::aarch64;
+using namespace slang::jit::abi::apple_aarch64;
 
 /*
  * Runtime helper calls for the generated code.
@@ -2167,8 +2169,10 @@ std::uint32_t read_local_offset(
 
 }    // namespace
 
-namespace slang::jit::aarch64
+namespace slang::jit::abi::apple_aarch64
 {
+
+using namespace slang::jit::aarch64;
 
 jit_function jit_compiler::create_jit_function(
   module_::function_signature signature,
@@ -3635,4 +3639,4 @@ jit_function jit_compiler::compile(
       max_stack_size);
 }
 
-}    // namespace slang::jit::aarch64
+}    // namespace slang::jit::abi::apple_aarch64

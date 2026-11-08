@@ -11,6 +11,9 @@
 
 #pragma once
 
+#include <cstring>
+#include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -76,43 +79,63 @@ public:
     /** Default constructor. */
     executable_memory() = default;
 
-    explicit executable_memory(
-      const std::vector<std::uint32_t>& machine_code)
-    : memory_size{byte_size(machine_code)}
+    explicit executable_memory(std::span<const std::byte> machine_code)
+    : memory_size{machine_code.size()}
     {
+        if(machine_code.empty())
+        {
+            throw std::invalid_argument{"Cannot create executable memory for empty machine code."};
+        }
+
+        int flags = MAP_ANON | MAP_PRIVATE;
+#ifdef __APPLE__
+        flags |= MAP_JIT;
+#endif
         memory = mmap(
           nullptr,
           memory_size,
           PROT_READ | PROT_WRITE,
-          MAP_ANON | MAP_PRIVATE | MAP_JIT,
+          flags,
           -1,
           0);
 
         if(memory == MAP_FAILED)
         {
+            memory = nullptr;
             throw std::runtime_error{
-              "jit_compiler_aarch64: mmap failed"};
+              "JIT executable memory allocation failed."};
         }
 
+#ifdef __APPLE__
         pthread_jit_write_protect_np(0);
+#endif
 
         std::memcpy(
           memory,
           machine_code.data(),
           memory_size);
 
+#ifdef __APPLE__
         pthread_jit_write_protect_np(1);
+#endif
 
         if(mprotect(memory, memory_size, PROT_READ | PROT_EXEC) != 0)
         {
             munmap(memory, memory_size);
+            memory = nullptr;
+            memory_size = 0;
             throw std::runtime_error{
-              "jit_compiler_aarch64: mprotect failed"};
+              "JIT executable memory protection failed."};
         }
 
         flush_instruction_cache(
           memory,
           memory_size);
+    }
+
+    explicit executable_memory(const std::vector<std::uint32_t>& machine_code)
+    : executable_memory{std::as_bytes(std::span{machine_code})}
+    {
     }
 
     /** Destructor. */

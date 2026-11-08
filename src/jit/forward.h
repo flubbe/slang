@@ -16,7 +16,8 @@
  * Check JIT availability.
  */
 
-#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_POSIX)
+#if (defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)) \
+  || (defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX))
 #    define SLANG_JIT_AVAILABLE 1
 #else
 #    define SLANG_JIT_AVAILABLE 0
@@ -29,18 +30,29 @@
 namespace slang::jit
 {
 
-#ifdef SLANG_ARCH_AARCH64
+class module_loader;
 
-namespace aarch64
+#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)
+
+namespace abi::apple_aarch64
 {
 class jit_compiler;
-class module_loader;
-}    // namespace aarch64
+}    // namespace abi::apple_aarch64
 
-using jit_compiler = aarch64::jit_compiler;
-using module_loader = aarch64::module_loader;
+using jit_compiler = abi::apple_aarch64::jit_compiler;
 
-#endif /* SLANG_ARCH_AARCH64 */
+#endif /* SLANG_ARCH_AARCH64 && SLANG_OS_MACOS */
+
+#if defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX)
+
+namespace abi::sysv_x86_64
+{
+class jit_compiler;
+}    // namespace abi::sysv_x86_64
+
+using jit_compiler = abi::sysv_x86_64::jit_compiler;
+
+#endif /* SLANG_ARCH_X86_64 && SLANG_OS_POSIX */
 
 #ifdef SLANG_OS_POSIX
 

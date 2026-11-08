@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <functional>
 #include <stdexcept>
 #include <utility>
@@ -25,7 +26,7 @@
  */
 
 #ifdef SLANG_OS_POSIX
-#    include "memory_posix.h"
+#    include "jit/memory/posix.h"
 #else
 #    error "JIT executable_memory is not supported on this target architecture."
 #endif
@@ -35,6 +36,9 @@ namespace slang::jit
 
 namespace cg = slang::codegen;
 namespace si = slang::interpreter;
+
+/** Byte size of a normalized operand-stack slot. */
+constexpr std::int32_t stack_slot_size = 8;
 
 /** JIT compiler error. */
 class jit_error : public std::runtime_error

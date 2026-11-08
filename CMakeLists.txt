@@ -115,13 +115,20 @@ set(SOURCES
 
 if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     list(APPEND SOURCES
-        src/jit/aarch64/cfg.cpp
-        src/jit/aarch64/compiler.cpp
+        src/jit/cfg.cpp
+        src/jit/abi/apple_aarch64/compiler.cpp
+        src/jit/module_loader.cpp
         src/jit/aarch64/emitter.cpp
-        src/jit/aarch64/module_loader.cpp
     )
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-    # TODO Add x86_64 source files/definitions here.
+    if(UNIX)
+        list(APPEND SOURCES
+            src/jit/cfg.cpp
+            src/jit/abi/sysv_x86_64/compiler.cpp
+            src/jit/module_loader.cpp
+            src/jit/x86_64/emitter.cpp
+        )
+    endif()
 endif()
 
 add_executable(slang ${SOURCES})
