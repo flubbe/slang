@@ -19,9 +19,9 @@
 
 #ifdef __APPLE__
 #    include <libkern/OSCacheControl.h>
+#    include <pthread.h>
 #endif
 
-#include <pthread.h>
 #include <sys/mman.h>
 
 namespace slang::jit::posix
@@ -137,6 +137,18 @@ public:
         flush_instruction_cache(
           memory,
           memory_size);
+    }
+
+    /**
+     * Creates executable memory containing the given machine code.
+     *
+     * @param machine_code Machine code to copy into executable memory, represented
+     *     as 8-bit values.
+     */
+    explicit executable_memory(
+      std::span<const std::uint8_t> machine_code)
+    : executable_memory{std::as_bytes(machine_code)}
+    {
     }
 
     /**
