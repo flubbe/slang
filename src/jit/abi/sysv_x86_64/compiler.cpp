@@ -34,7 +34,7 @@ using slang::interpreter::stack_frame;
 
 void load_string_constant(
   stack_frame* frame,
-  std::size_t constant_index,
+  std::size_t constant_index,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_offset) noexcept
 {
     try
@@ -74,7 +74,7 @@ void load_string_constant(
 void execute_reference_local(
   stack_frame* frame,
   opcode operation,
-  std::size_t local_offset,
+  std::size_t local_offset,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_offset) noexcept
 {
     try
@@ -181,7 +181,7 @@ void execute_reference_stack(
 void duplicate_stack_block(
   stack_frame* frame,
   opcode operation,
-  std::uint32_t reference_flags,
+  std::uint32_t reference_flags,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t old_size) noexcept
 {
     try
@@ -225,7 +225,8 @@ void duplicate_stack_block(
             const auto source_offset = old_size - copied_size;
             const std::vector<std::byte> copy{
               stack.begin() + static_cast<std::ptrdiff_t>(source_offset),
-              stack.begin() + static_cast<std::ptrdiff_t>(old_size)};
+              stack.begin() + static_cast<std::ptrdiff_t>(old_size),
+            };
             std::memcpy(
               stack.data() + old_size,
               copy.data(),
@@ -396,7 +397,7 @@ template<typename Element>
 void load_array_element(
   stack_frame* frame,
   void* array,
-  std::int32_t index,
+  std::int32_t index,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_offset,
   bool reference_element)
 {
@@ -474,7 +475,7 @@ void execute_array_load(
         const auto array_type = frame->gc->get_object_type(array);
         frame->gc->remove_temporary(array);
 
-        const auto expected_type = [&]()
+        const auto expected_type = [&]
         {
             switch(operation)
             {
@@ -597,7 +598,7 @@ template<typename Element>
 void store_array_element(
   stack_frame* frame,
   void* array,
-  std::int32_t index,
+  std::int32_t index,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t value_offset,
   bool reference_element)
 {
@@ -664,7 +665,7 @@ void execute_array_store(
         const auto array_type = frame->gc->get_object_type(array);
         frame->gc->remove_temporary(array);
 
-        const auto expected_type = [&]()
+        const auto expected_type = [&]
         {
             switch(operation)
             {
@@ -697,7 +698,7 @@ void execute_array_store(
               "Array store opcode does not match the array element type."};
         }
 
-        const auto value_offset = stack_offset + 2 * stack_slot_size;
+        const auto value_offset = stack_offset + (2uz * stack_slot_size);
         switch(operation)
         {
         case opcode::castore:
@@ -862,7 +863,7 @@ void create_struct(
   stack_frame* frame,
   std::size_t size,
   std::size_t alignment,
-  std::size_t layout_id,
+  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_offset) noexcept
 {
     try
@@ -896,7 +897,7 @@ void create_struct(
 
 void create_struct_array(
   stack_frame* frame,
-  std::size_t layout_id,
+  std::size_t layout_id,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t stack_offset) noexcept
 {
     try
@@ -929,7 +930,7 @@ void create_struct_array(
         std::memcpy(
           frame->stack.span().data() + stack_offset,
           &array,
-          sizeof(array));
+          sizeof(array));    // We really want to store the pointer here. // NOLINT(bugprone-sizeof-expression)
     }
     catch(...)
     {
@@ -944,7 +945,7 @@ void create_struct_array(
 void access_field(
   stack_frame* frame,
   bool store,
-  std::size_t field_size,
+  std::size_t field_size,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t field_offset,
   bool field_needs_gc,
   std::size_t stack_offset) noexcept
@@ -977,7 +978,7 @@ void access_field(
         if(field_size != 1
            && field_size != 2
            && field_size != 4
-           && field_size != 8)
+           && field_size != 8)    // NOLINT(readability-magic-numbers)
         {
             throw jit_error{
               std::format(
@@ -986,7 +987,7 @@ void access_field(
         }
 
         frame->gc->remove_temporary(object);
-        auto* location = static_cast<std::byte*>(object) + field_offset;
+        auto* location = static_cast<std::byte*>(object) + field_offset;    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         if(store)
         {
@@ -1001,7 +1002,7 @@ void access_field(
             {
                 void* reference{nullptr};
                 std::memcpy(
-                  &reference,
+                  static_cast<void*>(&reference),
                   &value,
                   sizeof(reference));
                 frame->gc->remove_temporary(reference);
@@ -1067,7 +1068,7 @@ void access_field(
         {
             void* reference{nullptr};
             std::memcpy(
-              &reference,
+              static_cast<void*>(&reference),
               &value,
               sizeof(reference));
             frame->gc->add_temporary(reference);
@@ -1130,7 +1131,7 @@ void check_cast(
 template<typename T>
     requires std::is_integral_v<T> && std::is_signed_v<T>
 void store_and_extend(
-  std::span<std::byte> destination,
+  std::span<std::byte> destination,    // NOLINT(bugprone-easily-swappable-parameters)
   std::span<const std::byte> source)
 {
     T value{};
@@ -1790,7 +1791,7 @@ T divide_or_remainder(
 
 std::int32_t execute_integer_division(
   stack_frame* frame,
-  std::size_t offset,
+  std::size_t offset,    // NOLINT(bugprone-easily-swappable-parameters)
   std::uint32_t flags) noexcept
 {
     try
@@ -1914,7 +1915,7 @@ void emit_helper_call(
 
 std::size_t get_local_offset(
   const vle_int& index,
-  const std::vector<std::size_t>& local_offsets,
+  const std::vector<std::size_t>& local_offsets,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t locals_size,
   std::size_t local_size)
 {
@@ -2055,7 +2056,7 @@ void emit_binary(
 
 jit_function jit_compiler::create_jit_function(
   module_::function_signature signature,
-  const std::vector<std::uint8_t>& machine_code,
+  const std::vector<std::uint8_t>& machine_code,    // NOLINT(bugprone-easily-swappable-parameters)
   std::size_t locals_size,
   std::size_t stack_size)
 {
@@ -2069,12 +2070,13 @@ jit_function jit_compiler::create_jit_function(
       std::move(memory),
       function,
       locals_size,
-      stack_size};
+      stack_size,
+    };
 }
 
 jit_function jit_compiler::compile(
   module_::function_signature signature,
-  std::span<const std::byte> bytecode,
+  std::span<const std::byte> bytecode,    // NOLINT(bugprone-easily-swappable-parameters)
   const std::vector<std::size_t>& local_offsets,
   std::size_t locals_size,
   const std::vector<std::unique_ptr<jit_call_target>>& call_targets,
@@ -2187,9 +2189,11 @@ jit_function jit_compiler::compile(
             const auto fixup = emitter.code.size();
             emitter.jmp_rel32();
             branch_fixups.push_back(
-              {.instruction_index = fixup,
-               .label_id = label_id.i,
-               .conditional = false});
+              {
+                .instruction_index = fixup,
+                .label_id = label_id.i,
+                .conditional = false,
+              });
             break;
         }
         case opcode::jnz:
@@ -2220,17 +2224,21 @@ jit_function jit_compiler::compile(
             emitter.jcc_rel32(condition_code::not_equal);
 
             branch_fixups.push_back(
-              {.instruction_index = conditional_fixup,
-               .label_id = then_label.i,
-               .conditional = true});
+              {
+                .instruction_index = conditional_fixup,
+                .label_id = then_label.i,
+                .conditional = true,
+              });
 
             const auto else_fixup = emitter.code.size();
             emitter.jmp_rel32();
 
             branch_fixups.push_back(
-              {.instruction_index = else_fixup,
-               .label_id = else_label.i,
-               .conditional = false});
+              {
+                .instruction_index = else_fixup,
+                .label_id = else_label.i,
+                .conditional = false,
+              });
 
             update_stack_size(
               op,
@@ -2339,8 +2347,8 @@ jit_function jit_compiler::compile(
               current_stack_size);
             emitter.mov_imm64(
               lhs_register,
-              reinterpret_cast<std::uintptr_t>(
-                &load_string_constant));    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+              reinterpret_cast<std::uintptr_t>(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+                &load_string_constant));
             emitter.call_reg(lhs_register);
 
             emit_exception_guard();
@@ -2686,7 +2694,7 @@ jit_function jit_compiler::compile(
             emitter.load_r64(
               lhs_register,
               stack_register,
-              checked_displacement(current_stack_size - 2 * stack_slot_size));
+              checked_displacement(current_stack_size - (2 * stack_slot_size)));
             emitter.load_r64(
               rhs_register,
               stack_register,
@@ -2694,7 +2702,7 @@ jit_function jit_compiler::compile(
             emit_binary(emitter, op);
             emitter.store_r64(
               stack_register,
-              checked_displacement(current_stack_size - 2 * stack_slot_size),
+              checked_displacement(current_stack_size - (2 * stack_slot_size)),
               lhs_register);
 
             update_stack_size(
@@ -2727,7 +2735,7 @@ jit_function jit_compiler::compile(
               frame_register);
             emitter.mov_imm64(
               cpu_registers::RSI,
-              current_stack_size - 2 * stack_slot_size);
+              current_stack_size - (2 * stack_slot_size));
             emitter.mov_imm32(
               cpu_registers::RDX,
               (is_64_bit ? 0x1u : 0u)
@@ -2768,7 +2776,7 @@ jit_function jit_compiler::compile(
                     to_string(op))};
             }
 
-            const auto left_offset = checked_displacement(current_stack_size - 2 * stack_slot_size);
+            const auto left_offset = checked_displacement(current_stack_size - (2 * stack_slot_size));
             const auto right_offset = checked_displacement(current_stack_size - stack_slot_size);
             const bool is_double =
               op == opcode::dadd
@@ -2925,7 +2933,7 @@ jit_function jit_compiler::compile(
               emitter,
               reinterpret_cast<std::uintptr_t>(&execute_comparison),    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
               op,
-              current_stack_size - 2 * stack_slot_size);
+              current_stack_size - (2 * stack_slot_size));
 
             emit_exception_guard();
             update_stack_size(
@@ -3362,7 +3370,7 @@ jit_function jit_compiler::compile(
             }
 
             const auto value_offset =
-              checked_displacement(current_stack_size - 2 * stack_slot_size);
+              checked_displacement(current_stack_size - (2 * stack_slot_size));
             const auto shift_offset =
               checked_displacement(current_stack_size - stack_slot_size);
             const bool is_64_bit =
@@ -3470,7 +3478,7 @@ jit_function jit_compiler::compile(
             case opcode::fneg:
                 emitter.mov_imm32(
                   rhs_register,
-                  0x80000000u);
+                  0x80000000u);    // NOLINT(readability-magic-numbers)
                 emitter.xor_r32(
                   lhs_register,
                   rhs_register);
@@ -3478,7 +3486,7 @@ jit_function jit_compiler::compile(
             case opcode::dneg:
                 emitter.mov_imm64(
                   rhs_register,
-                  0x8000000000000000u);
+                  0x8000000000000000u);    // NOLINT(readability-magic-numbers)
                 emitter.xor_r64(
                   lhs_register,
                   rhs_register);
