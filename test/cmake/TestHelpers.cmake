@@ -94,7 +94,8 @@ endfunction()
 
 # JIT Helpers with centralized target platform check
 macro(slang_is_jit_supported OUT_VAR)
-    if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    if((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+       OR (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$"))
         set(${OUT_VAR} TRUE)
     else()
         set(${OUT_VAR} FALSE)

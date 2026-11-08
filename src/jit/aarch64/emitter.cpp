@@ -8,7 +8,7 @@
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
-#include "jit/aarch64.h"
+#include "jit/aarch64/emitter.h"
 
 // NOLINTBEGIN(readability-magic-numbers)
 

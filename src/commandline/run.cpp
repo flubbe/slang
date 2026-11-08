@@ -16,9 +16,15 @@
 #include "interpreter/interpreter.h"
 #include "interpreter/invoke.h"
 
-#ifdef SLANG_ARCH_AARCH64
-#    include "jit/aarch64.h"
-#endif /* SLANG_ARCH_AARCH64 */
+#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)
+#    include "jit/abi/apple_aarch64/apple_aarch64.h"
+#    include "jit/module_loader.h"
+#endif /* SLANG_ARCH_AARCH64 && SLANG_OS_MACOS */
+
+#if defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX)
+#    include "jit/abi/sysv_x86_64/sysv_x86_64.h"
+#    include "jit/module_loader.h"
+#endif /* SLANG_ARCH_X86_64 && SLANG_OS_POSIX */
 
 #include "runtime/runtime.h"
 #include "shared/module.h"

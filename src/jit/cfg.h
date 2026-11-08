@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * Control Flow Graph analysis for JIT compiler.
+ * Shared control flow graph analysis for JIT compilers.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026

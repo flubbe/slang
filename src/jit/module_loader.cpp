@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * Module loader using the Just In Time compiler for AArch64.
+ * Shared Just In Time module loader.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026
@@ -13,13 +13,23 @@
 
 #include "interpreter/types.h"
 #include "interpreter/type_utils.h"
-#include "jit/aarch64.h"
+#include "jit/forward.h"
+#include "jit/module_loader.h"
+
+#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)
+#    include "jit/abi/apple_aarch64/apple_aarch64.h"
+#elif defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX)
+#    include "jit/abi/sysv_x86_64/sysv_x86_64.h"
+#else
+#    error "JIT module loading is not supported on this target architecture."
+#endif
+
 #include "shared/type_utils.h"
 #include "shared/type_class.h"
 #include "package.h"
 #include "utils.h"
 
-namespace slang::jit::aarch64
+namespace slang::jit
 {
 
 using slang::interpreter::get_native_type_properties;
@@ -161,7 +171,7 @@ static cg::type_kind get_type_kind(
     }
     if(type_str == "f64")
     {
-        return cg::type_kind::f32;
+        return cg::type_kind::f64;
     }
 
     return cg::type_kind::ref;
@@ -332,6 +342,7 @@ module_loader::module_loader(
           .type = import.type,
           .name = std::move(import.name),
           .package_index = import.package_index,
+          .export_reference = static_cast<const module_loader*>(nullptr),
         });
     }
 
@@ -812,4 +823,4 @@ std::size_t module_loader::register_native_function_recursive(
     return registrations;
 }
 
-}    // namespace slang::jit::aarch64
+}    // namespace slang::jit

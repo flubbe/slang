@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * Control Flow Graph analysis for JIT compiler.
+ * Shared control flow graph analysis for JIT compilers.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026
@@ -11,17 +11,15 @@
 #include <utility>
 
 #include "archives/archive.h"
-#include "jit/aarch64.h"
+#include "jit/cfg.h"
 #include "shared/opcodes.h"
 #include "shared/type_class.h"
-#include "cfg.h"
 
 namespace
 {
 
 using namespace slang;
 using namespace slang::jit;
-using slang::jit::aarch64::stack_slot_size;
 
 /**
  * Compute net stack delta in bytes and advance pc for any given bytecode instruction.
