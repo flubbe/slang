@@ -2301,7 +2301,7 @@ jit_function jit_compiler::compile(
                 start_pc)};
         }
 
-        auto op = static_cast<opcode>(instr);
+        const auto op = static_cast<opcode>(instr);
         switch(op)
         {
         case opcode::iconst:
