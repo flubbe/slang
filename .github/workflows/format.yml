@@ -18,4 +18,4 @@ jobs:
 
       - name: Check formatting
         run: |
-          CLANG_FORMAT=clang-format-20 sh ./scripts/check-format.sh
+          CLANG_FORMAT=clang-format-20 bash ./scripts/check-format.sh
