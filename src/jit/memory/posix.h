@@ -79,7 +79,13 @@ public:
     /** Default constructor. */
     executable_memory() = default;
 
-    explicit executable_memory(std::span<const std::byte> machine_code)
+    /**
+     * Creates executable memory containing the given machine code.
+     *
+     * @param machine_code Machine code to copy into executable memory.
+     */
+    explicit executable_memory(
+      std::span<const std::byte> machine_code)
     : memory_size{machine_code.size()}
     {
         if(machine_code.empty())
@@ -133,8 +139,15 @@ public:
           memory_size);
     }
 
-    explicit executable_memory(const std::vector<std::uint32_t>& machine_code)
-    : executable_memory{std::as_bytes(std::span{machine_code})}
+    /**
+     * Creates executable memory containing the given machine code.
+     *
+     * @param machine_code Machine code to copy into executable memory, represented
+     *     as 32-bit words.
+     */
+    explicit executable_memory(
+      std::span<const std::uint32_t> machine_code)
+    : executable_memory{std::as_bytes(machine_code)}
     {
     }
 
@@ -179,6 +192,7 @@ public:
         return memory;
     }
 
+    /** Get the size of the executable memory. */
     [[nodiscard]]
     std::size_t size() const noexcept
     {

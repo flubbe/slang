@@ -2180,7 +2180,7 @@ jit_function jit_compiler::create_jit_function(
   std::size_t locals_size,
   std::size_t stack_size)
 {
-    executable_memory memory{machine_code};
+    executable_memory memory{std::span{machine_code}};
 
     auto function =
       reinterpret_cast<jit_function_pointer>(memory.data());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)

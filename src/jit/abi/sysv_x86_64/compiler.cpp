@@ -1365,10 +1365,11 @@ jit_function jit_compiler::create_jit_function(
   std::size_t locals_size,
   std::size_t stack_size)
 {
-    const auto bytes = std::as_bytes(std::span{machine_code});
-    executable_memory memory{bytes};
+    executable_memory memory{std::span{machine_code}};
+
     auto function =
       reinterpret_cast<jit_function_pointer>(memory.data());    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
     return jit_function{
       std::move(signature),
       std::move(memory),
