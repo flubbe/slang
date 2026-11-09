@@ -15,28 +15,29 @@
 #include "archives/file.h"
 #include "interpreter/interpreter.h"
 #include "interpreter/invoke.h"
-
-#if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)
-#    include "jit/abi/apple_aarch64/apple_aarch64.h"
-#    include "jit/module_loader.h"
-#endif /* SLANG_ARCH_AARCH64 && SLANG_OS_MACOS */
-
-#if defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX)
-#    include "jit/abi/sysv_x86_64/sysv_x86_64.h"
-#    include "jit/module_loader.h"
-#endif /* SLANG_ARCH_X86_64 && SLANG_OS_POSIX */
-
 #include "runtime/runtime.h"
 #include "shared/module.h"
 #include "commandline.h"
 #include "utils.h"
 
+#if SLANG_JIT_AVAILABLE
+
+#    if defined(SLANG_ARCH_AARCH64) && defined(SLANG_OS_MACOS)
+#        include "jit/abi/apple_aarch64/apple_aarch64.h"
+#        include "jit/module_loader.h"
+#    elif defined(SLANG_ARCH_X86_64) && defined(SLANG_OS_POSIX)
+#        include "jit/abi/sysv_x86_64/sysv_x86_64.h"
+#        include "jit/module_loader.h"
+#    else
+#        error SLANG_JIT_AVAILABLE is set, but no supported JIT target is available for this platform.
+#    endif
+
+namespace sj = slang::jit;
+
+#endif /* SLANG_JIT_AVAILABLE */
+
 namespace rt = slang::runtime;
 namespace si = slang::interpreter;
-
-#if SLANG_JIT_AVAILABLE
-namespace sj = slang::jit;
-#endif /* SLANG_JIT_AVAILABLE */
 
 namespace slang::commandline
 {

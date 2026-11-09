@@ -179,14 +179,14 @@ Ignoring comments, a program consists of:
 
    ```
    macro <name!> {
-       <macro-branch1>
-       <macro-branch2>
+       <macro-rule1>
+       <macro-rule2>
        ...
-       <macro-branchN>
+       <macro-ruleN>
    }
    ```
 
-   where <code>&lt;macro-branch<i>i</i>&gt;</code> is of the form
+   where <code>&lt;macro-rule<i>i</i>&gt;</code> is of the form
 
    ```
    (<arg1> : <arg-type1>, ..., <argM> : <arg-typeM>) => {
@@ -208,7 +208,7 @@ Ignoring comments, a program consists of:
 Statements and expressions can be decorated with _directives_:
 
 ```
-#[directive(arg-name1=arg1,...,arg_nameN=argN)]
+#[directive(arg-name1=arg1,...,arg-nameN=argN)]
 ...
 ```
 
