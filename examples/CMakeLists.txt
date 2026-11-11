@@ -14,27 +14,17 @@ include_directories(
 
 add_executable(native_integration
     native_integration.cpp
-    ../src/archives/file.cpp
-    ../src/interpreter/cfg.cpp
-    ../src/interpreter/gc.cpp
-    ../src/interpreter/interpreter.cpp
-    ../src/interpreter/module_loader.cpp
-    ../src/runtime/arrays.cpp
-    ../src/runtime/debug.cpp
-    ../src/runtime/math.cpp
-    ../src/runtime/strings.cpp
-    ../src/runtime/types.cpp
-    ../src/runtime/utils.cpp
-    ../src/shared/location.cpp
-    ../src/shared/module.cpp
-    ../src/shared/opcodes.cpp
-    ../src/shared/token_stream.cpp
-    ../src/shared/token.cpp
-    ../src/filemanager.cpp
-    ../src/module_resolver.cpp
 )
-target_link_libraries(native_integration Microsoft.GSL::GSL)
+
+target_link_libraries(native_integration
+    slang_interpreter)
+
 target_compile_options(native_integration PRIVATE
     ${COMPILE_OPTIONS_MSVC}
     ${COMPILE_OPTIONS_NOT_MSVC}
 )
+
+# Build the C‑bindings native‑integration example when C bindings are enabled
+if(SLANG_BUILD_C_BINDINGS)
+    add_subdirectory(bindings/c)
+endif()

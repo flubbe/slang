@@ -99,3 +99,21 @@ See [the documentation](docs/language.md) for more details.
 ### VS Code integration
 
 A preliminary VS Code extension can be found in [`vscode/slang-language-support`](vscode/slang-language-support).
+
+## Bindings
+
+### C bindings
+
+The C API is provided in `src/bindings/c`.  To compile the bindings you need to enable the corresponding CMake option when configuring the project:
+
+```bash
+# Create a build directory (or reuse an existing one)
+cmake -B build -DSLANG_BUILD_C_BINDINGS=ON   # enable C bindings
+cmake --build build
+```
+
+The build produces a shared library `libslang_c` (or `slang_c.dll` on Windows) placed in the build output directory.  Link against it in your own CMake project with:
+
+```cmake
+target_link_libraries(your_target PRIVATE slang_c)
+```
