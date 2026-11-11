@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: CI
 
 on:
   push:
@@ -99,9 +99,10 @@ jobs:
       - name: Run Rust tests
         run: cargo test --workspace --all-targets --release
 
-      - name: Run Rust example
-        run: cargo run --release --package slang_examples_rust
-
       - name: Run tests
         run: |
           ctest --test-dir ${{github.workspace}}/build/${{matrix.build_type}}/test --output-on-failure
+
+      - name: Run Rust example
+        # Example depends on CTest output (compiled native_integration module).
+        run: cargo run --release --package native_integration_rust
