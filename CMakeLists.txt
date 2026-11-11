@@ -62,6 +62,10 @@ add_library(slang_shared_core STATIC
     src/shared/token_stream.cpp
 )
 
+set_target_properties(slang_shared_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
 add_library(slang_interpreter STATIC
     src/archives/file.cpp
     src/interpreter/cfg.cpp
