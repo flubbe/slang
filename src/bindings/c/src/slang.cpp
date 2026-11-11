@@ -101,6 +101,11 @@ extern "C" slang_status slang_context_add_search_path(
         context->last_error = e.what();
         return SLANG_STATUS_FILESYSTEM_ERROR;
     }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
     catch(...)
     {
         context->last_error = "Unknown error.";
@@ -134,6 +139,11 @@ extern "C" slang_status slang_context_get_type_layout_id(
         return SLANG_STATUS_OK;
     }
     catch(const slang::gc::gc_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const std::exception& e)
     {
         context->last_error = e.what();
         return SLANG_STATUS_ERROR;
@@ -187,8 +197,19 @@ extern "C" slang_status slang_context_resolve_module(
         context->last_error = e.what();
         return SLANG_STATUS_FILESYSTEM_ERROR;
     }
+    catch(const slang::gc::gc_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
     catch(...)
     {
+        context->last_error = "Unknown error.";
         return SLANG_STATUS_ERROR;
     }
 }
@@ -221,6 +242,11 @@ extern "C" slang_status slang_module_has_function(
         *out_result = loader->has_function(
           name);
         return SLANG_STATUS_OK;
+    }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
     }
     catch(...)
     {
@@ -258,6 +284,11 @@ extern "C" slang_status slang_module_get_function(
         *out_function = reinterpret_cast<slang_function>(&loader->get_function(    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
           name));
         return SLANG_STATUS_OK;
+    }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
     }
     catch(...)
     {
@@ -407,6 +438,11 @@ extern "C" slang_status slang_type_register_layout(
     catch(const slang::gc::gc_error& e)
     {
         context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
         return SLANG_STATUS_ERROR;
     }
     catch(...)
@@ -457,6 +493,11 @@ extern "C" slang_status slang_function_register_native(
         return SLANG_STATUS_OK;
     }
     catch(const si::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(const std::exception& e)
     {
         context->last_error = e.what();
         return SLANG_STATUS_ERROR;
@@ -637,6 +678,11 @@ extern "C" slang_status slang_context_gc_remove_temporary(
     catch(const slang::gc::gc_error& e)
     {
         context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const std::exception& e)
+    {
+        context->last_error = e.what();
         return SLANG_STATUS_ERROR;
     }
     catch(...)
@@ -662,6 +708,11 @@ extern "C" slang_status slang_context_gc_run(
         return SLANG_STATUS_OK;
     }
     catch(const slang::gc::gc_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const std::exception& e)
     {
         context->last_error = e.what();
         return SLANG_STATUS_ERROR;

@@ -55,6 +55,24 @@ jobs:
         if: runner.os == 'Linux'
         uses: turtlebrowser/get-conan@main
 
+      - name: Install libclang (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
+      - name: Install libclang (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Conan version
         run: echo "${{ steps.conan.outputs.version }}"
 
@@ -71,6 +89,18 @@ jobs:
 
       - name: Build
         run: cmake --build --preset ${{matrix.conan_preset}}
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test --workspace --all-targets --release
+
+      - name: Run Rust example
+        run: cargo run --release --package slang_examples_rust
 
       - name: Run tests
         run: |

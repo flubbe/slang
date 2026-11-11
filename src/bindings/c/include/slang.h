@@ -83,7 +83,8 @@ extern "C"
         SLANG_STATUS_OK = 0,                /**< Success. */
         SLANG_STATUS_ERROR = -1,            /**< Generic error. */
         SLANG_STATUS_INVALID_ARGUMENT = -2, /**< Passed arguments were invalid. */
-        SLANG_STATUS_FILESYSTEM_ERROR = -3  /**< A filesystem operation failed. */
+        SLANG_STATUS_FILESYSTEM_ERROR = -3, /**< A filesystem operation failed. */
+        SLANG_STATUS_GC_ERROR = -4,         /**< A garbage collector error. */
     } slang_status;
 
     /*

@@ -1,0 +1,8 @@
+[package]
+name = "slang_examples_rust"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+slang_bindings = { path = "../../../src/bindings/rust" }
+libc = "0.2"
