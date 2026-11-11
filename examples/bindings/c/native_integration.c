@@ -80,7 +80,7 @@ static slang_status
     };
 
     slang_status status =
-      slang_context_register_type_layout(
+      slang_type_register_layout(
         context,
         "native_integration.S",
         s_layout,
@@ -92,7 +92,7 @@ static slang_status
 
     /* Register a native function. */
     status =
-      slang_context_register_native_function(
+      slang_function_register_native(
         context,
         "slang",
         "print",
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
      */
     const char* str_literal = "Hello from native code!";
     slang_string str =
-      slang_string_new(strlen(str_literal), str_literal);
+      slang_string_create(strlen(str_literal), str_literal);
 
     struct s_native s = {
       .a = 12,    // NOLINT(readability-magic-numbers)
@@ -204,8 +204,8 @@ int main(int argc, char* argv[])
     }
 
     slang_value args[2] = {
-      slang_value_type(layout_id, &s),
-      slang_value_f32(3.141f),    // NOLINT(readability-magic-numbers)
+      slang_value_from_type(layout_id, &s),
+      slang_value_from_f32(3.141f),    // NOLINT(readability-magic-numbers)
     };
 
     slang_value result = {0};

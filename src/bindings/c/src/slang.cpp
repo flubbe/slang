@@ -302,7 +302,7 @@ extern "C" slang_status slang_value_destroy(
  * Strings.
  */
 
-extern "C" slang_string slang_string_new(
+extern "C" slang_string slang_string_create(
   size_t length,
   const char* data)
 {
@@ -368,7 +368,7 @@ extern "C" void slang_string_view(
  * Types.
  */
 
-extern "C" slang_status slang_context_register_type_layout(
+extern "C" slang_status slang_type_register_layout(
   slang_context* context,
   const char* name,
   const size_t* offsets,
@@ -420,7 +420,7 @@ extern "C" slang_status slang_context_register_type_layout(
  * Functions.
  */
 
-extern "C" slang_status slang_context_register_native_function(
+extern "C" slang_status slang_function_register_native(
   slang_context* context,
   const char* module_name,
   const char* function_name,
@@ -624,7 +624,7 @@ extern "C" slang_status slang_context_gc_remove_temporary(
 {
     if(context == nullptr)
     {
-        return SLANG_STATUS_ERROR;
+        return SLANG_STATUS_INVALID_ARGUMENT;
     }
 
     context->last_error.clear();
@@ -651,7 +651,7 @@ extern "C" slang_status slang_context_gc_run(
 {
     if(context == nullptr)
     {
-        return SLANG_STATUS_ERROR;
+        return SLANG_STATUS_INVALID_ARGUMENT;
     }
 
     context->last_error.clear();
