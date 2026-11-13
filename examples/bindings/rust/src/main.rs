@@ -1,6 +1,5 @@
 use slang_bindings::{
-    Context, Error, NativeCall, NativeType, OwnedValue, Value, create_string, destroy_string,
-    string_to_rust,
+    Context, Error, NativeCall, NativeType, OwnedString, OwnedValue, StringRef, Value,
 };
 use std::ffi::c_void;
 
@@ -11,6 +10,12 @@ struct NativeS {
     c: i16,
     s: *mut c_void,
     i: i32,
+}
+
+impl NativeS {
+    fn string(&self) -> Result<String, Error> {
+        unsafe { StringRef::from_raw(self.s)?.to_string() }
+    }
 }
 
 unsafe impl NativeType for NativeS {
@@ -47,11 +52,12 @@ fn main() -> Result<(), Error> {
         let module = ctx.resolve_module("native_integration")?;
         let func = module.get_function("test")?;
 
+        let native_string = OwnedString::new("Hello from native code!")?;
         let native_instance = NativeS {
             a: 12,
             b: 3,
             c: 99,
-            s: create_string("Hello from native code!")?.cast(),
+            s: native_string.as_ptr(),
             i: 123,
         };
 
@@ -71,20 +77,12 @@ fn main() -> Result<(), Error> {
         };
 
         let ret = native_ret.as_ref::<NativeS>(&struct_layout)?;
-        unsafe {
-            match string_to_rust(ret.s.cast()) {
-                Ok(s) => println!("String from script: {}", s),
-                Err(e) => eprintln!("Unexpected return type: {:?}", e),
-            }
-        };
+
+        println!("String from script: {}", ret.string()?);
         println!("Value a: {}", ret.a);
         println!("Value b: {}", ret.b);
         println!("Value c: {}", ret.c);
         println!("Value i: {}", ret.i);
-
-        unsafe {
-            destroy_string(native_instance.s.cast());
-        }
     }
 
     ctx.gc_run()?;

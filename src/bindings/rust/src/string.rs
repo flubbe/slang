@@ -1,5 +1,8 @@
 use crate::error::Error;
 use crate::sys;
+use std::ffi::c_void;
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 
 /// Create a Slang string owned by the interpreter.
 /// The returned handle must later be destroyed with `slang_string_destroy`.
@@ -27,30 +30,72 @@ pub unsafe fn destroy_string(s: sys::slang_string) {
     unsafe { sys::slang_string_destroy(s) };
 }
 
-/// Return the contents of a Slang string as a Rust `String`.
-///
-/// # Safety
-///
-/// `s` must be a valid Slang string that remains alive for the duration
-/// of this call.
-pub unsafe fn string_to_rust(s: sys::slang_string) -> Result<String, Error> {
-    let mut len: usize = 0;
-    let mut data: *const i8 = std::ptr::null();
+pub struct OwnedString {
+    raw: NonNull<c_void>,
+}
 
-    // SAFETY: The caller guarantees that `s` is valid and alive.
-    // The C API provides a pointer and length for the string contents.
-    unsafe {
-        sys::slang_string_view(s, &mut len as *mut usize, &mut data as *mut *const i8);
+impl OwnedString {
+    pub fn new(value: &str) -> Result<Self, Error> {
+        let raw = create_string(value)?;
+        let raw = NonNull::new(raw.cast()).expect("create_string returned a null pointer");
+
+        Ok(Self { raw })
     }
 
-    if data.is_null() {
-        return Err(Error::NullPointer);
+    pub fn as_ptr(&self) -> *mut c_void {
+        self.raw.as_ptr()
+    }
+}
+
+impl Drop for OwnedString {
+    fn drop(&mut self) {
+        unsafe {
+            destroy_string(self.raw.as_ptr().cast());
+        }
+    }
+}
+
+pub struct StringRef<'a> {
+    raw: NonNull<c_void>,
+    _marker: PhantomData<&'a c_void>,
+}
+
+impl<'a> StringRef<'a> {
+    /// # Safety
+    /// `raw` must point to a valid Slang string that remains alive
+    /// for the lifetime `'a`.
+    pub unsafe fn from_raw(raw: *mut c_void) -> Result<Self, Error> {
+        let raw = NonNull::new(raw).ok_or(Error::NullPointer)?;
+
+        Ok(Self {
+            raw,
+            _marker: PhantomData,
+        })
     }
 
-    // SAFETY: The C API guarantees that `data` points to `len` valid UTF-8
-    // bytes that remain valid until the string is destroyed. We copy them
-    // immediately, before returning.
-    let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len) };
+    pub fn to_string(&self) -> Result<String, Error> {
+        let mut len: usize = 0;
+        let mut data: *const i8 = std::ptr::null();
 
-    Ok(String::from_utf8_lossy(slice).into_owned())
+        // SAFETY: The caller guarantees that `s` is valid and alive.
+        // The C API provides a pointer and length for the string contents.
+        unsafe {
+            sys::slang_string_view(
+                self.raw.as_ptr().cast(),
+                &mut len as *mut usize,
+                &mut data as *mut *const i8,
+            );
+        }
+
+        if data.is_null() {
+            return Err(Error::NullPointer);
+        }
+
+        // SAFETY: The C API guarantees that `data` points to `len` valid UTF-8
+        // bytes that remain valid until the string is destroyed. We copy them
+        // immediately, before returning.
+        let slice = unsafe { std::slice::from_raw_parts(data as *const u8, len) };
+
+        Ok(String::from_utf8_lossy(slice).into_owned())
+    }
 }

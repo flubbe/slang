@@ -13,6 +13,6 @@ pub use error::Error;
 pub use function::Function;
 pub use module::Module;
 pub use native::NativeCall;
-pub use string::{create_string, destroy_string, string_to_rust};
+pub use string::{OwnedString, StringRef};
 pub use types::NativeType;
 pub use value::{NativeValue, OwnedValue, Value};
