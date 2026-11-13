@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 /// - Every reported offset is valid for the type's memory layout.
 pub unsafe trait NativeType {
     const NAME: &'static str;
+    const MODULE: &'static str;
 
     fn pointer_offsets() -> &'static [usize];
 }

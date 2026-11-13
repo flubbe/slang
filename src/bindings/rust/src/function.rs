@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::module::Module;
 use crate::sys;
-use crate::value::{OwnedValue, Value};
+use crate::value::{IntoArgs, OwnedValue};
 use std::ptr::NonNull;
 
 pub struct Function<'module, 'ctx> {
@@ -17,7 +17,11 @@ impl<'module, 'ctx> Function<'module, 'ctx> {
         Self { module, raw }
     }
 
-    pub fn invoke(&self, args: &[Value<'_>]) -> Result<OwnedValue<'ctx>, Error> {
+    pub fn invoke<A>(&self, args: A) -> Result<OwnedValue<'ctx>, Error>
+    where
+        A: IntoArgs<'ctx>,
+    {
+        let args = args.into_args(self.module.context())?;
         let raw_args: Result<Vec<_>, _> = args
             .iter()
             .map(|arg| arg.as_raw(self.module.context()))

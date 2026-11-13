@@ -18,11 +18,16 @@ impl std::fmt::Debug for Context {
     }
 }
 
-fn qualified_type_name<T: NativeType>(module_name: &str) -> Result<String, Error> {
+fn qualified_type_name<T: NativeType>() -> Result<String, Error> {
     let type_name = T::NAME;
+    let module_name = T::MODULE;
 
     if type_name.is_empty() || type_name.contains('.') {
         return Err(Error::InvalidTypeName);
+    }
+
+    if module_name.is_empty() {
+        return Err(Error::InvalidModuleName);
     }
 
     Ok(format!("{module_name}.{type_name}").to_string())
@@ -167,11 +172,8 @@ impl Context {
         result
     }
 
-    pub fn register_type<T: NativeType>(
-        &self,
-        module_name: &str,
-    ) -> Result<TypeLayout<'_, T>, Error> {
-        let name = qualified_type_name::<T>(module_name).map_err(|_| Error::InvalidTypeName)?;
+    pub fn register_type<T: NativeType>(&self) -> Result<TypeLayout<'_, T>, Error> {
+        let name = qualified_type_name::<T>().map_err(|_| Error::InvalidTypeName)?;
         let c_name = CString::new(name.as_str()).map_err(|_| Error::InvalidTypeName)?;
 
         let offsets = T::pointer_offsets();
@@ -186,16 +188,13 @@ impl Context {
         };
 
         self.check_status(status)?;
-        let layout = self.get_type_layout::<T>(module_name)?;
+        let layout = self.get_type_layout::<T>()?;
 
         Ok(layout)
     }
 
-    pub fn get_type_layout<T: NativeType>(
-        &self,
-        module_name: &str,
-    ) -> Result<TypeLayout<'_, T>, Error> {
-        let name = qualified_type_name::<T>(module_name)?;
+    pub fn get_type_layout<T: NativeType>(&self) -> Result<TypeLayout<'_, T>, Error> {
+        let name = qualified_type_name::<T>()?;
         let c_name = CString::new(name).map_err(|_| Error::InvalidTypeName)?;
         let mut layout_id: usize = 0;
 

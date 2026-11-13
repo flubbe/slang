@@ -16,6 +16,35 @@ pub enum Value<'a> {
     },
 }
 
+pub trait IntoValue<'a> {
+    fn into_value(self, context: &'a Context) -> Result<Value<'a>, Error>;
+}
+
+impl<'a> IntoValue<'a> for i32 {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::I32(self))
+    }
+}
+
+impl<'a> IntoValue<'a> for f32 {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::F32(self))
+    }
+}
+
+impl<'a> IntoValue<'a> for &'a str {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::Str(self))
+    }
+}
+
+impl<'a, T: NativeType> IntoValue<'a> for &'a T {
+    fn into_value(self, context: &'a Context) -> Result<Value<'a>, Error> {
+        let layout = context.get_type_layout::<T>()?;
+        Ok(Value::from_type(self, &layout))
+    }
+}
+
 pub struct NativeValue<'ctx> {
     raw: sys::slang_value,
     layout_id: usize,
@@ -39,17 +68,14 @@ impl Drop for NativeValue<'_> {
 }
 
 impl<'ctx> NativeValue<'ctx> {
-    pub fn as_ref<T: NativeType>(&self, layout: &TypeLayout<'ctx, T>) -> Result<&T, Error> {
-        if !std::ptr::eq(self.context, layout.context()) {
+    pub fn as_ref<T: NativeType>(&self) -> Result<&T, Error> {
+        let layout = self.context.get_type_layout::<T>()?;
+
+        if self.layout_id != layout.id {
             return Err(Error::InvalidArgument);
         }
 
-        if self.raw.kind != sys::slang_value_kind_SLANG_VALUE_TYPE || self.layout_id != layout.id {
-            return Err(Error::InvalidArgument);
-        }
-
-        let data = unsafe { self.raw.data.type_.data };
-        let data = data.cast::<T>();
+        let data = unsafe { self.raw.data.type_.data }.cast::<T>();
 
         if data.is_null() {
             return Err(Error::NullPointer);
@@ -149,7 +175,7 @@ impl<'a> Value<'a> {
         Self::F32(value)
     }
 
-    pub fn from_type<T: NativeType>(value: &'a T, layout: &'a TypeLayout<'_, T>) -> Self {
+    pub fn from_type<T: NativeType>(value: &'a T, layout: &TypeLayout<'a, T>) -> Self {
         Self::Native {
             data: (value as *const T).cast(),
             layout_id: layout.id,
@@ -198,3 +224,52 @@ impl<'ctx> OwnedValue<'ctx> {
         }
     }
 }
+
+pub trait IntoArgs<'a> {
+    fn into_args(self, context: &'a Context) -> Result<Vec<Value<'a>>, Error>;
+}
+
+impl<'a> IntoArgs<'a> for () {
+    fn into_args(self, _: &'a Context) -> Result<Vec<Value<'a>>, Error> {
+        Ok(Vec::new())
+    }
+}
+
+macro_rules! impl_into_args {
+    ($($type:ident $value:ident),+) => {
+        impl<'a, $($type),+> IntoArgs<'a> for ($($type,)+)
+        where
+            $($type: IntoValue<'a>,)+
+        {
+            fn into_args(
+                self,
+                context: &'a Context,
+            ) -> Result<Vec<Value<'a>>, Error> {
+                let ($($value,)+) = self;
+
+                Ok(vec![
+                    $($value.into_value(context)?,)+
+                ])
+            }
+        }
+    };
+}
+
+impl_into_args!(A a);
+impl_into_args!(A a, B b);
+impl_into_args!(A a, B b, C c);
+impl_into_args!(A a, B b, C c, D d);
+impl_into_args!(A a, B b, C c, D d, E e);
+impl_into_args!(A a, B b, C c, D d, E e, F f);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j, K k);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j, K k, L l);

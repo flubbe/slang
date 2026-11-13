@@ -16,3 +16,10 @@ pub use native::NativeCall;
 pub use string::{OwnedString, StringRef};
 pub use types::NativeType;
 pub use value::{NativeValue, OwnedValue, Value};
+
+#[macro_export]
+macro_rules! call {
+    ($func:expr $(, $arg:expr)* $(,)?) => {
+        $func.invoke(($($arg,)*))
+    };
+}
