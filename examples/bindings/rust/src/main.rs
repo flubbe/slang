@@ -51,8 +51,7 @@ fn main() -> Result<(), Error> {
             a: 12,
             b: 3,
             c: 99,
-            // Create a Slang string that the interpreter will own.
-            s: create_string("Hello from native code!").unwrap().cast(),
+            s: create_string("Hello from native code!")?.cast(),
             i: 123,
         };
 
@@ -63,32 +62,29 @@ fn main() -> Result<(), Error> {
         let args = &[struct_val, float_val];
         let result = func.invoke(args)?;
 
-        match result {
-            OwnedValue::Native(native) => {
-                // Safety: we know the layout matches `NativeS` because the script
-                // declared the same type.
-                let ret = native.as_ref::<NativeS>(&struct_layout)?;
-
-                match unsafe { string_to_rust(ret.s.cast()) } {
-                    Ok(s) => {
-                        println!("String from script: {}", s);
-                    }
-                    other => {
-                        eprintln!("Unexpected return type: {:?}", other);
-                    }
-                }
-
-                println!("Value a: {}", ret.a);
-                println!("Value b: {}", ret.b);
-                println!("Value c: {}", ret.c);
-                println!("Value i: {}", ret.i);
-            }
+        let native_ret = match result {
+            OwnedValue::Native(native) => native,
             other => {
                 eprintln!("Unexpected return type: {:?}", other);
+                return Ok(());
             }
-        }
+        };
 
-        unsafe { destroy_string(native_instance.s.cast()) };
+        let ret = native_ret.as_ref::<NativeS>(&struct_layout)?;
+        unsafe {
+            match string_to_rust(ret.s.cast()) {
+                Ok(s) => println!("String from script: {}", s),
+                Err(e) => eprintln!("Unexpected return type: {:?}", e),
+            }
+        };
+        println!("Value a: {}", ret.a);
+        println!("Value b: {}", ret.b);
+        println!("Value c: {}", ret.c);
+        println!("Value i: {}", ret.i);
+
+        unsafe {
+            destroy_string(native_instance.s.cast());
+        }
     }
 
     ctx.gc_run()?;
