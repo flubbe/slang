@@ -546,6 +546,16 @@ set_tests_properties("native_integration" PROPERTIES
     FIXTURES_REQUIRED native_integration
 )
 
+# Test the C‑bindings native‑integration example when C bindings are enabled
+if(SLANG_BUILD_C_BINDINGS)
+    add_test(NAME "native_integration (C bindings)" COMMAND ${CMAKE_BINARY_DIR}/examples/bindings/c/native_integration_c)
+    set_tests_properties("native_integration (C bindings)" PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        FIXTURES_REQUIRED native_integration
+    )
+endif()
+
+
 #
 # Formatter CLI end-to-end test
 #

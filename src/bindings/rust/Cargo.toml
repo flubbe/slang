@@ -1,0 +1,10 @@
+[package]
+name = "slang_bindings"
+version = "0.1.0"
+edition.workspace = true
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+bindgen = "0.73"

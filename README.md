@@ -4,6 +4,10 @@ This repository is for learning how to build a scripting language, that is, a co
 and an interpreter. The current iteration of the language should be fairly feature complete,
 though it is certainly rough around the edges.
 
+Some features include:
+- Some JIT support for macOS/AArch64, Linux/x86_64.
+- Preliminary bindings for C and Rust.
+
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline))
 provides these commands:
 
@@ -99,3 +103,42 @@ See [the documentation](docs/language.md) for more details.
 ### VS Code integration
 
 A preliminary VS Code extension can be found in [`vscode/slang-language-support`](vscode/slang-language-support).
+
+## Bindings
+
+### C bindings
+
+The C API is provided in `src/bindings/c`.  To compile the bindings you need to enable the corresponding CMake option when configuring the project:
+
+```bash
+# Create a build directory (or reuse an existing one)
+cmake -B build -DSLANG_BUILD_C_BINDINGS=ON   # enable C bindings
+cmake --build build
+```
+
+The build produces a shared library `libslang_c` (or `slang_c.dll` on Windows) placed in the build output directory.  Link against it in your own CMake project with:
+
+```cmake
+target_link_libraries(your_target PRIVATE slang_c)
+```
+
+### Rust bindings
+
+Preliminary Rust bindings are provided in `src/bindings/rust`. They wrap the C API and provide a more idiomatic Rust interface for working with the interpreter.
+
+Make sure the C bindings are enabled when configuring the project:
+
+```bash
+cmake -B build -DSLANG_BUILD_C_BINDINGS=ON
+cmake --build build
+```
+
+To build and run the Rust binding tests:
+
+```bash
+cargo test --manifest-path src/bindings/rust/Cargo.toml
+```
+
+An example demonstrating native Rust integration is provided in `examples/bindings/rust`.
+
+**Note:** The API is not yet stable, and its ownership and lifetime guarantees have not been fully validated.

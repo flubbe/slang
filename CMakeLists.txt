@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0110 NEW)
 
-project(slang CXX)
+project(slang C CXX)
 
 enable_testing()
 
@@ -54,10 +54,50 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(cxxopts REQUIRED)
 find_package(Microsoft.GSL REQUIRED)
 
+option(SLANG_BUILD_C_BINDINGS "Build C bindings (default OFF)" OFF)
+
 add_library(slang_shared_core STATIC
     src/shared/location.cpp
     src/shared/token.cpp
     src/shared/token_stream.cpp
+)
+
+set_target_properties(slang_shared_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
+
+add_library(slang_interpreter STATIC
+    src/archives/file.cpp
+    src/interpreter/cfg.cpp
+    src/interpreter/gc.cpp
+    src/interpreter/interpreter.cpp
+    src/interpreter/module_loader.cpp
+    src/runtime/arrays.cpp
+    src/runtime/debug.cpp
+    src/runtime/math.cpp
+    src/runtime/strings.cpp
+    src/runtime/types.cpp
+    src/runtime/utils.cpp
+    src/shared/module.cpp
+    src/shared/opcodes.cpp
+    src/filemanager.cpp
+    src/module_resolver.cpp
+)
+
+target_include_directories(slang_interpreter
+    PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+)
+
+target_link_libraries(slang_interpreter
+    PRIVATE
+    slang_shared_core
+    PUBLIC
+    Microsoft.GSL::GSL
+)
+
+set_target_properties(slang_interpreter PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
 )
 
 set(SOURCES
@@ -132,7 +172,15 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
 endif()
 
 add_executable(slang ${SOURCES})
-target_link_libraries(slang slang_shared_core cxxopts::cxxopts Microsoft.GSL::GSL)
+target_link_libraries(slang
+    slang_shared_core
+    cxxopts::cxxopts
+    Microsoft.GSL::GSL)
 
 add_subdirectory(examples)
 add_subdirectory(test)
+
+# Language bindings
+if(SLANG_BUILD_C_BINDINGS)
+    add_subdirectory(src/bindings/c)
+endif()
