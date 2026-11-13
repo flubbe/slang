@@ -121,3 +121,24 @@ The build produces a shared library `libslang_c` (or `slang_c.dll` on Windows) p
 ```cmake
 target_link_libraries(your_target PRIVATE slang_c)
 ```
+
+### Rust bindings
+
+Preliminary Rust bindings are provided in `src/bindings/rust`. They wrap the C API and provide a more idiomatic Rust interface for working with the interpreter.
+
+Make sure the C bindings are enabled when configuring the project:
+
+```bash
+cmake -B build -DSLANG_BUILD_C_BINDINGS=ON
+cmake --build build
+```
+
+To build and run the Rust binding tests:
+
+```bash
+cargo test --manifest-path src/bindings/rust/Cargo.toml
+```
+
+An example demonstrating native Rust integration is provided in `examples/bindings/rust`.
+
+**Note:** The API is not yet stable, and its ownership and lifetime guarantees have not been fully validated.
