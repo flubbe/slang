@@ -6,8 +6,5 @@ edition.workspace = true
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[dependencies]
-libc = "0.2"
-
 [build-dependencies]
 bindgen = "0.73"
