@@ -4,7 +4,7 @@
  * value type.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
@@ -36,16 +36,10 @@ class value
     module_::variable_type type;
 
     /** Pointer to the create function for this value. */
-    void (value::*unbound_create_function)(std::byte*) const = nullptr;
+    void (value::*create_function)(std::byte*) const = nullptr;
 
     /** Pointer to the destroy function for this value. */
-    void (value::*unbound_destroy_function)(std::byte*) const = nullptr;
-
-    /** Create this value in memory. */
-    std::function<void(std::byte*)> create_function;
-
-    /** Destroy this value in memory. */
-    std::function<void(std::byte*)> destroy_function;
+    void (value::*destroy_function)(std::byte*) const = nullptr;
 
     /**
      * Create a primitive type value in memory.
@@ -208,38 +202,6 @@ class value
         std::memset(memory, 0, sizeof(void*));
     }
 
-    /**
-     * Bind the value creation and destruction methods.
-     *
-     * @param new_unbound_create_function The new (unbound) value creation method. Can be `nullptr`.
-     * @param new_unbound_destroy_function The new (unbound) value destruction method. Can be `nullptr`.
-     */
-    void bind(
-      void (value::*new_unbound_create_function)(std::byte*) const,
-      void (value::*new_unbound_destroy_function)(std::byte*) const)
-    {
-        unbound_create_function = new_unbound_create_function;
-        unbound_destroy_function = new_unbound_destroy_function;
-
-        if(unbound_create_function != nullptr)
-        {
-            create_function = std::bind(unbound_create_function, this, std::placeholders::_1);
-        }
-        else
-        {
-            create_function = [](std::byte*) {}; /* no-op */
-        }
-
-        if(unbound_destroy_function != nullptr)
-        {
-            destroy_function = std::bind(unbound_destroy_function, this, std::placeholders::_1);
-        }
-        else
-        {
-            destroy_function = [](std::byte*) {}; /* no-op */
-        }
-    }
-
     /** Disallow public default construction. */
     value() = default;
 
@@ -249,17 +211,19 @@ public:
     : data{other.data}
     , size{other.size}
     , type{other.type}
+    , create_function{other.create_function}
+    , destroy_function{other.destroy_function}
     {
-        bind(other.unbound_create_function, other.unbound_destroy_function);
     }
 
     /** Move constructor. */
     value(value&& other)
     : data{std::move(other.data)}
-    , size{other.size}
+    , size{std::exchange(other.size, 0)}
     , type{std::move(other.type)}
+    , create_function{std::exchange(other.create_function, nullptr)}
+    , destroy_function{std::exchange(other.destroy_function, nullptr)}
     {
-        bind(other.unbound_create_function, other.unbound_destroy_function);
     }
 
     /** Copy assignment. */
@@ -268,7 +232,8 @@ public:
         data = other.data;
         size = other.size;
         type = other.type;
-        bind(other.unbound_create_function, other.unbound_destroy_function);
+        create_function = other.create_function;
+        destroy_function = other.destroy_function;
         return *this;
     }
 
@@ -276,9 +241,10 @@ public:
     value& operator=(value&& other)
     {
         data = std::move(other.data);
-        size = other.size;
+        size = std::exchange(other.size, 0);
         type = std::move(other.type);
-        bind(other.unbound_create_function, other.unbound_destroy_function);
+        create_function = std::exchange(other.create_function, nullptr);
+        destroy_function = std::exchange(other.destroy_function, nullptr);
         return *this;
     }
 
@@ -286,6 +252,8 @@ public:
     static value make_void()
     {
         value v;
+        v.data = nullptr;
+        v.size = 0;
         v.type = {"void"};
         return v;
     }
@@ -294,6 +262,8 @@ public:
     static value make_null()
     {
         value v;
+        v.data = nullptr;
+        v.size = sizeof(nullptr_t);
         v.type = {"null"};
         return v;
     }
@@ -310,9 +280,7 @@ public:
         v.data = i;
         v.size = sizeof(std::int32_t);
         v.type = {"i32"};
-        v.bind(
-          &value::create_primitive_type<std::int32_t>,
-          nullptr);
+        v.create_function = &value::create_primitive_type<std::int32_t>;
         return v;
     }
 
@@ -328,9 +296,7 @@ public:
         v.data = f;
         v.size = sizeof(float);
         v.type = {"f32"};
-        v.bind(
-          &value::create_primitive_type<float>,
-          nullptr);
+        v.create_function = &value::create_primitive_type<float>;
         return v;
     }
 
@@ -349,9 +315,8 @@ public:
         v.data = std::move(s);
         v.size = sizeof(std::string*);
         v.type = {"str"};
-        v.bind(
-          &value::create_str,
-          &value::destroy_str);
+        v.create_function = &value::create_str;
+        v.destroy_function = &value::destroy_str;
         return v;
     }
 
@@ -367,9 +332,8 @@ public:
         v.data = std::string{s};
         v.size = sizeof(std::string*);
         v.type = {"str"};
-        v.bind(
-          &value::create_str,
-          &value::destroy_str);
+        v.create_function = &value::create_str;
+        v.destroy_function = &value::destroy_str;
         return v;
     }
 
@@ -411,9 +375,8 @@ public:
         v.data = addr;
         v.size = sizeof(void*);
         v.type = {"ref", std::nullopt, layout_id, std::nullopt};
-        v.bind(
-          &value::create_addr,
-          &value::destroy_addr);
+        v.create_function = &value::create_addr;
+        v.destroy_function = &value::destroy_addr;
         return v;
     }
 
@@ -429,9 +392,8 @@ public:
         v.data = addr;
         v.size = sizeof(void*);
         v.type = {std::move(type)};
-        v.bind(
-          &value::create_addr,
-          &value::destroy_addr);
+        v.create_function = &value::create_addr;
+        v.destroy_function = &value::destroy_addr;
         return v;
     }
 
@@ -443,7 +405,10 @@ public:
      */
     std::size_t create(std::byte* memory) const
     {
-        create_function(memory);
+        if(create_function != nullptr)
+        {
+            (this->*create_function)(memory);
+        }
         return size;
     }
 
@@ -455,7 +420,10 @@ public:
      */
     std::size_t destroy(std::byte* memory) const
     {
-        destroy_function(memory);
+        if(destroy_function != nullptr)
+        {
+            (this->*destroy_function)(memory);
+        }
         return size;
     }
 
@@ -496,9 +464,8 @@ inline value value::make_i32_array(
     v.data = std::move(int_vec);
     v.size = sizeof(void*);
     v.type = {"i32", 1};
-    v.bind(
-      &value::create_vector_type<std::int32_t>,
-      &value::destroy_vector_type<std::int32_t>);
+    v.create_function = &value::create_vector_type<std::int32_t>;
+    v.destroy_function = &value::destroy_vector_type<std::int32_t>;
     return v;
 }
 
@@ -509,9 +476,8 @@ inline value value::make_f32_array(
     v.data = std::move(float_vec);
     v.size = sizeof(void*);
     v.type = {"f32", 1};
-    v.bind(
-      &value::create_vector_type<float>,
-      &value::destroy_vector_type<float>);
+    v.create_function = &value::create_vector_type<float>;
+    v.destroy_function = &value::destroy_vector_type<float>;
     return v;
 }
 
@@ -522,9 +488,8 @@ inline value value::make_string_array(
     v.data = std::move(string_vec);
     v.size = sizeof(void*);
     v.type = {"str", 1};
-    v.bind(
-      &value::create_string_vector_type,
-      &value::destroy_string_vector_type);
+    v.create_function = &value::create_string_vector_type;
+    v.destroy_function = &value::destroy_string_vector_type;
     return v;
 }
 
