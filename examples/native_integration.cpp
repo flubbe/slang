@@ -101,10 +101,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     S s = S{.a = 12, .b = 3, .c = 99, .s = &str, .i = 123};    // NOLINT(readability-magic-numbers)
 
     // Invoke the function.
-    si::value res;
+    std::optional<si::value> res;
     try
     {
-        res = function(si::value{layout_id, &s}, 3.141f);    // NOLINT(readability-magic-numbers,modernize-use-std-numbers)
+        res = function(si::value::make_reference(layout_id, &s), 3.141f);    // NOLINT(readability-magic-numbers,modernize-use-std-numbers)
     }
     catch(const si::interpreter_error& err)
     {
@@ -113,7 +113,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     }
 
     // Print the result.
-    void* const* ret = res.get<void*>();
+    void* const* ret = res->get<void*>();
     if(ret == nullptr)
     {
         // `ret` can be `nullptr` if the return type was not an object.

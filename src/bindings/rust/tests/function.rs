@@ -95,3 +95,38 @@ fn invoke_with_too_many_arguments() {
         other => panic!("Expected invocation error, got {other:?}"),
     }
 }
+
+#[test]
+fn invoke_void_function() {
+    let context = context_with_test_paths();
+    let module = context.resolve_module("example_package::hello").unwrap();
+    let function = module.get_function("void_function").unwrap();
+
+    assert!(matches!(function.invoke(()).unwrap(), OwnedValue::Void));
+}
+
+#[test]
+fn invoke_with_empty_string() {
+    let context = context_with_test_paths();
+    let module = context.resolve_module("example_package::hello").unwrap();
+    let function = module.get_function("identity_str").unwrap();
+
+    assert!(matches!(
+        function.invoke(("",)).unwrap(),
+        OwnedValue::String(value) if value.is_empty()
+    ));
+}
+
+#[test]
+fn invoke_with_unicode_string() {
+    let context = context_with_test_paths();
+    let module = context.resolve_module("example_package::hello").unwrap();
+    let function = module.get_function("identity_str").unwrap();
+
+    let input = "Hello, 世界! 🦀";
+
+    assert!(matches!(
+        function.invoke((input,)).unwrap(),
+        OwnedValue::String(value) if value == input
+    ));
+}

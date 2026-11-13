@@ -1,0 +1,28 @@
+error[E0597]: `context` does not live long enough
+  --> tests/compile_fail/lifetime_function_outlives_function.rs:14:22
+   |
+ 7 |     let mut context = Context::new().unwrap();
+   |         ----------- binding `context` declared here
+...
+11 |     let function: Function<'static, '_>;
+   |                   --------------------- type annotation requires that `context` is borrowed for `'static`
+...
+14 |         let module = context.resolve_module("example_package::hello").unwrap();
+   |                      ^^^^^^^ borrowed value does not live long enough
+...
+20 | }
+   | - `context` dropped here while still borrowed
+
+error[E0597]: `module` does not live long enough
+  --> tests/compile_fail/lifetime_function_outlives_function.rs:16:20
+   |
+11 |     let function: Function<'static, '_>;
+   |                   --------------------- type annotation requires that `module` is borrowed for `'static`
+...
+14 |         let module = context.resolve_module("example_package::hello").unwrap();
+   |             ------ binding `module` declared here
+15 |
+16 |         function = module.get_function("return_hello").unwrap();
+   |                    ^^^^^^ borrowed value does not live long enough
+17 |     }
+   |     - `module` dropped here while still borrowed

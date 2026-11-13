@@ -240,10 +240,10 @@ class value
         }
     }
 
-public:
-    /** Default constructor. */
+    /** Disallow public default construction. */
     value() = default;
 
+public:
     /** Copy constructor. */
     value(const value& other)
     : data{other.data}
@@ -282,74 +282,112 @@ public:
         return *this;
     }
 
-    /**
-     * Construct a integer value.
-     *
-     * @param i The integer.
-     */
-    explicit value(int i)
-    : data{i}
-    , size{sizeof(std::int32_t)}
-    , type{"i32"}
+    /** Create a 'void' value. */
+    static value make_void()
     {
-        bind(&value::create_primitive_type<std::int32_t>, nullptr);
+        value v;
+        v.type = {"void"};
+        return v;
+    }
+
+    /** Create a 'null' value. */
+    static value make_null()
+    {
+        value v;
+        v.type = {"null"};
+        return v;
     }
 
     /**
-     * Construct a floating point value.
+     * Create an 'i32' value.
      *
-     * @param f The floating point value.
+     * @param i The value.
+     * @return Returns a 'i32' value.
      */
-    explicit value(float f)
-    : data{f}
-    , size{sizeof(float)}
-    , type{"f32"}
+    static value make_i32(int i)
     {
-        bind(&value::create_primitive_type<float>, nullptr);
+        value v;
+        v.data = i;
+        v.size = sizeof(std::int32_t);
+        v.type = {"i32"};
+        v.bind(
+          &value::create_primitive_type<std::int32_t>,
+          nullptr);
+        return v;
     }
 
     /**
-     * Construct a string value.
+     * Create an 'f32' value.
+     *
+     * @param f The value.
+     * @return Returns a 'f32' value.
+     */
+    static value make_f32(float f)
+    {
+        value v;
+        v.data = f;
+        v.size = sizeof(float);
+        v.type = {"f32"};
+        v.bind(
+          &value::create_primitive_type<float>,
+          nullptr);
+        return v;
+    }
+
+    /**
+     * Create a string value.
      *
      * @note The string is owned by this `value`. This is relevant when using `write`,
-     * which writes a pointer to the specified memory address.
+     *     which writes a pointer to the specified memory address.
      *
      * @param s The string.
+     * @return Returns a string value.
      */
-    explicit value(std::string s)
-    : data{std::move(s)}
-    , size{sizeof(std::string*)}
-    , type{"str"}
+    static value make_string(std::string s)
     {
-        bind(&value::create_str, &value::destroy_str);
+        value v;
+        v.data = std::move(s);
+        v.size = sizeof(std::string*);
+        v.type = {"str"};
+        v.bind(
+          &value::create_str,
+          &value::destroy_str);
+        return v;
     }
 
     /**
-     * Construct a string value.
+     * Create a string value.
      *
      * @param s The string.
+     * @return Returns a string value.
      */
-    explicit value(const char* s)
-    : data{std::string{s}}
-    , size{sizeof(std::string*)}
-    , type{"str"}
+    static value make_string(const char* s)
     {
-        bind(&value::create_str, &value::destroy_str);
+        value v;
+        v.data = std::string{s};
+        v.size = sizeof(std::string*);
+        v.type = {"str"};
+        v.bind(
+          &value::create_str,
+          &value::destroy_str);
+        return v;
     }
 
     /**
-     * Construct an integer array value.
+     * Create an integer array value.
      *
      * @param int_vec The integers.
+     * @return Returns a string value.
      */
-    explicit value(std::vector<std::int32_t> int_vec);
+    static value make_i32_array(std::vector<std::int32_t> int_vec);
 
     /**
-     * Construct a floating point array value.
+     * Create a floating point array value.
      *
      * @param float_vec The floating point values.
+     * @return Returns a string value.
      */
-    explicit value(std::vector<float> float_vec);
+    static value make_f32_array(std::vector<float> float_vec);
 
     /**
      * Construct a string array value.
@@ -359,34 +397,42 @@ public:
      *
      * @param string_vec The strings.
      */
-    explicit value(std::vector<std::string> string_vec);
+    static value make_string_array(std::vector<std::string> string_vec);
 
     /**
-     * Construct a value from an object.
+     * Construct a value from an object reference.
      *
      * @param layout_id The type's layout id.
-     * @param obj The object.
+     * @param obj The object's address.
      */
-    explicit value(std::size_t layout_id, void* addr)
-    : data{addr}
-    , size{sizeof(void*)}
-    , type{"ref", std::nullopt, layout_id, std::nullopt}
+    static value make_reference(std::size_t layout_id, void* addr)
     {
-        bind(&value::create_addr, &value::destroy_addr);
+        value v;
+        v.data = addr;
+        v.size = sizeof(void*);
+        v.type = {"ref", std::nullopt, layout_id, std::nullopt};
+        v.bind(
+          &value::create_addr,
+          &value::destroy_addr);
+        return v;
     }
 
     /**
-     * Construct a value from an object.
+     * Create a value from an object reference.
      *
      * @param type The object's type.
-     * @param obj The object.
+     * @param obj The object's address.
      */
-    explicit value(module_::variable_type type, void* addr)
-    : data{addr}
-    , size{sizeof(void*)}
-    , type{std::move(type)}
+    static value make_reference(module_::variable_type type, void* addr)
     {
-        bind(&value::create_addr, &value::destroy_addr);
+        value v;
+        v.data = addr;
+        v.size = sizeof(void*);
+        v.type = {std::move(type)};
+        v.bind(
+          &value::create_addr,
+          &value::destroy_addr);
+        return v;
     }
 
     /**
@@ -443,28 +489,43 @@ public:
     }
 };
 
-inline value::value(std::vector<std::int32_t> int_vec)
-: data{std::move(int_vec)}
-, size{sizeof(void*)}
-, type{"i32", 1}
+inline value value::make_i32_array(
+  std::vector<std::int32_t> int_vec)
 {
-    bind(&value::create_vector_type<std::int32_t>, &value::destroy_vector_type<std::int32_t>);
+    value v;
+    v.data = std::move(int_vec);
+    v.size = sizeof(void*);
+    v.type = {"i32", 1};
+    v.bind(
+      &value::create_vector_type<std::int32_t>,
+      &value::destroy_vector_type<std::int32_t>);
+    return v;
 }
 
-inline value::value(std::vector<float> float_vec)
-: data{std::move(float_vec)}
-, size{sizeof(void*)}
-, type{"f32", 1}
+inline value value::make_f32_array(
+  std::vector<float> float_vec)
 {
-    bind(&value::create_vector_type<float>, &value::destroy_vector_type<float>);
+    value v;
+    v.data = std::move(float_vec);
+    v.size = sizeof(void*);
+    v.type = {"f32", 1};
+    v.bind(
+      &value::create_vector_type<float>,
+      &value::destroy_vector_type<float>);
+    return v;
 }
 
-inline value::value(std::vector<std::string> string_vec)
-: data{std::move(string_vec)}
-, size{sizeof(void*)}
-, type{"str", 1}
+inline value value::make_string_array(
+  std::vector<std::string> string_vec)
 {
-    bind(&value::create_string_vector_type, &value::destroy_string_vector_type);
+    value v;
+    v.data = std::move(string_vec);
+    v.size = sizeof(void*);
+    v.type = {"str", 1};
+    v.bind(
+      &value::create_string_vector_type,
+      &value::destroy_string_vector_type);
+    return v;
 }
 
 /**
@@ -482,7 +543,48 @@ std::vector<value> move_into_value_vector(Tuple&& tuple)
       {
           std::vector<value> result;
           result.reserve(sizeof...(elems));
-          (result.emplace_back(value{std::move(elems)}), ...);
+
+          (
+            result.emplace_back(
+              [&]() -> value
+              {
+                  using type = std::remove_cvref_t<decltype(elems)>;
+
+                  if constexpr(std::is_same_v<type, std::int32_t>)
+                  {
+                      return value::make_i32(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, float>)
+                  {
+                      return value::make_f32(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::string>)
+                  {
+                      return value::make_string(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<std::int32_t>>)
+                  {
+                      return value::make_i32_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<float>>)
+                  {
+                      return value::make_f32_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<std::string>>)
+                  {
+                      return value::make_string_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, value>)
+                  {
+                      return std::forward<decltype(elems)>(elems);
+                  }
+                  else
+                  {
+                      static_assert(!sizeof(type), "Unsupported native argument type");
+                  }
+              }()),
+            ...);
+
           return result;
       },
       std::forward<Tuple>(tuple));

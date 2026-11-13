@@ -3,7 +3,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     Filesystem(String),
-    FunctionNotFound(String),
     GarbageCollector(String),
     Generic(String),
     InvalidArgument,

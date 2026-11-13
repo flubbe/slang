@@ -13,3 +13,6 @@ fn identity_f32(f: f32) -> f32 {
 fn identity_str(s: str) -> str {
     return s;
 }
+
+fn void_function() -> void {
+}

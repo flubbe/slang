@@ -8,3 +8,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 bindgen = "0.73"
+
+[dependencies]
+trybuild = "1.0.122"
