@@ -96,12 +96,13 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --release -- -D warnings
 
-      - name: Run Rust tests
-        run: cargo test --workspace --all-targets --release
-
       - name: Run tests
         run: |
           ctest --test-dir ${{github.workspace}}/build/${{matrix.build_type}}/test --output-on-failure
+
+      - name: Run Rust tests
+        # Example depends on CTest output (compiled example_package/hello module).
+        run: cargo test --workspace --all-targets --release
 
       - name: Run Rust example
         # Example depends on CTest output (compiled native_integration module).
