@@ -220,6 +220,13 @@ extern "C" slang_status slang_module_has_function(
   const char* name,
   bool* out_result)
 {
+    if(out_result == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    *out_result = false;
+
     if(context == nullptr)
     {
         return SLANG_STATUS_INVALID_ARGUMENT;
@@ -228,13 +235,10 @@ extern "C" slang_status slang_module_has_function(
     context->last_error.clear();
 
     if(module == nullptr
-       || name == nullptr
-       || out_result == nullptr)
+       || name == nullptr)
     {
         return SLANG_STATUS_INVALID_ARGUMENT;
     }
-
-    *out_result = false;
 
     auto* loader = reinterpret_cast<slang::interpreter::module_loader*>(module);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
     try
@@ -302,9 +306,11 @@ extern "C" slang_status slang_module_get_function(
  */
 
 extern "C" slang_status slang_value_destroy(
+  slang_context* context,
   slang_value* value)
 {
-    if(value == nullptr)
+    if(context == nullptr
+       || value == nullptr)
     {
         return SLANG_STATUS_INVALID_ARGUMENT;
     }
@@ -314,16 +320,15 @@ extern "C" slang_status slang_value_destroy(
         std::free(              // NOLINT(cppcoreguidelines-no-malloc)
           const_cast<void*>(    // NOLINT(cppcoreguidelines-pro-type-const-cast)
             static_cast<const void*>(
-              value->str.data)));     // NOLINT(cppcoreguidelines-pro-type-union-access)
-        value->str.data = nullptr;    // NOLINT(cppcoreguidelines-pro-type-union-access)
-        value->str.length = 0;        // NOLINT(cppcoreguidelines-pro-type-union-access)
+              value->data.str.data)));     // NOLINT(cppcoreguidelines-pro-type-union-access)
+        value->data.str.data = nullptr;    // NOLINT(cppcoreguidelines-pro-type-union-access)
+        value->data.str.length = 0;        // NOLINT(cppcoreguidelines-pro-type-union-access)
     }
     else if(value->kind == SLANG_VALUE_TYPE)
     {
-        std::free(                     // NOLINT(cppcoreguidelines-no-malloc)
-          const_cast<void*>(           // NOLINT(cppcoreguidelines-pro-type-const-cast)
-            value->type.data));        // NOLINT(cppcoreguidelines-pro-type-union-access)
-        value->type.data = nullptr;    // NOLINT(cppcoreguidelines-pro-type-union-access)
+        auto* object = const_cast<void*>(value->data.type.data);
+        context->context.get_gc().remove_temporary(object);
+        value->data.type.data = nullptr;
     }
 
     return SLANG_STATUS_OK;
@@ -345,6 +350,254 @@ extern "C" void slang_string_destroy(
   slang_string string)
 {
     delete reinterpret_cast<std::string*>(string);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+}
+
+extern "C" slang_status slang_stack_push_i32(
+  slang_context* context,
+  slang_operand_stack stack,
+  int32_t value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    try
+    {
+        reinterpret_cast<si::operand_stack*>(stack)->push_cat1(value);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    }
+    catch(const slang::interpreter::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(...)
+    {
+        context->last_error = "Unknown error.";
+        return SLANG_STATUS_ERROR;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_push_f32(
+  slang_context* context,
+  slang_operand_stack stack,
+  float value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    try
+    {
+        reinterpret_cast<si::operand_stack*>(stack)->push_cat1(value);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    }
+    catch(const slang::interpreter::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(...)
+    {
+        context->last_error = "Unknown error.";
+        return SLANG_STATUS_ERROR;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_push_i64(
+  slang_context* context,
+  slang_operand_stack stack,
+  int64_t value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    try
+    {
+        reinterpret_cast<si::operand_stack*>(stack)->push_cat2(value);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    }
+    catch(const slang::interpreter::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(...)
+    {
+        context->last_error = "Unknown error.";
+        return SLANG_STATUS_ERROR;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_push_f64(
+  slang_context* context,
+  slang_operand_stack stack,
+  double value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    try
+    {
+        reinterpret_cast<si::operand_stack*>(stack)->push_cat2(value);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    }
+    catch(const slang::interpreter::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(...)
+    {
+        context->last_error = "Unknown error.";
+        return SLANG_STATUS_ERROR;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_push_string(
+  slang_context* context,
+  slang_operand_stack stack,
+  size_t length,
+  const char* data)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    try
+    {
+        auto* gc_string = context->context.get_gc().gc_new<std::string>(
+          slang::gc::gc_object::of_temporary);
+        gc_string->assign({data, length});
+
+        reinterpret_cast<si::operand_stack*>(stack)->push_addr(gc_string);    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    }
+    catch(const slang::gc::gc_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_GC_ERROR;
+    }
+    catch(const slang::interpreter::interpreter_error& e)
+    {
+        context->last_error = e.what();
+        return SLANG_STATUS_ERROR;
+    }
+    catch(...)
+    {
+        context->last_error = "Unknown error.";
+        return SLANG_STATUS_ERROR;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_pop_i32(
+  slang_context* context,
+  slang_operand_stack stack,
+  int32_t* out_value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    auto value = reinterpret_cast<si::operand_stack*>(stack)->pop_cat1<std::int32_t>();    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(out_value != nullptr)
+    {
+        *out_value = value;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_pop_f32(
+  slang_context* context,
+  slang_operand_stack stack,
+  float* out_value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    auto value = reinterpret_cast<si::operand_stack*>(stack)->pop_cat1<float>();    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(out_value != nullptr)
+    {
+        *out_value = value;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_pop_i64(
+  slang_context* context,
+  slang_operand_stack stack,
+  int64_t* out_value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    auto value = reinterpret_cast<si::operand_stack*>(stack)->pop_cat2<std::int64_t>();    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(out_value != nullptr)
+    {
+        *out_value = value;
+    }
+
+    return SLANG_STATUS_OK;
+}
+
+extern "C" slang_status slang_stack_pop_f64(
+  slang_context* context,
+  slang_operand_stack stack,
+  double* out_value)
+{
+    if(context == nullptr)
+    {
+        return SLANG_STATUS_INVALID_ARGUMENT;
+    }
+
+    context->last_error.clear();
+
+    auto value = reinterpret_cast<si::operand_stack*>(stack)->pop_cat2<double>();    // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+
+    if(out_value != nullptr)
+    {
+        *out_value = value;
+    }
+
+    return SLANG_STATUS_OK;
 }
 
 extern "C" slang_status slang_stack_pop_string(
@@ -516,6 +769,13 @@ extern "C" slang_status slang_function_invoke(
   size_t arg_count,
   slang_value* out_result)
 {
+    if(out_result != nullptr)
+    {
+        *out_result = {
+          .kind = slang_value_kind::SLANG_VALUE_VOID,
+        };
+    }
+
     if(context == nullptr)
     {
         return SLANG_STATUS_INVALID_ARGUMENT;
@@ -527,11 +787,6 @@ extern "C" slang_status slang_function_invoke(
        || (args == nullptr && arg_count != 0))
     {
         return SLANG_STATUS_INVALID_ARGUMENT;
-    }
-
-    if(out_result != nullptr)
-    {
-        *out_result = {};
     }
 
     try
@@ -547,23 +802,23 @@ extern "C" slang_status slang_function_invoke(
             switch(args[i].kind)    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             {
             case SLANG_VALUE_I32:
-                values.emplace_back(args[i].i32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                values.emplace_back(args[i].data.i32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_F32:
-                values.emplace_back(args[i].f32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                values.emplace_back(args[i].data.f32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_STR:
                 values.emplace_back(std::string{
-                  args[i].str.data,        // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
-                  args[i].str.length});    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                  args[i].data.str.data,        // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                  args[i].data.str.length});    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_TYPE:
                 values.emplace_back(
-                  args[i].type.layout_id,                   // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
-                  const_cast<void*>(args[i].type.data));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                  args[i].data.type.layout_id,                   // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                  const_cast<void*>(args[i].data.type.data));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             default:
@@ -576,24 +831,30 @@ extern "C" slang_status slang_function_invoke(
         si::value result = f->invoke(values);
 
         // Convert the result.
-        if(out_result != nullptr)
-        {
-            const auto& type = result.get_type().base_type();
+        const auto& type = result.get_type().base_type();
 
-            if(type == "i32")
+        if(type == "i32")
+        {
+            if(out_result != nullptr)
             {
                 out_result->kind = SLANG_VALUE_I32;
-                out_result->i32 = *result.get<int>();    // NOLINT(cppcoreguidelines-pro-type-union-access)
+                out_result->data.i32 = *result.get<int>();    // NOLINT(cppcoreguidelines-pro-type-union-access)
             }
-            else if(type == "f32")
+        }
+        else if(type == "f32")
+        {
+            if(out_result != nullptr)
             {
                 out_result->kind = SLANG_VALUE_F32;
-                out_result->f32 = *result.get<float>();    // NOLINT(cppcoreguidelines-pro-type-union-access)
+                out_result->data.f32 = *result.get<float>();    // NOLINT(cppcoreguidelines-pro-type-union-access)
             }
-            else if(type == "str")
-            {
-                const auto& str = *result.get<std::string>();
+        }
+        else if(type == "str")
+        {
+            const auto& str = *result.get<std::string>();
 
+            if(out_result != nullptr)
+            {
                 auto* string_copy = static_cast<char*>(    // NOLINT(cppcoreguidelines-owning-memory)
                   std::malloc(str.length() + 1));          // NOLINT(cppcoreguidelines-no-malloc)
 
@@ -610,28 +871,41 @@ extern "C" slang_status slang_function_invoke(
                 string_copy[str.length()] = '\0';    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
                 out_result->kind = SLANG_VALUE_STR;
-                out_result->str =    // NOLINT(cppcoreguidelines-pro-type-union-access)
+                out_result->data.str =    // NOLINT(cppcoreguidelines-pro-type-union-access)
                   {.length = str.length(),
                    .data = string_copy};
             }
-            else if(type == "void")
+        }
+        else if(type == "void")
+        {
+            if(out_result != nullptr)
             {
                 out_result->kind = SLANG_VALUE_VOID;
             }
-            else
+        }
+        else
+        {
+            // Custom object. Stays GC managed.
+            const auto& layout_id = result.get_type().get_layout_id();
+            if(!layout_id.has_value())
             {
-                // Custom object. Stays GC managed.
-                const auto& layout_id = result.get_type().get_layout_id();
-                if(!layout_id.has_value())
-                {
-                    context->last_error = "Result type has no layout id.";
-                    return SLANG_STATUS_ERROR;
-                }
+                context->last_error = "Result type has no layout id.";
+                return SLANG_STATUS_ERROR;
+            }
 
+            void* const* object = result.get<void*>();
+            if(object == nullptr)
+            {
+                context->last_error = "Invalid custom type result.";
+                return SLANG_STATUS_ERROR;
+            }
+
+            if(out_result != nullptr)
+            {
                 out_result->kind = SLANG_VALUE_TYPE;
-                out_result->type = {
+                out_result->data.type = {
                   .layout_id = layout_id.value(),
-                  .data = *result.get<void*>(),    // TODO Test this.
+                  .data = *object,    // TODO Test this.
                 };
             }
         }

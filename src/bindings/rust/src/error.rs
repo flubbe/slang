@@ -1,8 +1,26 @@
-use crate::sys::slang_status;
+use std::fmt;
 
-pub const STATUS_OK: slang_status = crate::sys::slang_status_SLANG_STATUS_OK;
-pub const STATUS_ERROR: slang_status = crate::sys::slang_status_SLANG_STATUS_ERROR;
-pub const STATUS_INVALID_ARGUMENT: slang_status =
-    crate::sys::slang_status_SLANG_STATUS_INVALID_ARGUMENT;
-pub const STATUS_FILESYSTEM_ERROR: slang_status =
-    crate::sys::slang_status_SLANG_STATUS_FILESYSTEM_ERROR;
+#[derive(Debug)]
+pub enum Error {
+    Filesystem(String),
+    FunctionNotFound(String),
+    GarbageCollector(String),
+    Generic(String),
+    InvalidArgument,
+    InvalidFunctionName,
+    InvalidModuleName,
+    InvalidPath,
+    InvalidTypeName,
+    InvalidUtf8,
+    NullPointer,
+    UnknownStatus(i32, String),
+    UnsupportedValue,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for Error {}
