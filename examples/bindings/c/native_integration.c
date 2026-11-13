@@ -225,15 +225,17 @@ int main(int argc, char* argv[])
 
     /* Read the result. */
     if(result.kind != SLANG_VALUE_TYPE
-       || result.type.data == nullptr)
+       || result.data.type.layout_id != layout_id
+       || result.data.type.data == nullptr)
     {
         fprintf(stderr, "Got unexpected return type.\n");
+        slang_value_destroy(context, &result);
         slang_context_destroy(context);
         return EXIT_FAILURE;
     }
 
     struct s_native* const ret_s =
-      (struct s_native*)result.type.data;
+      (struct s_native*)result.data.type.data;
 
     /* Read back the (script-created) string field. */
     if(ret_s->s == nullptr)
@@ -253,7 +255,7 @@ int main(int argc, char* argv[])
     printf("Value i: %d\n", ret_s->i);
 
     /* Clean up return values. */
-    slang_context_gc_remove_temporary(context, ret_s);
+    slang_value_destroy(context, &result);
     slang_context_gc_run(context);
 
     /* Check that the memory was cleaned up. */

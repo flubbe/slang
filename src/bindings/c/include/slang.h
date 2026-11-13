@@ -113,23 +113,23 @@ extern "C"
         /** Value kind. */
         slang_value_kind kind;
 
-        union
+        union value_data
         {
             int32_t i32;
             float f32;
 
-            struct
+            struct str_data
             {
                 size_t length;    /**< String length (excluding null-terminator). */
                 const char* data; /**< String data. */
             } str;
 
-            struct
+            struct type_data
             {
                 size_t layout_id; /**< Type layout id. */
                 const void* data; /**< Raw type data. */
             } type;
-        };
+        } data;
     } slang_value;
 
     /*
@@ -211,7 +211,7 @@ extern "C"
      * @param context The context.
      * @param module The module.
      * @param name Name of the function.
-     * @param out_result Receives whether the function exists.
+     * @param out_result Receives whether the function exists. Initialized to `false`.
      * @returns `SLANG_STATUS_OK` on success, and an error status on failure.
      */
     slang_status slang_module_has_function(
@@ -246,7 +246,7 @@ extern "C"
         return SLANG_COMPOUND_LITERAL(
           slang_value,
           .kind = SLANG_VALUE_I32,
-          .i32 = value);
+          .data = {.i32 = value});
     }
 
     /** Create a value from a `float`. */
@@ -256,7 +256,7 @@ extern "C"
         return SLANG_COMPOUND_LITERAL(
           slang_value,
           .kind = SLANG_VALUE_F32,
-          .f32 = value);
+          .data = {.f32 = value});
     }
 
     /**
@@ -274,9 +274,9 @@ extern "C"
         return SLANG_COMPOUND_LITERAL(
           slang_value,
           .kind = SLANG_VALUE_STR,
-          .str = {
-            .length = length,
-            .data = data});
+          .data = {.str = {
+                     .length = length,
+                     .data = data}});
     }
 
     /**
@@ -294,9 +294,9 @@ extern "C"
             return SLANG_COMPOUND_LITERAL(
               slang_value,
               .kind = SLANG_VALUE_STR,
-              .str = {
-                .length = 0,
-                .data = nullptr});
+              .data = {.str = {
+                         .length = 0,
+                         .data = nullptr}});
         }
 
         return slang_value_from_str(
@@ -319,17 +319,20 @@ extern "C"
         return SLANG_COMPOUND_LITERAL(
           slang_value,
           .kind = SLANG_VALUE_TYPE,
-          .type = {
-            .layout_id = layout_id,
-            .data = data});
+          .data = {.type = {
+                     .layout_id = layout_id,
+                     .data = data}});
     }
 
     /**
      * Destroy a `slang_value`. Releases the underlying memory (if any).
      *
+     * @param context The context.
      * @param value The value to destroy.
+     * @returns Returns the type value as a `slang_value`.
      */
     slang_status slang_value_destroy(
+      slang_context* context,
       slang_value* value);
 
     /*
@@ -368,6 +371,161 @@ extern "C"
       slang_string string);
 
     /**
+     * Get a read-only view of a string.
+     *
+     * The returned data is owned by the string and remains valid
+     * until the string is destroyed.
+     *
+     * @param string The string.
+     * @param out_length If non-null, the string length is written here.
+     * @param out_data If non-null, a reference to the string data is written here.
+     */
+    void slang_string_view(
+      slang_string string,
+      size_t* out_length,
+      const char** out_data);
+
+    /*
+     * Stack.
+     */
+
+    /**
+     * Push a `i32` to the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param value The value to be pushed.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_push_i32(
+      slang_context* context,
+      slang_operand_stack stack,
+      int32_t value);
+
+    /**
+     * Pop a `f32` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param value The value to be pushed.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_push_f32(
+      slang_context* context,
+      slang_operand_stack stack,
+      float value);
+
+    /**
+     * Pop a `i64` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param value The value to be pushed.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_push_i64(
+      slang_context* context,
+      slang_operand_stack stack,
+      int64_t value);
+
+    /**
+     * Pop a `f64` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param value The value to be pushed.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_push_f64(
+      slang_context* context,
+      slang_operand_stack stack,
+      double value);
+
+    /**
+     * Push a string to stack.
+     *
+     * @note The string (referred to by `data`) is copied into a GC controlled value.
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param length String length is written here.
+     * @param data String to be pushed.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_push_string(
+      slang_context* context,
+      slang_operand_stack stack,
+      size_t length,
+      const char* data);
+
+    /**
+     * Pop a `i32` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param out_value If non-null, the read value is written here.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_pop_i32(
+      slang_context* context,
+      slang_operand_stack stack,
+      int32_t* out_value);
+
+    /**
+     * Pop a `f32` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param out_value If non-null, the read value is written here.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_pop_f32(
+      slang_context* context,
+      slang_operand_stack stack,
+      float* out_value);
+
+    /**
+     * Pop a `i64` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param out_value If non-null, the read value is written here.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_pop_i64(
+      slang_context* context,
+      slang_operand_stack stack,
+      int64_t* out_value);
+
+    /**
+     * Pop a `f64` from the stack.
+     *
+     * This is useful when getting parameters from the stack in native functions.
+     *
+     * @param context The context.
+     * @param stack The function's stack.
+     * @param out_value If non-null, the read value is written here.
+     * @returns `SLANG_STATUS_OK` on success, or `SLANG_STATUS_INVALID_ARGUMENT` if `context` was `nullptr´.
+     */
+    slang_status slang_stack_pop_f64(
+      slang_context* context,
+      slang_operand_stack stack,
+      double* out_value);
+
+    /**
      * Pop a string from the stack.
      *
      * This is useful when getting parameters from the stack in native functions.
@@ -385,21 +543,6 @@ extern "C"
       size_t* out_length,
       const char** out_data);
 
-    /**
-     * Get a read-only view of a string.
-     *
-     * The returned data is owned by the string and remains valid
-     * until the string is destroyed.
-     *
-     * @param string The string.
-     * @param out_length If non-null, the string length is written here.
-     * @param out_data If non-null, a reference to the string data is written here.
-     */
-    void slang_string_view(
-      slang_string string,
-      size_t* out_length,
-      const char** out_data);
-
     /*
      * Types.
      */
@@ -412,6 +555,7 @@ extern "C"
      * @param offsets The type layout, given as a list of offsets of the contained pointers.
      * @param offset_count Number of offsets.
      * @returns `SLANG_STATUS_OK` on success, and an error status on failure.
+     *     In particular, `SLANG_STATUS_GC_ERROR` is returned if the type was already registered.
      */
     slang_status slang_type_register_layout(
       slang_context* context,
@@ -447,7 +591,8 @@ extern "C"
      * @param function The function to invoke.
      * @param args Function arguments array.
      * @param arg_count Argument count.
-     * @param out_result Result of the function call.
+     * @param out_result Result of the function call. Initialized to kind `slang_value_kind::SLANG_VALUE_VOID`
+     *     before invocation, including on failure.
      * @returns `SLANG_STATUS_OK` on success, and an error status on failure.
      */
     slang_status slang_function_invoke(

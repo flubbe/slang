@@ -1,49 +1,200 @@
+use crate::context::Context;
+use crate::error::Error;
 use crate::sys;
+use crate::types::{NativeType, TypeLayout};
+use core::fmt;
+use std::ffi::c_void;
 
-pub const VALUE_VOID: sys::slang_value_kind = sys::slang_value_kind_SLANG_VALUE_VOID;
-pub const VALUE_I32: sys::slang_value_kind = sys::slang_value_kind_SLANG_VALUE_I32;
-pub const VALUE_F32: sys::slang_value_kind = sys::slang_value_kind_SLANG_VALUE_F32;
-pub const VALUE_STR: sys::slang_value_kind = sys::slang_value_kind_SLANG_VALUE_STR;
-pub const VALUE_TYPE: sys::slang_value_kind = sys::slang_value_kind_SLANG_VALUE_TYPE;
-
-pub fn value_from_i32(value: i32) -> sys::slang_value {
-    sys::slang_value {
-        kind: VALUE_I32,
-        __bindgen_anon_1: sys::slang_value__bindgen_ty_1 { i32_: value },
-    }
-}
-pub fn value_from_f32(value: f32) -> sys::slang_value {
-    sys::slang_value {
-        kind: VALUE_F32,
-        __bindgen_anon_1: sys::slang_value__bindgen_ty_1 { f32_: value },
-    }
+pub enum Value<'a> {
+    I32(i32),
+    F32(f32),
+    Str(&'a str),
+    Native {
+        data: *const c_void,
+        layout_id: usize,
+        context: &'a Context,
+    },
 }
 
-pub fn value_from_str(value: &[u8]) -> sys::slang_value {
-    sys::slang_value {
-        kind: VALUE_STR,
-        __bindgen_anon_1: sys::slang_value__bindgen_ty_1 {
-            str_: sys::slang_value__bindgen_ty_1__bindgen_ty_1 {
-                length: value.len(),
-                data: value.as_ptr().cast(),
-            },
-        },
+pub struct NativeValue<'ctx> {
+    raw: sys::slang_value,
+    layout_id: usize,
+    context: &'ctx Context,
+}
+
+impl<'ctx> fmt::Debug for NativeValue<'ctx> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NativeValue")
+            .field("context", &self.context)
+            .finish_non_exhaustive()
     }
 }
 
-pub fn value_from_cstr(value: &std::ffi::CStr) -> sys::slang_value {
-    value_from_str(value.to_bytes())
+impl Drop for NativeValue<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            sys::slang_value_destroy(self.context.as_raw(), &mut self.raw);
+        }
+    }
 }
 
-pub fn value_from_type(layout_id: usize, data: *const std::ffi::c_void) -> sys::slang_value {
-    value_from_type_inner(layout_id, data)
+impl<'ctx> NativeValue<'ctx> {
+    pub fn as_ref<T: NativeType>(&self, layout: &TypeLayout<'ctx, T>) -> Result<&T, Error> {
+        if !std::ptr::eq(self.context, layout.context()) {
+            return Err(Error::InvalidArgument);
+        }
+
+        if self.raw.kind != sys::slang_value_kind_SLANG_VALUE_TYPE || self.layout_id != layout.id {
+            return Err(Error::InvalidArgument);
+        }
+
+        let data = unsafe { self.raw.data.type_.data };
+        let data = data.cast::<T>();
+
+        if data.is_null() {
+            return Err(Error::NullPointer);
+        }
+
+        Ok(unsafe { &*data })
+    }
 }
 
-fn value_from_type_inner(layout_id: usize, data: *const std::ffi::c_void) -> sys::slang_value {
+/// Owns a raw C value until it is either destroyed or transferred.
+struct RawValueGuard<'ctx> {
+    raw: sys::slang_value,
+    context: &'ctx Context,
+}
+
+fn void_value() -> sys::slang_value {
     sys::slang_value {
-        kind: VALUE_TYPE,
-        __bindgen_anon_1: sys::slang_value__bindgen_ty_1 {
-            type_: sys::slang_value__bindgen_ty_1__bindgen_ty_2 { layout_id, data },
-        },
+        kind: sys::slang_value_kind_SLANG_VALUE_VOID,
+        data: unsafe { std::mem::zeroed() },
+    }
+}
+
+impl<'ctx> RawValueGuard<'ctx> {
+    fn new(context: &'ctx Context, raw: sys::slang_value) -> Self {
+        Self { raw, context }
+    }
+
+    fn into_raw(mut self) -> sys::slang_value {
+        std::mem::replace(&mut self.raw, void_value())
+    }
+}
+
+impl Drop for RawValueGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = sys::slang_value_destroy(self.context.as_raw(), &mut self.raw);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum OwnedValue<'ctx> {
+    Void,
+    I32(i32),
+    F32(f32),
+    String(String),
+    Native(NativeValue<'ctx>),
+}
+
+impl<'a> Value<'a> {
+    pub(crate) fn as_raw(&self, context: &Context) -> Result<sys::slang_value, Error> {
+        match self {
+            Self::I32(value) => Ok(sys::slang_value {
+                kind: sys::slang_value_kind_SLANG_VALUE_I32,
+                data: sys::slang_value_value_data { i32_: *value },
+            }),
+            Self::F32(value) => Ok(sys::slang_value {
+                kind: sys::slang_value_kind_SLANG_VALUE_F32,
+                data: sys::slang_value_value_data { f32_: *value },
+            }),
+            Self::Str(value) => Ok(sys::slang_value {
+                kind: sys::slang_value_kind_SLANG_VALUE_STR,
+                data: sys::slang_value_value_data {
+                    str_: sys::slang_value_value_data_str_data {
+                        length: value.len(),
+                        data: value.as_ptr().cast(),
+                    },
+                },
+            }),
+            Self::Native {
+                layout_id,
+                data,
+                context: value_context,
+            } => {
+                if !std::ptr::eq(*value_context, context) {
+                    return Err(Error::InvalidArgument);
+                }
+
+                Ok(sys::slang_value {
+                    kind: sys::slang_value_kind_SLANG_VALUE_TYPE,
+                    data: sys::slang_value_value_data {
+                        type_: sys::slang_value_value_data_type_data {
+                            layout_id: *layout_id,
+                            data: *data,
+                        },
+                    },
+                })
+            }
+        }
+    }
+
+    pub fn from_i32(value: i32) -> Self {
+        Self::I32(value)
+    }
+
+    pub fn from_f32(value: f32) -> Self {
+        Self::F32(value)
+    }
+
+    pub fn from_type<T: NativeType>(value: &'a T, layout: &'a TypeLayout<'_, T>) -> Self {
+        Self::Native {
+            data: (value as *const T).cast(),
+            layout_id: layout.id,
+            context: layout.context(),
+        }
+    }
+}
+
+impl<'ctx> OwnedValue<'ctx> {
+    pub(crate) fn from_raw(context: &'ctx Context, raw: sys::slang_value) -> Result<Self, Error> {
+        let guard = RawValueGuard::new(context, raw);
+
+        match raw.kind {
+            sys::slang_value_kind_SLANG_VALUE_VOID => Ok(Self::Void),
+            sys::slang_value_kind_SLANG_VALUE_I32 => unsafe { Ok(Self::I32(raw.data.i32_)) },
+            sys::slang_value_kind_SLANG_VALUE_F32 => unsafe { Ok(Self::F32(raw.data.f32_)) },
+            sys::slang_value_kind_SLANG_VALUE_STR => {
+                let str_value = unsafe { &raw.data.str_ };
+
+                let bytes = if str_value.length == 0 {
+                    &[]
+                } else {
+                    if str_value.data.is_null() {
+                        return Err(Error::NullPointer);
+                    }
+
+                    unsafe {
+                        std::slice::from_raw_parts(str_value.data.cast::<u8>(), str_value.length)
+                    }
+                };
+
+                let value = String::from_utf8(bytes.to_vec()).map_err(|_| Error::InvalidUtf8)?;
+                Ok(Self::String(value))
+            }
+            sys::slang_value_kind_SLANG_VALUE_TYPE => {
+                let layout_id = unsafe { guard.raw.data.type_.layout_id };
+                let raw = guard.into_raw();
+
+                Ok(Self::Native(NativeValue {
+                    raw,
+                    layout_id,
+                    context,
+                }))
+            }
+            _ => Err(Error::UnsupportedValue),
+        }
     }
 }
