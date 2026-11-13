@@ -9,6 +9,7 @@ struct NativePoint {
 
 unsafe impl NativeType for NativePoint {
     const NAME: &'static str = "NativePoint";
+    const MODULE: &'static str = "example_package.hello";
 
     fn pointer_offsets() -> &'static [usize] {
         &[]
@@ -23,6 +24,7 @@ struct NativeReference {
 
 unsafe impl NativeType for NativeReference {
     const NAME: &'static str = "NativeReference";
+    const MODULE: &'static str = "example_package.hello";
 
     fn pointer_offsets() -> &'static [usize] {
         &[std::mem::offset_of!(Self, reference)]
@@ -33,6 +35,7 @@ struct EmptyName;
 
 unsafe impl NativeType for EmptyName {
     const NAME: &'static str = "";
+    const MODULE: &'static str = "";
 
     fn pointer_offsets() -> &'static [usize] {
         &[]
@@ -43,6 +46,7 @@ struct QualifiedName;
 
 unsafe impl NativeType for QualifiedName {
     const NAME: &'static str = "Some.QualifiedName";
+    const MODULE: &'static str = "Some.Module.Path";
 
     fn pointer_offsets() -> &'static [usize] {
         &[]
@@ -53,22 +57,19 @@ struct NullName;
 
 unsafe impl NativeType for NullName {
     const NAME: &'static str = "Invalid\0Name";
+    const MODULE: &'static str = "Invalid\0Module\0Name";
 
     fn pointer_offsets() -> &'static [usize] {
         &[]
     }
 }
 
-const MODULE: &str = "example_package.hello";
-
 #[test]
 fn register_type() {
     let context = Context::new().unwrap();
 
-    let registered_id = context.register_type::<NativePoint>(MODULE).unwrap();
-    let queried_id = context
-        .get_type_layout::<NativePoint>("example_package.hello")
-        .unwrap();
+    let registered_id = context.register_type::<NativePoint>().unwrap();
+    let queried_id = context.get_type_layout::<NativePoint>().unwrap();
 
     assert_eq!(registered_id, queried_id);
 }
@@ -77,10 +78,10 @@ fn register_type() {
 fn register_type_twice() {
     let context = Context::new().unwrap();
 
-    context.register_type::<NativePoint>(MODULE).unwrap();
+    context.register_type::<NativePoint>().unwrap();
 
     assert!(matches!(
-        context.register_type::<NativePoint>(MODULE),
+        context.register_type::<NativePoint>(),
         Err(Error::GarbageCollector(_))
     ));
 }
@@ -89,7 +90,7 @@ fn register_type_twice() {
 fn register_type_with_pointer_field() {
     let context = Context::new().unwrap();
 
-    context.register_type::<NativeReference>(MODULE).unwrap();
+    context.register_type::<NativeReference>().unwrap();
 }
 
 #[test]
@@ -97,7 +98,7 @@ fn reject_empty_type_name() {
     let context = Context::new().unwrap();
 
     assert!(matches!(
-        context.register_type::<EmptyName>(MODULE),
+        context.register_type::<EmptyName>(),
         Err(Error::InvalidTypeName)
     ));
 }
@@ -107,7 +108,7 @@ fn reject_qualified_type_name() {
     let context = Context::new().unwrap();
 
     assert!(matches!(
-        context.register_type::<QualifiedName>(MODULE),
+        context.register_type::<QualifiedName>(),
         Err(Error::InvalidTypeName)
     ));
 }
@@ -117,7 +118,7 @@ fn reject_type_name_with_null_byte() {
     let context = Context::new().unwrap();
 
     assert!(matches!(
-        context.register_type::<NullName>(MODULE),
+        context.register_type::<NullName>(),
         Err(Error::InvalidTypeName)
     ));
 }

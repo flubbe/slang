@@ -1,4 +1,4 @@
-use slang_bindings::{Context, Error, OwnedValue, Value};
+use slang_bindings::{Context, Error, OwnedValue};
 use std::path::PathBuf;
 
 fn context_with_test_paths() -> Context {
@@ -17,7 +17,7 @@ fn invoke_return_hello() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("return_hello").unwrap();
 
-    let result = function.invoke(&[]).unwrap();
+    let result = function.invoke(()).unwrap();
 
     assert!(matches!(
         result,
@@ -31,7 +31,7 @@ fn invoke_with_i32_argument() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("identity_i32").unwrap();
 
-    let result = function.invoke(&[Value::I32(42)]).unwrap();
+    let result = function.invoke((42,)).unwrap();
 
     assert!(matches!(result, OwnedValue::I32(42)));
 }
@@ -42,7 +42,7 @@ fn invoke_with_f32_argument() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("identity_f32").unwrap();
 
-    let result = function.invoke(&[Value::F32(1.23)]).unwrap();
+    let result = function.invoke((1.23,)).unwrap();
 
     assert!(matches!(
         result,
@@ -56,7 +56,7 @@ fn invoke_with_string_argument() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("identity_str").unwrap();
 
-    let result = function.invoke(&[Value::Str("Hello")]).unwrap();
+    let result = function.invoke(("Hello",)).unwrap();
 
     assert!(matches!(
         result,
@@ -70,7 +70,7 @@ fn invoke_with_too_few_arguments() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("identity_i32").unwrap();
 
-    let result = function.invoke(&[]);
+    let result = function.invoke(());
 
     match result {
         Err(Error::Generic(message)) => {
@@ -86,7 +86,7 @@ fn invoke_with_too_many_arguments() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("identity_i32").unwrap();
 
-    let result = function.invoke(&[Value::I32(42), Value::I32(43)]);
+    let result = function.invoke((42, 43));
 
     match result {
         Err(Error::Generic(message)) => {

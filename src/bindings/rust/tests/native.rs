@@ -34,6 +34,7 @@ struct NativeS {
 
 unsafe impl NativeType for NativeS {
     const NAME: &'static str = "S";
+    const MODULE: &'static str = "native_integration";
 
     fn pointer_offsets() -> &'static [usize] {
         &[std::mem::offset_of!(Self, s)]
@@ -58,9 +59,7 @@ fn register_print() {
 fn native_integration() {
     let mut context = context_with_test_paths();
 
-    context
-        .register_type::<NativeS>("native_integration")
-        .unwrap();
+    context.register_type::<NativeS>().unwrap();
     context
         .register_native("slang", "print", native_print)
         .unwrap();
