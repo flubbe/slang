@@ -17,7 +17,7 @@ impl<'module, 'ctx> Function<'module, 'ctx> {
         Self { module, raw }
     }
 
-    pub fn invoke<A>(&self, args: A) -> Result<OwnedValue<'ctx>, Error>
+    pub fn invoke<A>(&self, args: A) -> Result<Option<OwnedValue<'ctx>>, Error>
     where
         A: IntoArgs<'ctx>,
     {
@@ -48,7 +48,15 @@ impl<'module, 'ctx> Function<'module, 'ctx> {
         };
         self.module.check_status(status)?;
 
+        if (raw_result.kind == sys::slang_value_kind_SLANG_VALUE_STR
+            && unsafe { raw_result.data.str_.data.is_null() })
+            || (raw_result.kind == sys::slang_value_kind_SLANG_VALUE_TYPE
+                && unsafe { raw_result.data.type_.data.is_null() })
+        {
+            return Ok(None);
+        }
+
         let result = OwnedValue::from_raw(self.module.context(), raw_result)?;
-        Ok(result)
+        Ok(Some(result))
     }
 }

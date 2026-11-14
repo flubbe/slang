@@ -16,3 +16,7 @@ fn identity_str(s: str) -> str {
 
 fn void_function() -> void {
 }
+
+fn return_null() -> str {
+    return null;
+}

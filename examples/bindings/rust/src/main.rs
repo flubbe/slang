@@ -63,29 +63,26 @@ fn main() -> Result<(), Error> {
         };
 
         // Alternatively: let result = func.invoke((&native_instance, 1.234_f32))?;
-        let result = call!(func, &native_instance, 1.234_f32)?;
-
-        let native_ret = match result {
-            OwnedValue::Native(native) => native,
-            other => {
-                eprintln!("Unexpected return type: {:?}", other);
-                return Ok(());
-            }
+        let Some(result) = call!(func, &native_instance, 1.234_f32)? else {
+            eprintln!("Script returned None");
+            return Ok(());
         };
 
-        let ret = native_ret.as_ref::<NativeS>()?;
-        match ret {
-            Some(ret) => {
-                println!("String from script: {}", ret.string()?);
-                println!("Value a: {}", ret.a);
-                println!("Value b: {}", ret.b);
-                println!("Value c: {}", ret.c);
-                println!("Value i: {}", ret.i);
-            }
-            None => {
-                eprintln!("Script returned None");
-            }
+        let OwnedValue::Native(native_ret) = result else {
+            eprintln!("Unexpected return type: {:?}", result);
+            return Ok(());
         };
+
+        let Some(ret) = native_ret.as_ref::<NativeS>()? else {
+            eprintln!("Native value is null");
+            return Ok(());
+        };
+
+        println!("String from script: {}", ret.string()?);
+        println!("Value a: {}", ret.a);
+        println!("Value b: {}", ret.b);
+        println!("Value c: {}", ret.c);
+        println!("Value i: {}", ret.i);
     }
 
     context.gc_run()?;

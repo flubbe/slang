@@ -130,3 +130,12 @@ fn invoke_with_unicode_string() {
         OwnedValue::String(value) if value == input
     ));
 }
+
+#[test]
+fn null_return_value() {
+    let context = context_with_test_paths();
+    let module = context.resolve_module("example_package::hello").unwrap();
+    let function = module.get_function("return_null").unwrap();
+
+    assert!(matches!(function.invoke(()).unwrap(), None));
+}
