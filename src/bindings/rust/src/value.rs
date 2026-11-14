@@ -68,7 +68,7 @@ impl Drop for NativeValue<'_> {
 }
 
 impl<'ctx> NativeValue<'ctx> {
-    pub fn as_ref<T: NativeType>(&self) -> Result<&T, Error> {
+    pub fn as_ref<T: NativeType>(&self) -> Result<Option<&T>, Error> {
         let layout = self.context.get_type_layout::<T>()?;
 
         if self.layout_id != layout.id {
@@ -78,10 +78,10 @@ impl<'ctx> NativeValue<'ctx> {
         let data = unsafe { self.raw.data.type_.data }.cast::<T>();
 
         if data.is_null() {
-            return Err(Error::NullPointer);
+            return Ok(None);
         }
 
-        Ok(unsafe { &*data })
+        Ok(Some(unsafe { &*data }))
     }
 }
 

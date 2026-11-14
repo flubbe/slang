@@ -74,12 +74,18 @@ fn main() -> Result<(), Error> {
         };
 
         let ret = native_ret.as_ref::<NativeS>()?;
-
-        println!("String from script: {}", ret.string()?);
-        println!("Value a: {}", ret.a);
-        println!("Value b: {}", ret.b);
-        println!("Value c: {}", ret.c);
-        println!("Value i: {}", ret.i);
+        match ret {
+            Some(ret) => {
+                println!("String from script: {}", ret.string()?);
+                println!("Value a: {}", ret.a);
+                println!("Value b: {}", ret.b);
+                println!("Value c: {}", ret.c);
+                println!("Value i: {}", ret.i);
+            }
+            None => {
+                eprintln!("Script returned None");
+            }
+        };
     }
 
     context.gc_run()?;
