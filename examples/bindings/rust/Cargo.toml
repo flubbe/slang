@@ -7,4 +7,4 @@ edition.workspace = true
 
 [dependencies]
 slang_bindings = { path = "../../../src/bindings/rust" }
-libc = "0.2"
+
