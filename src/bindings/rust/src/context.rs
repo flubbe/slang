@@ -3,18 +3,28 @@ use crate::module::Module;
 use crate::native::NativeCall;
 use crate::sys;
 use crate::types::{NativeType, TypeLayout};
+use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+use std::rc::Rc;
 
+/// Interpreter context.
+///
+/// A context manages the runtime state shared by modules and values created
+/// through it. All objects associated with a context are bound to its lifetime.
+///
+///
+/// Contexts are neither `Send` nor `Sync`.
 pub struct Context {
     raw: NonNull<sys::slang_context>,
     _marker: PhantomData<std::rc::Rc<()>>,
+    callback_error: Rc<RefCell<Option<Error>>>,
 }
 
 impl std::fmt::Debug for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.raw)
+        write!(f, "Context {{ raw: {:?} }}", self.raw)
     }
 }
 
@@ -50,9 +60,15 @@ impl Context {
         Ok(Self {
             raw,
             _marker: PhantomData,
+            callback_error: Rc::new(RefCell::new(None)),
         })
     }
 
+    /// Create a new interpreter context.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NullPointer`] if the context could not be created.
     pub fn new() -> Result<Self, Error> {
         let raw = unsafe { sys::slang_context_create() };
         let raw = NonNull::new(raw).ok_or(Error::NullPointer)?;
@@ -60,9 +76,19 @@ impl Context {
         Ok(Self {
             raw,
             _marker: PhantomData,
+            callback_error: Rc::new(RefCell::new(None)),
         })
     }
 
+    /// Adds a search path for module resolution.
+    ///
+    /// The path is used when resolving imported modules.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidPath`] if the path cannot be represented as a
+    /// null-terminated UTF-8 string. Returns an error if the interpreter rejects
+    /// the search path.
     pub fn add_search_path(&mut self, path: impl AsRef<std::path::Path>) -> Result<(), Error> {
         let path = path.as_ref().to_str().ok_or(Error::InvalidPath)?;
         let path = CString::new(path).map_err(|_| Error::InvalidPath)?;
@@ -73,6 +99,15 @@ impl Context {
         self.check_status(status)
     }
 
+    /// Resolve a module from a name and load it.
+    /// The returned module is bound to the lifetime of this context.
+    ///
+    /// The module is searched for in the configured search paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidModuleName`] if `name` contains an interior null
+    /// byte. Returns an error if the module could not be resolved or loaded.
     pub fn resolve_module(&self, name: &str) -> Result<Module<'_>, Error> {
         let name = CString::new(name).map_err(|_| Error::InvalidModuleName)?;
         let mut raw_module = std::ptr::null_mut();
@@ -86,10 +121,25 @@ impl Context {
         Ok(Module::from_raw(self, raw_module))
     }
 
-    /// Register a native Rust function so it can be called from Slang.
+    /// Registers a native Rust function that can be called from the interpreter.
     ///
-    /// The function can be a normal Rust `fn(&mut NativeCall) -> Result<(), Error>`
-    /// (or a closure that satisfies the same signature).
+    /// The function is registered under the specified `module_name` and
+    /// `function_name`.
+    ///
+    /// The callback can be a regular Rust function or a closure implementing
+    /// `FnMut(&mut NativeCall) -> Result<(), Error>`. It receives a mutable
+    /// [`NativeCall`] through which it can access the arguments and return value.
+    ///
+    /// The callback must be `'static` because it is stored for the lifetime of
+    /// the context.
+    ///
+    /// Errors returned by the callback and panics are stored in the context and
+    /// can be retrieved using [`Context::take_callback_error`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the module or function name contains an interior null
+    /// byte, or if the native function could not be registered.
     pub fn register_native<F>(
         &mut self,
         module_name: &str,
@@ -99,16 +149,20 @@ impl Context {
     where
         F: FnMut(&mut NativeCall) -> Result<(), Error> + 'static,
     {
-        // Store both the closure and a raw pointer to the Context.
-        // The Context lives for the entire lifetime of the registration, so
-        // keeping a raw pointer is safe.
+        // Share callback error storage with the Context.
         struct CallbackData<F> {
             func: F,
-            error: Option<Error>,
+            error: Rc<RefCell<Option<Error>>>,
         }
 
+        // clear previous errors.
+        *self.callback_error.borrow_mut() = None;
+
         // Box the struct to obtain a stable heap pointer for the C API.
-        let boxed = Box::new(CallbackData { func, error: None });
+        let boxed = Box::new(CallbackData {
+            func,
+            error: self.callback_error.clone(),
+        });
         let user_data = Box::into_raw(boxed) as *mut std::ffi::c_void;
 
         // Trampoline that converts the C call into a Rust closure call.
@@ -119,11 +173,16 @@ impl Context {
         ) where
             F: FnMut(&mut NativeCall) -> Result<(), Error>,
         {
-            if ctx.is_null() || stack.is_null() || user.is_null() {
+            if user.is_null() {
                 return;
             }
 
             let cb = unsafe { &mut *(user as *mut CallbackData<F>) };
+
+            if ctx.is_null() || stack.is_null() {
+                *cb.error.borrow_mut() = Some(Error::InvalidArgument);
+                return;
+            }
 
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let ctx = std::mem::ManuallyDrop::new(
@@ -138,14 +197,20 @@ impl Context {
             match result {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => {
-                    cb.error = Some(error);
+                    // Preserve previous error (if any).
+                    let mut callback_error = cb.error.borrow_mut();
+                    if callback_error.is_none() {
+                        *callback_error = Some(error);
+                    }
                 }
                 Err(_) => {
-                    cb.error = Some(Error::Generic("Rust native callback panicked".into()));
+                    let mut callback_error = cb.error.borrow_mut();
+                    if callback_error.is_none() {
+                        *callback_error =
+                            Some(Error::Generic("Rust native callback panicked".into()));
+                    }
                 }
             }
-
-            // TODO: Propagate callback errors and panics to the runtime.
         }
 
         let c_module = std::ffi::CString::new(module_name).map_err(|_| Error::InvalidArgument)?;
@@ -172,6 +237,23 @@ impl Context {
         result
     }
 
+    /// Returns the error from the most recent failed native callback, if any.
+    pub fn take_callback_error(&self) -> Option<Error> {
+        self.callback_error.borrow_mut().take()
+    }
+
+    /// Registers a native type with the interpreter.
+    ///
+    /// The type must have `#[repr(C)]` so its memory layout is compatible with
+    /// the layout expected by the interpreter. The type's fully qualified name
+    /// is used as its identifier, and its pointer fields are registered for
+    /// garbage collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidTypeName`] if the type's name cannot be
+    /// represented as a null-terminated string. Returns an error if the type
+    /// could not be registered.
     pub fn register_type<T: NativeType>(&self) -> Result<TypeLayout<'_, T>, Error> {
         let name = qualified_type_name::<T>().map_err(|_| Error::InvalidTypeName)?;
         let c_name = CString::new(name.as_str()).map_err(|_| Error::InvalidTypeName)?;
@@ -193,6 +275,15 @@ impl Context {
         Ok(layout)
     }
 
+    /// Returns the type layout for a registered native type.
+    ///
+    /// The type is identified by its fully qualified name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidTypeName`] if the type's name cannot be
+    /// represented as a null-terminated string. Returns an error if the type
+    /// has not been registered or its layout cannot be retrieved.
     pub fn get_type_layout<T: NativeType>(&self) -> Result<TypeLayout<'_, T>, Error> {
         let name = qualified_type_name::<T>()?;
         let c_name = CString::new(name).map_err(|_| Error::InvalidTypeName)?;
@@ -223,11 +314,22 @@ impl Context {
         self.check_status(status)
     }
 
+    /// Runs the garbage collector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if garbage collection fails.
     pub fn gc_run(&mut self) -> Result<(), Error> {
         let status = unsafe { sys::slang_context_gc_run(self.as_raw()) };
         self.check_status(status)
     }
 
+    /// Returns the number of objects currently allocated through the garbage
+    /// collector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the object count cannot be retrieved.
     pub fn gc_object_count(&self) -> Result<usize, Error> {
         let mut count: usize = 0;
         let status =
@@ -236,6 +338,11 @@ impl Context {
         Ok(count)
     }
 
+    /// Returns the number of entries in the garbage collector's root set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the root set size cannot be retrieved.
     pub fn gc_root_set_size(&self) -> Result<usize, Error> {
         let mut size: usize = 0;
         let status =
@@ -244,6 +351,12 @@ impl Context {
         Ok(size)
     }
 
+    /// Returns the total number of bytes currently allocated through the
+    /// garbage collector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the allocated byte count cannot be retrieved.
     pub fn gc_byte_size(&self) -> Result<usize, Error> {
         let mut size: usize = 0;
         let status =
@@ -252,6 +365,12 @@ impl Context {
         Ok(size)
     }
 
+    /// Returns a tuple containing the garbage collector's object count,
+    /// root set size, and allocated byte count, in that order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the statistics cannot be retrieved.
     pub fn gc_stats(&self) -> Result<(usize, usize, usize), Error> {
         Ok((
             self.gc_object_count()?,

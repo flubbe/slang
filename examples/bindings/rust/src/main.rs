@@ -64,18 +64,22 @@ fn main() -> Result<(), Error> {
 
         // Alternatively: let result = func.invoke((&native_instance, 1.234_f32))?;
         let Some(result) = call!(func, &native_instance, 1.234_f32)? else {
-            eprintln!("Script returned None");
-            return Ok(());
+            return Err(Error::Generic("Script returned None".into()));
         };
 
+        if let Some(error) = context.take_callback_error() {
+            return Err(Error::Generic(format!("Native callback failed: {error}")));
+        }
+
         let OwnedValue::Native(native_ret) = result else {
-            eprintln!("Unexpected return type: {:?}", result);
-            return Ok(());
+            return Err(Error::Generic(format!(
+                "Unexpected return type: {:?}",
+                result
+            )));
         };
 
         let Some(ret) = native_ret.as_ref::<NativeS>()? else {
-            eprintln!("Native value is null");
-            return Ok(());
+            return Err(Error::Generic("Native value is null".into()));
         };
 
         println!("String from script: {}", ret.string()?);
@@ -88,13 +92,13 @@ fn main() -> Result<(), Error> {
     context.gc_run()?;
     let (objects, roots, bytes) = context.gc_stats()?;
     if objects != 0 {
-        println!("GC: {} objects still alive", objects);
+        println!("GC: {objects} objects still alive");
     }
     if roots != 0 {
-        println!("GC: {} root set entries still alive", roots);
+        println!("GC: {roots} root set entries still alive");
     }
     if bytes != 0 {
-        println!("GC: {} bytes still allocated", bytes);
+        println!("GC: {bytes} bytes still allocated");
     }
 
     Ok(())
