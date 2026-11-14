@@ -802,23 +802,25 @@ extern "C" slang_status slang_function_invoke(
             switch(args[i].kind)    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
             {
             case SLANG_VALUE_I32:
-                values.emplace_back(args[i].data.i32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                values.emplace_back(si::value::make_i32(args[i].data.i32));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_F32:
-                values.emplace_back(args[i].data.f32);    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                values.emplace_back(si::value::make_f32(args[i].data.f32));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_STR:
-                values.emplace_back(std::string{
-                  args[i].data.str.data,        // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
-                  args[i].data.str.length});    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                values.emplace_back(
+                  si::value::make_string(
+                    {args[i].data.str.data,         // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                     args[i].data.str.length}));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             case SLANG_VALUE_TYPE:
                 values.emplace_back(
-                  args[i].data.type.layout_id,                   // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
-                  const_cast<void*>(args[i].data.type.data));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                  si::value::make_reference(
+                    args[i].data.type.layout_id,                    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
+                    const_cast<void*>(args[i].data.type.data)));    // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-union-access)
                 break;
 
             default:
@@ -881,6 +883,15 @@ extern "C" slang_status slang_function_invoke(
             if(out_result != nullptr)
             {
                 out_result->kind = SLANG_VALUE_VOID;
+            }
+        }
+        else if(type == "null")
+        {
+            if(out_result != nullptr)
+            {
+                out_result->kind = SLANG_VALUE_NULL;
+                out_result->data.type.data = nullptr;
+                out_result->data.type.layout_id = 0;
             }
         }
         else

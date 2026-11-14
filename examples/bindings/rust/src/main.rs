@@ -1,5 +1,5 @@
 use slang_bindings::{
-    Context, Error, NativeCall, NativeType, OwnedString, OwnedValue, StringRef, Value,
+    Context, Error, NativeCall, NativeType, OwnedString, OwnedValue, StringRef, call,
 };
 use std::ffi::c_void;
 
@@ -20,6 +20,7 @@ impl NativeS {
 
 unsafe impl NativeType for NativeS {
     const NAME: &'static str = "S";
+    const MODULE: &'static str = "native_integration";
 
     fn pointer_offsets() -> &'static [usize] {
         // Only the `s` field is a pointer.
@@ -34,22 +35,22 @@ fn native_print(call: &mut NativeCall<'_>) -> Result<(), Error> {
 }
 
 fn init_context() -> Result<Context, Error> {
-    let mut ctx = Context::new()?;
+    let mut context = Context::new()?;
 
-    ctx.add_search_path(".")?;
-    ctx.add_search_path("examples")?;
+    context.add_search_path(".")?;
+    context.add_search_path("examples")?;
 
-    ctx.register_type::<NativeS>("native_integration")?;
-    ctx.register_native("slang", "print", native_print)?;
+    context.register_type::<NativeS>()?;
+    context.register_native("slang", "print", native_print)?;
 
-    Ok(ctx)
+    Ok(context)
 }
 
 fn main() -> Result<(), Error> {
-    let mut ctx = init_context()?;
+    let mut context = init_context()?;
 
     {
-        let module = ctx.resolve_module("native_integration")?;
+        let module = context.resolve_module("native_integration")?;
         let func = module.get_function("test")?;
 
         let native_string = OwnedString::new("Hello from native code!")?;
@@ -61,22 +62,25 @@ fn main() -> Result<(), Error> {
             i: 123,
         };
 
-        let struct_layout = ctx.get_type_layout::<NativeS>("native_integration")?;
-        let struct_val = Value::from_type(&native_instance, &struct_layout);
-        let float_val = Value::from_f32(1.234_f32);
-
-        let args = &[struct_val, float_val];
-        let result = func.invoke(args)?;
-
-        let native_ret = match result {
-            OwnedValue::Native(native) => native,
-            other => {
-                eprintln!("Unexpected return type: {:?}", other);
-                return Ok(());
-            }
+        // Alternatively: let result = func.invoke((&native_instance, 1.234_f32))?;
+        let Some(result) = call!(func, &native_instance, 1.234_f32)? else {
+            return Err(Error::Generic("Script returned None".into()));
         };
 
-        let ret = native_ret.as_ref::<NativeS>(&struct_layout)?;
+        if let Some(error) = context.take_callback_error() {
+            return Err(Error::Generic(format!("Native callback failed: {error}")));
+        }
+
+        let OwnedValue::Native(native_ret) = result else {
+            return Err(Error::Generic(format!(
+                "Unexpected return type: {:?}",
+                result
+            )));
+        };
+
+        let Some(ret) = native_ret.as_ref::<NativeS>()? else {
+            return Err(Error::Generic("Native value is null".into()));
+        };
 
         println!("String from script: {}", ret.string()?);
         println!("Value a: {}", ret.a);
@@ -85,16 +89,16 @@ fn main() -> Result<(), Error> {
         println!("Value i: {}", ret.i);
     }
 
-    ctx.gc_run()?;
-    let (objects, roots, bytes) = ctx.gc_stats()?;
+    context.gc_run()?;
+    let (objects, roots, bytes) = context.gc_stats()?;
     if objects != 0 {
-        println!("GC: {} objects still alive", objects);
+        println!("GC: {objects} objects still alive");
     }
     if roots != 0 {
-        println!("GC: {} root set entries still alive", roots);
+        println!("GC: {roots} root set entries still alive");
     }
     if bytes != 0 {
-        println!("GC: {} bytes still allocated", bytes);
+        println!("GC: {bytes} bytes still allocated");
     }
 
     Ok(())

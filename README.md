@@ -5,8 +5,8 @@ and an interpreter. The current iteration of the language should be fairly featu
 though it is certainly rough around the edges.
 
 Some features include:
-- Some JIT support for macOS/AArch64, Linux/x86_64.
-- Preliminary bindings for C and Rust.
+- Some [JIT support](src/jit) for macOS/AArch64, Linux/x86_64.
+- Preliminary [bindings](src/bindings) for C and Rust.
 
 The command line interface (in [src/main.cpp](src/main.cpp) and [src/commandline](src/commandline))
 provides these commands:
@@ -108,7 +108,7 @@ A preliminary VS Code extension can be found in [`vscode/slang-language-support`
 
 ### C bindings
 
-The C API is provided in `src/bindings/c`.  To compile the bindings you need to enable the corresponding CMake option when configuring the project:
+The C API is provided in [`src/bindings/c`](src/bindings/c).  To compile the bindings you need to enable the corresponding CMake option when configuring the project:
 
 ```bash
 # Create a build directory (or reuse an existing one)
@@ -124,7 +124,7 @@ target_link_libraries(your_target PRIVATE slang_c)
 
 ### Rust bindings
 
-Preliminary Rust bindings are provided in `src/bindings/rust`. They wrap the C API and provide a more idiomatic Rust interface for working with the interpreter.
+Preliminary Rust bindings are provided in [`src/bindings/rust`](src/bindings/rust). They wrap the C API and provide a more idiomatic Rust interface for working with the interpreter.
 
 Make sure the C bindings are enabled when configuring the project:
 
@@ -139,6 +139,6 @@ To build and run the Rust binding tests:
 cargo test --manifest-path src/bindings/rust/Cargo.toml
 ```
 
-An example demonstrating native Rust integration is provided in `examples/bindings/rust`.
+An example demonstrating native Rust integration is provided in [`examples/bindings/rust`](examples/bindings/rust).
 
 **Note:** The API is not yet stable, and its ownership and lifetime guarantees have not been fully validated.

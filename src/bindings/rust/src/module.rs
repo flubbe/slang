@@ -5,6 +5,10 @@ use crate::sys;
 use std::ffi::CString;
 use std::ptr::NonNull;
 
+/// A loaded module.
+///
+/// A module belongs to a [`Context`] and provides access to the functions
+/// defined in it.
 pub struct Module<'ctx> {
     context: &'ctx Context,
     raw: NonNull<sys::slang_module_impl>,
@@ -27,6 +31,12 @@ impl<'ctx> Module<'ctx> {
         self.context.check_status(status)
     }
 
+    /// Checks whether the module defines a function with the given name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFunctionName`] if `name` contains an interior
+    /// null byte. Returns an error if the function lookup fails.
     pub fn has_function(&self, name: &str) -> Result<bool, Error> {
         let name = CString::new(name).map_err(|_| Error::InvalidFunctionName)?;
         let mut has_function: bool = false;
@@ -44,6 +54,16 @@ impl<'ctx> Module<'ctx> {
         Ok(has_function)
     }
 
+    /// Returns a function with the given name from the module.
+    ///
+    /// The returned [`Function`] is tied to the lifetime of this module.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidFunctionName`] if `name` contains an interior
+    /// null byte. Returns [`Error::NullPointer`] if the function lookup succeeds
+    /// but returns a null pointer. Returns an error if the function cannot be
+    /// found or retrieved.
     pub fn get_function(&self, name: &str) -> Result<Function<'_, 'ctx>, Error> {
         let name = CString::new(name).map_err(|_| Error::InvalidFunctionName)?;
         let mut raw_function = std::ptr::null_mut();

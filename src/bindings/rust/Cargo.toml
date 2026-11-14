@@ -1,6 +1,8 @@
 [package]
 name = "slang_bindings"
 version = "0.1.0"
+authors.workspace = true
+license.workspace = true
 edition.workspace = true
 
 [lib]
@@ -8,3 +10,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 bindgen = "0.73"
+
+[dev-dependencies]
+trybuild = "1.0.122"

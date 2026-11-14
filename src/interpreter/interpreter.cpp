@@ -2264,44 +2264,49 @@ value context::exec(
     /*
      * Decode return value.
      */
-    value ret;
-    if(return_type_class == abi_type_class::void_)
+    value ret = [&]
     {
-        /* return void */
-    }
-    else if(return_type_class == abi_type_class::i32)
-    {
-        ret = value{frame.stack.pop_cat1<std::int32_t>()};
-    }
-    else if(return_type_class == abi_type_class::f32)
-    {
-        ret = value{frame.stack.pop_cat1<float>()};
-    }
-    else if(return_type_class == abi_type_class::str)
-    {
-        auto* s = frame.stack.pop_addr<std::string>();
-        if(s != nullptr)
+        if(return_type_class == abi_type_class::void_)
         {
-            ret = value{*s};    // copy string
-            gc.remove_temporary(s);
+            return value::make_void();
         }
+        else if(return_type_class == abi_type_class::i32)
+        {
+            return value::make_i32(frame.stack.pop_cat1<std::int32_t>());
+        }
+        else if(return_type_class == abi_type_class::f32)
+        {
+            return value::make_f32(frame.stack.pop_cat1<float>());
+        }
+        else if(return_type_class == abi_type_class::str)
+        {
+            auto _ = gsl::finally([&]
+                                  { gc.run(); });
 
-        gc.run();
-    }
-    else if(return_type_class == abi_type_class::ref)
-    {
-        const auto& sig = f.get_signature();
+            auto* s = frame.stack.pop_addr<std::string>();
+            if(s == nullptr)
+            {
+                return value::make_null();
+            }
 
-        void* addr = frame.stack.pop_addr<void>();
-        ret = value{sig.return_type, addr};
-        // NOTE The caller is responsible for calling `gc.remove_temporary(addr)`.
-    }
-    else
-    {
-        throw interpreter_error(std::format(
-          "Invalid return opcode '{}' ({}).",
-          to_string(return_type_class), static_cast<int>(return_type_class)));
-    }
+            auto copy = *s;    // copy string to remove temporary
+            gc.remove_temporary(s);
+
+            return value::make_string(std::move(copy));
+        }
+        else if(return_type_class == abi_type_class::ref)
+        {
+            const auto& sig = f.get_signature();
+            void* addr = frame.stack.pop_addr<void>();
+            return value::make_reference(sig.return_type, addr);
+        }
+        else
+        {
+            throw interpreter_error(std::format(
+              "Invalid return opcode '{}' ({}).",
+              to_string(return_type_class), static_cast<int>(return_type_class)));
+        }
+    }();
 
     // verify that the stack is empty.
     if(!frame.stack.empty())

@@ -5,10 +5,21 @@ use crate::types::{NativeType, TypeLayout};
 use core::fmt;
 use std::ffi::c_void;
 
+/// A value prepared for passing to the interpreter.
+///
+/// Native values and strings are borrowed and must remain valid for the
+/// duration of the call.
 pub enum Value<'a> {
+    /// A 32-bit signed integer.
     I32(i32),
+
+    /// A 32-bit floating-point number.
     F32(f32),
+
+    /// A borrowed UTF-8 string.
     Str(&'a str),
+
+    /// A borrowed native value, identified by its registered type layout.
     Native {
         data: *const c_void,
         layout_id: usize,
@@ -16,6 +27,43 @@ pub enum Value<'a> {
     },
 }
 
+/// Converts a Rust value into a value that can be passed to the interpreter.
+///
+/// Implementations are provided for `i32`, `f32`, `&str`, and references to
+/// types implementing [`NativeType`].
+pub trait IntoValue<'a> {
+    /// Converts the value using the given interpreter context.
+    fn into_value(self, context: &'a Context) -> Result<Value<'a>, Error>;
+}
+
+impl<'a> IntoValue<'a> for i32 {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::I32(self))
+    }
+}
+
+impl<'a> IntoValue<'a> for f32 {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::F32(self))
+    }
+}
+
+impl<'a> IntoValue<'a> for &'a str {
+    fn into_value(self, _: &'a Context) -> Result<Value<'a>, Error> {
+        Ok(Value::Str(self))
+    }
+}
+
+impl<'a, T: NativeType> IntoValue<'a> for &'a T {
+    fn into_value(self, context: &'a Context) -> Result<Value<'a>, Error> {
+        let layout = context.get_type_layout::<T>()?;
+        Ok(Value::from_type(self, &layout))
+    }
+}
+
+/// An owned native value returned by the interpreter.
+///
+/// The underlying value is destroyed when the `NativeValue` is dropped.
 pub struct NativeValue<'ctx> {
     raw: sys::slang_value,
     layout_id: usize,
@@ -39,23 +87,30 @@ impl Drop for NativeValue<'_> {
 }
 
 impl<'ctx> NativeValue<'ctx> {
-    pub fn as_ref<T: NativeType>(&self, layout: &TypeLayout<'ctx, T>) -> Result<&T, Error> {
-        if !std::ptr::eq(self.context, layout.context()) {
+    /// Returns a reference to the underlying native value.
+    ///
+    /// The requested type must match the value's registered type layout.
+    /// Returns `None` if the value contains a null pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArgument`] if the requested type does not match
+    /// the value's type layout. Returns an error if the type layout cannot be
+    /// retrieved.
+    pub fn as_ref<T: NativeType>(&self) -> Result<Option<&T>, Error> {
+        let layout = self.context.get_type_layout::<T>()?;
+
+        if self.layout_id != layout.id {
             return Err(Error::InvalidArgument);
         }
 
-        if self.raw.kind != sys::slang_value_kind_SLANG_VALUE_TYPE || self.layout_id != layout.id {
-            return Err(Error::InvalidArgument);
-        }
-
-        let data = unsafe { self.raw.data.type_.data };
-        let data = data.cast::<T>();
+        let data = unsafe { self.raw.data.type_.data }.cast::<T>();
 
         if data.is_null() {
-            return Err(Error::NullPointer);
+            return Ok(None);
         }
 
-        Ok(unsafe { &*data })
+        Ok(Some(unsafe { &*data }))
     }
 }
 
@@ -90,12 +145,24 @@ impl Drop for RawValueGuard<'_> {
     }
 }
 
+/// An owned value returned by the interpreter.
+///
+/// Native values are automatically destroyed when dropped.
 #[derive(Debug)]
 pub enum OwnedValue<'ctx> {
+    /// No value was returned.
     Void,
+
+    /// A 32-bit signed integer.
     I32(i32),
+
+    /// A 32-bit floating-point number.
     F32(f32),
+
+    /// An owned UTF-8 string.
     String(String),
+
+    /// An owned native value.
     Native(NativeValue<'ctx>),
 }
 
@@ -141,15 +208,20 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Creates an integer value.
     pub fn from_i32(value: i32) -> Self {
         Self::I32(value)
     }
 
+    /// Creates a floating-point value.
     pub fn from_f32(value: f32) -> Self {
         Self::F32(value)
     }
 
-    pub fn from_type<T: NativeType>(value: &'a T, layout: &'a TypeLayout<'_, T>) -> Self {
+    /// Creates a borrowed native value using the given type layout.
+    ///
+    /// The value and its type layout must belong to the same interpreter context.
+    pub fn from_type<T: NativeType>(value: &'a T, layout: &TypeLayout<'a, T>) -> Self {
         Self::Native {
             data: (value as *const T).cast(),
             layout_id: layout.id,
@@ -198,3 +270,57 @@ impl<'ctx> OwnedValue<'ctx> {
         }
     }
 }
+
+/// Converts a collection of Rust arguments into values for the interpreter.
+///
+/// Implementations are provided for tuples containing up to twelve arguments.
+/// Individual arguments must implement [`IntoValue`].
+pub trait IntoArgs<'a> {
+    /// Converts the arguments using the given interpreter context.
+    fn into_args(self, context: &'a Context) -> Result<Vec<Value<'a>>, Error>;
+}
+
+impl<'a> IntoArgs<'a> for () {
+    fn into_args(self, _: &'a Context) -> Result<Vec<Value<'a>>, Error> {
+        Ok(Vec::new())
+    }
+}
+
+macro_rules! impl_into_args {
+    ($($type:ident $value:ident),+) => {
+        impl<'a, $($type),+> IntoArgs<'a> for ($($type,)+)
+        where
+            $($type: IntoValue<'a>,)+
+        {
+            fn into_args(
+                self,
+                context: &'a Context,
+            ) -> Result<Vec<Value<'a>>, Error> {
+                let ($($value,)+) = self;
+
+                Ok(vec![
+                    $($value.into_value(context)?,)+
+                ])
+            }
+        }
+    };
+}
+
+impl_into_args!(A a);
+impl_into_args!(A a, B b);
+impl_into_args!(A a, B b, C c);
+impl_into_args!(A a, B b, C c, D d);
+impl_into_args!(A a, B b, C c, D d, E e);
+impl_into_args!(A a, B b, C c, D d, E e, F f);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j, K k);
+impl_into_args!(A a, B b, C c, D d, E e, F f,
+                G g, H h, I i, J j, K k, L l);

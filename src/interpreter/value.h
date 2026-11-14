@@ -4,13 +4,21 @@
  * value type.
  *
  * \author Felix Lubbe
- * \copyright Copyright (c) 2025
+ * \copyright Copyright (c) 2026
  * \license Distributed under the MIT software license (see accompanying LICENSE.txt).
  */
 
 #pragma once
 
+#include <algorithm>
 #include <any>
+#include <cstring>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "vector.h"
 
@@ -19,6 +27,29 @@ namespace slang::interpreter
 
 /**
  * Result and argument type.
+ *
+ * A value may contain references to data owned by the interpreter or by the
+ * value itself. The lifetime of these references is tied to the lifetime of
+ * the corresponding owner.
+ *
+ * The interpreter guarantees that returned values containing references are
+ * valid until explicitly handed back through the garbage collector interface,
+ * e.g.
+ *
+ * ```cpp
+ * value res = script_function();
+ * void* const* ret = res.get<void*>();
+ * if(ret != nullptr)
+ * {
+ *      // ... do something with the value ...
+ *
+ *      // hand it back
+ *      ctx.get_gc().remove_temporary(*ret);
+ *
+ *      // optionally run GC to clean up.
+ *      ctx.get_gc().run();
+ * }
+ * ```
  *
  * @note A `value` is implemented using `std::any`. This means methods accessing
  * the data potentially throws a `std::bad_any_cast` (that is, all methods except
@@ -36,16 +67,21 @@ class value
     module_::variable_type type;
 
     /** Pointer to the create function for this value. */
-    void (value::*unbound_create_function)(std::byte*) const = nullptr;
+    void (value::*create_function)(std::byte*) const = nullptr;
 
     /** Pointer to the destroy function for this value. */
-    void (value::*unbound_destroy_function)(std::byte*) const = nullptr;
+    void (value::*destroy_function)(std::byte*) const = nullptr;
 
-    /** Create this value in memory. */
-    std::function<void(std::byte*)> create_function;
-
-    /** Destroy this value in memory. */
-    std::function<void(std::byte*)> destroy_function;
+    /**
+     * Create a null value in memory.
+     *
+     * @param memory The memory to write into.
+     */
+    void create_null(std::byte* memory) const
+    {
+        void* ptr = nullptr;
+        std::memcpy(memory, &ptr, sizeof(ptr));
+    }
 
     /**
      * Create a primitive type value in memory.
@@ -100,20 +136,36 @@ class value
      */
     void create_string_vector_type(std::byte* memory) const
     {
-        // we need to convert `std::vector` to a `fixed_vector<T>*`.
-        auto input_vec = std::any_cast<std::vector<std::string>>(&data);
-        if(!input_vec)
+        // we need to convert `std::vector<std::string>` to a `fixed_vector<std::string*>*`.
+        const auto* input_vec = std::any_cast<std::vector<std::string>>(&data);
+        if(input_vec == nullptr)
         {
-            throw std::bad_any_cast();
+            throw std::bad_any_cast{};
         }
 
-        auto vec = new fixed_vector<std::string*>(input_vec->size());
-        for(std::size_t i = 0; i < input_vec->size(); ++i)
+        // Use unique_ptr to release memory in case of failure.
+        auto vec = std::make_unique<fixed_vector<std::string*>>(input_vec->size());
+        std::fill(vec->begin(), vec->end(), nullptr);
+
+        try
         {
-            (*vec)[i] = new std::string{(*input_vec)[i]};
+            for(std::size_t i = 0; i < input_vec->size(); ++i)
+            {
+                (*vec)[i] = new std::string{(*input_vec)[i]};
+            }
+        }
+        catch(...)
+        {
+            for(auto* v: *vec)
+            {
+                delete v;
+            }
+
+            throw;
         }
 
-        std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
+        auto* ptr = vec.release();
+        std::memcpy(memory, &ptr, sizeof(ptr));
     }
 
     /**
@@ -208,58 +260,28 @@ class value
         std::memset(memory, 0, sizeof(void*));
     }
 
-    /**
-     * Bind the value creation and destruction methods.
-     *
-     * @param new_unbound_create_function The new (unbound) value creation method. Can be `nullptr`.
-     * @param new_unbound_destroy_function The new (unbound) value destruction method. Can be `nullptr`.
-     */
-    void bind(
-      void (value::*new_unbound_create_function)(std::byte*) const,
-      void (value::*new_unbound_destroy_function)(std::byte*) const)
-    {
-        unbound_create_function = new_unbound_create_function;
-        unbound_destroy_function = new_unbound_destroy_function;
-
-        if(unbound_create_function != nullptr)
-        {
-            create_function = std::bind(unbound_create_function, this, std::placeholders::_1);
-        }
-        else
-        {
-            create_function = [](std::byte*) {}; /* no-op */
-        }
-
-        if(unbound_destroy_function != nullptr)
-        {
-            destroy_function = std::bind(unbound_destroy_function, this, std::placeholders::_1);
-        }
-        else
-        {
-            destroy_function = [](std::byte*) {}; /* no-op */
-        }
-    }
-
-public:
-    /** Default constructor. */
+    /** Disallow public default construction. */
     value() = default;
 
+public:
     /** Copy constructor. */
     value(const value& other)
     : data{other.data}
     , size{other.size}
     , type{other.type}
+    , create_function{other.create_function}
+    , destroy_function{other.destroy_function}
     {
-        bind(other.unbound_create_function, other.unbound_destroy_function);
     }
 
     /** Move constructor. */
     value(value&& other)
     : data{std::move(other.data)}
-    , size{other.size}
+    , size{std::exchange(other.size, 0)}
     , type{std::move(other.type)}
+    , create_function{std::exchange(other.create_function, nullptr)}
+    , destroy_function{std::exchange(other.destroy_function, nullptr)}
     {
-        bind(other.unbound_create_function, other.unbound_destroy_function);
     }
 
     /** Copy assignment. */
@@ -268,7 +290,8 @@ public:
         data = other.data;
         size = other.size;
         type = other.type;
-        bind(other.unbound_create_function, other.unbound_destroy_function);
+        create_function = other.create_function;
+        destroy_function = other.destroy_function;
         return *this;
     }
 
@@ -276,80 +299,118 @@ public:
     value& operator=(value&& other)
     {
         data = std::move(other.data);
-        size = other.size;
+        size = std::exchange(other.size, 0);
         type = std::move(other.type);
-        bind(other.unbound_create_function, other.unbound_destroy_function);
+        create_function = std::exchange(other.create_function, nullptr);
+        destroy_function = std::exchange(other.destroy_function, nullptr);
         return *this;
     }
 
-    /**
-     * Construct a integer value.
-     *
-     * @param i The integer.
-     */
-    explicit value(int i)
-    : data{i}
-    , size{sizeof(std::int32_t)}
-    , type{"i32"}
+    /** Create a 'void' value. */
+    static value make_void()
     {
-        bind(&value::create_primitive_type<std::int32_t>, nullptr);
+        value v;
+        v.data = nullptr;
+        v.size = 0;
+        v.type = {"void"};
+        return v;
+    }
+
+    /** Create a 'null' value. */
+    static value make_null()
+    {
+        value v;
+        v.data = nullptr;
+        v.size = sizeof(std::nullptr_t);
+        v.type = {"null"};
+        v.create_function = &value::create_null;
+        return v;
     }
 
     /**
-     * Construct a floating point value.
+     * Create an 'i32' value.
      *
-     * @param f The floating point value.
+     * @param i The value.
+     * @return Returns a 'i32' value.
      */
-    explicit value(float f)
-    : data{f}
-    , size{sizeof(float)}
-    , type{"f32"}
+    static value make_i32(std::int32_t i)
     {
-        bind(&value::create_primitive_type<float>, nullptr);
+        value v;
+        v.data = i;
+        v.size = sizeof(std::int32_t);
+        v.type = {"i32"};
+        v.create_function = &value::create_primitive_type<std::int32_t>;
+        return v;
     }
 
     /**
-     * Construct a string value.
+     * Create an 'f32' value.
+     *
+     * @param f The value.
+     * @return Returns a 'f32' value.
+     */
+    static value make_f32(float f)
+    {
+        value v;
+        v.data = f;
+        v.size = sizeof(float);
+        v.type = {"f32"};
+        v.create_function = &value::create_primitive_type<float>;
+        return v;
+    }
+
+    /**
+     * Create a string value.
      *
      * @note The string is owned by this `value`. This is relevant when using `write`,
-     * which writes a pointer to the specified memory address.
+     *     which writes a pointer to the specified memory address.
      *
      * @param s The string.
+     * @return Returns a string value.
      */
-    explicit value(std::string s)
-    : data{std::move(s)}
-    , size{sizeof(std::string*)}
-    , type{"str"}
+    static value make_string(std::string s)
     {
-        bind(&value::create_str, &value::destroy_str);
+        value v;
+        v.data = std::move(s);
+        v.size = sizeof(std::string*);
+        v.type = {"str"};
+        v.create_function = &value::create_str;
+        v.destroy_function = &value::destroy_str;
+        return v;
     }
 
     /**
-     * Construct a string value.
+     * Create a string value.
      *
      * @param s The string.
+     * @return Returns a string value.
      */
-    explicit value(const char* s)
-    : data{std::string{s}}
-    , size{sizeof(std::string*)}
-    , type{"str"}
+    static value make_string(const char* s)
     {
-        bind(&value::create_str, &value::destroy_str);
+        value v;
+        v.data = std::string{s};
+        v.size = sizeof(std::string*);
+        v.type = {"str"};
+        v.create_function = &value::create_str;
+        v.destroy_function = &value::destroy_str;
+        return v;
     }
 
     /**
-     * Construct an integer array value.
+     * Create an integer array value.
      *
      * @param int_vec The integers.
+     * @return Returns a string value.
      */
-    explicit value(std::vector<std::int32_t> int_vec);
+    static value make_i32_array(std::vector<std::int32_t> int_vec);
 
     /**
-     * Construct a floating point array value.
+     * Create a floating point array value.
      *
      * @param float_vec The floating point values.
+     * @return Returns a string value.
      */
-    explicit value(std::vector<float> float_vec);
+    static value make_f32_array(std::vector<float> float_vec);
 
     /**
      * Construct a string array value.
@@ -359,34 +420,40 @@ public:
      *
      * @param string_vec The strings.
      */
-    explicit value(std::vector<std::string> string_vec);
+    static value make_string_array(std::vector<std::string> string_vec);
 
     /**
-     * Construct a value from an object.
+     * Construct a value from an object reference.
      *
      * @param layout_id The type's layout id.
-     * @param obj The object.
+     * @param obj The object's address.
      */
-    explicit value(std::size_t layout_id, void* addr)
-    : data{addr}
-    , size{sizeof(void*)}
-    , type{"ref", std::nullopt, layout_id, std::nullopt}
+    static value make_reference(std::size_t layout_id, void* addr)
     {
-        bind(&value::create_addr, &value::destroy_addr);
+        value v;
+        v.data = addr;
+        v.size = sizeof(void*);
+        v.type = {"ref", std::nullopt, layout_id, std::nullopt};
+        v.create_function = &value::create_addr;
+        v.destroy_function = &value::destroy_addr;
+        return v;
     }
 
     /**
-     * Construct a value from an object.
+     * Create a value from an object reference.
      *
      * @param type The object's type.
-     * @param obj The object.
+     * @param obj The object's address.
      */
-    explicit value(module_::variable_type type, void* addr)
-    : data{addr}
-    , size{sizeof(void*)}
-    , type{std::move(type)}
+    static value make_reference(module_::variable_type type, void* addr)
     {
-        bind(&value::create_addr, &value::destroy_addr);
+        value v;
+        v.data = addr;
+        v.size = sizeof(void*);
+        v.type = {std::move(type)};
+        v.create_function = &value::create_addr;
+        v.destroy_function = &value::destroy_addr;
+        return v;
     }
 
     /**
@@ -397,7 +464,10 @@ public:
      */
     std::size_t create(std::byte* memory) const
     {
-        create_function(memory);
+        if(create_function != nullptr)
+        {
+            (this->*create_function)(memory);
+        }
         return size;
     }
 
@@ -409,7 +479,10 @@ public:
      */
     std::size_t destroy(std::byte* memory) const
     {
-        destroy_function(memory);
+        if(destroy_function != nullptr)
+        {
+            (this->*destroy_function)(memory);
+        }
         return size;
     }
 
@@ -443,28 +516,40 @@ public:
     }
 };
 
-inline value::value(std::vector<std::int32_t> int_vec)
-: data{std::move(int_vec)}
-, size{sizeof(void*)}
-, type{"i32", 1}
+inline value value::make_i32_array(
+  std::vector<std::int32_t> int_vec)
 {
-    bind(&value::create_vector_type<std::int32_t>, &value::destroy_vector_type<std::int32_t>);
+    value v;
+    v.data = std::move(int_vec);
+    v.size = sizeof(void*);
+    v.type = {"i32", 1};
+    v.create_function = &value::create_vector_type<std::int32_t>;
+    v.destroy_function = &value::destroy_vector_type<std::int32_t>;
+    return v;
 }
 
-inline value::value(std::vector<float> float_vec)
-: data{std::move(float_vec)}
-, size{sizeof(void*)}
-, type{"f32", 1}
+inline value value::make_f32_array(
+  std::vector<float> float_vec)
 {
-    bind(&value::create_vector_type<float>, &value::destroy_vector_type<float>);
+    value v;
+    v.data = std::move(float_vec);
+    v.size = sizeof(void*);
+    v.type = {"f32", 1};
+    v.create_function = &value::create_vector_type<float>;
+    v.destroy_function = &value::destroy_vector_type<float>;
+    return v;
 }
 
-inline value::value(std::vector<std::string> string_vec)
-: data{std::move(string_vec)}
-, size{sizeof(void*)}
-, type{"str", 1}
+inline value value::make_string_array(
+  std::vector<std::string> string_vec)
 {
-    bind(&value::create_string_vector_type, &value::destroy_string_vector_type);
+    value v;
+    v.data = std::move(string_vec);
+    v.size = sizeof(void*);
+    v.type = {"str", 1};
+    v.create_function = &value::create_string_vector_type;
+    v.destroy_function = &value::destroy_string_vector_type;
+    return v;
 }
 
 /**
@@ -482,7 +567,48 @@ std::vector<value> move_into_value_vector(Tuple&& tuple)
       {
           std::vector<value> result;
           result.reserve(sizeof...(elems));
-          (result.emplace_back(value{std::move(elems)}), ...);
+
+          (
+            result.emplace_back(
+              [&]() -> value
+              {
+                  using type = std::remove_cvref_t<decltype(elems)>;
+
+                  if constexpr(std::is_same_v<type, std::int32_t>)
+                  {
+                      return value::make_i32(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, float>)
+                  {
+                      return value::make_f32(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::string>)
+                  {
+                      return value::make_string(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<std::int32_t>>)
+                  {
+                      return value::make_i32_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<float>>)
+                  {
+                      return value::make_f32_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, std::vector<std::string>>)
+                  {
+                      return value::make_string_array(std::forward<decltype(elems)>(elems));
+                  }
+                  else if constexpr(std::is_same_v<type, value>)
+                  {
+                      return std::forward<decltype(elems)>(elems);
+                  }
+                  else
+                  {
+                      static_assert(!sizeof(type), "Unsupported native argument type");
+                  }
+              }()),
+            ...);
+
           return result;
       },
       std::forward<Tuple>(tuple));

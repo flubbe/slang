@@ -1,0 +1,12 @@
+error[E0597]: `context` does not live long enough
+  --> tests/compile_fail/lifetime_module_outlives_context.rs:19:18
+   |
+15 |     let module: Module<'static>;
+   |                 --------------- type annotation requires that `context` is borrowed for `'static`
+...
+18 |         let context = context_with_test_paths();
+   |             ------- binding `context` declared here
+19 |         module = context.resolve_module("example_package::hello").unwrap();
+   |                  ^^^^^^^ borrowed value does not live long enough
+20 |     }
+   |     - `context` dropped here while still borrowed
