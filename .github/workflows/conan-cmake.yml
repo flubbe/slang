@@ -97,7 +97,7 @@ jobs:
         run: cargo --locked clippy --workspace --all-targets --release -- -D warnings
 
       - name: Build RustDocs
-        run: RUSTDOCFLAGS="-D warnings" cargo --locked doc --no-deps
+        run: RUSTDOCFLAGS="-D warnings" cargo --locked doc --release --no-deps
 
       - name: Run tests
         run: |
