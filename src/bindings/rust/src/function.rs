@@ -4,6 +4,10 @@ use crate::sys;
 use crate::value::{IntoArgs, OwnedValue};
 use std::ptr::NonNull;
 
+/// A function defined in a loaded module.
+///
+/// A `Function` is tied to the lifetime of the [`Module`] it belongs to and
+/// can be used to invoke the function with native arguments.
 pub struct Function<'module, 'ctx> {
     module: &'module Module<'ctx>,
     raw: NonNull<sys::slang_function_impl>,
@@ -17,6 +21,18 @@ impl<'module, 'ctx> Function<'module, 'ctx> {
         Self { module, raw }
     }
 
+    /// Invokes the function with the given arguments.
+    ///
+    /// Arguments are converted into the interpreter's internal representation
+    /// through [`IntoArgs`] before invocation.
+    ///
+    /// Returns `Some` if the function produces a value, or `None` if it returns
+    /// no value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the arguments cannot be converted, the function
+    /// invocation fails, or the returned value cannot be represented by the bindings.
     pub fn invoke<A>(&self, args: A) -> Result<Option<OwnedValue<'ctx>>, Error>
     where
         A: IntoArgs<'ctx>,

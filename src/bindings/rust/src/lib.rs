@@ -15,7 +15,10 @@ pub use module::Module;
 pub use native::NativeCall;
 pub use string::{OwnedString, StringRef};
 pub use types::NativeType;
-pub use value::{NativeValue, OwnedValue, Value};
+pub use value::{NativeValue, OwnedValue};
+
+#[doc(hidden)]
+pub use value::{IntoArgs, IntoValue, Value};
 
 /// Invokes a Slang function with the given arguments.
 ///

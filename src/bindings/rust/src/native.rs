@@ -3,6 +3,7 @@ use crate::error::Error;
 use crate::sys;
 use std::ptr::NonNull;
 
+/// Provides access to the arguments and return value of a native function call.
 pub struct NativeCall<'a> {
     context: &'a Context,
     stack: NonNull<sys::slang_operand_stack_impl>,
