@@ -10,7 +10,15 @@
 
 #pragma once
 
+#include <algorithm>
 #include <any>
+#include <cstring>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "vector.h"
 
@@ -19,6 +27,29 @@ namespace slang::interpreter
 
 /**
  * Result and argument type.
+ *
+ * A value may contain references to data owned by the interpreter or by the
+ * value itself. The lifetime of these references is tied to the lifetime of
+ * the corresponding owner.
+ *
+ * The interpreter guarantees that returned values containing references are
+ * valid until explicitly handed back through the garbage collector interface,
+ * e.g.
+ *
+ * ```cpp
+ * value res = script_function();
+ * void* const* ret = res.get<void*>();
+ * if(ret != nullptr)
+ * {
+ *      // ... do something with the value ...
+ *
+ *      // hand it back
+ *      ctx.get_gc().remove_temporary(*ret);
+ *
+ *      // optionally run GC to clean up.
+ *      ctx.get_gc().run();
+ * }
+ * ```
  *
  * @note A `value` is implemented using `std::any`. This means methods accessing
  * the data potentially throws a `std::bad_any_cast` (that is, all methods except
@@ -40,6 +71,17 @@ class value
 
     /** Pointer to the destroy function for this value. */
     void (value::*destroy_function)(std::byte*) const = nullptr;
+
+    /**
+     * Create a null value in memory.
+     *
+     * @param memory The memory to write into.
+     */
+    void create_null(std::byte* memory) const
+    {
+        void* ptr = nullptr;
+        std::memcpy(memory, &ptr, sizeof(ptr));
+    }
 
     /**
      * Create a primitive type value in memory.
@@ -94,20 +136,36 @@ class value
      */
     void create_string_vector_type(std::byte* memory) const
     {
-        // we need to convert `std::vector` to a `fixed_vector<T>*`.
-        auto input_vec = std::any_cast<std::vector<std::string>>(&data);
-        if(!input_vec)
+        // we need to convert `std::vector<std::string>` to a `fixed_vector<std::string*>*`.
+        const auto* input_vec = std::any_cast<std::vector<std::string>>(&data);
+        if(input_vec == nullptr)
         {
-            throw std::bad_any_cast();
+            throw std::bad_any_cast{};
         }
 
-        auto vec = new fixed_vector<std::string*>(input_vec->size());
-        for(std::size_t i = 0; i < input_vec->size(); ++i)
+        // Use unique_ptr to release memory in case of failure.
+        auto vec = std::make_unique<fixed_vector<std::string*>>(input_vec->size());
+        std::fill(vec->begin(), vec->end(), nullptr);
+
+        try
         {
-            (*vec)[i] = new std::string{(*input_vec)[i]};
+            for(std::size_t i = 0; i < input_vec->size(); ++i)
+            {
+                (*vec)[i] = new std::string{(*input_vec)[i]};
+            }
+        }
+        catch(...)
+        {
+            for(auto* v: *vec)
+            {
+                delete v;
+            }
+
+            throw;
         }
 
-        std::memcpy(memory, &vec, sizeof(fixed_vector<std::string>*));
+        auto* ptr = vec.release();
+        std::memcpy(memory, &ptr, sizeof(ptr));
     }
 
     /**
@@ -263,8 +321,9 @@ public:
     {
         value v;
         v.data = nullptr;
-        v.size = sizeof(nullptr_t);
+        v.size = sizeof(std::nullptr_t);
         v.type = {"null"};
+        v.create_function = &value::create_null;
         return v;
     }
 
@@ -274,7 +333,7 @@ public:
      * @param i The value.
      * @return Returns a 'i32' value.
      */
-    static value make_i32(int i)
+    static value make_i32(std::int32_t i)
     {
         value v;
         v.data = i;

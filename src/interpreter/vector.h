@@ -143,7 +143,7 @@ public:
         return *this;
     }
 
-    /** Construct a vector with `n` uninitialized elements. */
+    /** Construct a vector with `n` default initialized elements. */
     explicit fixed_vector(size_type n)
     : data_ptr{allocate(n)}
     {
