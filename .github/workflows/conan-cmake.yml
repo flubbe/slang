@@ -29,6 +29,9 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
 
+    env:
+      CARGO_PROFILE_FLAG: ${{ matrix.build_type == 'Release' && '--release' || '' }}
+
     steps:
       - uses: actions/checkout@v7
 
@@ -94,10 +97,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run Clippy
-        run: cargo --locked clippy --workspace --all-targets --release -- -D warnings
+        run: cargo --locked clippy --workspace --all-targets ${{ env.CARGO_PROFILE_FLAG }} -- -D warnings
 
       - name: Build RustDocs
-        run: RUSTDOCFLAGS="-D warnings" cargo --locked doc --release --no-deps
+        run: RUSTDOCFLAGS="-D warnings" cargo --locked doc ${{ env.CARGO_PROFILE_FLAG }} --no-deps
 
       - name: Run tests
         run: |
@@ -105,8 +108,8 @@ jobs:
 
       - name: Run Rust tests
         # Example depends on CTest output (compiled example_package/hello module).
-        run: cargo --locked test --workspace --all-targets --release
+        run: cargo --locked test --workspace --all-targets ${{ env.CARGO_PROFILE_FLAG }}
 
       - name: Run Rust example
         # Example depends on CTest output (compiled native_integration module).
-        run: cargo --locked run --release --package native_integration_rust
+        run: cargo --locked run ${{ env.CARGO_PROFILE_FLAG }} --package native_integration_rust
