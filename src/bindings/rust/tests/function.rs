@@ -140,5 +140,5 @@ fn null_return_value() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("return_null").unwrap();
 
-    assert!(matches!(function.invoke(()).unwrap(), None));
+    assert!(function.invoke(()).unwrap().is_none());
 }
