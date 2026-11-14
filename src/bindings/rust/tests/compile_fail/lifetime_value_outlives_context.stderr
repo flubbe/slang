@@ -1,14 +1,15 @@
-error[E0597]: `context` does not live long enough
-  --> tests/compile_fail/lifetime_value_outlives_context.rs:14:22
+error[E0308]: mismatched types
+  --> tests/compile_fail/lifetime_value_outlives_context.rs:18:17
    |
  7 |     let value: OwnedValue<'static>;
-   |                ------------------- type annotation requires that `context` is borrowed for `'static`
+   |                ------------------- expected due to this type
 ...
-10 |         let mut context = Context::new().unwrap();
-   |             ----------- binding `context` declared here
-...
-14 |         let module = context.resolve_module("example_package::hello").unwrap();
-   |                      ^^^^^^^ borrowed value does not live long enough
-...
-19 |     }
-   |     - `context` dropped here while still borrowed
+18 |         value = function.invoke(()).unwrap();
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `OwnedValue<'_>`, found `Option<OwnedValue<'_>>`
+   |
+   = note: expected enum `OwnedValue<'static>`
+              found enum `Option<OwnedValue<'_>>`
+help: consider using `Option::expect` to unwrap the `Option<OwnedValue<'_>>` value, panicking if the value is an `Option::None`
+   |
+18 |         value = function.invoke(()).unwrap().expect("REASON");
+   |                                             +++++++++++++++++

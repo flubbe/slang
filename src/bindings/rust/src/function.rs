@@ -48,12 +48,16 @@ impl<'module, 'ctx> Function<'module, 'ctx> {
         };
         self.module.check_status(status)?;
 
+        if raw_result.kind == sys::slang_value_kind_SLANG_VALUE_NULL {
+            return Ok(None);
+        }
+
         if (raw_result.kind == sys::slang_value_kind_SLANG_VALUE_STR
             && unsafe { raw_result.data.str_.data.is_null() })
             || (raw_result.kind == sys::slang_value_kind_SLANG_VALUE_TYPE
                 && unsafe { raw_result.data.type_.data.is_null() })
         {
-            return Ok(None);
+            return Err(Error::NullPointer);
         }
 
         let result = OwnedValue::from_raw(self.module.context(), raw_result)?;

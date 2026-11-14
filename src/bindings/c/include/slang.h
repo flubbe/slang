@@ -95,6 +95,7 @@ extern "C"
     typedef enum slang_value_kind
     {
         SLANG_VALUE_VOID, /**< `void` */
+        SLANG_VALUE_NULL, /**< `null` */
         SLANG_VALUE_I32,  /**< `int32_t` */
         SLANG_VALUE_F32,  /**< `float`. */
         SLANG_VALUE_STR,  /**< String.  */

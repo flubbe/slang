@@ -885,6 +885,15 @@ extern "C" slang_status slang_function_invoke(
                 out_result->kind = SLANG_VALUE_VOID;
             }
         }
+        else if(type == "null")
+        {
+            if(out_result != nullptr)
+            {
+                out_result->kind = SLANG_VALUE_NULL;
+                out_result->data.type.data = nullptr;
+                out_result->data.type.layout_id = 0;
+            }
+        }
         else
         {
             // Custom object. Stays GC managed.

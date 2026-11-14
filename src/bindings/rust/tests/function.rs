@@ -21,7 +21,7 @@ fn invoke_return_hello() {
 
     assert!(matches!(
         result,
-        OwnedValue::String(ref value) if value == "Hello"
+        Some(OwnedValue::String(ref value)) if value == "Hello"
     ));
 }
 
@@ -33,7 +33,7 @@ fn invoke_with_i32_argument() {
 
     let result = function.invoke((42,)).unwrap();
 
-    assert!(matches!(result, OwnedValue::I32(42)));
+    assert!(matches!(result, Some(OwnedValue::I32(42))));
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn invoke_with_f32_argument() {
 
     assert!(matches!(
         result,
-        OwnedValue::F32(value) if (value - 1.23).abs() < 0.0001
+        Some(OwnedValue::F32(value)) if (value - 1.23).abs() < 0.0001
     ));
 }
 
@@ -60,7 +60,7 @@ fn invoke_with_string_argument() {
 
     assert!(matches!(
         result,
-        OwnedValue::String(ref value) if value == "Hello"
+        Some(OwnedValue::String(ref value)) if value == "Hello"
     ));
 }
 
@@ -102,7 +102,10 @@ fn invoke_void_function() {
     let module = context.resolve_module("example_package::hello").unwrap();
     let function = module.get_function("void_function").unwrap();
 
-    assert!(matches!(function.invoke(()).unwrap(), OwnedValue::Void));
+    assert!(matches!(
+        function.invoke(()).unwrap(),
+        Some(OwnedValue::Void)
+    ));
 }
 
 #[test]
@@ -113,7 +116,7 @@ fn invoke_with_empty_string() {
 
     assert!(matches!(
         function.invoke(("",)).unwrap(),
-        OwnedValue::String(value) if value.is_empty()
+        Some(OwnedValue::String(value)) if value.is_empty()
     ));
 }
 
@@ -127,7 +130,7 @@ fn invoke_with_unicode_string() {
 
     assert!(matches!(
         function.invoke((input,)).unwrap(),
-        OwnedValue::String(value) if value == input
+        Some(OwnedValue::String(value)) if value == input
     ));
 }
 
