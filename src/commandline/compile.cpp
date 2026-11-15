@@ -370,11 +370,13 @@ void compile::invoke(const std::vector<std::string>& args)
             {
             }
         }
-
-        diag_ctx.report_error(
-          module_path.string(),
-          std::nullopt,
-          what);
+        else
+        {
+            diag_ctx.report_error(
+              module_path.string(),
+              std::nullopt,
+              what);
+        }
 
         abort_if_errors();
     }

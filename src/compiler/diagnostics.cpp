@@ -329,7 +329,7 @@ std::string context::format(
               *this,
               diag.filename.value(),
               *diag.span,
-              diag.label.value());
+              diag.label);
         }
         else
         {
@@ -356,7 +356,7 @@ std::string context::format(
               *this,
               diag.filename.value(),
               *child.span,
-              child.label.value());
+              child.label);
         }
     }
 
