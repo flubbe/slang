@@ -492,9 +492,13 @@ void expression::evaluate_constant_expressions(
                           ::slang::to_string(expr.get_location())));
                   }
 
-                  env.set_const_info(
-                    symbol_id.value(),
-                    env.get_expression_value(*const_expr));
+                  auto const_value = env.get_expression_value(*const_expr);
+                  if(const_value.has_value())
+                  {
+                      env.set_const_info(
+                        symbol_id.value(),
+                        *const_value);
+                  }
               }
           }
       },

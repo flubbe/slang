@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "ast/ast.h"
-#include "compiler/source_error.h"
+#include "compiler/errors.h"
 #include "shared/token_stream.h"
 
 namespace slang

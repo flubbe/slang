@@ -11,7 +11,7 @@
 #pragma once
 
 #include "compiler/diagnostics.h"
-#include "compiler/source_error.h"
+#include "compiler/errors.h"
 #include "constant.h"
 #include "macro.h"
 #include "sema.h"

@@ -89,6 +89,11 @@ add_gtest_executable(test_package
 add_gtest_executable(test_diagnostics test_diagnostics.cpp)
 target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
 
+add_gtest_executable(test_constant_diagnostics
+    diagnostics/test_constant_diagnostics.cpp
+)
+target_link_libraries(test_constant_diagnostics PRIVATE slang_test_frontend_core)
+
 add_gtest_executable(test_lexer
     test_lexer.cpp
     ../src/compiler/lexer.cpp
@@ -111,7 +116,7 @@ add_gtest_executable(test_codegen
     ../src/compiler/typing.cpp
     ../src/utils.cpp
 )
-target_link_libraries(test_codegen PRIVATE slang_shared_core Microsoft.GSL::GSL)
+target_link_libraries(test_codegen PRIVATE slang_test_frontend_core Microsoft.GSL::GSL)
 
 add_gtest_executable(test_compile_ir test_compile_ir.cpp ../src/compiler/cfg/verify.cpp)
 target_link_libraries(test_compile_ir PRIVATE slang_test_frontend_core)

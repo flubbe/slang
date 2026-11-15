@@ -115,8 +115,13 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
     }
 
     // type cast.
-    const auto& v = env.get_expression_value(*expr);
-    if(v.type == const_::constant_type::i32)
+    auto v = env.get_expression_value(*expr);
+    if(!v.has_value())
+    {
+        return std::nullopt;
+    }
+
+    if(v->type == const_::constant_type::i32)
     {
         if(target_type->get_type() == type_ctx.get_i8_type())
         {
@@ -124,7 +129,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int8_t>(
-                std::get<std::int64_t>(v.value))};
+                std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -133,12 +138,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int16_t>(
-                std::get<std::int64_t>(v.value))};
+                std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
         {
-            return v;
+            return *v;
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())
@@ -146,7 +151,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i64,
-              .value = std::get<std::int64_t>(v.value)};
+              .value = std::get<std::int64_t>(v->value)};
         }
 
         if(target_type->get_type() == type_ctx.get_f32_type())
@@ -154,7 +159,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f32,
-              .value = static_cast<float>(std::get<std::int64_t>(v.value))};
+              .value = static_cast<float>(std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_f64_type())
@@ -162,18 +167,18 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f64,
-              .value = static_cast<double>(std::get<std::int64_t>(v.value))};
+              .value = static_cast<double>(std::get<std::int64_t>(v->value))};
         }
 
         throw ty::type_error(
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
-            const_::to_string(v.type),
+            const_::to_string(v->type),
             type_ctx.to_string(target_type->get_type())));
     }
 
-    if(v.type == const_::constant_type::i64)
+    if(v->type == const_::constant_type::i64)
     {
         if(target_type->get_type() == type_ctx.get_i8_type())
         {
@@ -181,7 +186,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int8_t>(
-                std::get<std::int64_t>(v.value))};
+                std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -190,7 +195,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int16_t>(
-                std::get<std::int64_t>(v.value))};
+                std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -199,12 +204,12 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int32_t>(
-                std::get<std::int64_t>(v.value))};
+                std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())
         {
-            return v;
+            return *v;
         }
 
         if(target_type->get_type() == type_ctx.get_f32_type())
@@ -212,7 +217,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f32,
-              .value = static_cast<float>(std::get<std::int64_t>(v.value))};
+              .value = static_cast<float>(std::get<std::int64_t>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_f64_type())
@@ -220,18 +225,18 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f64,
-              .value = static_cast<double>(std::get<std::int64_t>(v.value))};
+              .value = static_cast<double>(std::get<std::int64_t>(v->value))};
         }
 
         throw ty::type_error(
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
-            const_::to_string(v.type),
+            const_::to_string(v->type),
             type_ctx.to_string(target_type->get_type())));
     }
 
-    if(v.type == const_::constant_type::f32)
+    if(v->type == const_::constant_type::f32)
     {
         if(target_type->get_type() == type_ctx.get_i8_type())
         {
@@ -240,7 +245,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int8_t>(
                 static_cast<std::int64_t>(
-                  std::get<double>(v.value)))};
+                  std::get<double>(v->value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i16_type())
@@ -250,7 +255,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int16_t>(
                 static_cast<std::int64_t>(
-                  std::get<double>(v.value)))};
+                  std::get<double>(v->value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i32_type())
@@ -260,67 +265,7 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .type = const_::constant_type::i32,
               .value = utils::truncate_and_sign_extend<std::int32_t>(
                 static_cast<std::int64_t>(
-                  std::get<double>(v.value)))};
-        }
-
-        if(target_type->get_type() == type_ctx.get_i64_type())
-        {
-            return const_::const_info{
-              .origin_module_id = sema::symbol_info::current_module_id,
-              .type = const_::constant_type::i64,
-              .value = static_cast<std::int64_t>(
-                std::get<double>(v.value))};    // NOLINT(readability-magic-numbers)
-        }
-
-        if(target_type->get_type() == type_ctx.get_f32_type())
-        {
-            return v;
-        }
-
-        if(target_type->get_type() == type_ctx.get_f64_type())
-        {
-            return const_::const_info{
-              .origin_module_id = sema::symbol_info::current_module_id,
-              .type = const_::constant_type::f64,
-              .value = std::get<double>(v.value)};
-        }
-
-        throw ty::type_error(
-          loc,
-          std::format(
-            "Invalid compile-time evaluated cast '{}' -> '{}'.",
-            const_::to_string(v.type),
-            type_ctx.to_string(target_type->get_type())));
-    }
-
-    if(v.type == const_::constant_type::f64)
-    {
-        if(target_type->get_type() == type_ctx.get_i8_type())
-        {
-            return const_::const_info{
-              .origin_module_id = sema::symbol_info::current_module_id,
-              .type = const_::constant_type::i32,
-              .value = utils::truncate_and_sign_extend<std::int8_t>(
-                static_cast<std::int64_t>(
-                  std::get<double>(v.value)))};
-        }
-
-        if(target_type->get_type() == type_ctx.get_i16_type())
-        {
-            return const_::const_info{
-              .origin_module_id = sema::symbol_info::current_module_id,
-              .type = const_::constant_type::i32,
-              .value = utils::truncate_and_sign_extend<std::int16_t>(
-                std::get<double>(v.value))};
-        }
-
-        if(target_type->get_type() == type_ctx.get_i32_type())
-        {
-            return const_::const_info{
-              .origin_module_id = sema::symbol_info::current_module_id,
-              .type = const_::constant_type::i32,
-              .value = utils::truncate_and_sign_extend<std::int32_t>(
-                std::get<double>(v.value))};
+                  std::get<double>(v->value)))};
         }
 
         if(target_type->get_type() == type_ctx.get_i64_type())
@@ -329,7 +274,67 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::i64,
               .value = static_cast<std::int64_t>(
-                std::get<double>(v.value))};    // NOLINT(readability-magic-numbers)
+                std::get<double>(v->value))};    // NOLINT(readability-magic-numbers)
+        }
+
+        if(target_type->get_type() == type_ctx.get_f32_type())
+        {
+            return *v;
+        }
+
+        if(target_type->get_type() == type_ctx.get_f64_type())
+        {
+            return const_::const_info{
+              .origin_module_id = sema::symbol_info::current_module_id,
+              .type = const_::constant_type::f64,
+              .value = std::get<double>(v->value)};
+        }
+
+        throw ty::type_error(
+          loc,
+          std::format(
+            "Invalid compile-time evaluated cast '{}' -> '{}'.",
+            const_::to_string(v->type),
+            type_ctx.to_string(target_type->get_type())));
+    }
+
+    if(v->type == const_::constant_type::f64)
+    {
+        if(target_type->get_type() == type_ctx.get_i8_type())
+        {
+            return const_::const_info{
+              .origin_module_id = sema::symbol_info::current_module_id,
+              .type = const_::constant_type::i32,
+              .value = utils::truncate_and_sign_extend<std::int8_t>(
+                static_cast<std::int64_t>(
+                  std::get<double>(v->value)))};
+        }
+
+        if(target_type->get_type() == type_ctx.get_i16_type())
+        {
+            return const_::const_info{
+              .origin_module_id = sema::symbol_info::current_module_id,
+              .type = const_::constant_type::i32,
+              .value = utils::truncate_and_sign_extend<std::int16_t>(
+                std::get<double>(v->value))};
+        }
+
+        if(target_type->get_type() == type_ctx.get_i32_type())
+        {
+            return const_::const_info{
+              .origin_module_id = sema::symbol_info::current_module_id,
+              .type = const_::constant_type::i32,
+              .value = utils::truncate_and_sign_extend<std::int32_t>(
+                std::get<double>(v->value))};
+        }
+
+        if(target_type->get_type() == type_ctx.get_i64_type())
+        {
+            return const_::const_info{
+              .origin_module_id = sema::symbol_info::current_module_id,
+              .type = const_::constant_type::i64,
+              .value = static_cast<std::int64_t>(
+                std::get<double>(v->value))};    // NOLINT(readability-magic-numbers)
         }
 
         if(target_type->get_type() == type_ctx.get_f32_type())
@@ -337,19 +342,19 @@ std::optional<const_::const_info> type_cast_expression::evaluate(
             return const_::const_info{
               .origin_module_id = sema::symbol_info::current_module_id,
               .type = const_::constant_type::f32,
-              .value = static_cast<float>(std::get<double>(v.value))};
+              .value = static_cast<float>(std::get<double>(v->value))};
         }
 
         if(target_type->get_type() == type_ctx.get_f64_type())
         {
-            return v;
+            return *v;
         }
 
         throw ty::type_error(
           loc,
           std::format(
             "Invalid compile-time evaluated cast '{}' -> '{}'.",
-            const_::to_string(v.type),
+            const_::to_string(v->type),
             type_ctx.to_string(target_type->get_type())));
     }
 
@@ -839,46 +844,50 @@ std::optional<const_::const_info> binary_expression::evaluate(
     // special case: shift operators (l.h.s. and r.h.s. types don't have to match)
     if(op.s == "<<" || op.s == ">>")
     {
-        const auto& lhs_value = env.get_expression_value(*lhs);
-        const auto& rhs_value = env.get_expression_value(*rhs);
+        auto lhs_value = env.get_expression_value(*lhs);
+        auto rhs_value = env.get_expression_value(*rhs);
+        if(!lhs_value.has_value() || !rhs_value.has_value())
+        {
+            return std::nullopt;
+        }
 
-        if(lhs_value.type != const_::constant_type::i32
-           && lhs_value.type != const_::constant_type::i64)
+        if(lhs_value->type != const_::constant_type::i32
+           && lhs_value->type != const_::constant_type::i64)
         {
             throw cg::codegen_error(
               lhs->get_location(),
               std::format(
                 "Invalid type '{}' for shift operator '>>'. Expected 'i32' or 'i64'.",
-                const_::to_string(lhs_value.type)));
+                const_::to_string(lhs_value->type)));
         }
 
-        if(rhs_value.type != const_::constant_type::i32)
+        if(rhs_value->type != const_::constant_type::i32)
         {
             throw cg::codegen_error(
               rhs->get_location(),
               std::format(
                 "Expected r.h.s. of type 'i32', got '{}'.",
-                const_::to_string(rhs_value.type)));
+                const_::to_string(rhs_value->type)));
         }
 
-        if(std::get<std::int64_t>(rhs_value.value) < 0)
+        if(std::get<std::int64_t>(rhs_value->value) < 0)
         {
             throw cg::codegen_error("Negative shift counts are not allowed.");
         }
 
         std::uint32_t count_mask =
-          (lhs_value.type == const_::constant_type::i32)
+          (lhs_value->type == const_::constant_type::i32)
             ? 0x1f
             : 0x3f;
 
         std::uint64_t result_mask =
-          (lhs_value.type == const_::constant_type::i32)
+          (lhs_value->type == const_::constant_type::i32)
             ? static_cast<std::uint64_t>(static_cast<std::uint32_t>(~0))
             : static_cast<std::uint64_t>(~0);
 
         std::int64_t result{0};
-        std::uint32_t shift_count = static_cast<std::uint32_t>(std::get<std::int64_t>(rhs_value.value)) & count_mask;
-        std::int64_t shift_value = std::get<std::int64_t>(lhs_value.value);
+        std::uint32_t shift_count = static_cast<std::uint32_t>(std::get<std::int64_t>(rhs_value->value)) & count_mask;
+        std::int64_t shift_value = std::get<std::int64_t>(lhs_value->value);
 
         if(op.s == "<<")
         {
@@ -893,24 +902,27 @@ std::optional<const_::const_info> binary_expression::evaluate(
 
         return const_::const_info{
           .origin_module_id = sema::symbol_info::current_module_id,
-          .type = lhs_value.type,
+          .type = lhs_value->type,
           .value = result};
+    }
+
+    auto lhs_val = env.get_expression_value(*lhs);
+    auto rhs_val = env.get_expression_value(*rhs);
+    if(!lhs_val.has_value() || !rhs_val.has_value())
+    {
+        return std::nullopt;
     }
 
     auto eval_it = eval_map.find(op.s);
     if(eval_it != eval_map.end())
     {
-        return eval_it->second(
-          env.get_expression_value(*lhs),
-          env.get_expression_value(*rhs));
+        return eval_it->second(*lhs_val, *rhs_val);
     }
 
     auto comp_it = comp_map.find(op.s);
     if(comp_it != comp_map.end())
     {
-        return comp_it->second(
-          env.get_expression_value(*lhs),
-          env.get_expression_value(*rhs));
+        return comp_it->second(*lhs_val, *rhs_val);
     }
 
     return std::nullopt;
@@ -1112,7 +1124,12 @@ std::optional<const_::const_info> unary_expression::evaluate(
         }
     }
 
-    return it->second(env.get_expression_value(*operand));
+    auto operand_value = env.get_expression_value(*operand);
+    if(!operand_value.has_value())
+    {
+        return std::nullopt;
+    }
+    return it->second(*operand_value);
 }
 
 }    // namespace slang::ast

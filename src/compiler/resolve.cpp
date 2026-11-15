@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "shared/type_utils.h"
+#include "compiler/errors.h"
 #include "collect.h"
 #include "loader.h"
 #include "name_utils.h"
@@ -754,8 +755,7 @@ void context::resolve_imports(
 
                 if(!opt_id.has_value())
                 {
-                    // TODO replace with something like internal_error, with source info attached.
-                    throw std::runtime_error{
+                    throw slang::internal_error{
                       std::format(
                         "No symbol id for non-transitive module '{}'.",
                         qualified_module_name)};
@@ -777,8 +777,7 @@ void context::resolve_imports(
            spec});
         if(!success)
         {
-            // TODO replace with something like internal_error, with source info attached.
-            throw std::runtime_error{
+            throw slang::internal_error{
               std::format(
                 "{}: Module '{}' was already resolved at {}.",
                 ::slang::to_string(entry->second.location),
@@ -840,8 +839,7 @@ void context::resolve_imports(
         // set up global scope.
         if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
         {
-            // TODO replace with something like internal_error.
-            throw std::runtime_error("Got unexpected scope id for global scope.");
+            throw slang::internal_error("Got unexpected scope id for global scope.");
         }
 
         const auto& header = resolver->get_module().get_header();
@@ -864,8 +862,7 @@ void context::resolve_imports(
             auto resolved_it = resolved_import_specs.find(qualified_module_name);
             if(resolved_it == resolved_import_specs.end())
             {
-                // TODO replace with something like internal_error.
-                throw std::runtime_error(
+                throw slang::internal_error(
                   std::format(
                     "No source location for imported module {}.",
                     qualified_module_name));

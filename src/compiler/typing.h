@@ -17,8 +17,9 @@
 #include <vector>
 
 #include "shared/token.h"
+#include "compiler/diagnostics.h"
+#include "compiler/errors.h"
 #include "sema.h"
-#include "source_error.h"
 #include "type.h"
 
 /*
@@ -31,6 +32,15 @@ class expression; /* ast.h */
 
 namespace slang::typing
 {
+
+namespace diag = slang::compiler::diagnostics;
+
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
 
 /** Type errors. */
 struct type_error : public source_error
@@ -139,6 +149,9 @@ struct type_info
 /** Type system context. */
 class context
 {
+    /** Diagnostic context pointer. */
+    diag::context& diags;
+
     /** Next type id. */
     std::size_t next_type_id = 0;
 
@@ -180,7 +193,9 @@ class context
 
 public:
     /** Create a typing context. */
-    context()
+    explicit context(
+      diag::context& diags = default_diagnostics())
+    : diags{diags}
     {
         initialize_builtins();
     }
@@ -231,6 +246,12 @@ public:
      * @param struct_type_id Type id of the struct.
      */
     void seal_struct(type_id struct_type_id);
+
+    /** Return the diagnostics context. */
+    diag::context& get_diagnostics()
+    {
+        return diags;
+    }
 
     /**
      * Get the struct info.

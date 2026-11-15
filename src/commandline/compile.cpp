@@ -16,12 +16,12 @@
 #include "compiler/codegen/codegen.h"
 #include "compiler/diagnostics.h"
 #include "compiler/emitter.h"
+#include "compiler/errors.h"
 #include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
-#include "compiler/source_error.h"
 #include "compiler/typing.h"
 #include "commandline.h"
 
@@ -220,7 +220,7 @@ void compile::invoke(const std::vector<std::string>& args)
         sema::env sema_env;
         const_::env const_env;
         macro::env macro_env;
-        ty::context type_ctx;
+        ty::context type_ctx{diag_ctx};
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{
           sema_env,

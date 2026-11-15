@@ -1,7 +1,7 @@
 /**
  * slang - a simple scripting language.
  *
- * Front-end error base type.
+ * Compiler error types.
  *
  * \author Felix Lubbe
  * \copyright Copyright (c) 2026
@@ -73,6 +73,18 @@ struct source_error : public std::runtime_error
     , message{m}
     {
     }
+};
+
+/**
+ * Internal compiler error for conditions that should never occur.
+ *
+ * These represent bugs in the compiler itself, not user errors.
+ * Used for invariant violations and edge cases that are unreachable
+ * under normal operation.
+ */
+struct internal_error : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
 };
 
 }    // namespace slang

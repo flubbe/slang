@@ -19,7 +19,7 @@
 #include "shared/location.h"
 #include "shared/token.h"
 #include "attribute.h"
-#include "source_error.h"
+#include "errors.h"
 #include "syntax_context.h"
 #include "type.h"
 

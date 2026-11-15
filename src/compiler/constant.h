@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <variant>
 
+#include "compiler/diagnostics.h"
 #include "compiler/sema.h"
 
 /*
@@ -26,6 +27,15 @@ class expression; /* ast.h */
 
 namespace slang::const_
 {
+
+namespace diag = slang::compiler::diagnostics;
+
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
 
 /** Constant type. */
 enum class constant_type : std::uint8_t
@@ -108,17 +118,38 @@ struct env
     /** Registered constant symbols. */
     std::set<sema::symbol_id> constant_registry;
 
-    /** Default constructors. */
-    env() = default;
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /**
+     * Construct a constant evaluation environment with default diagnostics.
+     * For use in tests and contexts where a specific diagnostics context is not needed.
+     */
+    env()
+    : diags{default_diagnostics()}
+    {
+    }
+
+    /**
+     * Construct a constant evaluation environment.
+     *
+     * @param diags The diagnostics context.
+     */
+    explicit env(diag::context& diags)
+    : diags{diags}
+    {
+    }
+
+    /** Default copy and move constructors. */
     env(const env&) = default;
     env(env&&) = default;
 
     /** Default destructor. */
     ~env() = default;
 
-    /** Default assignments. */
-    env& operator=(const env&) = default;
-    env& operator=(env&&) = default;
+    /** Deleted assignments (cannot assign due to reference member). */
+    env& operator=(const env&) = delete;
+    env& operator=(env&&) = delete;
 
     /**
      * Set the result of a constant evaluation for a symbol.
@@ -242,12 +273,10 @@ struct env
     /**
      * Get an expressions's value.
      *
-     * @note The returned reference is only valid until a re-hash occurs.
-     *       Copy if you intend to use it later.
      * @param expr The ast node / expression.
-     * @returns Returns the expression's value.
+     * @returns Returns the expression's value, or `std::nullopt` if not found.
      */
-    const const_info& get_expression_value(
+    std::optional<const_info> get_expression_value(
       const ast::expression& expr) const;
 
     /**
