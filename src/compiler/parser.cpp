@@ -432,7 +432,7 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '<identifier>' or '[<identifier>; <length>]', got {}.",
+            "Expected '<identifier>', got {}.",
             current_token->describe()));
     }
 
@@ -677,43 +677,50 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 
     get_next_token();    // skip '{'.
     std::vector<std::unique_ptr<ast::variable_declaration_expression>> members;
-    while(true)
+    while(current_token->s != "}")
     {
-        if(current_token->type == token_type::identifier)
+        if(current_token->type != token_type::identifier)
         {
-            token member_name = *current_token;
-            validate_identifier_name(member_name);
-
-            get_next_token();
-
-            if(current_token->s != ":")
-            {
-                throw syntax_error(
-                  *current_token,
-                  std::format(
-                    "Expected ': <identifier>', got {}.",
-                    current_token->describe()));
-            }
-            get_next_token();    // skip ':'.
-
-            if(current_token->type != token_type::identifier
-               && current_token->s != "[")
-            {
-                throw syntax_error(
-                  *current_token,
-                  std::format(
-                    "Expected '<identifier>' or '[<identifier>]', got {}.",
-                    current_token->describe()));
-            }
-
-            auto member_type = parse_type();
-            members.emplace_back(
-              std::make_unique<ast::variable_declaration_expression>(
-                loc,
-                std::move(member_name),
-                std::move(member_type),
-                nullptr));
+            throw syntax_error(
+              *current_token,
+              std::format(
+                "Expected '<identifier>' or '}}', got {}.",
+                current_token->describe()));
         }
+
+        token member_name = *current_token;
+        validate_identifier_name(member_name);
+
+        get_next_token();
+
+        if(current_token->s != ":")
+        {
+            throw syntax_error(
+              *current_token,
+              std::format(
+                "Expected ': <identifier>', got {}.",
+                current_token->describe()));
+        }
+
+        get_next_token();    // skip ':'.
+
+        if(current_token->type != token_type::identifier
+           && current_token->s != "[")
+        {
+            throw syntax_error(
+              *current_token,
+              std::format(
+                "Expected '<identifier>', got {}.",
+                current_token->describe()));
+        }
+
+        auto member_type = parse_type();
+        members.emplace_back(
+          std::make_unique<ast::variable_declaration_expression>(
+            loc,
+            std::move(member_name),
+            std::move(member_type),
+            nullptr));
 
         if(current_token->s == "}")
         {

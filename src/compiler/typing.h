@@ -18,6 +18,7 @@
 
 #include "shared/token.h"
 #include "sema.h"
+#include "source_error.h"
 #include "type.h"
 
 /*
@@ -32,18 +33,9 @@ namespace slang::typing
 {
 
 /** Type errors. */
-class type_error : public std::runtime_error
+struct type_error : public source_error
 {
-    using std::runtime_error::runtime_error;
-
-public:
-    /**
-     * Construct a type_error.
-     *
-     * @param loc The error location in the source.
-     * @param message The error message.
-     */
-    type_error(const slang::source_location& loc, const std::string& message);
+    using source_error::source_error;
 };
 
 /** Built-in types. */

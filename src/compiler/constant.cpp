@@ -38,10 +38,10 @@ void env::set_const_info(
     {
         if(it->second != info)
         {
-            throw sema::semantic_error(
+            throw sema::semantic_error{
               std::format(
                 "Constant info already exists for the symbol '{}' with a different value.",
-                id.value));
+                id.value)};
         }
     }
     else
@@ -66,10 +66,10 @@ void env::register_constant(sema::symbol_id id)
 {
     if(constant_registry.contains(id))
     {
-        throw sema::semantic_error(
+        throw sema::semantic_error{
           std::format(
             "Constant already registered for the symbol '{}'.",
-            id.value));
+            id.value)};
     }
 
     constant_registry.insert(id);
@@ -265,10 +265,10 @@ const const_info& env::get_expression_value(
     auto it = const_eval_expr_values.find(&expr);
     if(it == const_eval_expr_values.end())
     {
-        throw sema::semantic_error(
+        throw sema::semantic_error{
           std::format(
             "{}: No evaluation result for expression found.",
-            ::slang::to_string(expr.get_location())));
+            ::slang::to_string(expr.get_location()))};
     }
 
     return it->second;

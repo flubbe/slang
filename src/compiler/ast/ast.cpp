@@ -33,6 +33,83 @@ namespace ty = slang::typing;
 namespace slang::ast
 {
 
+namespace
+{
+
+/**
+ * Check whether a type string corresponds to a type defined
+ * "locally" (i.e., inside the current module), or to a builtin
+ * type.
+ *
+ * @param ctx The type context.
+ * @param type_str The type string to check.
+ * @returns Returns whether the type was defined in this module or is a built-in type.
+ */
+bool is_local_or_builtin_type(
+  const ty::context& ctx,
+  const std::string& type_str)
+{
+    if(ctx.has_type(type_str))
+    {
+        return true;
+    }
+
+    try
+    {
+        return ctx.is_builtin(
+          ctx.get_type(type_str));
+    }
+    catch(const ty::type_error&)
+    {
+        // Unknown type, so neither local nor builtin.
+        return false;
+    }
+};
+
+/**
+ * Resolve a type string into a qualified name.
+ *
+ * @param loc Location for error reporting.
+ * @param ctx Type context.
+ * @param env Semantic environment.
+ * @param declaring_module Symbol id of the declaring module of the type.
+ * @param type_str Type string.
+ * @returns Returns the resolved name.
+ */
+std::string resolve_type_name(
+  const source_location& loc,
+  const ty::context& ctx,
+  const sema::env& env,
+  sema::symbol_id declaring_module,
+  const std::string& type_str)
+{
+    if(!type_str.contains("::"))
+    {
+        // Could be a built-in type or a local type.
+        if(!is_local_or_builtin_type(ctx, type_str))
+        {
+            auto it = env.symbol_table.find(declaring_module);
+            if(it == env.symbol_table.end())
+            {
+                throw sema::name_error{
+                  loc,
+                  std::format(
+                    "Cannot find module for type '{}' in symbol table.",
+                    type_str)};
+            }
+
+            return name::qualified_name(
+              it->second.qualified_name,
+              type_str);
+        }
+    }
+
+    // Built-in, module-local or qualified name.
+    return type_str;
+}
+
+}    // namespace
+
 /*
  * expression.
  */
@@ -1242,7 +1319,20 @@ std::optional<ty::type_id> type_cast_expression::type_check(
     }
 
     // casts for struct types. this is checked at run-time.
-    expr_type = ctx.get_type(target_type->get_qualified_name());    // no array casts.
+    expr_type = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              target_type->get_qualified_name());    // no array casts.
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = target_type->get_location();
+            throw;
+        }
+    }();
     ctx.set_expression_type(*this, expr_type);
 
     return expr_type;
@@ -2258,7 +2348,21 @@ void type_expression::type_check(
   ty::context& ctx,
   [[maybe_unused]] sema::env& env)
 {
-    type_id = ctx.get_type(get_qualified_name());
+    type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              get_qualified_name());
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = get_location();
+            throw;
+        }
+    }();
+
     if(array)
     {
         type_id = ctx.get_array(type_id, 1);
@@ -2405,7 +2509,21 @@ std::optional<ty::type_id> variable_declaration_expression::type_check(
 
     type->type_check(ctx, env);
 
-    auto annotated_type_id = ctx.get_type(type->get_qualified_name());
+    auto annotated_type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              type->get_qualified_name());
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = type->get_location();
+            throw;
+        }
+    }();
+
     if(type->is_array())
     {
         annotated_type_id = ctx.get_array(annotated_type_id, 1);
@@ -2562,7 +2680,21 @@ std::optional<ty::type_id> constant_declaration_expression::type_check(
         return ctx.get_expression_type(*this);
     }
 
-    auto annotated_type_id = ctx.get_type(type->get_qualified_name());
+    auto annotated_type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              type->get_qualified_name());
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = type->get_location();
+            throw;
+        }
+    }();
+
     if(type->is_array())
     {
         annotated_type_id = ctx.get_array(annotated_type_id, 1);
@@ -2824,8 +2956,21 @@ void struct_definition_expression::define_type(ty::context& ctx) const
 {
     for(const auto& m: members)
     {
-        auto field_type = ctx.get_type(
-          m->get_type()->get_qualified_name());
+        auto field_type = [&]
+        {
+            try
+            {
+                return ctx.get_type(
+                  m->get_type()->get_qualified_name());
+            }
+            catch(ty::type_error& e)
+            {
+                // Attach location info and re-throw.
+                e.location = m->get_type()->get_location();
+                throw;
+            }
+        }();
+
         if(m->is_array())
         {
             field_type = ctx.get_array(field_type, 1);
@@ -2968,7 +3113,21 @@ std::optional<ty::type_id> struct_anonymous_initializer_expression::type_check(
         return ctx.get_expression_type(*this);
     }
 
-    auto struct_type_id = ctx.get_type(get_qualified_name());    // FIXME should use symbol id?
+    auto struct_type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              get_qualified_name());    // FIXME should use symbol id?
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = get_location();
+            throw;
+        }
+    }();
+
     const auto& struct_info = ctx.get_struct_info(struct_type_id);
 
     if(initializers.size() != struct_info.fields.size())
@@ -3181,7 +3340,21 @@ std::optional<ty::type_id> struct_named_initializer_expression::type_check(
         return ctx.get_expression_type(*this);
     }
 
-    auto struct_type_id = ctx.get_type(get_qualified_name());    // FIXME should use symbol id?
+    auto struct_type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              get_qualified_name());    // FIXME should use symbol id?
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = get_location();
+            throw;
+        }
+    }();
+
     const ty::struct_info& info = ctx.get_struct_info(struct_type_id);
 
     if(info.fields.size() != initializers.size())
@@ -4699,7 +4872,21 @@ std::optional<ty::type_id> new_expression::type_check(
 {
     type_expr->type_check(ctx, env);
 
-    type_expr_id = ctx.get_type(type_expr->get_qualified_name());
+    type_expr_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              type_expr->get_qualified_name());
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = type_expr->get_location();
+            throw;
+        }
+    }();
+
     if(!type_expr_id.has_value())
     {
         throw ty::type_error(
@@ -5009,8 +5196,21 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
 
     for(const auto& arg: args)
     {
-        auto type = ctx.get_type(
-          std::get<2>(arg)->get_qualified_name());
+        auto type = [&]
+        {
+            try
+            {
+                return ctx.get_type(
+                  std::get<2>(arg)->get_qualified_name());
+            }
+            catch(ty::type_error& e)
+            {
+                // Attach location info and re-throw.
+                e.location = std::get<2>(arg)->get_location();
+                throw;
+            }
+        }();
+
         if(std::get<2>(arg)->is_array())
         {
             type = ctx.get_array(type, 1);
@@ -5020,7 +5220,21 @@ void prototype_ast::declare(ty::context& ctx, sema::env& env)
         env.type_map.insert({std::get<1>(arg), type});
     }
 
-    return_type_id = ctx.get_type(return_type->get_qualified_name());
+    return_type_id = [&]
+    {
+        try
+        {
+            return ctx.get_type(
+              return_type->get_qualified_name());
+        }
+        catch(ty::type_error& e)
+        {
+            // Attach location info and re-throw.
+            e.location = return_type->get_location();
+            throw;
+        }
+    }();
+
     if(return_type->is_array())
     {
         return_type_id = ctx.get_array(return_type_id, 1);
@@ -5631,28 +5845,12 @@ std::optional<ty::type_id> call_expression::type_check(
 
         auto desc = std::get<module_::function_descriptor>(exp_sym->desc);
 
-        std::string type_str = desc.signature.return_type.base_type();
-        if(!type_str.contains("::"))
-        {
-            // Could be a built-in type or a local type.
-            if(!ctx.has_type(type_str)
-               || !ctx.is_builtin(ctx.get_type(type_str)))
-            {
-                auto module_symbol_it = env.symbol_table.find(callee_symbol_info.declaring_module);
-                if(module_symbol_it == env.symbol_table.end())
-                {
-                    throw ty::type_error(
-                      loc,
-                      std::format(
-                        "Declaring module for external symbol '{}' not found.",
-                        callee_symbol_info.qualified_name));
-                }
-
-                type_str = name::qualified_name(
-                  env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
-                  type_str);
-            }
-        }
+        std::string type_str = resolve_type_name(
+          loc,
+          ctx,
+          env,
+          callee_symbol_info.declaring_module,
+          desc.signature.return_type.base_type());
 
         return_type = ctx.get_type(type_str);
         if(desc.signature.return_type.is_array())
@@ -5672,19 +5870,27 @@ std::optional<ty::type_id> call_expression::type_check(
 
         for(std::size_t i = 0; i < args.size(); ++i)
         {
-            std::string type_str = desc.signature.arg_types[i].base_type();
+            std::string type_str = resolve_type_name(
+              loc,
+              ctx,
+              env,
+              callee_symbol_info.declaring_module,
+              desc.signature.arg_types[i].base_type());
 
-            if(!type_str.contains("::")
-               // Could be a built-in type or a local type.
-               && (!ctx.has_type(type_str)
-                   || !ctx.is_builtin(ctx.get_type(type_str))))
+            auto expected_arg_type = [&]
             {
-                type_str = name::qualified_name(
-                  env.symbol_table[callee_symbol_info.declaring_module].qualified_name,
-                  type_str);
-            }
+                try
+                {
+                    return ctx.get_type(type_str);
+                }
+                catch(ty::type_error& e)
+                {
+                    // Attach the call-site location as the best available source location.
+                    e.location = callee.location;
+                    throw;
+                }
+            }();
 
-            auto expected_arg_type = ctx.get_type(type_str);
             if(desc.signature.arg_types[i].is_array())
             {
                 expected_arg_type = ctx.get_array(expected_arg_type, 1);
@@ -5847,12 +6053,22 @@ std::optional<ty::type_id> return_statement::type_check(
             throw ty::type_error(
               loc,
               std::format(
-                "Function '{}' declared as having 'void' return type cannot have a return expression.",
+                "Function '{}' has return type 'void' and cannot return a value.",
                 env.current_function_name.value()));
         }
     }
     else
     {
+        if(expr == nullptr)
+        {
+            throw ty::type_error(
+              loc,
+              std::format(
+                "Function '{}' must return a value of type '{}'.",
+                env.current_function_name.value(),
+                ctx.to_string(env.current_function_return_type.value())));
+        }
+
         auto ret_type = expr->type_check(ctx, env);
         if(!ret_type.has_value())
         {
@@ -5866,10 +6082,10 @@ std::optional<ty::type_id> return_statement::type_check(
             throw ty::type_error(
               loc,
               std::format(
-                "Function '{}': Return expression has type '{}', expected '{}'.",
+                "Function '{}' must return a value of type '{}', got '{}'",
                 env.current_function_name.value(),
-                ctx.to_string(ret_type.value()),
-                ctx.to_string(env.current_function_return_type.value())));
+                ctx.to_string(env.current_function_return_type.value()),
+                ctx.to_string(ret_type.value())));
         }
     }
 

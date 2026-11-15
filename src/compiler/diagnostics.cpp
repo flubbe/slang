@@ -17,6 +17,57 @@
 namespace slang::compiler::diagnostics
 {
 
+namespace
+{
+
+/**
+ * Returns the line to display for a diagnostic span.
+ * If the line at `line_no` is empty and the column is 1,
+ * fall back to the previous non‑empty line (if any) and shift the column.
+ */
+std::optional<
+  std::pair<
+    std::string_view,
+    source_location>>
+  get_display_line(
+    const context& ctx,
+    const std::string& filename,
+    source_location loc)
+{
+    // Try the requested line first.
+    auto line_opt = ctx.get_line(filename, loc.line);
+    if(line_opt
+       && !(line_opt->empty()))
+    {
+        return std::make_pair(*line_opt, loc);
+    }
+
+    // If empty and we are at column 1, look at the previous line.
+    if(loc.col == 1
+       && loc.line > 1)
+    {
+        auto prev_opt = ctx.get_line(filename, loc.line - 1);
+        if(prev_opt)
+        {
+            // New column = length of previous line + 1 (point after last char)
+            source_location new_loc = loc;
+            new_loc.line -= 1;
+            new_loc.col = prev_opt->size() + 1;
+            return std::make_pair(*prev_opt, new_loc);
+        }
+    }
+
+    // Fallback – return whatever we have (may be empty).
+    if(line_opt)
+    {
+        return std::make_pair(*line_opt, loc);
+    }
+
+    return std::nullopt;
+}
+
+}    // namespace
+
 std::string_view to_string(severity s)
 {
     switch(s)
@@ -228,59 +279,67 @@ static void render_snippet(
   const source_span& span,
   const std::optional<std::string>& label)
 {
-    std::size_t line = span.location.line;
-    std::size_t col = span.location.col;
-    std::size_t length = span.length == 0 ? 1 : span.length;
-
-    std::string line_str = std::to_string(line);
-    std::size_t width = std::max<std::size_t>(line_str.length(), 2);
-
-    auto src_line = ctx.get_line(filename, line);
-    if(src_line.has_value())
+    auto src_line = get_display_line(ctx, filename, span.location);
+    if(!src_line.has_value())
     {
-        out += std::format(
-          "{:>{}} |\n",
-          "",
-          width);
-        out += std::format(
-          "{:>{}} | {}\n",
-          line_str,
-          width,
-          *src_line);
-        out += std::format(
-          "{:>{}} | ",
-          "",
-          width);
-
-        // Calculate horizontal indentation matching tabs/spaces.
-        std::size_t indent_cols =
-          col > 0
-            ? col - 1
-            : 0;
-        for(std::size_t i = 0; i < indent_cols; ++i)
-        {
-            if(i < src_line->size() && (*src_line)[i] == '\t')
-            {
-                out += '\t';
-            }
-            else
-            {
-                out += ' ';
-            }
-        }
-
-        out += std::string(length, '^');
-        if(label.has_value() && !label->empty())
-        {
-            out += " ";
-            out += *label;
-        }
-        out += "\n";
-        out += std::format(
-          "{:>{}} |\n",
-          "",
-          width);
+        return;
     }
+
+    const auto& [source_line, location] = *src_line;
+
+    const std::size_t length =
+      span.length == 0
+        ? 1
+        : span.length;
+
+    const std::string line_str = std::to_string(location.line);
+    const std::size_t width = std::max<std::size_t>(line_str.length(), 2);
+
+    out += std::format(
+      "{:>{}} |\n",
+      "",
+      width);
+    out += std::format(
+      "{:>{}} | {}\n",
+      line_str,
+      width,
+      source_line);
+    out += std::format(
+      "{:>{}} | ",
+      "",
+      width);
+
+    // Calculate horizontal indentation matching tabs/spaces.
+    const std::size_t indent_cols =
+      location.col > 0
+        ? location.col - 1
+        : 0;
+
+    for(std::size_t i = 0; i < indent_cols; ++i)
+    {
+        if(i < source_line.size()
+           && source_line[i] == '\t')
+        {
+            out += '\t';
+        }
+        else
+        {
+            out += ' ';
+        }
+    }
+
+    out.append(length, '^');
+    if(label.has_value()
+       && !label->empty())
+    {
+        out += " ";
+        out += *label;
+    }
+    out += "\n";
+    out += std::format(
+      "{:>{}} |\n",
+      "",
+      width);
 }
 
 std::string context::format(

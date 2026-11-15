@@ -19,6 +19,7 @@
 #include "shared/location.h"
 #include "shared/token.h"
 #include "attribute.h"
+#include "source_error.h"
 #include "syntax_context.h"
 #include "type.h"
 
@@ -42,6 +43,12 @@ using slang::attribs::attribute_kind;
 class semantic_error : public std::runtime_error
 {
     using std::runtime_error::runtime_error;
+};
+
+/** Name resolution error. */
+class name_error : public source_error
+{
+    using source_error::source_error;
 };
 
 /** Symbol type. */
