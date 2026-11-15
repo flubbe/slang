@@ -34,6 +34,7 @@ add_library(slang_test_frontend_core STATIC
     ../src/compiler/codegen/codegen.cpp
     ../src/compiler/collect.cpp
     ../src/compiler/constant.cpp
+    ../src/compiler/diagnostics.cpp
     ../src/compiler/format_util.cpp
     ../src/compiler/lexer.cpp
     ../src/compiler/loader.cpp
@@ -84,6 +85,9 @@ add_gtest_executable(test_package
     ../src/package.cpp
     ../src/utils.cpp
 )
+
+add_gtest_executable(test_diagnostics test_diagnostics.cpp)
+target_link_libraries(test_diagnostics PRIVATE slang_test_frontend_core)
 
 add_gtest_executable(test_lexer
     test_lexer.cpp

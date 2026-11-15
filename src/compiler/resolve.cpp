@@ -722,19 +722,28 @@ void context::resolve_imports(
         import_module_spec spec = nh.mapped();
         bool transitive = spec.origin.value != sema::symbol_info::current_module_id;
 
-        module_::module_resolver* resolver = &loader.resolve_module(
-          qualified_module_name,
-          transitive);
+        // The module loader doesn't know about source locations,
+        // so we catch errors here and add it for diagnostics.
+
+        module_::module_resolver* resolver = [&]
+        {
+            try
+            {
+                return &loader.resolve_module(
+                  qualified_module_name,
+                  transitive);
+            }
+            catch(const file_error& e)
+            {
+                throw import_error{
+                  spec.location,
+                  e.what()};
+            }
+        }();
 
         auto unqualified_name = name::unqualified_name(qualified_module_name);
 
-        sema::symbol_id module_symbol_id =
-          [this,
-           &spec,
-           transitive,
-           &import_collector,
-           &unqualified_name,
-           &qualified_module_name] -> sema::symbol_id
+        sema::symbol_id module_symbol_id = [&]
         {
             if(!transitive)
             {
@@ -745,10 +754,11 @@ void context::resolve_imports(
 
                 if(!opt_id.has_value())
                 {
-                    throw std::runtime_error(
+                    // TODO replace with something like internal_error, with source info attached.
+                    throw std::runtime_error{
                       std::format(
                         "No symbol id for non-transitive module '{}'.",
-                        qualified_module_name));
+                        qualified_module_name)};
                 }
 
                 return opt_id.value();
@@ -767,12 +777,13 @@ void context::resolve_imports(
            spec});
         if(!success)
         {
-            throw std::runtime_error(
+            // TODO replace with something like internal_error, with source info attached.
+            throw std::runtime_error{
               std::format(
                 "{}: Module '{}' was already resolved at {}.",
                 ::slang::to_string(entry->second.location),
                 qualified_module_name,
-                ::slang::to_string(spec.location)));
+                ::slang::to_string(spec.location))};
         }
 
         module_graph[qualified_module_name] = {};
@@ -829,6 +840,7 @@ void context::resolve_imports(
         // set up global scope.
         if(import_collector.push_scope("<global>", {0, 0}) != co::context::global_scope_id)
         {
+            // TODO replace with something like internal_error.
             throw std::runtime_error("Got unexpected scope id for global scope.");
         }
 
@@ -852,6 +864,7 @@ void context::resolve_imports(
             auto resolved_it = resolved_import_specs.find(qualified_module_name);
             if(resolved_it == resolved_import_specs.end())
             {
+                // TODO replace with something like internal_error.
                 throw std::runtime_error(
                   std::format(
                     "No source location for imported module {}.",

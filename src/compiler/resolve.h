@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "compiler/diagnostics.h"
+#include "compiler/source_error.h"
 #include "constant.h"
 #include "macro.h"
 #include "sema.h"
@@ -27,8 +29,16 @@ namespace slang::resolve
 {
 
 namespace const_ = slang::const_;
+namespace diag = slang::compiler::diagnostics;
 namespace ld = slang::loader;
 namespace ty = slang::typing;
+
+/** Return a default, fallback diagnostic context for contexts where none is explicitly provided. */
+inline diag::context& default_diagnostics()
+{
+    static thread_local diag::context fallback;
+    return fallback;
+}
 
 /** Module id. */
 using module_id = std::uint64_t;
@@ -41,6 +51,12 @@ struct import_module_spec
 
     /** Source location of the import. */
     source_location location;
+};
+
+/** Import resolution failure. */
+struct import_error : public source_error
+{
+    using source_error::source_error;
 };
 
 /** Name resolution context. */
@@ -57,6 +73,13 @@ class context
 
     /** Type context. */
     ty::context& type_ctx;
+
+    /** Diagnostic context reference. */
+    diag::context& diags;
+
+    /** Filename of the currently compiled file. */
+    // FIXME Should this be solved differently? (used for diagnostics reporting)
+    std::string filename;
 
     /** Module map (map `qualified_name -> module_id`). */
     std::unordered_map<std::string, module_id> module_map;
@@ -178,11 +201,15 @@ public:
       sema::env& sema_env,
       const_::env& const_env,
       macro::env& macro_env,
-      ty::context& type_ctx)
+      ty::context& type_ctx,
+      diag::context& diags = default_diagnostics(),
+      std::string filename = "")
     : sema_env{sema_env}
     , const_env{const_env}
     , macro_env{macro_env}
     , type_ctx{type_ctx}
+    , diags{diags}
+    , filename{std::move(filename)}
     {
     }
 
@@ -192,6 +219,32 @@ public:
     /** Deleted assignments. */
     context& operator=(const context&) = delete;
     context& operator=(context&&) = delete;
+
+    /** Set current filename. */
+    void set_filename(std::string file)
+    {
+        filename = std::move(file);
+    }
+
+    /** Return diagnostics context. */
+    [[nodiscard]] diag::context& get_diagnostics() const
+    {
+        return diags;
+    }
+
+    /** Return current filename. */
+    [[nodiscard]] const std::string& get_filename() const
+    {
+        return filename;
+    }
+
+    /** Return visible symbol names for suggestions. */
+    [[nodiscard]] std::vector<std::string> get_visible_symbol_names(
+      sema::scope_id scope_id,
+      std::optional<sema::symbol_type> type = std::nullopt) const
+    {
+        return sema_env.get_visible_symbol_names(scope_id, type);
+    }
 
     /**
      * Resolve a symbol.

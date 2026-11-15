@@ -112,32 +112,6 @@ static void validate_base_type(const token& tok)
 }
 
 /*
- * Exceptions.
- */
-
-syntax_error::syntax_error(
-  const token& tok,
-  const std::string& message)
-: std::runtime_error{
-    std::format(
-      "{}: {}",
-      to_string(tok.location),
-      message)}
-{
-}
-
-parser_error::parser_error(
-  const token& tok,
-  const std::string& message)
-: std::runtime_error{
-    std::format(
-      "{}: {}",
-      to_string(tok.location),
-      message)}
-{
-}
-
-/*
  * Parser implementation.
  */
 
@@ -271,7 +245,7 @@ std::unique_ptr<ast::import_statement> parser::parse_import()
         token last_token = *current_token;    // store token for error reporting
         get_next_token();
 
-        if(current_token->type == token_type::end_of_input)
+        if(current_token->type == token_type::eof)
         {
             throw syntax_error(
               last_token,
@@ -403,9 +377,11 @@ std::unique_ptr<ast::function_expression> parser::parse_definition()
 {
     source_location loc = current_token->location;
     std::unique_ptr<ast::prototype_ast> proto = parse_prototype();
-    if(current_token->type == token_type::end_of_input)
+    if(current_token->type == token_type::eof)
     {
-        throw syntax_error("Unexpected end of file.");
+        throw syntax_error(
+          current_token->location,
+          "expected function body; found EOF.");
     }
 
     // check if we have a function body.
@@ -758,9 +734,11 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
 
     get_next_token();    // skip "}"
 
-    if(current_token->type == token_type::end_of_input)
+    if(current_token->type == token_type::eof)
     {
-        throw syntax_error("Unexpected end of file.");
+        throw syntax_error(
+          current_token->location,
+          "unexpected EOF after struct definition.");
     }
 
     return std::make_unique<ast::struct_definition_expression>(
@@ -1332,7 +1310,7 @@ std::unique_ptr<ast::expression> parser::parse_identifier_expression()
                 // It is not part of the captured argument, except when the
                 // parser is looking at its own end-of-input token.
                 const std::size_t argument_end =
-                  current_token->type == token_type::end_of_input
+                  current_token->type == token_type::eof
                     ? token_index
                     : token_index - 1;
                 argument_tokens.emplace_back(
@@ -1962,7 +1940,7 @@ void parser::parse(
 
     std::vector<std::unique_ptr<ast::expression>> exprs;
     while((current_token = get_next_token()).has_value()
-          && current_token->type != token_type::end_of_input)
+          && current_token->type != token_type::eof)
     {
         // skip empty statements.
         if(current_token->s == ";")
@@ -1986,7 +1964,7 @@ std::unique_ptr<ast::expression> parser::parse_expression(
     auto expression = expression_parser.parse_expression();
 
     if(expression_parser.current_token->type
-       != token_type::end_of_input)
+       != token_type::eof)
     {
         throw syntax_error(
           *expression_parser.current_token,
@@ -2005,7 +1983,7 @@ std::unique_ptr<ast::block> parser::parse_block_expression(
     block_parser.get_next_token();    // set up current_token
     auto block = block_parser.parse_block(true);
 
-    if(block_parser.current_token->type != token_type::end_of_input)
+    if(block_parser.current_token->type != token_type::eof)
     {
         throw syntax_error(
           *block_parser.current_token,

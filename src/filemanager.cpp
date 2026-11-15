@@ -70,10 +70,10 @@ fs::path file_manager::resolve(
     {
         if(!fs::is_regular_file(path))
         {
-            throw file_error(
+            throw file_error{
               std::format(
                 "Resolved path '{}' is not a file.",
-                path.string()));
+                path.string())};
         }
         return fs::canonical(path);
     }
@@ -86,10 +86,10 @@ fs::path file_manager::resolve(
         }
     }
 
-    throw file_error(
+    throw file_error{
       std::format(
         "Unable to resolve path '{}'.",
-        path.string()));
+        path.string())};
 }
 
 std::unique_ptr<file_archive> file_manager::open(
@@ -116,10 +116,10 @@ std::unique_ptr<file_archive> file_manager::open(
 
     if(resolved_path.empty())
     {
-        throw file_error(
+        throw file_error{
           std::format(
             "Unable to find file '{}' in search paths.",
-            path.string()));
+            path.string())};
     }
 
     if(mode == open_mode::read)
@@ -136,7 +136,7 @@ std::unique_ptr<file_archive> file_manager::open(
           std::endian::little);
     }
 
-    throw std::runtime_error("Invalid file open mode.");
+    throw std::runtime_error{"Invalid file open mode."};
 }
 
 }    // namespace slang

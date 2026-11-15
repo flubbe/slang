@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "ast/ast.h"
+#include "compiler/source_error.h"
 #include "shared/token_stream.h"
 
 namespace slang
@@ -25,36 +26,45 @@ namespace slang
 
 /**
  * An error during parsing.
+ *
+ * Carries the source location and (when thrown from a token) the offending
+ * text so the diagnostics can render a precise snippet.
  */
-struct parser_error : public std::runtime_error
+struct parser_error : public slang::source_error
 {
-    using std::runtime_error::runtime_error;
+    using slang::source_error::source_error;
 
     /**
-     * Construct a syntax_error.
+     * Construct a parser_error from the offending token.
      *
      * @param tok The token where the error occured.
      * @param message The error message.
      */
     parser_error(
       const token& tok,
-      const std::string& message);
+      const std::string& message)
+    : source_error{tok.location, message, tok.s}
+    {
+    }
 };
 
 /** A syntax error. */
-struct syntax_error : public std::runtime_error
+struct syntax_error : public slang::source_error
 {
-    using std::runtime_error::runtime_error;
+    using slang::source_error::source_error;
 
     /**
-     * Construct a syntax_error.
+     * Construct a syntax_error from the offending token.
      *
      * @param tok The token where the error occured.
      * @param message The error message.
      */
     syntax_error(
       const token& tok,
-      const std::string& message);
+      const std::string& message)
+    : source_error{tok.location, message, tok.s}
+    {
+    }
 };
 
 /** Operator associativity. */
@@ -84,10 +94,10 @@ protected:
     std::optional<token> current_token{std::nullopt};
 
     /** Parser-owned token used as lookahead after the input is exhausted. */
-    inline static const token end_of_input_token{
-      "<end-of-input>",
+    inline static const token eof_token{
+      "EOF",
       {1, 1},
-      token_type::end_of_input};
+      token_type::eof};
 
     /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
     bool parsing_native{false};
@@ -114,7 +124,7 @@ protected:
      * Get the next token and store it in the token buffer `current_token`.
      *
      * At the end of the stream, stores and returns the parser-owned
-     * `end_of_input` token. This gives parsing routines a stable lookahead
+     * EOF token. This gives parsing routines a stable lookahead
      * token without adding an EOF token to the source token stream.
      *
      * @return Returns the read token, or the end-of-input token.
@@ -130,7 +140,7 @@ protected:
 
         if(token_index >= tokens->size())
         {
-            current_token = end_of_input_token;
+            current_token = eof_token;
             current_token->location = tokens->empty()
                                         ? source_location{1, 1}
                                         : tokens->back().location;

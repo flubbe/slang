@@ -14,12 +14,14 @@
 #include "compiler/cfg/simplify.h"
 #include "compiler/cfg/verify.h"
 #include "compiler/codegen/codegen.h"
+#include "compiler/diagnostics.h"
 #include "compiler/emitter.h"
 #include "compiler/lexer.h"
 #include "compiler/loader.h"
 #include "compiler/macro.h"
 #include "compiler/parser.h"
 #include "compiler/resolve.h"
+#include "compiler/source_error.h"
 #include "compiler/typing.h"
 #include "commandline.h"
 
@@ -27,6 +29,7 @@ namespace ast = slang::ast;
 namespace cfg = slang::cfg;
 namespace cg = slang::codegen;
 namespace co = slang::collect;
+namespace diag = slang::compiler::diagnostics;
 namespace ty = slang::typing;
 namespace ld = slang::loader;
 namespace rs = slang::resolve;
@@ -171,7 +174,7 @@ void compile::invoke(const std::vector<std::string>& args)
             module_path.string()));
     }
 
-    std::println("Compiling '{}'...", module_path.string());
+    std::println(stderr, "Compiling '{}'...", module_path.string());
 
     std::string input_buffer;
     {
@@ -187,101 +190,194 @@ void compile::invoke(const std::vector<std::string>& args)
         input_ar->serialize(std::as_writable_bytes(std::span(input_buffer)));
     }
 
-    slang::parser parser;
+    diag::context diag_ctx;
+    diag_ctx.register_file(module_path.string(), input_buffer);
 
-    auto tokens = slang::lexer::lex(input_buffer);
-    parser.parse(std::move(tokens));
-
-    std::shared_ptr<ast::expression> ast = parser.get_ast();
-    if(!ast)
+    auto abort_if_errors = [&]()
     {
-        std::println("No AST produced.");
-        return;
-    }
-
-    ld::context loader_ctx{file_mgr};
-    sema::env sema_env;
-    const_::env const_env;
-    macro::env macro_env;
-    ty::context type_ctx;
-    co::context co_ctx{sema_env};
-    rs::context resolver_ctx{sema_env, const_env, macro_env, type_ctx};
-    tl::context lowering_ctx{type_ctx};
-    cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
-    cfg::simplify cfg_context{codegen_ctx};
-    slang::instruction_emitter emitter{
-      sema_env,
-      const_env,
-      macro_env,
-      type_ctx,
-      codegen_ctx};
-
-    if(!evaluate_constant_subexpressions)
-    {
-        codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval);
-    }
-
-    ast->collect_names(co_ctx);
-    ast->collect_attributes(sema_env);
-
-    resolver_ctx.resolve_imports(loader_ctx);
-    ast->resolve_names(resolver_ctx);
-
-    ast->collect_macros(sema_env, macro_env);
-    do    // NOLINT(cppcoreguidelines-avoid-do-while)
-    {
-        resolver_ctx.resolve_imports(loader_ctx);
-    } while(ast->expand_macros(
-      co_ctx,
-      resolver_ctx,
-      codegen_ctx,
-      macro_env,
-      sema_env.syntax_contexts));
-
-    ast->resolve_names(resolver_ctx);
-    ast->declare_types(type_ctx, sema_env);
-    ast->define_types(type_ctx);
-    ast->declare_functions(type_ctx, sema_env);
-    ast->bind_constant_declarations(sema_env, const_env);
-    ast->type_check(type_ctx, sema_env);
-    ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
-    ast->expand_late_macros(
-      co_ctx,
-      resolver_ctx,
-      type_ctx,
-      sema_env,
-      &codegen_ctx,
-      &macro_env,
-      &sema_env.syntax_contexts);
-    ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
-
-    // code generation and verification.
-    ast->generate_code(codegen_ctx);
-    cfg::verify(codegen_ctx.get_functions());
-
-    // CFG simplification and verification.
-    if(enable_cfg)
-    {
-        if(verbose)
+        if(diag_ctx.has_errors())
         {
-            std::println("Info: Running CFG simplification.");
+            diag_ctx.emit_all(stderr, true);
+            throw diag::diagnostic_error{};
+        }
+    };
+
+    try
+    {
+        slang::parser parser;
+
+        auto tokens = slang::lexer::lex(input_buffer);
+        parser.parse(std::move(tokens));
+
+        std::shared_ptr<ast::expression> ast = parser.get_ast();
+        if(!ast)
+        {
+            std::println("No AST produced.");
+            return;
         }
 
-        cfg_context.run();
+        ld::context loader_ctx{file_mgr};
+        sema::env sema_env;
+        const_::env const_env;
+        macro::env macro_env;
+        ty::context type_ctx;
+        co::context co_ctx{sema_env};
+        rs::context resolver_ctx{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          diag_ctx,
+          module_path.string()};
+        tl::context lowering_ctx{type_ctx};
+        cg::context codegen_ctx{sema_env, const_env, lowering_ctx};
+        cfg::simplify cfg_context{codegen_ctx};
+        slang::instruction_emitter emitter{
+          sema_env,
+          const_env,
+          macro_env,
+          type_ctx,
+          codegen_ctx};
+
+        if(!evaluate_constant_subexpressions)
+        {
+            codegen_ctx.clear_flag(cg::codegen_flags::enable_const_eval);
+        }
+
+        ast->collect_names(co_ctx);
+        ast->collect_attributes(sema_env);
+
+        resolver_ctx.resolve_imports(loader_ctx);
+        ast->resolve_names(resolver_ctx);
+        abort_if_errors();
+
+        ast->collect_macros(sema_env, macro_env);
+        do    // NOLINT(cppcoreguidelines-avoid-do-while)
+        {
+            resolver_ctx.resolve_imports(loader_ctx);
+        } while(ast->expand_macros(
+          co_ctx,
+          resolver_ctx,
+          codegen_ctx,
+          macro_env,
+          sema_env.syntax_contexts));
+
+        ast->resolve_names(resolver_ctx);
+        abort_if_errors();
+
+        ast->declare_types(type_ctx, sema_env);
+        ast->define_types(type_ctx);
+        ast->declare_functions(type_ctx, sema_env);
+        ast->bind_constant_declarations(sema_env, const_env);
+        ast->type_check(type_ctx, sema_env);
+        abort_if_errors();
+
+        ast->insert_implicit_casts(type_ctx, sema_env);    // FIXME part of type_check ?
+        ast->expand_late_macros(
+          co_ctx,
+          resolver_ctx,
+          type_ctx,
+          sema_env,
+          &codegen_ctx,
+          &macro_env,
+          &sema_env.syntax_contexts);
+        ast->evaluate_constant_expressions(type_ctx, const_env);    // FIXME disable with command line option?
+
+        // code generation and verification.
+        ast->generate_code(codegen_ctx);
         cfg::verify(codegen_ctx.get_functions());
+
+        // CFG simplification and verification.
+        if(enable_cfg)
+        {
+            if(verbose)
+            {
+                std::println("Info: Running CFG simplification.");
+            }
+
+            cfg_context.run();
+            cfg::verify(codegen_ctx.get_functions());
+        }
+        else if(verbose)
+        {
+            std::println("Info: Not running CFG simplification.");
+        }
+
+        emitter.run();
+
+        slang::module_::language_module mod = emitter.to_module();
+        slang::file_write_archive write_ar{output_file};
+        write_ar & mod;
+
+        if(diag_ctx.has_warnings())
+        {
+            diag_ctx.emit_all(stderr, true);
+        }
+
+        std::println("Compilation finished. Output file: {}", output_file.string());
     }
-    else if(verbose)
+    catch(const diag::diagnostic_error&)
     {
-        std::println("Info: Not running CFG simplification.");
+        throw;
     }
+    catch(const source_error& e)
+    {
+        std::size_t length = 1;
+        if(e.text.has_value() && !e.text->empty())
+        {
+            length = e.text->size();
+        }
+        diag_ctx.report_error(
+          module_path.string(),
+          diag::source_span{e.location, length},
+          e.message);
 
-    emitter.run();
+        abort_if_errors();
+    }
+    catch(const std::exception& e)
+    {
+        // Parse the legacy "<line>:<col>: <message>" encoding out of
+        // what() for errors that do not carry a structured location.
+        // TODO Remove.
 
-    slang::module_::language_module mod = emitter.to_module();
-    slang::file_write_archive write_ar{output_file};
-    write_ar & mod;
+        std::string what = e.what();
+        std::size_t first_colon = what.find(':');
+        std::size_t second_colon =
+          (first_colon != std::string::npos)
+            ? what.find(':', first_colon + 1)
+            : std::string::npos;
 
-    std::println("Compilation finished. Output file: {}", output_file.string());
+        if(first_colon != std::string::npos
+           && second_colon != std::string::npos)
+        {
+            try
+            {
+                std::size_t line = std::stoull(what.substr(0, first_colon));
+                std::size_t col = std::stoull(what.substr(first_colon + 1, second_colon - first_colon - 1));
+                std::string msg = what.substr(second_colon + 1);
+
+                if(!msg.empty() && msg.front() == ' ')
+                {
+                    msg.erase(0, 1);
+                }
+
+                diag_ctx.report_error(
+                  module_path.string(),
+                  diag::source_span{slang::source_location{line, col}, 1},
+                  msg);
+            }
+            catch(...)
+            {
+            }
+        }
+
+        diag_ctx.report_error(
+          module_path.string(),
+          std::nullopt,
+          what);
+
+        abort_if_errors();
+    }
 }
 
 std::string compile::get_description() const

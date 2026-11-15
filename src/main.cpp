@@ -16,6 +16,7 @@
 #include <cxxopts.hpp>
 
 #include "commandline/commandline.h"
+#include "compiler/diagnostics.h"
 
 /**
  * Add a unique command to a list. If a command of the same name
@@ -114,6 +115,14 @@ int main(int argc, char* argv[])
 
         std::print("Error: Command '{}' not found.\n\n", args[0]);
 
+        return EXIT_FAILURE;
+    }
+    catch(const slang::compiler::diagnostics::diagnostic_error& e)
+    {
+        if(std::string_view{e.what()}.size() > 0)
+        {
+            std::println("{}", e.what());
+        }
         return EXIT_FAILURE;
     }
     catch(const std::runtime_error& e)

@@ -32,9 +32,9 @@ enum class token_type
     int_literal,      /** integer literal */
     fp_literal,       /** floating-point literal */
     str_literal,      /** a quoted string (including the quotes) */
-    end_of_input,     /** parser-owned end-of-input marker */
+    eof,              /** parser-owned end-of-input marker */
 
-    last = end_of_input /** Last element. */
+    last = eof /** Last element. */
 };
 
 /**

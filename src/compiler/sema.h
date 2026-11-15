@@ -303,6 +303,18 @@ struct env
       symbol_type type) const;
 
     /**
+     * Get all visible symbol names from a scope and the symbol table.
+     *
+     * @param id The scope id to search from.
+     * @param type Optional symbol type filter.
+     * @returns Returns a sorted list of unique visible symbol names.
+     */
+    [[nodiscard]]
+    std::vector<std::string> get_visible_symbol_names(
+      scope_id id,
+      std::optional<symbol_type> type = std::nullopt) const;
+
+    /**
      * Add attribute.
      *
      * @param id Symbol id to attach the attributes to.

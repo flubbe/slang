@@ -440,7 +440,8 @@ TEST(output, hello_world)
 
         ASSERT_NO_THROW(ast->collect_names(co_ctx));
         ASSERT_NO_THROW(resolver_ctx.resolve_imports(loader_ctx));
-        ASSERT_THROW(ast->resolve_names(resolver_ctx), cg::codegen_error);
+        ASSERT_NO_THROW(ast->resolve_names(resolver_ctx));
+        EXPECT_TRUE(resolver_ctx.get_diagnostics().has_errors());
     }
 }
 

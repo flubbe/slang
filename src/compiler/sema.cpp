@@ -169,6 +169,51 @@ std::optional<symbol_id> env::get_symbol_id(
     return it->first;
 }
 
+std::vector<std::string> env::get_visible_symbol_names(
+  scope_id id,
+  std::optional<symbol_type> type) const
+{
+    std::vector<std::string> names;
+
+    while(id != scope::invalid_id)
+    {
+        auto scope_it = scope_map.find(id);
+        if(scope_it == scope_map.end())
+        {
+            break;
+        }
+
+        for(const auto& [bound_id, type_map]: scope_it->second.bindings)
+        {
+            if(!type.has_value() || type_map.contains(*type))
+            {
+                names.push_back(bound_id.name);
+            }
+        }
+
+        id = scope_it->second.parent;
+    }
+
+    // Also include symbols from the symbol table matching the type.
+    for(const auto& [sym_id, info]: symbol_table)
+    {
+        if(!type.has_value() || info.type == *type)
+        {
+            names.push_back(info.name);
+            if(!info.qualified_name.empty() && info.qualified_name != info.name)
+            {
+                names.push_back(info.qualified_name);
+            }
+        }
+    }
+
+    std::ranges::sort(names);
+    auto [first, last] = std::ranges::unique(names);
+    names.erase(first, last);
+
+    return names;
+}
+
 void env::attach_attribute(
   symbol_id id,
   attribute_info attrib)
