@@ -842,6 +842,9 @@ token_stream lexer::lex(
         tokens.push_back(current_token.value());
     }
 
+    tokens.push_back(
+      token::eof(lexer.location));
+
     return token_stream{
       std::move(tokens)};
 }

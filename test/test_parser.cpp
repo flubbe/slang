@@ -53,7 +53,7 @@ TEST(parser, parse_expression_token_stream_rejects_empty_input)
 {
     EXPECT_THROW(
       slang::parser::parse_expression(slang::token_stream{}),
-      slang::syntax_error);
+      slang::parser_error);
 }
 
 TEST(parser, parse_expression_token_stream_rejects_block)

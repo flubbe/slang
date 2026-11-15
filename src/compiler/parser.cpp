@@ -63,8 +63,8 @@ static void validate_identifier_name(const token& tok)
         throw syntax_error(
           tok,
           std::format(
-            "Expected <identifier>, got '{}'.",
-            tok.s));
+            "Expected <identifier>, got {}.",
+            tok.describe()));
     }
 
     if(is_keyword(tok.s))
@@ -90,8 +90,8 @@ static void validate_base_type(const token& tok)
         throw syntax_error(
           tok,
           std::format(
-            "Expected <type>, got '{}'.",
-            tok.s));
+            "Expected <type>, got {}.",
+            tok.describe()));
     }
 
     // check built-in types.
@@ -237,8 +237,8 @@ std::unique_ptr<ast::import_statement> parser::parse_import()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected <identifier>, got '{}'.",
-                current_token->s));
+                "Expected <identifier>, got {}.",
+                current_token->describe()));
         }
         import_path.emplace_back(*current_token);
 
@@ -266,8 +266,8 @@ std::unique_ptr<ast::import_statement> parser::parse_import()
         throw syntax_error(
           last_token,
           std::format(
-            "Expected ';', got '{}'.",
-            last_token.s));
+            "Expected ';', got {}.",
+            last_token.describe()));
     }
 
     return std::make_unique<ast::import_statement>(
@@ -296,8 +296,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '(', got '{}'.",
-            current_token->s));
+            "Expected '(', got {}.",
+            current_token->describe()));
     }
 
     get_next_token();
@@ -323,8 +323,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected ':', got '{}'.",
-                current_token->s));
+                "Expected ':', got {}.",
+                current_token->describe()));
         }
 
         get_next_token();
@@ -348,8 +348,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ')', got '{}'.",
-            current_token->s));
+            "Expected ')', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip ')'
 
@@ -358,8 +358,8 @@ std::unique_ptr<ast::prototype_ast> parser::parse_prototype()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '->', got '{}'.",
-            current_token->s));
+            "Expected '->', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip '->'
 
@@ -421,8 +421,8 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ': <identifier>', got '{}'.",
-            current_token->s));
+            "Expected ': <identifier>', got {}.",
+            current_token->describe()));
     }
 
     get_next_token();
@@ -432,8 +432,8 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '<identifier>' or '[<identifier>; <length>]', got '{}'.",
-            current_token->s));
+            "Expected '<identifier>' or '[<identifier>; <length>]', got {}.",
+            current_token->describe()));
     }
 
     auto type = parse_type();
@@ -456,8 +456,8 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected ';', got '{}'.",
-                current_token->s));
+                "Expected ';', got {}.",
+                current_token->describe()));
         }
 
         return std::make_unique<ast::variable_declaration_expression>(
@@ -470,8 +470,8 @@ std::unique_ptr<ast::variable_declaration_expression> parser::parse_variable()
     throw syntax_error(
       *current_token,
       std::format(
-        "Expected '=', got '{}'.",
-        current_token->s));
+        "Expected '=', got {}.",
+        current_token->describe()));
 }
 
 // const_def ::= 'const' identifier ':' identifier '=' literal_expression
@@ -495,8 +495,8 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ': <identifier>', got '{}'.",
-            current_token->s));
+            "Expected ': <identifier>', got {}.",
+            current_token->describe()));
     }
 
     get_next_token();
@@ -505,8 +505,8 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '<identifier>', got '{}'.",
-            current_token->s));
+            "Expected '<identifier>', got {}.",
+            current_token->describe()));
     }
 
     auto type = parse_type();
@@ -515,8 +515,8 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '=' for constant initialization, got '{}'.",
-            current_token->s));
+            "Expected '=' for constant initialization, got {}.",
+            current_token->describe()));
     }
 
     get_next_token();    // skip '='.
@@ -527,8 +527,8 @@ std::unique_ptr<ast::constant_declaration_expression> parser::parse_const()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
 
     return std::make_unique<ast::constant_declaration_expression>(
@@ -549,8 +549,8 @@ std::unique_ptr<ast::type_expression> parser::parse_type(
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '<identifier>', got '{}'.",
-            current_token->s));
+            "Expected '<identifier>', got {}.",
+            current_token->describe()));
     }
 
     std::vector<token> components;
@@ -561,8 +561,8 @@ std::unique_ptr<ast::type_expression> parser::parse_type(
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected '<identifier>', got '{}'.",
-                current_token->s));
+                "Expected '<identifier>', got {}.",
+                current_token->describe()));
         }
 
         components.emplace_back(*current_token);
@@ -589,8 +589,8 @@ std::unique_ptr<ast::type_expression> parser::parse_type(
                 throw syntax_error(
                   *current_token,
                   std::format(
-                    "Expected ']', got '{}'.",
-                    current_token->s));
+                    "Expected ']', got {}.",
+                    current_token->describe()));
             }
             get_next_token();
         }
@@ -637,8 +637,8 @@ std::unique_ptr<ast::array_initializer_expression> parser::parse_array_initializ
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected ',' or ']', got '{}'.",
-                current_token->s));
+                "Expected ',' or ']', got {}.",
+                current_token->describe()));
         }
     }
 
@@ -658,8 +658,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '<identifier>', got '{}'.",
-            current_token->s));
+            "Expected '<identifier>', got {}.",
+            current_token->describe()));
     }
 
     token name = *current_token;
@@ -671,8 +671,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '{{', got '{}'.",
-            current_token->s));
+            "Expected '{{', got {}.",
+            current_token->describe()));
     }
 
     get_next_token();    // skip '{'.
@@ -691,8 +691,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
                 throw syntax_error(
                   *current_token,
                   std::format(
-                    "Expected ': <identifier>', got '{}'.",
-                    current_token->s));
+                    "Expected ': <identifier>', got {}.",
+                    current_token->describe()));
             }
             get_next_token();    // skip ':'.
 
@@ -702,8 +702,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
                 throw syntax_error(
                   *current_token,
                   std::format(
-                    "Expected '<identifier>' or '[<identifier>]', got '{}'.",
-                    current_token->s));
+                    "Expected '<identifier>' or '[<identifier>]', got {}.",
+                    current_token->describe()));
             }
 
             auto member_type = parse_type();
@@ -725,8 +725,8 @@ std::unique_ptr<ast::struct_definition_expression> parser::parse_struct()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected '}}' or ',', got '{}'.",
-                current_token->s));
+                "Expected '}}' or ',', got {}.",
+                current_token->describe()));
         }
 
         get_next_token();    // skip ','.
@@ -759,8 +759,8 @@ std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '[', got '{}'.",
-            current_token->s));
+            "Expected '[', got {}.",
+            current_token->describe()));
     }
     get_next_token();
 
@@ -770,8 +770,8 @@ std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
         throw syntax_error(
           name,
           std::format(
-            "Expected <identifier> as directive name, got '{}'.",
-            name.s));
+            "Expected <identifier> as directive name, got {}.",
+            name.describe()));
     }
     get_next_token();
 
@@ -825,8 +825,8 @@ std::pair<token, std::vector<std::pair<token, token>>> parser::get_directive()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ']', got '{}'.",
-            current_token->s));
+            "Expected ']', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip ']'
 
@@ -847,7 +847,11 @@ std::unique_ptr<ast::block> parser::parse_block(bool skip_closing_brace)
     source_location loc = current_token->location;
     if(current_token->s != "{")
     {
-        throw syntax_error(*current_token, std::format("Expected '{{', got '{}'.", current_token->s));
+        throw syntax_error(
+          *current_token,
+          std::format(
+            "Expected '{{', got {}.",
+            current_token->describe()));
     }
     get_next_token();
 
@@ -952,8 +956,8 @@ std::unique_ptr<ast::expression> parser::parse_block_stmt()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
     get_next_token();
 
@@ -991,8 +995,8 @@ std::unique_ptr<ast::expression> parser::parse_primary()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected <primary-expression>, got '{}'.",
-            current_token->s));
+            "Expected <primary-expression>, got {}.",
+            current_token->describe()));
     }
 
     return expr;
@@ -1199,8 +1203,8 @@ std::unique_ptr<ast::expression> parser::parse_unary(bool ignore_type_cast)
                     throw syntax_error(
                       *current_token,
                       std::format(
-                        "Expected ']', got '{}'.",
-                        current_token->s));
+                        "Expected ']', got {}.",
+                        current_token->describe()));
                 }
                 get_next_token();    // skip "]"
 
@@ -1252,8 +1256,8 @@ std::unique_ptr<ast::expression> parser::parse_new()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '[', got '{}'.",
-            current_token->s));
+            "Expected '[', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip "["
 
@@ -1264,8 +1268,8 @@ std::unique_ptr<ast::expression> parser::parse_new()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ']', got '{}'.",
-            current_token->s));
+            "Expected ']', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip "]"
 
@@ -1526,8 +1530,8 @@ std::unique_ptr<ast::literal_expression> parser::parse_literal_expression()
         throw syntax_error(
           tok,
           std::format(
-            "Expected <literal>, got '{}'.",
-            tok.s));
+            "Expected <literal>, got {}.",
+            tok.describe()));
     }
 
     return std::make_unique<ast::literal_expression>(
@@ -1568,8 +1572,8 @@ std::unique_ptr<ast::expression> parser::parse_type_cast_expression(
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected <identifier>, got '{}'.",
-            current_token->s));
+            "Expected <identifier>, got {}.",
+            current_token->describe()));
     }
 
     return std::make_unique<ast::type_cast_expression>(
@@ -1588,8 +1592,8 @@ std::unique_ptr<ast::if_statement> parser::parse_if()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '(', got '{}'.",
-            current_token->s));
+            "Expected '(', got {}.",
+            current_token->describe()));
     }
     std::unique_ptr<ast::expression> condition = parse_expression();    // '(' expression ')'
     std::unique_ptr<ast::expression> if_block = parse_block();
@@ -1624,8 +1628,8 @@ std::unique_ptr<ast::expression> parser::parse_while()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '(', got '{}'.",
-            current_token->s));
+            "Expected '(', got {}.",
+            current_token->describe()));
     }
     std::unique_ptr<ast::expression> condition = parse_expression();    // '(' expression ')'
     std::unique_ptr<ast::expression> while_block = parse_block();
@@ -1645,8 +1649,8 @@ std::unique_ptr<ast::expression> parser::parse_break()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
     return std::make_unique<ast::break_statement>(loc);
 }
@@ -1660,8 +1664,8 @@ std::unique_ptr<ast::expression> parser::parse_continue()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
     return std::make_unique<ast::continue_statement>(loc);
 }
@@ -1682,8 +1686,8 @@ std::unique_ptr<ast::return_statement> parser::parse_return()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
 
     return std::make_unique<ast::return_statement>(
@@ -1712,8 +1716,8 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '{{', got '{}'.",
-            current_token->s));
+            "Expected '{{', got {}.",
+            current_token->describe()));
     }
     get_next_token();
 
@@ -1728,8 +1732,8 @@ std::unique_ptr<ast::macro_expression> parser::parse_macro()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '}}', got '{}'.",
-            current_token->s));
+            "Expected '}}', got {}.",
+            current_token->describe()));
     }
 
     // don't skip closing brace, as this is done by the caller.
@@ -1757,8 +1761,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected <macro-identifier>, got '{}'.",
-                current_token->s));
+                "Expected <macro-identifier>, got {}.",
+                current_token->describe()));
         }
         token arg_name = *current_token;
         get_next_token();
@@ -1768,8 +1772,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected ':', got '{}'.",
-                current_token->s));
+                "Expected ':', got {}.",
+                current_token->describe()));
         }
         get_next_token();
 
@@ -1778,8 +1782,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected 'expr', got '{}'.",
-                current_token->s));
+                "Expected 'expr', got {}.",
+                current_token->describe()));
         }
         token type_name = *current_token;
         get_next_token();
@@ -1797,8 +1801,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
                 throw syntax_error(
                   *current_token,
                   std::format(
-                    "Expected ')', got '{}'.",
-                    current_token->s));
+                    "Expected ')', got {}.",
+                    current_token->describe()));
             }
 
             break;
@@ -1820,8 +1824,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
             throw syntax_error(
               *current_token,
               std::format(
-                "Expected ',' or ')', got '{}'.",
-                current_token->s));
+                "Expected ',' or ')', got {}.",
+                current_token->describe()));
         }
     }
 
@@ -1835,8 +1839,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected '=>', got '{}'.",
-            current_token->s));
+            "Expected '=>', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip "=>".
 
@@ -1846,8 +1850,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
         throw syntax_error(
           body_opening_delimiter,
           std::format(
-            "Expected '{{', got '{}'.",
-            body_opening_delimiter.s));
+            "Expected '{{', got {}.",
+            body_opening_delimiter.describe()));
     }
 
     const std::size_t body_opening_index = token_index - 1;
@@ -1877,8 +1881,8 @@ std::unique_ptr<ast::macro_rule> parser::parse_macro_rule()
         throw syntax_error(
           *current_token,
           std::format(
-            "Expected ';', got '{}'.",
-            current_token->s));
+            "Expected ';', got {}.",
+            current_token->describe()));
     }
     get_next_token();    // skip ";".
 

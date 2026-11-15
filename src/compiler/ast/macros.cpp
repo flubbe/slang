@@ -50,6 +50,8 @@ std::unique_ptr<block> parse_macro_rule_body(const macro_rule& branch)
     tokens.insert(tokens.end(), body->data().begin(), body->data().end());
     tokens.push_back(closing.value());
 
+    append_eof(tokens);
+
     return parser::parse_block_expression(token_stream{std::move(tokens)});
 }
 
@@ -89,6 +91,9 @@ bool expression::expand_macros(
           syntax_contexts,
           expr->get_location(),
           expr->get_argument_separators());
+
+        append_eof(expanded_tokens);
+
         expr->set_expansion(
           parser::parse_block_expression(std::move(expanded_tokens)));
         return true;

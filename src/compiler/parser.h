@@ -93,12 +93,6 @@ protected:
     /** Token buffer. */
     std::optional<token> current_token{std::nullopt};
 
-    /** Parser-owned token used as lookahead after the input is exhausted. */
-    inline static const token eof_token{
-      "EOF",
-      {1, 1},
-      token_type::eof};
-
     /** Whether we are parsing a native function declaration. Enables untyped array parsing. */
     bool parsing_native{false};
 
@@ -130,7 +124,7 @@ protected:
      * @return Returns the read token, or the end-of-input token.
      * @throws A `parser_error` if no token stream is set.
      */
-    std::optional<token> get_next_token()
+    token get_next_token()
     {
         if(!tokens.has_value())
         {
@@ -138,17 +132,28 @@ protected:
               "No token stream set for parsing."};
         }
 
-        if(token_index >= tokens->size())
+        if(tokens->empty()
+           || tokens->back().type != token_type::eof)
         {
-            current_token = eof_token;
-            current_token->location = tokens->empty()
-                                        ? source_location{1, 1}
-                                        : tokens->back().location;
-            return current_token;
+            throw parser_error{
+              "Token stream does not end with EOF."};
         }
 
-        current_token = (*tokens)[token_index++];
-        return current_token;
+        if(token_index < tokens->size())
+        {
+            current_token = (*tokens)[token_index++];
+
+            if(current_token->type == token_type::eof)
+            {
+                --token_index;
+            }
+        }
+        else
+        {
+            current_token = tokens->back();
+        }
+
+        return *current_token;
     }
 
     /**

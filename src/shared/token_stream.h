@@ -182,4 +182,22 @@ archive& operator&(
   archive& ar,
   token_stream& ts);
 
+/**
+ * Append an EOF token to a token-stream-like container.
+ *
+ * @param stream The stream.
+ */
+template<typename T>
+    requires requires(T& stream) {
+        stream.back();
+        stream.push_back(token{});
+    }
+void append_eof(
+  T& stream)
+{
+    auto eof_location = stream.back().location;
+    eof_location.col += stream.back().s.size();
+    stream.push_back(token::eof(eof_location));
+}
+
 }    // namespace slang

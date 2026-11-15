@@ -194,17 +194,21 @@ token_stream expand_format_builtin(
           fmt_tok.location);
     }
 
+    std::vector<token> result;
+
     // String only: no placeholders. Emit the format string literal as‑is.
     if(placeholders.empty())
     {
-        return token_stream{std::vector<token>{fmt_tok}};
+
+        result.emplace_back(fmt_tok);
+        append_eof(result);
+
+        return token_stream{std::move(result)};
     }
 
     /*
      * 4. Build the left‑nested std::string_concat(...) chain.
      */
-
-    std::vector<token> result;
 
     // last_fragment_end tracks the offset into `fmt` after the previous
     // placeholder. `fmt` is the unquoted format string, so the leading
@@ -298,6 +302,8 @@ token_stream expand_format_builtin(
           {string_literal_token(fragment, call_loc)},
           call_loc);
     }
+
+    append_eof(result);
 
     return token_stream{std::move(result)};
 }
