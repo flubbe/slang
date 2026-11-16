@@ -44,6 +44,13 @@ struct source_error : public std::runtime_error
      */
     std::string message{};
 
+    /**
+     * An optional "did you mean" suggestion, e.g. the closest matching
+     * identifier when the offending name is a typo. Recovered by the
+     * diagnostic reporting site and emitted as a help sub-diagnostic.
+     */
+    std::optional<std::string> did_you_mean{};
+
     /** Construct from a message only; the location defaults to the file start. */
     explicit source_error(
       const std::string& m)

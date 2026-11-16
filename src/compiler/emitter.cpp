@@ -636,8 +636,19 @@ void instruction_emitter::collect_imports()
             continue;
         }
 
+        std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
+        if(!type_id.has_value())
+        {
+            // FIXME emitter_error?
+            throw ty::type_error{
+              symbol_info.loc,
+              std::format(
+                "Type '{}' not found.",
+                symbol_info.name)};
+        }
+
         const auto& type_info = type_ctx.get_type_info(
-          type_ctx.get_type(symbol_info.name));
+          type_id.value());
 
         imports.intern_struct(
           symbol_info.qualified_name);
@@ -2051,8 +2062,19 @@ void instruction_emitter::run()
             continue;
         }
 
+        std::optional<ty::type_id> type_id = type_ctx.get_type(symbol_info.name);
+        if(!type_id.has_value())
+        {
+            // FIXME emitter_error?
+            throw ty::type_error{
+              symbol_info.loc,
+              std::format(
+                "Type '{}' not found.",
+                symbol_info.name)};
+        }
+
         const auto& type_info = type_ctx.get_type_info(
-          type_ctx.get_type(symbol_info.name));
+          type_id.value());
 
         const auto& struct_info = std::get<ty::struct_info>(type_info.data);
         exports.add_struct(*this, struct_info);

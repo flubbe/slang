@@ -149,9 +149,6 @@ struct type_info
 /** Type system context. */
 class context
 {
-    /** Diagnostic context pointer. */
-    diag::context& diags;
-
     /** Next type id. */
     std::size_t next_type_id = 0;
 
@@ -193,9 +190,7 @@ class context
 
 public:
     /** Create a typing context. */
-    explicit context(
-      diag::context& diags = default_diagnostics())
-    : diags{diags}
+    context()
     {
         initialize_builtins();
     }
@@ -246,12 +241,6 @@ public:
      * @param struct_type_id Type id of the struct.
      */
     void seal_struct(type_id struct_type_id);
-
-    /** Return the diagnostics context. */
-    diag::context& get_diagnostics()
-    {
-        return diags;
-    }
 
     /**
      * Get the struct info.
@@ -305,10 +294,9 @@ public:
      * Get the id of an existing type.
      *
      * @param name The type's name.
-     * @returns Returns the type id.
-     * @throws Throws a `type_error` if the type is not known.
+     * @returns Returns the type id, or `std::nullopt` if the type is not known.
      */
-    type_id get_type(const std::string& name) const;
+    std::optional<type_id> get_type(const std::string& name) const;
 
     /**
      * Get the full type info for an existing type.

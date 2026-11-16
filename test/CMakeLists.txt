@@ -301,6 +301,14 @@ add_jit_compile_test("slang const export" TRUE test/test_const_export)
 add_compile_exec_test("slang const import" TRUE test/test_const_import)
 add_jit_compile_test("slang const import" TRUE test/test_const_import)
 
+add_compile_fail_test("slang const type fail" FALSE test/test_const_type_fail)
+
+add_my_test("slang type typo suggest" slang compile test/test_type_typo_fail)
+set_tests_properties("slang type typo suggest"
+    PROPERTIES
+    WILL_FAIL TRUE
+    PASS_REGULAR_EXPRESSION "did you mean `custom_type`")
+
 add_compile_exec_test("slang conversions" TRUE test/test_conversions)
 add_jit_compile_test("slang conversions" TRUE test/test_conversions)
 
@@ -588,5 +596,15 @@ set_tests_properties("check formatting (examples)" PROPERTIES WORKING_DIRECTORY 
 add_test(NAME "check formatting (src)" COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check src)
 set_tests_properties("check formatting (src)" PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-add_test(NAME "check formatting (test)" COMMAND ${CMAKE_BINARY_DIR}/slang fmt --check test)
+file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test/*.sl"
+)
+
+# Exclude tests that are expected to fail parsing/formatting.
+list(FILTER TEST_FILES EXCLUDE REGEX "/test/fail/")
+
+add_test(
+    NAME "check formatting (test)"
+    COMMAND slang fmt --check ${TEST_FILES}
+)
 set_tests_properties("check formatting (test)" PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)

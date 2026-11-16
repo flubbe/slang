@@ -164,13 +164,13 @@ void context::import_function(
 
     // TODO Only verify and load types?
 
-    resolve_imported_type(
+    resolve_imported_type(    // FIXME returns `false` if resolution failed. what do report to diagnostics? no source location?
       desc.signature.return_type,
       module_name);
 
     for(const auto& arg_type: desc.signature.arg_types)
     {
-        resolve_imported_type(
+        resolve_imported_type(    // FIXME returns `false` if resolution failed. what do report to diagnostics? no source location?
           arg_type,
           module_name);
     }
@@ -212,7 +212,7 @@ void context::import_macro(
       definition_context);
 }
 
-ty::type_id context::resolve_imported_type(
+std::optional<ty::type_id> context::resolve_imported_type(
   const module_::variable_type& t,
   const std::string& module_name)
 {
@@ -266,23 +266,38 @@ void context::import_type(
 
     for(const auto& m: desc.member_types)
     {
-        bool has_type = type_ctx.has_type(m.second.base_type.base_type());
-        bool is_builtin = has_type
-                          && type_ctx.is_builtin(
-                            type_ctx.get_type(
-                              m.second.base_type.base_type()));
+        std::optional<ty::type_id> type_id =
+          type_ctx.get_type(
+            m.second.base_type.base_type());
 
-        ty::type_id member_type_id =
+        bool is_builtin =
+          type_id.has_value()
+          && type_ctx.is_builtin(type_id.value());
+
+        std::optional<ty::type_id> member_type_id =
           is_builtin
-            ? type_ctx.get_type(m.second.base_type.base_type())
+            ? type_id
             : resolve_imported_type(
                 m.second.base_type,
                 module_name);
 
-        type_ctx.add_field(
-          struct_type_id,
-          m.first,
-          member_type_id);
+        if(!member_type_id.has_value())
+        {
+            get_diagnostics().report_error(
+                std::nullopt,
+                std::nullopt,
+                std::format("unknown type '{}' in struct '{}' of imported module '{}'",
+                             m.second.base_type.base_type(),
+                             symbol.name,
+                             module_name));
+        }
+        else
+        {
+            type_ctx.add_field(
+              struct_type_id,
+              m.first,
+              member_type_id.value());
+        }
     }
 
     type_ctx.seal_struct(struct_type_id);

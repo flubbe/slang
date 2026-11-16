@@ -387,7 +387,7 @@ bool context::has_type(const std::string& name) const
     return it != type_info_map.end();
 }
 
-type_id context::get_type(const std::string& name) const
+std::optional<type_id> context::get_type(const std::string& name) const
 {
     bool is_name_qualified = name.contains("::");
 
@@ -409,10 +409,7 @@ type_id context::get_type(const std::string& name) const
         return it->first;
     }
 
-    throw type_error(
-      std::format(
-        "Type '{}' not found.",
-        name));
+    return std::nullopt;
 }
 
 type_info context::get_type_info(type_id id) const

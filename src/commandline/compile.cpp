@@ -220,7 +220,7 @@ void compile::invoke(const std::vector<std::string>& args)
         sema::env sema_env;
         const_::env const_env;
         macro::env macro_env;
-        ty::context type_ctx{diag_ctx};
+        ty::context type_ctx;
         co::context co_ctx{sema_env};
         rs::context resolver_ctx{
           sema_env,
@@ -323,14 +323,23 @@ void compile::invoke(const std::vector<std::string>& args)
     catch(const source_error& e)
     {
         std::size_t length = 1;
-        if(e.text.has_value() && !e.text->empty())
+        if(e.text.has_value()
+           && !e.text->empty())
         {
             length = e.text->size();
         }
-        diag_ctx.report_error(
+
+        auto& d = diag_ctx.report_error(
           module_path.string(),
           diag::source_span{e.location, length},
           e.message);
+        if(e.did_you_mean.has_value())
+        {
+            d.with_help(
+              std::format(
+                "did you mean `{}`?",
+                *e.did_you_mean));
+        }
 
         abort_if_errors();
     }

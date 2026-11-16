@@ -130,9 +130,9 @@ class context
      *
      * @param t The type to resolve.
      * @param module_name The module name of the type reference.
-     * @returns Returns the type id of the resolved type.
+     * @returns Returns the resolved type id, or `std::nullopt` if resolution failed.
      */
-    ty::type_id resolve_imported_type(
+    std::optional<ty::type_id> resolve_imported_type(
       const module_::variable_type& t,
       const std::string& module_name);
 
